@@ -1,0 +1,25 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-pyright.pyright",
+    "charliermarsh.ruff",
+    "the0807.uv-toolkit",
+
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+    "EditorConfig.EditorConfig",
+
+    "github.vscode-pull-request-github",
+    "github.vscode-github-actions",
+
+    "davidanson.vscode-markdownlint",
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.pylint",
+    "ms-python.flake8",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "esbenp.prettier-vscode"
+  ]
+}

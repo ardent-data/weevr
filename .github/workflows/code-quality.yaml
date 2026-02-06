@@ -1,0 +1,41 @@
+name: Python CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin Python deterministically using your repo’s .python-version
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      # Install uv (current major is v7) and enable uv cache
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.28"
+          enable-cache: true
+
+      # Ensure the lock file matches and dev tools are installed deterministically
+      - name: Sync (locked)
+        run: uv sync --locked --dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format (check)
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run pyright .
+
+      - name: Tests
+        run: uv run pytest
