@@ -1,0 +1,58 @@
+[project]
+name = "weevr"
+version = "0.1.0"
+description = "Metadata-driven execution engine for Fabric/Spark data pipelines."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Pierre LaFromboise", email = "44212292+DataInsightPro@users.noreply.github.com" }
+]
+requires-python = ">=3.11,<3.12"
+dependencies = []
+
+[project.scripts]
+weevr = "weevr:main"
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["weevr"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+
+include = ["src", "tests"]
+exclude = ["**/__pycache__", ".venv", ".git", ".github"]
+
+venvPath = "."
+venv = ".venv"
+
+reportMissingTypeStubs = false
+reportMissingImports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
