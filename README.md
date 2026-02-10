@@ -1,94 +1,159 @@
 # weevr
 
-**weevr** is a metadata‑driven execution framework designed to translate declarative intent into repeatable, inspectable data processing workflows.
+**weevr** is a configuration-driven data shaping framework for Spark workloads in Microsoft Fabric.
 
-At a high level, weevr sits between *configuration* and *execution*. Rather than writing procedural code to orchestrate data movement and transformation, users describe **what** should happen using structured configuration. weevr then interprets that intent and coordinates the underlying execution engine to carry it out.
+Its purpose is to make PySpark-based data engineering **repeatable, predictable, optimized, and governable** by separating *declarative data shaping intent* from *execution mechanics*.
 
-The initial focus of weevr is on Spark‑based data platforms (such as Microsoft Fabric), but the core ideas are intentionally platform‑agnostic.
+Users declare **what** should happen to data in YAML configuration. A stable PySpark engine interprets that intent and executes optimized data transformations using Spark's native DataFrame APIs — without exposing implementation complexity to the user.
 
----
+weevr does not replace Spark. Spark remains the execution engine. weevr provides a disciplined, Fabric-native layer that consistently applies configuration-driven patterns to shape and move data.
 
-## Core ideas
+## Core principles
 
-### Declarative over procedural
+### Declarative intent, imperative execution
 
-weevr does not generate code from configuration. Instead, configuration is **read at runtime** and drives execution decisions directly. The framework acts as a thin translation layer that maps declarative intent to concrete execution steps.
+Configuration is **read at runtime** and drives execution directly. weevr does not generate code from YAML — it interprets configuration and orchestrates Spark DataFrame operations.
 
 This approach emphasizes:
 
 * Predictability over flexibility
-* Explicit structure over ad‑hoc logic
+* Explicit structure over ad-hoc logic
 * Inspectable artifacts over opaque execution
 
----
+### Spark-native, Fabric-aligned
 
-### Execution, not abstraction
+All execution uses Spark DataFrame APIs inside Fabric's runtime. No external systems, runtimes, or connectivity assumptions are introduced. weevr leverages what Spark already does well.
 
-weevr is not a replacement for Spark or a re‑implementation of data processing primitives. It intentionally relies on the native execution engine for all data movement, transformation, and optimization.
+### Deterministic and idempotent
 
-The role of weevr is to:
+Given the same configuration and inputs, execution behavior is consistent and safe to rerun. Idempotency guarantees are mode-dependent (overwrite, append, merge).
 
-* Interpret configuration
-* Determine execution order
-* Enforce consistency and conventions
-* Orchestrate calls into the underlying engine
+### Opinionated defaults, configurable overrides
 
----
+weevr provides safe, well-reasoned defaults for null handling, join behavior, failure semantics, and schema management. Authors can override any default when they have specific requirements.
 
-### Planned conceptual model
+### Configuration reuse through inheritance
 
-While the implementation is still evolving, weevr is built around a small set of core concepts:
+Repeatable patterns are defined once at higher levels (loom, weave) and inherited by threads. This reduces development effort and enforces standards across a project.
 
-* **Threads** – individual, focused units of work
-* **Weaves** – ordered compositions of threads
-* **Looms** – execution contexts that coordinate one or more weaves
-* **Projects** – the boundary for configuration, artifacts, and execution state
+## Core abstractions
 
-These concepts exist to provide a shared vocabulary for reasoning about execution without binding users to low‑level implementation details.
+weevr is built around a small set of core concepts:
 
----
+* **Thread** — The smallest executable unit. Defines the flow of data from one or more sources into a single authoritative target (Lakehouse table, file output, etc.). Encapsulates sources, transformations, validations, write behavior, and audit columns.
 
-### Inspectable execution
+* **Weave** — A flat collection of threads that form a dependency graph (DAG). Represents a subject area or processing stage. Independent threads within a weave execute in parallel on a shared SparkSession.
 
-A key design goal of weevr is that execution should leave behind **structured, inspectable artifacts**:
+* **Loom** — A deployable execution unit that packages one or more weaves. Defines execution order between weaves and acts as the primary unit of versioning and release.
 
-* Execution manifests
-* Ordering and dependency resolution
-* Materialized configuration snapshots
+* **Project** — The logical solution container that groups related looms. A conceptual boundary for shared configuration (audit templates, parameter files, custom helpers/UDFs).
+
+These concepts provide a shared vocabulary for reasoning about execution without binding users to low-level implementation details.
+
+## Deployment model
+
+weevr's core engine will be distributed as a **public open-source Python library** hosted on GitHub and published to PyPI:
+
+```bash
+pip install weevr
+```
+
+```python
+import weevr
+
+ctx = weevr.Context(
+    spark=spark,
+    params={"run_date": "2025-01-15"},
+    param_file="params/prod.yaml"
+)
+
+result = ctx.run("looms/nightly.yaml")
+```
+
+The engine contains no project-specific configuration — it is a general-purpose framework.
+
+**Integration projects** are separate Git repositories containing:
+
+* YAML configuration files (threads, weaves, looms, parameters)
+* Fabric Notebooks or Spark Job Definitions that import `weevr` and point it at configurations
+* Project-specific UDFs, custom helper functions, and Python modules
+
+This separation allows the engine to evolve independently while teams own their integration projects without coupling to engine development.
+
+## Inspectable execution
+
+A key design goal of weevr is that execution leaves behind **structured, inspectable artifacts**:
+
+* Structured telemetry with row counts, durations, and validation outcomes
+* Execution traces showing operation order and data flow
+* Configuration snapshots with resolved parameters
 * Deterministic paths and outputs
 
-This makes it possible to understand *what happened* and *why* without reverse‑engineering runtime behavior.
-
----
+This makes it possible to understand *what happened* and *why* without reverse-engineering runtime behavior.
 
 ## Status
 
-weevr is currently in an **early scaffolding and design phase**. The repository focuses on:
+weevr is currently in an **early planning and design phase** (Phase 0). The repository focuses on:
 
-* Project structure and tooling
+* Foundational project structure and tooling
 * CI, release, and contribution workflows
-* Clarifying core concepts and boundaries
+* Technical specification and architectural design
+* Clarifying core concepts, boundaries, and capabilities
 
-Functional capabilities will be introduced incrementally once the foundational design is settled.
+Functional capabilities will be introduced incrementally through a phased approach:
 
----
+* **Phase 0** — Proof of concept with core thread/weave/loom execution, basic transformations, and configuration inheritance
+* **Phase 1** — Transform depth with analytical operations, advanced merge patterns, and data quality
+* **Phase 2** — Extensibility with UDF/helper registries, circuit breakers, and governance features
+* **Phase 3** — Maturity with dry-run modes, developer tooling, and community integrations
 
-## Non‑goals (by design)
+See the technical specification for complete phasing details.
 
-* weevr is not a low‑code or no‑code platform
-* weevr is not a visual workflow designer
-* weevr does not attempt to hide the underlying execution engine
+## Non-goals
 
-The intent is to reduce orchestration friction, not to obscure how data is actually processed.
+By design, weevr is intentionally **not**:
 
----
+* A low-code or no-code platform
+* A visual workflow designer
+* A replacement for Spark or re-implementation of data processing primitives
+* An abstraction layer that hides the underlying execution engine
+
+The intent is to reduce orchestration friction and enforce repeatable patterns, not to obscure how data is actually processed.
+
+## Key capabilities (planned)
+
+weevr is designed to support:
+
+* **Declarative transformation pipelines** — Filters, joins, aggregates, window functions, pivots, dedup, and more expressed in YAML
+* **Expression language** — Spark SQL expressions users already know, plus helper functions for common patterns (key generation, temporal logic, change detection)
+* **Flexible write modes** — Overwrite, append, merge (upsert), and insert-only with configurable match/update/delete behavior
+* **Incremental processing** — Watermark-based and parameter-driven incremental loads, plus CDC support
+* **Validation and data quality** — Configurable severity levels (info, warn, error, fatal) with row quarantine
+* **Configuration inheritance** — Define patterns once at loom or weave level, cascade down to threads
+* **Variable injection** — Environment-agnostic configs with parameter files and runtime overrides
+* **Observability** — Structured logging, row count telemetry, execution traces, and progress tracking
+* **Null-safe defaults** — Opinionated defaults for join semantics and key handling that prevent common Spark pitfalls
+* **Extensibility** — Project-level UDFs and custom helper functions
+
+See the technical specification for complete capability details.
+
+## Target audience
+
+weevr is designed for a broad audience:
+
+* Analysts who know SQL but not Spark
+* Data engineers who want config-driven consistency
+* Teams building medallion architectures in Fabric
+* Anyone seeking repeatable, governed data transformation patterns
+
+The YAML configuration uses familiar terminology and hides Spark complexity, while the expression language leverages Spark SQL so users can apply what they already know.
 
 ## Contributing
 
 See `CONTRIBUTING.md` for development setup, workflow expectations, and pull request conventions.
 
----
+Contributions are welcome once the foundational design is settled.
 
 ## License
 
-This project is licensed under the terms of the `LICENSE` file in this repository.
+This project is licensed under the terms specified in the `LICENSE` file in this repository.
