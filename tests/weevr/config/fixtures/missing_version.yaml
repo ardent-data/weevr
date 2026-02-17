@@ -1,0 +1,4 @@
+sources:
+  customers: table://lakehouse.dim_customer
+target:
+  table: fact_orders
