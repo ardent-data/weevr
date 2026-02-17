@@ -245,3 +245,185 @@ def validate_params(
                     f"Parameter '{param_name}' expected list of strings",
                     config_key=param_name,
                 )
+
+
+def resolve_logical_name(name: str, config_type: str, base_path: Path) -> Path:
+    """Resolve a logical config name to a file path.
+
+    Args:
+        name: Logical name (e.g., 'dimensions.dim_customer')
+        config_type: Type of config ('thread', 'weave', 'loom')
+        base_path: Project root directory
+
+    Returns:
+        Resolved absolute path to config file
+
+    Examples:
+        - 'dimensions.dim_customer' (thread) -> base_path/threads/dimensions/dim_customer.yaml
+        - 'dimensions' (weave) -> base_path/weaves/dimensions.yaml
+        - 'nightly' (loom) -> base_path/looms/nightly.yaml
+    """
+    # Replace dots with path separators
+    path_parts = name.split(".")
+
+    # Determine directory prefix
+    if config_type == "thread":
+        directory = "threads"
+    elif config_type == "weave":
+        directory = "weaves"
+    elif config_type == "loom":
+        directory = "looms"
+    else:
+        directory = ""
+
+    # Build path
+    path = base_path / directory
+    for part in path_parts:
+        path = path / part
+
+    # Add .yaml extension
+    path = path.with_suffix(".yaml")
+
+    return path.resolve()
+
+
+def resolve_references(
+    config: dict[str, Any],
+    config_type: str,
+    base_path: Path,
+    runtime_params: dict[str, Any] | None = None,
+    param_file: Path | None = None,
+    visited: set[str] | None = None,
+) -> dict[str, Any]:
+    """Resolve references to other config files.
+
+    Recursively loads referenced configs (threads in weaves, weaves in looms)
+    with circular reference detection.
+
+    Args:
+        config: Config dict to resolve references in
+        config_type: Type of this config
+        base_path: Project root directory
+        runtime_params: Runtime parameters to pass to child configs
+        param_file: Parameter file to pass to child configs
+        visited: Set of already-visited file paths (for cycle detection)
+
+    Returns:
+        Config dict with resolved child configs attached under
+        '_resolved_threads' or '_resolved_weaves' keys
+
+    Raises:
+        ReferenceResolutionError: If referenced file not found or circular reference
+    """
+    from weevr.config.parser import detect_config_type, extract_config_version, parse_yaml, validate_config_version
+    from weevr.config.schema import validate_schema
+    from weevr.errors import ReferenceResolutionError
+
+    if visited is None:
+        visited = set()
+
+    result = config.copy()
+
+    # Resolve weaves in loom
+    if config_type == "loom" and "weaves" in config:
+        resolved_weaves = []
+
+        for weave_name in config["weaves"]:
+            weave_path = resolve_logical_name(weave_name, "weave", base_path)
+            weave_path_str = str(weave_path)
+
+            # Check for circular reference
+            if weave_path_str in visited:
+                cycle = " -> ".join(visited) + f" -> {weave_path_str}"
+                raise ReferenceResolutionError(
+                    f"Circular reference detected: {cycle}",
+                    file_path=weave_path_str,
+                )
+
+            # Check file exists
+            if not weave_path.exists():
+                raise ReferenceResolutionError(
+                    f"Referenced weave '{weave_name}' not found at {weave_path}",
+                    file_path=weave_path_str,
+                )
+
+            # Load and process child config
+            visited.add(weave_path_str)
+            try:
+                raw = parse_yaml(weave_path)
+                version = extract_config_version(raw)
+                child_type = detect_config_type(raw)
+                validate_config_version(version, child_type)
+                validated = validate_schema(raw, child_type)
+                child_dict = validated.model_dump()
+
+                # Resolve variables in child
+                param_file_data = None
+                if param_file:
+                    param_file_data = parse_yaml(param_file)
+                context = build_param_context(runtime_params, param_file_data, child_dict.get("defaults"))
+                resolved_child = resolve_variables(child_dict, context)
+
+                # Recursively resolve child's references
+                resolved_child = resolve_references(
+                    resolved_child,
+                    child_type,
+                    base_path,
+                    runtime_params,
+                    param_file,
+                    visited.copy(),
+                )
+
+                resolved_weaves.append(resolved_child)
+            finally:
+                visited.discard(weave_path_str)
+
+        result["_resolved_weaves"] = resolved_weaves
+
+    # Resolve threads in weave
+    elif config_type == "weave" and "threads" in config:
+        resolved_threads = []
+
+        for thread_name in config["threads"]:
+            thread_path = resolve_logical_name(thread_name, "thread", base_path)
+            thread_path_str = str(thread_path)
+
+            # Check for circular reference
+            if thread_path_str in visited:
+                cycle = " -> ".join(visited) + f" -> {thread_path_str}"
+                raise ReferenceResolutionError(
+                    f"Circular reference detected: {cycle}",
+                    file_path=thread_path_str,
+                )
+
+            # Check file exists
+            if not thread_path.exists():
+                raise ReferenceResolutionError(
+                    f"Referenced thread '{thread_name}' not found at {thread_path}",
+                    file_path=thread_path_str,
+                )
+
+            # Load and process child config
+            visited.add(thread_path_str)
+            try:
+                raw = parse_yaml(thread_path)
+                version = extract_config_version(raw)
+                child_type = detect_config_type(raw)
+                validate_config_version(version, child_type)
+                validated = validate_schema(raw, child_type)
+                child_dict = validated.model_dump()
+
+                # Resolve variables in child
+                param_file_data = None
+                if param_file:
+                    param_file_data = parse_yaml(param_file)
+                context = build_param_context(runtime_params, param_file_data, child_dict.get("defaults"))
+                resolved_child = resolve_variables(child_dict, context)
+
+                resolved_threads.append(resolved_child)
+            finally:
+                visited.discard(thread_path_str)
+
+        result["_resolved_threads"] = resolved_threads
+
+    return result
