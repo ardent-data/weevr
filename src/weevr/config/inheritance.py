@@ -1,0 +1,1 @@
+"""Config inheritance cascade logic."""
