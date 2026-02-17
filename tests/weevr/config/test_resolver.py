@@ -293,3 +293,78 @@ class TestValidateParams:
     def test_empty_param_specs(self):
         """Empty param specs should not raise."""
         validate_params({}, {"env": "dev"})  # Should not raise
+
+
+class TestReferenceResolution:
+    """Test reference resolution functions."""
+
+    def test_resolve_logical_name_thread(self):
+        """Resolve thread logical name to path."""
+        from weevr.config.resolver import resolve_logical_name
+
+        base = Path("/project")
+        result = resolve_logical_name("dimensions.dim_customer", "thread", base)
+        # Check path components (resolve() makes it absolute)
+        assert "threads" in result.parts
+        assert "dimensions" in result.parts
+        assert result.name == "dim_customer.yaml"
+
+    def test_resolve_logical_name_weave(self):
+        """Resolve weave logical name to path."""
+        from weevr.config.resolver import resolve_logical_name
+
+        base = Path("/project")
+        result = resolve_logical_name("dimensions", "weave", base)
+        # Check path components
+        assert "weaves" in result.parts
+        assert result.name == "dimensions.yaml"
+
+    def test_resolve_logical_name_loom(self):
+        """Resolve loom logical name to path."""
+        from weevr.config.resolver import resolve_logical_name
+
+        base = Path("/project")
+        result = resolve_logical_name("nightly", "loom", base)
+        # Check path components
+        assert "looms" in result.parts
+        assert result.name == "nightly.yaml"
+
+    def test_resolve_references_loom_to_weave_to_thread(self):
+        """Resolve full hierarchy: loom -> weave -> thread."""
+        from weevr.config.parser import parse_yaml
+        from weevr.config.resolver import resolve_references
+
+        project_root = FIXTURES / "project"
+        loom_config = {
+            "config_version": "1.0",
+            "weaves": ["dimensions"],
+        }
+
+        result = resolve_references(
+            loom_config,
+            "loom",
+            project_root,
+        )
+
+        assert "_resolved_weaves" in result
+        assert len(result["_resolved_weaves"]) == 1
+        weave = result["_resolved_weaves"][0]
+        assert "_resolved_threads" in weave
+        assert len(weave["_resolved_threads"]) == 1
+        thread = weave["_resolved_threads"][0]
+        assert "dim_customer" in thread["target"]["table"]
+
+    def test_resolve_references_missing_file(self):
+        """Raise ReferenceResolutionError for missing referenced file."""
+        from weevr.config.resolver import resolve_references
+        from weevr.errors import ReferenceResolutionError
+
+        project_root = FIXTURES / "project"
+        config = {
+            "config_version": "1.0",
+            "weaves": ["nonexistent"],
+        }
+
+        with pytest.raises(ReferenceResolutionError) as exc_info:
+            resolve_references(config, "loom", project_root)
+        assert "not found" in str(exc_info.value)
