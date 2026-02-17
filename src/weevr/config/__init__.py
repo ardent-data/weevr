@@ -61,7 +61,7 @@ def load_config(
     # Step 4: Validate schema
     validate_config_version(version, config_type)
     validated = validate_schema(raw, config_type)
-    config_dict = validated.model_dump()
+    config_dict = validated.model_dump(exclude_unset=True)
 
     # Step 5: Build parameter context
     param_file_data = None

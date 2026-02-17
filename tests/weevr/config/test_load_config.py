@@ -243,10 +243,14 @@ mode: append
         weave = result["_resolved_weaves"][0]
         thread = weave["_resolved_threads"][0]
 
-        # Verify thread has inherited defaults
-        # (Note: inheritance cascade happens at load time)
-        assert "mode" in thread
-        assert "tags" in thread or "audit" in thread
+        # Thread's mode should win (overrides weave's default)
+        assert thread["mode"] == "append"
+
+        # Weave's tags should win (overrides loom's)
+        assert thread["tags"] == ["weave_tag"]
+
+        # Loom's audit should be inherited
+        assert thread["audit"] == "enabled"
 
 
 class TestLoadConfigErrorHandling:
@@ -407,7 +411,11 @@ defaults:
         assert thread["sources"]["customers"] == "table://bronze.raw_customers"
         assert thread["target"]["table"] == "dim_customer_prod"  # Runtime env=prod
 
-        # Verify config structure is complete
-        assert "mode" in thread
-        assert "sources" in thread
-        assert "target" in thread
+        # Verify inheritance (thread mode > weave default mode)
+        assert thread["mode"] == "append"
+
+        # Verify weave default inherited
+        assert thread["tags"] == ["dimensions"]
+
+        # Verify loom default inherited
+        assert thread["audit"] == "enabled"

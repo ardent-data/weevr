@@ -1,11 +1,12 @@
 """Tests for Pydantic config schemas."""
 
 import pytest
+from pydantic import ValidationError
 
 from weevr.config.schema import (
     LoomConfig,
-    ParamSpec,
     ParamsConfig,
+    ParamSpec,
     ThreadConfig,
     WeaveConfig,
     validate_schema,
@@ -44,7 +45,9 @@ class TestThreadConfig:
         }
         config = ThreadConfig.model_validate(data)
         assert len(config.steps) == 1
+        assert config.write is not None
         assert config.write["mode"] == "merge"
+        assert config.tags is not None
         assert "critical" in config.tags
 
     def test_missing_required_sources(self):
@@ -53,7 +56,7 @@ class TestThreadConfig:
             "config_version": "1.0",
             "target": {"table": "fact_orders"},
         }
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             ThreadConfig.model_validate(data)
 
     def test_missing_required_target(self):
@@ -62,7 +65,7 @@ class TestThreadConfig:
             "config_version": "1.0",
             "sources": {"customers": "table://dim_customer"},
         }
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             ThreadConfig.model_validate(data)
 
     def test_wrong_field_type(self):
@@ -72,7 +75,7 @@ class TestThreadConfig:
             "sources": "invalid_string",
             "target": {"table": "fact_orders"},
         }
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             ThreadConfig.model_validate(data)
 
 
@@ -97,12 +100,13 @@ class TestWeaveConfig:
             "defaults": {"write": {"mode": "merge"}},
         }
         config = WeaveConfig.model_validate(data)
+        assert config.defaults is not None
         assert config.defaults["write"]["mode"] == "merge"
 
     def test_missing_threads(self):
         """Missing required 'threads' field."""
         data = {"config_version": "1.0"}
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             WeaveConfig.model_validate(data)
 
     def test_threads_not_list(self):
@@ -111,7 +115,7 @@ class TestWeaveConfig:
             "config_version": "1.0",
             "threads": "not_a_list",
         }
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             WeaveConfig.model_validate(data)
 
 
@@ -136,12 +140,13 @@ class TestLoomConfig:
             "defaults": {"tags": ["nightly"]},
         }
         config = LoomConfig.model_validate(data)
+        assert config.defaults is not None
         assert "nightly" in config.defaults["tags"]
 
     def test_missing_weaves(self):
         """Missing required 'weaves' field."""
         data = {"config_version": "1.0"}
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             LoomConfig.model_validate(data)
 
     def test_weaves_not_list(self):
@@ -150,7 +155,7 @@ class TestLoomConfig:
             "config_version": "1.0",
             "weaves": {"invalid": "dict"},
         }
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(ValidationError):
             LoomConfig.model_validate(data)
 
 
@@ -189,13 +194,13 @@ class TestParamSpec:
         """ParamSpec accepts all 7 supported types."""
         types = ["string", "int", "float", "bool", "date", "timestamp", "list[string]"]
         for param_type in types:
-            spec = ParamSpec(name="test_param", type=param_type)
+            spec = ParamSpec.model_validate({"name": "test_param", "type": param_type})
             assert spec.type == param_type
 
     def test_invalid_type(self):
         """ParamSpec rejects invalid types."""
-        with pytest.raises(Exception):  # Pydantic ValidationError
-            ParamSpec(name="test_param", type="invalid_type")
+        with pytest.raises(ValidationError):
+            ParamSpec.model_validate({"name": "test_param", "type": "invalid_type"})
 
     def test_required_and_default(self):
         """ParamSpec with required and default fields."""

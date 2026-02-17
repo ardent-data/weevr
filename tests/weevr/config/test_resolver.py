@@ -331,7 +331,6 @@ class TestReferenceResolution:
 
     def test_resolve_references_loom_to_weave_to_thread(self):
         """Resolve full hierarchy: loom -> weave -> thread."""
-        from weevr.config.parser import parse_yaml
         from weevr.config.resolver import resolve_references
 
         project_root = FIXTURES / "project"

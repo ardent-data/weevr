@@ -110,15 +110,14 @@ def resolve_variables(
                 # Try dotted key access first
                 value = _get_dotted_value(context, var_name)
                 return str(value)
-            except KeyError:
+            except KeyError as exc:
                 if default_value is not None:
-                    # Use default if provided
                     return default_value
                 else:
                     raise VariableResolutionError(
                         f"Unresolved variable '${{{var_name}}}' with no default value",
                         config_key=var_name,
-                    )
+                    ) from exc
 
         return VARIABLE_PATTERN.sub(replace_var, config)
 
@@ -315,7 +314,12 @@ def resolve_references(
     Raises:
         ReferenceResolutionError: If referenced file not found or circular reference
     """
-    from weevr.config.parser import detect_config_type, extract_config_version, parse_yaml, validate_config_version
+    from weevr.config.parser import (
+        detect_config_type,
+        extract_config_version,
+        parse_yaml,
+        validate_config_version,
+    )
     from weevr.config.schema import validate_schema
     from weevr.errors import ReferenceResolutionError
 
@@ -323,6 +327,11 @@ def resolve_references(
         visited = set()
 
     result = config.copy()
+
+    # Pre-load param file once (avoid re-reading per child)
+    param_file_data = None
+    if param_file:
+        param_file_data = parse_yaml(param_file)
 
     # Resolve weaves in loom
     if config_type == "loom" and "weaves" in config:
@@ -332,7 +341,6 @@ def resolve_references(
             weave_path = resolve_logical_name(weave_name, "weave", base_path)
             weave_path_str = str(weave_path)
 
-            # Check for circular reference
             if weave_path_str in visited:
                 cycle = " -> ".join(visited) + f" -> {weave_path_str}"
                 raise ReferenceResolutionError(
@@ -340,14 +348,12 @@ def resolve_references(
                     file_path=weave_path_str,
                 )
 
-            # Check file exists
             if not weave_path.exists():
                 raise ReferenceResolutionError(
                     f"Referenced weave '{weave_name}' not found at {weave_path}",
                     file_path=weave_path_str,
                 )
 
-            # Load and process child config
             visited.add(weave_path_str)
             try:
                 raw = parse_yaml(weave_path)
@@ -355,16 +361,13 @@ def resolve_references(
                 child_type = detect_config_type(raw)
                 validate_config_version(version, child_type)
                 validated = validate_schema(raw, child_type)
-                child_dict = validated.model_dump()
+                child_dict = validated.model_dump(exclude_unset=True)
 
-                # Resolve variables in child
-                param_file_data = None
-                if param_file:
-                    param_file_data = parse_yaml(param_file)
-                context = build_param_context(runtime_params, param_file_data, child_dict.get("defaults"))
+                context = build_param_context(
+                    runtime_params, param_file_data, child_dict.get("defaults")
+                )
                 resolved_child = resolve_variables(child_dict, context)
 
-                # Recursively resolve child's references
                 resolved_child = resolve_references(
                     resolved_child,
                     child_type,
@@ -388,7 +391,6 @@ def resolve_references(
             thread_path = resolve_logical_name(thread_name, "thread", base_path)
             thread_path_str = str(thread_path)
 
-            # Check for circular reference
             if thread_path_str in visited:
                 cycle = " -> ".join(visited) + f" -> {thread_path_str}"
                 raise ReferenceResolutionError(
@@ -396,14 +398,12 @@ def resolve_references(
                     file_path=thread_path_str,
                 )
 
-            # Check file exists
             if not thread_path.exists():
                 raise ReferenceResolutionError(
                     f"Referenced thread '{thread_name}' not found at {thread_path}",
                     file_path=thread_path_str,
                 )
 
-            # Load and process child config
             visited.add(thread_path_str)
             try:
                 raw = parse_yaml(thread_path)
@@ -411,13 +411,11 @@ def resolve_references(
                 child_type = detect_config_type(raw)
                 validate_config_version(version, child_type)
                 validated = validate_schema(raw, child_type)
-                child_dict = validated.model_dump()
+                child_dict = validated.model_dump(exclude_unset=True)
 
-                # Resolve variables in child
-                param_file_data = None
-                if param_file:
-                    param_file_data = parse_yaml(param_file)
-                context = build_param_context(runtime_params, param_file_data, child_dict.get("defaults"))
+                context = build_param_context(
+                    runtime_params, param_file_data, child_dict.get("defaults")
+                )
                 resolved_child = resolve_variables(child_dict, context)
 
                 resolved_threads.append(resolved_child)

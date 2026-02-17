@@ -1,7 +1,5 @@
 """Tests for config inheritance cascade."""
 
-import pytest
-
 from weevr.config.inheritance import apply_inheritance, cascade
 
 

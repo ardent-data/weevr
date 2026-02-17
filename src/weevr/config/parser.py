@@ -76,15 +76,11 @@ def extract_config_version(raw: dict[str, Any]) -> tuple[int, int]:
 
     version_str = raw["config_version"]
     if not isinstance(version_str, str):
-        raise ConfigParseError(
-            f"config_version must be a string, got {type(version_str).__name__}"
-        )
+        raise ConfigParseError(f"config_version must be a string, got {type(version_str).__name__}")
 
     parts = version_str.split(".")
     if len(parts) != 2:
-        raise ConfigParseError(
-            f"config_version must be 'major.minor' format, got '{version_str}'"
-        )
+        raise ConfigParseError(f"config_version must be 'major.minor' format, got '{version_str}'")
 
     try:
         major = int(parts[0])
@@ -157,8 +153,8 @@ def detect_config_type(raw: dict[str, Any]) -> str:
         return "weave"
     elif "sources" in raw or "target" in raw:
         return "thread"
-    elif "config_version" in raw and len(raw) >= 1:
-        # Likely a params file (just key-value pairs)
+    elif "config_version" in raw and len(raw) > 1:
+        # Params file: has config_version plus other key-value pairs
         return "params"
 
     raise ConfigParseError(

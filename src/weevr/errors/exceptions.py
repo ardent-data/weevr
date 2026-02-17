@@ -1,7 +1,5 @@
 """Exception hierarchy for weevr."""
 
-from typing import Any
-
 
 class WeevError(Exception):
     """Base exception for all weevr errors."""

@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from weevr.errors import ConfigSchemaError
 
@@ -19,6 +19,8 @@ class ParamSpec(BaseModel):
 
 class BaseConfig(BaseModel):
     """Base configuration model with shared fields."""
+
+    model_config = {"extra": "allow"}
 
     config_version: str
     params: dict[str, ParamSpec] | None = None
@@ -83,16 +85,14 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
 
     if config_type not in model_map:
         raise ConfigSchemaError(
-            f"Unknown config type '{config_type}', expected one of: "
-            f"{', '.join(model_map.keys())}"
+            f"Unknown config type '{config_type}', expected one of: {', '.join(model_map.keys())}"
         )
 
     model_class = model_map[config_type]
 
     try:
         return model_class.model_validate(raw)
-    except Exception as e:
-        # Wrap Pydantic ValidationError in our ConfigSchemaError
+    except ValidationError as e:
         raise ConfigSchemaError(
             f"Schema validation failed for {config_type} config: {e}",
             cause=e,
