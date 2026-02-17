@@ -1,0 +1,7 @@
+config_version: "1.0"
+env: dev
+lakehouse: bronze_dev
+source_path: /data/raw/dev
+database:
+  host: localhost
+  port: 5432
