@@ -1,0 +1,85 @@
+config_version: "1.0"
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+    dedup:
+      keys: [customer_id]
+      order_by: modified_at
+  orders:
+    type: csv
+    path: /data/orders/
+    options:
+      delimiter: "|"
+      header: true
+steps:
+  - filter:
+      expr: "active = true"
+  - derive:
+      name: full_name
+      expr: "first_name || ' ' || last_name"
+  - join:
+      source: orders
+      type: left
+      "on": [customer_id]
+  - select:
+      columns: [customer_id, full_name, order_total]
+  - drop:
+      columns: [_tmp]
+  - rename:
+      columns:
+        customer_id: id
+  - cast:
+      columns:
+        order_total: double
+  - dedup:
+      keys: [id]
+      order_by: created_at
+  - sort:
+      columns: [created_at]
+      ascending: false
+  - union:
+      sources: [customers]
+      mode: by_name
+target:
+  mapping_mode: explicit
+  columns:
+    id:
+      type: string
+    order_total:
+      expr: "order_total * 1.1"
+      type: double
+  partition_by: [year, month]
+  audit_template: standard_v1
+write:
+  mode: merge
+  match_keys: [id]
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore
+keys:
+  business_key: [id]
+  surrogate_key:
+    name: sk_id
+    algorithm: sha256
+  change_detection:
+    name: row_hash
+    columns: [full_name, order_total]
+    algorithm: md5
+load:
+  mode: incremental_watermark
+  watermark_column: modified_at
+  watermark_type: timestamp
+validations:
+  - rule: "id IS NOT NULL"
+    name: id_not_null
+    severity: error
+  - rule: "order_total > 0"
+    name: positive_order
+    severity: warn
+assertions:
+  - type: row_count
+    min: 1
+  - type: unique
+    columns: [id]
+tags: [nightly, critical]

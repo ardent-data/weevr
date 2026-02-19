@@ -1,0 +1,6 @@
+config_version: "1.0"
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+target: {}
