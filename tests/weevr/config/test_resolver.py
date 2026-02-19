@@ -351,7 +351,7 @@ class TestReferenceResolution:
         assert "_resolved_threads" in weave
         assert len(weave["_resolved_threads"]) == 1
         thread = weave["_resolved_threads"][0]
-        assert "dim_customer" in thread["target"]["table"]
+        assert "customers" in thread["sources"]
 
     def test_resolve_references_missing_file(self):
         """Raise ReferenceResolutionError for missing referenced file."""

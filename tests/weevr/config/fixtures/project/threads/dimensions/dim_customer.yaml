@@ -1,5 +1,6 @@
 config_version: "1.0"
 sources:
-  customers: table://lakehouse.raw_customers
-target:
-  table: dim_customer
+  customers:
+    type: delta
+    alias: lakehouse.raw_customers
+target: {}
