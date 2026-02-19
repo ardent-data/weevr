@@ -1,0 +1,10 @@
+config_version: "1.0"
+sources:
+  events:
+    type: delta
+    alias: raw.events
+target: {}
+load:
+  mode: incremental_watermark
+  watermark_column: event_ts
+  watermark_type: timestamp

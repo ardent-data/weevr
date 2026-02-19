@@ -2,5 +2,5 @@ config_version: "1.0"
 sources:
   customers:
     type: delta
-    alias: lakehouse.dim_customer
+    alias: raw.customers
 target: {}

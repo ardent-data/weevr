@@ -10,6 +10,7 @@ from weevr.errors import (
     DataValidationError,
     ExecutionError,
     InheritanceError,
+    ModelValidationError,
     ReferenceResolutionError,
     SparkError,
     VariableResolutionError,
@@ -34,6 +35,7 @@ class TestExceptionHierarchy:
         assert issubclass(VariableResolutionError, ConfigError)
         assert issubclass(ReferenceResolutionError, ConfigError)
         assert issubclass(InheritanceError, ConfigError)
+        assert issubclass(ModelValidationError, ConfigError)
 
     def test_execution_error_hierarchy(self):
         """SparkError should inherit from ExecutionError."""
@@ -162,6 +164,12 @@ class TestSpecificExceptions:
             raise InheritanceError("Cascade failed")
         assert "Cascade failed" in str(exc_info.value)
 
+    def test_model_validation_error(self):
+        """ModelValidationError can be raised and caught."""
+        with pytest.raises(ModelValidationError) as exc_info:
+            raise ModelValidationError("Hydration failed for thread")
+        assert "Hydration failed for thread" in str(exc_info.value)
+
     def test_catch_via_base_type(self):
         """Specific errors catchable via ConfigError."""
         with pytest.raises(ConfigError):
@@ -169,3 +177,40 @@ class TestSpecificExceptions:
 
         with pytest.raises(WeevError):
             raise ConfigSchemaError("test")
+
+
+class TestModelValidationError:
+    """Test ModelValidationError specific behaviour."""
+
+    def test_is_config_error(self):
+        """ModelValidationError is a ConfigError and WeevError."""
+        err = ModelValidationError("semantic failure")
+        assert isinstance(err, ConfigError)
+        assert isinstance(err, WeevError)
+
+    def test_file_path_context(self):
+        """ModelValidationError accepts file_path context."""
+        err = ModelValidationError("bad model", file_path="/configs/thread.yaml")
+        assert err.file_path == "/configs/thread.yaml"
+        assert "/configs/thread.yaml" in str(err)
+
+    def test_cause_chaining(self):
+        """ModelValidationError wraps a cause exception."""
+        original = ValueError("pydantic detail")
+        err = ModelValidationError("hydration failed", cause=original)
+        assert err.cause is original
+        assert "caused by" in str(err)
+        assert "pydantic detail" in str(err)
+
+    def test_str_with_all_context(self):
+        """String representation includes message, file path, and cause."""
+        original = ValueError("nested detail")
+        err = ModelValidationError(
+            "model hydration failed",
+            cause=original,
+            file_path="/path/to/thread.yaml",
+        )
+        result = str(err)
+        assert "model hydration failed" in result
+        assert "/path/to/thread.yaml" in result
+        assert "nested detail" in result

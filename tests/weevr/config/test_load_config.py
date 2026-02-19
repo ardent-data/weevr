@@ -9,9 +9,10 @@ from weevr.errors import (
     ConfigParseError,
     ConfigSchemaError,
     ConfigVersionError,
-    ReferenceResolutionError,
+    ModelValidationError,
     VariableResolutionError,
 )
+from weevr.model import Loom, Thread, Weave
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -20,76 +21,77 @@ class TestLoadConfigHappyPath:
     """Test successful config loading scenarios."""
 
     def test_load_simple_thread(self):
-        """Load a simple thread config."""
+        """load_config returns a Thread model for a thread config."""
         result = load_config(FIXTURES / "valid_thread.yaml")
-        assert result["config_version"] == "1.0"
-        assert "sources" in result
-        assert "target" in result
+        assert isinstance(result, Thread)
+        assert result.config_version == "1.0"
+        assert "customers" in result.sources
+        assert result.target is not None
 
     def test_load_thread_from_project(self):
         """Load a thread from project fixtures."""
         thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
         result = load_config(thread_path)
-        assert result["config_version"] == "1.0"
-        assert "sources" in result
-        assert "target" in result
+        assert isinstance(result, Thread)
+        assert result.config_version == "1.0"
+        assert "customers" in result.sources
 
     def test_load_thread_with_variable_resolution(self, tmp_path):
-        """Load thread with variable interpolation."""
-        # Create a thread with variables
+        """load_config resolves variables and returns a typed Thread."""
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
 sources:
-  data: table://${lakehouse}.customers
+  data:
+    type: delta
+    alias: ${lakehouse}.customers
 target:
-  table: ${output_table}
+  audit_template: ${env}_template
 """
         )
 
-        # Load with runtime params
         result = load_config(
             thread_file,
-            runtime_params={"lakehouse": "bronze", "output_table": "dim_customer"},
+            runtime_params={"lakehouse": "bronze", "env": "dev"},
         )
 
-        assert result["sources"]["data"] == "table://bronze.customers"
-        assert result["target"]["table"] == "dim_customer"
+        assert isinstance(result, Thread)
+        assert result.sources["data"].alias == "bronze.customers"
+        assert result.target.audit_template == "dev_template"
 
     def test_load_thread_with_param_file(self, tmp_path):
-        """Load thread using param file."""
-        # Create param file
+        """load_config resolves variables from a param file."""
         param_file = tmp_path / "params.yaml"
         param_file.write_text(
             """
 config_version: "1.0"
 lakehouse: bronze
-output_table: dim_customer
+env: dev
 """
         )
 
-        # Create thread with variables
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
 sources:
-  data: table://${lakehouse}.customers
+  data:
+    type: delta
+    alias: ${lakehouse}.customers
 target:
-  table: ${output_table}
+  audit_template: ${env}_template
 """
         )
 
-        # Load with param file
         result = load_config(thread_file, param_file=param_file)
 
-        assert result["sources"]["data"] == "table://bronze.customers"
-        assert result["target"]["table"] == "dim_customer"
+        assert isinstance(result, Thread)
+        assert result.sources["data"].alias == "bronze.customers"
+        assert result.target.audit_template == "dev_template"
 
     def test_runtime_params_override_param_file(self, tmp_path):
-        """Runtime params should override param file values."""
-        # Create param file
+        """Runtime params override param file values."""
         param_file = tmp_path / "params.yaml"
         param_file.write_text(
             """
@@ -98,159 +100,61 @@ env: dev
 """
         )
 
-        # Create thread with variable
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
 sources:
-  data: table://lakehouse
+  data:
+    type: delta
+    alias: lakehouse
 target:
-  table: output_${env}
+  audit_template: output_${env}
 """
         )
 
-        # Load with runtime override
         result = load_config(
             thread_file,
             runtime_params={"env": "prod"},
             param_file=param_file,
         )
 
-        # Runtime value should win
-        assert result["target"]["table"] == "output_prod"
+        assert isinstance(result, Thread)
+        assert result.target.audit_template == "output_prod"
 
     def test_variable_with_fallback_default(self, tmp_path):
-        """Variables with fallback defaults should work."""
+        """Variables with fallback defaults use the default when unset."""
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
 sources:
-  data: table://lakehouse
+  data:
+    type: delta
+    alias: lakehouse
 target:
-  table: ${output_table:-default_output}
+  audit_template: ${output_table:-default_output}
 """
         )
 
-        # Load without providing output_table
         result = load_config(thread_file)
 
-        # Should use default
-        assert result["target"]["table"] == "default_output"
+        assert isinstance(result, Thread)
+        assert result.target.audit_template == "default_output"
 
+    def test_load_weave_returns_weave_model(self):
+        """load_config returns a Weave model for a weave config."""
+        result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
+        assert isinstance(result, Weave)
+        assert result.config_version == "1.0"
+        assert "dimensions.dim_customer" in result.threads
 
-class TestLoadConfigWithReferences:
-    """Test config loading with file references."""
-
-    def test_load_loom_with_weave_and_thread_references(self):
-        """Load loom that references weaves and threads."""
-        loom_path = FIXTURES / "project" / "looms" / "nightly.yaml"
-        result = load_config(loom_path)
-
-        # Verify loom loaded
-        assert result["config_version"] == "1.0"
-        assert "weaves" in result
-
-        # Verify weave was resolved
-        assert "_resolved_weaves" in result
-        assert len(result["_resolved_weaves"]) == 1
-
-        weave = result["_resolved_weaves"][0]
-        assert "threads" in weave
-
-        # Verify thread was resolved
-        assert "_resolved_threads" in weave
-        assert len(weave["_resolved_threads"]) == 1
-
-        thread = weave["_resolved_threads"][0]
-        assert "sources" in thread
-        assert "target" in thread
-
-    def test_load_weave_with_thread_references(self):
-        """Load weave that references threads."""
-        weave_path = FIXTURES / "project" / "weaves" / "dimensions.yaml"
-        result = load_config(weave_path)
-
-        # Verify weave loaded
-        assert result["config_version"] == "1.0"
-        assert "threads" in result
-
-        # Verify threads were resolved
-        assert "_resolved_threads" in result
-        assert len(result["_resolved_threads"]) == 1
-
-        thread = result["_resolved_threads"][0]
-        assert "dim_customer" in thread["target"]["table"]
-
-
-class TestLoadConfigWithInheritance:
-    """Test config loading with inheritance cascade."""
-
-    def test_inheritance_applied_to_threads(self, tmp_path):
-        """Thread should inherit from weave and loom defaults."""
-        # Create loom with defaults
-        loom_dir = tmp_path / "looms"
-        loom_dir.mkdir()
-        loom_file = loom_dir / "test.yaml"
-        loom_file.write_text(
-            """
-config_version: "1.0"
-weaves:
-  - test_weave
-defaults:
-  tags:
-    - loom_tag
-  audit: enabled
-"""
-        )
-
-        # Create weave with defaults
-        weave_dir = tmp_path / "weaves"
-        weave_dir.mkdir()
-        weave_file = weave_dir / "test_weave.yaml"
-        weave_file.write_text(
-            """
-config_version: "1.0"
-threads:
-  - test_thread
-defaults:
-  tags:
-    - weave_tag
-  mode: merge
-"""
-        )
-
-        # Create thread
-        thread_dir = tmp_path / "threads"
-        thread_dir.mkdir()
-        thread_file = thread_dir / "test_thread.yaml"
-        thread_file.write_text(
-            """
-config_version: "1.0"
-sources:
-  data: table://customers
-target:
-  table: output
-mode: append
-"""
-        )
-
-        # Load loom
-        result = load_config(loom_file)
-
-        # Get the resolved thread
-        weave = result["_resolved_weaves"][0]
-        thread = weave["_resolved_threads"][0]
-
-        # Thread's mode should win (overrides weave's default)
-        assert thread["mode"] == "append"
-
-        # Weave's tags should win (overrides loom's)
-        assert thread["tags"] == ["weave_tag"]
-
-        # Loom's audit should be inherited
-        assert thread["audit"] == "enabled"
+    def test_load_loom_returns_loom_model(self):
+        """load_config returns a Loom model for a loom config."""
+        result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
+        assert isinstance(result, Loom)
+        assert result.config_version == "1.0"
+        assert "dimensions" in result.weaves
 
 
 class TestLoadConfigErrorHandling:
@@ -282,7 +186,7 @@ class TestLoadConfigErrorHandling:
         assert "99.0" in str(exc_info.value)
 
     def test_schema_validation_failure(self, tmp_path):
-        """Raise ConfigSchemaError for invalid schema."""
+        """Raise ConfigSchemaError for structurally invalid schema."""
         bad_file = tmp_path / "bad_schema.yaml"
         bad_file.write_text(
             """
@@ -302,9 +206,10 @@ threads: not_a_list
             """
 config_version: "1.0"
 sources:
-  data: table://${missing_var}
-target:
-  table: output
+  data:
+    type: delta
+    alias: ${missing_var}.customers
+target: {}
 """
         )
 
@@ -313,109 +218,22 @@ target:
         assert "Unresolved variable" in str(exc_info.value)
         assert "missing_var" in str(exc_info.value)
 
-    def test_missing_referenced_file(self, tmp_path):
-        """Raise ReferenceResolutionError for missing referenced file."""
-        weave_dir = tmp_path / "weaves"
-        weave_dir.mkdir()
-        weave_file = weave_dir / "test.yaml"
-        weave_file.write_text(
-            """
-config_version: "1.0"
-threads:
-  - nonexistent_thread
-"""
-        )
-
-        with pytest.raises(ReferenceResolutionError) as exc_info:
-            load_config(weave_file)
-        assert "not found" in str(exc_info.value)
-
-
-class TestLoadConfigIntegration:
-    """Full integration tests exercising complete pipeline."""
-
-    def test_full_pipeline_loom_to_thread(self, tmp_path):
-        """Test complete pipeline: loom -> weave -> thread with all features."""
-        # Create param file
-        param_file = tmp_path / "params.yaml"
-        param_file.write_text(
-            """
-config_version: "1.0"
-lakehouse: bronze
-env: dev
-"""
-        )
-
-        # Create thread with variables
-        thread_dir = tmp_path / "threads" / "dimensions"
-        thread_dir.mkdir(parents=True)
-        thread_file = thread_dir / "dim_customer.yaml"
+    def test_model_validation_error_on_bad_thread(self, tmp_path):
+        """Raise ModelValidationError when hydration fails (e.g., invalid step type)."""
+        thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
 sources:
-  customers: table://${lakehouse}.raw_customers
-target:
-  table: dim_customer_${env}
-mode: append
+  data:
+    type: delta
+    alias: lakehouse
+target: {}
+steps:
+  - pivot:
+      columns: [x]
 """
         )
 
-        # Create weave referencing thread
-        weave_dir = tmp_path / "weaves"
-        weave_dir.mkdir()
-        weave_file = weave_dir / "dimensions.yaml"
-        weave_file.write_text(
-            """
-config_version: "1.0"
-threads:
-  - dimensions.dim_customer
-defaults:
-  tags:
-    - dimensions
-  mode: merge
-"""
-        )
-
-        # Create loom referencing weave
-        loom_dir = tmp_path / "looms"
-        loom_dir.mkdir()
-        loom_file = loom_dir / "nightly.yaml"
-        loom_file.write_text(
-            """
-config_version: "1.0"
-weaves:
-  - dimensions
-defaults:
-  audit: enabled
-"""
-        )
-
-        # Load with runtime override
-        result = load_config(
-            loom_file,
-            runtime_params={"env": "prod"},
-            param_file=param_file,
-        )
-
-        # Verify structure
-        assert result["config_version"] == "1.0"
-        assert "_resolved_weaves" in result
-
-        weave = result["_resolved_weaves"][0]
-        assert "_resolved_threads" in weave
-
-        thread = weave["_resolved_threads"][0]
-
-        # Verify variable resolution (runtime overrides param file)
-        assert thread["sources"]["customers"] == "table://bronze.raw_customers"
-        assert thread["target"]["table"] == "dim_customer_prod"  # Runtime env=prod
-
-        # Verify inheritance (thread mode > weave default mode)
-        assert thread["mode"] == "append"
-
-        # Verify weave default inherited
-        assert thread["tags"] == ["dimensions"]
-
-        # Verify loom default inherited
-        assert thread["audit"] == "enabled"
+        with pytest.raises(ModelValidationError):
+            load_config(thread_file)

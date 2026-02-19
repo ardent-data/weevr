@@ -1,0 +1,16 @@
+config_version: "1.0"
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+  orders:
+    type: delta
+    alias: raw.orders
+steps:
+  - join:
+      source: orders
+      type: inner
+      "on":
+        - left: customer_id
+          right: cust_id
+target: {}

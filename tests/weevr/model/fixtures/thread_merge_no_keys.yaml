@@ -1,6 +1,8 @@
 config_version: "1.0"
 sources:
-  customers:
+  data:
     type: delta
-    alias: lakehouse.dim_customer
+    alias: raw.data
 target: {}
+write:
+  mode: merge

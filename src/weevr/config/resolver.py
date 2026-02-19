@@ -320,7 +320,7 @@ def resolve_references(
         parse_yaml,
         validate_config_version,
     )
-    from weevr.config.schema import validate_schema
+    from weevr.config.validation import validate_schema
     from weevr.errors import ReferenceResolutionError
 
     if visited is None:

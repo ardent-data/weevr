@@ -3,15 +3,14 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.config.schema import (
+from weevr.config.validation import (
     LoomConfig,
-    ParamsConfig,
-    ParamSpec,
     ThreadConfig,
     WeaveConfig,
     validate_schema,
 )
 from weevr.errors import ConfigSchemaError
+from weevr.model.params import ParamsConfig, ParamSpec
 
 
 class TestThreadConfig:

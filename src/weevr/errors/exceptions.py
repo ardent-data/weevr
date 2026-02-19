@@ -93,6 +93,12 @@ class InheritanceError(ConfigError):
     pass
 
 
+class ModelValidationError(ConfigError):
+    """Semantic validation failures during model hydration."""
+
+    pass
+
+
 class ExecutionError(WeevError):
     """Base exception for execution-time errors (M03+)."""
 
