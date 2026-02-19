@@ -16,8 +16,8 @@ steps:
   - filter:
       expr: "active = true"
   - derive:
-      name: full_name
-      expr: "first_name || ' ' || last_name"
+      columns:
+        full_name: "first_name || ' ' || last_name"
   - join:
       source: orders
       type: left

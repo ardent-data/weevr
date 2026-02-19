@@ -61,7 +61,7 @@ class TestThreadConstruction:
             **_MINIMAL,
             "steps": [
                 {"filter": {"expr": "amount > 0"}},
-                {"derive": {"name": "amount_usd", "expr": "amount * rate"}},
+                {"derive": {"columns": {"amount_usd": "amount * rate"}}},
             ],
         }
         t = Thread.model_validate(data)

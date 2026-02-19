@@ -77,7 +77,7 @@ class TestThreadHydrationViaPipeline:
 
         # Step content preserved
         assert result.steps[0].filter.expr == "active = true"
-        assert result.steps[1].derive.name == "full_name"
+        assert "full_name" in result.steps[1].derive.columns
         assert result.steps[2].join.source == "orders"
         assert result.steps[2].join.type == "left"
 

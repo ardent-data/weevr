@@ -58,10 +58,13 @@ class FilterParams(FrozenBase):
 
 
 class DeriveParams(FrozenBase):
-    """Parameters for the derive step."""
+    """Parameters for the derive step.
 
-    name: str
-    expr: SparkExpr
+    ``columns`` maps output column names to Spark SQL expressions.
+    Multiple columns can be derived in a single step.
+    """
+
+    columns: dict[str, SparkExpr]
 
 
 class JoinParams(FrozenBase):
@@ -147,7 +150,7 @@ class FilterStep(FrozenBase):
 
 
 class DeriveStep(FrozenBase):
-    """Pipeline step: derive a new column."""
+    """Pipeline step: derive one or more new columns from Spark SQL expressions."""
 
     derive: DeriveParams
 

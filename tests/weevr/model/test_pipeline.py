@@ -102,9 +102,10 @@ class TestStepDiscriminator:
 
     def test_derive_step(self):
         """Dict with 'derive' key dispatches to DeriveStep."""
-        step = self._validate({"derive": {"name": "amount_usd", "expr": "amount * rate"}})
+        step = self._validate({"derive": {"columns": {"amount_usd": "amount * rate"}}})
         assert isinstance(step, DeriveStep)
-        assert step.derive.name == "amount_usd"
+        assert "amount_usd" in step.derive.columns
+        assert step.derive.columns["amount_usd"] == "amount * rate"
 
     def test_join_step(self):
         """Dict with 'join' key dispatches to JoinStep."""
@@ -160,7 +161,7 @@ class TestStepDiscriminator:
     def test_ambiguous_step_keys_raises(self):
         """Dict with two step type keys raises ValidationError."""
         with pytest.raises(ValidationError):
-            self._validate({"filter": {"expr": "x > 0"}, "derive": {"name": "y", "expr": "1"}})
+            self._validate({"filter": {"expr": "x > 0"}, "derive": {"columns": {"y": "1"}}})
 
 
 class TestStepFreezeAndRoundTrip:
@@ -174,9 +175,9 @@ class TestStepFreezeAndRoundTrip:
 
     def test_derive_step_frozen(self):
         """DeriveStep is immutable."""
-        s = DeriveStep(derive=DeriveParams(name="col", expr=SparkExpr("1")))
+        s = DeriveStep(derive=DeriveParams(columns={"col": SparkExpr("1")}))
         with pytest.raises(ValidationError):
-            s.derive = DeriveParams(name="other", expr=SparkExpr("2"))  # type: ignore[misc]
+            s.derive = DeriveParams(columns={"other": SparkExpr("2")})  # type: ignore[misc]
 
     def test_filter_step_round_trip(self):
         """FilterStep round-trips via Step union adapter."""
@@ -214,7 +215,7 @@ class TestStepFreezeAndRoundTrip:
         """All 10 step types construct and dump without error."""
         steps_data = [
             {"filter": {"expr": "x > 0"}},
-            {"derive": {"name": "c", "expr": "a + b"}},
+            {"derive": {"columns": {"c": "a + b"}}},
             {"join": {"source": "t", "on": ["id"]}},
             {"select": {"columns": ["a", "b"]}},
             {"drop": {"columns": ["tmp"]}},
