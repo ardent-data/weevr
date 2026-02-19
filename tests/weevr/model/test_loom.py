@@ -34,6 +34,7 @@ class TestLoom:
                 "defaults": {"tags": ["nightly"]},
             }
         )
+        assert loom.defaults is not None
         assert loom.defaults["tags"] == ["nightly"]
 
     def test_with_params(self):
@@ -45,6 +46,7 @@ class TestLoom:
                 "params": {"env": {"name": "env", "type": "string"}},
             }
         )
+        assert loom.params is not None
         assert "env" in loom.params
 
     def test_frozen(self):

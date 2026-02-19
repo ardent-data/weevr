@@ -93,7 +93,7 @@ class TestSource:
         s = Source(
             type="delta",
             alias="raw.customers",
-            dedup={"keys": ["id"], "order_by": "modified_at"},
+            dedup={"keys": ["id"], "order_by": "modified_at"},  # type: ignore[arg-type]
         )
         assert isinstance(s.dedup, DedupConfig)
         assert s.dedup.keys == ["id"]
@@ -110,7 +110,7 @@ class TestSource:
             type="delta",
             alias="raw.customers",
             options={"timeout": 30},
-            dedup={"keys": ["id"]},
+            dedup={"keys": ["id"]},  # type: ignore[arg-type]
         )
         assert Source.model_validate(s.model_dump()) == s
 

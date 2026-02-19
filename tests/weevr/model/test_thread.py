@@ -98,12 +98,14 @@ class TestThreadConstruction:
             "validations": [{"rule": "id IS NOT NULL", "name": "id_not_null"}],
         }
         t = Thread.model_validate(data)
+        assert t.validations is not None
         assert isinstance(t.validations[0], ValidationRule)
 
     def test_assertions_hydrated(self):
         """assertions list items are hydrated into Assertion models."""
         data = {**_MINIMAL, "assertions": [{"type": "row_count", "min": 1}]}
         t = Thread.model_validate(data)
+        assert t.assertions is not None
         assert isinstance(t.assertions[0], Assertion)
 
     def test_tags_accepted(self):
@@ -136,7 +138,9 @@ class TestThreadConstruction:
         t = Thread.model_validate(data)
         assert len(t.sources) == 2
         assert len(t.steps) == 2
+        assert t.write is not None
         assert t.write.mode == "merge"
+        assert t.keys is not None
         assert t.keys.business_key == ["id"]
 
 

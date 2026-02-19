@@ -84,6 +84,7 @@ class TestThreadHydrationViaPipeline:
         # Target
         assert isinstance(result.target, Target)
         assert result.target.mapping_mode == "explicit"
+        assert result.target.columns is not None
         assert isinstance(result.target.columns["id"], ColumnMapping)
         assert result.target.partition_by == ["year", "month"]
         assert result.target.audit_template == "standard_v1"
@@ -195,6 +196,7 @@ class TestWeaveAndLoomModelHydration:
         w = Weave.model_validate(data)
         assert isinstance(w, Weave)
         assert w.threads == ["dimensions.dim_customer", "dimensions.dim_product"]
+        assert w.defaults is not None
         assert w.defaults["tags"] == ["nightly"]
         with pytest.raises(ValidationError):
             w.config_version = "2.0"  # type: ignore[misc]

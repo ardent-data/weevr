@@ -81,21 +81,21 @@ class TestKeyConfig:
 
     def test_with_surrogate_key(self):
         """KeyConfig with nested SurrogateKeyConfig."""
-        k = KeyConfig(surrogate_key={"name": "sk_id", "algorithm": "sha256"})
+        k = KeyConfig(surrogate_key={"name": "sk_id", "algorithm": "sha256"})  # type: ignore[arg-type]
         assert isinstance(k.surrogate_key, SurrogateKeyConfig)
         assert k.surrogate_key.name == "sk_id"
 
     def test_with_change_detection(self):
         """KeyConfig with nested ChangeDetectionConfig."""
-        k = KeyConfig(change_detection={"name": "row_hash", "columns": ["a", "b"]})
+        k = KeyConfig(change_detection={"name": "row_hash", "columns": ["a", "b"]})  # type: ignore[arg-type]
         assert isinstance(k.change_detection, ChangeDetectionConfig)
 
     def test_all_sub_configs(self):
         """KeyConfig with all sub-configs populated."""
         k = KeyConfig(
             business_key=["id"],
-            surrogate_key={"name": "sk", "algorithm": "md5"},
-            change_detection={"name": "ch", "columns": ["col1"]},
+            surrogate_key={"name": "sk", "algorithm": "md5"},  # type: ignore[arg-type]
+            change_detection={"name": "ch", "columns": ["col1"]},  # type: ignore[arg-type]
         )
         assert k.business_key == ["id"]
         assert isinstance(k.surrogate_key, SurrogateKeyConfig)
@@ -111,7 +111,7 @@ class TestKeyConfig:
         """KeyConfig round-trips."""
         k = KeyConfig(
             business_key=["id"],
-            surrogate_key={"name": "sk", "algorithm": "sha256"},
-            change_detection={"name": "ch", "columns": ["a"]},
+            surrogate_key={"name": "sk", "algorithm": "sha256"},  # type: ignore[arg-type]
+            change_detection={"name": "ch", "columns": ["a"]},  # type: ignore[arg-type]
         )
         assert KeyConfig.model_validate(k.model_dump()) == k

@@ -76,11 +76,12 @@ class TestTarget:
     def test_with_columns(self):
         """Target accepts columns dict with ColumnMapping values."""
         t = Target(
-            columns={
+            columns={  # type: ignore[arg-type]
                 "amount_usd": {"expr": "amount * rate", "type": "double"},
                 "is_active": {"default": True},
             }
         )
+        assert t.columns is not None
         assert isinstance(t.columns["amount_usd"], ColumnMapping)
         assert t.columns["amount_usd"].expr == "amount * rate"
 
@@ -111,7 +112,7 @@ class TestTarget:
         """Target round-trips."""
         t = Target(
             mapping_mode="explicit",
-            columns={"col_a": {"type": "string"}},
+            columns={"col_a": {"type": "string"}},  # type: ignore[arg-type]
             partition_by=["date"],
             audit_template="standard",
         )

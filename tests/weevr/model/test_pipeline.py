@@ -4,27 +4,20 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from weevr.model.pipeline import (
-    CastParams,
     CastStep,
-    DedupParams,
     DedupStep,
     DeriveParams,
     DeriveStep,
-    DropParams,
     DropStep,
     FilterParams,
     FilterStep,
     JoinKeyPair,
     JoinParams,
     JoinStep,
-    RenameParams,
     RenameStep,
-    SelectParams,
     SelectStep,
-    SortParams,
     SortStep,
     Step,
-    UnionParams,
     UnionStep,
 )
 from weevr.model.types import SparkExpr
@@ -65,7 +58,7 @@ class TestJoinParams:
 
     def test_explicit_pairs_accepted(self):
         """Explicit JoinKeyPair dicts are accepted."""
-        jp = JoinParams(source="orders", on=[{"left": "customer_id", "right": "cust_id"}])
+        jp = JoinParams(source="orders", on=[{"left": "customer_id", "right": "cust_id"}])  # type: ignore[list-item]
         assert jp.on[0].left == "customer_id"
         assert jp.on[0].right == "cust_id"
 

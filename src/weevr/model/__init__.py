@@ -3,7 +3,7 @@
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.loom import Loom
-from weevr.model.params import ParamSpec, ParamsConfig
+from weevr.model.params import ParamsConfig, ParamSpec
 from weevr.model.pipeline import (
     CastStep,
     DedupStep,

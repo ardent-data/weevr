@@ -21,7 +21,9 @@ class TestValidationRule:
         """ValidationRule accepts all four severity levels."""
         for severity in ("info", "warn", "error", "fatal"):
             vr = ValidationRule(
-                rule=SparkExpr("x > 0"), name="test", severity=severity  # type: ignore[arg-type]
+                rule=SparkExpr("x > 0"),
+                name="test",
+                severity=severity,  # type: ignore[arg-type]
             )
             assert vr.severity == severity
 

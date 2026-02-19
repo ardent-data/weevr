@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.model.params import ParamSpec, ParamsConfig
+from weevr.model.params import ParamsConfig, ParamSpec
 
 
 class TestParamSpec:
@@ -69,12 +69,12 @@ class TestParamsConfig:
 
     def test_extra_fields_allowed(self):
         """ParamsConfig accepts arbitrary extra fields."""
-        pc = ParamsConfig(config_version="1.0", env="dev", lakehouse="bronze")
+        pc = ParamsConfig(config_version="1.0", env="dev", lakehouse="bronze")  # type: ignore[call-arg]
         assert pc.config_version == "1.0"
 
     def test_nested_extra_fields(self):
         """ParamsConfig accepts nested extra fields."""
-        pc = ParamsConfig(config_version="1.0", db={"host": "localhost", "port": 5432})
+        pc = ParamsConfig(config_version="1.0", db={"host": "localhost", "port": 5432})  # type: ignore[call-arg]
         assert pc.config_version == "1.0"
 
     def test_mutable(self):

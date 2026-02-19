@@ -10,7 +10,7 @@ from weevr.config.validation import (
     validate_schema,
 )
 from weevr.errors import ConfigSchemaError
-from weevr.model.params import ParamSpec, ParamsConfig
+from weevr.model.params import ParamsConfig, ParamSpec
 
 
 class TestThreadConfig:

@@ -34,6 +34,7 @@ class TestWeave:
                 "defaults": {"write": {"mode": "merge"}},
             }
         )
+        assert w.defaults is not None
         assert w.defaults["write"]["mode"] == "merge"
 
     def test_with_params(self):
@@ -45,6 +46,7 @@ class TestWeave:
                 "params": {"env": {"name": "env", "type": "string"}},
             }
         )
+        assert w.params is not None
         assert "env" in w.params
 
     def test_frozen(self):
