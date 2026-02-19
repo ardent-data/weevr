@@ -207,6 +207,16 @@ class TestStepFreezeAndRoundTrip:
         assert isinstance(restored, JoinStep)
         assert restored.join.on[0].left == "a"
 
+    def test_join_on_not_list_raises(self):
+        """JoinParams raises when 'on' is not a list."""
+        with pytest.raises(ValidationError):
+            JoinParams(source="t", on="not_a_list")  # type: ignore[arg-type]
+
+    def test_non_step_object_in_union_raises(self):
+        """Passing a non-dict, non-Step object to the Step union raises ValidationError."""
+        with pytest.raises(ValidationError):
+            _step_adapter.validate_python(42)
+
     def test_all_step_types_round_trip(self):
         """All 10 step types construct and dump without error."""
         steps_data = [
