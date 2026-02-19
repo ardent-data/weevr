@@ -13,7 +13,7 @@ from weevr.config.parser import (
     validate_config_version,
 )
 from weevr.config.resolver import build_param_context, resolve_references, resolve_variables
-from weevr.config.schema import validate_schema
+from weevr.config.validation import validate_schema
 from weevr.errors import ModelValidationError
 from weevr.model import Loom, Thread, Weave
 

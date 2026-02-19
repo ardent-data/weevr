@@ -1,20 +1,18 @@
-"""Pydantic schema models for config validation."""
+"""Pre-resolution schema validation for the config loading pipeline.
 
-from typing import Any, Literal
+These loose schemas validate config structure *before* variable substitution.
+They intentionally use ``dict[str, Any]`` and ``extra="allow"`` so that
+``${...}`` placeholder strings pass validation.  Strict domain-model
+validation happens as the final step of ``load_config()`` via
+``model_validate()``.
+"""
+
+from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
 from weevr.errors import ConfigSchemaError
-
-
-class ParamSpec(BaseModel):
-    """Parameter specification for typed validation."""
-
-    name: str
-    type: Literal["string", "int", "float", "bool", "date", "timestamp", "list[string]"]
-    required: bool = True
-    default: Any = None
-    description: str = ""
+from weevr.model.params import ParamsConfig
 
 
 class BaseConfig(BaseModel):
@@ -23,12 +21,12 @@ class BaseConfig(BaseModel):
     model_config = {"extra": "allow"}
 
     config_version: str
-    params: dict[str, ParamSpec] | None = None
+    params: dict[str, Any] | None = None
     defaults: dict[str, Any] | None = None
 
 
 class ThreadConfig(BaseConfig):
-    """Thread configuration schema (Phase 0 fields)."""
+    """Thread configuration schema (pre-resolution, Phase 0 fields)."""
 
     sources: dict[str, Any]
     steps: list[dict[str, Any]] = Field(default_factory=list)
@@ -42,32 +40,24 @@ class ThreadConfig(BaseConfig):
 
 
 class WeaveConfig(BaseConfig):
-    """Weave configuration schema."""
+    """Weave configuration schema (pre-resolution)."""
 
     threads: list[str]
     defaults: dict[str, Any] | None = None
 
 
 class LoomConfig(BaseConfig):
-    """Loom configuration schema."""
+    """Loom configuration schema (pre-resolution)."""
 
     weaves: list[str]
     defaults: dict[str, Any] | None = None
 
 
-class ParamsConfig(BaseModel):
-    """Parameter file schema (flat key-value structure)."""
-
-    config_version: str
-    # Allow arbitrary additional fields for params
-    model_config = {"extra": "allow"}
-
-
 def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
-    """Validate config dict against appropriate Pydantic schema.
+    """Validate a raw config dict against the appropriate pre-resolution schema.
 
     Args:
-        raw: Raw config dictionary
+        raw: Raw config dictionary (variables not yet resolved)
         config_type: Type of config (thread, weave, loom, params)
 
     Returns:
@@ -76,7 +66,7 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
     Raises:
         ConfigSchemaError: If validation fails
     """
-    model_map = {
+    model_map: dict[str, type[BaseModel]] = {
         "thread": ThreadConfig,
         "weave": WeaveConfig,
         "loom": LoomConfig,
@@ -92,8 +82,8 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
 
     try:
         return model_class.model_validate(raw)
-    except ValidationError as e:
+    except ValidationError as exc:
         raise ConfigSchemaError(
-            f"Schema validation failed for {config_type} config: {e}",
-            cause=e,
-        ) from e
+            f"Schema validation failed for {config_type} config: {exc}",
+            cause=exc,
+        ) from exc
