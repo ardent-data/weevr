@@ -122,6 +122,7 @@ class DedupParams(FrozenBase):
 
     keys: list[str]
     order_by: str | None = None
+    keep: Literal["first", "last"] = "last"
 
 
 class SortParams(FrozenBase):
@@ -136,6 +137,7 @@ class UnionParams(FrozenBase):
 
     sources: list[str]
     mode: Literal["by_name", "by_position"] = "by_name"
+    allow_missing: bool = False
 
 
 # ---------------------------------------------------------------------------

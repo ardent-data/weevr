@@ -141,6 +141,18 @@ class TestStepDiscriminator:
         assert isinstance(step, DedupStep)
         assert step.dedup.order_by == "ts"
 
+    def test_dedup_default_keep(self):
+        """DedupParams defaults keep to 'last'."""
+        step = self._validate({"dedup": {"keys": ["id"]}})
+        assert isinstance(step, DedupStep)
+        assert step.dedup.keep == "last"
+
+    def test_dedup_keep_first(self):
+        """DedupParams accepts keep='first'."""
+        step = self._validate({"dedup": {"keys": ["id"], "keep": "first"}})
+        assert isinstance(step, DedupStep)
+        assert step.dedup.keep == "first"
+
     def test_sort_step(self):
         """Dict with 'sort' key dispatches to SortStep."""
         step = self._validate({"sort": {"columns": ["date", "id"]}})
@@ -152,6 +164,18 @@ class TestStepDiscriminator:
         step = self._validate({"union": {"sources": ["table_a", "table_b"]}})
         assert isinstance(step, UnionStep)
         assert step.union.mode == "by_name"
+
+    def test_union_default_allow_missing(self):
+        """UnionParams defaults allow_missing to False."""
+        step = self._validate({"union": {"sources": ["s1", "s2"]}})
+        assert isinstance(step, UnionStep)
+        assert step.union.allow_missing is False
+
+    def test_union_allow_missing_true(self):
+        """UnionParams accepts allow_missing=True."""
+        step = self._validate({"union": {"sources": ["s1", "s2"], "allow_missing": True}})
+        assert isinstance(step, UnionStep)
+        assert step.union.allow_missing is True
 
     def test_unknown_step_type_raises(self):
         """Dict with an unknown step key raises ValidationError."""
