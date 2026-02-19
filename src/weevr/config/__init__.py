@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.parser import (
     detect_config_type,
@@ -12,13 +14,15 @@ from weevr.config.parser import (
 )
 from weevr.config.resolver import build_param_context, resolve_references, resolve_variables
 from weevr.config.schema import validate_schema
+from weevr.errors import ModelValidationError
+from weevr.model import Loom, Thread, Weave
 
 
 def load_config(
     path: str | Path,
     runtime_params: dict[str, Any] | None = None,
     param_file: str | Path | None = None,
-) -> dict[str, Any]:
+) -> Thread | Weave | Loom | dict[str, Any]:
     """Load and validate a weevr configuration file.
 
     This function orchestrates the full config loading pipeline:
@@ -30,6 +34,7 @@ def load_config(
     6. Resolve variable references (${var} and ${var:-default})
     7. Resolve references to child configs (threads, weaves)
     8. Apply inheritance cascade (loom -> weave -> thread)
+    9. Hydrate into typed domain model (thread, weave, loom only)
 
     Args:
         path: Path to the config file (thread, weave, or loom)
@@ -37,10 +42,8 @@ def load_config(
         param_file: Optional parameter file path
 
     Returns:
-        Fully resolved and validated configuration dictionary with:
-        - All variables interpolated
-        - References resolved (child configs in _resolved_threads/_resolved_weaves)
-        - Inheritance applied where applicable
+        A frozen, typed domain model instance (Thread, Weave, or Loom) for
+        thread/weave/loom config types. Returns a plain dict for params configs.
 
     Raises:
         ConfigParseError: YAML syntax errors, file not found
@@ -48,6 +51,7 @@ def load_config(
         ConfigSchemaError: Schema validation failures
         VariableResolutionError: Unresolved variables without defaults
         ReferenceResolutionError: Missing referenced files, circular dependencies
+        ModelValidationError: Semantic validation failures during model hydration
     """
     # Step 1: Parse YAML
     raw = parse_yaml(path)
@@ -119,4 +123,21 @@ def load_config(
             merged = apply_inheritance(None, weave_defaults, thread)
             resolved_with_refs["_resolved_threads"][i] = merged
 
+    # Step 9: Hydrate into typed domain model
+    model_map: dict[str, type[Thread | Weave | Loom]] = {
+        "thread": Thread,
+        "weave": Weave,
+        "loom": Loom,
+    }
+    if config_type in model_map:
+        try:
+            return model_map[config_type].model_validate(resolved_with_refs)
+        except ValidationError as exc:
+            raise ModelValidationError(
+                f"Model hydration failed for {config_type}: {exc}",
+                cause=exc,
+                file_path=str(path),
+            ) from exc
+
+    # params config type returns a plain dict
     return resolved_with_refs
