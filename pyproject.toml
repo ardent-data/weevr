@@ -22,7 +22,9 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "delta-spark>=3.2.0,<3.3.0",
     "pyright>=1.1.408",
+    "pyspark>=3.5.0,<3.6.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.0",
