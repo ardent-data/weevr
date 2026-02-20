@@ -48,6 +48,7 @@ class TestThreadHydrationViaPipeline:
         assert result.sources["customers"].alias == "raw.customers"
         assert isinstance(result.target, Target)
         assert result.steps == []
+        assert isinstance(result.name, str)  # name field exists; value set by loader (Task 3)
 
     def test_full_thread_all_nested_models(self):
         """Full thread YAML hydrates all nested model types correctly."""

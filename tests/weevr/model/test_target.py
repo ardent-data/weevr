@@ -101,6 +101,18 @@ class TestTarget:
         assert t.columns is None
         assert t.partition_by is None
         assert t.audit_template is None
+        assert t.alias is None
+        assert t.path is None
+
+    def test_with_alias(self):
+        """Target accepts alias for Delta table name."""
+        t = Target(alias="gold.dim_customer")
+        assert t.alias == "gold.dim_customer"
+
+    def test_with_path(self):
+        """Target accepts path for physical write location."""
+        t = Target(path="/mnt/lakehouse/tables/dim_customer")
+        assert t.path == "/mnt/lakehouse/tables/dim_customer"
 
     def test_frozen(self):
         """Target is immutable."""

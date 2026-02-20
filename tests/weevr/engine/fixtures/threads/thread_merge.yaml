@@ -1,0 +1,13 @@
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: ${src_path}
+target:
+  path: ${tgt_path}
+write:
+  mode: merge
+  match_keys: [id]
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore

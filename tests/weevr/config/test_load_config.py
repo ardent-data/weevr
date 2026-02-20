@@ -157,6 +157,54 @@ target:
         assert "dimensions" in result.weaves
 
 
+class TestLoadConfigNameInjection:
+    """Test that load_config() derives and injects name from file path."""
+
+    def test_thread_name_from_project_path(self):
+        """Thread loaded from project path gets dot-separated name."""
+        thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
+        result = load_config(thread_path)
+        assert isinstance(result, Thread)
+        assert result.name == "dimensions.dim_customer"
+
+    def test_thread_name_from_top_level_path(self):
+        """Thread loaded from a top-level file gets stem as name."""
+        result = load_config(FIXTURES / "valid_thread.yaml")
+        assert isinstance(result, Thread)
+        assert result.name == "valid_thread"
+
+    def test_weave_name_derived(self):
+        """Weave loaded from project path gets name from stem."""
+        result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
+        assert isinstance(result, Weave)
+        assert result.name == "dimensions"
+
+    def test_loom_name_derived(self):
+        """Loom loaded from project path gets name from stem."""
+        result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
+        assert isinstance(result, Loom)
+        assert result.name == "nightly"
+
+    def test_thread_name_not_overridden_when_present(self, tmp_path):
+        """Explicit name in config is preserved over derived name."""
+        thread_file = tmp_path / "threads" / "my_thread.yaml"
+        thread_file.parent.mkdir(parents=True)
+        thread_file.write_text(
+            """
+config_version: "1.0"
+name: custom.name
+sources:
+  data:
+    type: delta
+    alias: lakehouse
+target: {}
+"""
+        )
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert result.name == "custom.name"
+
+
 class TestLoadConfigErrorHandling:
     """Test error handling in config loading."""
 

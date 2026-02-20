@@ -78,6 +78,7 @@ class JoinParams(FrozenBase):
     source: str
     type: Literal["inner", "left", "right", "full", "cross", "semi", "anti"] = "inner"
     on: list[JoinKeyPair]
+    null_safe: bool = True
 
     @field_validator("on", mode="before")
     @classmethod

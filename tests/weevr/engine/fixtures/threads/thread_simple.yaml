@@ -1,0 +1,9 @@
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: ${src_path}
+target:
+  path: ${tgt_path}
+write:
+  mode: overwrite

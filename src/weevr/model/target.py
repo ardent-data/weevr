@@ -30,6 +30,8 @@ class ColumnMapping(FrozenBase):
 class Target(FrozenBase):
     """Write destination with column mapping and partitioning configuration."""
 
+    alias: str | None = None
+    path: str | None = None
     mapping_mode: Literal["auto", "explicit"] = "auto"
     columns: dict[str, ColumnMapping] | None = None
     partition_by: list[str] | None = None

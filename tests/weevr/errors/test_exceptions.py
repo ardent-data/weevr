@@ -179,6 +179,80 @@ class TestSpecificExceptions:
             raise ConfigSchemaError("test")
 
 
+class TestExecutionError:
+    """Test ExecutionError context fields."""
+
+    def test_minimal_construction(self):
+        """ExecutionError constructs with message only."""
+        err = ExecutionError("execution failed")
+        assert str(err) == "execution failed"
+        assert err.thread_name is None
+        assert err.step_index is None
+        assert err.step_type is None
+        assert err.source_name is None
+
+    def test_with_thread_name(self):
+        """thread_name appears in string representation."""
+        err = ExecutionError("failed", thread_name="dimensions.dim_customer")
+        assert "dimensions.dim_customer" in str(err)
+        assert err.thread_name == "dimensions.dim_customer"
+
+    def test_with_step_context(self):
+        """step_index and step_type appear in string representation."""
+        err = ExecutionError("bad step", step_index=2, step_type="filter")
+        result = str(err)
+        assert "step 2" in result
+        assert "filter" in result
+        assert err.step_index == 2
+        assert err.step_type == "filter"
+
+    def test_with_step_index_only(self):
+        """step_index without step_type still appears."""
+        err = ExecutionError("bad step", step_index=0)
+        assert "step 0" in str(err)
+
+    def test_with_source_name(self):
+        """source_name appears in string representation."""
+        err = ExecutionError("read failed", source_name="customers")
+        assert "customers" in str(err)
+        assert err.source_name == "customers"
+
+    def test_with_all_context(self):
+        """All context fields appear in string representation."""
+        cause = ValueError("underlying error")
+        err = ExecutionError(
+            "pipeline failed",
+            cause=cause,
+            thread_name="facts.fact_order",
+            step_index=3,
+            step_type="join",
+            source_name="orders",
+        )
+        result = str(err)
+        assert "pipeline failed" in result
+        assert "facts.fact_order" in result
+        assert "step 3" in result
+        assert "join" in result
+        assert "orders" in result
+        assert "caused by" in result
+        assert "underlying error" in result
+
+    def test_spark_error_inherits_context(self):
+        """SparkError inherits ExecutionError context fields."""
+        err = SparkError("spark failed", thread_name="t1", step_index=1)
+        assert isinstance(err, ExecutionError)
+        assert err.thread_name == "t1"
+        assert "t1" in str(err)
+
+    def test_catchable_as_execution_error(self):
+        """SparkError is catchable as ExecutionError and WeevError."""
+        with pytest.raises(ExecutionError):
+            raise SparkError("spark failure")
+
+        with pytest.raises(WeevError):
+            raise SparkError("spark failure")
+
+
 class TestModelValidationError:
     """Test ModelValidationError specific behaviour."""
 

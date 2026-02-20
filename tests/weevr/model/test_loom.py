@@ -61,3 +61,13 @@ class TestLoom:
             {"config_version": "1.0", "weaves": ["a", "b"], "defaults": {"y": 2}}
         )
         assert Loom.model_validate(loom.model_dump()) == loom
+
+    def test_name_defaults_to_empty_string(self):
+        """name defaults to empty string when not provided."""
+        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        assert loom.name == ""
+
+    def test_name_can_be_set(self):
+        """name is stored when explicitly provided."""
+        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"], "name": "nightly"})
+        assert loom.name == "nightly"
