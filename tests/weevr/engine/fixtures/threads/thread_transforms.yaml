@@ -1,0 +1,25 @@
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: ${src_path}
+steps:
+  - filter:
+      expr: "amount > 0"
+  - derive:
+      columns:
+        doubled: "amount * 2"
+  - select:
+      columns: [id, amount, doubled]
+  - drop:
+      columns: [amount]
+  - rename:
+      columns:
+        doubled: total
+  - cast:
+      columns:
+        total: string
+target:
+  path: ${tgt_path}
+write:
+  mode: overwrite

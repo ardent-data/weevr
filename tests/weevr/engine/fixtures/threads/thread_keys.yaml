@@ -1,0 +1,16 @@
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: ${src_path}
+keys:
+  business_key: [id]
+  surrogate_key:
+    name: sk
+  change_detection:
+    name: row_hash
+    columns: [id, name]
+target:
+  path: ${tgt_path}
+write:
+  mode: overwrite
