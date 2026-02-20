@@ -111,8 +111,10 @@ def write_target(
             writer.save(target_path)
 
         elif mode == "merge":
-            assert write_config is not None
-            assert write_config.match_keys is not None
+            if write_config is None:
+                raise ExecutionError("merge mode requires a write_config with match_keys")
+            if write_config.match_keys is None:
+                raise ExecutionError("merge mode requires 'match_keys' to be set")
             _execute_merge(spark, df, write_config, target_path)
 
         return row_count
@@ -133,7 +135,8 @@ def _execute_merge(
     target_path: str,
 ) -> None:
     """Execute a Delta merge operation against an existing table."""
-    assert write_config.match_keys is not None
+    if write_config.match_keys is None:
+        raise ExecutionError("merge mode requires 'match_keys' to be set")
     merge_condition = " AND ".join(
         f"target.{k} = source.{k}" for k in write_config.match_keys
     )
@@ -152,7 +155,12 @@ def _execute_merge(
         has_when_clause = True
     # on_no_match_target == "ignore": no insert clause → new source rows discarded
 
-    if write_config.on_no_match_source in ("delete", "soft_delete"):
+    if write_config.on_no_match_source == "soft_delete":
+        raise ExecutionError(
+            "on_no_match_source='soft_delete' is not supported in this version; "
+            "use 'delete' or 'ignore'"
+        )
+    if write_config.on_no_match_source == "delete":
         merger = merger.whenNotMatchedBySourceDelete()
         has_when_clause = True
     # on_no_match_source == "ignore": no delete clause → unmatched target rows kept

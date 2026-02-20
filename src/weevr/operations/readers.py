@@ -52,11 +52,13 @@ def read_sources(spark: SparkSession, sources: dict[str, Source]) -> dict[str, D
 def _read_raw(spark: SparkSession, source: Source) -> DataFrame:
     """Read source data without applying deduplication."""
     if source.type == "delta":
-        assert source.alias is not None
+        if source.alias is None:
+            raise ExecutionError("Delta source requires 'alias' to be set")
         return spark.read.format("delta").load(source.alias)
 
     if source.type in {"csv", "json", "parquet"}:
-        assert source.path is not None
+        if source.path is None:
+            raise ExecutionError(f"'{source.type}' source requires 'path' to be set")
         return spark.read.format(source.type).options(**source.options).load(source.path)
 
     raise ExecutionError(f"Unsupported source type: '{source.type}'")

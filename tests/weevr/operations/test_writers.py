@@ -5,6 +5,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import LongType, StringType, StructField, StructType
 
 from spark_helpers import create_delta_table
+from weevr.errors.exceptions import ExecutionError
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
@@ -427,3 +428,18 @@ class TestWriteTargetMerge:
         write_target(spark, simple_df, target, write_config, path)
         result = spark.read.format("delta").load(path)
         assert result.count() == 2
+
+    def test_merge_soft_delete_raises_execution_error(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_soft_delete")
+        create_delta_table(spark, path, [{"id": 1, "val": "existing"}])
+        incoming = spark.createDataFrame([{"id": 1, "val": "updated"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_no_match_source="soft_delete",
+        )
+        with pytest.raises(ExecutionError, match="soft_delete"):
+            write_target(spark, incoming, target, write_config, path)
