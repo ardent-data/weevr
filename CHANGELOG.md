@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/ardent-data/weevr/compare/weevr-v0.1.2...weevr-v0.2.0) (2026-02-19)
+
+
+### Features
+
+* **config:** add error hierarchy and config loading pipeline ([#10](https://github.com/ardent-data/weevr/issues/10)) ([0db6c4f](https://github.com/ardent-data/weevr/commit/0db6c4fefacd82ba76b2507eb59d21d238b8a5d8))
+* **model:** add typed domain object model with config hydration ([#11](https://github.com/ardent-data/weevr/issues/11)) ([60fa407](https://github.com/ardent-data/weevr/commit/60fa407eb245f2899bce4a6d8960c22bf70d8f13))
+
 ## [0.1.2](https://github.com/ardent-data/weevr/compare/weevr-v0.1.1...weevr-v0.1.2) (2026-02-10)
 
 
