@@ -4,7 +4,9 @@ from delta.tables import DeltaTable
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from weevr.errors.exceptions import ExecutionError
 from weevr.model.target import Target
+from weevr.model.write import WriteConfig
 
 
 def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> DataFrame:
@@ -64,6 +66,100 @@ def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> 
 
     # explicit with no columns declared — nothing to select, return as-is.
     return result
+
+
+def write_target(
+    spark: SparkSession,
+    df: DataFrame,
+    target: Target,
+    write_config: WriteConfig | None,
+    target_path: str,
+) -> int:
+    """Write a DataFrame to a Delta table.
+
+    Args:
+        spark: Active SparkSession.
+        df: DataFrame to write.
+        target: Target configuration (partition_by).
+        write_config: Write mode and merge parameters. Defaults to overwrite when None.
+        target_path: Physical path for the Delta table.
+
+    Returns:
+        Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
+
+    Raises:
+        ExecutionError: If the write operation fails.
+    """
+    mode = write_config.mode if write_config else "overwrite"
+    partition_cols = target.partition_by or []
+    target_exists = _delta_table_exists(spark, target_path)
+
+    try:
+        row_count = df.count()
+
+        if mode == "overwrite" or not target_exists:
+            # First write (any mode) and overwrite: write as overwrite to create/replace table.
+            writer = df.write.format("delta").mode("overwrite")
+            if partition_cols:
+                writer = writer.partitionBy(*partition_cols)
+            writer.save(target_path)
+
+        elif mode == "append":
+            writer = df.write.format("delta").mode("append")
+            if partition_cols:
+                writer = writer.partitionBy(*partition_cols)
+            writer.save(target_path)
+
+        elif mode == "merge":
+            assert write_config is not None
+            assert write_config.match_keys is not None
+            _execute_merge(spark, df, write_config, target_path)
+
+        return row_count
+
+    except ExecutionError:
+        raise
+    except Exception as exc:
+        raise ExecutionError(
+            f"Failed to write to '{target_path}' (mode={mode})",
+            cause=exc,
+        ) from exc
+
+
+def _execute_merge(
+    spark: SparkSession,
+    df: DataFrame,
+    write_config: WriteConfig,
+    target_path: str,
+) -> None:
+    """Execute a Delta merge operation against an existing table."""
+    assert write_config.match_keys is not None
+    merge_condition = " AND ".join(
+        f"target.{k} = source.{k}" for k in write_config.match_keys
+    )
+    delta_table = DeltaTable.forPath(spark, target_path)
+    merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
+
+    has_when_clause = False
+
+    if write_config.on_match == "update":
+        merger = merger.whenMatchedUpdateAll()
+        has_when_clause = True
+    # on_match == "ignore": no whenMatched clause → matched rows unchanged
+
+    if write_config.on_no_match_target == "insert":
+        merger = merger.whenNotMatchedInsertAll()
+        has_when_clause = True
+    # on_no_match_target == "ignore": no insert clause → new source rows discarded
+
+    if write_config.on_no_match_source in ("delete", "soft_delete"):
+        merger = merger.whenNotMatchedBySourceDelete()
+        has_when_clause = True
+    # on_no_match_source == "ignore": no delete clause → unmatched target rows kept
+
+    # Delta requires at least one WHEN clause; if all are "ignore", nothing to do.
+    if has_when_clause:
+        merger.execute()
 
 
 def _delta_table_exists(spark: SparkSession, path: str) -> bool:

@@ -1,4 +1,4 @@
-"""Tests for target mapping (apply_target_mapping)."""
+"""Tests for target mapping (apply_target_mapping) and Delta writers (write_target)."""
 
 import pytest
 from pyspark.sql import SparkSession
@@ -7,7 +7,8 @@ from pyspark.sql.types import LongType, StringType, StructField, StructType
 from spark_helpers import create_delta_table
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.types import SparkExpr
-from weevr.operations.writers import apply_target_mapping
+from weevr.model.write import WriteConfig
+from weevr.operations.writers import apply_target_mapping, write_target
 
 
 @pytest.fixture()
@@ -227,3 +228,202 @@ class TestExplicitMode:
         )
         result = apply_target_mapping(source_df, target, spark)
         assert result.count() == source_df.count()
+
+
+# ---------------------------------------------------------------------------
+# write_target tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def simple_df(spark: SparkSession):
+    """Small DataFrame for write tests."""
+    return spark.createDataFrame([
+        {"id": 1, "val": "a"},
+        {"id": 2, "val": "b"},
+    ])
+
+
+class TestWriteTargetOverwrite:
+    """Overwrite write mode."""
+
+    def test_overwrite_creates_new_table(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("overwrite_new")
+        target = Target(path=path)
+        write_config = WriteConfig(mode="overwrite")
+        rows = write_target(spark, simple_df, target, write_config, path)
+        assert rows == 2
+        assert spark.read.format("delta").load(path).count() == 2
+
+    def test_overwrite_replaces_existing_table(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("overwrite_existing")
+        create_delta_table(spark, path, [{"id": 99, "val": "old"}])
+        target = Target(path=path)
+        write_config = WriteConfig(mode="overwrite")
+        write_target(spark, simple_df, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
+        assert result.filter("id = 99").count() == 0
+
+    def test_overwrite_returns_row_count(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("overwrite_count")
+        target = Target(path=path)
+        rows = write_target(spark, simple_df, target, None, path)
+        assert rows == 2
+
+    def test_overwrite_with_partition(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("overwrite_partition")
+        df = spark.createDataFrame([{"id": 1, "region": "eu"}, {"id": 2, "region": "us"}])
+        target = Target(path=path, partition_by=["region"])
+        write_target(spark, df, target, WriteConfig(mode="overwrite"), path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
+
+
+class TestWriteTargetAppend:
+    """Append write mode."""
+
+    def test_append_adds_rows_to_existing_table(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("append_existing")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+        target = Target(path=path)
+        write_target(spark, simple_df, target, WriteConfig(mode="append"), path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 3
+
+    def test_append_returns_row_count(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("append_count")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+        target = Target(path=path)
+        rows = write_target(spark, simple_df, target, WriteConfig(mode="append"), path)
+        assert rows == 2
+
+
+class TestWriteTargetMerge:
+    """Merge write mode — all on_match / on_no_match_target / on_no_match_source combos."""
+
+    def test_merge_update_on_match(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_update")
+        create_delta_table(spark, path, [{"id": 1, "val": "old"}, {"id": 2, "val": "keep"}])
+        incoming = spark.createDataFrame([{"id": 1, "val": "new"}])
+        target = Target(path=path)
+        write_config = WriteConfig(mode="merge", match_keys=["id"], on_match="update")
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.filter("id = 1").collect()[0]["val"] == "new"
+        assert result.filter("id = 2").collect()[0]["val"] == "keep"
+
+    def test_merge_ignore_on_match(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_ignore_match")
+        create_delta_table(spark, path, [{"id": 1, "val": "original"}])
+        incoming = spark.createDataFrame([{"id": 1, "val": "should_not_update"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_match="ignore",
+            on_no_match_target="ignore",
+        )
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.collect()[0]["val"] == "original"
+
+    def test_merge_insert_on_no_match_target(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_insert")
+        create_delta_table(spark, path, [{"id": 1, "val": "existing"}])
+        incoming = spark.createDataFrame([{"id": 2, "val": "new"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_no_match_target="insert",
+        )
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
+
+    def test_merge_ignore_on_no_match_target(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_ignore_target")
+        create_delta_table(spark, path, [{"id": 1, "val": "existing"}])
+        incoming = spark.createDataFrame([{"id": 2, "val": "not_inserted"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_match="ignore",
+            on_no_match_target="ignore",
+        )
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 1
+
+    def test_merge_delete_on_no_match_source(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_delete_source")
+        create_delta_table(spark, path, [
+            {"id": 1, "val": "keep_matched"},
+            {"id": 2, "val": "delete_unmatched"},
+        ])
+        incoming = spark.createDataFrame([{"id": 1, "val": "updated"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_match="update",
+            on_no_match_source="delete",
+        )
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 1
+        assert result.collect()[0]["id"] == 1
+
+    def test_merge_ignore_on_no_match_source(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("merge_ignore_source")
+        create_delta_table(spark, path, [
+            {"id": 1, "val": "matched"},
+            {"id": 2, "val": "unmatched_kept"},
+        ])
+        incoming = spark.createDataFrame([{"id": 1, "val": "updated"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_match="update",
+            on_no_match_source="ignore",
+        )
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
+
+    def test_merge_on_new_target_writes_all_rows(
+        self, spark: SparkSession, tmp_delta_path, simple_df
+    ) -> None:
+        path = tmp_delta_path("merge_new_target")
+        target = Target(path=path)
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        write_target(spark, simple_df, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
