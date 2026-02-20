@@ -19,10 +19,10 @@ class TestWriteConfig:
         w = WriteConfig(mode="append")
         assert w.mode == "append"
 
-    def test_insert_only_mode(self):
-        """Insert-only mode is valid."""
-        w = WriteConfig(mode="insert_only")
-        assert w.mode == "insert_only"
+    def test_insert_only_mode_invalid(self):
+        """insert_only is no longer a valid write mode."""
+        with pytest.raises(ValidationError):
+            WriteConfig(mode="insert_only")  # type: ignore[arg-type]
 
     def test_merge_mode_with_keys(self):
         """Merge mode is valid when match_keys is supplied."""

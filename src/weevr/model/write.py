@@ -14,7 +14,7 @@ class WriteConfig(FrozenBase):
     - ``mode == "merge"`` requires ``match_keys`` to be set.
     """
 
-    mode: Literal["overwrite", "append", "merge", "insert_only"] = "overwrite"
+    mode: Literal["overwrite", "append", "merge"] = "overwrite"
     match_keys: list[str] | None = None
     on_match: Literal["update", "ignore"] = "update"
     on_no_match_target: Literal["insert", "ignore"] = "insert"

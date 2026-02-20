@@ -9,6 +9,7 @@ from weevr.model.params import ParamSpec
 class Weave(FrozenBase):
     """A collection of thread references with optional shared defaults."""
 
+    name: str = ""
     config_version: str
     threads: list[str]
     defaults: dict[str, Any] | None = None

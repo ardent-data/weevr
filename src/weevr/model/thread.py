@@ -20,6 +20,7 @@ class Thread(FrozenBase):
     of transformation steps, and a single target.
     """
 
+    name: str = ""
     config_version: str
     sources: dict[str, Source]
     steps: list[Step] = []

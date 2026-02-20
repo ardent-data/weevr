@@ -87,6 +87,16 @@ class TestJoinParams:
         with pytest.raises(ValidationError):
             JoinParams(source="t", on=["id"], type="outer")  # type: ignore[arg-type,list-item]
 
+    def test_null_safe_default_true(self):
+        """null_safe defaults to True."""
+        jp = JoinParams(source="t", on=["id"])  # type: ignore[list-item]
+        assert jp.null_safe is True
+
+    def test_null_safe_can_be_disabled(self):
+        """null_safe can be set to False."""
+        jp = JoinParams(source="t", on=["id"], null_safe=False)  # type: ignore[list-item]
+        assert jp.null_safe is False
+
 
 class TestStepDiscriminator:
     """Test Step discriminated union dispatch for all 10 step types."""

@@ -165,3 +165,23 @@ class TestThreadFreezeAndRoundTrip:
         restored = Thread.model_validate(t.model_dump())
         assert restored.config_version == t.config_version
         assert len(restored.steps) == 1
+
+
+class TestThreadNameField:
+    """Test Thread.name field behaviour."""
+
+    def test_name_defaults_to_empty_string(self):
+        """name defaults to empty string when not provided."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.name == ""
+
+    def test_name_can_be_set(self):
+        """name is stored when explicitly provided."""
+        t = Thread.model_validate({**_MINIMAL, "name": "dimensions.dim_customer"})
+        assert t.name == "dimensions.dim_customer"
+
+    def test_name_preserved_in_round_trip(self):
+        """name survives a model_dump/model_validate round-trip."""
+        t = Thread.model_validate({**_MINIMAL, "name": "facts.fact_order"})
+        restored = Thread.model_validate(t.model_dump())
+        assert restored.name == "facts.fact_order"

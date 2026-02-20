@@ -61,3 +61,13 @@ class TestWeave:
             {"config_version": "1.0", "threads": ["a", "b"], "defaults": {"x": 1}}
         )
         assert Weave.model_validate(w.model_dump()) == w
+
+    def test_name_defaults_to_empty_string(self):
+        """name defaults to empty string when not provided."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        assert w.name == ""
+
+    def test_name_can_be_set(self):
+        """name is stored when explicitly provided."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"], "name": "dimensions"})
+        assert w.name == "dimensions"
