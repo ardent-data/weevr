@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/ardent-data/weevr/compare/weevr-v0.2.0...weevr-v0.3.0) (2026-02-20)
+
+
+### Features
+
+* **engine:** add thread execution pipeline with source readers, transforms, and Delta writers ([#13](https://github.com/ardent-data/weevr/issues/13)) ([3fc7857](https://github.com/ardent-data/weevr/commit/3fc78577ead715798471ddc4c17f53fd6e50d44f))
+
 ## [0.2.0](https://github.com/ardent-data/weevr/compare/weevr-v0.1.2...weevr-v0.2.0) (2026-02-19)
 
 
