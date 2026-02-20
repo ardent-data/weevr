@@ -1,0 +1,39 @@
+{
+    "name": "weevr",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    // Mount .venv as an isolated Docker volume so the Linux venv never mixes
+    // with any host (Windows) venv created outside the container.
+    "mounts": [
+        "source=weevr-venv,target=${containerWorkspaceFolder}/.venv,type=volume"
+    ],
+    // Sync all dev dependencies (including pyspark + delta-spark) on first open.
+    "postCreateCommand": "uv sync --dev",
+    "remoteEnv": {
+        // Prefer the system Python 3.11 that ships with the base image.
+        "UV_PYTHON_PREFERENCE": "system"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-pyright.pyright",
+                "charliermarsh.ruff",
+                "the0807.uv-toolkit",
+                "redhat.vscode-yaml",
+                "tamasfe.even-better-toml",
+                "EditorConfig.EditorConfig",
+                "github.vscode-pull-request-github",
+                "github.vscode-github-actions",
+                "davidanson.vscode-markdownlint",
+                "streetsidesoftware.code-spell-checker"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+            }
+        }
+    },
+    "remoteUser": "vscode"
+}
