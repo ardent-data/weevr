@@ -100,13 +100,57 @@ class ModelValidationError(ConfigError):
 
 
 class ExecutionError(WeevError):
-    """Base exception for execution-time errors (M03+)."""
+    """Base exception for execution-time errors.
 
-    pass
+    Carries optional execution context to pinpoint where a failure occurred
+    within a thread pipeline.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        thread_name: str | None = None,
+        step_index: int | None = None,
+        step_type: str | None = None,
+        source_name: str | None = None,
+    ) -> None:
+        """Initialize ExecutionError.
+
+        Args:
+            message: Human-readable error message.
+            cause: Optional underlying exception.
+            thread_name: Name of the thread where the error occurred.
+            step_index: Zero-based index of the pipeline step that failed.
+            step_type: Step type key (e.g. "filter", "join") that failed.
+            source_name: Source alias that caused the error.
+        """
+        super().__init__(message, cause)
+        self.thread_name = thread_name
+        self.step_index = step_index
+        self.step_type = step_type
+        self.source_name = source_name
+
+    def __str__(self) -> str:
+        """Return string representation with execution context."""
+        parts = [self.message]
+        if self.thread_name:
+            parts.append(f"in thread '{self.thread_name}'")
+        if self.step_index is not None:
+            step_label = f"step {self.step_index}"
+            if self.step_type:
+                step_label += f" ({self.step_type})"
+            parts.append(f"at {step_label}")
+        if self.source_name:
+            parts.append(f"reading source '{self.source_name}'")
+        base_msg = " ".join(parts)
+        if self.cause:
+            return f"{base_msg} (caused by: {self.cause})"
+        return base_msg
 
 
 class SparkError(ExecutionError):
-    """Spark-specific execution errors (M03+)."""
+    """Spark-specific execution errors."""
 
     pass
 
