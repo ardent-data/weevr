@@ -4,14 +4,12 @@
         "dockerfile": "Dockerfile",
         "context": ".."
     },
-    // Mount .venv as an isolated Docker volume so the Linux venv never mixes
-    // with any host (Windows) venv created outside the container.
-    "mounts": [
-        "source=weevr-venv,target=${containerWorkspaceFolder}/.venv,type=volume"
-    ],
     // Sync all dev dependencies (including pyspark + delta-spark) on first open.
     "postCreateCommand": "uv sync --dev",
     "remoteEnv": {
+        // Store the virtual environment in the container home directory so it
+        // never conflicts with any Windows .venv in the workspace mount.
+        "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv",
         // Prefer the system Python 3.11 that ships with the base image.
         "UV_PYTHON_PREFERENCE": "system"
     },
@@ -31,7 +29,7 @@
                 "streetsidesoftware.code-spell-checker"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+                "python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"
             }
         }
     },
