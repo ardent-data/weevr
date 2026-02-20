@@ -17,6 +17,32 @@ from weevr.config.validation import validate_schema
 from weevr.errors import ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
+_CONFIG_TYPE_DIRS = {"thread": "threads", "weave": "weaves", "loom": "looms"}
+
+
+def _derive_config_name(path: Path, config_type: str) -> str:
+    """Derive a dot-separated config name from a file path.
+
+    Searches for the standard config type directory (threads/, weaves/, looms/)
+    and returns everything after it with path separators replaced by dots. Falls
+    back to the file stem when the directory is not present in the path.
+
+    Examples:
+        project/threads/dimensions/dim_customer.yaml -> dimensions.dim_customer
+        project/weaves/dimensions.yaml -> dimensions
+        project/looms/nightly.yaml -> nightly
+        standalone_thread.yaml -> standalone_thread
+    """
+    type_dir = _CONFIG_TYPE_DIRS.get(config_type)
+    if type_dir:
+        parts = path.parts
+        for i, part in enumerate(parts):
+            if part == type_dir and i < len(parts) - 1:
+                after = parts[i + 1 :]
+                name_segments = list(after[:-1]) + [Path(after[-1]).stem]
+                return ".".join(name_segments)
+    return path.stem
+
 
 def load_config(
     path: str | Path,
@@ -130,6 +156,10 @@ def load_config(
         "loom": Loom,
     }
     if config_type in model_map:
+        # Inject name derived from file path (DEC-020, DEC-021).
+        # Only set when not already explicitly provided in the config.
+        if not resolved_with_refs.get("name"):
+            resolved_with_refs["name"] = _derive_config_name(Path(path), config_type)
         try:
             return model_map[config_type].model_validate(resolved_with_refs)
         except ValidationError as exc:
