@@ -1,11 +1,12 @@
 {
     "name": "weevr",
 
-    "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
 
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {},
         "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/node:1": {},
         "ghcr.io/devcontainers/features/java:1": {
             "version": "17.0.12-tem"
         },
@@ -14,15 +15,13 @@
         "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {}
     },
 
-    // Bind-mount host auth stores so container rebuilds don't require re-authentication.
-    // Git credentials are forwarded automatically by VS Code — no mount needed.
     "mounts": [
         // GitHub CLI: share host's ~/.config/gh so gh auth persists across rebuilds.
-        "source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
+        "source=${localEnv:USERPROFILE}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
         // Claude Code: share host's ~/.claude (global auth/config, not project .claude/).
-        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+        "source=${localEnv:USERPROFILE}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
         // Codex CLI: share host's ~/.codex so auth.json and config.toml persist across rebuilds.
-        "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
+        "source=${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
     // Sync all dev dependencies (including pyspark + delta-spark) on first open.
@@ -32,13 +31,8 @@
     "postStartCommand": "uv sync",
 
     "remoteEnv": {
-        // Store the virtual environment in the container home directory so it
-        // never conflicts with any Windows .venv in the workspace mount.
         "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv",
-        // Prefer the system Python 3.11 that ships with the base image.
         "UV_PYTHON_PREFERENCE": "system",
-        // Ensure PySpark driver and worker processes use the venv Python, not
-        // the system Python, so all installed packages are available at runtime.
         "PYSPARK_PYTHON": "/home/vscode/.venv/bin/python",
         "PYSPARK_DRIVER_PYTHON": "/home/vscode/.venv/bin/python"
     },
