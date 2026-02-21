@@ -9,8 +9,18 @@
         "ghcr.io/devcontainers/features/java:1": {
             "version": "17.0.12-tem"
         },
-        "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
+        "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
     },
+
+    // Bind-mount host auth stores so container rebuilds don't require re-authentication.
+    // Git credentials are forwarded automatically by VS Code — no mount needed.
+    "mounts": [
+        // GitHub CLI: share host's ~/.config/gh so gh auth persists across rebuilds.
+        "source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
+        // Claude Code: share host's ~/.claude (global auth/config, not project .claude/).
+        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached"
+    ],
 
     // Sync all dev dependencies (including pyspark + delta-spark) on first open.
     "postCreateCommand": "uv sync --dev",
