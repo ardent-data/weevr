@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/ardent-data/weevr/compare/weevr-v0.3.0...weevr-v0.3.1) (2026-02-21)
+
+
+### Bug Fixes
+
+* **devcontainer:** update image and add node feature to resolve yarn GPG error ([#16](https://github.com/ardent-data/weevr/issues/16)) ([00a3346](https://github.com/ardent-data/weevr/commit/00a3346e167f38de8dd767cb75e7e3931b246481))
+
 ## [0.3.0](https://github.com/ardent-data/weevr/compare/weevr-v0.2.0...weevr-v0.3.0) (2026-02-20)
 
 
