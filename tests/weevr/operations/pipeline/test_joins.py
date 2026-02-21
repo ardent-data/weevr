@@ -12,21 +12,25 @@ from weevr.operations.pipeline.joins import apply_join, apply_union
 @pytest.fixture()
 def left_df(spark: SparkSession):
     """Left-side DataFrame for join tests."""
-    return spark.createDataFrame([
-        {"id": 1, "left_val": "a"},
-        {"id": 2, "left_val": "b"},
-        {"id": 3, "left_val": "c"},
-    ])
+    return spark.createDataFrame(
+        [
+            {"id": 1, "left_val": "a"},
+            {"id": 2, "left_val": "b"},
+            {"id": 3, "left_val": "c"},
+        ]
+    )
 
 
 @pytest.fixture()
 def right_df(spark: SparkSession):
     """Right-side DataFrame for join tests."""
-    return spark.createDataFrame([
-        {"id": 1, "right_val": "x"},
-        {"id": 2, "right_val": "y"},
-        {"id": 4, "right_val": "z"},
-    ])
+    return spark.createDataFrame(
+        [
+            {"id": 1, "right_val": "x"},
+            {"id": 2, "right_val": "y"},
+            {"id": 4, "right_val": "z"},
+        ]
+    )
 
 
 @pytest.fixture()
@@ -104,10 +108,12 @@ class TestApplyJoin:
         assert result.count() == 9  # 3 * 3
 
     def test_null_safe_join_default_is_true(self, spark: SparkSession) -> None:
-        schema = StructType([
-            StructField("k", LongType(), nullable=True),
-            StructField("v", StringType()),
-        ])
+        schema = StructType(
+            [
+                StructField("k", LongType(), nullable=True),
+                StructField("v", StringType()),
+            ]
+        )
         left = spark.createDataFrame([(None, "left_null")], schema=schema)
         right = spark.createDataFrame([(None, "right_null")], schema=schema)
         src = {"right": right}
@@ -122,10 +128,12 @@ class TestApplyJoin:
         assert result.count() == 1
 
     def test_non_null_safe_join_excludes_null_matches(self, spark: SparkSession) -> None:
-        schema = StructType([
-            StructField("k", LongType(), nullable=True),
-            StructField("v", StringType()),
-        ])
+        schema = StructType(
+            [
+                StructField("k", LongType(), nullable=True),
+                StructField("v", StringType()),
+            ]
+        )
         left = spark.createDataFrame([(None, "left_null")], schema=schema)
         right = spark.createDataFrame([(None, "right_null")], schema=schema)
         src = {"right": right}

@@ -35,9 +35,7 @@ class TestDeltaSource:
 
         assert df.count() == 10
 
-    def test_missing_delta_path_raises_execution_error(
-        self, spark: SparkSession
-    ) -> None:
+    def test_missing_delta_path_raises_execution_error(self, spark: SparkSession) -> None:
         source = Source(type="delta", alias="/nonexistent/path/delta")
         with pytest.raises(ExecutionError) as exc_info:
             read_source(spark, "missing", source)
@@ -100,9 +98,7 @@ class TestFileSource:
         assert df.count() == 2
         assert "name" in df.columns
 
-    def test_unsupported_type_raises_execution_error(
-        self, spark: SparkSession
-    ) -> None:
+    def test_unsupported_type_raises_execution_error(self, spark: SparkSession) -> None:
         source = Source.__new__(Source)
         object.__setattr__(source, "type", "avro")
         object.__setattr__(source, "alias", None)
@@ -135,9 +131,7 @@ class TestSourceDedup:
 
         assert df.count() == 2
 
-    def test_dedup_with_order_by_keep_latest(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_dedup_with_order_by_keep_latest(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("dedup_with_order")
         data = [
             {"id": 1, "ts": 100, "val": "old"},
@@ -157,9 +151,7 @@ class TestSourceDedup:
         row_id1 = df.filter("id = 1").collect()[0]
         assert row_id1["val"] == "new"
 
-    def test_dedup_with_order_by_keep_earliest(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_dedup_with_order_by_keep_earliest(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("dedup_asc_order")
         data = [
             {"id": 1, "ts": 100, "val": "first"},
@@ -195,9 +187,7 @@ class TestSourceDedup:
 
         assert df.count() == 2
 
-    def test_no_dedup_when_not_configured(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_no_dedup_when_not_configured(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("no_dedup")
         data = [{"id": 1}, {"id": 1}, {"id": 2}]
         create_delta_table(spark, path, data)

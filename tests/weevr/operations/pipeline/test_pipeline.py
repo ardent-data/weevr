@@ -35,11 +35,13 @@ from weevr.operations.pipeline import run_pipeline
 @pytest.fixture()
 def base_df(spark: SparkSession):
     """Base DataFrame for pipeline tests."""
-    return spark.createDataFrame([
-        {"id": 1, "name": "alice", "amount": 100},
-        {"id": 2, "name": "bob", "amount": 50},
-        {"id": 3, "name": "carol", "amount": 200},
-    ])
+    return spark.createDataFrame(
+        [
+            {"id": 1, "name": "alice", "amount": 100},
+            {"id": 2, "name": "bob", "amount": 50},
+            {"id": 3, "name": "carol", "amount": 200},
+        ]
+    )
 
 
 class TestRunPipelineBasic:
@@ -89,14 +91,14 @@ class TestRunPipelineBasic:
         assert result.schema["amount"].dataType.typeName() == "string"
 
     def test_pipeline_with_dedup_step(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "ts": 1},
-            {"id": 1, "ts": 2},
-            {"id": 2, "ts": 3},
-        ])
-        steps: list[Step] = [
-            DedupStep(dedup=DedupParams(keys=["id"], order_by="ts", keep="first"))
-        ]
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "ts": 1},
+                {"id": 1, "ts": 2},
+                {"id": 2, "ts": 3},
+            ]
+        )
+        steps: list[Step] = [DedupStep(dedup=DedupParams(keys=["id"], order_by="ts", keep="first"))]
         result = run_pipeline(df, steps, {})
         assert result.count() == 2
 
@@ -111,16 +113,20 @@ class TestRunPipelineWithSources:
     """Dispatcher behaviour when steps require sources dict."""
 
     def test_pipeline_with_join_step(self, spark: SparkSession, base_df) -> None:
-        right = spark.createDataFrame([
-            {"id": 1, "score": 99},
-            {"id": 2, "score": 88},
-        ])
+        right = spark.createDataFrame(
+            [
+                {"id": 1, "score": 99},
+                {"id": 2, "score": 88},
+            ]
+        )
         steps: list[Step] = [
-            JoinStep(join=JoinParams(
-                source="scores",
-                type="inner",
-                on=[JoinKeyPair(left="id", right="id")],
-            ))
+            JoinStep(
+                join=JoinParams(
+                    source="scores",
+                    type="inner",
+                    on=[JoinKeyPair(left="id", right="id")],
+                )
+            )
         ]
         result = run_pipeline(base_df, steps, {"scores": right})
         assert result.count() == 2
@@ -128,9 +134,7 @@ class TestRunPipelineWithSources:
 
     def test_pipeline_with_union_step(self, spark: SparkSession, base_df) -> None:
         extra = spark.createDataFrame([{"id": 4, "name": "dave", "amount": 75}])
-        steps: list[Step] = [
-            UnionStep(union=UnionParams(sources=["extra"], mode="by_name"))
-        ]
+        steps: list[Step] = [UnionStep(union=UnionParams(sources=["extra"], mode="by_name"))]
         result = run_pipeline(base_df, steps, {"extra": extra})
         assert result.count() == 4
 
@@ -149,11 +153,13 @@ class TestRunPipelineErrorHandling:
 
     def test_execution_error_passes_through_unwrapped(self, base_df) -> None:
         steps: list[Step] = [
-            JoinStep(join=JoinParams(
-                source="nonexistent",
-                type="inner",
-                on=[JoinKeyPair(left="id", right="id")],
-            ))
+            JoinStep(
+                join=JoinParams(
+                    source="nonexistent",
+                    type="inner",
+                    on=[JoinKeyPair(left="id", right="id")],
+                )
+            )
         ]
         with pytest.raises(ExecutionError) as exc_info:
             run_pipeline(base_df, steps, {})

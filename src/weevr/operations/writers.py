@@ -137,9 +137,7 @@ def _execute_merge(
     """Execute a Delta merge operation against an existing table."""
     if write_config.match_keys is None:
         raise ExecutionError("merge mode requires 'match_keys' to be set")
-    merge_condition = " AND ".join(
-        f"target.{k} = source.{k}" for k in write_config.match_keys
-    )
+    merge_condition = " AND ".join(f"target.{k} = source.{k}" for k in write_config.match_keys)
     delta_table = DeltaTable.forPath(spark, target_path)
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
 

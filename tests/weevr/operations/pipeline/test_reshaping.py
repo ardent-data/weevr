@@ -9,64 +9,74 @@ from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
 class TestApplyDedup:
     """Tests for the dedup step handler."""
 
-    def test_dedup_without_order_removes_exact_duplicates(
-        self, spark: SparkSession
-    ) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "val": "a"},
-            {"id": 1, "val": "a"},
-            {"id": 2, "val": "b"},
-        ])
+    def test_dedup_without_order_removes_exact_duplicates(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "val": "a"},
+                {"id": 1, "val": "a"},
+                {"id": 2, "val": "b"},
+            ]
+        )
         params = DedupParams(keys=["id", "val"])
         result = apply_dedup(df, params)
         assert result.count() == 2
 
     def test_dedup_without_order_on_key_subset(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "val": "a"},
-            {"id": 1, "val": "b"},
-            {"id": 2, "val": "c"},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "val": "a"},
+                {"id": 1, "val": "b"},
+                {"id": 2, "val": "c"},
+            ]
+        )
         params = DedupParams(keys=["id"])
         result = apply_dedup(df, params)
         assert result.count() == 2
 
     def test_dedup_keep_first_with_order_by(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "ts": 100, "val": "first"},
-            {"id": 1, "ts": 200, "val": "second"},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "ts": 100, "val": "first"},
+                {"id": 1, "ts": 200, "val": "second"},
+            ]
+        )
         params = DedupParams(keys=["id"], order_by="ts", keep="first")
         result = apply_dedup(df, params)
         assert result.count() == 1
         assert result.collect()[0]["val"] == "first"
 
     def test_dedup_keep_last_with_order_by(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "ts": 100, "val": "first"},
-            {"id": 1, "ts": 200, "val": "second"},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "ts": 100, "val": "first"},
+                {"id": 1, "ts": 200, "val": "second"},
+            ]
+        )
         params = DedupParams(keys=["id"], order_by="ts", keep="last")
         result = apply_dedup(df, params)
         assert result.count() == 1
         assert result.collect()[0]["val"] == "second"
 
     def test_dedup_default_keep_is_last(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "ts": 100, "val": "first"},
-            {"id": 1, "ts": 200, "val": "second"},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "ts": 100, "val": "first"},
+                {"id": 1, "ts": 200, "val": "second"},
+            ]
+        )
         params = DedupParams(keys=["id"], order_by="ts")
         result = apply_dedup(df, params)
         assert result.count() == 1
         assert result.collect()[0]["val"] == "second"
 
     def test_dedup_composite_keys(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"a": 1, "b": 1, "ts": 1, "val": "keep"},
-            {"a": 1, "b": 1, "ts": 2, "val": "drop"},
-            {"a": 1, "b": 2, "ts": 1, "val": "keep2"},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"a": 1, "b": 1, "ts": 1, "val": "keep"},
+                {"a": 1, "b": 1, "ts": 2, "val": "drop"},
+                {"a": 1, "b": 2, "ts": 1, "val": "keep2"},
+            ]
+        )
         params = DedupParams(keys=["a", "b"], order_by="ts", keep="first")
         result = apply_dedup(df, params)
         assert result.count() == 2
@@ -103,11 +113,13 @@ class TestApplySort:
         assert values == [1, 3]
 
     def test_sort_multiple_columns(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"a": 1, "b": 2},
-            {"a": 1, "b": 1},
-            {"a": 2, "b": 3},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"a": 1, "b": 2},
+                {"a": 1, "b": 1},
+                {"a": 2, "b": 3},
+            ]
+        )
         params = SortParams(columns=["a", "b"], ascending=True)
         result = apply_sort(df, params)
         rows = result.collect()

@@ -40,9 +40,7 @@ def _make_thread(
 class TestExecuteThreadResult:
     """ThreadResult fields populated correctly by execute_thread."""
 
-    def test_returns_thread_result_on_success(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_returns_thread_result_on_success(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("exec_src")
         tgt = tmp_delta_path("exec_tgt")
         create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
@@ -53,9 +51,7 @@ class TestExecuteThreadResult:
         assert isinstance(result, ThreadResult)
         assert result.status == "success"
 
-    def test_result_thread_name_matches(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_result_thread_name_matches(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("name_src")
         tgt = tmp_delta_path("name_tgt")
         create_delta_table(spark, src, [{"id": 1}])
@@ -65,9 +61,7 @@ class TestExecuteThreadResult:
 
         assert result.thread_name == "named_thread"
 
-    def test_result_rows_written_matches_source(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_result_rows_written_matches_source(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("rows_src")
         tgt = tmp_delta_path("rows_tgt")
         create_delta_table(spark, src, [{"id": i} for i in range(5)])
@@ -77,9 +71,7 @@ class TestExecuteThreadResult:
 
         assert result.rows_written == 5
 
-    def test_result_write_mode_overwrite(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_result_write_mode_overwrite(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("mode_src")
         tgt = tmp_delta_path("mode_tgt")
         create_delta_table(spark, src, [{"id": 1}])
@@ -101,9 +93,7 @@ class TestExecuteThreadResult:
 
         assert result.write_mode == "overwrite"
 
-    def test_result_target_path_populated(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_result_target_path_populated(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("path_src")
         tgt = tmp_delta_path("path_tgt")
         create_delta_table(spark, src, [{"id": 1}])
@@ -117,9 +107,7 @@ class TestExecuteThreadResult:
 class TestExecuteThreadWrites:
     """execute_thread actually writes data to the target."""
 
-    def test_data_written_to_target_delta_table(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_data_written_to_target_delta_table(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("write_src")
         tgt = tmp_delta_path("write_tgt")
         create_delta_table(spark, src, [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}])
@@ -130,19 +118,19 @@ class TestExecuteThreadWrites:
         written = spark.read.format("delta").load(tgt)
         assert written.count() == 2
 
-    def test_pipeline_steps_applied_before_write(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_pipeline_steps_applied_before_write(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("steps_src")
         tgt = tmp_delta_path("steps_tgt")
-        create_delta_table(spark, src, [
-            {"id": 1, "amount": 100},
-            {"id": 2, "amount": 30},
-        ])
+        create_delta_table(
+            spark,
+            src,
+            [
+                {"id": 1, "amount": 100},
+                {"id": 2, "amount": 30},
+            ],
+        )
 
-        steps: list[Step] = [
-            FilterStep(filter=FilterParams(expr=SparkExpr("amount > 50")))
-        ]
+        steps: list[Step] = [FilterStep(filter=FilterParams(expr=SparkExpr("amount > 50")))]
         thread = _make_thread("steps_thread", src, tgt, steps=steps)
         result = execute_thread(spark, thread)
 
@@ -150,9 +138,7 @@ class TestExecuteThreadWrites:
         written = spark.read.format("delta").load(tgt)
         assert written.count() == 1
 
-    def test_keys_computed_before_write(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_keys_computed_before_write(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("keys_src")
         tgt = tmp_delta_path("keys_tgt")
         create_delta_table(spark, src, [{"id": 1, "name": "alice"}])
@@ -167,9 +153,7 @@ class TestExecuteThreadWrites:
         written = spark.read.format("delta").load(tgt)
         assert "sk" in written.columns
 
-    def test_append_mode_accumulates_rows(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_append_mode_accumulates_rows(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("append_src")
         tgt = tmp_delta_path("append_tgt")
         create_delta_table(spark, src, [{"id": 1}])
@@ -215,9 +199,7 @@ class TestExecuteThreadErrors:
 
         assert "no_path_thread" in str(exc_info.value)
 
-    def test_execution_error_carries_thread_name(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_execution_error_carries_thread_name(self, spark: SparkSession, tmp_delta_path) -> None:
         tgt = tmp_delta_path("carry_tgt")
         thread = _make_thread("carry_thread", "/nonexistent", tgt)
 

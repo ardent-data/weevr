@@ -62,8 +62,7 @@ def apply_union(
     for alias in params.sources:
         if alias not in sources:
             raise ExecutionError(
-                f"Union source '{alias}' not found in loaded sources. "
-                f"Available: {sorted(sources)}"
+                f"Union source '{alias}' not found in loaded sources. Available: {sorted(sources)}"
             )
         other = sources[alias]
         if params.mode == "by_name":
