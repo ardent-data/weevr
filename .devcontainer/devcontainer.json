@@ -28,12 +28,28 @@
     // Sync all dev dependencies (including pyspark + delta-spark) on first open.
     "postCreateCommand": "uv sync --dev",
 
+    // Keep the venv current on every container start (not just first create).
+    "postStartCommand": "uv sync",
+
     "remoteEnv": {
         // Store the virtual environment in the container home directory so it
         // never conflicts with any Windows .venv in the workspace mount.
         "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv",
         // Prefer the system Python 3.11 that ships with the base image.
-        "UV_PYTHON_PREFERENCE": "system"
+        "UV_PYTHON_PREFERENCE": "system",
+        // Ensure PySpark driver and worker processes use the venv Python, not
+        // the system Python, so all installed packages are available at runtime.
+        "PYSPARK_PYTHON": "/home/vscode/.venv/bin/python",
+        "PYSPARK_DRIVER_PYTHON": "/home/vscode/.venv/bin/python"
+    },
+
+    // Forward Spark UI so it's accessible in the browser during development.
+    "forwardPorts": [4040],
+    "portsAttributes": {
+        "4040": {
+            "label": "Spark UI",
+            "onAutoForward": "notify"
+        }
     },
 
     "customizations": {
@@ -52,7 +68,15 @@
                 "streetsidesoftware.code-spell-checker"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"
+                "python.defaultInterpreterPath": "/home/vscode/.venv/bin/python",
+                "editor.rulers": [100],
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": "explicit"
+                    }
+                }
             }
         }
     },
