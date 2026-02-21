@@ -10,7 +10,8 @@
             "version": "17.0.12-tem"
         },
         "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
-        "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+        "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {}
     },
 
     // Bind-mount host auth stores so container rebuilds don't require re-authentication.
@@ -19,7 +20,9 @@
         // GitHub CLI: share host's ~/.config/gh so gh auth persists across rebuilds.
         "source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
         // Claude Code: share host's ~/.claude (global auth/config, not project .claude/).
-        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+        // Codex CLI: share host's ~/.codex so auth.json and config.toml persist across rebuilds.
+        "source=${localEnv:HOME}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
     // Sync all dev dependencies (including pyspark + delta-spark) on first open.
