@@ -87,10 +87,12 @@ class TestApplyDerive:
         assert names == {"ALICE", "BOB", "CAROL"}
 
     def test_derive_multiple_columns_at_once(self, sample_df) -> None:
-        params = DeriveParams(columns={
-            "doubled": SparkExpr("amount * 2"),
-            "label": SparkExpr("concat(name, '_lbl')"),
-        })
+        params = DeriveParams(
+            columns={
+                "doubled": SparkExpr("amount * 2"),
+                "label": SparkExpr("concat(name, '_lbl')"),
+            }
+        )
         result = apply_derive(sample_df, params)
         assert "doubled" in result.columns
         assert "label" in result.columns
@@ -213,10 +215,12 @@ class TestApplyCast:
         assert result.collect()[0]["val"] == 42
 
     def test_cast_multiple_columns(self, spark: SparkSession) -> None:
-        schema = StructType([
-            StructField("a", LongType()),
-            StructField("b", LongType()),
-        ])
+        schema = StructType(
+            [
+                StructField("a", LongType()),
+                StructField("b", LongType()),
+            ]
+        )
         df = spark.createDataFrame([(1, 2)], schema=schema)
 
         params = CastParams(columns={"a": "string", "b": "string"})

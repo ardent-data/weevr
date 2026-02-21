@@ -12,11 +12,13 @@ from weevr.operations.hashing import compute_keys
 @pytest.fixture()
 def people_df(spark: SparkSession):
     """DataFrame with name and department columns for key tests."""
-    return spark.createDataFrame([
-        {"first": "alice", "last": "smith", "dept": "eng"},
-        {"first": "bob", "last": "jones", "dept": "ops"},
-        {"first": "carol", "last": "smith", "dept": "eng"},
-    ])
+    return spark.createDataFrame(
+        [
+            {"first": "alice", "last": "smith", "dept": "eng"},
+            {"first": "bob", "last": "jones", "dept": "ops"},
+            {"first": "carol", "last": "smith", "dept": "eng"},
+        ]
+    )
 
 
 class TestSurrogateKey:
@@ -69,10 +71,12 @@ class TestSurrogateKey:
         assert lengths == {32}
 
     def test_same_key_columns_produce_same_hash(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"id": 1, "k": "abc"},
-            {"id": 2, "k": "abc"},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "k": "abc"},
+                {"id": 2, "k": "abc"},
+            ]
+        )
         keys = KeyConfig(
             business_key=["k"],
             surrogate_key=SurrogateKeyConfig(name="sk"),
@@ -91,10 +95,12 @@ class TestSurrogateKey:
         assert len(hashes) == 3
 
     def test_null_business_key_produces_consistent_hash(self, spark: SparkSession) -> None:
-        schema = StructType([
-            StructField("k", StringType(), nullable=True),
-            StructField("v", LongType()),
-        ])
+        schema = StructType(
+            [
+                StructField("k", StringType(), nullable=True),
+                StructField("v", LongType()),
+            ]
+        )
         df = spark.createDataFrame([(None, 1), (None, 2)], schema=schema)
         keys = KeyConfig(
             business_key=["k"],
@@ -135,49 +141,41 @@ class TestChangeDetection:
         assert "row_hash" in result.columns
 
     def test_change_hash_same_rows_produce_same_hash(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([
-            {"a": "x", "b": "y"},
-            {"a": "x", "b": "y"},
-        ])
-        keys = KeyConfig(
-            change_detection=ChangeDetectionConfig(name="ch", columns=["a", "b"])
+        df = spark.createDataFrame(
+            [
+                {"a": "x", "b": "y"},
+                {"a": "x", "b": "y"},
+            ]
         )
+        keys = KeyConfig(change_detection=ChangeDetectionConfig(name="ch", columns=["a", "b"]))
         result = compute_keys(df, keys)
         hashes = {r["ch"] for r in result.collect()}
         assert len(hashes) == 1
 
-    def test_change_hash_different_rows_produce_different_hashes(
-        self, people_df
-    ) -> None:
+    def test_change_hash_different_rows_produce_different_hashes(self, people_df) -> None:
         keys = KeyConfig(
-            change_detection=ChangeDetectionConfig(
-                name="ch", columns=["first", "last", "dept"]
-            )
+            change_detection=ChangeDetectionConfig(name="ch", columns=["first", "last", "dept"])
         )
         result = compute_keys(people_df, keys)
         hashes = {r["ch"] for r in result.collect()}
         assert len(hashes) == 3
 
-    def test_change_hash_null_column_produces_consistent_hash(
-        self, spark: SparkSession
-    ) -> None:
-        schema = StructType([
-            StructField("a", StringType(), nullable=True),
-            StructField("b", StringType()),
-        ])
-        df = spark.createDataFrame([(None, "x"), (None, "x")], schema=schema)
-        keys = KeyConfig(
-            change_detection=ChangeDetectionConfig(name="ch", columns=["a", "b"])
+    def test_change_hash_null_column_produces_consistent_hash(self, spark: SparkSession) -> None:
+        schema = StructType(
+            [
+                StructField("a", StringType(), nullable=True),
+                StructField("b", StringType()),
+            ]
         )
+        df = spark.createDataFrame([(None, "x"), (None, "x")], schema=schema)
+        keys = KeyConfig(change_detection=ChangeDetectionConfig(name="ch", columns=["a", "b"]))
         result = compute_keys(df, keys)
         hashes = {r["ch"] for r in result.collect()}
         assert len(hashes) == 1
         assert None not in hashes
 
     def test_change_hash_subset_of_columns(self, people_df) -> None:
-        keys = KeyConfig(
-            change_detection=ChangeDetectionConfig(name="dept_hash", columns=["dept"])
-        )
+        keys = KeyConfig(change_detection=ChangeDetectionConfig(name="dept_hash", columns=["dept"]))
         result = compute_keys(people_df, keys)
         # alice and carol are both in "eng" → same dept hash
         dept_hashes = {r["dept"]: r["dept_hash"] for r in result.collect()}
@@ -204,9 +202,7 @@ class TestComputeKeysCombined:
         result = compute_keys(people_df, keys)
         assert set(result.columns) == set(people_df.columns)
 
-    def test_missing_business_key_column_raises_execution_error(
-        self, people_df
-    ) -> None:
+    def test_missing_business_key_column_raises_execution_error(self, people_df) -> None:
         keys = KeyConfig(
             business_key=["first", "nonexistent"],
             surrogate_key=SurrogateKeyConfig(name="sk"),

@@ -15,25 +15,23 @@ from weevr.operations.writers import apply_target_mapping, write_target
 @pytest.fixture()
 def source_df(spark: SparkSession):
     """Source DataFrame with mixed columns for mapping tests."""
-    return spark.createDataFrame([
-        {"id": 1, "name": "alice", "amount": 100, "status": "active"},
-        {"id": 2, "name": "bob", "amount": 50, "status": "inactive"},
-    ])
+    return spark.createDataFrame(
+        [
+            {"id": 1, "name": "alice", "amount": 100, "status": "active"},
+            {"id": 2, "name": "bob", "amount": 50, "status": "inactive"},
+        ]
+    )
 
 
 class TestAutoModeNewTarget:
     """auto mode when target does not yet exist — all columns pass through."""
 
-    def test_auto_new_no_columns_config_passes_all(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_auto_new_no_columns_config_passes_all(self, source_df, spark: SparkSession) -> None:
         target = Target(path="/nonexistent/target")
         result = apply_target_mapping(source_df, target, spark)
         assert set(result.columns) == set(source_df.columns)
 
-    def test_auto_new_with_drop_removes_column(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_auto_new_with_drop_removes_column(self, source_df, spark: SparkSession) -> None:
         target = Target(
             path="/nonexistent/target",
             columns={"status": ColumnMapping(drop=True)},
@@ -42,9 +40,7 @@ class TestAutoModeNewTarget:
         assert "status" not in result.columns
         assert "id" in result.columns
 
-    def test_auto_new_with_expr_adds_column(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_auto_new_with_expr_adds_column(self, source_df, spark: SparkSession) -> None:
         target = Target(
             path="/nonexistent/target",
             columns={"doubled": ColumnMapping(expr=SparkExpr("amount * 2"))},
@@ -62,13 +58,13 @@ class TestAutoModeNewTarget:
         result = apply_target_mapping(source_df, target, spark)
         assert result.schema["amount"].dataType == StringType()
 
-    def test_auto_new_with_default_fills_nulls(
-        self, spark: SparkSession
-    ) -> None:
-        schema = StructType([
-            StructField("id", LongType()),
-            StructField("val", StringType(), nullable=True),
-        ])
+    def test_auto_new_with_default_fills_nulls(self, spark: SparkSession) -> None:
+        schema = StructType(
+            [
+                StructField("id", LongType()),
+                StructField("val", StringType(), nullable=True),
+            ]
+        )
         df = spark.createDataFrame([(1, None), (2, "existing")], schema=schema)
         target = Target(
             path="/nonexistent/target",
@@ -96,9 +92,11 @@ class TestAutoModeExistingTarget:
         existing_path = tmp_delta_path("existing_target")
         create_delta_table(spark, existing_path, [{"id": 0, "name": "seed"}])
 
-        source_df = spark.createDataFrame([
-            {"id": 1, "name": "alice", "extra_col": "ignored"},
-        ])
+        source_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "alice", "extra_col": "ignored"},
+            ]
+        )
         target = Target(alias=existing_path)
         result = apply_target_mapping(source_df, target, spark)
 
@@ -115,11 +113,16 @@ class TestAutoModeExistingTarget:
         schema = StructType([StructField("b", LongType()), StructField("a", LongType())])
         spark.createDataFrame([(1, 2)], schema=schema).write.format("delta").save(existing_path)
 
-        source_df = spark.createDataFrame([(10, 20, 30)], schema=StructType([
-            StructField("a", LongType()),
-            StructField("b", LongType()),
-            StructField("c", LongType()),
-        ]))
+        source_df = spark.createDataFrame(
+            [(10, 20, 30)],
+            schema=StructType(
+                [
+                    StructField("a", LongType()),
+                    StructField("b", LongType()),
+                    StructField("c", LongType()),
+                ]
+            ),
+        )
         target = Target(alias=existing_path)
         result = apply_target_mapping(source_df, target, spark)
 
@@ -146,9 +149,7 @@ class TestAutoModeExistingTarget:
 class TestExplicitMode:
     """explicit mode — keep only declared non-dropped columns."""
 
-    def test_explicit_selects_only_declared_columns(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_explicit_selects_only_declared_columns(self, source_df, spark: SparkSession) -> None:
         target = Target(
             mapping_mode="explicit",
             columns={
@@ -160,9 +161,7 @@ class TestExplicitMode:
         assert set(result.columns) == {"id", "name"}
         assert "amount" not in result.columns
 
-    def test_explicit_with_expr_applies_expression(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_explicit_with_expr_applies_expression(self, source_df, spark: SparkSession) -> None:
         target = Target(
             mapping_mode="explicit",
             columns={
@@ -184,9 +183,7 @@ class TestExplicitMode:
         assert result.columns == ["amount"]
         assert result.schema["amount"].dataType == StringType()
 
-    def test_explicit_excludes_dropped_columns(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_explicit_excludes_dropped_columns(self, source_df, spark: SparkSession) -> None:
         target = Target(
             mapping_mode="explicit",
             columns={
@@ -199,18 +196,18 @@ class TestExplicitMode:
         assert "amount" not in result.columns
         assert {"id", "name"} <= set(result.columns)
 
-    def test_explicit_no_columns_returns_as_is(
-        self, source_df, spark: SparkSession
-    ) -> None:
+    def test_explicit_no_columns_returns_as_is(self, source_df, spark: SparkSession) -> None:
         target = Target(mapping_mode="explicit")
         result = apply_target_mapping(source_df, target, spark)
         assert set(result.columns) == set(source_df.columns)
 
     def test_explicit_default_fills_nulls(self, spark: SparkSession) -> None:
-        schema = StructType([
-            StructField("id", LongType()),
-            StructField("score", LongType(), nullable=True),
-        ])
+        schema = StructType(
+            [
+                StructField("id", LongType()),
+                StructField("score", LongType(), nullable=True),
+            ]
+        )
         df = spark.createDataFrame([(1, None), (2, 99)], schema=schema)
         target = Target(
             mapping_mode="explicit",
@@ -239,10 +236,12 @@ class TestExplicitMode:
 @pytest.fixture()
 def simple_df(spark: SparkSession):
     """Small DataFrame for write tests."""
-    return spark.createDataFrame([
-        {"id": 1, "val": "a"},
-        {"id": 2, "val": "b"},
-    ])
+    return spark.createDataFrame(
+        [
+            {"id": 1, "val": "a"},
+            {"id": 2, "val": "b"},
+        ]
+    )
 
 
 class TestWriteTargetOverwrite:
@@ -278,9 +277,7 @@ class TestWriteTargetOverwrite:
         rows = write_target(spark, simple_df, target, None, path)
         assert rows == 2
 
-    def test_overwrite_with_partition(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_overwrite_with_partition(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("overwrite_partition")
         df = spark.createDataFrame([{"id": 1, "region": "eu"}, {"id": 2, "region": "us"}])
         target = Target(path=path, partition_by=["region"])
@@ -302,9 +299,7 @@ class TestWriteTargetAppend:
         result = spark.read.format("delta").load(path)
         assert result.count() == 3
 
-    def test_append_returns_row_count(
-        self, spark: SparkSession, simple_df, tmp_delta_path
-    ) -> None:
+    def test_append_returns_row_count(self, spark: SparkSession, simple_df, tmp_delta_path) -> None:
         path = tmp_delta_path("append_count")
         create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
         target = Target(path=path)
@@ -315,9 +310,7 @@ class TestWriteTargetAppend:
 class TestWriteTargetMerge:
     """Merge write mode — all on_match / on_no_match_target / on_no_match_source combos."""
 
-    def test_merge_update_on_match(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_update_on_match(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("merge_update")
         create_delta_table(spark, path, [{"id": 1, "val": "old"}, {"id": 2, "val": "keep"}])
         incoming = spark.createDataFrame([{"id": 1, "val": "new"}])
@@ -328,9 +321,7 @@ class TestWriteTargetMerge:
         assert result.filter("id = 1").collect()[0]["val"] == "new"
         assert result.filter("id = 2").collect()[0]["val"] == "keep"
 
-    def test_merge_ignore_on_match(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_ignore_on_match(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("merge_ignore_match")
         create_delta_table(spark, path, [{"id": 1, "val": "original"}])
         incoming = spark.createDataFrame([{"id": 1, "val": "should_not_update"}])
@@ -345,9 +336,7 @@ class TestWriteTargetMerge:
         result = spark.read.format("delta").load(path)
         assert result.collect()[0]["val"] == "original"
 
-    def test_merge_insert_on_no_match_target(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_insert_on_no_match_target(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("merge_insert")
         create_delta_table(spark, path, [{"id": 1, "val": "existing"}])
         incoming = spark.createDataFrame([{"id": 2, "val": "new"}])
@@ -361,9 +350,7 @@ class TestWriteTargetMerge:
         result = spark.read.format("delta").load(path)
         assert result.count() == 2
 
-    def test_merge_ignore_on_no_match_target(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_ignore_on_no_match_target(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("merge_ignore_target")
         create_delta_table(spark, path, [{"id": 1, "val": "existing"}])
         incoming = spark.createDataFrame([{"id": 2, "val": "not_inserted"}])
@@ -378,14 +365,16 @@ class TestWriteTargetMerge:
         result = spark.read.format("delta").load(path)
         assert result.count() == 1
 
-    def test_merge_delete_on_no_match_source(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_delete_on_no_match_source(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("merge_delete_source")
-        create_delta_table(spark, path, [
-            {"id": 1, "val": "keep_matched"},
-            {"id": 2, "val": "delete_unmatched"},
-        ])
+        create_delta_table(
+            spark,
+            path,
+            [
+                {"id": 1, "val": "keep_matched"},
+                {"id": 2, "val": "delete_unmatched"},
+            ],
+        )
         incoming = spark.createDataFrame([{"id": 1, "val": "updated"}])
         target = Target(path=path)
         write_config = WriteConfig(
@@ -399,14 +388,16 @@ class TestWriteTargetMerge:
         assert result.count() == 1
         assert result.collect()[0]["id"] == 1
 
-    def test_merge_ignore_on_no_match_source(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_ignore_on_no_match_source(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("merge_ignore_source")
-        create_delta_table(spark, path, [
-            {"id": 1, "val": "matched"},
-            {"id": 2, "val": "unmatched_kept"},
-        ])
+        create_delta_table(
+            spark,
+            path,
+            [
+                {"id": 1, "val": "matched"},
+                {"id": 2, "val": "unmatched_kept"},
+            ],
+        )
         incoming = spark.createDataFrame([{"id": 1, "val": "updated"}])
         target = Target(path=path)
         write_config = WriteConfig(

@@ -37,9 +37,7 @@ def compute_keys(df: DataFrame, keys: KeyConfig) -> DataFrame:
     if keys.business_key:
         missing = set(keys.business_key) - set(df.columns)
         if missing:
-            raise ExecutionError(
-                f"Business key columns not found in DataFrame: {sorted(missing)}"
-            )
+            raise ExecutionError(f"Business key columns not found in DataFrame: {sorted(missing)}")
 
     if keys.surrogate_key is not None and keys.business_key is not None:
         result = _compute_surrogate_key(result, keys.surrogate_key, keys.business_key)
@@ -99,9 +97,7 @@ def _build_concat_expr(columns: list[str]):  # type: ignore[return]
     Each column is cast to string and null values are replaced with the sentinel
     before concatenation.
     """
-    coerced = [
-        F.coalesce(F.col(c).cast("string"), F.lit(_NULL_SENTINEL)) for c in columns
-    ]
+    coerced = [F.coalesce(F.col(c).cast("string"), F.lit(_NULL_SENTINEL)) for c in columns]
     return F.concat_ws(_KEY_SEPARATOR, *coerced)
 
 

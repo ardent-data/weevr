@@ -76,11 +76,7 @@ def _apply_dedup(df: DataFrame, dedup: DedupConfig) -> DataFrame:
 
     order_col = _parse_order_col(dedup.order_by)
     window = Window.partitionBy(dedup.keys).orderBy(order_col)
-    return (
-        df.withColumn("_rn", F.row_number().over(window))
-        .filter(F.col("_rn") == 1)
-        .drop("_rn")
-    )
+    return df.withColumn("_rn", F.row_number().over(window)).filter(F.col("_rn") == 1).drop("_rn")
 
 
 def _parse_order_col(order_by: str):  # type: ignore[return]

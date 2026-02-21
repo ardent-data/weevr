@@ -59,9 +59,7 @@ def _thread(
 class TestYamlLoadToExecute:
     """EC-001, EC-004, EC-010, EC-013, EC-014 — YAML config loaded via load_config()."""
 
-    def test_simple_thread_content_correct(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_simple_thread_content_correct(self, spark: SparkSession, tmp_delta_path) -> None:
         """EC-001: Delta source → overwrite → verify target content."""
         src = tmp_delta_path("ec001_src")
         tgt = tmp_delta_path("ec001_tgt")
@@ -78,9 +76,7 @@ class TestYamlLoadToExecute:
         written = spark.read.format("delta").load(tgt)
         assert written.count() == 2
 
-    def test_transforms_thread_applies_all_steps(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_transforms_thread_applies_all_steps(self, spark: SparkSession, tmp_delta_path) -> None:
         """EC-004: All declared transform steps execute in sequence (filter, derive,
         select, drop, rename, cast)."""
         src = tmp_delta_path("ec004_src")
@@ -108,9 +104,7 @@ class TestYamlLoadToExecute:
         assert "amount" not in written.columns
         assert "doubled" not in written.columns
 
-    def test_name_derived_from_file_path(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_name_derived_from_file_path(self, spark: SparkSession, tmp_delta_path) -> None:
         """EC-014: Thread.name is derived from the YAML file path."""
         src = tmp_delta_path("ec014_src")
         tgt = tmp_delta_path("ec014_tgt")
@@ -146,9 +140,7 @@ class TestYamlLoadToExecute:
         assert result.write_mode == "overwrite"
         assert result.target_path == tgt
 
-    def test_merge_thread_via_yaml(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_merge_thread_via_yaml(self, spark: SparkSession, tmp_delta_path) -> None:
         """EC-010: Merge write mode — update matched, insert new, ignore unmatched source."""
         src = tmp_delta_path("ec010_src")
         tgt = tmp_delta_path("ec010_tgt")
@@ -167,8 +159,8 @@ class TestYamlLoadToExecute:
         assert result.status == "success"
         written = spark.read.format("delta").load(tgt)
         rows = {r["id"]: r["val"] for r in written.collect()}
-        assert rows[1] == "new"     # updated on match
-        assert rows[2] == "keep"    # unchanged — not in source (on_no_match_source=ignore)
+        assert rows[1] == "new"  # updated on match
+        assert rows[2] == "keep"  # unchanged — not in source (on_no_match_source=ignore)
         assert rows[3] == "insert"  # inserted on no match in target
 
 
@@ -236,16 +228,16 @@ class TestFileSourceReaders:
 class TestSourceDedup:
     """EC-003: Source-level deduplication removes duplicates before pipeline steps."""
 
-    def test_source_dedup_removes_duplicates(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_source_dedup_removes_duplicates(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("ec003_src")
         tgt = tmp_delta_path("ec003_tgt")
-        schema = StructType([
-            StructField("id", IntegerType()),
-            StructField("ts", IntegerType()),
-            StructField("val", StringType()),
-        ])
+        schema = StructType(
+            [
+                StructField("id", IntegerType()),
+                StructField("ts", IntegerType()),
+                StructField("val", StringType()),
+            ]
+        )
         create_delta_table(
             spark,
             src,
@@ -281,9 +273,7 @@ class TestSourceDedup:
 class TestPipelineStepTypes:
     """EC-004 (remainder): dedup, sort, join, union pipeline steps via execute_thread."""
 
-    def test_pipeline_dedup_step(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_pipeline_dedup_step(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("dedup_src")
         tgt = tmp_delta_path("dedup_tgt")
         create_delta_table(spark, src, [{"id": 1, "v": 10}, {"id": 1, "v": 20}, {"id": 2, "v": 5}])
@@ -298,9 +288,7 @@ class TestPipelineStepTypes:
         id1_vals = [r["v"] for r in written.collect() if r["id"] == 1]
         assert id1_vals == [20]
 
-    def test_pipeline_sort_step(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_pipeline_sort_step(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("sort_src")
         tgt = tmp_delta_path("sort_tgt")
         create_delta_table(spark, src, [{"id": 3}, {"id": 1}, {"id": 2}])
@@ -314,9 +302,7 @@ class TestPipelineStepTypes:
         ids = [r["id"] for r in written.collect()]
         assert ids == sorted(ids)
 
-    def test_pipeline_union_step(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_pipeline_union_step(self, spark: SparkSession, tmp_delta_path) -> None:
         src_a = tmp_delta_path("union_a")
         src_b = tmp_delta_path("union_b")
         tgt = tmp_delta_path("union_tgt")
@@ -355,10 +341,12 @@ class TestJoins:
         src_right = tmp_delta_path("ns_right")
         tgt = tmp_delta_path("ns_tgt")
 
-        schema = StructType([
-            StructField("k", StringType(), nullable=True),
-            StructField("v", StringType()),
-        ])
+        schema = StructType(
+            [
+                StructField("k", StringType(), nullable=True),
+                StructField("v", StringType()),
+            ]
+        )
         create_delta_table(
             spark,
             src_left,
@@ -405,10 +393,12 @@ class TestJoins:
         src_right = tmp_delta_path("std_right")
         tgt = tmp_delta_path("std_tgt")
 
-        schema = StructType([
-            StructField("k", StringType(), nullable=True),
-            StructField("v", StringType()),
-        ])
+        schema = StructType(
+            [
+                StructField("k", StringType(), nullable=True),
+                StructField("v", StringType()),
+            ]
+        )
         create_delta_table(
             spark,
             src_left,
@@ -451,9 +441,7 @@ class TestJoins:
 class TestKeyGeneration:
     """EC-006, EC-007: Surrogate key and change detection hash via YAML config."""
 
-    def test_surrogate_key_generated_via_yaml(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_surrogate_key_generated_via_yaml(self, spark: SparkSession, tmp_delta_path) -> None:
         """EC-006: Surrogate key column present with null-safe business key hashing."""
         src = tmp_delta_path("ec006_src")
         tgt = tmp_delta_path("ec006_tgt")
@@ -558,9 +546,7 @@ class TestTargetMapping:
 class TestWriteModes:
     """EC-010, EC-011: Write mode integration (merge covered in YAML tests, append here)."""
 
-    def test_append_accumulates_rows(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_append_accumulates_rows(self, spark: SparkSession, tmp_delta_path) -> None:
         """EC-011: Append mode adds rows to existing table."""
         src = tmp_delta_path("append_src")
         tgt = tmp_delta_path("append_tgt")
@@ -573,9 +559,7 @@ class TestWriteModes:
         written = spark.read.format("delta").load(tgt)
         assert written.count() == 3  # 1 existing + 2 appended
 
-    def test_overwrite_replaces_existing_rows(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_overwrite_replaces_existing_rows(self, spark: SparkSession, tmp_delta_path) -> None:
         """Overwrite mode replaces all existing content."""
         src = tmp_delta_path("ow_src")
         tgt = tmp_delta_path("ow_tgt")
