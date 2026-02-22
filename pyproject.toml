@@ -60,4 +60,7 @@ reportMissingImports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not spark'"
+markers = [
+    "spark: marks tests that require PySpark and Delta Lake (deselected by default)",
+]
