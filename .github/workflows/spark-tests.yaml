@@ -1,0 +1,47 @@
+name: Spark Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/weevr/operations/**"
+      - "src/weevr/engine/**"
+      - "tests/weevr/operations/**"
+      - "tests/weevr/engine/**"
+      - "tests/conftest.py"
+      - "tests/spark_helpers.py"
+      - "pyproject.toml"
+  pull_request:
+    paths:
+      - "src/weevr/operations/**"
+      - "src/weevr/engine/**"
+      - "tests/weevr/operations/**"
+      - "tests/weevr/engine/**"
+      - "tests/conftest.py"
+      - "tests/spark_helpers.py"
+      - "pyproject.toml"
+
+jobs:
+  spark-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.28"
+          enable-cache: true
+
+      - name: Sync (locked)
+        run: uv sync --locked --dev
+
+      - name: Spark tests
+        run: uv run pytest -m spark
