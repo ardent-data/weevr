@@ -1,9 +1,12 @@
 """Tests for reshaping step handlers — dedup and sort."""
 
+import pytest
 from pyspark.sql import SparkSession
 
 from weevr.model.pipeline import DedupParams, SortParams
 from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
+
+pytestmark = pytest.mark.spark
 
 
 class TestApplyDedup:

@@ -10,6 +10,8 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.source import DedupConfig, Source
 from weevr.operations.readers import read_source, read_sources
 
+pytestmark = pytest.mark.spark
+
 
 class TestDeltaSource:
     """Tests for Delta source reading."""

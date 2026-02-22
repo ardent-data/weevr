@@ -8,6 +8,8 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
 from weevr.operations.hashing import compute_keys
 
+pytestmark = pytest.mark.spark
+
 
 @pytest.fixture()
 def people_df(spark: SparkSession):

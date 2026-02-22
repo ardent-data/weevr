@@ -11,6 +11,8 @@ from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
 from weevr.operations.writers import apply_target_mapping, write_target
 
+pytestmark = pytest.mark.spark
+
 
 @pytest.fixture()
 def source_df(spark: SparkSession):
