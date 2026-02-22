@@ -30,6 +30,8 @@ from weevr.model.thread import Thread
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
 
+pytestmark = pytest.mark.spark
+
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "threads"
 
 

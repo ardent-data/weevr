@@ -8,6 +8,8 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import JoinKeyPair, JoinParams, UnionParams
 from weevr.operations.pipeline.joins import apply_join, apply_union
 
+pytestmark = pytest.mark.spark
+
 
 @pytest.fixture()
 def left_df(spark: SparkSession):

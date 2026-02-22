@@ -31,6 +31,8 @@ from weevr.model.pipeline import (
 from weevr.model.types import SparkExpr
 from weevr.operations.pipeline import run_pipeline
 
+pytestmark = pytest.mark.spark
+
 
 @pytest.fixture()
 def base_df(spark: SparkSession):

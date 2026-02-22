@@ -15,6 +15,8 @@ from weevr.model.thread import Thread
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
 
+pytestmark = pytest.mark.spark
+
 
 def _make_thread(
     name: str,

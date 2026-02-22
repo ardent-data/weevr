@@ -1,8 +1,11 @@
 """Smoke tests for Spark test infrastructure."""
 
+import pytest
 from pyspark.sql import SparkSession
 
 from spark_helpers import assert_dataframes_equal, create_delta_table
+
+pytestmark = pytest.mark.spark
 
 
 class TestSparkFixture:

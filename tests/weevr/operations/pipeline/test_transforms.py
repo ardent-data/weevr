@@ -22,6 +22,8 @@ from weevr.operations.pipeline.transforms import (
     apply_select,
 )
 
+pytestmark = pytest.mark.spark
+
 
 @pytest.fixture()
 def sample_df(spark: SparkSession):

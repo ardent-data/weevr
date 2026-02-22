@@ -1,4 +1,4 @@
-name: Python CI
+name: Code Quality
 
 on:
   push:
@@ -39,5 +39,5 @@ jobs:
       - name: Type check
         run: uv run pyright .
 
-      - name: Tests
+      - name: Tests (fast)
         run: uv run pytest
