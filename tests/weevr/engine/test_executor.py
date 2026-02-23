@@ -6,13 +6,14 @@ from pyspark.sql import SparkSession
 from spark_helpers import create_delta_table
 from weevr.engine.executor import execute_thread
 from weevr.engine.result import ThreadResult
-from weevr.errors.exceptions import ExecutionError
+from weevr.errors.exceptions import DataValidationError, ExecutionError
 from weevr.model.keys import KeyConfig, SurrogateKeyConfig
 from weevr.model.pipeline import FilterParams, FilterStep, Step
 from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.thread import Thread
 from weevr.model.types import SparkExpr
+from weevr.model.validation import Assertion, ValidationRule
 from weevr.model.write import WriteConfig
 
 pytestmark = pytest.mark.spark
@@ -26,6 +27,8 @@ def _make_thread(
     steps: list[Step] | None = None,
     write: WriteConfig | None = None,
     keys: KeyConfig | None = None,
+    validations: list[ValidationRule] | None = None,
+    assertions: list[Assertion] | None = None,
 ) -> Thread:
     """Helper to construct a minimal Thread for testing."""
     return Thread(
@@ -36,6 +39,8 @@ def _make_thread(
         target=Target(path=target_path),
         write=write,
         keys=keys,
+        validations=validations,
+        assertions=assertions,
     )
 
 
@@ -209,3 +214,86 @@ class TestExecuteThreadErrors:
             execute_thread(spark, thread)
 
         assert exc_info.value.thread_name == "carry_thread"
+
+
+class TestExecuteThreadTelemetry:
+    """Telemetry populated on ThreadResult."""
+
+    def test_telemetry_populated_without_rules(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src = tmp_delta_path("tel_src")
+        tgt = tmp_delta_path("tel_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+
+        thread = _make_thread("tel_thread", src, tgt)
+        result = execute_thread(spark, thread)
+
+        assert result.telemetry is not None
+        assert result.telemetry.validation_results == []
+        assert result.telemetry.assertion_results == []
+        assert result.telemetry.rows_read == 2
+        assert result.telemetry.rows_written == 2
+        assert result.telemetry.rows_quarantined == 0
+
+
+class TestExecuteThreadValidation:
+    """Validation integration in execute_thread."""
+
+    def test_error_severity_quarantines_rows(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src = tmp_delta_path("val_src")
+        tgt = tmp_delta_path("val_tgt")
+        create_delta_table(
+            spark, src, [{"id": 1, "amount": 100}, {"id": 2, "amount": -5}]
+        )
+
+        rules = [
+            ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")
+        ]
+        thread = _make_thread("val_thread", src, tgt, validations=rules)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 1  # Only clean row written
+        assert result.telemetry is not None
+        assert result.telemetry.rows_quarantined > 0
+        assert len(result.telemetry.validation_results) == 1
+        assert result.telemetry.validation_results[0].rows_failed == 1
+
+        # Verify quarantine table exists
+        q_df = spark.read.format("delta").load(f"{tgt}_quarantine")
+        assert q_df.count() >= 1
+
+    def test_fatal_validation_raises(self, spark: SparkSession, tmp_delta_path) -> None:
+        src = tmp_delta_path("fatal_src")
+        tgt = tmp_delta_path("fatal_tgt")
+        create_delta_table(spark, src, [{"id": 1, "amount": -5}])
+
+        rules = [
+            ValidationRule(rule=SparkExpr("amount > 0"), severity="fatal", name="must_positive")
+        ]
+        thread = _make_thread("fatal_thread", src, tgt, validations=rules)
+
+        with pytest.raises(DataValidationError):
+            execute_thread(spark, thread)
+
+
+class TestExecuteThreadAssertions:
+    """Assertion integration in execute_thread."""
+
+    def test_passing_assertions_recorded(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src = tmp_delta_path("assert_src")
+        tgt = tmp_delta_path("assert_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+
+        assertions = [Assertion(type="row_count", min=1, max=10)]
+        thread = _make_thread("assert_thread", src, tgt, assertions=assertions)
+        result = execute_thread(spark, thread)
+
+        assert result.telemetry is not None
+        assert len(result.telemetry.assertion_results) == 1
+        assert result.telemetry.assertion_results[0].passed is True
