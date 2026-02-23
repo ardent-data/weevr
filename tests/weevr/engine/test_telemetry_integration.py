@@ -275,3 +275,31 @@ class TestFatalValidationIntegration:
         thread_spans = [s for s in spans if s.name == "thread:fatal_thread"]
         assert len(thread_spans) == 1
         assert thread_spans[0].status == SpanStatus.ERROR
+
+    def test_execution_error_span_recorded_in_collector(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """ExecutionError path adds the error span to the collector."""
+        src = tmp_delta_path("exec_err_src")
+        # Source exists but target path is None — triggers ExecutionError
+        create_delta_table(spark, src, [{"id": 1}])
+
+        thread = Thread(
+            name="err_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(),  # no path or alias → ExecutionError
+        )
+
+        collector = SpanCollector(generate_trace_id())
+
+        from weevr.errors.exceptions import ExecutionError
+
+        with pytest.raises(ExecutionError):
+            execute_thread(spark, thread, collector=collector)
+
+        spans = collector.get_spans()
+        err_spans = [s for s in spans if s.name == "thread:err_thread"]
+        assert len(err_spans) == 1
+        assert err_spans[0].status == SpanStatus.ERROR

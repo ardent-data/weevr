@@ -152,7 +152,9 @@ def execute_thread(
 
     except ExecutionError as exc:
         if span_builder is not None:
-            span_builder.finish(status=SpanStatus.ERROR)
+            span = span_builder.finish(status=SpanStatus.ERROR)
+            if collector is not None:
+                collector.add_span(span)
         if exc.thread_name is None:
             raise ExecutionError(
                 exc.message,
@@ -165,7 +167,9 @@ def execute_thread(
         raise
     except Exception as exc:
         if span_builder is not None:
-            span_builder.finish(status=SpanStatus.ERROR)
+            span = span_builder.finish(status=SpanStatus.ERROR)
+            if collector is not None:
+                collector.add_span(span)
         raise ExecutionError(
             f"Thread '{thread.name}' failed unexpectedly",
             cause=exc,
