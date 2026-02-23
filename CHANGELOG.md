@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/ardent-data/weevr/compare/weevr-v0.5.0...weevr-v0.5.1) (2026-02-23)
+
+
+### Documentation
+
+* **readme:** update status and capabilities to reflect implemented milestones ([#23](https://github.com/ardent-data/weevr/issues/23)) ([a681ad8](https://github.com/ardent-data/weevr/commit/a681ad80951306d937927ed90465f51d4facc4d3))
+
 ## [0.5.0](https://github.com/ardent-data/weevr/compare/weevr-v0.4.0...weevr-v0.5.0) (2026-02-23)
 
 
