@@ -58,9 +58,7 @@ class CacheManager:
             df = spark.read.format("delta").load(target_path)
             df.persist(StorageLevel.MEMORY_AND_DISK)
             self._cached[thread_name] = df
-            logger.debug(
-                "Cached output of thread '%s' from path '%s'", thread_name, target_path
-            )
+            logger.debug("Cached output of thread '%s' from path '%s'", thread_name, target_path)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Failed to cache output of thread '%s' (path: '%s'): %s — "

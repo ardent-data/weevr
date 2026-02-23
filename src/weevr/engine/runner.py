@@ -9,9 +9,11 @@ from pyspark.sql import SparkSession
 
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.executor import execute_thread
-from weevr.engine.planner import ExecutionPlan
-from weevr.engine.result import ThreadResult, WeaveResult
+from weevr.engine.planner import ExecutionPlan, build_plan
+from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+from weevr.model.loom import Loom
 from weevr.model.thread import Thread
+from weevr.model.weave import Weave
 
 logger = logging.getLogger(__name__)
 
@@ -188,5 +190,80 @@ def execute_weave(
         weave_name=plan.weave_name,
         thread_results=thread_results,
         threads_skipped=threads_skipped,
+        duration_ms=duration_ms,
+    )
+
+
+def execute_loom(
+    spark: SparkSession,
+    loom: Loom,
+    weaves: dict[str, Weave],
+    threads: dict[str, dict[str, Thread]],
+) -> LoomResult:
+    """Execute weaves sequentially in declared order.
+
+    Iterates the weaves listed in ``loom.weaves``, builds an
+    :class:`~weevr.engine.planner.ExecutionPlan` for each, and executes them
+    via :func:`execute_weave`. Stops on the first weave failure (no
+    ``on_failure`` at loom level in M04).
+
+    Args:
+        spark: Active SparkSession.
+        loom: Loom configuration declaring the ordered list of weave names.
+        weaves: Mapping of weave name to :class:`~weevr.model.weave.Weave` config.
+        threads: Nested mapping of ``weave_name → thread_name → Thread`` config.
+
+    Returns:
+        :class:`~weevr.engine.result.LoomResult` with aggregate status and
+        per-weave results.
+    """
+    start_ns = time.monotonic_ns()
+    weave_results: list[WeaveResult] = []
+
+    logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
+
+    for weave_name in loom.weaves:
+        weave = weaves[weave_name]
+        weave_threads = threads[weave_name]
+
+        plan = build_plan(
+            weave_name=weave_name,
+            threads=weave_threads,
+            thread_entries=list(weave.threads),
+        )
+
+        result = execute_weave(spark, plan, weave_threads)
+        weave_results.append(result)
+
+        if result.status == "failure":
+            logger.debug(
+                "Loom '%s' — weave '%s' failed, stopping loom execution",
+                loom.name,
+                weave_name,
+            )
+            break
+
+    duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+
+    # Compute aggregate loom status
+    statuses = {r.status for r in weave_results}
+    if statuses <= {"success"}:
+        loom_status: Literal["success", "failure", "partial"] = "success"
+    elif "success" in statuses:
+        loom_status = "partial"
+    else:
+        loom_status = "failure"
+
+    logger.debug(
+        "Loom '%s' complete — status=%s, duration=%dms",
+        loom.name,
+        loom_status,
+        duration_ms,
+    )
+
+    return LoomResult(
+        status=loom_status,
+        loom_name=loom.name,
+        weave_results=weave_results,
         duration_ms=duration_ms,
     )
