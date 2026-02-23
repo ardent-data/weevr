@@ -122,16 +122,133 @@ class TestRunResult:
         result.warnings.append("warning 1")
         assert result.warnings == ["warning 1"]
 
-    def test_summary_returns_string(self) -> None:
+    def test_summary_execute_thread(self) -> None:
         result = RunResult(
             status="success",
             mode=ExecutionMode.EXECUTE,
             config_type="thread",
-            config_name="t",
+            config_name="dim_customer",
+            duration_ms=1200,
         )
         s = result.summary()
-        assert isinstance(s, str)
-        assert "success" in s
+        assert "Status: success" in s
+        assert "thread:dim_customer" in s
+        assert "1.2s" in s
+
+    def test_summary_execute_thread_with_detail(self) -> None:
+        from weevr.engine.result import ThreadResult
+
+        detail = ThreadResult(
+            status="success",
+            thread_name="dim_customer",
+            rows_written=1234,
+            write_mode="overwrite",
+            target_path="/data/dim_customer",
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="dim_customer",
+            duration_ms=800,
+            detail=detail,
+        )
+        s = result.summary()
+        assert "1,234 written" in s
+
+    def test_summary_validate_success(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.VALIDATE,
+            config_type="weave",
+            config_name="dimensions",
+        )
+        s = result.summary()
+        assert "validate" in s
+        assert "\u2713" in s  # checkmark
+
+    def test_summary_validate_failure(self) -> None:
+        result = RunResult(
+            status="failure",
+            mode=ExecutionMode.VALIDATE,
+            config_type="thread",
+            config_name="dim_customer",
+            validation_errors=["Source 'raw' not found: /data/raw"],
+        )
+        s = result.summary()
+        assert "Errors:" in s
+        assert "Source 'raw' not found" in s
+
+    def test_summary_plan(self) -> None:
+        from weevr.engine.planner import ExecutionPlan
+
+        plan = ExecutionPlan(
+            weave_name="dimensions",
+            threads=["dim_product", "dim_customer"],
+            dependencies={"dim_customer": ["dim_product"]},
+            dependents={"dim_product": ["dim_customer"]},
+            execution_order=[["dim_product"], ["dim_customer"]],
+            cache_targets=[],
+            inferred_dependencies={},
+            explicit_dependencies={"dim_customer": ["dim_product"]},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dimensions",
+            execution_plan=[plan],
+        )
+        s = result.summary()
+        assert "plan" in s
+        assert "Execution order:" in s
+        assert "dim_product" in s
+        assert "dim_customer" in s
+
+    def test_summary_preview(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+        )
+        s = result.summary()
+        assert "preview" in s
+        assert "thread:dim_customer" in s
+
+    def test_summary_with_warnings(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="dims",
+            warnings=["No threads matched filter"],
+        )
+        s = result.summary()
+        assert "Warnings:" in s
+        assert "No threads matched filter" in s
+
+    def test_summary_duration_formatting(self) -> None:
+        # Milliseconds
+        r1 = RunResult(
+            status="success", mode=ExecutionMode.EXECUTE,
+            config_type="thread", config_name="t", duration_ms=500,
+        )
+        assert "500ms" in r1.summary()
+
+        # Seconds
+        r2 = RunResult(
+            status="success", mode=ExecutionMode.EXECUTE,
+            config_type="thread", config_name="t", duration_ms=2100,
+        )
+        assert "2.1s" in r2.summary()
+
+        # Minutes
+        r3 = RunResult(
+            status="success", mode=ExecutionMode.EXECUTE,
+            config_type="thread", config_name="t", duration_ms=135000,
+        )
+        assert "2m" in r3.summary()
 
     def test_partial_status(self) -> None:
         result = RunResult(
