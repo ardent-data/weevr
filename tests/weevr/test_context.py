@@ -312,3 +312,134 @@ class TestContextRunExecute:
 
         assert result.status == "success"
         assert any("No threads matched" in w for w in result.warnings)
+
+
+@pytest.mark.spark
+class TestValidateMode:
+    def test_validate_valid_thread(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_val")
+        tgt = str(tmp_path / "tgt_val")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "vt1", src, tgt)
+        ctx = Context(spark=spark)
+        result = ctx.run(yaml_path, mode="validate")
+
+        assert result.status == "success"
+        assert result.mode == ExecutionMode.VALIDATE
+        assert result.validation_errors is None
+
+    def test_validate_valid_weave(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_vw")
+        tgt = str(tmp_path / "tgt_vw")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        _create_thread_yaml(tmp_path, "vt2", src, tgt)
+        weave_yaml = _create_weave_yaml(tmp_path, "vw1", ["vt2"])
+        ctx = Context(spark=spark)
+        result = ctx.run(weave_yaml, mode="validate")
+
+        assert result.status == "success"
+        assert result.validation_errors is None
+
+    def test_validate_missing_source(self, spark: SparkSession, tmp_path: Path) -> None:
+        tgt = str(tmp_path / "tgt_miss")
+        yaml_path = _create_thread_yaml(tmp_path, "vmiss", "/nonexistent/path", tgt)
+        ctx = Context(spark=spark)
+        result = ctx.run(yaml_path, mode="validate")
+
+        assert result.status == "failure"
+        assert result.validation_errors is not None
+        assert any("not found" in e for e in result.validation_errors)
+
+
+@pytest.mark.spark
+class TestPlanMode:
+    def test_plan_thread(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_pt")
+        tgt = str(tmp_path / "tgt_pt")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "pt1", src, tgt)
+        ctx = Context(spark=spark)
+        result = ctx.run(yaml_path, mode="plan")
+
+        assert result.status == "success"
+        assert result.mode == ExecutionMode.PLAN
+        assert result.execution_plan is None  # threads have no plan
+
+    def test_plan_weave(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_pw")
+        tgt = str(tmp_path / "tgt_pw")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        _create_thread_yaml(tmp_path, "pw1", src, tgt)
+        weave_yaml = _create_weave_yaml(tmp_path, "wpln", ["pw1"])
+        ctx = Context(spark=spark)
+        result = ctx.run(weave_yaml, mode="plan")
+
+        assert result.status == "success"
+        assert result.execution_plan is not None
+        assert len(result.execution_plan) == 1
+        assert result.execution_plan[0].weave_name == "wpln"
+
+    def test_plan_loom(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_pl")
+        tgt = str(tmp_path / "tgt_pl")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        _create_thread_yaml(tmp_path, "pl1", src, tgt)
+        _create_weave_yaml(tmp_path, "wpl1", ["pl1"])
+        loom_yaml = _create_loom_yaml(tmp_path, "lpln", ["wpl1"])
+        ctx = Context(spark=spark)
+        result = ctx.run(loom_yaml, mode="plan")
+
+        assert result.status == "success"
+        assert result.execution_plan is not None
+        assert len(result.execution_plan) == 1
+
+
+@pytest.mark.spark
+class TestPreviewMode:
+    def test_preview_limits_rows(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_prev")
+        tgt = str(tmp_path / "tgt_prev")
+        data = [{"id": i, "val": f"v{i}"} for i in range(100)]
+        spark.createDataFrame(data).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "prev1", src, tgt)
+        ctx = Context(spark=spark)
+        result = ctx.run(yaml_path, mode="preview", sample_rows=10)
+
+        assert result.status == "success"
+        assert result.mode == ExecutionMode.PREVIEW
+        assert result.preview_data is not None
+        assert "prev1" in result.preview_data
+        assert result.preview_data["prev1"].count() <= 10
+
+    def test_preview_no_writes(self, spark: SparkSession, tmp_path: Path) -> None:
+        src = str(tmp_path / "src_nw")
+        tgt = str(tmp_path / "tgt_nw")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "prev2", src, tgt)
+        ctx = Context(spark=spark)
+        ctx.run(yaml_path, mode="preview")
+
+        # Target should NOT exist after preview
+        assert not Path(tgt).exists() or not any(Path(tgt).iterdir())
+
+    def test_preview_custom_sample_rows(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        src = str(tmp_path / "src_csr")
+        tgt = str(tmp_path / "tgt_csr")
+        data = [{"id": i} for i in range(200)]
+        spark.createDataFrame(data).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "prev3", src, tgt)
+        ctx = Context(spark=spark)
+        result = ctx.run(yaml_path, mode="preview", sample_rows=50)
+
+        assert result.preview_data is not None
+        assert result.preview_data["prev3"].count() <= 50
