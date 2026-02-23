@@ -176,8 +176,14 @@ class Context:
         try:
             if resolved_mode is ExecutionMode.EXECUTE:
                 result = self._run_execute(resolved, tags=tags, thread_names=threads)
+            elif resolved_mode is ExecutionMode.VALIDATE:
+                result = self._run_validate(resolved)
+            elif resolved_mode is ExecutionMode.PLAN:
+                result = self._run_plan(resolved, tags=tags, thread_names=threads)
             else:
-                raise NotImplementedError(f"Mode '{mode}' not yet implemented")
+                result = self._run_preview(
+                    resolved, tags=tags, thread_names=threads, sample_rows=sample_rows
+                )
         except (ExecutionError, DataValidationError) as exc:
             duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
             return RunResult(
@@ -327,6 +333,238 @@ class Context:
         if not filtered:
             warnings.append("No threads matched filter")
         return filtered, warnings
+
+    # ------------------------------------------------------------------
+    # Validate mode
+    # ------------------------------------------------------------------
+
+    def _run_validate(self, resolved: _ResolvedConfig) -> RunResult:
+        """Validate config, DAG, and source existence without executing."""
+        validation_errors: list[str] = []
+
+        # DAG validation — build plans to detect cycles
+        if resolved.config_type == "weave":
+            model = resolved.model
+            assert isinstance(model, Weave)
+            wt = resolved.threads.get(resolved.config_name, {})
+            try:
+                build_plan(
+                    weave_name=resolved.config_name,
+                    threads=wt,
+                    thread_entries=list(model.threads),
+                )
+            except Exception as exc:
+                validation_errors.append(f"DAG validation failed: {exc}")
+
+        elif resolved.config_type == "loom":
+            model = resolved.model
+            assert isinstance(model, Loom)
+            for weave_name in model.weaves:
+                weave = resolved.weaves.get(weave_name)
+                if weave is None:
+                    validation_errors.append(f"Weave '{weave_name}' not found")
+                    continue
+                wt = resolved.threads.get(weave_name, {})
+                try:
+                    build_plan(
+                        weave_name=weave_name,
+                        threads=wt,
+                        thread_entries=list(weave.threads),
+                    )
+                except Exception as exc:
+                    validation_errors.append(
+                        f"DAG validation failed for weave '{weave_name}': {exc}"
+                    )
+
+        # Source existence checking
+        all_threads = self._collect_all_threads(resolved)
+        source_errors = self._check_source_existence(all_threads)
+        validation_errors.extend(source_errors)
+
+        status = "failure" if validation_errors else "success"
+        return RunResult(
+            status=status,
+            mode=ExecutionMode.VALIDATE,
+            config_type=resolved.config_type,
+            config_name=resolved.config_name,
+            validation_errors=validation_errors if validation_errors else None,
+        )
+
+    def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
+        """Check that all sources referenced by threads exist."""
+        errors: list[str] = []
+        checked: set[str] = set()
+
+        for thread_name, thread in threads.items():
+            for source_name, source in thread.sources.items():
+                resolve_path = source.alias if source.type == "delta" else source.path
+                if resolve_path is None or resolve_path in checked:
+                    continue
+                checked.add(resolve_path)
+
+                try:
+                    self._spark.read.format(
+                        source.type if source.type != "excel" else "com.crealytics.spark.excel"
+                    ).load(resolve_path).limit(0).collect()
+                except Exception:
+                    errors.append(
+                        f"Source '{source_name}' in thread '{thread_name}' "
+                        f"not found: {resolve_path}"
+                    )
+        return errors
+
+    @staticmethod
+    def _collect_all_threads(resolved: _ResolvedConfig) -> dict[str, Thread]:
+        """Flatten all threads from a resolved config into a single dict."""
+        if resolved.config_type == "thread":
+            model = resolved.model
+            assert isinstance(model, Thread)
+            return {resolved.config_name: model}
+
+        result: dict[str, Thread] = {}
+        for thread_map in resolved.threads.values():
+            result.update(thread_map)
+        return result
+
+    # ------------------------------------------------------------------
+    # Plan mode
+    # ------------------------------------------------------------------
+
+    def _run_plan(
+        self,
+        resolved: _ResolvedConfig,
+        *,
+        tags: list[str] | None = None,
+        thread_names: list[str] | None = None,
+    ) -> RunResult:
+        """Build and return execution plans without executing."""
+        plans: list[Any] = []
+        all_warnings: list[str] = []
+
+        if resolved.config_type == "thread":
+            return RunResult(
+                status="success",
+                mode=ExecutionMode.PLAN,
+                config_type="thread",
+                config_name=resolved.config_name,
+                execution_plan=None,
+            )
+
+        if resolved.config_type == "weave":
+            model = resolved.model
+            assert isinstance(model, Weave)
+            wt = resolved.threads.get(resolved.config_name, {})
+            wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
+            all_warnings.extend(warnings)
+            if wt:
+                filtered_entries = [e for e in model.threads if e.name in wt]
+                plans.append(
+                    build_plan(
+                        weave_name=resolved.config_name,
+                        threads=wt,
+                        thread_entries=filtered_entries,
+                    )
+                )
+
+        elif resolved.config_type == "loom":
+            model = resolved.model
+            assert isinstance(model, Loom)
+            for weave_name in model.weaves:
+                weave = resolved.weaves.get(weave_name)
+                if weave is None:
+                    continue
+                wt = resolved.threads.get(weave_name, {})
+                wt, warnings = self._filter_threads(
+                    wt, tags=tags, thread_names=thread_names
+                )
+                all_warnings.extend(warnings)
+                if wt:
+                    filtered_entries = [e for e in weave.threads if e.name in wt]
+                    plans.append(
+                        build_plan(
+                            weave_name=weave_name,
+                            threads=wt,
+                            thread_entries=filtered_entries,
+                        )
+                    )
+
+        return RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type=resolved.config_type,
+            config_name=resolved.config_name,
+            execution_plan=plans if plans else None,
+            warnings=all_warnings,
+        )
+
+    # ------------------------------------------------------------------
+    # Preview mode
+    # ------------------------------------------------------------------
+
+    def _run_preview(
+        self,
+        resolved: _ResolvedConfig,
+        *,
+        tags: list[str] | None = None,
+        thread_names: list[str] | None = None,
+        sample_rows: int = 100,
+    ) -> RunResult:
+        """Execute with sampled data — no writes, no assertions."""
+        from weevr.operations.hashing import compute_keys
+        from weevr.operations.pipeline import run_pipeline
+        from weevr.operations.readers import read_sources
+        from weevr.operations.validation import validate_dataframe
+        from weevr.operations.writers import apply_target_mapping
+
+        all_threads = self._collect_all_threads(resolved)
+        all_threads, warnings = self._filter_threads(
+            all_threads, tags=tags, thread_names=thread_names
+        )
+
+        preview_data: dict[str, Any] = {}
+        errors: list[str] = []
+
+        for thread_name, thread in all_threads.items():
+            try:
+                # Read sources with row limit
+                sources_map = read_sources(self._spark, thread.sources)
+                for key in sources_map:
+                    sources_map[key] = sources_map[key].limit(sample_rows)
+
+                # Primary DataFrame
+                df = next(iter(sources_map.values()))
+
+                # Run pipeline steps
+                df = run_pipeline(df, thread.steps, sources_map)
+
+                # Run validations (skip assertions per DEC-012)
+                if thread.validations:
+                    outcome = validate_dataframe(df, thread.validations)
+                    df = outcome.clean_df
+
+                # Compute keys
+                if thread.keys is not None:
+                    df = compute_keys(df, thread.keys)
+
+                # Apply column mapping
+                df = apply_target_mapping(df, thread.target, self._spark)
+
+                preview_data[thread_name] = df
+            except Exception as exc:
+                errors.append(f"Preview failed for thread '{thread_name}': {exc}")
+
+        status = "failure" if errors and not preview_data else "success"
+        if errors and preview_data:
+            status = "partial"
+
+        return RunResult(
+            status=status,
+            mode=ExecutionMode.PREVIEW,
+            config_type=resolved.config_type,
+            config_name=resolved.config_name,
+            preview_data=preview_data if preview_data else None,
+            warnings=warnings + errors,
+        )
 
     # ------------------------------------------------------------------
     # Config assembly
