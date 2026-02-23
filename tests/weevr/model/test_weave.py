@@ -3,17 +3,19 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.model.weave import Weave
+from weevr.model.weave import ThreadEntry, Weave
 
 
 class TestWeave:
     """Test Weave model."""
 
     def test_minimal_weave(self):
-        """Weave from minimal dict."""
+        """Weave from minimal dict normalizes string threads to ThreadEntry objects."""
         w = Weave.model_validate({"config_version": "1.0", "threads": ["dim_customer"]})
         assert w.config_version == "1.0"
-        assert w.threads == ["dim_customer"]
+        assert len(w.threads) == 1
+        assert isinstance(w.threads[0], ThreadEntry)
+        assert w.threads[0].name == "dim_customer"
 
     def test_missing_threads_raises(self):
         """Weave without threads raises ValidationError."""
@@ -71,3 +73,78 @@ class TestWeave:
         """name is stored when explicitly provided."""
         w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"], "name": "dimensions"})
         assert w.name == "dimensions"
+
+
+class TestThreadEntry:
+    """Tests for ThreadEntry model and Weave normalization."""
+
+    def test_string_thread_list_normalizes_to_thread_entry(self):
+        """Weave with string-only thread list normalizes to list[ThreadEntry]."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": ["a", "b", "c"]})
+        assert all(isinstance(e, ThreadEntry) for e in w.threads)
+        assert [e.name for e in w.threads] == ["a", "b", "c"]
+
+    def test_string_thread_entry_has_no_dependencies(self):
+        """String-normalized ThreadEntry has dependencies=None."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": ["a"]})
+        assert w.threads[0].dependencies is None
+
+    def test_map_thread_entry_with_dependencies(self):
+        """Dict thread entry with dependencies parsed correctly."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    "a",
+                    {"name": "b", "dependencies": ["a"]},
+                ],
+            }
+        )
+        assert w.threads[0].name == "a"
+        assert w.threads[0].dependencies is None
+        assert w.threads[1].name == "b"
+        assert w.threads[1].dependencies == ["a"]
+
+    def test_map_thread_entry_no_dependencies(self):
+        """Dict thread entry without dependencies has dependencies=None."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": [{"name": "x"}]})
+        assert w.threads[0].name == "x"
+        assert w.threads[0].dependencies is None
+
+    def test_mixed_string_and_map_entries(self):
+        """Weave with mixed string/map entries normalizes correctly."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    "load_raw",
+                    {"name": "clean", "dependencies": ["load_raw"]},
+                    "summarize",
+                ],
+            }
+        )
+        assert len(w.threads) == 3
+        assert w.threads[0].name == "load_raw"
+        assert w.threads[1].name == "clean"
+        assert w.threads[1].dependencies == ["load_raw"]
+        assert w.threads[2].name == "summarize"
+
+    def test_thread_entry_frozen(self):
+        """ThreadEntry is immutable."""
+        e = ThreadEntry(name="t")
+        with pytest.raises((ValidationError, TypeError)):
+            e.name = "other"  # type: ignore[misc]
+
+    def test_round_trip_with_thread_entries(self):
+        """Weave with ThreadEntry objects round-trips correctly."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    "a",
+                    {"name": "b", "dependencies": ["a"]},
+                ],
+            }
+        )
+        restored = Weave.model_validate(w.model_dump())
+        assert restored == w

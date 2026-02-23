@@ -1,5 +1,6 @@
 """Domain object model for weevr configuration."""
 
+from weevr.model.failure import FailureConfig
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.loom import Loom
@@ -22,7 +23,7 @@ from weevr.model.target import ColumnMapping, Target
 from weevr.model.thread import Thread
 from weevr.model.types import SparkExpr
 from weevr.model.validation import Assertion, ValidationRule
-from weevr.model.weave import Weave
+from weevr.model.weave import ThreadEntry, Weave
 from weevr.model.write import WriteConfig
 
 __all__ = [
@@ -30,6 +31,10 @@ __all__ = [
     "Thread",
     "Weave",
     "Loom",
+    # Failure handling
+    "FailureConfig",
+    # Weave thread entry
+    "ThreadEntry",
     # Source
     "Source",
     "DedupConfig",

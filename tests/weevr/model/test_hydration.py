@@ -196,7 +196,7 @@ class TestWeaveAndLoomModelHydration:
         }
         w = Weave.model_validate(data)
         assert isinstance(w, Weave)
-        assert w.threads == ["dimensions.dim_customer", "dimensions.dim_product"]
+        assert [e.name for e in w.threads] == ["dimensions.dim_customer", "dimensions.dim_product"]
         assert w.defaults is not None
         assert w.defaults["tags"] == ["nightly"]
         with pytest.raises(ValidationError):

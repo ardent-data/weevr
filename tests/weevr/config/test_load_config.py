@@ -147,7 +147,7 @@ target:
         result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
         assert isinstance(result, Weave)
         assert result.config_version == "1.0"
-        assert "dimensions.dim_customer" in result.threads
+        assert any(e.name == "dimensions.dim_customer" for e in result.threads)
 
     def test_load_loom_returns_loom_model(self):
         """load_config returns a Loom model for a loom config."""
