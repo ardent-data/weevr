@@ -3,17 +3,19 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.model.weave import Weave
+from weevr.model.weave import ThreadEntry, Weave
 
 
 class TestWeave:
     """Test Weave model."""
 
     def test_minimal_weave(self):
-        """Weave from minimal dict."""
+        """Weave from minimal dict normalizes string threads to ThreadEntry objects."""
         w = Weave.model_validate({"config_version": "1.0", "threads": ["dim_customer"]})
         assert w.config_version == "1.0"
-        assert w.threads == ["dim_customer"]
+        assert len(w.threads) == 1
+        assert isinstance(w.threads[0], ThreadEntry)
+        assert w.threads[0].name == "dim_customer"
 
     def test_missing_threads_raises(self):
         """Weave without threads raises ValidationError."""
