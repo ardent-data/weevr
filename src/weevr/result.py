@@ -11,6 +11,18 @@ if TYPE_CHECKING:
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
 
 
+def _format_duration(ms: int) -> str:
+    """Format milliseconds as a human-readable duration string."""
+    if ms < 1000:
+        return f"{ms}ms"
+    seconds = ms / 1000
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes = int(seconds // 60)
+    remaining = seconds % 60
+    return f"{minutes}m {remaining:.1f}s"
+
+
 class ExecutionMode(StrEnum):
     """Execution modes for ``Context.run()``.
 
@@ -91,7 +103,106 @@ class RunResult:
 
     def summary(self) -> str:
         """Return a formatted, human-readable execution summary."""
-        return f"Status: {self.status}"
+        lines: list[str] = [f"Status: {self.status}"]
+
+        if self.mode is ExecutionMode.EXECUTE:
+            lines.extend(self._summary_execute())
+        elif self.mode is ExecutionMode.VALIDATE:
+            lines.extend(self._summary_validate())
+        elif self.mode is ExecutionMode.PLAN:
+            lines.extend(self._summary_plan())
+        elif self.mode is ExecutionMode.PREVIEW:
+            lines.extend(self._summary_preview())
+
+        if self.warnings:
+            lines.append("")
+            lines.append("Warnings:")
+            for w in self.warnings:
+                lines.append(f"  - {w}")
+
+        return "\n".join(lines)
+
+    def _summary_execute(self) -> list[str]:
+        lines: list[str] = [f"Scope:  {self.config_type}:{self.config_name}"]
+
+        rows_written = 0
+        if self.detail is not None:
+            if self.config_type == "thread":
+                rows_written = getattr(self.detail, "rows_written", 0)
+            elif self.config_type == "weave":
+                for tr in getattr(self.detail, "thread_results", []):
+                    rows_written += getattr(tr, "rows_written", 0)
+            elif self.config_type == "loom":
+                for wr in getattr(self.detail, "weave_results", []):
+                    for tr in getattr(wr, "thread_results", []):
+                        rows_written += getattr(tr, "rows_written", 0)
+
+        lines.append(f"Rows:   {rows_written:,} written")
+        lines.append(f"Time:   {_format_duration(self.duration_ms)}")
+
+        if self.config_type == "loom" and self.detail is not None:
+            weave_results = getattr(self.detail, "weave_results", [])
+            if weave_results:
+                lines.append("")
+                lines.append("Weaves:")
+                for wr in weave_results:
+                    thread_count = len(getattr(wr, "thread_results", []))
+                    wr_dur = _format_duration(getattr(wr, "duration_ms", 0))
+                    lines.append(
+                        f"  {wr.weave_name}  {wr.status}  "
+                        f"{thread_count} threads  {wr_dur}"
+                    )
+
+        return lines
+
+    def _summary_validate(self) -> list[str]:
+        lines: list[str] = [
+            "Mode:   validate",
+            f"Scope:  {self.config_type}:{self.config_name}",
+        ]
+
+        if self.validation_errors:
+            lines.append("Errors:")
+            for err in self.validation_errors:
+                lines.append(f"  - {err}")
+        else:
+            lines.append("Checks: config schema \u2713 | DAG \u2713 | sources \u2713")
+
+        return lines
+
+    def _summary_plan(self) -> list[str]:
+        lines: list[str] = [
+            "Mode:   plan",
+            f"Scope:  {self.config_type}:{self.config_name}",
+        ]
+
+        if self.execution_plan:
+            lines.append("")
+            lines.append("Execution order:")
+            for plan in self.execution_plan:
+                for i, group in enumerate(plan.execution_order, 1):
+                    lines.append(f"  {i}. [{', '.join(group)}]")
+
+        return lines
+
+    def _summary_preview(self) -> list[str]:
+        lines: list[str] = [
+            "Mode:   preview",
+            f"Scope:  {self.config_type}:{self.config_name}",
+        ]
+
+        if self.preview_data:
+            lines.append("")
+            lines.append("Preview:")
+            for name, df in self.preview_data.items():
+                try:
+                    cols = len(df.columns)
+                    rows = df.count()
+                    lines.append(f"  {name}  {cols} cols \u00d7 {rows} rows")
+                except Exception:
+                    lines.append(f"  {name}  (unavailable)")
+
+        return lines
 
 
 class LoadedConfig:
