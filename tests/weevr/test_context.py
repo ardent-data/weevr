@@ -91,31 +91,23 @@ class TestFilterThreads:
         assert warnings == []
 
     def test_filter_by_tags(self, thread_map: dict[str, Thread]) -> None:
-        filtered, warnings = Context._filter_threads(
-            thread_map, tags=["dimension"]
-        )
+        filtered, warnings = Context._filter_threads(thread_map, tags=["dimension"])
         assert set(filtered.keys()) == {"dim_customer", "dim_product"}
         assert warnings == []
 
     def test_filter_by_tags_intersection(self, thread_map: dict[str, Thread]) -> None:
-        filtered, warnings = Context._filter_threads(
-            thread_map, tags=["core"]
-        )
+        filtered, warnings = Context._filter_threads(thread_map, tags=["core"])
         assert set(filtered.keys()) == {"dim_customer"}
         assert warnings == []
 
     def test_filter_no_match_returns_warning(self, thread_map: dict[str, Thread]) -> None:
-        filtered, warnings = Context._filter_threads(
-            thread_map, thread_names=["nonexistent"]
-        )
+        filtered, warnings = Context._filter_threads(thread_map, thread_names=["nonexistent"])
         assert filtered == {}
         assert len(warnings) == 1
         assert "No threads matched" in warnings[0]
 
     def test_filter_by_tags_no_match(self, thread_map: dict[str, Thread]) -> None:
-        filtered, warnings = Context._filter_threads(
-            thread_map, tags=["nonexistent_tag"]
-        )
+        filtered, warnings = Context._filter_threads(thread_map, tags=["nonexistent_tag"])
         assert filtered == {}
         assert "No threads matched" in warnings[0]
 
@@ -124,9 +116,8 @@ class TestFilterThreads:
 # Integration tests — require Spark
 # ---------------------------------------------------------------------------
 
-def _create_thread_yaml(
-    base: Path, name: str, src_alias: str, tgt_path: str
-) -> Path:
+
+def _create_thread_yaml(base: Path, name: str, src_alias: str, tgt_path: str) -> Path:
     """Create a minimal thread YAML config at base/threads/<name>.yaml."""
     thread_dir = base / "threads"
     thread_dir.mkdir(parents=True, exist_ok=True)
@@ -226,9 +217,7 @@ class TestContextLoad:
 
 @pytest.mark.spark
 class TestContextRunExecute:
-    def test_run_execute_thread(
-        self, spark: SparkSession, tmp_path: Path
-    ) -> None:
+    def test_run_execute_thread(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_exec")
         tgt = str(tmp_path / "tgt_exec")
         spark.createDataFrame([{"id": 1, "val": "a"}]).write.format("delta").save(src)
@@ -244,9 +233,7 @@ class TestContextRunExecute:
         assert result.detail is not None
         assert result.duration_ms >= 0
 
-    def test_run_execute_weave(
-        self, spark: SparkSession, tmp_path: Path
-    ) -> None:
+    def test_run_execute_weave(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_wexec")
         tgt = str(tmp_path / "tgt_wexec")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
@@ -261,9 +248,7 @@ class TestContextRunExecute:
         assert result.config_type == "weave"
         assert result.detail is not None
 
-    def test_run_execute_loom(
-        self, spark: SparkSession, tmp_path: Path
-    ) -> None:
+    def test_run_execute_loom(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_lexec")
         tgt = str(tmp_path / "tgt_lexec")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
@@ -279,9 +264,7 @@ class TestContextRunExecute:
         assert result.config_type == "loom"
         assert result.detail is not None
 
-    def test_context_reusable(
-        self, spark: SparkSession, tmp_path: Path
-    ) -> None:
+    def test_context_reusable(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_reuse")
         tgt1 = str(tmp_path / "tgt_reuse1")
         tgt2 = str(tmp_path / "tgt_reuse2")
@@ -429,9 +412,7 @@ class TestPreviewMode:
         # Target should NOT exist after preview
         assert not Path(tgt).exists() or not any(Path(tgt).iterdir())
 
-    def test_preview_custom_sample_rows(
-        self, spark: SparkSession, tmp_path: Path
-    ) -> None:
+    def test_preview_custom_sample_rows(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_csr")
         tgt = str(tmp_path / "tgt_csr")
         data = [{"id": i} for i in range(200)]

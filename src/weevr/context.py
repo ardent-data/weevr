@@ -74,17 +74,13 @@ class Context:
         log_level: str = "standard",
     ) -> None:
         if not isinstance(spark, SparkSession):
-            raise TypeError(
-                f"'spark' must be a SparkSession, got {type(spark).__name__}"
-            )
+            raise TypeError(f"'spark' must be a SparkSession, got {type(spark).__name__}")
 
         try:
             resolved_level = LogLevel(log_level)
         except ValueError:
             valid = ", ".join(f"'{v.value}'" for v in LogLevel)
-            raise ValueError(
-                f"Invalid log_level '{log_level}'. Must be one of: {valid}"
-            ) from None
+            raise ValueError(f"Invalid log_level '{log_level}'. Must be one of: {valid}") from None
 
         self._spark = spark
         self._params = params
@@ -163,9 +159,7 @@ class Context:
             resolved_mode = ExecutionMode(mode)
         except ValueError:
             valid = ", ".join(f"'{m.value}'" for m in ExecutionMode)
-            raise ValueError(
-                f"Invalid mode '{mode}'. Must be one of: {valid}"
-            ) from None
+            raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid}") from None
 
         if tags is not None and threads is not None:
             raise ValueError("'tags' and 'threads' are mutually exclusive")
@@ -285,9 +279,7 @@ class Context:
                 warnings=all_warnings,
             )
 
-        engine_result = execute_loom(
-            self._spark, model, filtered_weaves, filtered_threads
-        )
+        engine_result = execute_loom(self._spark, model, filtered_weaves, filtered_threads)
         return RunResult(
             status=engine_result.status,
             mode=ExecutionMode.EXECUTE,
@@ -474,9 +466,7 @@ class Context:
                 if weave is None:
                     continue
                 wt = resolved.threads.get(weave_name, {})
-                wt, warnings = self._filter_threads(
-                    wt, tags=tags, thread_names=thread_names
-                )
+                wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
                 all_warnings.extend(warnings)
                 if wt:
                     filtered_entries = [e for e in weave.threads if e.name in wt]

@@ -149,8 +149,7 @@ class RunResult:
                     thread_count = len(getattr(wr, "thread_results", []))
                     wr_dur = _format_duration(getattr(wr, "duration_ms", 0))
                     lines.append(
-                        f"  {wr.weave_name}  {wr.status}  "
-                        f"{thread_count} threads  {wr_dur}"
+                        f"  {wr.weave_name}  {wr.status}  {thread_count} threads  {wr_dur}"
                     )
 
         return lines

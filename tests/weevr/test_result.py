@@ -231,22 +231,31 @@ class TestRunResult:
     def test_summary_duration_formatting(self) -> None:
         # Milliseconds
         r1 = RunResult(
-            status="success", mode=ExecutionMode.EXECUTE,
-            config_type="thread", config_name="t", duration_ms=500,
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="t",
+            duration_ms=500,
         )
         assert "500ms" in r1.summary()
 
         # Seconds
         r2 = RunResult(
-            status="success", mode=ExecutionMode.EXECUTE,
-            config_type="thread", config_name="t", duration_ms=2100,
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="t",
+            duration_ms=2100,
         )
         assert "2.1s" in r2.summary()
 
         # Minutes
         r3 = RunResult(
-            status="success", mode=ExecutionMode.EXECUTE,
-            config_type="thread", config_name="t", duration_ms=135000,
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="t",
+            duration_ms=135000,
         )
         assert "2m" in r3.summary()
 
@@ -323,9 +332,7 @@ class TestLoadedConfig:
         with pytest.raises(AttributeError, match="no attribute 'nonexistent'"):
             _ = loaded.nonexistent
 
-    def test_getattr_error_message_includes_model_type(
-        self, sample_thread: Thread
-    ) -> None:
+    def test_getattr_error_message_includes_model_type(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
         with pytest.raises(AttributeError, match="Thread"):
             _ = loaded.bogus
