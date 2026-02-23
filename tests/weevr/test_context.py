@@ -57,12 +57,11 @@ class TestRunErrorHandling:
         mock_spark = MagicMock(spec=SparkSession)
         ctx = Context(spark=mock_spark)
 
-        with patch.object(ctx, "_load_resolved") as mock_load, patch.object(
-            ctx, "_run_execute", side_effect=ExecutionError("Spark write failed")
+        with (
+            patch.object(ctx, "_load_resolved") as mock_load,
+            patch.object(ctx, "_run_execute", side_effect=ExecutionError("Spark write failed")),
         ):
-            mock_load.return_value = MagicMock(
-                config_type="thread", config_name="dim_test"
-            )
+            mock_load.return_value = MagicMock(config_type="thread", config_name="dim_test")
             result = ctx.run(str(tmp_path / "threads" / "dim_test.yaml"))
 
         assert isinstance(result, RunResult)
