@@ -14,24 +14,26 @@ pytestmark = pytest.mark.spark
 @pytest.fixture()
 def quarantine_df(spark: SparkSession):
     """Sample quarantine DataFrame with metadata columns."""
-    return spark.createDataFrame([
-        {
-            "id": 1,
-            "amount": -5,
-            "__rule_name": "positive_amount",
-            "__rule_expression": "amount > 0",
-            "__severity": "error",
-            "__quarantine_ts": "2026-01-01T00:00:00+00:00",
-        },
-        {
-            "id": 2,
-            "amount": -10,
-            "__rule_name": "positive_amount",
-            "__rule_expression": "amount > 0",
-            "__severity": "error",
-            "__quarantine_ts": "2026-01-01T00:00:00+00:00",
-        },
-    ])
+    return spark.createDataFrame(
+        [
+            {
+                "id": 1,
+                "amount": -5,
+                "__rule_name": "positive_amount",
+                "__rule_expression": "amount > 0",
+                "__severity": "error",
+                "__quarantine_ts": "2026-01-01T00:00:00+00:00",
+            },
+            {
+                "id": 2,
+                "amount": -10,
+                "__rule_name": "positive_amount",
+                "__rule_expression": "amount > 0",
+                "__severity": "error",
+                "__quarantine_ts": "2026-01-01T00:00:00+00:00",
+            },
+        ]
+    )
 
 
 class TestWriteQuarantine:

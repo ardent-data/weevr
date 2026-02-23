@@ -496,9 +496,7 @@ class TestLoomTelemetry:
         """LoomTelemetry aggregates weave-level telemetry."""
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
-        loom = Loom.model_validate(
-            {"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]}
-        )
+        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]})
         weaves = {
             "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]}),
             "w2": Weave.model_validate({"config_version": "1.0", "name": "w2", "threads": ["t2"]}),

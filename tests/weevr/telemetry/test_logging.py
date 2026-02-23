@@ -107,9 +107,7 @@ class TestConfigureLogging:
 
     def test_has_json_formatter(self) -> None:
         logger = configure_logging(LogLevel.STANDARD, logger_name="weevr.test.fmt")
-        assert any(
-            isinstance(h.formatter, StructuredJsonFormatter) for h in logger.handlers
-        )
+        assert any(isinstance(h.formatter, StructuredJsonFormatter) for h in logger.handlers)
 
     def test_no_duplicate_handlers(self) -> None:
         name = "weevr.test.dup"

@@ -48,9 +48,7 @@ def _make_thread(
 class TestThreadTelemetryIntegration:
     """Thread-level telemetry with collector."""
 
-    def test_thread_span_created_with_collector(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_thread_span_created_with_collector(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("tel_int_src")
         tgt = tmp_delta_path("tel_int_tgt")
         create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
@@ -70,9 +68,7 @@ class TestThreadTelemetryIntegration:
         thread_spans = [s for s in spans if s.name == "thread:t1"]
         assert len(thread_spans) == 1
 
-    def test_thread_span_with_parent(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_thread_span_with_parent(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("parent_src")
         tgt = tmp_delta_path("parent_tgt")
         create_delta_table(spark, src, [{"id": 1}])
@@ -82,9 +78,7 @@ class TestThreadTelemetryIntegration:
         parent_id = parent_builder.span_id
 
         thread = _make_thread("t1", src, tgt)
-        result = execute_thread(
-            spark, thread, collector=collector, parent_span_id=parent_id
-        )
+        result = execute_thread(spark, thread, collector=collector, parent_span_id=parent_id)
 
         assert result.telemetry is not None
         assert result.telemetry.span.parent_span_id == parent_id
@@ -98,25 +92,21 @@ class TestWeaveExecutionIntegration:
     ) -> None:
         src = tmp_delta_path("weave_val_src")
         tgt = tmp_delta_path("weave_val_tgt")
-        create_delta_table(
-            spark, src, [{"id": 1, "amount": 100}, {"id": 2, "amount": -5}]
-        )
+        create_delta_table(spark, src, [{"id": 1, "amount": 100}, {"id": 2, "amount": -5}])
 
-        rules = [
-            ValidationRule(
-                rule=SparkExpr("amount > 0"), severity="error", name="positive"
-            )
-        ]
+        rules = [ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")]
         assertions = [Assertion(type="row_count", min=1)]
-        thread = _make_thread(
-            "val_thread", src, tgt, validations=rules, assertions=assertions
-        )
+        thread = _make_thread("val_thread", src, tgt, validations=rules, assertions=assertions)
         threads = {"val_thread": thread}
 
         plan = build_plan(
-            "val_weave", threads, list(Weave.model_validate({
-                "config_version": "1.0", "name": "val_weave", "threads": ["val_thread"]
-            }).threads)
+            "val_weave",
+            threads,
+            list(
+                Weave.model_validate(
+                    {"config_version": "1.0", "name": "val_weave", "threads": ["val_thread"]}
+                ).threads
+            ),
         )
 
         collector = SpanCollector(generate_trace_id())
@@ -139,9 +129,7 @@ class TestWeaveExecutionIntegration:
         q_df = spark.read.format("delta").load(f"{tgt}_quarantine")
         assert q_df.count() == 1
 
-    def test_weave_row_count_reconciliation(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_weave_row_count_reconciliation(self, spark: SparkSession, tmp_delta_path) -> None:
         """rows_read == rows_written + rows_quarantined for error-severity rules."""
         src = tmp_delta_path("recon_src")
         tgt = tmp_delta_path("recon_tgt")
@@ -156,18 +144,18 @@ class TestWeaveExecutionIntegration:
             ],
         )
 
-        rules = [
-            ValidationRule(
-                rule=SparkExpr("val > 0"), severity="error", name="positive_val"
-            )
-        ]
+        rules = [ValidationRule(rule=SparkExpr("val > 0"), severity="error", name="positive_val")]
         thread = _make_thread("recon_thread", src, tgt, validations=rules)
         threads = {"recon_thread": thread}
 
         plan = build_plan(
-            "recon_weave", threads, list(Weave.model_validate({
-                "config_version": "1.0", "name": "recon_weave", "threads": ["recon_thread"]
-            }).threads)
+            "recon_weave",
+            threads,
+            list(
+                Weave.model_validate(
+                    {"config_version": "1.0", "name": "recon_weave", "threads": ["recon_thread"]}
+                ).threads
+            ),
         )
 
         collector = SpanCollector(generate_trace_id())
@@ -184,21 +172,17 @@ class TestWeaveExecutionIntegration:
 class TestLoomExecutionIntegration:
     """Full loom → weave → thread execution with telemetry."""
 
-    def test_loom_telemetry_hierarchy(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_loom_telemetry_hierarchy(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("loom_src")
         tgt = tmp_delta_path("loom_tgt")
         create_delta_table(spark, src, [{"id": 1}, {"id": 2}, {"id": 3}])
 
         thread = _make_thread("loom_thread", src, tgt)
-        loom = Loom.model_validate({
-            "name": "test_loom", "config_version": "1.0", "weaves": ["w1"]
-        })
+        loom = Loom.model_validate({"name": "test_loom", "config_version": "1.0", "weaves": ["w1"]})
         weaves = {
-            "w1": Weave.model_validate({
-                "config_version": "1.0", "name": "w1", "threads": ["loom_thread"]
-            })
+            "w1": Weave.model_validate(
+                {"config_version": "1.0", "name": "w1", "threads": ["loom_thread"]}
+            )
         }
         threads = {"w1": {"loom_thread": thread}}
 
@@ -231,22 +215,18 @@ class TestLoomExecutionIntegration:
         )
 
         rules = [
-            ValidationRule(
-                rule=SparkExpr("score >= 0"), severity="error", name="non_negative"
-            )
+            ValidationRule(rule=SparkExpr("score >= 0"), severity="error", name="non_negative")
         ]
         assertions = [Assertion(type="row_count", min=1, max=100)]
 
-        thread = _make_thread(
-            "scored_thread", src, tgt, validations=rules, assertions=assertions
+        thread = _make_thread("scored_thread", src, tgt, validations=rules, assertions=assertions)
+        loom = Loom.model_validate(
+            {"name": "scoring_loom", "config_version": "1.0", "weaves": ["scoring"]}
         )
-        loom = Loom.model_validate({
-            "name": "scoring_loom", "config_version": "1.0", "weaves": ["scoring"]
-        })
         weaves = {
-            "scoring": Weave.model_validate({
-                "config_version": "1.0", "name": "scoring", "threads": ["scored_thread"]
-            })
+            "scoring": Weave.model_validate(
+                {"config_version": "1.0", "name": "scoring", "threads": ["scored_thread"]}
+            )
         }
         threads = {"scoring": {"scored_thread": thread}}
 
@@ -277,18 +257,12 @@ class TestLoomExecutionIntegration:
 class TestFatalValidationIntegration:
     """Fatal validation aborts thread, span has ERROR status."""
 
-    def test_fatal_validation_error_span_status(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_fatal_validation_error_span_status(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("fatal_src")
         tgt = tmp_delta_path("fatal_tgt")
         create_delta_table(spark, src, [{"id": 1, "val": -5}])
 
-        rules = [
-            ValidationRule(
-                rule=SparkExpr("val > 0"), severity="fatal", name="must_positive"
-            )
-        ]
+        rules = [ValidationRule(rule=SparkExpr("val > 0"), severity="fatal", name="must_positive")]
 
         collector = SpanCollector(generate_trace_id())
         thread = _make_thread("fatal_thread", src, tgt, validations=rules)

@@ -58,9 +58,7 @@ def execute_thread(
     """
     span_builder = None
     if collector is not None:
-        span_builder = collector.start_span(
-            f"thread:{thread.name}", parent_span_id=parent_span_id
-        )
+        span_builder = collector.start_span(f"thread:{thread.name}", parent_span_id=parent_span_id)
 
     validation_results = []
     assertion_results = []
@@ -91,9 +89,7 @@ def execute_thread(
             # Write quarantine rows if present
             target_path_for_q = thread.target.alias or thread.target.path or ""
             if outcome.quarantine_df is not None:
-                rows_quarantined = write_quarantine(
-                    spark, outcome.quarantine_df, target_path_for_q
-                )
+                rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path_for_q)
 
             # Continue with clean_df
             df = outcome.clean_df

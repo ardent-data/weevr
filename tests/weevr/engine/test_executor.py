@@ -219,9 +219,7 @@ class TestExecuteThreadErrors:
 class TestExecuteThreadTelemetry:
     """Telemetry populated on ThreadResult."""
 
-    def test_telemetry_populated_without_rules(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_telemetry_populated_without_rules(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("tel_src")
         tgt = tmp_delta_path("tel_tgt")
         create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
@@ -240,18 +238,12 @@ class TestExecuteThreadTelemetry:
 class TestExecuteThreadValidation:
     """Validation integration in execute_thread."""
 
-    def test_error_severity_quarantines_rows(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_error_severity_quarantines_rows(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("val_src")
         tgt = tmp_delta_path("val_tgt")
-        create_delta_table(
-            spark, src, [{"id": 1, "amount": 100}, {"id": 2, "amount": -5}]
-        )
+        create_delta_table(spark, src, [{"id": 1, "amount": 100}, {"id": 2, "amount": -5}])
 
-        rules = [
-            ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")
-        ]
+        rules = [ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")]
         thread = _make_thread("val_thread", src, tgt, validations=rules)
         result = execute_thread(spark, thread)
 
@@ -283,9 +275,7 @@ class TestExecuteThreadValidation:
 class TestExecuteThreadAssertions:
     """Assertion integration in execute_thread."""
 
-    def test_passing_assertions_recorded(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_passing_assertions_recorded(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("assert_src")
         tgt = tmp_delta_path("assert_tgt")
         create_delta_table(spark, src, [{"id": 1}, {"id": 2}])

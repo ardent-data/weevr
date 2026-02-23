@@ -14,11 +14,13 @@ pytestmark = pytest.mark.spark
 def target_df(spark: SparkSession, tmp_delta_path):
     """Write a sample Delta table and return its path."""
     path = tmp_delta_path("assertion_target")
-    df = spark.createDataFrame([
-        {"id": 1, "name": "alice", "amount": 100},
-        {"id": 2, "name": "bob", "amount": 200},
-        {"id": 3, "name": None, "amount": 300},
-    ])
+    df = spark.createDataFrame(
+        [
+            {"id": 1, "name": "alice", "amount": 100},
+            {"id": 2, "name": "bob", "amount": 200},
+            {"id": 3, "name": None, "amount": 300},
+        ]
+    )
     df.write.format("delta").mode("overwrite").save(path)
     return path
 
@@ -27,11 +29,13 @@ def target_df(spark: SparkSession, tmp_delta_path):
 def dup_target_df(spark: SparkSession, tmp_delta_path):
     """Write a Delta table with duplicate rows and return its path."""
     path = tmp_delta_path("dup_target")
-    df = spark.createDataFrame([
-        {"id": 1, "name": "alice"},
-        {"id": 1, "name": "alice"},
-        {"id": 2, "name": "bob"},
-    ])
+    df = spark.createDataFrame(
+        [
+            {"id": 1, "name": "alice"},
+            {"id": 1, "name": "alice"},
+            {"id": 2, "name": "bob"},
+        ]
+    )
     df.write.format("delta").mode("overwrite").save(path)
     return path
 

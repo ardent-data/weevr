@@ -8,9 +8,7 @@ from weevr.telemetry.span import SpanStatus, generate_trace_id
 
 class TestSpanBuilder:
     def test_finish_produces_span(self) -> None:
-        builder = SpanBuilder(
-            trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None
-        )
+        builder = SpanBuilder(trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None)
         span = builder.finish(SpanStatus.OK)
         assert span.trace_id == "a" * 32
         assert span.span_id == "b" * 16
@@ -20,9 +18,7 @@ class TestSpanBuilder:
         assert span.parent_span_id is None
 
     def test_set_attribute(self) -> None:
-        builder = SpanBuilder(
-            trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None
-        )
+        builder = SpanBuilder(trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None)
         builder.set_attribute("rows_read", 100)
         builder.set_attribute("duration_ms", 42)
         span = builder.finish()
@@ -30,9 +26,7 @@ class TestSpanBuilder:
         assert span.attributes["duration_ms"] == 42
 
     def test_add_event(self) -> None:
-        builder = SpanBuilder(
-            trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None
-        )
+        builder = SpanBuilder(trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None)
         builder.add_event("validation_start", {"rules": 3})
         builder.add_event("validation_end")
         span = builder.finish()
@@ -42,9 +36,7 @@ class TestSpanBuilder:
         assert span.events[1].name == "validation_end"
 
     def test_finish_twice_raises(self) -> None:
-        builder = SpanBuilder(
-            trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None
-        )
+        builder = SpanBuilder(trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None)
         builder.finish()
         with pytest.raises(RuntimeError, match="already finished"):
             builder.finish()
@@ -57,9 +49,7 @@ class TestSpanBuilder:
         assert span.parent_span_id == "c" * 16
 
     def test_span_id_property(self) -> None:
-        builder = SpanBuilder(
-            trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None
-        )
+        builder = SpanBuilder(trace_id="a" * 32, span_id="b" * 16, name="test", parent_span_id=None)
         assert builder.span_id == "b" * 16
 
 

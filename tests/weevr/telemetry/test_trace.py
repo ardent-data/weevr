@@ -76,12 +76,8 @@ class TestLoomTrace:
                 "dim": WeaveTrace(
                     span=weave1_span,
                     threads={
-                        "customer": _make_thread_trace(
-                            "thread:customer", weave1_span.span_id
-                        ),
-                        "product": _make_thread_trace(
-                            "thread:product", weave1_span.span_id
-                        ),
+                        "customer": _make_thread_trace("thread:customer", weave1_span.span_id),
+                        "product": _make_thread_trace("thread:product", weave1_span.span_id),
                     },
                 ),
                 "fact": WeaveTrace(

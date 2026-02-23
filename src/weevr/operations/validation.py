@@ -86,9 +86,7 @@ def validate_dataframe(
     validation_results = _compute_results(tagged, applied, unapplied)
 
     # Step 3: Check for fatal failures
-    has_fatal = any(
-        vr.severity == "fatal" and vr.rows_failed > 0 for vr in validation_results
-    )
+    has_fatal = any(vr.severity == "fatal" and vr.rows_failed > 0 for vr in validation_results)
     if has_fatal:
         return ValidationOutcome(
             clean_df=df,
@@ -149,12 +147,8 @@ def _compute_results(
     if applied:
         agg_exprs = []
         for _, col_name, _ in applied:
-            agg_exprs.append(
-                F.sum(F.when(F.col(col_name), 1).otherwise(0)).alias(f"{col_name}_p")
-            )
-            agg_exprs.append(
-                F.sum(F.when(~F.col(col_name), 1).otherwise(0)).alias(f"{col_name}_f")
-            )
+            agg_exprs.append(F.sum(F.when(F.col(col_name), 1).otherwise(0)).alias(f"{col_name}_p"))
+            agg_exprs.append(F.sum(F.when(~F.col(col_name), 1).otherwise(0)).alias(f"{col_name}_f"))
 
         counts_row = tagged.agg(*agg_exprs).collect()[0]
 

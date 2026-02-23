@@ -138,9 +138,7 @@ def execute_weave(
                             )
                         ] = name
                     else:
-                        future_to_name[
-                            executor.submit(execute_thread, spark, threads[name])
-                        ] = name
+                        future_to_name[executor.submit(execute_thread, spark, threads[name])] = name
 
                 for future in as_completed(future_to_name):
                     name = future_to_name[future]
@@ -230,9 +228,7 @@ def execute_weave(
         collector.add_span(weave_span)
 
     # Build weave telemetry from thread results
-    weave_telemetry = _build_weave_telemetry(
-        plan.weave_name, thread_results, collector
-    )
+    weave_telemetry = _build_weave_telemetry(plan.weave_name, thread_results, collector)
 
     logger.debug(
         "Weave '%s' complete — status=%s, duration=%dms",
@@ -334,7 +330,9 @@ def execute_loom(
         )
 
         result = execute_weave(
-            spark, plan, weave_threads,
+            spark,
+            plan,
+            weave_threads,
             collector=collector,
             parent_span_id=loom_span_id,
         )

@@ -49,9 +49,7 @@ class TestValidateDataframeSingleRule:
         assert outcome.validation_results[0].rows_failed == 0
 
     def test_some_fail_error(self, sample_df):
-        rules = [
-            ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")
-        ]
+        rules = [ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")]
         outcome = validate_dataframe(sample_df, rules)
         assert outcome.has_fatal is False
         assert outcome.clean_df.count() == 2
@@ -65,9 +63,7 @@ class TestValidateDataframeSingleRule:
         assert "__quarantine_ts" in q_cols
 
     def test_validation_result_counts(self, sample_df):
-        rules = [
-            ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")
-        ]
+        rules = [ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive")]
         outcome = validate_dataframe(sample_df, rules)
         vr = outcome.validation_results[0]
         assert vr.rule_name == "positive"
@@ -90,9 +86,7 @@ class TestValidateDataframeFatal:
 
     def test_fatal_all_pass(self, spark: SparkSession):
         df = spark.createDataFrame([{"x": 1}, {"x": 2}])
-        rules = [
-            ValidationRule(rule=SparkExpr("x > 0"), severity="fatal", name="positive")
-        ]
+        rules = [ValidationRule(rule=SparkExpr("x > 0"), severity="fatal", name="positive")]
         outcome = validate_dataframe(df, rules)
         assert outcome.has_fatal is False
 
@@ -139,10 +133,12 @@ class TestValidateDataframeMixedSeverities:
 class TestValidateDataframeMultipleErrors:
     def test_row_fails_two_rules(self, spark: SparkSession):
         """Row failing two error rules produces two quarantine rows."""
-        df = spark.createDataFrame([
-            {"id": 1, "a": 10, "b": 20},
-            {"id": 2, "a": -1, "b": -1},
-        ])
+        df = spark.createDataFrame(
+            [
+                {"id": 1, "a": 10, "b": 20},
+                {"id": 2, "a": -1, "b": -1},
+            ]
+        )
         rules = [
             ValidationRule(rule=SparkExpr("a > 0"), severity="error", name="a_positive"),
             ValidationRule(rule=SparkExpr("b > 0"), severity="error", name="b_positive"),
