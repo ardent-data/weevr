@@ -1,5 +1,6 @@
 """Domain object model for weevr configuration."""
 
+from weevr.model.failure import FailureConfig
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.loom import Loom
@@ -30,6 +31,8 @@ __all__ = [
     "Thread",
     "Weave",
     "Loom",
+    # Failure handling
+    "FailureConfig",
     # Source
     "Source",
     "DedupConfig",
