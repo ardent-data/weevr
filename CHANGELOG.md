@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/ardent-data/weevr/compare/weevr-v0.4.0...weevr-v0.5.0) (2026-02-23)
+
+
+### Features
+
+* **engine:** add telemetry, validation, and assertion execution ([#21](https://github.com/ardent-data/weevr/issues/21)) ([3de36b0](https://github.com/ardent-data/weevr/commit/3de36b099d63d8cff90d421074a37e6a8a65c3c1))
+
 ## [0.4.0](https://github.com/ardent-data/weevr/compare/weevr-v0.3.1...weevr-v0.4.0) (2026-02-23)
 
 
