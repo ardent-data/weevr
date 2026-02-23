@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/ardent-data/weevr/compare/weevr-v0.5.1...weevr-v0.6.0) (2026-02-23)
+
+
+### Features
+
+* **api:** add Context-based Python API with run/load and verification modes ([#25](https://github.com/ardent-data/weevr/issues/25)) ([4c4b57f](https://github.com/ardent-data/weevr/commit/4c4b57f31b82db3b75e1fc5ac26e953a0a566f04))
+
 ## [0.5.1](https://github.com/ardent-data/weevr/compare/weevr-v0.5.0...weevr-v0.5.1) (2026-02-23)
 
 
