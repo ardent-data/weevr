@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pyspark.sql import SparkSession
 
 from weevr.context import Context
+from weevr.errors import ExecutionError
 from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.thread import Thread
@@ -49,6 +50,28 @@ class TestRunValidation:
         ctx = Context(spark=mock_spark)
         with pytest.raises(ValueError, match="mutually exclusive"):
             ctx.run("some/path.yaml", tags=["t1"], threads=["t2"])
+
+
+class TestRunErrorHandling:
+    def test_execution_error_returns_failure_result(self, tmp_path: Path) -> None:
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark)
+
+        with patch.object(ctx, "_load_resolved") as mock_load, patch.object(
+            ctx, "_run_execute", side_effect=ExecutionError("Spark write failed")
+        ):
+            mock_load.return_value = MagicMock(
+                config_type="thread", config_name="dim_test"
+            )
+            result = ctx.run(str(tmp_path / "threads" / "dim_test.yaml"))
+
+        assert isinstance(result, RunResult)
+        assert result.status == "failure"
+        assert result.mode == ExecutionMode.EXECUTE
+        assert result.config_type == "thread"
+        assert result.config_name == "dim_test"
+        assert any("Spark write failed" in w for w in result.warnings)
+        assert result.duration_ms >= 0
 
 
 class TestFilterThreads:
