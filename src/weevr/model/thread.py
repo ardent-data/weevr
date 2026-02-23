@@ -3,6 +3,7 @@
 from typing import Any
 
 from weevr.model.base import FrozenBase
+from weevr.model.execution import ExecutionConfig
 from weevr.model.failure import FailureConfig
 from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
@@ -35,4 +36,5 @@ class Thread(FrozenBase):
     params: dict[str, ParamSpec] | None = None
     defaults: dict[str, Any] | None = None
     failure: FailureConfig | None = None
+    execution: ExecutionConfig | None = None
     cache: bool | None = None

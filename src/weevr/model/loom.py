@@ -3,6 +3,7 @@
 from typing import Any
 
 from weevr.model.base import FrozenBase
+from weevr.model.execution import ExecutionConfig
 from weevr.model.params import ParamSpec
 
 
@@ -14,3 +15,4 @@ class Loom(FrozenBase):
     weaves: list[str]
     defaults: dict[str, Any] | None = None
     params: dict[str, ParamSpec] | None = None
+    execution: ExecutionConfig | None = None

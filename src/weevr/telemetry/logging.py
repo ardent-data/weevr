@@ -3,17 +3,8 @@
 import json
 import logging
 from datetime import UTC, datetime
-from enum import StrEnum
 
-
-class LogLevel(StrEnum):
-    """Configurable log level for weevr execution."""
-
-    MINIMAL = "minimal"
-    STANDARD = "standard"
-    VERBOSE = "verbose"
-    DEBUG = "debug"
-
+from weevr.model.execution import LogLevel
 
 # Mapping from weevr LogLevel to Python logging levels
 _LOG_LEVEL_MAP: dict[LogLevel, int] = {

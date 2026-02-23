@@ -74,8 +74,8 @@ class TestAssertion:
         assert a.type == "unique"
 
     def test_all_types_valid(self):
-        """All three assertion types are accepted."""
-        for t in ("row_count", "column_not_null", "unique"):
+        """All four assertion types are accepted."""
+        for t in ("row_count", "column_not_null", "unique", "expression"):
             a = Assertion(type=t)  # type: ignore[arg-type]
             assert a.type == t
 
@@ -84,12 +84,34 @@ class TestAssertion:
         with pytest.raises(ValidationError):
             Assertion(type="schema_match")  # type: ignore[arg-type]
 
+    def test_severity_default_warn(self):
+        """Assertion severity defaults to warn."""
+        a = Assertion(type="row_count")
+        assert a.severity == "warn"
+
+    def test_severity_all_levels(self):
+        """Assertion accepts all four severity levels."""
+        for sev in ("info", "warn", "error", "fatal"):
+            a = Assertion(type="row_count", severity=sev)  # type: ignore[arg-type]
+            assert a.severity == sev
+
+    def test_expression_assertion(self):
+        """Expression assertion with custom Spark SQL expression."""
+        a = Assertion(
+            type="expression",
+            expression=SparkExpr("COUNT(*) > 0"),
+            severity="error",
+        )
+        assert a.type == "expression"
+        assert a.expression == "COUNT(*) > 0"
+
     def test_optional_fields_default_none(self):
-        """columns, min, max default to None."""
+        """columns, min, max, expression default to None."""
         a = Assertion(type="row_count")
         assert a.columns is None
         assert a.min is None
         assert a.max is None
+        assert a.expression is None
 
     def test_frozen(self):
         """Assertion is immutable."""

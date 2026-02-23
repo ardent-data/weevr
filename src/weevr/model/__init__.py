@@ -1,5 +1,6 @@
 """Domain object model for weevr configuration."""
 
+from weevr.model.execution import ExecutionConfig, LogLevel
 from weevr.model.failure import FailureConfig
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
 from weevr.model.load import LoadConfig
@@ -67,6 +68,9 @@ __all__ = [
     # Params
     "ParamSpec",
     "ParamsConfig",
+    # Execution config
+    "ExecutionConfig",
+    "LogLevel",
     # Types
     "SparkExpr",
 ]
