@@ -3,15 +3,48 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
 from pyspark.sql import SparkSession
 
+from weevr.config.inheritance import apply_inheritance
+from weevr.config.parser import (
+    detect_config_type,
+    extract_config_version,
+    parse_yaml,
+    validate_config_version,
+)
+from weevr.config.resolver import (
+    build_param_context,
+    resolve_references,
+    resolve_variables,
+)
+from weevr.config.validation import validate_schema
+from weevr.errors import ModelValidationError
 from weevr.model.execution import LogLevel
+from weevr.model.loom import Loom
+from weevr.model.thread import Thread
+from weevr.model.weave import Weave
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ResolvedConfig:
+    """Intermediate container for resolved config data."""
+
+    config_type: str
+    config_name: str
+    model: Thread | Weave | Loom
+    weaves: dict[str, Weave] = field(default_factory=dict)
+    threads: dict[str, dict[str, Thread]] = field(default_factory=dict)
+
+
+_CONFIG_TYPE_DIRS = {"thread": "threads", "weave": "weaves", "loom": "looms"}
 
 
 class Context:
@@ -68,3 +101,185 @@ class Context:
     def log_level(self) -> LogLevel:
         """Configured logging verbosity."""
         return self._log_level
+
+    # ------------------------------------------------------------------
+    # Config assembly
+    # ------------------------------------------------------------------
+
+    def _load_resolved(self, path: str | Path) -> _ResolvedConfig:
+        """Run the config pipeline and return the hydrated model with children.
+
+        Replicates the ``load_config`` pipeline but captures resolved child
+        configs (``_resolved_threads`` / ``_resolved_weaves``) before Pydantic
+        hydration strips them.
+        """
+        path = Path(path)
+
+        # Steps 1-3: Parse, version, type
+        raw = parse_yaml(path)
+        version = extract_config_version(raw)
+        config_type = detect_config_type(raw)
+        validate_config_version(version, config_type)
+
+        # Step 4: Schema validation
+        validated = validate_schema(raw, config_type)
+        config_dict = validated.model_dump(exclude_unset=True)
+
+        # Step 5: Parameter context
+        param_file_data = None
+        if self._param_file:
+            param_file_data = parse_yaml(self._param_file)
+
+        param_context = build_param_context(
+            self._params,
+            param_file_data,
+            config_dict.get("defaults") or config_dict.get("params"),
+        )
+
+        # Step 6: Variable resolution
+        resolved = resolve_variables(config_dict, param_context)
+
+        # Step 7: Resolve child references
+        base_path = self._resolve_base_path(path, config_type)
+        param_file_path = self._param_file
+        resolved_with_refs = resolve_references(
+            resolved, config_type, base_path, self._params, param_file_path
+        )
+
+        # Step 8: Apply inheritance cascade
+        if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
+            loom_defaults = resolved_with_refs.get("defaults")
+            for weave in resolved_with_refs["_resolved_weaves"]:
+                if "_resolved_threads" in weave:
+                    weave_defaults = weave.get("defaults")
+                    for i, thread in enumerate(weave["_resolved_threads"]):
+                        merged = apply_inheritance(loom_defaults, weave_defaults, thread)
+                        weave["_resolved_threads"][i] = merged
+
+        elif config_type == "weave" and "_resolved_threads" in resolved_with_refs:
+            weave_defaults = resolved_with_refs.get("defaults")
+            for i, thread in enumerate(resolved_with_refs["_resolved_threads"]):
+                merged = apply_inheritance(None, weave_defaults, thread)
+                resolved_with_refs["_resolved_threads"][i] = merged
+
+        # Derive config name
+        config_name = self._derive_name(path, config_type)
+        if not resolved_with_refs.get("name"):
+            resolved_with_refs["name"] = config_name
+
+        # Step 9: Hydrate top-level model
+        model = self._hydrate_model(resolved_with_refs, config_type, path)
+
+        # Extract and hydrate child models
+        weaves: dict[str, Weave] = {}
+        threads: dict[str, dict[str, Thread]] = {}
+
+        if config_type == "weave":
+            weave_name = config_name
+            thread_map = self._hydrate_threads(
+                resolved_with_refs.get("threads", []),
+                resolved_with_refs.get("_resolved_threads", []),
+                path,
+            )
+            threads[weave_name] = thread_map
+
+        elif config_type == "loom":
+            for weave_ref, weave_dict in zip(
+                resolved_with_refs.get("weaves", []),
+                resolved_with_refs.get("_resolved_weaves", []),
+                strict=True,
+            ):
+                weave_name = weave_ref if isinstance(weave_ref, str) else str(weave_ref)
+                if not weave_dict.get("name"):
+                    weave_dict["name"] = weave_name
+                weave_model = self._hydrate_model(weave_dict, "weave", path)
+                if not isinstance(weave_model, Weave):  # pragma: no cover
+                    continue
+                weaves[weave_name] = weave_model
+
+                thread_map = self._hydrate_threads(
+                    weave_dict.get("threads", []),
+                    weave_dict.get("_resolved_threads", []),
+                    path,
+                )
+                threads[weave_name] = thread_map
+
+        return _ResolvedConfig(
+            config_type=config_type,
+            config_name=config_name,
+            model=model,
+            weaves=weaves,
+            threads=threads,
+        )
+
+    @staticmethod
+    def _resolve_base_path(path: Path, config_type: str) -> Path:
+        """Walk up from the config file to find the project root."""
+        base_path = path.parent
+        if config_type == "thread":
+            base_path = base_path.parent
+            if base_path.name == "threads":
+                base_path = base_path.parent
+        elif config_type == "weave":
+            if base_path.name == "weaves":
+                base_path = base_path.parent
+        elif config_type == "loom":
+            if base_path.name == "looms":
+                base_path = base_path.parent
+        return base_path
+
+    @staticmethod
+    def _derive_name(path: Path, config_type: str) -> str:
+        """Derive a dot-separated config name from a file path."""
+        type_dir = _CONFIG_TYPE_DIRS.get(config_type)
+        if type_dir:
+            parts = path.parts
+            for i, part in enumerate(parts):
+                if part == type_dir and i < len(parts) - 1:
+                    after = parts[i + 1 :]
+                    name_segments = list(after[:-1]) + [Path(after[-1]).stem]
+                    return ".".join(name_segments)
+        return path.stem
+
+    @staticmethod
+    def _hydrate_model(
+        data: dict[str, Any], config_type: str, source_path: Path
+    ) -> Thread | Weave | Loom:
+        """Hydrate a dict into a typed domain model."""
+        model_map: dict[str, type[Thread | Weave | Loom]] = {
+            "thread": Thread,
+            "weave": Weave,
+            "loom": Loom,
+        }
+        cls = model_map[config_type]
+        try:
+            return cls.model_validate(data)
+        except ValidationError as exc:
+            raise ModelValidationError(
+                f"Model hydration failed for {config_type}: {exc}",
+                cause=exc,
+                file_path=str(source_path),
+            ) from exc
+
+    @staticmethod
+    def _hydrate_threads(
+        thread_names: list[Any],
+        resolved_dicts: list[dict[str, Any]],
+        source_path: Path,
+    ) -> dict[str, Thread]:
+        """Hydrate resolved thread dicts into a name→Thread mapping."""
+        result: dict[str, Thread] = {}
+        for name_entry, thread_dict in zip(thread_names, resolved_dicts, strict=True):
+            # thread_names entries can be strings or dicts with "name" key
+            name = name_entry.get("name", "") if isinstance(name_entry, dict) else str(name_entry)
+            if not thread_dict.get("name"):
+                thread_dict["name"] = name
+            try:
+                result[name] = Thread.model_validate(thread_dict)
+            except ValidationError as exc:
+                raise ModelValidationError(
+                    f"Thread hydration failed for '{name}': {exc}",
+                    cause=exc,
+                    file_path=str(source_path),
+                ) from exc
+        return result
