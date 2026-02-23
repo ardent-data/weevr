@@ -93,21 +93,23 @@ This makes it possible to understand *what happened* and *why* without reverse-e
 
 ## Status
 
-weevr is currently in an **early planning and design phase** (Phase 0). The repository focuses on:
+weevr is in **active development** (Phase 0). The core execution engine is functional — threads, weaves, and looms execute end-to-end from YAML configuration through to Delta table writes with DAG-based orchestration, data validation, and structured telemetry.
 
-* Foundational project structure and tooling
-* CI, release, and contribution workflows
-* Technical specification and architectural design
-* Clarifying core concepts, boundaries, and capabilities
+### What works today
 
-Functional capabilities will be introduced incrementally through a phased approach:
+* **Configuration layer** — YAML parsing, schema validation, variable injection, parameter files, reference resolution, and inheritance cascade (loom → weave → thread)
+* **Object model** — Typed domain models for threads, weaves, looms, sources, targets, pipeline steps, keys, write config, and validation rules
+* **Thread execution** — Source reading (Delta, CSV, JSON, Parquet), core transforms (filter, derive, select, drop, rename, cast, dedup, sort, join, union), null-safe joins, surrogate key generation, change detection hashing, target column mapping, and Delta writes (overwrite, append, merge)
+* **DAG orchestration** — Dependency resolution from source/target path analysis, parallel thread execution within weaves, sequential weave ordering in looms, configurable failure behavior (abort_weave, skip_downstream, continue), and auto-cache management
+* **Validation and data quality** — Pre-write validation rules with severity routing (info/warn log only, error quarantines to `{target}_quarantine`, fatal aborts), post-write assertions (row_count, column_not_null, unique, expression)
+* **Telemetry** — OTel-compatible execution spans, structured JSON logging, execution trace trees with flat span serialization, row count reconciliation, and telemetry composition on result objects
 
-* **Phase 0** — Proof of concept with core thread/weave/loom execution, basic transformations, and configuration inheritance
-* **Phase 1** — Transform depth with analytical operations, advanced merge patterns, and data quality
-* **Phase 2** — Extensibility with UDF/helper registries, circuit breakers, and governance features
-* **Phase 3** — Maturity with dry-run modes, developer tooling, and community integrations
+### Roadmap
 
-See the technical specification for complete phasing details.
+* **Phase 0 (current)** — Python API (Context class, run/load/validate), incremental processing (watermark-based loads)
+* **Phase 1** — Analytical transforms (aggregate, window, pivot), naming normalization, advanced merge patterns, CDC
+* **Phase 2** — Extensibility (stitches, helper/UDF registries), operational features (retry, circuit breaker, mirrors)
+* **Phase 3** — Developer tooling (test framework, CLI validation, dry-run modes)
 
 ## Non-goals
 
@@ -120,22 +122,19 @@ By design, weevr is intentionally **not**:
 
 The intent is to reduce orchestration friction and enforce repeatable patterns, not to obscure how data is actually processed.
 
-## Key capabilities (planned)
+## Key capabilities
 
-weevr is designed to support:
-
-* **Declarative transformation pipelines** — Filters, joins, aggregates, window functions, pivots, dedup, and more expressed in YAML
-* **Expression language** — Spark SQL expressions users already know, plus helper functions for common patterns (key generation, temporal logic, change detection)
-* **Flexible write modes** — Overwrite, append, merge (upsert), and insert-only with configurable match/update/delete behavior
-* **Incremental processing** — Watermark-based and parameter-driven incremental loads, plus CDC support
-* **Validation and data quality** — Configurable severity levels (info, warn, error, fatal) with row quarantine
-* **Configuration inheritance** — Define patterns once at loom or weave level, cascade down to threads
+* **Declarative transformation pipelines** — Filters, joins, dedup, sort, rename, cast, derive, select, drop, and union expressed in YAML. Aggregate, window, and pivot transforms are planned.
+* **Expression language** — Spark SQL expressions users already know, plus key generation and change detection hashing
+* **Flexible write modes** — Overwrite, append, and merge (upsert) with configurable match/update/delete behavior. Insert-only mode is planned.
+* **Validation and data quality** — Pre-write validation rules with configurable severity (info, warn, error, fatal) and automatic row quarantine. Post-write assertions for row counts, null checks, uniqueness, and custom expressions.
+* **Configuration inheritance** — Define patterns once at loom or weave level, cascade down to threads with child-wins semantics
 * **Variable injection** — Environment-agnostic configs with parameter files and runtime overrides
-* **Observability** — Structured logging, row count telemetry, execution traces, and progress tracking
+* **Observability** — OTel-compatible execution spans, structured JSON logging, row count reconciliation, and execution trace trees with flat span serialization
+* **DAG orchestration** — Automatic dependency resolution, parallel thread execution, configurable failure behavior, and auto-cache management
 * **Null-safe defaults** — Opinionated defaults for join semantics and key handling that prevent common Spark pitfalls
-* **Extensibility** — Project-level UDFs and custom helper functions
-
-See the technical specification for complete capability details.
+* **Incremental processing** *(planned)* — Watermark-based and parameter-driven incremental loads, plus CDC support
+* **Extensibility** *(planned)* — Project-level UDFs, custom helper functions, and reusable stitch patterns
 
 ## Target audience
 
@@ -152,7 +151,7 @@ The YAML configuration uses familiar terminology and hides Spark complexity, whi
 
 See `CONTRIBUTING.md` for development setup, workflow expectations, and pull request conventions.
 
-Contributions are welcome once the foundational design is settled.
+Contributions are welcome.
 
 ## License
 
