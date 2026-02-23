@@ -249,7 +249,7 @@ def execute_loom(
     statuses = {r.status for r in weave_results}
     if statuses <= {"success"}:
         loom_status: Literal["success", "failure", "partial"] = "success"
-    elif "success" in statuses:
+    elif "success" in statuses or "partial" in statuses:
         loom_status = "partial"
     else:
         loom_status = "failure"

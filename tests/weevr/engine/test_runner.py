@@ -397,6 +397,34 @@ class TestLoomRunner:
         assert len(result.weave_results) == 2
 
     @patch("weevr.engine.runner.execute_thread")
+    def test_single_partial_weave_loom_status_is_partial(self, mock_exec):
+        """Loom with a single partial weave → LoomResult.status='partial', not 'failure'."""
+
+        def side_effect(spark, thread):
+            if thread.name == "t_fail":
+                raise ExecutionError("t_fail failed", thread_name="t_fail")
+            return _make_result(thread.name)
+
+        mock_exec.side_effect = side_effect
+
+        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1"]})
+        weaves = {
+            "w1": Weave.model_validate(
+                {"config_version": "1.0", "name": "w1", "threads": ["t_ok", "t_fail"]}
+            ),
+        }
+        threads = {
+            "w1": {
+                "t_ok": _make_thread("t_ok"),
+                "t_fail": _make_thread("t_fail", on_failure="continue"),
+            },
+        }
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+        assert result.status == "partial"
+        assert len(result.weave_results) == 1
+        assert result.weave_results[0].status == "partial"
+
+    @patch("weevr.engine.runner.execute_thread")
     def test_loom_result_duration_ms_positive(self, mock_exec):
         """LoomResult.duration_ms is a non-negative integer."""
         mock_exec.side_effect = lambda spark, thread: _make_result(thread.name)
