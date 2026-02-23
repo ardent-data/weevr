@@ -28,6 +28,7 @@ from weevr.model.execution import LogLevel
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import Weave
+from weevr.result import LoadedConfig
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,32 @@ class Context:
     def log_level(self) -> LogLevel:
         """Configured logging verbosity."""
         return self._log_level
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def load(self, path: str | Path) -> LoadedConfig:
+        """Load and validate a config file, returning a model wrapper.
+
+        Parses, resolves, and hydrates the config at *path* without executing
+        anything.  The returned :class:`LoadedConfig` exposes the underlying
+        model and, for weave/loom configs, a lazily-built execution plan.
+
+        Args:
+            path: Filesystem path to a thread, weave, or loom YAML file.
+
+        Returns:
+            A :class:`LoadedConfig` wrapping the hydrated model.
+        """
+        resolved = self._load_resolved(path)
+        return LoadedConfig(
+            model=resolved.model,
+            config_type=resolved.config_type,
+            config_name=resolved.config_name,
+            threads=resolved.threads or None,
+            weaves=resolved.weaves or None,
+        )
 
     # ------------------------------------------------------------------
     # Config assembly
