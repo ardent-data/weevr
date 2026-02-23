@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/ardent-data/weevr/compare/weevr-v0.3.1...weevr-v0.4.0) (2026-02-23)
+
+
+### Features
+
+* **engine:** add DAG orchestration for weave and loom execution ([#19](https://github.com/ardent-data/weevr/issues/19)) ([99964a2](https://github.com/ardent-data/weevr/commit/99964a25ba088c89516866f3c99afd4ff527e3a3))
+
 ## [0.3.1](https://github.com/ardent-data/weevr/compare/weevr-v0.3.0...weevr-v0.3.1) (2026-02-21)
 
 
