@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from weevr.model.failure import FailureConfig
 from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.pipeline import DeriveStep, FilterStep
@@ -185,3 +186,76 @@ class TestThreadNameField:
         t = Thread.model_validate({**_MINIMAL, "name": "facts.fact_order"})
         restored = Thread.model_validate(t.model_dump())
         assert restored.name == "facts.fact_order"
+
+
+class TestThreadFailureConfig:
+    """Tests for the Thread.failure field and FailureConfig model."""
+
+    def test_failure_defaults_to_none(self):
+        """Thread without failure block has failure=None (backward compatible)."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.failure is None
+
+    def test_failure_config_hydrated(self):
+        """Thread with failure block is hydrated into FailureConfig."""
+        data = {**_MINIMAL, "failure": {"on_failure": "skip_downstream"}}
+        t = Thread.model_validate(data)
+        assert isinstance(t.failure, FailureConfig)
+        assert t.failure.on_failure == "skip_downstream"
+
+    def test_failure_config_default_on_failure(self):
+        """FailureConfig defaults on_failure to 'abort_weave'."""
+        cfg = FailureConfig()
+        assert cfg.on_failure == "abort_weave"
+
+    def test_failure_config_abort_weave(self):
+        """FailureConfig accepts on_failure='abort_weave'."""
+        cfg = FailureConfig(on_failure="abort_weave")
+        assert cfg.on_failure == "abort_weave"
+
+    def test_failure_config_skip_downstream(self):
+        """FailureConfig accepts on_failure='skip_downstream'."""
+        cfg = FailureConfig(on_failure="skip_downstream")
+        assert cfg.on_failure == "skip_downstream"
+
+    def test_failure_config_continue(self):
+        """FailureConfig accepts on_failure='continue'."""
+        cfg = FailureConfig(on_failure="continue")
+        assert cfg.on_failure == "continue"
+
+    def test_failure_config_invalid_raises(self):
+        """FailureConfig rejects unknown on_failure values."""
+        with pytest.raises(ValidationError):
+            FailureConfig(on_failure="retry")  # type: ignore[arg-type]
+
+    def test_thread_with_abort_weave_failure(self):
+        """Thread parses failure block with abort_weave mode."""
+        data = {**_MINIMAL, "failure": {"on_failure": "abort_weave"}}
+        t = Thread.model_validate(data)
+        assert t.failure is not None
+        assert t.failure.on_failure == "abort_weave"
+
+    def test_failure_config_frozen(self):
+        """FailureConfig is immutable."""
+        cfg = FailureConfig()
+        with pytest.raises((ValidationError, TypeError)):
+            cfg.on_failure = "continue"  # type: ignore[misc]
+
+
+class TestThreadCacheField:
+    """Tests for the Thread.cache field."""
+
+    def test_cache_defaults_to_none(self):
+        """Thread without cache field has cache=None (auto-cache by planner)."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.cache is None
+
+    def test_cache_false_suppresses_auto_cache(self):
+        """Thread with cache=False stores the value."""
+        t = Thread.model_validate({**_MINIMAL, "cache": False})
+        assert t.cache is False
+
+    def test_cache_true_forces_caching(self):
+        """Thread with cache=True stores the value."""
+        t = Thread.model_validate({**_MINIMAL, "cache": True})
+        assert t.cache is True
