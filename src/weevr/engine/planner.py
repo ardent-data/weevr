@@ -110,9 +110,8 @@ def _build_dependency_graph(
         source_paths = _extract_source_paths(thread)
         for src_path in source_paths:
             producer = target_index.get(src_path)
-            if producer is not None and producer != name:
-                if producer not in inferred[name]:
-                    inferred[name].append(producer)
+            if producer is not None and producer != name and producer not in inferred[name]:
+                inferred[name].append(producer)
 
     return inferred, explicit_index
 
@@ -196,7 +195,7 @@ def _topological_sort(
     """
     in_degree: dict[str, int] = {name: 0 for name in thread_names}
     for name in thread_names:
-        for dep in dependencies.get(name, []):
+        for _dep in dependencies.get(name, []):
             in_degree[name] += 1
 
     queue: deque[str] = deque(name for name in thread_names if in_degree[name] == 0)
@@ -288,9 +287,7 @@ def build_plan(
     cycle = _detect_cycles(thread_names, dependencies)
     if cycle is not None:
         cycle_path = " → ".join(cycle)
-        raise ConfigError(
-            f"Circular dependency detected in weave '{weave_name}': {cycle_path}"
-        )
+        raise ConfigError(f"Circular dependency detected in weave '{weave_name}': {cycle_path}")
 
     # 4. Build reverse graph (dependents)
     dependents = _build_dependents(thread_names, dependencies)
