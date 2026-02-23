@@ -129,6 +129,7 @@ def execute_thread(
             rows_read,
             rows_written,
             rows_quarantined,
+            collector=collector,
         )
 
         return ThreadResult(
@@ -149,6 +150,7 @@ def execute_thread(
             rows_written,
             rows_quarantined,
             status=SpanStatus.ERROR,
+            collector=collector,
         )
         raise
 
@@ -183,10 +185,13 @@ def _build_telemetry(
     rows_written: int,
     rows_quarantined: int,
     status: SpanStatus = SpanStatus.OK,
+    collector: SpanCollector | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
         span = span_builder.finish(status=status)
+        if collector is not None:
+            collector.add_span(span)
     else:
         span = ExecutionSpan(
             trace_id=generate_trace_id(),

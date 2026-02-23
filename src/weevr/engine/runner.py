@@ -223,10 +223,11 @@ def execute_weave(
     status = _compute_weave_status(thread_states)
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
-    # Finalize weave span
-    if weave_span_builder is not None:
+    # Finalize weave span and add to collector
+    if weave_span_builder is not None and collector is not None:
         weave_span_status = SpanStatus.OK if status == "success" else SpanStatus.ERROR
-        weave_span_builder.finish(status=weave_span_status)
+        weave_span = weave_span_builder.finish(status=weave_span_status)
+        collector.add_span(weave_span)
 
     # Build weave telemetry from thread results
     weave_telemetry = _build_weave_telemetry(
@@ -358,9 +359,10 @@ def execute_loom(
     else:
         loom_status = "failure"
 
-    # Finalize loom span
+    # Finalize loom span and add to collector
     loom_span_status = SpanStatus.OK if loom_status == "success" else SpanStatus.ERROR
-    loom_span_builder.finish(status=loom_span_status)
+    loom_span = loom_span_builder.finish(status=loom_span_status)
+    collector.add_span(loom_span)
 
     # Build loom telemetry
     loom_telemetry = _build_loom_telemetry(loom.name, weave_results, collector)
