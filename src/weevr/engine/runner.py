@@ -1,5 +1,7 @@
 """Weave and loom execution runners."""
 
+from __future__ import annotations
+
 import logging
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -14,6 +16,9 @@ from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import Weave
+from weevr.telemetry.collector import SpanCollector
+from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
+from weevr.telemetry.span import SpanStatus, generate_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +53,8 @@ def execute_weave(
     spark: SparkSession,
     plan: ExecutionPlan,
     threads: dict[str, Thread],
+    collector: SpanCollector | None = None,
+    parent_span_id: str | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -61,6 +68,9 @@ def execute_weave(
         plan: Immutable :class:`~weevr.engine.planner.ExecutionPlan` produced
             by :func:`~weevr.engine.planner.build_plan`.
         threads: Mapping of thread name to :class:`~weevr.model.thread.Thread` config.
+        collector: Optional span collector for telemetry. When provided,
+            per-thread collectors are created and merged after execution.
+        parent_span_id: Optional parent span ID for trace tree linkage.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -72,6 +82,15 @@ def execute_weave(
     threads_skipped: list[str] = []
     cache = CacheManager(plan.cache_targets, plan.dependents)
     aborted = False
+
+    # Create weave span if collector is active
+    weave_span_builder = None
+    weave_span_id = None
+    if collector is not None:
+        weave_span_builder = collector.start_span(
+            f"weave:{plan.weave_name}", parent_span_id=parent_span_id
+        )
+        weave_span_id = weave_span_builder.span_id
 
     logger.debug("Starting weave '%s' — %d threads", plan.weave_name, len(plan.threads))
 
@@ -100,10 +119,26 @@ def execute_weave(
             )
 
             future_to_name: dict[Future[ThreadResult], str] = {}
+            # Per-thread collectors for isolation during concurrent execution
+            thread_collectors: dict[str, SpanCollector] = {}
+
             with ThreadPoolExecutor(max_workers=len(to_run)) as executor:
                 for name in to_run:
                     thread_states[name] = "running"
-                    future_to_name[executor.submit(execute_thread, spark, threads[name])] = name
+                    if collector is not None:
+                        tc = SpanCollector(collector.trace_id)
+                        thread_collectors[name] = tc
+                        future_to_name[
+                            executor.submit(
+                                execute_thread,
+                                spark,
+                                threads[name],
+                                collector=tc,
+                                parent_span_id=weave_span_id,
+                            )
+                        ] = name
+                    else:
+                        future_to_name[executor.submit(execute_thread, spark, threads[name])] = name
 
                 for future in as_completed(future_to_name):
                     name = future_to_name[future]
@@ -112,6 +147,10 @@ def execute_weave(
                         thread_states[name] = "succeeded"
                         thread_results.append(result)
                         logger.debug("Thread '%s' succeeded", name)
+
+                        # Merge thread collector into weave collector
+                        if name in thread_collectors and collector is not None:
+                            collector.merge(thread_collectors[name])
 
                         # Persist cache if this thread is a cache target
                         if cache.is_cache_target(name):
@@ -124,6 +163,10 @@ def execute_weave(
 
                     except Exception as exc:
                         thread_states[name] = "failed"
+                        # Merge thread collector even on failure
+                        if name in thread_collectors and collector is not None:
+                            collector.merge(thread_collectors[name])
+
                         # Record a failure result
                         thread_results.append(
                             ThreadResult(
@@ -178,6 +221,15 @@ def execute_weave(
     status = _compute_weave_status(thread_states)
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
+    # Finalize weave span and add to collector
+    if weave_span_builder is not None and collector is not None:
+        weave_span_status = SpanStatus.OK if status == "success" else SpanStatus.ERROR
+        weave_span = weave_span_builder.finish(status=weave_span_status)
+        collector.add_span(weave_span)
+
+    # Build weave telemetry from thread results
+    weave_telemetry = _build_weave_telemetry(plan.weave_name, thread_results, collector)
+
     logger.debug(
         "Weave '%s' complete — status=%s, duration=%dms",
         plan.weave_name,
@@ -191,6 +243,45 @@ def execute_weave(
         thread_results=thread_results,
         threads_skipped=threads_skipped,
         duration_ms=duration_ms,
+        telemetry=weave_telemetry,
+    )
+
+
+def _build_weave_telemetry(
+    weave_name: str,
+    thread_results: list[ThreadResult],
+    collector: SpanCollector | None,
+) -> WeaveTelemetry | None:
+    """Build WeaveTelemetry from thread results."""
+    if collector is None:
+        return None
+
+    from weevr.telemetry.span import ExecutionSpan, generate_span_id
+
+    # Find the weave span from the collector
+    spans = collector.get_spans()
+    weave_span = None
+    for s in spans:
+        if s.name == f"weave:{weave_name}":
+            weave_span = s
+            break
+
+    if weave_span is None:
+        weave_span = ExecutionSpan(
+            trace_id=collector.trace_id,
+            span_id=generate_span_id(),
+            name=f"weave:{weave_name}",
+            status=SpanStatus.OK,
+        )
+
+    thread_telemetry: dict[str, ThreadTelemetry] = {}
+    for tr in thread_results:
+        if tr.telemetry is not None:
+            thread_telemetry[tr.thread_name] = tr.telemetry
+
+    return WeaveTelemetry(
+        span=weave_span,
+        thread_telemetry=thread_telemetry,
     )
 
 
@@ -204,8 +295,8 @@ def execute_loom(
 
     Iterates the weaves listed in ``loom.weaves``, builds an
     :class:`~weevr.engine.planner.ExecutionPlan` for each, and executes them
-    via :func:`execute_weave`. Stops on the first weave failure (no
-    ``on_failure`` at loom level in M04).
+    via :func:`execute_weave`. Creates a root span collector for telemetry
+    and passes it through the execution tree.
 
     Args:
         spark: Active SparkSession.
@@ -220,6 +311,12 @@ def execute_loom(
     start_ns = time.monotonic_ns()
     weave_results: list[WeaveResult] = []
 
+    # Create root collector and loom span
+    trace_id = generate_trace_id()
+    collector = SpanCollector(trace_id)
+    loom_span_builder = collector.start_span(f"loom:{loom.name}")
+    loom_span_id = loom_span_builder.span_id
+
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
     for weave_name in loom.weaves:
@@ -232,7 +329,13 @@ def execute_loom(
             thread_entries=list(weave.threads),
         )
 
-        result = execute_weave(spark, plan, weave_threads)
+        result = execute_weave(
+            spark,
+            plan,
+            weave_threads,
+            collector=collector,
+            parent_span_id=loom_span_id,
+        )
         weave_results.append(result)
 
         if result.status == "failure":
@@ -254,6 +357,14 @@ def execute_loom(
     else:
         loom_status = "failure"
 
+    # Finalize loom span and add to collector
+    loom_span_status = SpanStatus.OK if loom_status == "success" else SpanStatus.ERROR
+    loom_span = loom_span_builder.finish(status=loom_span_status)
+    collector.add_span(loom_span)
+
+    # Build loom telemetry
+    loom_telemetry = _build_loom_telemetry(loom.name, weave_results, collector)
+
     logger.debug(
         "Loom '%s' complete — status=%s, duration=%dms",
         loom.name,
@@ -266,4 +377,40 @@ def execute_loom(
         loom_name=loom.name,
         weave_results=weave_results,
         duration_ms=duration_ms,
+        telemetry=loom_telemetry,
+    )
+
+
+def _build_loom_telemetry(
+    loom_name: str,
+    weave_results: list[WeaveResult],
+    collector: SpanCollector,
+) -> LoomTelemetry:
+    """Build LoomTelemetry from weave results."""
+    from weevr.telemetry.span import ExecutionSpan, generate_span_id
+
+    # Find the loom span from the collector
+    spans = collector.get_spans()
+    loom_span = None
+    for s in spans:
+        if s.name == f"loom:{loom_name}":
+            loom_span = s
+            break
+
+    if loom_span is None:
+        loom_span = ExecutionSpan(
+            trace_id=collector.trace_id,
+            span_id=generate_span_id(),
+            name=f"loom:{loom_name}",
+            status=SpanStatus.OK,
+        )
+
+    weave_telemetry: dict[str, WeaveTelemetry] = {}
+    for wr in weave_results:
+        if wr.telemetry is not None:
+            weave_telemetry[wr.weave_name] = wr.telemetry
+
+    return LoomTelemetry(
+        span=loom_span,
+        weave_telemetry=weave_telemetry,
     )

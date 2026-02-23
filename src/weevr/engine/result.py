@@ -1,8 +1,11 @@
 """Execution result models for threads, weaves, and looms."""
 
+from __future__ import annotations
+
 from typing import Literal
 
 from weevr.model.base import FrozenBase
+from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
 
 
 class ThreadResult(FrozenBase):
@@ -14,6 +17,7 @@ class ThreadResult(FrozenBase):
         rows_written: Number of rows in the DataFrame at write time.
         write_mode: The write mode used (``"overwrite"``, ``"append"``, or ``"merge"``).
         target_path: Physical path of the Delta table that was written.
+        telemetry: Thread-level telemetry with validation/assertion results and row counts.
     """
 
     status: Literal["success", "failure"]
@@ -21,6 +25,7 @@ class ThreadResult(FrozenBase):
     rows_written: int
     write_mode: str
     target_path: str
+    telemetry: ThreadTelemetry | None = None
 
 
 class WeaveResult(FrozenBase):
@@ -34,6 +39,7 @@ class WeaveResult(FrozenBase):
         thread_results: Results for each thread that was executed (not skipped).
         threads_skipped: Names of threads that were skipped due to upstream failure.
         duration_ms: Wall-clock duration of the weave execution in milliseconds.
+        telemetry: Weave-level telemetry aggregated from thread telemetry.
     """
 
     status: Literal["success", "failure", "partial"]
@@ -41,6 +47,7 @@ class WeaveResult(FrozenBase):
     thread_results: list[ThreadResult]
     threads_skipped: list[str]
     duration_ms: int
+    telemetry: WeaveTelemetry | None = None
 
 
 class LoomResult(FrozenBase):
@@ -53,9 +60,11 @@ class LoomResult(FrozenBase):
         loom_name: Name of the loom that was executed.
         weave_results: Results for each weave that was executed.
         duration_ms: Wall-clock duration of the loom execution in milliseconds.
+        telemetry: Loom-level telemetry aggregated from weave telemetry.
     """
 
     status: Literal["success", "failure", "partial"]
     loom_name: str
     weave_results: list[WeaveResult]
     duration_ms: int
+    telemetry: LoomTelemetry | None = None

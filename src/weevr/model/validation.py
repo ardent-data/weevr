@@ -15,9 +15,20 @@ class ValidationRule(FrozenBase):
 
 
 class Assertion(FrozenBase):
-    """A post-execution assertion on the target dataset."""
+    """A post-execution assertion on the target dataset.
 
-    type: Literal["row_count", "column_not_null", "unique"]
+    Attributes:
+        type: Assertion kind — built-in or expression-based.
+        severity: Severity level when the assertion fails.
+        columns: Columns involved, for column_not_null and unique types.
+        min: Minimum bound for row_count assertions.
+        max: Maximum bound for row_count assertions.
+        expression: Spark SQL expression for expression-type assertions.
+    """
+
+    type: Literal["row_count", "column_not_null", "unique", "expression"]
+    severity: Literal["info", "warn", "error", "fatal"] = "warn"
     columns: list[str] | None = None
     min: int | None = None
     max: int | None = None
+    expression: SparkExpr | None = None

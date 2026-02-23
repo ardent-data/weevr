@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
+from weevr.model.execution import ExecutionConfig
 from weevr.model.params import ParamSpec
 
 
@@ -29,6 +30,7 @@ class Weave(FrozenBase):
     threads: list[ThreadEntry]
     defaults: dict[str, Any] | None = None
     params: dict[str, ParamSpec] | None = None
+    execution: ExecutionConfig | None = None
 
     @model_validator(mode="before")
     @classmethod

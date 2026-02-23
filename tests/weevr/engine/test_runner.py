@@ -300,7 +300,7 @@ class TestLoomRunner:
     @patch("weevr.engine.runner.execute_thread")
     def test_two_weaves_execute_sequentially(self, mock_exec):
         """Loom with 2 weaves: both execute in order, LoomResult has 2 WeaveResults."""
-        mock_exec.side_effect = lambda spark, thread: _make_result(thread.name)
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
         loom = Loom.model_validate(
             {"name": "nightly", "config_version": "1.0", "weaves": ["dims", "facts"]}
@@ -328,7 +328,7 @@ class TestLoomRunner:
     def test_first_weave_fails_loom_stops(self, mock_exec):
         """First weave fails → loom stops; LoomResult.status='failure'."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "dim_a":
                 raise ExecutionError("dim_a failed", thread_name="dim_a")
             return _make_result(thread.name)
@@ -358,7 +358,7 @@ class TestLoomRunner:
     @patch("weevr.engine.runner.execute_thread")
     def test_all_weaves_succeed_loom_success(self, mock_exec):
         """All weaves succeed → LoomResult.status='success'."""
-        mock_exec.side_effect = lambda spark, thread: _make_result(thread.name)
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
         loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]})
         weaves = {
@@ -376,7 +376,7 @@ class TestLoomRunner:
     def test_first_succeeds_second_fails_partial(self, mock_exec):
         """First weave succeeds, second fails → LoomResult.status='partial'."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "t2":
                 raise ExecutionError("t2 failed", thread_name="t2")
             return _make_result(thread.name)
@@ -400,7 +400,7 @@ class TestLoomRunner:
     def test_single_partial_weave_loom_status_is_partial(self, mock_exec):
         """Loom with a single partial weave → LoomResult.status='partial', not 'failure'."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "t_fail":
                 raise ExecutionError("t_fail failed", thread_name="t_fail")
             return _make_result(thread.name)
@@ -427,7 +427,7 @@ class TestLoomRunner:
     @patch("weevr.engine.runner.execute_thread")
     def test_loom_result_duration_ms_positive(self, mock_exec):
         """LoomResult.duration_ms is a non-negative integer."""
-        mock_exec.side_effect = lambda spark, thread: _make_result(thread.name)
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
         loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1"]})
         weaves = {
@@ -437,6 +437,79 @@ class TestLoomRunner:
         result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
         assert isinstance(result.duration_ms, int)
         assert result.duration_ms >= 0
+
+
+# ---------------------------------------------------------------------------
+# Telemetry tests — weave and loom
+# ---------------------------------------------------------------------------
+
+
+class TestWeaveTelemetry:
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_telemetry_populated_with_collector(self, mock_exec):
+        """WeaveResult includes telemetry when a collector is provided."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("tel_weave", threads, _entries("A"))
+
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        collector = SpanCollector(generate_trace_id())
+        result = execute_weave(_MOCK_SPARK, plan, threads, collector=collector)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.span is not None
+        assert result.telemetry.span.name == "weave:tel_weave"
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_telemetry_none_without_collector(self, mock_exec):
+        """WeaveResult.telemetry is None when no collector is provided."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {"A": _make_thread("A")}
+        result = _run_weave(threads)
+
+        assert result.status == "success"
+        assert result.telemetry is None
+
+
+class TestLoomTelemetry:
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_telemetry_always_populated(self, mock_exec):
+        """LoomResult always has telemetry (collector created internally)."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+
+        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1"]})
+        weaves = {
+            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.telemetry is not None
+        assert result.telemetry.span is not None
+        assert result.telemetry.span.name == "loom:l"
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_telemetry_contains_weave_telemetry(self, mock_exec):
+        """LoomTelemetry aggregates weave-level telemetry."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+
+        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]})
+        weaves = {
+            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]}),
+            "w2": Weave.model_validate({"config_version": "1.0", "name": "w2", "threads": ["t2"]}),
+        }
+        threads = {
+            "w1": {"t1": _make_thread("t1")},
+            "w2": {"t2": _make_thread("t2")},
+        }
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.telemetry is not None
+        assert "w1" in result.telemetry.weave_telemetry
+        assert "w2" in result.telemetry.weave_telemetry
 
 
 # ---------------------------------------------------------------------------

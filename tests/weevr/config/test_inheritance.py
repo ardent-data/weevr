@@ -192,6 +192,32 @@ class TestApplyInheritance:
         # Loom's audit is inherited
         assert result["audit"] == "enabled"
 
+    def test_execution_config_cascade(self):
+        """Execution config cascades from loom through weave to thread."""
+        loom = {"execution": {"log_level": "minimal", "trace": True}}
+        weave = {}
+        thread = {"sources": {"s": "t"}, "target": {"table": "out"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["execution"] == {"log_level": "minimal", "trace": True}
+
+    def test_execution_config_thread_overrides(self):
+        """Thread execution config replaces loom execution entirely."""
+        loom = {"execution": {"log_level": "minimal", "trace": True}}
+        weave = {}
+        thread = {"execution": {"log_level": "debug"}}
+        result = apply_inheritance(loom, weave, thread)
+        # Thread's execution dict replaces entirely (no deep merge)
+        assert result["execution"] == {"log_level": "debug"}
+        assert "trace" not in result["execution"]
+
+    def test_execution_config_weave_overrides_loom(self):
+        """Weave execution config replaces loom execution."""
+        loom = {"execution": {"log_level": "minimal", "trace": True}}
+        weave = {"execution": {"log_level": "verbose", "trace": False}}
+        thread = {}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["execution"] == {"log_level": "verbose", "trace": False}
+
     def test_dict_replacement_in_cascade(self):
         """Dicts should replace entirely at each cascade level."""
         loom = {"write": {"mode": "overwrite", "format": "delta", "partition": "date"}}
