@@ -1,0 +1,192 @@
+"""Weave and loom execution runners."""
+
+import logging
+import time
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from typing import Literal
+
+from pyspark.sql import SparkSession
+
+from weevr.engine.cache_manager import CacheManager
+from weevr.engine.executor import execute_thread
+from weevr.engine.planner import ExecutionPlan
+from weevr.engine.result import ThreadResult, WeaveResult
+from weevr.model.thread import Thread
+
+logger = logging.getLogger(__name__)
+
+_ThreadState = Literal["pending", "running", "succeeded", "failed", "skipped"]
+
+
+def _get_transitive_dependents(thread_name: str, dependents: dict[str, list[str]]) -> set[str]:
+    """Return all transitive downstream threads of ``thread_name``."""
+    visited: set[str] = set()
+    queue = list(dependents.get(thread_name, []))
+    while queue:
+        current = queue.pop()
+        if current not in visited:
+            visited.add(current)
+            queue.extend(dependents.get(current, []))
+    return visited
+
+
+def _compute_weave_status(
+    thread_states: dict[str, _ThreadState],
+) -> Literal["success", "failure", "partial"]:
+    """Compute aggregate weave status from individual thread states."""
+    states = set(thread_states.values())
+    if states <= {"succeeded"}:
+        return "success"
+    if states <= {"failed", "skipped"}:
+        return "failure"
+    return "partial"
+
+
+def execute_weave(
+    spark: SparkSession,
+    plan: ExecutionPlan,
+    threads: dict[str, Thread],
+) -> WeaveResult:
+    """Execute threads according to the execution plan.
+
+    Processes each parallel group sequentially, submitting threads within a
+    group to a :class:`~concurrent.futures.ThreadPoolExecutor` for concurrent
+    execution. Respects ``on_failure`` config on each thread and manages the
+    cache lifecycle via :class:`~weevr.engine.cache_manager.CacheManager`.
+
+    Args:
+        spark: Active SparkSession.
+        plan: Immutable :class:`~weevr.engine.planner.ExecutionPlan` produced
+            by :func:`~weevr.engine.planner.build_plan`.
+        threads: Mapping of thread name to :class:`~weevr.model.thread.Thread` config.
+
+    Returns:
+        :class:`~weevr.engine.result.WeaveResult` with aggregate status and
+        per-thread results.
+    """
+    start_ns = time.monotonic_ns()
+    thread_states: dict[str, _ThreadState] = {name: "pending" for name in plan.threads}
+    thread_results: list[ThreadResult] = []
+    threads_skipped: list[str] = []
+    cache = CacheManager(plan.cache_targets, plan.dependents)
+    aborted = False
+
+    logger.debug("Starting weave '%s' — %d threads", plan.weave_name, len(plan.threads))
+
+    try:
+        for group in plan.execution_order:
+            if aborted:
+                for name in group:
+                    if thread_states[name] == "pending":
+                        thread_states[name] = "skipped"
+                        threads_skipped.append(name)
+                continue
+
+            # Separate threads that should run vs those already skipped
+            to_run = [n for n in group if thread_states[n] == "pending"]
+            for name in group:
+                if thread_states[name] == "skipped":
+                    threads_skipped.append(name)
+
+            if not to_run:
+                continue
+
+            logger.debug(
+                "Weave '%s' — executing group: %s",
+                plan.weave_name,
+                to_run,
+            )
+
+            future_to_name: dict[Future[ThreadResult], str] = {}
+            with ThreadPoolExecutor(max_workers=len(to_run)) as executor:
+                for name in to_run:
+                    thread_states[name] = "running"
+                    future_to_name[executor.submit(execute_thread, spark, threads[name])] = name
+
+                for future in as_completed(future_to_name):
+                    name = future_to_name[future]
+                    try:
+                        result = future.result()
+                        thread_states[name] = "succeeded"
+                        thread_results.append(result)
+                        logger.debug("Thread '%s' succeeded", name)
+
+                        # Persist cache if this thread is a cache target
+                        if cache.is_cache_target(name):
+                            target_path = threads[name].target.alias or threads[name].target.path
+                            if target_path:
+                                cache.persist(name, spark, target_path)
+
+                        # Notify cache manager so it can unpersist when all consumers done
+                        cache.notify_complete(name)
+
+                    except Exception as exc:
+                        thread_states[name] = "failed"
+                        # Record a failure result
+                        thread_results.append(
+                            ThreadResult(
+                                status="failure",
+                                thread_name=name,
+                                rows_written=0,
+                                write_mode="",
+                                target_path="",
+                            )
+                        )
+                        logger.debug("Thread '%s' failed: %s", name, exc)
+
+                        # Resolve on_failure: use thread config, fall back to abort_weave
+                        thread_cfg = threads[name]
+                        on_failure = (
+                            thread_cfg.failure.on_failure
+                            if thread_cfg.failure is not None
+                            else "abort_weave"
+                        )
+
+                        downstream = _get_transitive_dependents(name, plan.dependents)
+
+                        if on_failure == "abort_weave":
+                            # Mark all remaining pending threads as skipped
+                            for t in plan.threads:
+                                if thread_states[t] == "pending":
+                                    thread_states[t] = "skipped"
+                            aborted = True
+                            logger.debug(
+                                "Thread '%s' abort_weave — remaining threads skipped", name
+                            )
+                        else:
+                            # skip_downstream or continue: skip transitive dependents only
+                            for dep in downstream:
+                                if thread_states[dep] == "pending":
+                                    thread_states[dep] = "skipped"
+                            logger.debug(
+                                "Thread '%s' %s — dependents skipped: %s",
+                                name,
+                                on_failure,
+                                sorted(downstream),
+                            )
+
+    finally:
+        cache.cleanup()
+
+    # Collect any pending threads that weren't processed (shouldn't happen, but be safe)
+    for name, state in thread_states.items():
+        if state == "skipped" and name not in threads_skipped:
+            threads_skipped.append(name)
+
+    status = _compute_weave_status(thread_states)
+    duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+
+    logger.debug(
+        "Weave '%s' complete — status=%s, duration=%dms",
+        plan.weave_name,
+        status,
+        duration_ms,
+    )
+
+    return WeaveResult(
+        status=status,
+        weave_name=plan.weave_name,
+        thread_results=thread_results,
+        threads_skipped=threads_skipped,
+        duration_ms=duration_ms,
+    )
