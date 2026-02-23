@@ -37,6 +37,7 @@ class ThreadConfig(BaseConfig):
     assertions: list[dict[str, Any]] | None = None
     load: dict[str, Any] | None = None
     tags: list[str] | None = None
+    execution: dict[str, Any] | None = None
 
 
 class WeaveConfig(BaseConfig):
@@ -44,6 +45,7 @@ class WeaveConfig(BaseConfig):
 
     threads: list[str]
     defaults: dict[str, Any] | None = None
+    execution: dict[str, Any] | None = None
 
 
 class LoomConfig(BaseConfig):
@@ -51,6 +53,7 @@ class LoomConfig(BaseConfig):
 
     weaves: list[str]
     defaults: dict[str, Any] | None = None
+    execution: dict[str, Any] | None = None
 
 
 def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:

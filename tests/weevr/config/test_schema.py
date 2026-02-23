@@ -49,6 +49,19 @@ class TestThreadConfig:
         assert config.tags is not None
         assert "critical" in config.tags
 
+    def test_thread_with_execution(self):
+        """Thread config with execution block."""
+        data = {
+            "config_version": "1.0",
+            "sources": {"customers": "table://dim_customer"},
+            "target": {"table": "fact_orders"},
+            "execution": {"log_level": "verbose", "trace": False},
+        }
+        config = ThreadConfig.model_validate(data)
+        assert config.execution is not None
+        assert config.execution["log_level"] == "verbose"
+        assert config.execution["trace"] is False
+
     def test_missing_required_sources(self):
         """Missing required 'sources' field."""
         data = {
@@ -91,6 +104,17 @@ class TestWeaveConfig:
         assert len(config.threads) == 2
         assert "dimensions.dim_customer" in config.threads
 
+    def test_weave_with_execution(self):
+        """Weave config with execution block."""
+        data = {
+            "config_version": "1.0",
+            "threads": ["thread1"],
+            "execution": {"log_level": "minimal"},
+        }
+        config = WeaveConfig.model_validate(data)
+        assert config.execution is not None
+        assert config.execution["log_level"] == "minimal"
+
     def test_weave_with_defaults(self):
         """Weave config with defaults."""
         data = {
@@ -130,6 +154,17 @@ class TestLoomConfig:
         config = LoomConfig.model_validate(data)
         assert len(config.weaves) == 2
         assert "dimensions" in config.weaves
+
+    def test_loom_with_execution(self):
+        """Loom config with execution block."""
+        data = {
+            "config_version": "1.0",
+            "weaves": ["weave1"],
+            "execution": {"log_level": "debug", "trace": True},
+        }
+        config = LoomConfig.model_validate(data)
+        assert config.execution is not None
+        assert config.execution["log_level"] == "debug"
 
     def test_loom_with_defaults(self):
         """Loom config with defaults."""
