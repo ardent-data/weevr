@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,12 +24,15 @@ from weevr.config.resolver import (
     resolve_variables,
 )
 from weevr.config.validation import validate_schema
-from weevr.errors import ModelValidationError
+from weevr.engine.executor import execute_thread
+from weevr.engine.planner import build_plan
+from weevr.engine.runner import execute_loom, execute_weave
+from weevr.errors import DataValidationError, ExecutionError, ModelValidationError
 from weevr.model.execution import LogLevel
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import Weave
-from weevr.result import LoadedConfig
+from weevr.result import ExecutionMode, LoadedConfig, RunResult
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -128,6 +132,201 @@ class Context:
             threads=resolved.threads or None,
             weaves=resolved.weaves or None,
         )
+
+    def run(
+        self,
+        path: str | Path,
+        *,
+        mode: str = "execute",
+        tags: list[str] | None = None,
+        threads: list[str] | None = None,
+        sample_rows: int = 100,
+    ) -> RunResult:
+        """Run a config file in the specified mode.
+
+        Args:
+            path: Filesystem path to a thread, weave, or loom YAML file.
+            mode: Execution mode — ``"execute"`` (default), ``"validate"``,
+                ``"plan"``, or ``"preview"``.
+            tags: Run only threads matching any of these tags.
+            threads: Run only threads with these names.
+            sample_rows: Maximum rows for preview mode (default 100).
+
+        Returns:
+            A :class:`RunResult` describing the outcome.
+
+        Raises:
+            ValueError: If *mode* is invalid or both *tags* and *threads*
+                are provided.
+        """
+        try:
+            resolved_mode = ExecutionMode(mode)
+        except ValueError:
+            valid = ", ".join(f"'{m.value}'" for m in ExecutionMode)
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be one of: {valid}"
+            ) from None
+
+        if tags is not None and threads is not None:
+            raise ValueError("'tags' and 'threads' are mutually exclusive")
+
+        start_ns = time.monotonic_ns()
+        resolved = self._load_resolved(path)
+
+        try:
+            if resolved_mode is ExecutionMode.EXECUTE:
+                result = self._run_execute(resolved, tags=tags, thread_names=threads)
+            else:
+                raise NotImplementedError(f"Mode '{mode}' not yet implemented")
+        except (ExecutionError, DataValidationError) as exc:
+            duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+            return RunResult(
+                status="failure",
+                mode=resolved_mode,
+                config_type=resolved.config_type,
+                config_name=resolved.config_name,
+                duration_ms=duration_ms,
+                warnings=[str(exc)],
+            )
+
+        result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+        return result
+
+    # ------------------------------------------------------------------
+    # Execute mode
+    # ------------------------------------------------------------------
+
+    def _run_execute(
+        self,
+        resolved: _ResolvedConfig,
+        *,
+        tags: list[str] | None = None,
+        thread_names: list[str] | None = None,
+    ) -> RunResult:
+        """Execute a resolved config and wrap the result."""
+        if resolved.config_type == "thread":
+            model = resolved.model
+            assert isinstance(model, Thread)
+            engine_result = execute_thread(self._spark, model)
+            return RunResult(
+                status=engine_result.status,
+                mode=ExecutionMode.EXECUTE,
+                config_type="thread",
+                config_name=resolved.config_name,
+                detail=engine_result,
+                telemetry=engine_result.telemetry,
+            )
+
+        if resolved.config_type == "weave":
+            model = resolved.model
+            assert isinstance(model, Weave)
+            weave_threads = resolved.threads.get(resolved.config_name, {})
+            weave_threads, warnings = self._filter_threads(
+                weave_threads, tags=tags, thread_names=thread_names
+            )
+
+            if not weave_threads:
+                return RunResult(
+                    status="success",
+                    mode=ExecutionMode.EXECUTE,
+                    config_type="weave",
+                    config_name=resolved.config_name,
+                    warnings=warnings,
+                )
+
+            filtered_entries = [e for e in model.threads if e.name in weave_threads]
+            plan = build_plan(
+                weave_name=resolved.config_name,
+                threads=weave_threads,
+                thread_entries=filtered_entries,
+            )
+            engine_result = execute_weave(self._spark, plan, weave_threads)
+            return RunResult(
+                status=engine_result.status,
+                mode=ExecutionMode.EXECUTE,
+                config_type="weave",
+                config_name=resolved.config_name,
+                detail=engine_result,
+                telemetry=engine_result.telemetry,
+                warnings=warnings,
+            )
+
+        # loom
+        model = resolved.model
+        assert isinstance(model, Loom)
+        all_warnings: list[str] = []
+
+        # Apply filtering per-weave and remove empty weaves
+        filtered_weaves: dict[str, Weave] = {}
+        filtered_threads: dict[str, dict[str, Thread]] = {}
+        for weave_name in model.weaves:
+            weave = resolved.weaves.get(weave_name)
+            if weave is None:
+                continue
+            wt = resolved.threads.get(weave_name, {})
+            wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
+            all_warnings.extend(warnings)
+            if wt:
+                filtered_weaves[weave_name] = weave
+                filtered_threads[weave_name] = wt
+
+        if not filtered_weaves:
+            return RunResult(
+                status="success",
+                mode=ExecutionMode.EXECUTE,
+                config_type="loom",
+                config_name=resolved.config_name,
+                warnings=all_warnings,
+            )
+
+        engine_result = execute_loom(
+            self._spark, model, filtered_weaves, filtered_threads
+        )
+        return RunResult(
+            status=engine_result.status,
+            mode=ExecutionMode.EXECUTE,
+            config_type="loom",
+            config_name=resolved.config_name,
+            detail=engine_result,
+            telemetry=engine_result.telemetry,
+            warnings=all_warnings,
+        )
+
+    # ------------------------------------------------------------------
+    # Thread filtering
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _filter_threads(
+        all_threads: dict[str, Thread],
+        *,
+        tags: list[str] | None = None,
+        thread_names: list[str] | None = None,
+    ) -> tuple[dict[str, Thread], list[str]]:
+        """Filter threads by tags or explicit names.
+
+        Returns:
+            A tuple of (filtered threads dict, warning messages).
+        """
+        if tags is None and thread_names is None:
+            return all_threads, []
+
+        if thread_names is not None:
+            requested = set(thread_names)
+            filtered = {n: t for n, t in all_threads.items() if n in requested}
+        else:
+            assert tags is not None
+            requested_tags = set(tags)
+            filtered = {
+                n: t
+                for n, t in all_threads.items()
+                if t.tags is not None and requested_tags & set(t.tags)
+            }
+
+        warnings: list[str] = []
+        if not filtered:
+            warnings.append("No threads matched filter")
+        return filtered, warnings
 
     # ------------------------------------------------------------------
     # Config assembly
