@@ -4,11 +4,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pyspark.sql.types import StringType, StructField, StructType, TimestampType
+
 from weevr.errors.exceptions import StateError
 from weevr.state.watermark import WatermarkState, WatermarkStore
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
+
+_WATERMARK_SCHEMA = StructType(
+    [
+        StructField("thread_name", StringType(), False),
+        StructField("watermark_column", StringType(), False),
+        StructField("watermark_type", StringType(), False),
+        StructField("last_value", StringType(), False),
+        StructField("last_updated", TimestampType(), True),
+        StructField("run_id", StringType(), True),
+    ]
+)
 
 
 class MetadataTableStore(WatermarkStore):
@@ -91,14 +104,7 @@ class MetadataTableStore(WatermarkStore):
                         state.run_id,
                     )
                 ],
-                schema=[
-                    "thread_name",
-                    "watermark_column",
-                    "watermark_type",
-                    "last_value",
-                    "last_updated",
-                    "run_id",
-                ],
+                schema=_WATERMARK_SCHEMA,
             )
 
             target = DeltaTable.forPath(spark, self._table_path)
