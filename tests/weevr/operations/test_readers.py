@@ -1,4 +1,4 @@
-"""Tests for source readers."""
+"""Tests for source readers (Spark integration tests)."""
 
 import json
 
