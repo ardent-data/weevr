@@ -41,9 +41,7 @@ class CdcConfig(FrozenBase):
             )
 
         if not has_preset and not has_explicit:
-            raise ValueError(
-                "CDC config requires either 'preset' or 'operation_column' to be set"
-            )
+            raise ValueError("CDC config requires either 'preset' or 'operation_column' to be set")
 
         if has_explicit and not (self.insert_value or self.update_value):
             raise ValueError(

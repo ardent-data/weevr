@@ -67,9 +67,7 @@ class TestCdcTelemetry:
 class TestIncrementalParameterTelemetry:
     """incremental_parameter mode telemetry — semantic marker (DEC-008)."""
 
-    def test_parameter_mode_records_load_mode(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_parameter_mode_records_load_mode(self, spark: SparkSession, tmp_delta_path) -> None:
         """Thread with incremental_parameter records load_mode in telemetry."""
         src = tmp_delta_path("param_tel_src")
         tgt = tmp_delta_path("param_tel_tgt")
@@ -96,9 +94,7 @@ class TestIncrementalParameterTelemetry:
 class TestFullModeTelemetryUnaffected:
     """Full-mode thread — new telemetry fields are None/default (regression check)."""
 
-    def test_full_mode_no_incremental_fields(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_full_mode_no_incremental_fields(self, spark: SparkSession, tmp_delta_path) -> None:
         """Full-mode execution has incremental telemetry fields at defaults."""
         src = tmp_delta_path("full_tel_src")
         tgt = tmp_delta_path("full_tel_tgt")

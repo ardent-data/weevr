@@ -56,9 +56,7 @@ class TestCdcGenericMerge:
         assert rows[2] == "Bobby"  # updated
         assert 3 not in rows  # hard deleted
 
-    def test_first_cdc_write_creates_table(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_first_cdc_write_creates_table(self, spark: SparkSession, tmp_delta_path) -> None:
         """First CDC write to non-existent target creates the table (excluding deletes)."""
         tgt = tmp_delta_path("cdc_first_tgt")
 
@@ -102,9 +100,7 @@ class TestCdcSoftDelete:
             ],
         )
 
-        cdc_df = spark.createDataFrame(
-            [{"id": 2, "name": "Bob", "op": "D", "is_deleted": "false"}]
-        )
+        cdc_df = spark.createDataFrame([{"id": 2, "name": "Bob", "op": "D", "is_deleted": "false"}])
 
         cdc_config = CdcConfig(
             operation_column="op",
@@ -137,9 +133,7 @@ class TestCdcSoftDelete:
             [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}],
         )
 
-        cdc_df = spark.createDataFrame(
-            [{"id": 2, "name": "Bob", "op": "D"}]
-        )
+        cdc_df = spark.createDataFrame([{"id": 2, "name": "Bob", "op": "D"}])
 
         cdc_config = CdcConfig(
             operation_column="op",

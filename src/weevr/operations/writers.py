@@ -241,9 +241,7 @@ def execute_cdc_merge(
     update_val = cols["update_value"]
     delete_val = cols["delete_value"]
 
-    merge_condition = " AND ".join(
-        f"target.{k} = source.{k}" for k in write_config.match_keys
-    )
+    merge_condition = " AND ".join(f"target.{k} = source.{k}" for k in write_config.match_keys)
 
     # Drop CDC metadata columns before writing to target
     cdc_meta_cols: set[str] = {"_change_type", "_commit_version", "_commit_timestamp"}
@@ -289,9 +287,7 @@ def execute_cdc_merge(
 
         if delete_val:
             if cdc_config.on_delete == "hard_delete":
-                merger = merger.whenMatchedDelete(
-                    condition=f"source.{op_col} = '{delete_val}'"
-                )
+                merger = merger.whenMatchedDelete(condition=f"source.{op_col} = '{delete_val}'")
             elif cdc_config.on_delete == "soft_delete":
                 if not write_config.soft_delete_column:
                     raise ExecutionError(
@@ -303,9 +299,7 @@ def execute_cdc_merge(
                 )
 
         if insert_val:
-            insert_set: dict[str, str | Column] = {
-                c: F.col(f"source.{c}") for c in data_cols
-            }
+            insert_set: dict[str, str | Column] = {c: F.col(f"source.{c}") for c in data_cols}
             merger = merger.whenNotMatchedInsert(
                 condition=f"source.{op_col} = '{insert_val}'",
                 values=insert_set,

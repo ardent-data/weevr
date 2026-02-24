@@ -40,9 +40,7 @@ class TestTablePropertiesStore:
         assert result.last_value == "2024-06-15T12:00:00"
         assert result.run_id == "run-abc"
 
-    def test_read_no_watermark_properties(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_read_no_watermark_properties(self, spark: SparkSession, tmp_delta_path) -> None:
         """Target table with no watermark tblproperties returns None."""
         path = tmp_delta_path("tbl_no_props")
         create_delta_table(spark, path, [{"id": 1}])
@@ -105,9 +103,7 @@ class TestTablePropertiesStore:
         with pytest.raises(StateError, match="Failed to read watermark"):
             store.read(spark, "t1")
 
-    def test_multiple_threads_on_same_table(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_multiple_threads_on_same_table(self, spark: SparkSession, tmp_delta_path) -> None:
         """Multiple threads can store watermarks on the same target table."""
         path = tmp_delta_path("tbl_multi_thread")
         create_delta_table(spark, path, [{"id": 1}])

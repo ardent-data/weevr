@@ -45,9 +45,7 @@ class TablePropertiesStore(WatermarkStore):
             props: dict[str, str] = props_row[0]["properties"] or {}
             prefix = f"{_PROP_PREFIX}.{thread_name}."
 
-            wm_props = {
-                k.removeprefix(prefix): v for k, v in props.items() if k.startswith(prefix)
-            }
+            wm_props = {k.removeprefix(prefix): v for k, v in props.items() if k.startswith(prefix)}
 
             if not wm_props or "last_value" not in wm_props:
                 return None
@@ -84,9 +82,7 @@ class TablePropertiesStore(WatermarkStore):
             }
 
             props_sql = ", ".join(f"'{k}' = '{v}'" for k, v in props.items())
-            spark.sql(
-                f"ALTER TABLE delta.`{self._target_path}` SET TBLPROPERTIES ({props_sql})"
-            )
+            spark.sql(f"ALTER TABLE delta.`{self._target_path}` SET TBLPROPERTIES ({props_sql})")
         except Exception as e:
             if isinstance(e, StateError):
                 raise

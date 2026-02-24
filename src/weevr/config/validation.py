@@ -156,9 +156,7 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
                 )
 
     if mode == "cdc" and write_mode != "merge":
-        diagnostics.append(
-            f"ERROR: cdc mode requires write.mode='merge', got '{write_mode}'"
-        )
+        diagnostics.append(f"ERROR: cdc mode requires write.mode='merge', got '{write_mode}'")
 
     if load.get("watermark_inclusive") and write_mode == "append":
         diagnostics.append(
