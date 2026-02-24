@@ -2,23 +2,32 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from pyspark.sql import SparkSession
 
 from weevr.engine.result import ThreadResult
-from weevr.errors.exceptions import DataValidationError, ExecutionError
+from weevr.errors.exceptions import DataValidationError, ExecutionError, StateError
 from weevr.model.thread import Thread
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.hashing import compute_keys
 from weevr.operations.pipeline import run_pipeline
 from weevr.operations.quarantine import write_quarantine
-from weevr.operations.readers import read_sources
+from weevr.operations.readers import (
+    read_cdc_source,
+    read_source,
+    read_source_incremental,
+    read_sources,
+)
 from weevr.operations.validation import validate_dataframe
-from weevr.operations.writers import apply_target_mapping, write_target
+from weevr.operations.writers import apply_target_mapping, execute_cdc_merge, write_target
+from weevr.state.watermark import WatermarkState, WatermarkStore, resolve_store
 from weevr.telemetry.collector import SpanBuilder, SpanCollector
 from weevr.telemetry.results import ThreadTelemetry
 from weevr.telemetry.span import ExecutionSpan, SpanStatus, generate_span_id, generate_trace_id
+
+logger = logging.getLogger(__name__)
 
 
 def execute_thread(
@@ -31,6 +40,8 @@ def execute_thread(
 
     Execution order:
     1. Read all declared sources into DataFrames.
+       - For ``incremental_watermark``: load prior HWM, apply filter, capture new HWM.
+       - For ``cdc``: read via CDF or generic CDC source.
     2. Set the primary (first) source as the working DataFrame.
     3. Run pipeline steps against the working DataFrame.
     4. Run validation rules (if configured) — quarantine or abort on failures.
@@ -38,8 +49,10 @@ def execute_thread(
     6. Resolve the target write path.
     7. Apply target column mapping.
     8. Write to the Delta target.
-    9. Run post-write assertions (if configured).
-    10. Build telemetry and return ThreadResult.
+       - For ``cdc``: use CDC merge routing instead of standard write.
+    9. Persist watermark state (if applicable).
+    10. Run post-write assertions (if configured).
+    11. Build telemetry and return ThreadResult.
 
     Args:
         spark: Active SparkSession.
@@ -60,14 +73,87 @@ def execute_thread(
     if collector is not None:
         span_builder = collector.start_span(f"thread:{thread.name}", parent_span_id=parent_span_id)
 
-    validation_results = []
-    assertion_results = []
+    validation_results: list = []
+    assertion_results: list = []
     rows_read = 0
     rows_written = 0
     rows_quarantined = 0
+
+    # Incremental processing state
+    load_mode = thread.load.mode if thread.load else "full"
+    watermark_store: WatermarkStore | None = None
+    prior_state: WatermarkState | None = None
+    new_hwm: str | None = None
+    watermark_first_run = False
+    watermark_persisted = False
+    cdc_counts: dict[str, int] | None = None
+
     try:
-        # Step 1 — read all sources
-        sources_map = read_sources(spark, thread.sources)
+        # Resolve target path early (needed for watermark store resolution)
+        target_path = thread.target.alias or thread.target.path
+        if target_path is None:
+            raise ExecutionError(
+                "Target has no 'alias' or 'path' — cannot resolve write location",
+                thread_name=thread.name,
+            )
+
+        # --- Watermark/CDC state loading ---
+        if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
+            watermark_store = resolve_store(thread.load, target_path)
+            prior_state = watermark_store.read(spark, thread.name)
+            watermark_first_run = prior_state is None
+            logger.debug(
+                "Thread '%s': load_mode=%s, first_run=%s, prior_value=%s",
+                thread.name,
+                load_mode,
+                watermark_first_run,
+                prior_state.last_value if prior_state else None,
+            )
+
+        # --- Step 1: Read sources ---
+        if load_mode == "incremental_watermark" and thread.load is not None:
+            # Read primary source with watermark filter
+            primary_alias = next(iter(thread.sources))
+            primary_source = thread.sources[primary_alias]
+            primary_df, new_hwm = read_source_incremental(
+                spark, primary_alias, primary_source, thread.load, prior_state
+            )
+
+            # Read secondary sources normally
+            sources_map = {primary_alias: primary_df}
+            for alias, source in thread.sources.items():
+                if alias != primary_alias:
+                    sources_map[alias] = read_source(spark, alias, source)
+
+        elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
+            # Read CDC source
+            primary_alias = next(iter(thread.sources))
+            primary_source = thread.sources[primary_alias]
+
+            last_version: int | None = None
+            if prior_state is not None:
+                try:
+                    last_version = int(prior_state.last_value)
+                except (ValueError, TypeError):
+                    last_version = None
+
+            primary_df = read_cdc_source(spark, primary_source, thread.load.cdc, last_version)
+
+            # Capture new CDF version if Delta CDF
+            if thread.load.cdc.preset == "delta_cdf" and "_commit_version" in primary_df.columns:
+                from pyspark.sql import functions as F
+
+                max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
+                if max_row and max_row[0]["mv"] is not None:
+                    new_hwm = str(max_row[0]["mv"])
+
+            sources_map = {primary_alias: primary_df}
+            for alias, source in thread.sources.items():
+                if alias != primary_alias:
+                    sources_map[alias] = read_source(spark, alias, source)
+        else:
+            # Full mode or incremental_parameter — read all sources normally
+            sources_map = read_sources(spark, thread.sources)
 
         # Step 2 — primary DataFrame is the first declared source
         df = next(iter(sources_map.values()))
@@ -87,9 +173,8 @@ def execute_thread(
                 )
 
             # Write quarantine rows if present
-            target_path_for_q = thread.target.alias or thread.target.path or ""
             if outcome.quarantine_df is not None:
-                rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path_for_q)
+                rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
 
             # Continue with clean_df
             df = outcome.clean_df
@@ -98,26 +183,61 @@ def execute_thread(
         if thread.keys is not None:
             df = compute_keys(df, thread.keys)
 
-        # Step 6 — resolve target write path
-        target_path = thread.target.alias or thread.target.path
-        if target_path is None:
-            raise ExecutionError(
-                "Target has no 'alias' or 'path' — cannot resolve write location",
-                thread_name=thread.name,
-            )
-
         # Step 7 — apply target column mapping
         df = apply_target_mapping(df, thread.target, spark)
 
         # Step 8 — write to Delta
         write_mode = thread.write.mode if thread.write else "overwrite"
-        rows_written = write_target(spark, df, thread.target, thread.write, target_path)
 
-        # Step 9 — run post-write assertions
+        if load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
+            # CDC merge routing
+            cdc_counts = execute_cdc_merge(
+                spark, df, target_path, thread.write or _default_merge_write(), thread.load.cdc
+            )
+            rows_written = sum(cdc_counts.values())
+        else:
+            rows_written = write_target(spark, df, thread.target, thread.write, target_path)
+
+        # Step 9 — persist watermark state
+        if (
+            watermark_store is not None
+            and load_mode in ("incremental_watermark", "cdc")
+            and thread.load is not None
+            and new_hwm is not None
+        ):
+            try:
+                wm_type = thread.load.watermark_type or "timestamp"
+                wm_col = thread.load.watermark_column or "_commit_version"
+
+                new_state = WatermarkState(
+                    thread_name=thread.name,
+                    watermark_column=wm_col,
+                    watermark_type=wm_type,
+                    last_value=new_hwm,
+                    last_updated=datetime.now(UTC),
+                )
+                watermark_store.write(spark, new_state)
+                watermark_persisted = True
+                logger.debug(
+                    "Thread '%s': persisted HWM %s=%s",
+                    thread.name,
+                    wm_col,
+                    new_hwm,
+                )
+            except StateError:
+                raise
+            except Exception as e:
+                raise StateError(
+                    f"Failed to persist watermark for thread '{thread.name}'",
+                    cause=e,
+                    thread_name=thread.name,
+                ) from e
+
+        # Step 10 — run post-write assertions
         if thread.assertions:
             assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
 
-        # Step 10 — build result
+        # Step 11 — build result
         telemetry = _build_telemetry(
             span_builder,
             validation_results,
@@ -126,6 +246,13 @@ def execute_thread(
             rows_written,
             rows_quarantined,
             collector=collector,
+            load_mode=load_mode,
+            watermark_column=thread.load.watermark_column if thread.load else None,
+            watermark_previous_value=prior_state.last_value if prior_state else None,
+            watermark_new_value=new_hwm,
+            watermark_persisted=watermark_persisted,
+            watermark_first_run=watermark_first_run,
+            cdc_counts=cdc_counts,
         )
 
         return ThreadResult(
@@ -177,6 +304,13 @@ def execute_thread(
         ) from exc
 
 
+def _default_merge_write():
+    """Return a minimal WriteConfig for CDC merge when no write config is set."""
+    from weevr.model.write import WriteConfig
+
+    return WriteConfig(mode="merge", match_keys=["id"])
+
+
 def _build_telemetry(
     span_builder: SpanBuilder | None,
     validation_results: list,
@@ -186,6 +320,13 @@ def _build_telemetry(
     rows_quarantined: int,
     status: SpanStatus = SpanStatus.OK,
     collector: SpanCollector | None = None,
+    load_mode: str | None = None,
+    watermark_column: str | None = None,
+    watermark_previous_value: str | None = None,
+    watermark_new_value: str | None = None,
+    watermark_persisted: bool = False,
+    watermark_first_run: bool = False,
+    cdc_counts: dict[str, int] | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
@@ -209,4 +350,13 @@ def _build_telemetry(
         rows_read=rows_read,
         rows_written=rows_written,
         rows_quarantined=rows_quarantined,
+        load_mode=load_mode,
+        watermark_column=watermark_column,
+        watermark_previous_value=watermark_previous_value,
+        watermark_new_value=watermark_new_value,
+        watermark_persisted=watermark_persisted,
+        watermark_first_run=watermark_first_run,
+        cdc_inserts=cdc_counts["inserts"] if cdc_counts else None,
+        cdc_updates=cdc_counts["updates"] if cdc_counts else None,
+        cdc_deletes=cdc_counts["deletes"] if cdc_counts else None,
     )
