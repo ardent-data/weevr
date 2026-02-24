@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/ardent-data/weevr/compare/weevr-v0.7.2...weevr-v0.7.3) (2026-02-24)
+
+
+### Bug Fixes
+
+* **ci:** merge publish into release workflow ([#33](https://github.com/ardent-data/weevr/issues/33)) ([d5a32da](https://github.com/ardent-data/weevr/commit/d5a32daa269df7ec2505e08c93e043f72f555796))
+
 ## [0.7.2](https://github.com/ardent-data/weevr/compare/weevr-v0.7.1...weevr-v0.7.2) (2026-02-24)
 
 
