@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/ardent-data/weevr/compare/weevr-v0.7.3...weevr-v0.7.4) (2026-02-24)
+
+
+### Bug Fixes
+
+* **ci:** disable attestations and enable verbose for TestPyPI publish ([#35](https://github.com/ardent-data/weevr/issues/35)) ([a89e38a](https://github.com/ardent-data/weevr/commit/a89e38a91b47087a254303cdef9dfc0e44e7605b))
+
 ## [0.7.3](https://github.com/ardent-data/weevr/compare/weevr-v0.7.2...weevr-v0.7.3) (2026-02-24)
 
 
