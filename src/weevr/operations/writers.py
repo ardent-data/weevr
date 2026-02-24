@@ -1,10 +1,13 @@
 """Target mapping and Delta write operations."""
 
+from __future__ import annotations
+
 from delta.tables import DeltaTable
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.load import CdcConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 
@@ -154,10 +157,14 @@ def _execute_merge(
     # on_no_match_target == "ignore": no insert clause → new source rows discarded
 
     if write_config.on_no_match_source == "soft_delete":
-        raise ExecutionError(
-            "on_no_match_source='soft_delete' is not supported in this version; "
-            "use 'delete' or 'ignore'"
+        if not write_config.soft_delete_column:
+            raise ExecutionError(
+                "on_no_match_source='soft_delete' requires 'soft_delete_column' on WriteConfig"
+            )
+        merger = merger.whenNotMatchedBySourceUpdate(
+            set={write_config.soft_delete_column: F.lit(write_config.soft_delete_value)}
         )
+        has_when_clause = True
     if write_config.on_no_match_source == "delete":
         merger = merger.whenNotMatchedBySourceDelete()
         has_when_clause = True
@@ -174,3 +181,141 @@ def _delta_table_exists(spark: SparkSession, path: str) -> bool:
         return DeltaTable.isDeltaTable(spark, path)
     except Exception:
         return False
+
+
+def resolve_cdc_columns(cdc_config: CdcConfig) -> dict[str, str | None]:
+    """Resolve CDC column mapping, expanding presets if needed.
+
+    Returns a dict with keys: ``operation_column``, ``insert_value``,
+    ``update_value``, ``delete_value``.
+    """
+    if cdc_config.preset == "delta_cdf":
+        return {
+            "operation_column": "_change_type",
+            "insert_value": "insert",
+            "update_value": "update_postimage",
+            "delete_value": "delete",
+        }
+    return {
+        "operation_column": cdc_config.operation_column,
+        "insert_value": cdc_config.insert_value,
+        "update_value": cdc_config.update_value,
+        "delete_value": cdc_config.delete_value,
+    }
+
+
+def execute_cdc_merge(
+    spark: SparkSession,
+    df: DataFrame,
+    target_path: str,
+    write_config: WriteConfig,
+    cdc_config: CdcConfig,
+) -> dict[str, int]:
+    """Execute a CDC merge operation, routing rows by operation type.
+
+    Rows are classified by the ``operation_column`` and merged against
+    the target table using the ``match_keys`` from ``write_config``.
+
+    Args:
+        spark: Active SparkSession.
+        df: Source DataFrame containing CDC rows with operation column.
+        target_path: Path to the Delta target table.
+        write_config: Write configuration (must be merge mode with match_keys).
+        cdc_config: CDC configuration (preset or explicit mapping).
+
+    Returns:
+        Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
+
+    Raises:
+        ExecutionError: If the merge operation fails.
+    """
+    if not write_config.match_keys:
+        raise ExecutionError("CDC merge requires 'match_keys' on write_config")
+
+    cols = resolve_cdc_columns(cdc_config)
+    op_col = cols["operation_column"]
+    if op_col is None:
+        raise ExecutionError("CDC config must resolve an operation_column")
+
+    insert_val = cols["insert_value"]
+    update_val = cols["update_value"]
+    delete_val = cols["delete_value"]
+
+    merge_condition = " AND ".join(
+        f"target.{k} = source.{k}" for k in write_config.match_keys
+    )
+
+    # Drop CDC metadata columns before writing to target
+    cdc_meta_cols = {"_change_type", "_commit_version", "_commit_timestamp"}
+    data_cols = [c for c in df.columns if c not in cdc_meta_cols]
+
+    counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
+    target_exists = _delta_table_exists(spark, target_path)
+
+    try:
+        # Count operations
+        if insert_val:
+            counts["inserts"] = df.filter(F.col(op_col) == insert_val).count()
+        if update_val:
+            counts["updates"] = df.filter(F.col(op_col) == update_val).count()
+        if delete_val:
+            counts["deletes"] = df.filter(F.col(op_col) == delete_val).count()
+
+        if not target_exists:
+            # First CDC write — insert all non-delete rows
+            insert_df = df
+            if delete_val:
+                insert_df = df.filter(F.col(op_col) != delete_val)
+            insert_df.select(data_cols).write.format("delta").mode("overwrite").save(target_path)
+            return counts
+
+        delta_table = DeltaTable.forPath(spark, target_path)
+        merger = delta_table.alias("target").merge(
+            df.select(data_cols + [op_col]).alias("source"),
+            merge_condition,
+        )
+
+        # Route by operation type
+        if update_val:
+            update_set: dict[str, str | Column] = {
+                c: F.col(f"source.{c}") for c in data_cols if c not in write_config.match_keys
+            }
+            merger = merger.whenMatchedUpdate(
+                condition=f"source.{op_col} = '{update_val}'",
+                set=update_set,
+            )
+
+        if delete_val:
+            if cdc_config.on_delete == "hard_delete":
+                merger = merger.whenMatchedDelete(
+                    condition=f"source.{op_col} = '{delete_val}'"
+                )
+            elif cdc_config.on_delete == "soft_delete":
+                if not write_config.soft_delete_column:
+                    raise ExecutionError(
+                        "CDC soft_delete requires 'soft_delete_column' on write_config"
+                    )
+                merger = merger.whenMatchedUpdate(
+                    condition=f"source.{op_col} = '{delete_val}'",
+                    set={write_config.soft_delete_column: F.lit(write_config.soft_delete_value)},
+                )
+
+        if insert_val:
+            insert_set: dict[str, str | Column] = {
+                c: F.col(f"source.{c}") for c in data_cols
+            }
+            merger = merger.whenNotMatchedInsert(
+                condition=f"source.{op_col} = '{insert_val}'",
+                values=insert_set,
+            )
+
+        merger.execute()
+        return counts
+
+    except ExecutionError:
+        raise
+    except Exception as exc:
+        raise ExecutionError(
+            f"CDC merge failed on target '{target_path}'",
+            cause=exc,
+        ) from exc
