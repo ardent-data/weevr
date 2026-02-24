@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/ardent-data/weevr/compare/weevr-v0.7.1...weevr-v0.7.2) (2026-02-24)
+
+
+### Bug Fixes
+
+* **ci:** trigger publish on release event instead of tag push ([#31](https://github.com/ardent-data/weevr/issues/31)) ([4ad3d3a](https://github.com/ardent-data/weevr/commit/4ad3d3a728a64c6819c115b96c28aa23ce7ac3e2))
+
 ## [0.7.1](https://github.com/ardent-data/weevr/compare/weevr-v0.7.0...weevr-v0.7.1) (2026-02-24)
 
 
