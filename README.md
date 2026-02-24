@@ -52,7 +52,7 @@ These concepts provide a shared vocabulary for reasoning about execution without
 
 ## Deployment model
 
-weevr's core engine will be distributed as a **public open-source Python library** hosted on GitHub and published to PyPI:
+weevr's core engine is distributed as a **public open-source Python library** hosted on GitHub and published to PyPI:
 
 ```bash
 pip install weevr
@@ -93,7 +93,7 @@ This makes it possible to understand *what happened* and *why* without reverse-e
 
 ## Status
 
-weevr is in **active development** (Phase 0). The core execution engine is functional — threads, weaves, and looms execute end-to-end from YAML configuration through to Delta table writes with DAG-based orchestration, data validation, and structured telemetry.
+weevr is in **active development** (Phase 0). The core execution engine is functional — threads, weaves, and looms execute end-to-end from YAML configuration through to Delta table writes with DAG-based orchestration, data validation, structured telemetry, and incremental processing.
 
 ### What works today
 
@@ -103,11 +103,13 @@ weevr is in **active development** (Phase 0). The core execution engine is funct
 * **DAG orchestration** — Dependency resolution from source/target path analysis, parallel thread execution within weaves, sequential weave ordering in looms, configurable failure behavior (abort_weave, skip_downstream, continue), and auto-cache management
 * **Validation and data quality** — Pre-write validation rules with severity routing (info/warn log only, error quarantines to `{target}_quarantine`, fatal aborts), post-write assertions (row_count, column_not_null, unique, expression)
 * **Telemetry** — OTel-compatible execution spans, structured JSON logging, execution trace trees with flat span serialization, row count reconciliation, and telemetry composition on result objects
+* **Python API** — `Context` class with `run()`, `load()`, and verification modes for programmatic execution from notebooks and scripts
+* **Incremental processing** — Watermark-based incremental loads (int, long, timestamp, date), high-water mark persistence (table properties or metadata table), CDC support with generic operation columns and Delta Change Data Feed preset, configurable hard/soft delete routing
 
 ### Roadmap
 
-* **Phase 0 (current)** — Python API (Context class, run/load/validate), incremental processing (watermark-based loads)
-* **Phase 1** — Analytical transforms (aggregate, window, pivot), naming normalization, advanced merge patterns, CDC
+* **Phase 0 (current)** — Nearing completion
+* **Phase 1** — Analytical transforms (aggregate, window, pivot), naming normalization, advanced merge patterns
 * **Phase 2** — Extensibility (stitches, helper/UDF registries), operational features (retry, circuit breaker, mirrors)
 * **Phase 3** — Developer tooling (test framework, CLI validation, dry-run modes)
 
@@ -133,7 +135,8 @@ The intent is to reduce orchestration friction and enforce repeatable patterns, 
 * **Observability** — OTel-compatible execution spans, structured JSON logging, row count reconciliation, and execution trace trees with flat span serialization
 * **DAG orchestration** — Automatic dependency resolution, parallel thread execution, configurable failure behavior, and auto-cache management
 * **Null-safe defaults** — Opinionated defaults for join semantics and key handling that prevent common Spark pitfalls
-* **Incremental processing** *(planned)* — Watermark-based and parameter-driven incremental loads, plus CDC support
+* **Incremental processing** — Watermark-based incremental loads with configurable high-water mark persistence, CDC merge routing with hard/soft delete support, and Delta Change Data Feed integration
+* **Python API** — `Context` class providing `run()` for full execution, `load()` for config inspection, and verification modes for dry-run validation
 * **Extensibility** *(planned)* — Project-level UDFs, custom helper functions, and reusable stitch patterns
 
 ## Target audience

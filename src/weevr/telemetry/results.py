@@ -58,6 +58,15 @@ class ThreadTelemetry(FrozenBase):
         rows_read: Total rows read from sources.
         rows_written: Rows written to the target.
         rows_quarantined: Rows written to the quarantine table.
+        load_mode: Load mode used (full, incremental_watermark, etc.).
+        watermark_column: Watermark column name, if applicable.
+        watermark_previous_value: Prior HWM value before this run.
+        watermark_new_value: New HWM value captured during this run.
+        watermark_persisted: Whether watermark state was successfully persisted.
+        watermark_first_run: Whether this was the first run (no prior state).
+        cdc_inserts: Number of CDC insert operations.
+        cdc_updates: Number of CDC update operations.
+        cdc_deletes: Number of CDC delete operations.
     """
 
     span: ExecutionSpan
@@ -66,6 +75,15 @@ class ThreadTelemetry(FrozenBase):
     rows_read: int = 0
     rows_written: int = 0
     rows_quarantined: int = 0
+    load_mode: str | None = None
+    watermark_column: str | None = None
+    watermark_previous_value: str | None = None
+    watermark_new_value: str | None = None
+    watermark_persisted: bool = False
+    watermark_first_run: bool = False
+    cdc_inserts: int | None = None
+    cdc_updates: int | None = None
+    cdc_deletes: int | None = None
 
 
 class WeaveTelemetry(FrozenBase):

@@ -155,6 +155,45 @@ class SparkError(ExecutionError):
     pass
 
 
+class StateError(ExecutionError):
+    """Watermark state persistence errors.
+
+    Raised when watermark state cannot be read from or written to the
+    configured store. Carries ``store_type`` context in addition to
+    the standard execution context fields.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        thread_name: str | None = None,
+        store_type: str | None = None,
+    ) -> None:
+        """Initialize StateError.
+
+        Args:
+            message: Human-readable error message.
+            cause: Optional underlying exception.
+            thread_name: Name of the thread where the error occurred.
+            store_type: Watermark store type (e.g. "table_properties", "metadata_table").
+        """
+        super().__init__(message, cause=cause, thread_name=thread_name)
+        self.store_type = store_type
+
+    def __str__(self) -> str:
+        """Return string representation with store context."""
+        parts = [self.message]
+        if self.thread_name:
+            parts.append(f"in thread '{self.thread_name}'")
+        if self.store_type:
+            parts.append(f"using store '{self.store_type}'")
+        base_msg = " ".join(parts)
+        if self.cause:
+            return f"{base_msg} (caused by: {self.cause})"
+        return base_msg
+
+
 class DataValidationError(WeevError):
     """Data validation errors (M05+)."""
 
