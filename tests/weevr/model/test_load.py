@@ -26,9 +26,13 @@ class TestLoadConfig:
         assert lc.mode == "incremental_parameter"
 
     def test_cdc_mode(self):
-        """cdc mode is valid."""
-        lc = LoadConfig(mode="cdc")
+        """cdc mode with cdc config is valid."""
+        lc = LoadConfig(
+            mode="cdc",
+            cdc={"preset": "delta_cdf"},
+        )
         assert lc.mode == "cdc"
+        assert lc.cdc is not None
 
     def test_watermark_mode_with_column(self):
         """incremental_watermark with watermark_column is valid."""
