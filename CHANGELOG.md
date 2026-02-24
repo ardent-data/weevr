@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/ardent-data/weevr/compare/weevr-v0.6.0...weevr-v0.7.0) (2026-02-24)
+
+
+### Features
+
+* **engine:** add incremental processing with watermark persistence and CDC support ([#27](https://github.com/ardent-data/weevr/issues/27)) ([6bf54f7](https://github.com/ardent-data/weevr/commit/6bf54f7da281e65a69a17356e146e5df195f63b2))
+
 ## [0.6.0](https://github.com/ardent-data/weevr/compare/weevr-v0.5.1...weevr-v0.6.0) (2026-02-23)
 
 
