@@ -246,7 +246,9 @@ def execute_cdc_merge(
     )
 
     # Drop CDC metadata columns before writing to target
-    cdc_meta_cols = {"_change_type", "_commit_version", "_commit_timestamp"}
+    cdc_meta_cols: set[str] = {"_change_type", "_commit_version", "_commit_timestamp"}
+    if op_col:
+        cdc_meta_cols.add(op_col)
     data_cols = [c for c in df.columns if c not in cdc_meta_cols]
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
