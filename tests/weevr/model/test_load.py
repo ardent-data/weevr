@@ -29,7 +29,7 @@ class TestLoadConfig:
         """cdc mode with cdc config is valid."""
         lc = LoadConfig(
             mode="cdc",
-            cdc={"preset": "delta_cdf"},
+            cdc={"preset": "delta_cdf"},  # type: ignore[arg-type]
         )
         assert lc.mode == "cdc"
         assert lc.cdc is not None
@@ -92,14 +92,14 @@ class TestLoadConfig:
         with pytest.raises(ValidationError, match="must not set 'watermark_column'"):
             LoadConfig(
                 mode="cdc",
-                cdc={"preset": "delta_cdf"},
+                cdc={"preset": "delta_cdf"},  # type: ignore[arg-type]
                 watermark_column="ts",
             )
 
     def test_cdc_config_not_valid_on_non_cdc_mode(self):
         """cdc config on non-cdc mode raises ValidationError."""
         with pytest.raises(ValidationError, match="only valid when mode is 'cdc'"):
-            LoadConfig(mode="full", cdc={"preset": "delta_cdf"})
+            LoadConfig(mode="full", cdc={"preset": "delta_cdf"})  # type: ignore[arg-type]
 
     def test_watermark_inclusive_defaults_false(self):
         """watermark_inclusive defaults to False."""
@@ -122,7 +122,7 @@ class TestLoadConfig:
             mode="incremental_watermark",
             watermark_column="ts",
             watermark_type="timestamp",
-            watermark_store={"type": "metadata_table", "table_path": "/mnt/watermarks"},
+            watermark_store={"type": "metadata_table", "table_path": "/mnt/watermarks"},  # type: ignore[arg-type]
         )
         assert lc.watermark_store is not None
         assert lc.watermark_store.type == "metadata_table"

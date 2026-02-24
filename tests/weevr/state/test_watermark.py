@@ -1,6 +1,6 @@
 """Tests for WatermarkState model, WatermarkStore ABC, and resolve_store."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -21,7 +21,7 @@ class TestWatermarkState:
             watermark_column="modified_at",
             watermark_type="timestamp",
             last_value="2024-01-15T10:30:00",
-            last_updated=datetime(2024, 1, 16, 8, 0, 0, tzinfo=timezone.utc),
+            last_updated=datetime(2024, 1, 16, 8, 0, 0, tzinfo=UTC),
         )
         assert state.thread_name == "orders_daily"
         assert state.watermark_column == "modified_at"
@@ -36,7 +36,7 @@ class TestWatermarkState:
             watermark_column="ts",
             watermark_type="timestamp",
             last_value="v1",
-            last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            last_updated=datetime(2024, 1, 1, tzinfo=UTC),
         )
         with pytest.raises(ValidationError):
             state.last_value = "v2"  # type: ignore[misc]
@@ -48,7 +48,7 @@ class TestWatermarkState:
             watermark_column="row_id",
             watermark_type="int",
             last_value="42",
-            last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            last_updated=datetime(2024, 1, 1, tzinfo=UTC),
         )
         assert isinstance(state.last_value, str)
         assert state.last_value == "42"
@@ -60,7 +60,7 @@ class TestWatermarkState:
             watermark_column="ts",
             watermark_type="timestamp",
             last_value="v1",
-            last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            last_updated=datetime(2024, 1, 1, tzinfo=UTC),
         )
         assert state.run_id is None
 
@@ -71,7 +71,7 @@ class TestWatermarkState:
             watermark_column="ts",
             watermark_type="timestamp",
             last_value="v1",
-            last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            last_updated=datetime(2024, 1, 1, tzinfo=UTC),
             run_id="run_123",
         )
         assert state.run_id == "run_123"
@@ -84,7 +84,7 @@ class TestWatermarkState:
                 watermark_column="col",
                 watermark_type=wm_type,  # type: ignore[arg-type]
                 last_value="v",
-                last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                last_updated=datetime(2024, 1, 1, tzinfo=UTC),
             )
             assert state.watermark_type == wm_type
 
@@ -96,7 +96,7 @@ class TestWatermarkState:
                 watermark_column="col",
                 watermark_type="float",  # type: ignore[arg-type]
                 last_value="v",
-                last_updated=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                last_updated=datetime(2024, 1, 1, tzinfo=UTC),
             )
 
     def test_round_trip(self):
@@ -106,7 +106,7 @@ class TestWatermarkState:
             watermark_column="ts",
             watermark_type="date",
             last_value="2024-01-15",
-            last_updated=datetime(2024, 1, 16, tzinfo=timezone.utc),
+            last_updated=datetime(2024, 1, 16, tzinfo=UTC),
             run_id="run_abc",
         )
         assert WatermarkState.model_validate(state.model_dump()) == state
