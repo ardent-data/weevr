@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame, SparkSession, Window
+from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ExecutionError
@@ -105,8 +105,8 @@ def build_watermark_filter(
     watermark_type: str,
     last_value: str,
     inclusive: bool = False,
-) -> str:
-    """Build a Spark SQL filter expression for watermark-based incremental reads.
+) -> Column:
+    """Build a Spark Column filter expression for watermark-based incremental reads.
 
     Args:
         watermark_column: Column name to filter on.
@@ -116,12 +116,16 @@ def build_watermark_filter(
             Defaults to ``False`` (strict ``>``).
 
     Returns:
-        A SQL predicate string suitable for ``df.filter()``.
+        A Spark Column expression suitable for ``df.filter()``.
     """
-    op = ">=" if inclusive else ">"
+    col = F.col(watermark_column)
     if watermark_type in ("timestamp", "date"):
-        return f"{watermark_column} {op} '{last_value}'"
-    return f"{watermark_column} {op} {last_value}"
+        lit_val = F.lit(last_value).cast(watermark_type)
+    elif watermark_type == "long":
+        lit_val = F.lit(int(last_value)).cast("long")
+    else:
+        lit_val = F.lit(int(last_value))
+    return col >= lit_val if inclusive else col > lit_val
 
 
 def read_source_incremental(

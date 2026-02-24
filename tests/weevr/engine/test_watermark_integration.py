@@ -276,3 +276,64 @@ class TestWatermarkPersistenceFailure:
 
             with pytest.raises(StateError, match="Simulated write failure"):
                 execute_thread(spark, thread)
+
+
+class TestWatermarkTimestamp:
+    """Watermark with timestamp type — verifies non-int watermark types work end-to-end."""
+
+    def test_timestamp_watermark_filters_correctly(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Timestamp watermark persists ISO value and filters on second run."""
+        from pyspark.sql import functions as F
+
+        src = tmp_delta_path("wm_ts_src")
+        tgt = tmp_delta_path("wm_ts_tgt")
+        wm = tmp_delta_path("wm_ts_store")
+
+        initial = spark.createDataFrame(
+            [
+                (1, "2024-01-01T00:00:00", "a"),
+                (2, "2024-06-15T12:00:00", "b"),
+            ],
+            ["id", "updated_at", "val"],
+        ).withColumn("updated_at", F.col("updated_at").cast("timestamp"))
+        initial.write.format("delta").mode("overwrite").save(src)
+
+        thread = _make_watermark_thread(
+            "ts_thread",
+            src,
+            tgt,
+            wm,
+            watermark_column="updated_at",
+            watermark_type="timestamp",
+        )
+
+        # First run — reads all rows
+        result1 = execute_thread(spark, thread)
+        assert result1.rows_written == 2
+        assert result1.telemetry is not None
+        assert result1.telemetry.watermark_first_run is True
+        assert result1.telemetry.watermark_new_value is not None
+        assert "2024-06-15" in result1.telemetry.watermark_new_value
+
+        # Verify HWM persisted
+        store = MetadataTableStore(wm)
+        state = store.read(spark, "ts_thread")
+        assert state is not None
+        assert state.watermark_type == "timestamp"
+        assert "2024-06-15" in state.last_value
+
+        # Add new data after the HWM
+        new_rows = spark.createDataFrame(
+            [(3, "2024-12-01T00:00:00", "c")],
+            ["id", "updated_at", "val"],
+        ).withColumn("updated_at", F.col("updated_at").cast("timestamp"))
+        new_rows.write.format("delta").mode("append").save(src)
+
+        # Second run — should only read the new row
+        result2 = execute_thread(spark, thread)
+        assert result2.rows_written == 1
+        assert result2.telemetry is not None
+        assert result2.telemetry.watermark_first_run is False
+        assert "2024-12-01" in (result2.telemetry.watermark_new_value or "")

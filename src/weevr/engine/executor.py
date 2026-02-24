@@ -10,6 +10,7 @@ from pyspark.sql import SparkSession
 from weevr.engine.result import ThreadResult
 from weevr.errors.exceptions import DataValidationError, ExecutionError, StateError
 from weevr.model.thread import Thread
+from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.hashing import compute_keys
 from weevr.operations.pipeline import run_pipeline
@@ -87,6 +88,10 @@ def execute_thread(
     watermark_first_run = False
     watermark_persisted = False
     cdc_counts: dict[str, int] | None = None
+
+    # Fail-fast: validate incremental config cross-cutting constraints
+    if load_mode != "full":
+        _validate_incremental(thread, load_mode)
 
     try:
         # Resolve target path early (needed for watermark store resolution)
@@ -190,9 +195,8 @@ def execute_thread(
             # CDC merge routing — skip target column mapping because
             # execute_cdc_merge handles column selection internally
             # (it must retain the operation column for row routing).
-            cdc_counts = execute_cdc_merge(
-                spark, df, target_path, thread.write or _default_merge_write(), thread.load.cdc
-            )
+            cdc_write = _validate_cdc_write_config(thread)
+            cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
             rows_written = sum(cdc_counts.values())
         else:
             # Apply target column mapping for non-CDC writes
@@ -305,11 +309,38 @@ def execute_thread(
         ) from exc
 
 
-def _default_merge_write():
-    """Return a minimal WriteConfig for CDC merge when no write config is set."""
-    from weevr.model.write import WriteConfig
+def _validate_incremental(thread: Thread, load_mode: str) -> None:
+    """Run cross-cutting incremental config validation at executor entry."""
+    from weevr.config.validation import validate_incremental_config
 
-    return WriteConfig(mode="merge", match_keys=["id"])
+    raw = {"load": {"mode": load_mode}}
+    if thread.write is not None:
+        raw["write"] = {"mode": thread.write.mode}
+    diagnostics = validate_incremental_config(raw)
+    errors = [d for d in diagnostics if d.startswith("ERROR:")]
+    if errors:
+        raise ExecutionError(
+            "; ".join(errors),
+            thread_name=thread.name,
+        )
+    for diag in diagnostics:
+        if diag.startswith("WARN:"):
+            logger.warning("Thread '%s': %s", thread.name, diag)
+
+
+def _validate_cdc_write_config(thread: Thread) -> WriteConfig:
+    """Validate and return write config for CDC merge, failing fast if misconfigured."""
+    if thread.write is None:
+        raise ExecutionError(
+            "CDC mode requires a 'write' config with mode='merge' and 'match_keys'",
+            thread_name=thread.name,
+        )
+    if not thread.write.match_keys:
+        raise ExecutionError(
+            "CDC mode requires 'match_keys' on write config",
+            thread_name=thread.name,
+        )
+    return thread.write
 
 
 def _build_telemetry(

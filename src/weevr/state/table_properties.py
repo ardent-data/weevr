@@ -81,7 +81,10 @@ class TablePropertiesStore(WatermarkStore):
                 f"{prefix}.run_id": state.run_id or "",
             }
 
-            props_sql = ", ".join(f"'{k}' = '{v}'" for k, v in props.items())
+            props_sql = ", ".join(
+                f"'{k}' = '{v.replace(chr(39), chr(39) + chr(39))}'"
+                for k, v in props.items()
+            )
             spark.sql(f"ALTER TABLE delta.`{self._target_path}` SET TBLPROPERTIES ({props_sql})")
         except Exception as e:
             if isinstance(e, StateError):

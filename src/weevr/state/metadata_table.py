@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pyspark.sql import functions as F
 from pyspark.sql.types import StringType, StructField, StructType, TimestampType
 
 from weevr.errors.exceptions import StateError
@@ -60,7 +61,7 @@ class MetadataTableStore(WatermarkStore):
             rows = (
                 spark.read.format("delta")
                 .load(self._table_path)
-                .filter(f"thread_name = '{thread_name}'")
+                .filter(F.col("thread_name") == thread_name)
                 .collect()
             )
 

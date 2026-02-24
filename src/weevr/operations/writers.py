@@ -249,6 +249,11 @@ def execute_cdc_merge(
         cdc_meta_cols.add(op_col)
     data_cols = [c for c in df.columns if c not in cdc_meta_cols]
 
+    # Filter to recognized operation values only (e.g., exclude CDF update_preimage)
+    recognized_ops = [v for v in (insert_val, update_val, delete_val) if v]
+    if recognized_ops:
+        df = df.filter(F.col(op_col).isin(recognized_ops))
+
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
     target_exists = _delta_table_exists(spark, target_path)
 
