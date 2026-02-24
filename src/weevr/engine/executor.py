@@ -183,19 +183,20 @@ def execute_thread(
         if thread.keys is not None:
             df = compute_keys(df, thread.keys)
 
-        # Step 7 — apply target column mapping
-        df = apply_target_mapping(df, thread.target, spark)
-
-        # Step 8 — write to Delta
+        # Step 7/8 — write to Delta
         write_mode = thread.write.mode if thread.write else "overwrite"
 
         if load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-            # CDC merge routing
+            # CDC merge routing — skip target column mapping because
+            # execute_cdc_merge handles column selection internally
+            # (it must retain the operation column for row routing).
             cdc_counts = execute_cdc_merge(
                 spark, df, target_path, thread.write or _default_merge_write(), thread.load.cdc
             )
             rows_written = sum(cdc_counts.values())
         else:
+            # Apply target column mapping for non-CDC writes
+            df = apply_target_mapping(df, thread.target, spark)
             rows_written = write_target(spark, df, thread.target, thread.write, target_path)
 
         # Step 9 — persist watermark state
