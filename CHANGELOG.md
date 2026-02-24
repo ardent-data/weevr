@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/ardent-data/weevr/compare/weevr-v0.7.0...weevr-v0.7.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* **ci:** correct publish workflow tag pattern ([#29](https://github.com/ardent-data/weevr/issues/29)) ([8244f5e](https://github.com/ardent-data/weevr/commit/8244f5ec39aa941ed6ea3f5dc0079377383b97b6))
+
 ## [0.7.0](https://github.com/ardent-data/weevr/compare/weevr-v0.6.0...weevr-v0.7.0) (2026-02-24)
 
 
