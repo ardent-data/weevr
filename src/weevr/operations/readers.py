@@ -1,10 +1,14 @@
 """Source readers — read one or more sources into Spark DataFrames."""
 
+from __future__ import annotations
+
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
+from weevr.state.watermark import WatermarkState
 
 
 def read_source(spark: SparkSession, alias: str, source: Source) -> DataFrame:
@@ -94,3 +98,117 @@ def _parse_order_col(order_by: str):  # type: ignore[return]
 
     col = F.expr(expr_str)
     return col.desc() if direction == "DESC" else col.asc()
+
+
+def build_watermark_filter(
+    watermark_column: str,
+    watermark_type: str,
+    last_value: str,
+    inclusive: bool = False,
+) -> str:
+    """Build a Spark SQL filter expression for watermark-based incremental reads.
+
+    Args:
+        watermark_column: Column name to filter on.
+        watermark_type: One of ``timestamp``, ``date``, ``int``, ``long``.
+        last_value: Serialized high-water mark value.
+        inclusive: If ``True``, use ``>=`` (re-read boundary row).
+            Defaults to ``False`` (strict ``>``).
+
+    Returns:
+        A SQL predicate string suitable for ``df.filter()``.
+    """
+    op = ">=" if inclusive else ">"
+    if watermark_type in ("timestamp", "date"):
+        return f"{watermark_column} {op} '{last_value}'"
+    return f"{watermark_column} {op} {last_value}"
+
+
+def read_source_incremental(
+    spark: SparkSession,
+    alias: str,
+    source: Source,
+    load_config: LoadConfig,
+    prior_state: WatermarkState | None,
+) -> tuple[DataFrame, str | None]:
+    """Read source with watermark filter and capture new HWM.
+
+    If ``prior_state`` is ``None`` (first run), reads all data.
+    Otherwise applies a watermark filter for predicate pushdown.
+    HWM is captured as ``MAX(watermark_column)`` from the source read
+    (before transforms, per DEC-003).
+
+    Args:
+        spark: Active SparkSession.
+        alias: Logical source name.
+        source: Source configuration.
+        load_config: Thread-level load configuration.
+        prior_state: Previously persisted watermark state, or ``None``.
+
+    Returns:
+        Tuple of ``(DataFrame, new_hwm_value)``. ``new_hwm_value`` is
+        ``None`` if the source returned zero rows.
+    """
+    df = _read_raw(spark, source)
+
+    # Apply watermark filter if prior state exists
+    if (
+        prior_state is not None
+        and load_config.watermark_column is not None
+        and load_config.watermark_type is not None
+    ):
+        filter_expr = build_watermark_filter(
+            watermark_column=load_config.watermark_column,
+            watermark_type=load_config.watermark_type,
+            last_value=prior_state.last_value,
+            inclusive=load_config.watermark_inclusive,
+        )
+        df = df.filter(filter_expr)
+
+    # Capture HWM before dedup (from filtered source)
+    new_hwm: str | None = None
+    if load_config.watermark_column is not None:
+        hwm_row = df.agg(F.max(F.col(load_config.watermark_column)).alias("hwm")).collect()
+        if hwm_row and hwm_row[0]["hwm"] is not None:
+            new_hwm = str(hwm_row[0]["hwm"])
+
+    # Apply dedup after HWM capture
+    if source.dedup is not None:
+        df = _apply_dedup(df, source.dedup)
+
+    return df, new_hwm
+
+
+def read_cdc_source(
+    spark: SparkSession,
+    source: Source,
+    cdc_config: CdcConfig,
+    last_version: int | None = None,
+) -> DataFrame:
+    """Read a CDC source, optionally starting from a specific version.
+
+    For ``preset=delta_cdf``, reads with Delta Change Data Feed options.
+    For generic CDC (explicit column mapping), reads the source normally
+    since change flags are already in the data.
+
+    Args:
+        spark: Active SparkSession.
+        source: Source configuration (must be Delta for CDF preset).
+        cdc_config: CDC configuration with preset or explicit mapping.
+        last_version: Last processed CDF commit version. If provided,
+            reads changes starting from ``last_version + 1``.
+
+    Returns:
+        DataFrame with CDC data (includes change type column for CDF).
+    """
+    if cdc_config.preset == "delta_cdf":
+        if source.type != "delta" or source.alias is None:
+            raise ExecutionError("Delta CDF preset requires a Delta source with 'alias' set")
+
+        reader = spark.read.format("delta").option("readChangeFeed", "true")
+        if last_version is not None:
+            reader = reader.option("startingVersion", last_version + 1)
+        return reader.load(source.alias)
+
+    # Generic CDC: read source normally; change flags are in the data
+    return _read_raw(spark, source)
