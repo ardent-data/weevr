@@ -322,6 +322,7 @@ def execute_loom(
     loom: Loom,
     weaves: dict[str, Weave],
     threads: dict[str, dict[str, Thread]],
+    params: dict[str, Any] | None = None,
 ) -> LoomResult:
     """Execute weaves sequentially in declared order.
 
@@ -335,6 +336,7 @@ def execute_loom(
         loom: Loom configuration declaring the ordered list of weave names.
         weaves: Mapping of weave name to :class:`~weevr.model.weave.Weave` config.
         threads: Nested mapping of ``weave_name → thread_name → Thread`` config.
+        params: Parameters for condition evaluation at weave and thread levels.
 
     Returns:
         :class:`~weevr.engine.result.LoomResult` with aggregate status and
@@ -356,13 +358,23 @@ def execute_loom(
 
         # Evaluate weave-level condition
         if weave_entry.condition is not None and not evaluate_condition(
-            weave_entry.condition, spark=spark
+            weave_entry.condition, spark=spark, params=params
         ):
             logger.debug(
                 "Loom '%s' — weave '%s' skipped (condition: '%s')",
                 loom.name,
                 weave_name,
                 weave_entry.condition.when,
+            )
+            weave_results.append(
+                WeaveResult(
+                    status="skipped",
+                    weave_name=weave_name,
+                    thread_results=[],
+                    threads_skipped=[],
+                    duration_ms=0,
+                    skip_reason=weave_entry.condition.when,
+                )
             )
             continue
 
@@ -388,6 +400,7 @@ def execute_loom(
             collector=collector,
             parent_span_id=loom_span_id,
             thread_conditions=thread_conditions if thread_conditions else None,
+            params=params,
         )
         weave_results.append(result)
 
@@ -401,9 +414,9 @@ def execute_loom(
 
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
-    # Compute aggregate loom status
+    # Compute aggregate loom status (skipped weaves don't count as failures)
     statuses = {r.status for r in weave_results}
-    if statuses <= {"success"}:
+    if statuses <= {"success", "skipped"}:
         loom_status: Literal["success", "failure", "partial"] = "success"
     elif "success" in statuses or "partial" in statuses:
         loom_status = "partial"

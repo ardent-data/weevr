@@ -37,20 +37,23 @@ class WeaveResult(FrozenBase):
     Attributes:
         status: Aggregate outcome — ``"success"`` if all threads succeeded,
             ``"failure"`` if all threads failed or were skipped, ``"partial"``
-            if some succeeded and some failed or were skipped.
+            if some succeeded and some failed or were skipped, ``"skipped"``
+            if the weave was conditionally skipped at loom level.
         weave_name: Name of the weave that was executed.
         thread_results: Results for each thread that was executed (not skipped).
         threads_skipped: Names of threads that were skipped due to upstream failure.
         duration_ms: Wall-clock duration of the weave execution in milliseconds.
         telemetry: Weave-level telemetry aggregated from thread telemetry.
+        skip_reason: The condition expression that caused the weave to be skipped.
     """
 
-    status: Literal["success", "failure", "partial"]
+    status: Literal["success", "failure", "partial", "skipped"]
     weave_name: str
     thread_results: list[ThreadResult]
     threads_skipped: list[str]
     duration_ms: int
     telemetry: WeaveTelemetry | None = None
+    skip_reason: str | None = None
 
 
 class LoomResult(FrozenBase):

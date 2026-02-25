@@ -243,8 +243,10 @@ class Context:
                 thread_entries=filtered_entries,
             )
             engine_result = execute_weave(self._spark, plan, weave_threads)
+            # Direct weave execution never returns "skipped" (only loom runner does)
+            assert engine_result.status in ("success", "failure", "partial")
             return RunResult(
-                status=engine_result.status,
+                status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="weave",
                 config_name=resolved.config_name,

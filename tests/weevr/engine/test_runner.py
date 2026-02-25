@@ -652,7 +652,7 @@ class TestConditionalWeaveExecution:
 
     @patch("weevr.engine.runner.execute_weave")
     def test_weave_condition_false_skips(self, mock_weave_exec):
-        """Weave with condition=False is skipped entirely."""
+        """Weave with condition=False is skipped with a WeaveResult."""
         loom = Loom.model_validate(
             {
                 "config_version": "1.0",
@@ -666,8 +666,15 @@ class TestConditionalWeaveExecution:
         }
         thread_map = {"dims": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map)
-        # Weave was skipped, so no weave results
-        assert len(result.weave_results) == 0
+        # Weave was skipped — result recorded with status="skipped"
+        assert len(result.weave_results) == 1
+        assert result.weave_results[0].status == "skipped"
+        assert result.weave_results[0].weave_name == "dims"
+        assert result.weave_results[0].skip_reason == "false"
+        assert result.weave_results[0].thread_results == []
+        assert result.weave_results[0].duration_ms == 0
+        # Skipped weaves still count as success for loom
+        assert result.status == "success"
         mock_weave_exec.assert_not_called()
 
     @patch("weevr.engine.runner.execute_weave")
@@ -697,3 +704,80 @@ class TestConditionalWeaveExecution:
         result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map)
         assert len(result.weave_results) == 1
         assert result.weave_results[0].status == "success"
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_weave_param_condition_skips(self, mock_weave_exec):
+        """Weave with param condition that doesn't match is skipped."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": [
+                    {"name": "dims", "condition": {"when": "${param.schedule} == 'daily'"}},
+                ],
+            }
+        )
+        weaves = {
+            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+        }
+        thread_map = {"dims": {"t1": _make_thread("t1")}}
+        result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map, params={"schedule": "monthly"})
+        assert result.weave_results[0].status == "skipped"
+        assert result.weave_results[0].skip_reason == "${param.schedule} == 'daily'"
+        mock_weave_exec.assert_not_called()
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.evaluate_condition")
+    def test_weave_param_condition_executes(self, mock_eval, mock_weave_exec):
+        """Weave with param condition that matches executes normally."""
+        mock_eval.return_value = True
+        mock_weave_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="dims",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=100,
+        )
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": [
+                    {"name": "dims", "condition": {"when": "${param.schedule} == 'daily'"}},
+                ],
+            }
+        )
+        weaves = {
+            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+        }
+        thread_map = {"dims": {"t1": _make_thread("t1")}}
+        result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map, params={"schedule": "daily"})
+        assert len(result.weave_results) == 1
+        assert result.weave_results[0].status == "success"
+        # Verify params were passed to evaluate_condition
+        mock_eval.assert_called_once()
+        call_kwargs = mock_eval.call_args
+        assert call_kwargs.kwargs.get("params") == {"schedule": "daily"}
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_params_passed_to_execute_weave(self, mock_weave_exec):
+        """Loom params are forwarded to execute_weave for thread conditions."""
+        mock_weave_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="dims",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=100,
+        )
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["dims"],
+            }
+        )
+        weaves = {
+            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+        }
+        thread_map = {"dims": {"t1": _make_thread("t1")}}
+        execute_loom(_MOCK_SPARK, loom, weaves, thread_map, params={"env": "prod"})
+        # Verify params passed through to execute_weave
+        call_kwargs = mock_weave_exec.call_args
+        assert call_kwargs.kwargs.get("params") == {"env": "prod"}
