@@ -1,0 +1,28 @@
+# Basic Thread Example
+#
+# Reads a Delta table, selects a subset of columns, and writes
+# the result to a new Delta table using overwrite mode.
+
+config_version: "1.0"
+name: dim_customer
+
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+
+# Pipeline steps applied in order
+steps:
+  - select:
+      columns:
+        - customer_id
+        - first_name
+        - last_name
+        - email
+        - region
+
+target:
+  alias: curated.dim_customer
+
+write:
+  mode: overwrite

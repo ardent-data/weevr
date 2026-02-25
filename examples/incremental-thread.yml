@@ -1,0 +1,49 @@
+# Incremental Thread Example
+#
+# Uses a watermark column to load only new or changed rows since
+# the last successful run. The watermark is persisted in Delta
+# table properties (zero-config default).
+
+config_version: "1.0"
+name: fact_transactions
+
+sources:
+  transactions:
+    type: delta
+    alias: raw.transactions
+
+steps:
+  - filter:
+      expr: "amount > 0"
+
+  - derive:
+      columns:
+        transaction_date: "to_date(transaction_ts)"
+
+  - select:
+      columns:
+        - transaction_id
+        - account_id
+        - amount
+        - currency
+        - transaction_ts
+        - transaction_date
+
+target:
+  alias: curated.fact_transactions
+  partition_by:
+    - transaction_date
+
+# Incremental load using watermark
+load:
+  mode: incremental_watermark
+  watermark_column: transaction_ts
+  watermark_type: timestamp
+
+write:
+  mode: merge
+  match_keys:
+    - transaction_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore

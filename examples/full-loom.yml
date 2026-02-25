@@ -1,0 +1,39 @@
+# Full Loom Example
+#
+# A deployment unit that groups two weaves with shared defaults,
+# parameters, and execution settings. Configuration cascades from
+# loom defaults down to individual threads.
+
+config_version: "1.0"
+name: sales_lakehouse
+
+weaves:
+  - name: dimensions
+  - name: facts
+    condition:
+      when: "table_exists('curated.dim_customer')"
+
+# Shared defaults inherited by all weaves and threads
+defaults:
+  write:
+    mode: overwrite
+  execution:
+    log_level: standard
+
+# Parameters injected into thread configs via ${param.x} syntax
+params:
+  lakehouse_path:
+    name: lakehouse_path
+    type: string
+    required: true
+    description: "Root path for the lakehouse storage layer"
+  load_date:
+    name: load_date
+    type: date
+    required: false
+    default: "2025-01-01"
+    description: "Date to use for incremental load boundaries"
+
+execution:
+  log_level: standard
+  trace: true

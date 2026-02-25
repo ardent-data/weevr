@@ -1,0 +1,57 @@
+# Validation Thread Example
+#
+# Demonstrates data quality checks applied before and after writing.
+# Validations run pre-write on the DataFrame; assertions run post-write
+# against the target table.
+
+config_version: "1.0"
+name: dim_store
+
+sources:
+  stores:
+    type: delta
+    alias: raw.stores
+
+steps:
+  - select:
+      columns:
+        - store_id
+        - store_name
+        - city
+        - state
+        - square_footage
+        - open_date
+
+  - cast:
+      columns:
+        square_footage: "int"
+
+# Pre-write validation rules (evaluated as Spark SQL expressions)
+validations:
+  - name: store_id_not_null
+    rule: "store_id IS NOT NULL"
+    severity: fatal
+  - name: square_footage_positive
+    rule: "square_footage > 0"
+    severity: warn
+
+# Post-write assertions against the target
+assertions:
+  - type: column_not_null
+    columns:
+      - store_id
+      - store_name
+    severity: error
+  - type: row_count
+    min: 1
+    severity: warn
+  - type: unique
+    columns:
+      - store_id
+    severity: error
+
+target:
+  alias: curated.dim_store
+
+write:
+  mode: overwrite

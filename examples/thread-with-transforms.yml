@@ -1,0 +1,50 @@
+# Thread with Multiple Transforms
+#
+# Demonstrates chaining several pipeline steps: filter rows,
+# derive a computed column, select the final columns, and cast types.
+
+config_version: "1.0"
+name: fact_order_summary
+
+sources:
+  orders:
+    type: delta
+    alias: raw.orders
+
+steps:
+  # Keep only completed orders from the last year
+  - filter:
+      expr: "status = 'completed' AND order_date >= '2025-01-01'"
+
+  # Compute total with tax
+  - derive:
+      columns:
+        total_with_tax: "subtotal + tax_amount"
+        order_year: "year(order_date)"
+
+  # Narrow to the columns we need
+  - select:
+      columns:
+        - order_id
+        - customer_id
+        - order_date
+        - order_year
+        - subtotal
+        - tax_amount
+        - total_with_tax
+        - region
+
+  # Ensure consistent numeric types
+  - cast:
+      columns:
+        subtotal: "decimal(18,2)"
+        tax_amount: "decimal(18,2)"
+        total_with_tax: "decimal(18,2)"
+
+target:
+  alias: curated.fact_order_summary
+  partition_by:
+    - order_year
+
+write:
+  mode: overwrite
