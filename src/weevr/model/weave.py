@@ -6,6 +6,7 @@ from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.execution import ExecutionConfig
+from weevr.model.naming import NamingConfig
 from weevr.model.params import ParamSpec
 
 
@@ -46,6 +47,7 @@ class Weave(FrozenBase):
     defaults: dict[str, Any] | None = None
     params: dict[str, ParamSpec] | None = None
     execution: ExecutionConfig | None = None
+    naming: NamingConfig | None = None
 
     @model_validator(mode="before")
     @classmethod

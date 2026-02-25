@@ -228,3 +228,59 @@ class TestApplyInheritance:
         assert result["write"] == {"mode": "append"}
         assert "format" not in result["write"]
         assert "partition" not in result["write"]
+
+
+class TestNamingInheritance:
+    """Test naming config cascade through loom → weave → thread levels."""
+
+    def test_loom_naming_cascades_to_thread(self):
+        """Loom naming inherited by thread when thread has no naming."""
+        loom = {"naming": {"columns": "snake_case"}}
+        thread = {"target": {"alias": "data.output"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["naming"] == {"columns": "snake_case"}
+
+    def test_weave_naming_overrides_loom(self):
+        """Weave naming overrides loom naming."""
+        loom = {"naming": {"columns": "snake_case"}}
+        weave = {"naming": {"columns": "camelCase"}}
+        thread = {"target": {"alias": "data.output"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["target"]["naming"] == {"columns": "camelCase"}
+
+    def test_thread_naming_overrides_weave(self):
+        """Thread target naming overrides weave naming."""
+        weave = {"naming": {"columns": "camelCase"}}
+        thread = {"target": {"alias": "data.output", "naming": {"columns": "PascalCase"}}}
+        result = apply_inheritance(None, weave, thread)
+        # Thread already has naming, so parent naming is NOT applied
+        assert result["target"]["naming"] == {"columns": "PascalCase"}
+
+    def test_thread_opt_out_with_none(self):
+        """Thread can opt out of naming with columns=none."""
+        loom = {"naming": {"columns": "snake_case"}}
+        thread = {"target": {"alias": "data.output", "naming": {"columns": "none"}}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["naming"] == {"columns": "none"}
+
+    def test_no_naming_at_any_level(self):
+        """No naming config anywhere → no naming key in target."""
+        thread = {"target": {"alias": "data.output"}}
+        result = apply_inheritance(None, None, thread)
+        assert "naming" not in result.get("target", {})
+
+    def test_exclude_list_inherited(self):
+        """Loom exclude list inherited when thread has no naming."""
+        loom = {"naming": {"columns": "snake_case", "exclude": ["__*"]}}
+        thread = {"target": {"alias": "data.output"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["naming"]["exclude"] == ["__*"]
+
+    def test_thread_naming_replaces_parent_entirely(self):
+        """Thread naming replaces parent entirely (not merged field-by-field)."""
+        loom = {"naming": {"columns": "snake_case", "exclude": ["__*"]}}
+        thread = {"target": {"alias": "data.output", "naming": {"columns": "camelCase"}}}
+        result = apply_inheritance(loom, None, thread)
+        # Thread had naming, so loom naming is NOT applied
+        assert result["target"]["naming"] == {"columns": "camelCase"}
+        assert "exclude" not in result["target"]["naming"]

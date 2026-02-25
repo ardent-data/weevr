@@ -13,6 +13,7 @@ from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.hashing import compute_keys
+from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import run_pipeline
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
@@ -183,6 +184,10 @@ def execute_thread(
 
             # Continue with clean_df
             df = outcome.clean_df
+
+        # Step 4b — apply naming normalization (before target mapping)
+        if thread.target.naming is not None:
+            df = normalize_columns(df, thread.target.naming)
 
         # Step 5 — compute keys and hashes
         if thread.keys is not None:
