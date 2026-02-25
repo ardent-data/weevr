@@ -285,3 +285,96 @@ steps:
 
         with pytest.raises(ModelValidationError):
             load_config(thread_file)
+
+
+class TestLoadConfigForeach:
+    """Test foreach macro expansion in the load_config pipeline."""
+
+    def test_foreach_expands_steps(self, tmp_path):
+        """Foreach block in steps is expanded before hydration."""
+        thread_file = tmp_path / "thread.yaml"
+        thread_file.write_text(
+            """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: lakehouse
+target: {}
+steps:
+  - foreach:
+      values: [name, email]
+      as: col
+      steps:
+        - cast:
+            columns:
+              "{col}": string
+"""
+        )
+
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert len(result.steps) == 2
+        from weevr.model.pipeline import CastStep
+
+        assert isinstance(result.steps[0], CastStep)
+        assert result.steps[0].cast.columns == {"name": "string"}
+        assert isinstance(result.steps[1], CastStep)
+        assert result.steps[1].cast.columns == {"email": "string"}
+
+    def test_foreach_mixed_with_regular_steps(self, tmp_path):
+        """Foreach interleaved with regular steps preserves order."""
+        thread_file = tmp_path / "thread.yaml"
+        thread_file.write_text(
+            """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: lakehouse
+target: {}
+steps:
+  - filter:
+      expr: "active = true"
+  - foreach:
+      values: [a, b]
+      as: col
+      steps:
+        - rename:
+            columns:
+              "{col}": "{col}_clean"
+  - select:
+      columns: [id]
+"""
+        )
+
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert len(result.steps) == 4
+
+    def test_foreach_with_variables(self, tmp_path):
+        """Foreach works alongside variable resolution."""
+        thread_file = tmp_path / "thread.yaml"
+        thread_file.write_text(
+            """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: ${schema}.customers
+target: {}
+steps:
+  - foreach:
+      values: [x, y]
+      as: col
+      steps:
+        - cast:
+            columns:
+              "{col}": string
+"""
+        )
+
+        result = load_config(thread_file, runtime_params={"schema": "bronze"})
+        assert isinstance(result, Thread)
+        assert result.sources["data"].alias == "bronze.customers"
+        assert len(result.steps) == 2
