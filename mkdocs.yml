@@ -1,0 +1,98 @@
+site_name: weevr
+site_description: Configuration-driven execution framework for Spark in Microsoft Fabric
+site_url: https://ardent-data.github.io/weevr/
+repo_url: https://github.com/ardent-data/weevr
+repo_name: ardent-data/weevr
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            members_order: source
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Your First Loom: tutorials/your-first-loom.md
+  - How-to Guides:
+      - Add a Thread: how-to/add-a-thread.md
+      - Add Validation Rules: how-to/add-validation-rules.md
+      - Implement Custom Telemetry Sink: how-to/implement-custom-telemetry-sink.md
+      - Cache a Lookup: how-to/cache-a-lookup.md
+      - Run from Fabric Pipeline: how-to/run-from-fabric-pipeline.md
+  - Reference:
+      - YAML Schema:
+          - Thread: reference/yaml-schema/thread.md
+          - Weave: reference/yaml-schema/weave.md
+          - Loom: reference/yaml-schema/loom.md
+      - API:
+          - Context: reference/api/context.md
+          - Config: reference/api/config.md
+          - Model: reference/api/model.md
+          - Engine: reference/api/engine.md
+          - Operations: reference/api/operations.md
+          - Telemetry: reference/api/telemetry.md
+          - State: reference/api/state.md
+          - Errors: reference/api/errors.md
+      - Configuration Keys: reference/configuration-keys.md
+      - Compatibility: reference/compatibility.md
+  - Concepts:
+      - Why weevr: concepts/why-weevr.md
+      - Thread, Weave, Loom: concepts/thread-weave-loom.md
+      - Artifacts Model: concepts/artifacts-model.md
+      - Execution Modes: concepts/execution-modes.md
+      - Idempotency: concepts/idempotency.md
+  - Guides:
+      - Fabric Runtime: guides/fabric-runtime.md
+      - Observability: guides/observability.md
+  - FAQ: faq.md
+  - Contributing: contributing.md
+  - Release Notes:
+      - "1.0": release-notes/1.0.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  version:
+    provider: mike
