@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from weevr.model.loom import Loom
+from weevr.model.loom import Loom, WeaveEntry
 from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.thread import Thread
@@ -321,7 +321,7 @@ class TestLoadedConfig:
 
     def test_getattr_proxies_weaves(self, sample_loom: Loom) -> None:
         loaded = LoadedConfig(sample_loom, "loom", "nightly")
-        assert loaded.weaves == ["dimensions"]
+        assert loaded.weaves == [WeaveEntry(name="dimensions")]
 
     def test_getattr_proxies_threads(self, sample_weave: Weave) -> None:
         loaded = LoadedConfig(sample_weave, "weave", "dimensions")

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.model.loom import Loom
+from weevr.model.loom import Loom, WeaveEntry
 
 
 class TestLoom:
@@ -13,7 +13,7 @@ class TestLoom:
         """Loom from minimal dict."""
         loom = Loom.model_validate({"config_version": "1.0", "weaves": ["dimensions"]})
         assert loom.config_version == "1.0"
-        assert loom.weaves == ["dimensions"]
+        assert loom.weaves == [WeaveEntry(name="dimensions")]
 
     def test_missing_weaves_raises(self):
         """Loom without weaves raises ValidationError."""

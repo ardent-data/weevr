@@ -154,7 +154,7 @@ target:
         result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
         assert isinstance(result, Loom)
         assert result.config_version == "1.0"
-        assert "dimensions" in result.weaves
+        assert any(e.name == "dimensions" for e in result.weaves)
 
 
 class TestLoadConfigNameInjection:

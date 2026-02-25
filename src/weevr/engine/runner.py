@@ -319,7 +319,8 @@ def execute_loom(
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
-    for weave_name in loom.weaves:
+    for weave_entry in loom.weaves:
+        weave_name = weave_entry.name
         weave = weaves[weave_name]
         weave_threads = threads[weave_name]
 
