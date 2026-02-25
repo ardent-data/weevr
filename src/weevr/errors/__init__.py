@@ -11,6 +11,7 @@ from weevr.errors.exceptions import (
     ModelValidationError,
     ReferenceResolutionError,
     SparkError,
+    StateError,
     VariableResolutionError,
     WeevError,
 )
@@ -27,5 +28,6 @@ __all__ = [
     "ModelValidationError",
     "ExecutionError",
     "SparkError",
+    "StateError",
     "DataValidationError",
 ]

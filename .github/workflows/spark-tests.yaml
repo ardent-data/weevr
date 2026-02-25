@@ -7,8 +7,11 @@ on:
     paths:
       - "src/weevr/operations/**"
       - "src/weevr/engine/**"
+      - "src/weevr/state/**"
       - "tests/weevr/operations/**"
       - "tests/weevr/engine/**"
+      - "tests/weevr/state/**"
+      - "tests/weevr/conftest.py"
       - "tests/conftest.py"
       - "tests/spark_helpers.py"
       - "pyproject.toml"
@@ -16,8 +19,11 @@ on:
     paths:
       - "src/weevr/operations/**"
       - "src/weevr/engine/**"
+      - "src/weevr/state/**"
       - "tests/weevr/operations/**"
       - "tests/weevr/engine/**"
+      - "tests/weevr/state/**"
+      - "tests/weevr/conftest.py"
       - "tests/conftest.py"
       - "tests/spark_helpers.py"
       - "pyproject.toml"
