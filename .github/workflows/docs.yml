@@ -77,7 +77,7 @@ jobs:
         run: uv run ruff check . --select D
 
       - name: Test coverage
-        run: uv run pytest --cov --cov-fail-under=90
+        run: uv run pytest -m "" --cov --cov-fail-under=90
 
   deploy-docs:
     if: github.event_name == 'release'
