@@ -296,7 +296,8 @@ class LoadedConfig:
             )
 
         elif self._config_type == "loom" and self._weaves is not None and self._threads is not None:
-            for weave_name in self._model.weaves:
+            for weave_entry in self._model.weaves:
+                weave_name = weave_entry.name if hasattr(weave_entry, "name") else str(weave_entry)
                 weave = self._weaves.get(weave_name)
                 if weave is None:
                     continue

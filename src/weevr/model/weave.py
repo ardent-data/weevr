@@ -6,7 +6,20 @@ from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.execution import ExecutionConfig
+from weevr.model.naming import NamingConfig
 from weevr.model.params import ParamSpec
+
+
+class ConditionSpec(FrozenBase):
+    """A condition expression for conditional execution.
+
+    Attributes:
+        when: Condition expression string. Supports parameter references
+            (``${param.x}``), built-in checks (``table_exists()``,
+            ``table_empty()``, ``row_count()``), and simple boolean operators.
+    """
+
+    when: str
 
 
 class ThreadEntry(FrozenBase):
@@ -16,10 +29,13 @@ class ThreadEntry(FrozenBase):
         name: Thread name as declared in the weave config.
         dependencies: Explicit upstream thread names. When set, these are merged
             with any auto-inferred dependencies from source/target path matching.
+        condition: Optional condition for conditional execution. When set, the
+            thread is only executed if the condition evaluates to True.
     """
 
     name: str
     dependencies: list[str] | None = None
+    condition: ConditionSpec | None = None
 
 
 class Weave(FrozenBase):
@@ -31,6 +47,7 @@ class Weave(FrozenBase):
     defaults: dict[str, Any] | None = None
     params: dict[str, ParamSpec] | None = None
     execution: ExecutionConfig | None = None
+    naming: NamingConfig | None = None
 
     @model_validator(mode="before")
     @classmethod

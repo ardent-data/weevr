@@ -4,21 +4,41 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from weevr.model.pipeline import (
+    AggregateParams,
+    AggregateStep,
+    CaseWhenBranch,
+    CaseWhenParams,
+    CaseWhenStep,
     CastStep,
+    CoalesceParams,
+    CoalesceStep,
+    DateOpsParams,
+    DateOpsStep,
     DedupStep,
     DeriveParams,
     DeriveStep,
     DropStep,
+    FillNullParams,
+    FillNullStep,
     FilterParams,
     FilterStep,
     JoinKeyPair,
     JoinParams,
     JoinStep,
+    PivotParams,
+    PivotStep,
     RenameStep,
     SelectStep,
     SortStep,
     Step,
+    StringOpsParams,
+    StringOpsStep,
     UnionStep,
+    UnpivotParams,
+    UnpivotStep,
+    WindowFrame,
+    WindowParams,
+    WindowStep,
 )
 from weevr.model.types import SparkExpr
 
@@ -190,7 +210,7 @@ class TestStepDiscriminator:
     def test_unknown_step_type_raises(self):
         """Dict with an unknown step key raises ValidationError."""
         with pytest.raises(ValidationError):
-            self._validate({"pivot": {"columns": ["x"]}})
+            self._validate({"explode": {"column": "tags"}})
 
     def test_ambiguous_step_keys_raises(self):
         """Dict with two step type keys raises ValidationError."""
@@ -246,7 +266,7 @@ class TestStepFreezeAndRoundTrip:
             _step_adapter.validate_python(42)
 
     def test_all_step_types_round_trip(self):
-        """All 10 step types construct and dump without error."""
+        """All 19 step types construct and dump without error."""
         steps_data = [
             {"filter": {"expr": "x > 0"}},
             {"derive": {"columns": {"c": "a + b"}}},
@@ -258,8 +278,388 @@ class TestStepFreezeAndRoundTrip:
             {"dedup": {"keys": ["id"]}},
             {"sort": {"columns": ["date"]}},
             {"union": {"sources": ["s1", "s2"]}},
+            {"aggregate": {"measures": {"total": "sum(amount)"}}},
+            {"window": {"functions": {"rn": "row_number()"}, "partition_by": ["region"]}},
+            {
+                "pivot": {
+                    "group_by": ["region"],
+                    "pivot_column": "status",
+                    "values": ["active", "inactive"],
+                    "aggregate": "sum(amount)",
+                },
+            },
+            {
+                "unpivot": {
+                    "columns": ["q1", "q2"],
+                    "name_column": "quarter",
+                    "value_column": "revenue",
+                },
+            },
+            {
+                "case_when": {
+                    "column": "tier",
+                    "cases": [{"when": "amount > 100", "then": "'high'"}],
+                    "otherwise": "'low'",
+                },
+            },
+            {"fill_null": {"columns": {"amount": 0, "name": "unknown"}}},
+            {"coalesce": {"columns": {"email": ["work_email", "personal_email"]}}},
+            {"string_ops": {"columns": ["name"], "expr": "trim({col})"}},
+            {"date_ops": {"columns": ["created_at"], "expr": "date_format({col}, 'yyyy-MM-dd')"}},
         ]
         for data in steps_data:
             step = _step_adapter.validate_python(data)
             dumped = step.model_dump()  # type: ignore[union-attr]
             assert isinstance(dumped, dict)
+
+
+# ---------------------------------------------------------------------------
+# New M08a supporting models
+# ---------------------------------------------------------------------------
+
+
+class TestWindowFrame:
+    """Test WindowFrame model."""
+
+    def test_valid_rows(self):
+        """Rows frame with valid bounds."""
+        wf = WindowFrame(type="rows", start=-2, end=0)
+        assert wf.type == "rows"
+        assert wf.start == -2
+        assert wf.end == 0
+
+    def test_valid_range(self):
+        """Range frame with valid bounds."""
+        wf = WindowFrame(type="range", start=-100, end=100)
+        assert wf.type == "range"
+
+    def test_start_greater_than_end_raises(self):
+        """start > end raises ValidationError."""
+        with pytest.raises(ValidationError, match="start.*<=.*end"):
+            WindowFrame(type="rows", start=5, end=2)
+
+    def test_frozen(self):
+        """WindowFrame is immutable."""
+        wf = WindowFrame(type="rows", start=-1, end=0)
+        with pytest.raises(ValidationError):
+            wf.type = "range"  # type: ignore[misc]
+
+
+class TestCaseWhenBranch:
+    """Test CaseWhenBranch model."""
+
+    def test_valid(self):
+        """Valid construction."""
+        b = CaseWhenBranch(when=SparkExpr("amount > 100"), then=SparkExpr("'high'"))
+        assert b.when == "amount > 100"
+        assert b.then == "'high'"
+
+    def test_missing_when_raises(self):
+        """Missing when raises ValidationError."""
+        with pytest.raises(ValidationError):
+            CaseWhenBranch(then=SparkExpr("'high'"))  # type: ignore[call-arg]
+
+    def test_missing_then_raises(self):
+        """Missing then raises ValidationError."""
+        with pytest.raises(ValidationError):
+            CaseWhenBranch(when=SparkExpr("amount > 100"))  # type: ignore[call-arg]
+
+
+# ---------------------------------------------------------------------------
+# New M08a param models
+# ---------------------------------------------------------------------------
+
+
+class TestAggregateParams:
+    """Test AggregateParams model."""
+
+    def test_with_group_by(self):
+        """Valid aggregate with group_by."""
+        p = AggregateParams(group_by=["region"], measures={"total": SparkExpr("sum(amount)")})
+        assert p.group_by == ["region"]
+        assert len(p.measures) == 1
+
+    def test_without_group_by(self):
+        """Whole-DataFrame aggregation (no group_by)."""
+        p = AggregateParams(measures={"cnt": SparkExpr("count(*)")})
+        assert p.group_by is None
+
+    def test_empty_measures_raises(self):
+        """Empty measures raises ValidationError."""
+        with pytest.raises(ValidationError, match="measures must not be empty"):
+            AggregateParams(measures={})
+
+    def test_multiple_measures(self):
+        """Multiple measures in one step."""
+        p = AggregateParams(
+            measures={
+                "total": SparkExpr("sum(amount)"),
+                "cnt": SparkExpr("count(*)"),
+                "avg_amt": SparkExpr("avg(amount)"),
+            }
+        )
+        assert len(p.measures) == 3
+
+
+class TestWindowParams:
+    """Test WindowParams model."""
+
+    def test_valid_full(self):
+        """Valid window with all fields."""
+        frame = WindowFrame(type="rows", start=-2, end=0)
+        p = WindowParams(
+            functions={"rn": SparkExpr("row_number()")},
+            partition_by=["region"],
+            order_by=["date desc"],
+            frame=frame,
+        )
+        assert len(p.functions) == 1
+        assert p.partition_by == ["region"]
+        assert p.order_by == ["date desc"]
+        assert p.frame == frame
+
+    def test_optional_order_by_and_frame(self):
+        """order_by and frame are optional."""
+        p = WindowParams(functions={"cnt": SparkExpr("count(*)")}, partition_by=["region"])
+        assert p.order_by is None
+        assert p.frame is None
+
+    def test_empty_functions_raises(self):
+        """Empty functions raises ValidationError."""
+        with pytest.raises(ValidationError, match="functions must not be empty"):
+            WindowParams(functions={}, partition_by=["region"])
+
+    def test_empty_partition_by_raises(self):
+        """Empty partition_by raises ValidationError."""
+        with pytest.raises(ValidationError, match="partition_by must not be empty"):
+            WindowParams(functions={"rn": SparkExpr("row_number()")}, partition_by=[])
+
+
+class TestPivotParams:
+    """Test PivotParams model."""
+
+    def test_valid(self):
+        """Valid pivot construction."""
+        p = PivotParams(
+            group_by=["region"],
+            pivot_column="status",
+            values=["active", "inactive"],
+            aggregate=SparkExpr("sum(amount)"),
+        )
+        assert p.pivot_column == "status"
+        assert len(p.values) == 2
+
+    def test_empty_values_raises(self):
+        """Empty values raises ValidationError."""
+        with pytest.raises(ValidationError, match="values must not be empty"):
+            PivotParams(
+                group_by=["r"], pivot_column="s", values=[], aggregate=SparkExpr("count(*)")
+            )
+
+    def test_mixed_value_types(self):
+        """Values can be mixed types."""
+        p = PivotParams(
+            group_by=["r"],
+            pivot_column="x",
+            values=["a", 1, 2.5, True],
+            aggregate=SparkExpr("count(*)"),
+        )
+        assert len(p.values) == 4
+
+
+class TestUnpivotParams:
+    """Test UnpivotParams model."""
+
+    def test_valid(self):
+        """Valid unpivot construction."""
+        p = UnpivotParams(columns=["q1", "q2", "q3"], name_column="quarter", value_column="rev")
+        assert len(p.columns) == 3
+        assert p.name_column == "quarter"
+
+    def test_name_equals_value_raises(self):
+        """name_column == value_column raises ValidationError."""
+        with pytest.raises(ValidationError, match="must be different"):
+            UnpivotParams(columns=["a"], name_column="col", value_column="col")
+
+    def test_empty_columns_raises(self):
+        """Empty columns raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            UnpivotParams(columns=[], name_column="n", value_column="v")
+
+
+class TestCaseWhenParams:
+    """Test CaseWhenParams model."""
+
+    def test_valid_with_otherwise(self):
+        """Valid case_when with otherwise."""
+        p = CaseWhenParams(
+            column="tier",
+            cases=[CaseWhenBranch(when=SparkExpr("amount > 100"), then=SparkExpr("'high'"))],
+            otherwise=SparkExpr("'low'"),
+        )
+        assert p.column == "tier"
+        assert len(p.cases) == 1
+        assert p.otherwise == "'low'"
+
+    def test_valid_without_otherwise(self):
+        """Valid case_when without otherwise (null for unmatched)."""
+        p = CaseWhenParams(
+            column="tier",
+            cases=[CaseWhenBranch(when=SparkExpr("amount > 100"), then=SparkExpr("'high'"))],
+        )
+        assert p.otherwise is None
+
+    def test_empty_cases_raises(self):
+        """Empty cases raises ValidationError."""
+        with pytest.raises(ValidationError, match="cases must not be empty"):
+            CaseWhenParams(column="tier", cases=[])
+
+
+class TestFillNullParams:
+    """Test FillNullParams model."""
+
+    def test_valid(self):
+        """Valid fill_null construction."""
+        p = FillNullParams(columns={"amount": 0, "name": "unknown"})
+        assert len(p.columns) == 2
+
+    def test_empty_columns_raises(self):
+        """Empty columns raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            FillNullParams(columns={})
+
+
+class TestCoalesceParams:
+    """Test CoalesceParams model."""
+
+    def test_valid(self):
+        """Valid coalesce construction."""
+        p = CoalesceParams(columns={"email": ["work_email", "personal_email"]})
+        assert p.columns["email"] == ["work_email", "personal_email"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns dict raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            CoalesceParams(columns={})
+
+    def test_empty_source_list_raises(self):
+        """Empty source list for a column raises ValidationError."""
+        with pytest.raises(ValidationError, match="source list.*must not be empty"):
+            CoalesceParams(columns={"email": []})
+
+
+class TestStringOpsParams:
+    """Test StringOpsParams model."""
+
+    def test_valid(self):
+        """Valid string_ops construction."""
+        p = StringOpsParams(columns=["name"], expr="trim({col})")
+        assert p.on_empty == "warn"
+
+    def test_on_empty_error(self):
+        """on_empty accepts 'error'."""
+        p = StringOpsParams(columns=["name"], expr="upper({col})", on_empty="error")
+        assert p.on_empty == "error"
+
+    def test_missing_col_placeholder_raises(self):
+        """Expression without {col} raises ValidationError."""
+        with pytest.raises(ValidationError, match="\\{col\\}"):
+            StringOpsParams(columns=["name"], expr="trim(name)")
+
+
+class TestDateOpsParams:
+    """Test DateOpsParams model."""
+
+    def test_valid(self):
+        """Valid date_ops construction."""
+        p = DateOpsParams(columns=["created_at"], expr="date_format({col}, 'yyyy-MM-dd')")
+        assert p.on_empty == "warn"
+
+    def test_on_empty_error(self):
+        """on_empty accepts 'error'."""
+        p = DateOpsParams(columns=["ts"], expr="year({col})", on_empty="error")
+        assert p.on_empty == "error"
+
+    def test_missing_col_placeholder_raises(self):
+        """Expression without {col} raises ValidationError."""
+        with pytest.raises(ValidationError, match="\\{col\\}"):
+            DateOpsParams(columns=["ts"], expr="year(ts)")
+
+
+# ---------------------------------------------------------------------------
+# Discriminated union dispatch for new step types
+# ---------------------------------------------------------------------------
+
+
+class TestNewStepDiscriminator:
+    """Test Step discriminated union dispatch for new M08a step types."""
+
+    def _validate(self, d: dict) -> Step:  # type: ignore[type-arg]
+        return _step_adapter.validate_python(d)
+
+    def test_aggregate_step(self):
+        """Dict with 'aggregate' key dispatches to AggregateStep."""
+        step = self._validate({"aggregate": {"measures": {"total": "sum(amount)"}}})
+        assert isinstance(step, AggregateStep)
+
+    def test_window_step(self):
+        """Dict with 'window' key dispatches to WindowStep."""
+        step = self._validate(
+            {"window": {"functions": {"rn": "row_number()"}, "partition_by": ["region"]}}
+        )
+        assert isinstance(step, WindowStep)
+
+    def test_pivot_step(self):
+        """Dict with 'pivot' key dispatches to PivotStep."""
+        step = self._validate(
+            {
+                "pivot": {
+                    "group_by": ["region"],
+                    "pivot_column": "status",
+                    "values": ["active"],
+                    "aggregate": "sum(amount)",
+                }
+            }
+        )
+        assert isinstance(step, PivotStep)
+
+    def test_unpivot_step(self):
+        """Dict with 'unpivot' key dispatches to UnpivotStep."""
+        step = self._validate(
+            {"unpivot": {"columns": ["q1", "q2"], "name_column": "qtr", "value_column": "rev"}}
+        )
+        assert isinstance(step, UnpivotStep)
+
+    def test_case_when_step(self):
+        """Dict with 'case_when' key dispatches to CaseWhenStep."""
+        step = self._validate(
+            {
+                "case_when": {
+                    "column": "tier",
+                    "cases": [{"when": "amount > 100", "then": "'high'"}],
+                }
+            }
+        )
+        assert isinstance(step, CaseWhenStep)
+
+    def test_fill_null_step(self):
+        """Dict with 'fill_null' key dispatches to FillNullStep."""
+        step = self._validate({"fill_null": {"columns": {"amount": 0}}})
+        assert isinstance(step, FillNullStep)
+
+    def test_coalesce_step(self):
+        """Dict with 'coalesce' key dispatches to CoalesceStep."""
+        step = self._validate({"coalesce": {"columns": {"email": ["e1", "e2"]}}})
+        assert isinstance(step, CoalesceStep)
+
+    def test_string_ops_step(self):
+        """Dict with 'string_ops' key dispatches to StringOpsStep."""
+        step = self._validate({"string_ops": {"columns": ["name"], "expr": "trim({col})"}})
+        assert isinstance(step, StringOpsStep)
+
+    def test_date_ops_step(self):
+        """Dict with 'date_ops' key dispatches to DateOpsStep."""
+        step = self._validate(
+            {"date_ops": {"columns": ["ts"], "expr": "date_format({col}, 'yyyy-MM-dd')"}}
+        )
+        assert isinstance(step, DateOpsStep)

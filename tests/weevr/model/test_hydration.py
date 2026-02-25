@@ -11,6 +11,7 @@ from weevr.model import (
     Loom,
     Thread,
     Weave,
+    WeaveEntry,
     WriteConfig,
 )
 from weevr.model.keys import KeyConfig
@@ -211,7 +212,7 @@ class TestWeaveAndLoomModelHydration:
         }
         loom = Loom.model_validate(data)
         assert isinstance(loom, Loom)
-        assert loom.weaves == ["dimensions", "facts"]
+        assert loom.weaves == [WeaveEntry(name="dimensions"), WeaveEntry(name="facts")]
         with pytest.raises(ValidationError):
             loom.weaves = []  # type: ignore[misc]
 
@@ -224,4 +225,4 @@ class TestWeaveAndLoomModelHydration:
         }
         loom = Loom.model_validate(data)
         assert not hasattr(loom, "_resolved_weaves")
-        assert loom.weaves == ["dimensions"]
+        assert loom.weaves == [WeaveEntry(name="dimensions")]

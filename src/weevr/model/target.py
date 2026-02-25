@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
+from weevr.model.naming import NamingConfig
 from weevr.model.types import SparkExpr
 
 
@@ -36,3 +37,4 @@ class Target(FrozenBase):
     columns: dict[str, ColumnMapping] | None = None
     partition_by: list[str] | None = None
     audit_template: str | None = None
+    naming: NamingConfig | None = None

@@ -5,17 +5,18 @@ from __future__ import annotations
 import logging
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from typing import Literal
+from typing import Any, Literal
 
 from pyspark.sql import SparkSession
 
 from weevr.engine.cache_manager import CacheManager
+from weevr.engine.conditions import evaluate_condition
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
-from weevr.model.weave import Weave
+from weevr.model.weave import ConditionSpec, Weave
 from weevr.telemetry.collector import SpanCollector
 from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
 from weevr.telemetry.span import SpanStatus, generate_trace_id
@@ -55,6 +56,8 @@ def execute_weave(
     threads: dict[str, Thread],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    thread_conditions: dict[str, ConditionSpec] | None = None,
+    params: dict[str, Any] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -71,6 +74,9 @@ def execute_weave(
         collector: Optional span collector for telemetry. When provided,
             per-thread collectors are created and merged after execution.
         parent_span_id: Optional parent span ID for trace tree linkage.
+        thread_conditions: Mapping of thread name to condition spec. Threads
+            with a condition that evaluates to False are skipped.
+        params: Parameters for condition evaluation.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -103,10 +109,36 @@ def execute_weave(
                         threads_skipped.append(name)
                 continue
 
+            # Evaluate conditions for pending threads before execution
+            conditions = thread_conditions or {}
+            for name in group:
+                if (
+                    thread_states[name] == "pending"
+                    and name in conditions
+                    and not evaluate_condition(conditions[name], spark=spark, params=params)
+                ):
+                    thread_states[name] = "skipped"
+                    threads_skipped.append(name)
+                    thread_results.append(
+                        ThreadResult(
+                            status="skipped",
+                            thread_name=name,
+                            rows_written=0,
+                            write_mode="",
+                            target_path="",
+                            skip_reason=conditions[name].when,
+                        )
+                    )
+                    logger.debug(
+                        "Thread '%s' skipped — condition '%s' is False",
+                        name,
+                        conditions[name].when,
+                    )
+
             # Separate threads that should run vs those already skipped
             to_run = [n for n in group if thread_states[n] == "pending"]
             for name in group:
-                if thread_states[name] == "skipped":
+                if thread_states[name] == "skipped" and name not in threads_skipped:
                     threads_skipped.append(name)
 
             if not to_run:
@@ -290,6 +322,7 @@ def execute_loom(
     loom: Loom,
     weaves: dict[str, Weave],
     threads: dict[str, dict[str, Thread]],
+    params: dict[str, Any] | None = None,
 ) -> LoomResult:
     """Execute weaves sequentially in declared order.
 
@@ -303,6 +336,7 @@ def execute_loom(
         loom: Loom configuration declaring the ordered list of weave names.
         weaves: Mapping of weave name to :class:`~weevr.model.weave.Weave` config.
         threads: Nested mapping of ``weave_name → thread_name → Thread`` config.
+        params: Parameters for condition evaluation at weave and thread levels.
 
     Returns:
         :class:`~weevr.engine.result.LoomResult` with aggregate status and
@@ -319,7 +353,31 @@ def execute_loom(
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
-    for weave_name in loom.weaves:
+    for weave_entry in loom.weaves:
+        weave_name = weave_entry.name
+
+        # Evaluate weave-level condition
+        if weave_entry.condition is not None and not evaluate_condition(
+            weave_entry.condition, spark=spark, params=params
+        ):
+            logger.debug(
+                "Loom '%s' — weave '%s' skipped (condition: '%s')",
+                loom.name,
+                weave_name,
+                weave_entry.condition.when,
+            )
+            weave_results.append(
+                WeaveResult(
+                    status="skipped",
+                    weave_name=weave_name,
+                    thread_results=[],
+                    threads_skipped=[],
+                    duration_ms=0,
+                    skip_reason=weave_entry.condition.when,
+                )
+            )
+            continue
+
         weave = weaves[weave_name]
         weave_threads = threads[weave_name]
 
@@ -329,12 +387,20 @@ def execute_loom(
             thread_entries=list(weave.threads),
         )
 
+        # Build thread condition map from ThreadEntry conditions
+        thread_conditions: dict[str, ConditionSpec] = {}
+        for te in weave.threads:
+            if te.condition is not None:
+                thread_conditions[te.name] = te.condition
+
         result = execute_weave(
             spark,
             plan,
             weave_threads,
             collector=collector,
             parent_span_id=loom_span_id,
+            thread_conditions=thread_conditions if thread_conditions else None,
+            params=params,
         )
         weave_results.append(result)
 
@@ -348,9 +414,9 @@ def execute_loom(
 
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
-    # Compute aggregate loom status
+    # Compute aggregate loom status (skipped weaves don't count as failures)
     statuses = {r.status for r in weave_results}
-    if statuses <= {"success"}:
+    if statuses <= {"success", "skipped"}:
         loom_status: Literal["success", "failure", "partial"] = "success"
     elif "success" in statuses or "partial" in statuses:
         loom_status = "partial"

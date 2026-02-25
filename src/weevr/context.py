@@ -208,8 +208,10 @@ class Context:
             model = resolved.model
             assert isinstance(model, Thread)
             engine_result = execute_thread(self._spark, model)
+            # Direct thread execution never returns "skipped" (only runner does)
+            assert engine_result.status in ("success", "failure")
             return RunResult(
-                status=engine_result.status,
+                status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="thread",
                 config_name=resolved.config_name,
@@ -241,8 +243,10 @@ class Context:
                 thread_entries=filtered_entries,
             )
             engine_result = execute_weave(self._spark, plan, weave_threads)
+            # Direct weave execution never returns "skipped" (only loom runner does)
+            assert engine_result.status in ("success", "failure", "partial")
             return RunResult(
-                status=engine_result.status,
+                status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="weave",
                 config_name=resolved.config_name,
@@ -259,7 +263,8 @@ class Context:
         # Apply filtering per-weave and remove empty weaves
         filtered_weaves: dict[str, Weave] = {}
         filtered_threads: dict[str, dict[str, Thread]] = {}
-        for weave_name in model.weaves:
+        for weave_entry in model.weaves:
+            weave_name = weave_entry.name
             weave = resolved.weaves.get(weave_name)
             if weave is None:
                 continue
@@ -351,7 +356,8 @@ class Context:
         elif resolved.config_type == "loom":
             model = resolved.model
             assert isinstance(model, Loom)
-            for weave_name in model.weaves:
+            for weave_entry in model.weaves:
+                weave_name = weave_entry.name
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     validation_errors.append(f"Weave '{weave_name}' not found")
@@ -461,7 +467,8 @@ class Context:
         elif resolved.config_type == "loom":
             model = resolved.model
             assert isinstance(model, Loom)
-            for weave_name in model.weaves:
+            for weave_entry in model.weaves:
+                weave_name = weave_entry.name
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     continue

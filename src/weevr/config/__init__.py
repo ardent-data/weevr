@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from weevr.config.inheritance import apply_inheritance
+from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
     detect_config_type,
     extract_config_version,
@@ -148,6 +149,10 @@ def load_config(
         for i, thread in enumerate(resolved_with_refs["_resolved_threads"]):
             merged = apply_inheritance(None, weave_defaults, thread)
             resolved_with_refs["_resolved_threads"][i] = merged
+
+    # Step 8b: Expand foreach macros in thread steps
+    if config_type == "thread" and isinstance(resolved_with_refs.get("steps"), list):
+        resolved_with_refs["steps"] = expand_foreach(resolved_with_refs["steps"])
 
     # Step 9: Hydrate into typed domain model
     model_map: dict[str, type[Thread | Weave | Loom]] = {

@@ -12,20 +12,23 @@ class ThreadResult(FrozenBase):
     """Immutable record of a completed thread execution.
 
     Attributes:
-        status: Outcome of the execution — ``"success"`` or ``"failure"``.
+        status: Outcome of the execution — ``"success"``, ``"failure"``, or
+            ``"skipped"`` (when a condition evaluated to False).
         thread_name: Name of the thread that was executed.
         rows_written: Number of rows in the DataFrame at write time.
         write_mode: The write mode used (``"overwrite"``, ``"append"``, or ``"merge"``).
         target_path: Physical path of the Delta table that was written.
         telemetry: Thread-level telemetry with validation/assertion results and row counts.
+        skip_reason: The condition expression that caused the thread to be skipped.
     """
 
-    status: Literal["success", "failure"]
+    status: Literal["success", "failure", "skipped"]
     thread_name: str
     rows_written: int
     write_mode: str
     target_path: str
     telemetry: ThreadTelemetry | None = None
+    skip_reason: str | None = None
 
 
 class WeaveResult(FrozenBase):
@@ -34,20 +37,23 @@ class WeaveResult(FrozenBase):
     Attributes:
         status: Aggregate outcome — ``"success"`` if all threads succeeded,
             ``"failure"`` if all threads failed or were skipped, ``"partial"``
-            if some succeeded and some failed or were skipped.
+            if some succeeded and some failed or were skipped, ``"skipped"``
+            if the weave was conditionally skipped at loom level.
         weave_name: Name of the weave that was executed.
         thread_results: Results for each thread that was executed (not skipped).
         threads_skipped: Names of threads that were skipped due to upstream failure.
         duration_ms: Wall-clock duration of the weave execution in milliseconds.
         telemetry: Weave-level telemetry aggregated from thread telemetry.
+        skip_reason: The condition expression that caused the weave to be skipped.
     """
 
-    status: Literal["success", "failure", "partial"]
+    status: Literal["success", "failure", "partial", "skipped"]
     weave_name: str
     thread_results: list[ThreadResult]
     threads_skipped: list[str]
     duration_ms: int
     telemetry: WeaveTelemetry | None = None
+    skip_reason: str | None = None
 
 
 class LoomResult(FrozenBase):

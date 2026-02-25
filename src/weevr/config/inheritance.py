@@ -62,4 +62,34 @@ def apply_inheritance(
     # Cascade thread config over everything
     result = cascade(result, thread_config) if result else thread_config.copy()
 
+    # Naming config cascade: loom.naming → weave.naming → thread.target.naming
+    # The most specific (thread-level) wins entirely.
+    _cascade_naming(loom_defaults, weave_defaults, result)
+
     return result
+
+
+def _cascade_naming(
+    loom_defaults: dict[str, Any] | None,
+    weave_defaults: dict[str, Any] | None,
+    thread_config: dict[str, Any],
+) -> None:
+    """Cascade naming config from loom/weave defaults into thread target.
+
+    Naming config inheritance: loom.naming → weave.naming → thread.target.naming.
+    The most specific non-None value wins entirely (no field-by-field merge).
+    """
+    # Resolve effective naming from parent levels
+    parent_naming = None
+    if loom_defaults and "naming" in loom_defaults:
+        parent_naming = loom_defaults["naming"]
+    if weave_defaults and "naming" in weave_defaults:
+        parent_naming = weave_defaults["naming"]
+
+    if parent_naming is None:
+        return
+
+    # Apply to thread's target block if thread doesn't already have naming
+    target = thread_config.get("target")
+    if isinstance(target, dict) and "naming" not in target:
+        target["naming"] = parent_naming
