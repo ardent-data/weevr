@@ -13,6 +13,18 @@ from weevr.state.watermark import WatermarkState
 pytestmark = pytest.mark.spark
 
 
+class TestTablePropertiesStoreInit:
+    """Unit tests for TablePropertiesStore constructor validation."""
+
+    def test_rejects_backtick_in_path(self) -> None:
+        with pytest.raises(StateError, match="backtick"):
+            TablePropertiesStore("/path/with`backtick/table")
+
+    def test_accepts_normal_path(self) -> None:
+        store = TablePropertiesStore("/lakehouse/tables/my_table")
+        assert store.target_path == "/lakehouse/tables/my_table"
+
+
 class TestTablePropertiesStore:
     """Integration tests for TablePropertiesStore with real Delta tables."""
 

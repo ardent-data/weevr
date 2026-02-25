@@ -74,6 +74,18 @@ class TestColumnNotNullAssertion:
         assert "'name' has 1 nulls" in results[0].details
         assert results[0].columns == ["name"]
 
+    def test_empty_columns_fails(self, spark, target_df):
+        assertions = [Assertion(type="column_not_null", columns=[])]
+        results = evaluate_assertions(spark, assertions, target_df)
+        assert results[0].passed is False
+        assert "No columns specified" in results[0].details
+
+    def test_none_columns_fails(self, spark, target_df):
+        assertions = [Assertion(type="column_not_null")]
+        results = evaluate_assertions(spark, assertions, target_df)
+        assert results[0].passed is False
+        assert "No columns specified" in results[0].details
+
 
 class TestUniqueAssertion:
     def test_all_unique(self, spark, target_df):
@@ -86,6 +98,12 @@ class TestUniqueAssertion:
         results = evaluate_assertions(spark, assertions, dup_target_df)
         assert results[0].passed is False
         assert "1 duplicate" in results[0].details
+
+    def test_empty_columns_fails(self, spark, target_df):
+        assertions = [Assertion(type="unique", columns=[])]
+        results = evaluate_assertions(spark, assertions, target_df)
+        assert results[0].passed is False
+        assert "No columns specified" in results[0].details
 
 
 class TestExpressionAssertion:

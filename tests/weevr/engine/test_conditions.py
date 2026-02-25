@@ -88,6 +88,21 @@ class TestParamConditions:
         assert evaluate_condition(cond, params={"enabled": "true", "env": "prod"}) is True
         assert evaluate_condition(cond, params={"enabled": "true", "env": "dev"}) is False
 
+    def test_not_and_precedence(self):
+        """'not' binds tighter than 'and': not True and False → False."""
+        cond = ConditionSpec(when="not True and False")
+        assert evaluate_condition(cond) is False
+
+    def test_not_or_precedence(self):
+        """'not' binds tighter than 'or': not False or False → True."""
+        cond = ConditionSpec(when="not False or False")
+        assert evaluate_condition(cond) is True
+
+    def test_or_and_precedence(self):
+        """'and' binds tighter than 'or': True or False and False → True."""
+        cond = ConditionSpec(when="True or False and False")
+        assert evaluate_condition(cond) is True
+
     def test_invalid_expression_raises(self):
         """Malformed expression raises ConfigError."""
         cond = ConditionSpec(when="??? invalid")
