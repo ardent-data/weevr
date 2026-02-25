@@ -375,9 +375,7 @@ class TestAggregateParams:
 
     def test_with_group_by(self):
         """Valid aggregate with group_by."""
-        p = AggregateParams(
-            group_by=["region"], measures={"total": SparkExpr("sum(amount)")}
-        )
+        p = AggregateParams(group_by=["region"], measures={"total": SparkExpr("sum(amount)")})
         assert p.group_by == ["region"]
         assert len(p.measures) == 1
 
@@ -422,9 +420,7 @@ class TestWindowParams:
 
     def test_optional_order_by_and_frame(self):
         """order_by and frame are optional."""
-        p = WindowParams(
-            functions={"cnt": SparkExpr("count(*)")}, partition_by=["region"]
-        )
+        p = WindowParams(functions={"cnt": SparkExpr("count(*)")}, partition_by=["region"])
         assert p.order_by is None
         assert p.frame is None
 
@@ -615,14 +611,16 @@ class TestNewStepDiscriminator:
 
     def test_pivot_step(self):
         """Dict with 'pivot' key dispatches to PivotStep."""
-        step = self._validate({
-            "pivot": {
-                "group_by": ["region"],
-                "pivot_column": "status",
-                "values": ["active"],
-                "aggregate": "sum(amount)",
+        step = self._validate(
+            {
+                "pivot": {
+                    "group_by": ["region"],
+                    "pivot_column": "status",
+                    "values": ["active"],
+                    "aggregate": "sum(amount)",
+                }
             }
-        })
+        )
         assert isinstance(step, PivotStep)
 
     def test_unpivot_step(self):
@@ -634,12 +632,14 @@ class TestNewStepDiscriminator:
 
     def test_case_when_step(self):
         """Dict with 'case_when' key dispatches to CaseWhenStep."""
-        step = self._validate({
-            "case_when": {
-                "column": "tier",
-                "cases": [{"when": "amount > 100", "then": "'high'"}],
+        step = self._validate(
+            {
+                "case_when": {
+                    "column": "tier",
+                    "cases": [{"when": "amount > 100", "then": "'high'"}],
+                }
             }
-        })
+        )
         assert isinstance(step, CaseWhenStep)
 
     def test_fill_null_step(self):

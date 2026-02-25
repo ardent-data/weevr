@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.model.weave import ThreadEntry, Weave
+from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
 
 
 class TestWeave:
@@ -142,6 +142,84 @@ class TestThreadEntry:
                 "config_version": "1.0",
                 "threads": [
                     "a",
+                    {"name": "b", "dependencies": ["a"]},
+                ],
+            }
+        )
+        restored = Weave.model_validate(w.model_dump())
+        assert restored == w
+
+
+class TestConditionSpec:
+    """Tests for ConditionSpec model."""
+
+    def test_basic_condition(self):
+        """ConditionSpec stores a when expression."""
+        cond = ConditionSpec(when="table_exists('raw.customers')")
+        assert cond.when == "table_exists('raw.customers')"
+
+    def test_frozen(self):
+        """ConditionSpec is immutable."""
+        cond = ConditionSpec(when="true")
+        with pytest.raises((ValidationError, TypeError)):
+            cond.when = "false"  # type: ignore[misc]
+
+    def test_missing_when_raises(self):
+        """ConditionSpec without when raises ValidationError."""
+        with pytest.raises(ValidationError):
+            ConditionSpec.model_validate({})
+
+
+class TestThreadEntryCondition:
+    """Tests for ThreadEntry with condition field."""
+
+    def test_thread_entry_without_condition(self):
+        """ThreadEntry defaults condition to None."""
+        entry = ThreadEntry(name="t1")
+        assert entry.condition is None
+
+    def test_thread_entry_with_condition(self):
+        """ThreadEntry accepts a ConditionSpec."""
+        entry = ThreadEntry(
+            name="t1",
+            condition=ConditionSpec(when="table_exists('raw.data')"),
+        )
+        assert entry.condition is not None
+        assert entry.condition.when == "table_exists('raw.data')"
+
+    def test_thread_entry_condition_from_dict(self):
+        """ThreadEntry condition hydrates from dict."""
+        entry = ThreadEntry.model_validate(
+            {"name": "t1", "condition": {"when": "${param.enabled} == true"}}
+        )
+        assert entry.condition is not None
+        assert entry.condition.when == "${param.enabled} == true"
+
+    def test_weave_with_conditional_thread(self):
+        """Weave accepts thread entries with conditions."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    "always_run",
+                    {
+                        "name": "conditional",
+                        "condition": {"when": "table_exists('staging.data')"},
+                    },
+                ],
+            }
+        )
+        assert w.threads[0].condition is None
+        assert w.threads[1].condition is not None
+        assert w.threads[1].condition.when == "table_exists('staging.data')"
+
+    def test_round_trip_with_condition(self):
+        """Weave with conditional threads round-trips correctly."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    {"name": "a", "condition": {"when": "true"}},
                     {"name": "b", "dependencies": ["a"]},
                 ],
             }

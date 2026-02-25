@@ -259,7 +259,8 @@ class Context:
         # Apply filtering per-weave and remove empty weaves
         filtered_weaves: dict[str, Weave] = {}
         filtered_threads: dict[str, dict[str, Thread]] = {}
-        for weave_name in model.weaves:
+        for weave_entry in model.weaves:
+            weave_name = weave_entry.name
             weave = resolved.weaves.get(weave_name)
             if weave is None:
                 continue
@@ -351,7 +352,8 @@ class Context:
         elif resolved.config_type == "loom":
             model = resolved.model
             assert isinstance(model, Loom)
-            for weave_name in model.weaves:
+            for weave_entry in model.weaves:
+                weave_name = weave_entry.name
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     validation_errors.append(f"Weave '{weave_name}' not found")
@@ -461,7 +463,8 @@ class Context:
         elif resolved.config_type == "loom":
             model = resolved.model
             assert isinstance(model, Loom)
-            for weave_name in model.weaves:
+            for weave_entry in model.weaves:
+                weave_name = weave_entry.name
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     continue

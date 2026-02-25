@@ -96,9 +96,7 @@ def _apply_expr_template(
 
     if not resolved:
         if on_empty == "error":
-            raise ConfigError(
-                f"{step_name}: no columns matched selectors {columns}"
-            )
+            raise ConfigError(f"{step_name}: no columns matched selectors {columns}")
         logger.warning("%s: no columns matched selectors %s — skipping", step_name, columns)
         return df
 

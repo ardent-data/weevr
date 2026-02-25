@@ -8,27 +8,29 @@ from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
 
 # All valid step type keys — used by the discriminator
-_STEP_TYPES = frozenset({
-    "filter",
-    "derive",
-    "join",
-    "select",
-    "drop",
-    "rename",
-    "cast",
-    "dedup",
-    "sort",
-    "union",
-    "aggregate",
-    "window",
-    "pivot",
-    "unpivot",
-    "case_when",
-    "fill_null",
-    "coalesce",
-    "string_ops",
-    "date_ops",
-})
+_STEP_TYPES = frozenset(
+    {
+        "filter",
+        "derive",
+        "join",
+        "select",
+        "drop",
+        "rename",
+        "cast",
+        "dedup",
+        "sort",
+        "union",
+        "aggregate",
+        "window",
+        "pivot",
+        "unpivot",
+        "case_when",
+        "fill_null",
+        "coalesce",
+        "string_ops",
+        "date_ops",
+    }
+)
 
 
 def _step_discriminator(v: Any) -> str:

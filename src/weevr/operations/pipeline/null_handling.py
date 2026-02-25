@@ -34,7 +34,5 @@ def apply_coalesce(df: DataFrame, params: CoalesceParams) -> DataFrame:
     """
     result = df
     for output_col, source_cols in params.columns.items():
-        result = result.withColumn(
-            output_col, F.coalesce(*[F.col(c) for c in source_cols])
-        )
+        result = result.withColumn(output_col, F.coalesce(*[F.col(c) for c in source_cols]))
     return result

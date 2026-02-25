@@ -289,10 +289,12 @@ class TestLoadedConfig:
 
     @pytest.fixture()
     def sample_loom(self) -> Loom:
-        return Loom(
-            name="nightly",
-            config_version="1.0",
-            weaves=["dimensions"],
+        return Loom.model_validate(
+            {
+                "name": "nightly",
+                "config_version": "1.0",
+                "weaves": ["dimensions"],
+            }
         )
 
     def test_model_property(self, sample_thread: Thread) -> None:

@@ -11,7 +11,10 @@ def _substitute_value(obj: Any, var_name: str, value: Any) -> Any:
     if isinstance(obj, str):
         return obj.replace(f"{{{var_name}}}", str(value))
     if isinstance(obj, dict):
-        return {k: _substitute_value(v, var_name, value) for k, v in obj.items()}
+        return {
+            _substitute_value(k, var_name, value): _substitute_value(v, var_name, value)
+            for k, v in obj.items()
+        }
     if isinstance(obj, list):
         return [_substitute_value(item, var_name, value) for item in obj]
     return obj
@@ -47,26 +50,18 @@ def expand_foreach(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         foreach = item["foreach"]
         if not isinstance(foreach, dict):
-            raise ConfigError(
-                f"foreach block at step index {i}: 'foreach' must be a mapping"
-            )
+            raise ConfigError(f"foreach block at step index {i}: 'foreach' must be a mapping")
 
         values = foreach.get("values")
         var_name = foreach.get("as")
         template_steps = foreach.get("steps")
 
         if values is None or (isinstance(values, list) and len(values) == 0):
-            raise ConfigError(
-                f"foreach block at step index {i}: 'values' must be a non-empty list"
-            )
+            raise ConfigError(f"foreach block at step index {i}: 'values' must be a non-empty list")
         if not var_name:
-            raise ConfigError(
-                f"foreach block at step index {i}: 'as' variable name is required"
-            )
+            raise ConfigError(f"foreach block at step index {i}: 'as' variable name is required")
         if not template_steps or not isinstance(template_steps, list):
-            raise ConfigError(
-                f"foreach block at step index {i}: 'steps' must be a non-empty list"
-            )
+            raise ConfigError(f"foreach block at step index {i}: 'steps' must be a non-empty list")
 
         for value in values:
             for template in template_steps:
