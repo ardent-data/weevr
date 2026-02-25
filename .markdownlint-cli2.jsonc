@@ -1,0 +1,15 @@
+{
+  // Line length: 100 characters (match project standard)
+  "config": {
+    "MD013": {
+      "line_length": 100,
+      "code_blocks": false,
+      "tables": false,
+      "headings": false
+    },
+    // Allow inline HTML (for admonitions and advanced formatting)
+    "MD033": false,
+    // Disable trailing punctuation in headings (project uses colons)
+    "MD026": false
+  }
+}
