@@ -7,19 +7,37 @@ from pyspark.sql import DataFrame
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import (
+    AggregateStep,
+    CaseWhenStep,
     CastStep,
+    CoalesceStep,
+    DateOpsStep,
     DedupStep,
     DeriveStep,
     DropStep,
+    FillNullStep,
     FilterStep,
     JoinStep,
+    PivotStep,
     RenameStep,
     SelectStep,
     SortStep,
     Step,
+    StringOpsStep,
     UnionStep,
+    UnpivotStep,
+    WindowStep,
 )
+from weevr.operations.pipeline.analytical import (
+    apply_aggregate,
+    apply_pivot,
+    apply_unpivot,
+    apply_window,
+)
+from weevr.operations.pipeline.column_ops import apply_date_ops, apply_string_ops
+from weevr.operations.pipeline.conditional import apply_case_when
 from weevr.operations.pipeline.joins import apply_join, apply_union
+from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
 from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
 from weevr.operations.pipeline.transforms import (
     apply_cast,
@@ -35,6 +53,7 @@ from weevr.operations.pipeline.transforms import (
 StepHandler = Callable[[DataFrame, Any, dict[str, DataFrame]], DataFrame]
 
 _STEP_HANDLERS: dict[type, StepHandler] = {
+    # Original steps
     FilterStep: lambda df, step, _src: apply_filter(df, step.filter),
     DeriveStep: lambda df, step, _src: apply_derive(df, step.derive),
     SelectStep: lambda df, step, _src: apply_select(df, step.select),
@@ -45,6 +64,19 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     SortStep: lambda df, step, _src: apply_sort(df, step.sort),
     JoinStep: lambda df, step, src: apply_join(df, step.join, src),
     UnionStep: lambda df, step, src: apply_union(df, step.union, src),
+    # Analytical steps (M08a)
+    AggregateStep: lambda df, step, _src: apply_aggregate(df, step.aggregate),
+    WindowStep: lambda df, step, _src: apply_window(df, step.window),
+    PivotStep: lambda df, step, _src: apply_pivot(df, step.pivot),
+    UnpivotStep: lambda df, step, _src: apply_unpivot(df, step.unpivot),
+    # Conditional step (M08a)
+    CaseWhenStep: lambda df, step, _src: apply_case_when(df, step.case_when),
+    # Null-handling steps (M08a)
+    FillNullStep: lambda df, step, _src: apply_fill_null(df, step.fill_null),
+    CoalesceStep: lambda df, step, _src: apply_coalesce(df, step.coalesce),
+    # Column-ops steps (M08a)
+    StringOpsStep: lambda df, step, _src: apply_string_ops(df, step.string_ops),
+    DateOpsStep: lambda df, step, _src: apply_date_ops(df, step.date_ops),
 }
 
 
