@@ -7,17 +7,26 @@ from weevr.model.load import LoadConfig
 from weevr.model.loom import Loom
 from weevr.model.params import ParamsConfig, ParamSpec
 from weevr.model.pipeline import (
+    AggregateStep,
+    CaseWhenStep,
     CastStep,
+    CoalesceStep,
+    DateOpsStep,
     DedupStep,
     DeriveStep,
     DropStep,
+    FillNullStep,
     FilterStep,
     JoinStep,
+    PivotStep,
     RenameStep,
     SelectStep,
     SortStep,
     Step,
+    StringOpsStep,
     UnionStep,
+    UnpivotStep,
+    WindowStep,
 )
 from weevr.model.source import DedupConfig, Source
 from weevr.model.target import ColumnMapping, Target
@@ -54,6 +63,15 @@ __all__ = [
     "DedupStep",
     "SortStep",
     "UnionStep",
+    "AggregateStep",
+    "WindowStep",
+    "PivotStep",
+    "UnpivotStep",
+    "CaseWhenStep",
+    "FillNullStep",
+    "CoalesceStep",
+    "StringOpsStep",
+    "DateOpsStep",
     # Keys
     "KeyConfig",
     "SurrogateKeyConfig",
