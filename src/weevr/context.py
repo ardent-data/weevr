@@ -73,6 +73,7 @@ class Context:
         param_file: str | Path | None = None,
         log_level: str = "standard",
     ) -> None:
+        """Initialize a Context with a SparkSession and optional parameters."""
         if not isinstance(spark, SparkSession):
             raise TypeError(f"'spark' must be a SparkSession, got {type(spark).__name__}")
 

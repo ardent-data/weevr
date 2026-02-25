@@ -1,3 +1,5 @@
+"""Configuration-driven execution framework for Spark in Microsoft Fabric."""
+
 from weevr.context import Context
 from weevr.result import ExecutionMode, LoadedConfig, RunResult
 

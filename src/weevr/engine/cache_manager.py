@@ -29,6 +29,7 @@ class CacheManager:
         cache_targets: list[str],
         dependents: dict[str, list[str]],
     ) -> None:
+        """Initialize with target thread names and their dependency map."""
         self._cache_targets: set[str] = set(cache_targets)
         self._dependents = dependents
         self._cached: dict[str, DataFrame] = {}

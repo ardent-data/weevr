@@ -24,6 +24,7 @@ class TablePropertiesStore(WatermarkStore):
     """
 
     def __init__(self, target_path: str) -> None:
+        """Initialize with the path to the Delta target table."""
         self._target_path = target_path
 
     @property

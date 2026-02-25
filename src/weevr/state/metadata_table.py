@@ -32,6 +32,7 @@ class MetadataTableStore(WatermarkStore):
     """
 
     def __init__(self, table_path: str) -> None:
+        """Initialize with the path to the watermarks metadata table."""
         self._table_path = table_path
 
     @property

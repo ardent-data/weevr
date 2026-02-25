@@ -33,6 +33,7 @@ class ValidationOutcome:
         validation_results: list[ValidationResult],
         has_fatal: bool,
     ) -> None:
+        """Initialize with clean/quarantine splits and validation results."""
         self.clean_df = clean_df
         self.quarantine_df = quarantine_df
         self.validation_results = validation_results
