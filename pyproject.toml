@@ -40,7 +40,11 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["weevr"]
@@ -68,3 +72,11 @@ addopts = "-q -m 'not spark'"
 markers = [
     "spark: marks tests that require PySpark and Delta Lake (deselected by default)",
 ]
+
+[tool.interrogate]
+fail-under = 90
+ignore-init-method = true
+ignore-init-module = false
+ignore-module = false
+ignore-private = true
+ignore-semiprivate = true
