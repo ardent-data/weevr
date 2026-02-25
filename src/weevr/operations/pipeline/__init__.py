@@ -1,5 +1,8 @@
 """Pipeline step dispatcher — routes each step to the appropriate handler."""
 
+from collections.abc import Callable
+from typing import Any
+
 from pyspark.sql import DataFrame
 
 from weevr.errors.exceptions import ExecutionError
@@ -26,6 +29,23 @@ from weevr.operations.pipeline.transforms import (
     apply_rename,
     apply_select,
 )
+
+# Handler signature: (df, step, sources) -> DataFrame
+# All handlers receive the full step object and source dict for a uniform interface.
+StepHandler = Callable[[DataFrame, Any, dict[str, DataFrame]], DataFrame]
+
+_STEP_HANDLERS: dict[type, StepHandler] = {
+    FilterStep: lambda df, step, _src: apply_filter(df, step.filter),
+    DeriveStep: lambda df, step, _src: apply_derive(df, step.derive),
+    SelectStep: lambda df, step, _src: apply_select(df, step.select),
+    DropStep: lambda df, step, _src: apply_drop(df, step.drop),
+    RenameStep: lambda df, step, _src: apply_rename(df, step.rename),
+    CastStep: lambda df, step, _src: apply_cast(df, step.cast),
+    DedupStep: lambda df, step, _src: apply_dedup(df, step.dedup),
+    SortStep: lambda df, step, _src: apply_sort(df, step.sort),
+    JoinStep: lambda df, step, src: apply_join(df, step.join, src),
+    UnionStep: lambda df, step, src: apply_union(df, step.union, src),
+}
 
 
 def run_pipeline(
@@ -55,26 +75,15 @@ def run_pipeline(
     result = df
     for i, step in enumerate(steps):
         try:
-            if isinstance(step, FilterStep):
-                result = apply_filter(result, step.filter)
-            elif isinstance(step, DeriveStep):
-                result = apply_derive(result, step.derive)
-            elif isinstance(step, SelectStep):
-                result = apply_select(result, step.select)
-            elif isinstance(step, DropStep):
-                result = apply_drop(result, step.drop)
-            elif isinstance(step, RenameStep):
-                result = apply_rename(result, step.rename)
-            elif isinstance(step, CastStep):
-                result = apply_cast(result, step.cast)
-            elif isinstance(step, DedupStep):
-                result = apply_dedup(result, step.dedup)
-            elif isinstance(step, SortStep):
-                result = apply_sort(result, step.sort)
-            elif isinstance(step, JoinStep):
-                result = apply_join(result, step.join, sources)
-            elif isinstance(step, UnionStep):
-                result = apply_union(result, step.union, sources)
+            handler = _STEP_HANDLERS.get(type(step))
+            if handler is None:
+                step_type = type(step).__name__.removesuffix("Step").lower()
+                raise ExecutionError(
+                    f"Pipeline step {i}: unrecognized step type '{step_type}'",
+                    step_index=i,
+                    step_type=step_type,
+                )
+            result = handler(result, step, sources)
         except ExecutionError:
             raise
         except Exception as exc:
