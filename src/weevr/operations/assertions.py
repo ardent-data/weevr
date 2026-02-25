@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pyspark.sql import SparkSession
 
 from weevr.model.validation import Assertion
@@ -104,8 +106,16 @@ def _eval_column_not_null(
     target_path: str,
 ) -> AssertionResult:
     """Check that specified columns have no null values."""
-    df = spark.read.format("delta").load(target_path)
     columns = assertion.columns or []
+    if not columns:
+        return AssertionResult(
+            assertion_type="column_not_null",
+            severity=assertion.severity,
+            passed=False,
+            details="No columns specified for column_not_null assertion",
+        )
+
+    df = spark.read.format("delta").load(target_path)
 
     null_counts: dict[str, int] = {}
     for col in columns:
@@ -137,8 +147,16 @@ def _eval_unique(
     target_path: str,
 ) -> AssertionResult:
     """Check that specified columns form a unique key."""
-    df = spark.read.format("delta").load(target_path)
     columns = assertion.columns or []
+    if not columns:
+        return AssertionResult(
+            assertion_type="unique",
+            severity=assertion.severity,
+            passed=False,
+            details="No columns specified for unique assertion",
+        )
+
+    df = spark.read.format("delta").load(target_path)
 
     total = df.count()
     distinct = df.select(*columns).distinct().count()
@@ -178,8 +196,8 @@ def _eval_expression(
             details="No expression provided for expression assertion",
         )
 
-    # Create a temp view and evaluate the expression
-    view_name = "__weevr_assertion_check"
+    # Create a unique temp view to avoid collisions during concurrent execution
+    view_name = f"__weevr_assertion_{uuid.uuid4().hex[:8]}"
     df.createOrReplaceTempView(view_name)
     try:
         result_df = spark.sql(f"SELECT ({expr}) AS __result FROM {view_name} LIMIT 1")

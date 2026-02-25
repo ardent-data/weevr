@@ -96,19 +96,19 @@ def _safe_eval(expr: str) -> bool:
     """
     expr = expr.strip()
 
-    # Handle "not expr"
-    if expr.lower().startswith("not "):
-        return not _safe_eval(expr[4:])
+    # Split by lowest-precedence operator first: or
+    or_parts = _split_operator(expr, " or ")
+    if len(or_parts) > 1:
+        return any(_safe_eval(p) for p in or_parts)
 
-    # Handle "expr and expr"
+    # Then: and
     and_parts = _split_operator(expr, " and ")
     if len(and_parts) > 1:
         return all(_safe_eval(p) for p in and_parts)
 
-    # Handle "expr or expr"
-    or_parts = _split_operator(expr, " or ")
-    if len(or_parts) > 1:
-        return any(_safe_eval(p) for p in or_parts)
+    # Highest unary precedence: not
+    if expr.lower().startswith("not "):
+        return not _safe_eval(expr[4:])
 
     # Handle comparison operators (keep values as comparable types, not booleans)
     for op in ("!=", "==", "<=", ">=", "<", ">"):

@@ -13,9 +13,6 @@ dependencies = [
     "pyyaml>=6.0,<7.0",
 ]
 
-[project.scripts]
-weevr = "weevr:main"
-
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]
 build-backend = "uv_build"

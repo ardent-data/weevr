@@ -12,6 +12,15 @@ from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 
 
+def _quote_identifier(name: str) -> str:
+    """Backtick-escape a SQL identifier to prevent injection.
+
+    Escapes any existing backticks by doubling them, then wraps the name
+    in backticks so it is treated as a single identifier token.
+    """
+    return f"`{name.replace('`', '``')}`"
+
+
 def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> DataFrame:
     """Apply target column mapping to shape the DataFrame for writing.
 
@@ -140,7 +149,10 @@ def _execute_merge(
     """Execute a Delta merge operation against an existing table."""
     if write_config.match_keys is None:
         raise ExecutionError("merge mode requires 'match_keys' to be set")
-    merge_condition = " AND ".join(f"target.{k} = source.{k}" for k in write_config.match_keys)
+    merge_condition = " AND ".join(
+        f"target.{_quote_identifier(k)} = source.{_quote_identifier(k)}"
+        for k in write_config.match_keys
+    )
     delta_table = DeltaTable.forPath(spark, target_path)
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
 
@@ -241,7 +253,10 @@ def execute_cdc_merge(
     update_val = cols["update_value"]
     delete_val = cols["delete_value"]
 
-    merge_condition = " AND ".join(f"target.{k} = source.{k}" for k in write_config.match_keys)
+    merge_condition = " AND ".join(
+        f"target.{_quote_identifier(k)} = source.{_quote_identifier(k)}"
+        for k in write_config.match_keys
+    )
 
     # Drop CDC metadata columns before writing to target
     cdc_meta_cols: set[str] = {"_change_type", "_commit_version", "_commit_timestamp"}
@@ -281,32 +296,41 @@ def execute_cdc_merge(
         )
 
         # Route by operation type
+        quoted_op = _quote_identifier(op_col)
+
         if update_val:
+            escaped_val = update_val.replace("'", "''")
             update_set: dict[str, str | Column] = {
-                c: F.col(f"source.{c}") for c in data_cols if c not in write_config.match_keys
+                c: F.col(f"source.{_quote_identifier(c)}")
+                for c in data_cols
+                if c not in write_config.match_keys
             }
             merger = merger.whenMatchedUpdate(
-                condition=f"source.{op_col} = '{update_val}'",
+                condition=f"source.{quoted_op} = '{escaped_val}'",
                 set=update_set,
             )
 
         if delete_val:
+            escaped_del = delete_val.replace("'", "''")
             if cdc_config.on_delete == "hard_delete":
-                merger = merger.whenMatchedDelete(condition=f"source.{op_col} = '{delete_val}'")
+                merger = merger.whenMatchedDelete(condition=f"source.{quoted_op} = '{escaped_del}'")
             elif cdc_config.on_delete == "soft_delete":
                 if not write_config.soft_delete_column:
                     raise ExecutionError(
                         "CDC soft_delete requires 'soft_delete_column' on write_config"
                     )
                 merger = merger.whenMatchedUpdate(
-                    condition=f"source.{op_col} = '{delete_val}'",
+                    condition=f"source.{quoted_op} = '{escaped_del}'",
                     set={write_config.soft_delete_column: F.lit(write_config.soft_delete_value)},
                 )
 
         if insert_val:
-            insert_set: dict[str, str | Column] = {c: F.col(f"source.{c}") for c in data_cols}
+            escaped_ins = insert_val.replace("'", "''")
+            insert_set: dict[str, str | Column] = {
+                c: F.col(f"source.{_quote_identifier(c)}") for c in data_cols
+            }
             merger = merger.whenNotMatchedInsert(
-                condition=f"source.{op_col} = '{insert_val}'",
+                condition=f"source.{quoted_op} = '{escaped_ins}'",
                 values=insert_set,
             )
 

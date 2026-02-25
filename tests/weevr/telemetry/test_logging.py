@@ -52,7 +52,7 @@ class TestStructuredJsonFormatter:
         record.span_id = "b" * 16  # type: ignore[attr-defined]
         output = formatter.format(record)
         parsed = json.loads(output)
-        assert parsed["thread_name"] == "customer_dim"
+        assert parsed["weevr_thread"] == "customer_dim"
         assert parsed["trace_id"] == "a" * 32
 
     def test_includes_extra_attributes(self) -> None:
@@ -84,8 +84,8 @@ class TestStructuredJsonFormatter:
         )
         output = formatter.format(record)
         parsed = json.loads(output)
-        assert "thread_name" not in parsed
-        assert "weave_name" not in parsed
+        assert "weevr_thread" not in parsed
+        assert "weevr_weave" not in parsed
 
 
 class TestConfigureLogging:

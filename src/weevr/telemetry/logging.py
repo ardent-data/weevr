@@ -31,17 +31,19 @@ class StructuredJsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
-        # Include weevr-specific context if attached to the record
-        for key in (
-            "thread_name",
-            "weave_name",
-            "loom_name",
-            "trace_id",
-            "span_id",
+        # Include weevr-specific context if attached to the record.
+        # Use "weevr_" prefix for thread/weave/loom to avoid shadowing
+        # Python's LogRecord.thread_name.
+        for record_key, entry_key in (
+            ("thread_name", "weevr_thread"),
+            ("weave_name", "weevr_weave"),
+            ("loom_name", "weevr_loom"),
+            ("trace_id", "trace_id"),
+            ("span_id", "span_id"),
         ):
-            value = getattr(record, key, None)
+            value = getattr(record, record_key, None)
             if value is not None:
-                entry[key] = value
+                entry[entry_key] = value
 
         # Include extra attributes if present
         extra_attrs = getattr(record, "attributes", None)
