@@ -269,9 +269,18 @@ class TestApplyUnpivot:
 
     def test_null_values(self, spark: SparkSession):
         """Nulls in unpivoted columns are preserved."""
+        from pyspark.sql.types import IntegerType, StringType, StructField, StructType
+
+        schema = StructType(
+            [
+                StructField("id", StringType()),
+                StructField("q1", IntegerType()),
+                StructField("q2", IntegerType()),
+            ]
+        )
         df = spark.createDataFrame(
             [("a", 10, None)],
-            ["id", "q1", "q2"],
+            schema=schema,
         )
         params = UnpivotParams(
             columns=["q1", "q2"],

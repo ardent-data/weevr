@@ -57,7 +57,10 @@ class TestApplyCoalesce:
 
     def test_all_null(self, spark: SparkSession):
         """All sources null → output is null."""
-        df = spark.createDataFrame([(None, None)], ["a", "b"])
+        from pyspark.sql.types import StringType, StructField, StructType
+
+        schema = StructType([StructField("a", StringType()), StructField("b", StringType())])
+        df = spark.createDataFrame([(None, None)], schema=schema)
         params = CoalesceParams(columns={"out": ["a", "b"]})
         result = apply_coalesce(df, params)
         assert result.collect()[0]["out"] is None

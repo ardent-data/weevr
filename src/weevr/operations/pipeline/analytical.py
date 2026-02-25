@@ -33,6 +33,22 @@ def _parse_order_by(columns: list[str]) -> list[Column]:
     return result
 
 
+def _resolve_frame_boundary(value: int) -> int:
+    """Map user-facing sentinel values to PySpark window boundaries.
+
+    PySpark requires its own constants for unbounded preceding/following and
+    current row.  Users may supply common sentinel values (e.g. ``-2147483648``
+    for unbounded preceding) that need to be translated.
+    """
+    if value <= -2147483648:
+        return Window.unboundedPreceding
+    if value >= 2147483647:
+        return Window.unboundedFollowing
+    if value == 0:
+        return Window.currentRow
+    return value
+
+
 def _build_window_spec(params: WindowParams) -> WindowSpec:
     """Build a PySpark WindowSpec from window parameters."""
     spec: WindowSpec = Window.partitionBy(*params.partition_by)
@@ -41,10 +57,12 @@ def _build_window_spec(params: WindowParams) -> WindowSpec:
         spec = spec.orderBy(*_parse_order_by(params.order_by))
 
     if params.frame is not None:
+        start = _resolve_frame_boundary(params.frame.start)
+        end = _resolve_frame_boundary(params.frame.end)
         if params.frame.type == "rows":
-            spec = spec.rowsBetween(params.frame.start, params.frame.end)
+            spec = spec.rowsBetween(start, end)
         else:
-            spec = spec.rangeBetween(params.frame.start, params.frame.end)
+            spec = spec.rangeBetween(start, end)
 
     return spec
 
