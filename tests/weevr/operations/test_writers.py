@@ -27,9 +27,6 @@ class TestQuoteIdentifier:
         assert _quote_identifier("") == "``"
 
 
-pytestmark = pytest.mark.spark
-
-
 @pytest.fixture()
 def source_df(spark: SparkSession):
     """Source DataFrame with mixed columns for mapping tests."""
@@ -41,6 +38,7 @@ def source_df(spark: SparkSession):
     )
 
 
+@pytest.mark.spark
 class TestAutoModeNewTarget:
     """auto mode when target does not yet exist — all columns pass through."""
 
@@ -100,6 +98,7 @@ class TestAutoModeNewTarget:
         assert result.count() == source_df.count()
 
 
+@pytest.mark.spark
 class TestAutoModeExistingTarget:
     """auto mode when target table already exists — select matching columns only."""
 
@@ -164,6 +163,7 @@ class TestAutoModeExistingTarget:
         assert result.collect()[0]["label"] == "ALICE"
 
 
+@pytest.mark.spark
 class TestExplicitMode:
     """explicit mode — keep only declared non-dropped columns."""
 
@@ -262,6 +262,7 @@ def simple_df(spark: SparkSession):
     )
 
 
+@pytest.mark.spark
 class TestWriteTargetOverwrite:
     """Overwrite write mode."""
 
@@ -304,6 +305,7 @@ class TestWriteTargetOverwrite:
         assert result.count() == 2
 
 
+@pytest.mark.spark
 class TestWriteTargetAppend:
     """Append write mode."""
 
@@ -325,6 +327,7 @@ class TestWriteTargetAppend:
         assert rows == 2
 
 
+@pytest.mark.spark
 class TestWriteTargetMerge:
     """Merge write mode — all on_match / on_no_match_target / on_no_match_source combos."""
 

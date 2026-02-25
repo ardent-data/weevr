@@ -10,8 +10,6 @@ from weevr.errors.exceptions import StateError
 from weevr.state.table_properties import TablePropertiesStore
 from weevr.state.watermark import WatermarkState
 
-pytestmark = pytest.mark.spark
-
 
 class TestTablePropertiesStoreInit:
     """Unit tests for TablePropertiesStore constructor validation."""
@@ -25,6 +23,7 @@ class TestTablePropertiesStoreInit:
         assert store.target_path == "/lakehouse/tables/my_table"
 
 
+@pytest.mark.spark
 class TestTablePropertiesStore:
     """Integration tests for TablePropertiesStore with real Delta tables."""
 

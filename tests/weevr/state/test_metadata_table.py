@@ -9,13 +9,9 @@ from weevr.errors.exceptions import StateError
 from weevr.state.metadata_table import MetadataTableStore
 from weevr.state.watermark import WatermarkState
 
-pytestmark = pytest.mark.spark
-
 
 class TestMetadataTableStoreInit:
     """Unit tests for MetadataTableStore constructor validation."""
-
-    pytestmark = []  # No Spark needed
 
     def test_rejects_backtick_in_path(self) -> None:
         with pytest.raises(StateError, match="backtick"):
@@ -26,6 +22,7 @@ class TestMetadataTableStoreInit:
         assert store.table_path == "/lakehouse/tables/watermarks"
 
 
+@pytest.mark.spark
 class TestMetadataTableStore:
     """Integration tests for MetadataTableStore with real Delta tables."""
 
