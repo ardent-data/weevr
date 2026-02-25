@@ -12,20 +12,23 @@ class ThreadResult(FrozenBase):
     """Immutable record of a completed thread execution.
 
     Attributes:
-        status: Outcome of the execution — ``"success"`` or ``"failure"``.
+        status: Outcome of the execution — ``"success"``, ``"failure"``, or
+            ``"skipped"`` (when a condition evaluated to False).
         thread_name: Name of the thread that was executed.
         rows_written: Number of rows in the DataFrame at write time.
         write_mode: The write mode used (``"overwrite"``, ``"append"``, or ``"merge"``).
         target_path: Physical path of the Delta table that was written.
         telemetry: Thread-level telemetry with validation/assertion results and row counts.
+        skip_reason: The condition expression that caused the thread to be skipped.
     """
 
-    status: Literal["success", "failure"]
+    status: Literal["success", "failure", "skipped"]
     thread_name: str
     rows_written: int
     write_mode: str
     target_path: str
     telemetry: ThreadTelemetry | None = None
+    skip_reason: str | None = None
 
 
 class WeaveResult(FrozenBase):

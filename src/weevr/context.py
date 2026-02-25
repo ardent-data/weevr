@@ -208,8 +208,10 @@ class Context:
             model = resolved.model
             assert isinstance(model, Thread)
             engine_result = execute_thread(self._spark, model)
+            # Direct thread execution never returns "skipped" (only runner does)
+            assert engine_result.status in ("success", "failure")
             return RunResult(
-                status=engine_result.status,
+                status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="thread",
                 config_name=resolved.config_name,

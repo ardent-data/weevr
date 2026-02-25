@@ -14,7 +14,7 @@ from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
-from weevr.model.weave import ThreadEntry, Weave
+from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -555,3 +555,145 @@ class TestCacheManager:
         cm.cleanup()
         mock_df.unpersist.assert_called_once()
         assert "A" not in cm._cached
+
+
+# ---------------------------------------------------------------------------
+# Conditional Execution tests
+# ---------------------------------------------------------------------------
+
+
+class TestConditionalThreadExecution:
+    """Test that threads with conditions are evaluated and skipped correctly."""
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_condition_true_executes(self, mock_exec):
+        """Thread with condition=True executes normally."""
+        mock_exec.return_value = _make_result("A")
+        threads = {"A": _make_thread("A")}
+        entries = [ThreadEntry(name="A", condition=ConditionSpec(when="true"))]
+        plan = build_plan("test_weave", threads, entries)
+        conditions = {"A": ConditionSpec(when="true")}
+        result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
+        assert result.status == "success"
+        assert len(result.thread_results) == 1
+        mock_exec.assert_called_once()
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_condition_false_skips(self, mock_exec):
+        """Thread with condition=False is skipped without execution."""
+        threads = {"A": _make_thread("A")}
+        entries = [ThreadEntry(name="A")]
+        plan = build_plan("test_weave", threads, entries)
+        conditions = {"A": ConditionSpec(when="false")}
+        result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
+        assert result.status == "failure"  # all threads skipped → failure
+        assert "A" in result.threads_skipped
+        mock_exec.assert_not_called()
+        # Check the skipped result
+        skipped = [r for r in result.thread_results if r.status == "skipped"]
+        assert len(skipped) == 1
+        assert skipped[0].thread_name == "A"
+        assert skipped[0].skip_reason == "false"
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_mixed_conditions(self, mock_exec):
+        """Some threads have conditions, others don't."""
+        mock_exec.return_value = _make_result("B")
+        threads = {
+            "A": _make_thread("A"),
+            "B": _make_thread("B"),
+        }
+        entries = [ThreadEntry(name="A"), ThreadEntry(name="B")]
+        plan = build_plan("test_weave", threads, entries)
+        conditions = {"A": ConditionSpec(when="false")}  # B has no condition
+        result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
+        assert result.status == "partial"
+        assert "A" in result.threads_skipped
+        assert any(r.thread_name == "B" and r.status == "success" for r in result.thread_results)
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_param_condition(self, mock_exec):
+        """Thread condition with param reference evaluates correctly."""
+        mock_exec.return_value = _make_result("A")
+        threads = {"A": _make_thread("A")}
+        entries = [ThreadEntry(name="A")]
+        plan = build_plan("test_weave", threads, entries)
+        conditions = {"A": ConditionSpec(when="${param.env} == 'prod'")}
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            thread_conditions=conditions,
+            params={"env": "prod"},
+        )
+        assert result.status == "success"
+        mock_exec.assert_called_once()
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_param_condition_false(self, mock_exec):
+        """Thread condition with param that doesn't match is skipped."""
+        threads = {"A": _make_thread("A")}
+        entries = [ThreadEntry(name="A")]
+        plan = build_plan("test_weave", threads, entries)
+        conditions = {"A": ConditionSpec(when="${param.env} == 'prod'")}
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            thread_conditions=conditions,
+            params={"env": "dev"},
+        )
+        assert "A" in result.threads_skipped
+        mock_exec.assert_not_called()
+
+
+class TestConditionalWeaveExecution:
+    """Test that weaves with conditions are evaluated in loom execution."""
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_weave_condition_false_skips(self, mock_weave_exec):
+        """Weave with condition=False is skipped entirely."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": [
+                    {"name": "dims", "condition": {"when": "false"}},
+                ],
+            }
+        )
+        weaves = {
+            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+        }
+        thread_map = {"dims": {"t1": _make_thread("t1")}}
+        result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map)
+        # Weave was skipped, so no weave results
+        assert len(result.weave_results) == 0
+        mock_weave_exec.assert_not_called()
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.evaluate_condition")
+    def test_weave_condition_true_executes(self, mock_eval, mock_weave_exec):
+        """Weave with condition=True executes normally."""
+        mock_eval.return_value = True
+        mock_weave_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="dims",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=100,
+        )
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": [
+                    {"name": "dims", "condition": {"when": "true"}},
+                ],
+            }
+        )
+        weaves = {
+            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+        }
+        thread_map = {"dims": {"t1": _make_thread("t1")}}
+        result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map)
+        assert len(result.weave_results) == 1
+        assert result.weave_results[0].status == "success"
