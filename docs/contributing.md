@@ -126,7 +126,7 @@ git push --force-with-lease
 PR titles must follow **Conventional Commits** syntax. This project uses
 Release Please for versioning, and PR titles become changelog entries.
 
-```
+```text
 feat(engine): add parallel thread execution
 fix(config): resolve variable substitution in nested maps
 chore(ci): pin ruff version in workflow
@@ -139,7 +139,7 @@ Always include the component scope in parentheses.
 
 Indicate breaking changes with `!` after the type:
 
-```
+```text
 feat(model)!: rename thread execution fields
 ```
 
@@ -209,7 +209,7 @@ in navigation.
 
 ### Documentation structure
 
-```
+```text
 docs/
   index.md                          -- Home page
   tutorials/                        -- Step-by-step learning guides
@@ -292,7 +292,7 @@ All checks must pass before a PR can be merged.
 
 ## Project structure
 
-```
+```text
 src/weevr/                -- Library source (src layout)
 tests/weevr/              -- Tests (mirrors src structure)
 docs/                     -- Documentation source (MkDocs)

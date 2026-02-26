@@ -28,7 +28,7 @@ add it to your notebook's inline install cell:
 
 Create a project directory with the conventional layout that weevr expects:
 
-```
+```text
 my-project/
   threads/
     staging/

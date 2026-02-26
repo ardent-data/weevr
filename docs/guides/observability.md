@@ -115,7 +115,7 @@ Events mark significant moments within a span. Each `SpanEvent` has a
 
 A loom execution produces a three-level span tree:
 
-```
+```text
 loom:nightly                        ← root span
   ├── weave:dimensions              ← child of loom
   │   ├── thread:dim_customer       ← child of weave

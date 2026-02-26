@@ -72,7 +72,7 @@ The mapping is direct: **one thread writes to one Delta table**. The thread
 name typically mirrors the target table name, though this is a convention
 rather than a requirement.
 
-```
+```text
 Thread: dim_customer  →  Delta table: silver.dim_customer
 Thread: fact_orders   →  Delta table: silver.fact_orders
 ```

@@ -3,7 +3,7 @@
 weevr organizes work into a three-level hierarchy. Each level has a distinct
 responsibility, and configuration flows downward through inheritance.
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │  Loom                                           │
 │  Deployment unit — orders weaves, sets defaults  │
@@ -132,7 +132,7 @@ loom might share the dimensions weave but include different fact weaves.
 Configuration values cascade through the hierarchy. The rule is simple:
 **most specific wins**.
 
-```
+```text
 Loom defaults  →  Weave defaults  →  Thread config
 (least specific)                    (most specific)
 ```
@@ -162,7 +162,7 @@ A loom sets `write.mode: overwrite` as the default. One weave overrides
 it to `merge` for its threads. A single thread within that weave overrides
 it again to `append`:
 
-```
+```text
 Loom default:   write.mode = overwrite
   └─ Weave:     write.mode = merge       ← overrides loom
        └─ Thread A: (inherits merge)

@@ -42,7 +42,7 @@ object.
 
 Defaults and execution settings flow downward through the hierarchy:
 
-```
+```text
 Loom defaults
   --> Weave defaults (override loom)
     --> Thread config (override weave)

@@ -70,7 +70,7 @@ templates. A weave can override any of those. A thread can override
 anything the weave set. Scalar values are replaced outright; collections
 (lists, maps) are also replaced entirely, not merged.
 
-```
+```text
 Loom default:   write.mode = overwrite
   └─ Weave:     write.mode = merge       ← overrides loom
        └─ Thread A: (inherits merge)

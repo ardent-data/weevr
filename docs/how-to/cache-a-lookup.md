@@ -26,7 +26,7 @@ Suppose you have a `dim_product` thread that writes a product dimension table,
 and two downstream threads (`fact_orders` and `fact_returns`) that both join
 against it:
 
-```
+```text
 dim_product  -->  fact_orders
              -->  fact_returns
 ```
