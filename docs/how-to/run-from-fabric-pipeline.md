@@ -31,7 +31,7 @@ with the weevr `Context`:
 from weevr import Context
 
 ctx = Context(
-    spark=spark,
+    spark,
     "my-project.weevr",
     log_level="standard",
 )
@@ -84,7 +84,7 @@ Override parameter file values or inject execution-specific values through the
 
 ```python
 ctx = Context(
-    spark=spark,
+    spark,
     "my-project.weevr",
     params={
         "run_date": "2025-06-15",
@@ -117,7 +117,7 @@ from weevr import Context
 run_date = mssparkutils.notebook.params.get("run_date", "")
 
 ctx = Context(
-    spark=spark,
+    spark,
     "my-project.weevr",
     params={"run_date": run_date},
 )

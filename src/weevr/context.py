@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from pyspark.sql import SparkSession
 
 from weevr.config.inheritance import apply_inheritance
+from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
     detect_config_type_from_extension,
     extract_config_version,
@@ -690,9 +691,19 @@ class Context:
                 merged = apply_inheritance(None, weave_defaults, thread)
                 resolved_with_refs["_resolved_threads"][i] = merged
 
+        # Step 8b: Expand foreach macros in thread steps
+        if config_type == "thread" and isinstance(resolved_with_refs.get("steps"), list):
+            resolved_with_refs["steps"] = expand_foreach(resolved_with_refs["steps"])
+
         # Derive config name from stem and inject
         config_name = file_path.stem
-        if not resolved_with_refs.get("name"):
+        declared_name = resolved_with_refs.get("name", "")
+        if declared_name and declared_name != config_name:
+            raise ConfigError(
+                f"Declared name '{declared_name}' does not match filename stem '{config_name}'",
+                file_path=str(file_path),
+            )
+        if not declared_name:
             resolved_with_refs["name"] = config_name
 
         # Compute qualified key for top-level config
