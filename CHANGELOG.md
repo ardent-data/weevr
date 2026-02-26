@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/ardent-data/weevr/compare/weevr-v1.0.1...weevr-v1.0.2) (2026-02-26)
+
+
+### Bug Fixes
+
+* **ci:** add root redirect for GitHub Pages docs ([#43](https://github.com/ardent-data/weevr/issues/43)) ([33a7572](https://github.com/ardent-data/weevr/commit/33a7572a492684a513184ad1c30a975d06d27227))
+
 ## [1.0.1](https://github.com/ardent-data/weevr/compare/weevr-v1.0.0...weevr-v1.0.1) (2026-02-26)
 
 
