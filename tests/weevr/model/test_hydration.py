@@ -40,7 +40,7 @@ class TestThreadHydrationViaPipeline:
 
     def test_minimal_thread_hydrates(self):
         """Minimal thread YAML produces a valid frozen Thread."""
-        result = load_config(FIXTURES / "thread_minimal.yaml")
+        result = load_config(FIXTURES / "thread_minimal.thread")
 
         assert isinstance(result, Thread)
         assert result.config_version == "1.0"
@@ -53,7 +53,7 @@ class TestThreadHydrationViaPipeline:
 
     def test_full_thread_all_nested_models(self):
         """Full thread YAML hydrates all nested model types correctly."""
-        result = load_config(FIXTURES / "thread_full.yaml")
+        result = load_config(FIXTURES / "thread_full.thread")
 
         assert isinstance(result, Thread)
 
@@ -127,17 +127,17 @@ class TestThreadHydrationViaPipeline:
     def test_invalid_step_raises_model_validation_error(self):
         """Unknown step type raises ModelValidationError (EC-004)."""
         with pytest.raises(ModelValidationError) as exc_info:
-            load_config(FIXTURES / "thread_invalid_step.yaml")
+            load_config(FIXTURES / "thread_invalid_step.thread")
         assert "thread" in str(exc_info.value).lower()
 
     def test_merge_write_without_keys_raises_model_validation_error(self):
         """Merge mode without match_keys raises ModelValidationError (EC-004)."""
         with pytest.raises(ModelValidationError):
-            load_config(FIXTURES / "thread_merge_no_keys.yaml")
+            load_config(FIXTURES / "thread_merge_no_keys.thread")
 
     def test_join_explicit_key_pairs(self):
         """Thread with explicit join key pairs hydrates correctly (DEC-005)."""
-        result = load_config(FIXTURES / "thread_join_explicit_keys.yaml")
+        result = load_config(FIXTURES / "thread_join_explicit_keys.thread")
 
         assert isinstance(result, Thread)
         join_step = result.steps[0]
@@ -147,7 +147,7 @@ class TestThreadHydrationViaPipeline:
 
     def test_watermark_load_config(self):
         """Thread with incremental_watermark load config hydrates correctly."""
-        result = load_config(FIXTURES / "thread_watermark.yaml")
+        result = load_config(FIXTURES / "thread_watermark.thread")
 
         assert isinstance(result, Thread)
         assert isinstance(result.load, LoadConfig)
@@ -160,21 +160,21 @@ class TestThreadFrozenAfterHydration:
 
     def test_thread_is_frozen(self):
         """Thread model is immutable after hydration."""
-        result = load_config(FIXTURES / "thread_minimal.yaml")
+        result = load_config(FIXTURES / "thread_minimal.thread")
         assert isinstance(result, Thread)
         with pytest.raises(ValidationError):
             result.config_version = "2.0"  # type: ignore[misc]
 
     def test_nested_source_is_frozen(self):
         """Nested Source model is immutable after hydration."""
-        result = load_config(FIXTURES / "thread_minimal.yaml")
+        result = load_config(FIXTURES / "thread_minimal.thread")
         assert isinstance(result, Thread)
         with pytest.raises(ValidationError):
             result.sources["customers"].type = "csv"  # type: ignore[misc]
 
     def test_full_thread_nested_models_frozen(self):
         """All nested models in a full thread are frozen."""
-        result = load_config(FIXTURES / "thread_full.yaml")
+        result = load_config(FIXTURES / "thread_full.thread")
         assert isinstance(result, Thread)
 
         with pytest.raises(ValidationError):

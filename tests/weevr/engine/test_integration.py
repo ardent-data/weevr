@@ -68,7 +68,7 @@ class TestYamlLoadToExecute:
         create_delta_table(spark, src, [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}])
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_simple.yaml",
+            _FIXTURE_DIR / "thread_simple.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)
@@ -90,7 +90,7 @@ class TestYamlLoadToExecute:
         )
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_transforms.yaml",
+            _FIXTURE_DIR / "thread_transforms.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)
@@ -113,7 +113,7 @@ class TestYamlLoadToExecute:
         create_delta_table(spark, src, [{"id": 1}])
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_simple.yaml",
+            _FIXTURE_DIR / "thread_simple.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)
@@ -129,7 +129,7 @@ class TestYamlLoadToExecute:
         create_delta_table(spark, src, [{"id": i} for i in range(3)])
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_simple.yaml",
+            _FIXTURE_DIR / "thread_simple.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)
@@ -152,7 +152,7 @@ class TestYamlLoadToExecute:
         create_delta_table(spark, src, [{"id": 1, "val": "new"}, {"id": 3, "val": "insert"}])
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_merge.yaml",
+            _FIXTURE_DIR / "thread_merge.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)
@@ -450,7 +450,7 @@ class TestKeyGeneration:
         create_delta_table(spark, src, [{"id": 1, "name": "alice"}, {"id": 2, "name": None}])
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_keys.yaml",
+            _FIXTURE_DIR / "thread_keys.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)
@@ -470,7 +470,7 @@ class TestKeyGeneration:
         create_delta_table(spark, src, [{"id": 1, "name": "alice"}, {"id": 2, "name": "bob"}])
 
         thread = load_config(
-            _FIXTURE_DIR / "thread_keys.yaml",
+            _FIXTURE_DIR / "thread_keys.thread",
             runtime_params={"src_path": src, "tgt_path": tgt},
         )
         assert isinstance(thread, Thread)

@@ -22,7 +22,7 @@ class TestLoadConfigHappyPath:
 
     def test_load_simple_thread(self):
         """load_config returns a Thread model for a thread config."""
-        result = load_config(FIXTURES / "valid_thread.yaml")
+        result = load_config(FIXTURES / "valid_thread.thread")
         assert isinstance(result, Thread)
         assert result.config_version == "1.0"
         assert "customers" in result.sources
@@ -30,8 +30,8 @@ class TestLoadConfigHappyPath:
 
     def test_load_thread_from_project(self):
         """Load a thread from project fixtures."""
-        thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
-        result = load_config(thread_path)
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions" / "dim_customer.thread", project_root=project)
         assert isinstance(result, Thread)
         assert result.config_version == "1.0"
         assert "customers" in result.sources
@@ -130,17 +130,19 @@ target:
 
     def test_load_weave_returns_weave_model(self):
         """load_config returns a Weave model for a weave config."""
-        result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions.weave", project_root=project)
         assert isinstance(result, Weave)
         assert result.config_version == "1.0"
-        assert any(e.name == "dimensions.dim_customer" for e in result.threads)
+        assert any(e.ref == "dimensions/dim_customer.thread" for e in result.threads)
 
     def test_load_loom_returns_loom_model(self):
         """load_config returns a Loom model for a loom config."""
-        result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "nightly.loom", project_root=project)
         assert isinstance(result, Loom)
         assert result.config_version == "1.0"
-        assert any(e.name == "dimensions" for e in result.weaves)
+        assert any(e.ref == "dimensions.weave" for e in result.weaves)
 
 
 class TestLoadConfigNameInjection:
@@ -148,26 +150,28 @@ class TestLoadConfigNameInjection:
 
     def test_thread_name_from_project_path(self):
         """Thread loaded from project path gets stem as name."""
-        thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
-        result = load_config(thread_path)
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions" / "dim_customer.thread", project_root=project)
         assert isinstance(result, Thread)
         assert result.name == "dim_customer"
 
     def test_thread_name_from_top_level_path(self):
         """Thread loaded from a top-level file gets stem as name."""
-        result = load_config(FIXTURES / "valid_thread.yaml")
+        result = load_config(FIXTURES / "valid_thread.thread")
         assert isinstance(result, Thread)
         assert result.name == "valid_thread"
 
     def test_weave_name_derived(self):
         """Weave loaded from project path gets name from stem."""
-        result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions.weave", project_root=project)
         assert isinstance(result, Weave)
         assert result.name == "dimensions"
 
     def test_loom_name_derived(self):
         """Loom loaded from project path gets name from stem."""
-        result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "nightly.loom", project_root=project)
         assert isinstance(result, Loom)
         assert result.name == "nightly"
 

@@ -1,22 +1,22 @@
 # weevr Examples
 
-Example YAML configurations demonstrating weevr's declarative pipeline model.
+Example configurations demonstrating weevr's declarative pipeline model.
 
-Each file is a self-contained configuration that illustrates a specific capability.
-They are not runnable without a Spark/Fabric environment, but they serve as
-reference templates and are validated by CI to ensure structural correctness.
+Each file uses a typed extension (`.thread`, `.weave`, `.loom`) to indicate its
+config type. They are not runnable without a Spark/Fabric environment, but they
+serve as reference templates and are validated by CI to ensure structural correctness.
 
 ## Examples
 
 | File | Description |
 |------|-------------|
-| `basic-thread.yml` | Minimal thread: read a Delta source, select columns, write to Delta. |
-| `thread-with-transforms.yml` | Thread with multiple pipeline steps: filter, derive, select, cast. |
-| `merge-thread.yml` | Thread that merges into a Delta target using match keys. |
-| `incremental-thread.yml` | Thread with watermark-based incremental loading. |
-| `multi-thread-weave.yml` | Weave orchestrating three threads with explicit dependencies. |
-| `full-loom.yml` | Complete loom with two weaves, variables, defaults, and execution settings. |
-| `validation-thread.yml` | Thread with data quality validations and post-write assertions. |
+| `basic-thread.thread` | Minimal thread: read a Delta source, select columns, write to Delta. |
+| `thread-with-transforms.thread` | Thread with multiple pipeline steps: filter, derive, select, cast. |
+| `merge-thread.thread` | Thread that merges into a Delta target using match keys. |
+| `incremental-thread.thread` | Thread with watermark-based incremental loading. |
+| `multi-thread-weave.weave` | Weave orchestrating three threads with explicit dependencies. |
+| `full-loom.loom` | Complete loom with two weaves, variables, defaults, and execution settings. |
+| `validation-thread.thread` | Thread with data quality validations and post-write assertions. |
 
 ## Configuration Hierarchy
 

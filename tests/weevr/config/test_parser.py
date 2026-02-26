@@ -21,7 +21,7 @@ class TestParseYAML:
 
     def test_valid_yaml(self):
         """Parse valid YAML file."""
-        result = parse_yaml(FIXTURES / "valid_thread.yaml")
+        result = parse_yaml(FIXTURES / "valid_thread.thread")
         assert isinstance(result, dict)
         assert "config_version" in result
         assert "sources" in result
@@ -185,7 +185,7 @@ class TestParserIntegration:
 
     def test_parse_valid_thread(self):
         """Parse and validate a complete thread config."""
-        raw = parse_yaml(FIXTURES / "valid_thread.yaml")
+        raw = parse_yaml(FIXTURES / "valid_thread.thread")
         version = extract_config_version(raw)
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
@@ -196,7 +196,7 @@ class TestParserIntegration:
 
     def test_parse_valid_weave(self):
         """Parse and validate a complete weave config."""
-        raw = parse_yaml(FIXTURES / "valid_weave.yaml")
+        raw = parse_yaml(FIXTURES / "valid_weave.weave")
         version = extract_config_version(raw)
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
@@ -207,7 +207,7 @@ class TestParserIntegration:
 
     def test_parse_valid_loom(self):
         """Parse and validate a complete loom config."""
-        raw = parse_yaml(FIXTURES / "valid_loom.yaml")
+        raw = parse_yaml(FIXTURES / "valid_loom.loom")
         version = extract_config_version(raw)
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
