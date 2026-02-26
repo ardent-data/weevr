@@ -1,0 +1,5338 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.0/reference/api/model/">
+      
+      
+        <link rel="prev" href="../config/">
+      
+      
+        <link rel="next" href="../engine/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Model - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#model-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Model
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../yaml-schema/thread/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../release-notes/1.0/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#weevr.model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SparkExpr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkExpr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __all__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ExecutionConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.LogLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogLevel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.FailureConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FailureConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ChangeDetectionConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChangeDetectionConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.KeyConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KeyConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SurrogateKeyConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SurrogateKeyConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.LoadConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoadConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Loom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.WeaveEntry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeaveEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ParamsConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ParamsConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ParamSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ParamSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.AggregateStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AggregateStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.CaseWhenStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CaseWhenStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.CastStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CastStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.CoalesceStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CoalesceStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DateOpsStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DateOpsStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DedupStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DedupStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DeriveStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeriveStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DropStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DropStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.FillNullStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FillNullStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.FilterStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FilterStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.JoinStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JoinStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.PivotStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PivotStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.RenameStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RenameStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SelectStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SelectStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SortStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SortStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.StringOpsStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StringOpsStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.UnionStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnionStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.UnpivotStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnpivotStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.WindowStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WindowStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DedupConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DedupConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ColumnMapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ColumnMapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Thread" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Assertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assertion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ValidationRule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidationRule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ConditionSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConditionSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ThreadEntry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ThreadEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Weave" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weave
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.WriteConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WriteConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#weevr.model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SparkExpr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkExpr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __all__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ExecutionConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.LogLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogLevel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.FailureConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FailureConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ChangeDetectionConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChangeDetectionConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.KeyConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KeyConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SurrogateKeyConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SurrogateKeyConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.LoadConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoadConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Loom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.WeaveEntry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeaveEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ParamsConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ParamsConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ParamSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ParamSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.AggregateStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AggregateStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.CaseWhenStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CaseWhenStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.CastStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CastStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.CoalesceStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CoalesceStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DateOpsStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DateOpsStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DedupStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DedupStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DeriveStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeriveStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DropStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DropStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.FillNullStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FillNullStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.FilterStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FilterStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.JoinStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JoinStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.PivotStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PivotStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.RenameStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RenameStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SelectStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SelectStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.SortStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SortStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.StringOpsStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StringOpsStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.UnionStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnionStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.UnpivotStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UnpivotStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.WindowStep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WindowStep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.DedupConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DedupConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ColumnMapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ColumnMapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Thread" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Assertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assertion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ValidationRule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidationRule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ConditionSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConditionSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ThreadEntry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ThreadEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Weave" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weave
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.WriteConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WriteConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="model-api">Model API<a class="headerlink" href="#model-api" title="Permanent link">&para;</a></h1>
+<p>The <code>weevr.model</code> package contains all Pydantic domain models that represent
+the configuration structure -- threads, weaves, looms, pipeline steps, sources,
+targets, and supporting types.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="weevr.model" class="doc doc-heading">
+            <code>weevr.model</code>
+
+
+<a href="#weevr.model" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Domain object model for weevr configuration.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="weevr.model.Step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Step</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">Annotated</span><span class="p">[</span><span class="n">FilterStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;filter&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">DeriveStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;derive&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">JoinStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;join&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">SelectStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;select&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">DropStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;drop&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">RenameStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;rename&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">CastStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;cast&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">DedupStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;dedup&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">SortStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;sort&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">UnionStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;union&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">AggregateStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;aggregate&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">WindowStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;window&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">PivotStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;pivot&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">UnpivotStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;unpivot&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">CaseWhenStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;case_when&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">FillNullStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;fill_null&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">CoalesceStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;coalesce&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">StringOpsStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;string_ops&#39;</span><span class="p">)]</span> <span class="o">|</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">DateOpsStep</span><span class="p">,</span> <span class="n">Tag</span><span class="p">(</span><span class="s1">&#39;date_ops&#39;</span><span class="p">)],</span> <span class="n">Discriminator</span><span class="p">(</span><span class="n">_step_discriminator</span><span class="p">)]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#weevr.model.Step" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Discriminated union of all pipeline step types.</p>
+<p>Accepts a dict with a single key matching the step type name:
+<code>{"filter": {"expr": "amount &gt; 0"}}</code> → <code>FilterStep</code></p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="weevr.model.SparkExpr" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">SparkExpr</span> <span class="o">=</span> <span class="n">NewType</span><span class="p">(</span><span class="s1">&#39;SparkExpr&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#weevr.model.SparkExpr" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>A Spark SQL expression string.</p>
+<p>Used to annotate fields that hold Spark SQL expressions (e.g., filter predicates,
+derived column expressions). At runtime these are plain strings; the NewType signals
+intent and allows downstream type-checkers to distinguish expressions from arbitrary
+strings.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="weevr.model.__all__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Thread&#39;</span><span class="p">,</span> <span class="s1">&#39;Weave&#39;</span><span class="p">,</span> <span class="s1">&#39;Loom&#39;</span><span class="p">,</span> <span class="s1">&#39;FailureConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ThreadEntry&#39;</span><span class="p">,</span> <span class="s1">&#39;ConditionSpec&#39;</span><span class="p">,</span> <span class="s1">&#39;WeaveEntry&#39;</span><span class="p">,</span> <span class="s1">&#39;Source&#39;</span><span class="p">,</span> <span class="s1">&#39;DedupConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;Target&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnMapping&#39;</span><span class="p">,</span> <span class="s1">&#39;Step&#39;</span><span class="p">,</span> <span class="s1">&#39;FilterStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DeriveStep&#39;</span><span class="p">,</span> <span class="s1">&#39;JoinStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SelectStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DropStep&#39;</span><span class="p">,</span> <span class="s1">&#39;RenameStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CastStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DedupStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SortStep&#39;</span><span class="p">,</span> <span class="s1">&#39;UnionStep&#39;</span><span class="p">,</span> <span class="s1">&#39;AggregateStep&#39;</span><span class="p">,</span> <span class="s1">&#39;WindowStep&#39;</span><span class="p">,</span> <span class="s1">&#39;PivotStep&#39;</span><span class="p">,</span> <span class="s1">&#39;UnpivotStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CaseWhenStep&#39;</span><span class="p">,</span> <span class="s1">&#39;FillNullStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CoalesceStep&#39;</span><span class="p">,</span> <span class="s1">&#39;StringOpsStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DateOpsStep&#39;</span><span class="p">,</span> <span class="s1">&#39;KeyConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;SurrogateKeyConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ChangeDetectionConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;WriteConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationRule&#39;</span><span class="p">,</span> <span class="s1">&#39;Assertion&#39;</span><span class="p">,</span> <span class="s1">&#39;LoadConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ParamSpec&#39;</span><span class="p">,</span> <span class="s1">&#39;ParamsConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ExecutionConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;LogLevel&#39;</span><span class="p">,</span> <span class="s1">&#39;SparkExpr&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#weevr.model.__all__" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ExecutionConfig" class="doc doc-heading">
+            <code>ExecutionConfig</code>
+
+
+<a href="#weevr.model.ExecutionConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Runtime execution settings that cascade through loom/weave/thread.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ExecutionConfig.log_level">log_level</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LogLevel (weevr.model.execution.LogLevel)" href="#weevr.model.LogLevel">LogLevel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Logging verbosity for execution output.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ExecutionConfig.trace">trace</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to collect execution spans for telemetry.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.LogLevel" class="doc doc-heading">
+            <code>LogLevel</code>
+
+
+<a href="#weevr.model.LogLevel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.StrEnum">StrEnum</span></code></p>
+
+
+
+        <p>Configurable log level for weevr execution.</p>
+<p>Controls the verbosity of structured logging output during pipeline
+execution. Maps to Python logging levels internally.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.FailureConfig" class="doc doc-heading">
+            <code>FailureConfig</code>
+
+
+<a href="#weevr.model.FailureConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Per-thread failure handling policy.</p>
+<p>Controls what happens to remaining threads in a weave when this thread fails.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.FailureConfig.on_failure">on_failure</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;skip_downstream&#39;, &#39;continue&#39;, &#39;abort_weave&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One of <code>"abort_weave"</code> (default), <code>"skip_downstream"</code>,
+or <code>"continue"</code>. See SPEC §14.2 for semantics.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ChangeDetectionConfig" class="doc doc-heading">
+            <code>ChangeDetectionConfig</code>
+
+
+<a href="#weevr.model.ChangeDetectionConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Configuration for change detection hash generation.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.KeyConfig" class="doc doc-heading">
+            <code>KeyConfig</code>
+
+
+<a href="#weevr.model.KeyConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Key management configuration for a thread.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.SurrogateKeyConfig" class="doc doc-heading">
+            <code>SurrogateKeyConfig</code>
+
+
+<a href="#weevr.model.SurrogateKeyConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Configuration for surrogate key generation.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.LoadConfig" class="doc doc-heading">
+            <code>LoadConfig</code>
+
+
+<a href="#weevr.model.LoadConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Incremental load mode and watermark parameters.</p>
+<p>Cross-field validation:
+- <code>mode == "incremental_watermark"</code> requires <code>watermark_column</code> to be set.
+- <code>mode == "cdc"</code> requires <code>cdc</code> config to be set.
+- <code>mode == "cdc"</code> must not have <code>watermark_column</code> set
+  (CDF version tracking is automatic).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.Loom" class="doc doc-heading">
+            <code>Loom</code>
+
+
+<a href="#weevr.model.Loom" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A deployment unit containing weave references with optional shared defaults.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.WeaveEntry" class="doc doc-heading">
+            <code>WeaveEntry</code>
+
+
+<a href="#weevr.model.WeaveEntry" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A weave reference within a loom, with optional condition.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.WeaveEntry.name">name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weave name. Required for inline definitions; derived from
+filename stem for external references.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.WeaveEntry.ref">ref</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to an external <code>.weave</code> file, relative to project root.
+Mutually exclusive with inline definition (name + body).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.WeaveEntry.condition">condition</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConditionSpec (weevr.model.weave.ConditionSpec)" href="#weevr.model.ConditionSpec">ConditionSpec</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional condition for conditional execution.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ParamsConfig" class="doc doc-heading">
+            <code>ParamsConfig</code>
+
+
+<a href="#weevr.model.ParamsConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>Parameter file schema (flat key-value structure).</p>
+<p>Uses a mutable <code>BaseModel</code> rather than <code>FrozenBase</code> because it is a
+validation schema for param files, not a domain object. It relies on
+<code>extra="allow"</code> for arbitrary param keys and on
+<code>model_dump(exclude_unset=True)</code> within the config pipeline.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ParamSpec" class="doc doc-heading">
+            <code>ParamSpec</code>
+
+
+<a href="#weevr.model.ParamSpec" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Typed parameter specification for config-level param declarations.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.AggregateStep" class="doc doc-heading">
+            <code>AggregateStep</code>
+
+
+<a href="#weevr.model.AggregateStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: aggregate rows with optional grouping.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.CaseWhenStep" class="doc doc-heading">
+            <code>CaseWhenStep</code>
+
+
+<a href="#weevr.model.CaseWhenStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: conditional column values.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.CastStep" class="doc doc-heading">
+            <code>CastStep</code>
+
+
+<a href="#weevr.model.CastStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: cast column types.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.CoalesceStep" class="doc doc-heading">
+            <code>CoalesceStep</code>
+
+
+<a href="#weevr.model.CoalesceStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: coalesce columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.DateOpsStep" class="doc doc-heading">
+            <code>DateOpsStep</code>
+
+
+<a href="#weevr.model.DateOpsStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: apply expression template to date/timestamp columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.DedupStep" class="doc doc-heading">
+            <code>DedupStep</code>
+
+
+<a href="#weevr.model.DedupStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: deduplicate rows.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.DeriveStep" class="doc doc-heading">
+            <code>DeriveStep</code>
+
+
+<a href="#weevr.model.DeriveStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: derive one or more new columns from Spark SQL expressions.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.DropStep" class="doc doc-heading">
+            <code>DropStep</code>
+
+
+<a href="#weevr.model.DropStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: drop columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.FillNullStep" class="doc doc-heading">
+            <code>FillNullStep</code>
+
+
+<a href="#weevr.model.FillNullStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: fill null values with defaults.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.FilterStep" class="doc doc-heading">
+            <code>FilterStep</code>
+
+
+<a href="#weevr.model.FilterStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: filter rows using a Spark SQL expression.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.JoinStep" class="doc doc-heading">
+            <code>JoinStep</code>
+
+
+<a href="#weevr.model.JoinStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: join with another source.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.PivotStep" class="doc doc-heading">
+            <code>PivotStep</code>
+
+
+<a href="#weevr.model.PivotStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: pivot rows to columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.RenameStep" class="doc doc-heading">
+            <code>RenameStep</code>
+
+
+<a href="#weevr.model.RenameStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: rename columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.SelectStep" class="doc doc-heading">
+            <code>SelectStep</code>
+
+
+<a href="#weevr.model.SelectStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: select a subset of columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.SortStep" class="doc doc-heading">
+            <code>SortStep</code>
+
+
+<a href="#weevr.model.SortStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: sort rows.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.StringOpsStep" class="doc doc-heading">
+            <code>StringOpsStep</code>
+
+
+<a href="#weevr.model.StringOpsStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: apply expression template to string columns.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.UnionStep" class="doc doc-heading">
+            <code>UnionStep</code>
+
+
+<a href="#weevr.model.UnionStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: union with other sources.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.UnpivotStep" class="doc doc-heading">
+            <code>UnpivotStep</code>
+
+
+<a href="#weevr.model.UnpivotStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: unpivot columns to rows.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.WindowStep" class="doc doc-heading">
+            <code>WindowStep</code>
+
+
+<a href="#weevr.model.WindowStep" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Pipeline step: apply window functions.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.DedupConfig" class="doc doc-heading">
+            <code>DedupConfig</code>
+
+
+<a href="#weevr.model.DedupConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Deduplication configuration applied immediately after reading a source.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.Source" class="doc doc-heading">
+            <code>Source</code>
+
+
+<a href="#weevr.model.Source" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A data source declaration.</p>
+<p>Cross-field validation rules:
+- <code>type == "delta"</code> requires <code>alias</code> to be set.
+- <code>type</code> in file types (csv, json, parquet, excel) requires <code>path</code> to be set.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ColumnMapping" class="doc doc-heading">
+            <code>ColumnMapping</code>
+
+
+<a href="#weevr.model.ColumnMapping" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Mapping specification for a single target column.</p>
+<p>Cross-field validation:
+- <code>expr</code> and <code>drop=True</code> are mutually exclusive.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.Target" class="doc doc-heading">
+            <code>Target</code>
+
+
+<a href="#weevr.model.Target" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Write destination with column mapping and partitioning configuration.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.Thread" class="doc doc-heading">
+            <code>Thread</code>
+
+
+<a href="#weevr.model.Thread" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Complete domain model for a thread configuration.</p>
+<p>A thread is the smallest unit of work: one or more sources, a sequence
+of transformation steps, and a single target.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.Assertion" class="doc doc-heading">
+            <code>Assertion</code>
+
+
+<a href="#weevr.model.Assertion" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A post-execution assertion on the target dataset.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.Assertion.type">type</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;row_count&#39;, &#39;column_not_null&#39;, &#39;unique&#39;, &#39;expression&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Assertion kind — built-in or expression-based.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.Assertion.severity">severity</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;info&#39;, &#39;warn&#39;, &#39;error&#39;, &#39;fatal&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Severity level when the assertion fails.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.Assertion.columns">columns</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Columns involved, for column_not_null and unique types.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.Assertion.min">min</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Minimum bound for row_count assertions.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.Assertion.max">max</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum bound for row_count assertions.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.Assertion.expression">expression</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SparkExpr = NewType('SparkExpr', str)
+
+  
+      module-attribute
+   (weevr.model.types.SparkExpr)" href="#weevr.model.SparkExpr">SparkExpr</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Spark SQL expression for expression-type assertions.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ValidationRule" class="doc doc-heading">
+            <code>ValidationRule</code>
+
+
+<a href="#weevr.model.ValidationRule" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A pre-write data quality rule evaluated as a Spark SQL expression.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ConditionSpec" class="doc doc-heading">
+            <code>ConditionSpec</code>
+
+
+<a href="#weevr.model.ConditionSpec" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A condition expression for conditional execution.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ConditionSpec.when">when</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Condition expression string. Supports parameter references
+(<code>${param.x}</code>), built-in checks (<code>table_exists()</code>,
+<code>table_empty()</code>, <code>row_count()</code>), and simple boolean operators.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.ThreadEntry" class="doc doc-heading">
+            <code>ThreadEntry</code>
+
+
+<a href="#weevr.model.ThreadEntry" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A thread reference within a weave, with optional per-thread overrides.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ThreadEntry.name">name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thread name. Required for inline definitions; derived from
+filename stem for external references.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ThreadEntry.ref">ref</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to an external <code>.thread</code> file, relative to project root.
+Mutually exclusive with inline definition (name + body).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ThreadEntry.dependencies">dependencies</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Explicit upstream thread names. When set, these are merged
+with any auto-inferred dependencies from source/target path matching.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ThreadEntry.condition">condition</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConditionSpec (weevr.model.weave.ConditionSpec)" href="#weevr.model.ConditionSpec">ConditionSpec</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional condition for conditional execution. When set, the
+thread is only executed if the condition evaluates to True.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.Weave" class="doc doc-heading">
+            <code>Weave</code>
+
+
+<a href="#weevr.model.Weave" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A collection of thread references with optional shared defaults.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.WriteConfig" class="doc doc-heading">
+            <code>WriteConfig</code>
+
+
+<a href="#weevr.model.WriteConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Write mode and merge parameters for a thread target.</p>
+<p>Cross-field validation:
+- <code>mode == "merge"</code> requires <code>match_keys</code> to be set.
+- <code>on_no_match_source == "soft_delete"</code> requires <code>soft_delete_column</code> to be set.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
