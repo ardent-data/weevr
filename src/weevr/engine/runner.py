@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Literal
 
 from pyspark.sql import SparkSession
@@ -359,7 +360,7 @@ def execute_loom(
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
     for weave_entry in loom.weaves:
-        weave_name = weave_entry.name
+        weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
 
         # Evaluate weave-level condition
         if weave_entry.condition is not None and not evaluate_condition(
