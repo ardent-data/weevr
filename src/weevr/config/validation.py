@@ -50,7 +50,7 @@ class ThreadConfig(BaseConfig):
 class WeaveConfig(BaseConfig):
     """Weave configuration schema (pre-resolution)."""
 
-    threads: list[str]
+    threads: list[str | dict[str, Any]]
     defaults: dict[str, Any] | None = None
     execution: dict[str, Any] | None = None
 
@@ -58,7 +58,7 @@ class WeaveConfig(BaseConfig):
 class LoomConfig(BaseConfig):
     """Loom configuration schema (pre-resolution)."""
 
-    weaves: list[str]
+    weaves: list[str | dict[str, Any]]
     defaults: dict[str, Any] | None = None
     execution: dict[str, Any] | None = None
 

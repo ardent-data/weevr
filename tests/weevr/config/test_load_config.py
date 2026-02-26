@@ -60,17 +60,8 @@ target:
         assert result.sources["data"].alias == "bronze.customers"
         assert result.target.audit_template == "dev_template"
 
-    def test_load_thread_with_param_file(self, tmp_path):
-        """load_config resolves variables from a param file."""
-        param_file = tmp_path / "params.yaml"
-        param_file.write_text(
-            """
-config_version: "1.0"
-lakehouse: bronze
-env: dev
-"""
-        )
-
+    def test_load_thread_with_runtime_params(self, tmp_path):
+        """load_config resolves variables from runtime params."""
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
@@ -84,26 +75,22 @@ target:
 """
         )
 
-        result = load_config(thread_file, param_file=param_file)
+        result = load_config(
+            thread_file, runtime_params={"lakehouse": "bronze", "env": "dev"}
+        )
 
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"
         assert result.target.audit_template == "dev_template"
 
-    def test_runtime_params_override_param_file(self, tmp_path):
-        """Runtime params override param file values."""
-        param_file = tmp_path / "params.yaml"
-        param_file.write_text(
-            """
-config_version: "1.0"
-env: dev
-"""
-        )
-
+    def test_runtime_params_override_defaults(self, tmp_path):
+        """Runtime params override config default values."""
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
+defaults:
+  env: dev
 sources:
   data:
     type: delta
@@ -116,7 +103,6 @@ target:
         result = load_config(
             thread_file,
             runtime_params={"env": "prod"},
-            param_file=param_file,
         )
 
         assert isinstance(result, Thread)
@@ -161,11 +147,11 @@ class TestLoadConfigNameInjection:
     """Test that load_config() derives and injects name from file path."""
 
     def test_thread_name_from_project_path(self):
-        """Thread loaded from project path gets dot-separated name."""
+        """Thread loaded from project path gets stem as name."""
         thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
         result = load_config(thread_path)
         assert isinstance(result, Thread)
-        assert result.name == "dimensions.dim_customer"
+        assert result.name == "dim_customer"
 
     def test_thread_name_from_top_level_path(self):
         """Thread loaded from a top-level file gets stem as name."""

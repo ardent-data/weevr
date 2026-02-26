@@ -23,31 +23,39 @@ from weevr.result import ExecutionMode, RunResult
 class TestContextValidation:
     def test_invalid_spark_type(self) -> None:
         with pytest.raises(TypeError, match="SparkSession"):
-            Context(spark="not a session")  # type: ignore[arg-type]
+            Context(spark="not a session", project="dummy")  # type: ignore[arg-type]
 
     def test_invalid_log_level(self) -> None:
         mock_spark = MagicMock(spec=SparkSession)
         with pytest.raises(ValueError, match="log_level"):
-            Context(spark=mock_spark, log_level="nope")
+            Context(spark=mock_spark, project="dummy", log_level="nope")
 
-    def test_valid_construction(self) -> None:
+    def test_valid_construction(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        ctx = Context(spark=mock_spark, params={"a": "1"}, log_level="minimal")
+        project_dir = tmp_path / "test.weevr"
+        project_dir.mkdir()
+        ctx = Context(
+            spark=mock_spark, project=str(project_dir), params={"a": "1"}, log_level="minimal"
+        )
         assert ctx.spark is mock_spark
         assert ctx.params == {"a": "1"}
         assert ctx.log_level.value == "minimal"
 
 
 class TestRunValidation:
-    def test_invalid_mode(self) -> None:
+    def test_invalid_mode(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        ctx = Context(spark=mock_spark)
+        project_dir = tmp_path / "test.weevr"
+        project_dir.mkdir()
+        ctx = Context(spark=mock_spark, project=str(project_dir))
         with pytest.raises(ValueError, match="Invalid mode"):
             ctx.run("some/path.yaml", mode="bogus")
 
-    def test_tags_and_threads_exclusive(self) -> None:
+    def test_tags_and_threads_exclusive(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        ctx = Context(spark=mock_spark)
+        project_dir = tmp_path / "test.weevr"
+        project_dir.mkdir()
+        ctx = Context(spark=mock_spark, project=str(project_dir))
         with pytest.raises(ValueError, match="mutually exclusive"):
             ctx.run("some/path.yaml", tags=["t1"], threads=["t2"])
 
@@ -55,7 +63,9 @@ class TestRunValidation:
 class TestRunErrorHandling:
     def test_execution_error_returns_failure_result(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        ctx = Context(spark=mock_spark)
+        project_dir = tmp_path / "test.weevr"
+        project_dir.mkdir()
+        ctx = Context(spark=mock_spark, project=str(project_dir))
 
         with (
             patch.object(ctx, "_load_resolved") as mock_load,
