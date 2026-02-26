@@ -132,21 +132,25 @@ class Context:
                 raise ConfigError(f"Project directory not found: {project_str}")
             return project_path
 
+        # Normalize: strip .weevr suffix if already present so Tier 1/2
+        # don't produce a double extension (e.g. "my_project.weevr.weevr").
+        base_name = project_str.removesuffix(".weevr")
+
         # Tier 2: OneLake qualified — workspace + lakehouse provided
         if workspace and lakehouse:
             return (
                 f"abfss://{workspace}@onelake.dfs.fabric.microsoft.com"
-                f"/{lakehouse}/Files/{project_str}.weevr"
+                f"/{lakehouse}/Files/{base_name}.weevr"
             )
 
         # Tier 1: Default lakehouse
-        default_path = Path(f"/lakehouse/default/Files/{project_str}.weevr")
+        default_path = Path(f"/lakehouse/default/Files/{base_name}.weevr")
         if default_path.is_dir():
             return default_path
 
         raise ConfigError(
-            "No default lakehouse available. Provide workspace and lakehouse "
-            "parameters or a direct project path."
+            f"Project directory not found at {default_path}. "
+            "Provide workspace and lakehouse parameters or a direct project path."
         )
 
     @property

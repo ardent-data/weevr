@@ -61,10 +61,30 @@ class TestContextValidation:
         expected = "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
         assert ctx.project_root == expected
 
+    def test_onelake_resolution_with_weevr_suffix(self, tmp_path: Path) -> None:
+        """Workspace + lakehouse strips .weevr suffix to avoid double extension."""
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(
+            spark=mock_spark,
+            project="myproject.weevr",
+            workspace="ws-id",
+            lakehouse="lh-id",
+        )
+        expected = "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
+        assert ctx.project_root == expected
+
+    def test_default_lakehouse_with_weevr_suffix(self, tmp_path: Path) -> None:
+        """Default lakehouse resolution strips .weevr suffix to avoid double extension."""
+        mock_spark = MagicMock(spec=SparkSession)
+        project_dir = Path("/lakehouse/default/Files/myproject.weevr")
+        with patch("weevr.context.Path.is_dir", return_value=True):
+            ctx = Context(spark=mock_spark, project="myproject.weevr")
+        assert ctx.project_root == project_dir
+
     def test_missing_project_raises(self) -> None:
         """Non-absolute path without workspace/lakehouse and no default raises."""
         mock_spark = MagicMock(spec=SparkSession)
-        with pytest.raises(ConfigError):
+        with pytest.raises(ConfigError, match="Project directory not found"):
             Context(spark=mock_spark, project="nonexistent")
 
     def test_non_weevr_extension_raises(self) -> None:
