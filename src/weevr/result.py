@@ -154,7 +154,42 @@ class RunResult:
                         f"  {wr.weave_name}  {wr.status}  {thread_count} threads  {wr_dur}"
                     )
 
+        # Collect thread errors from the detail tree
+        errors = self._collect_thread_errors()
+        if errors:
+            lines.append("")
+            lines.append("Errors:")
+            for err in errors:
+                lines.append(f"  - {err}")
+
         return lines
+
+    def _collect_thread_errors(self) -> list[str]:
+        """Extract error messages from failed threads in the detail tree."""
+        if self.detail is None:
+            return []
+
+        errors: list[str] = []
+        thread_results: list[Any] = []
+
+        if self.config_type == "thread":
+            error = getattr(self.detail, "error", None)
+            if error:
+                name = getattr(self.detail, "thread_name", "unknown")
+                errors.append(f"[{name}] {error}")
+        elif self.config_type == "weave":
+            thread_results = getattr(self.detail, "thread_results", [])
+        elif self.config_type == "loom":
+            for wr in getattr(self.detail, "weave_results", []):
+                thread_results.extend(getattr(wr, "thread_results", []))
+
+        for tr in thread_results:
+            error = getattr(tr, "error", None)
+            if error:
+                name = getattr(tr, "thread_name", "unknown")
+                errors.append(f"[{name}] {error}")
+
+        return errors
 
     def _summary_validate(self) -> list[str]:
         lines: list[str] = [

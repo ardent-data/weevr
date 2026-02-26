@@ -268,6 +268,150 @@ class TestRunResult:
         )
         assert result.status == "partial"
 
+    def test_summary_execute_thread_with_error(self) -> None:
+        from weevr.engine.result import ThreadResult
+
+        detail = ThreadResult(
+            status="failure",
+            thread_name="dim_customer",
+            rows_written=0,
+            write_mode="",
+            target_path="",
+            error="Source path not found: /data/raw_customers",
+        )
+        result = RunResult(
+            status="failure",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="dim_customer",
+            duration_ms=50,
+            detail=detail,
+        )
+        s = result.summary()
+        assert "Errors:" in s
+        assert "[dim_customer] Source path not found: /data/raw_customers" in s
+
+    def test_summary_execute_weave_with_thread_errors(self) -> None:
+        from weevr.engine.result import ThreadResult, WeaveResult
+
+        detail = WeaveResult(
+            status="partial",
+            weave_name="dims",
+            thread_results=[
+                ThreadResult(
+                    status="success",
+                    thread_name="dim_product",
+                    rows_written=50,
+                    write_mode="overwrite",
+                    target_path="/data/dim_product",
+                ),
+                ThreadResult(
+                    status="failure",
+                    thread_name="dim_customer",
+                    rows_written=0,
+                    write_mode="",
+                    target_path="",
+                    error="Column 'email' not found",
+                ),
+            ],
+            threads_skipped=[],
+            duration_ms=200,
+        )
+        result = RunResult(
+            status="partial",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="dims",
+            duration_ms=200,
+            detail=detail,
+        )
+        s = result.summary()
+        assert "Errors:" in s
+        assert "[dim_customer] Column 'email' not found" in s
+        assert "dim_product" not in s.split("Errors:")[1]
+
+    def test_summary_execute_loom_with_thread_errors(self) -> None:
+        from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+
+        detail = LoomResult(
+            status="partial",
+            loom_name="nightly",
+            weave_results=[
+                WeaveResult(
+                    status="success",
+                    weave_name="dims",
+                    thread_results=[
+                        ThreadResult(
+                            status="success",
+                            thread_name="dim_product",
+                            rows_written=100,
+                            write_mode="overwrite",
+                            target_path="/data/dim_product",
+                        ),
+                    ],
+                    threads_skipped=[],
+                    duration_ms=100,
+                ),
+                WeaveResult(
+                    status="failure",
+                    weave_name="facts",
+                    thread_results=[
+                        ThreadResult(
+                            status="failure",
+                            thread_name="fact_orders",
+                            rows_written=0,
+                            write_mode="",
+                            target_path="",
+                            error="Bad Request: file not found",
+                        ),
+                    ],
+                    threads_skipped=["fact_revenue"],
+                    duration_ms=50,
+                ),
+            ],
+            duration_ms=150,
+        )
+        result = RunResult(
+            status="partial",
+            mode=ExecutionMode.EXECUTE,
+            config_type="loom",
+            config_name="nightly",
+            duration_ms=150,
+            detail=detail,
+        )
+        s = result.summary()
+        assert "Errors:" in s
+        assert "[fact_orders] Bad Request: file not found" in s
+
+    def test_summary_execute_no_errors_when_all_succeed(self) -> None:
+        from weevr.engine.result import ThreadResult, WeaveResult
+
+        detail = WeaveResult(
+            status="success",
+            weave_name="dims",
+            thread_results=[
+                ThreadResult(
+                    status="success",
+                    thread_name="dim_product",
+                    rows_written=50,
+                    write_mode="overwrite",
+                    target_path="/data/dim_product",
+                ),
+            ],
+            threads_skipped=[],
+            duration_ms=100,
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="dims",
+            duration_ms=100,
+            detail=detail,
+        )
+        s = result.summary()
+        assert "Errors:" not in s
+
 
 class TestLoadedConfig:
     @pytest.fixture()

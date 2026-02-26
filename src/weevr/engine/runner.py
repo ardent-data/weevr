@@ -204,7 +204,8 @@ def execute_weave(
                         if name in thread_collectors and collector is not None:
                             collector.merge(thread_collectors[name])
 
-                        # Record a failure result
+                        # Record a failure result with the error message
+                        error_msg = f"{type(exc).__name__}: {exc}"
                         thread_results.append(
                             ThreadResult(
                                 status="failure",
@@ -212,6 +213,7 @@ def execute_weave(
                                 rows_written=0,
                                 write_mode="",
                                 target_path="",
+                                error=error_msg,
                             )
                         )
                         logger.debug("Thread '%s' failed: %s", name, exc)
