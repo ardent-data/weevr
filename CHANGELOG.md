@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/ardent-data/weevr/compare/weevr-v1.0.0...weevr-v1.0.1) (2026-02-26)
+
+
+### Bug Fixes
+
+* **ci:** move docs deployment into release workflow ([#41](https://github.com/ardent-data/weevr/issues/41)) ([8743ba0](https://github.com/ardent-data/weevr/commit/8743ba0e8bc953c643d2278f296e80a9720731da))
+
 ## [1.0.0](https://github.com/ardent-data/weevr/compare/weevr-v0.7.4...weevr-v1.0.0) (2026-02-26)
 
 
