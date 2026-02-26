@@ -89,6 +89,7 @@ class RunResult:
         validation_errors: list[str] | None = None,
         warnings: list[str] | None = None,
     ) -> None:
+        """Initialize a RunResult with execution outcome and telemetry."""
         self.status = status
         self.mode = mode
         self.config_type = config_type
@@ -235,6 +236,7 @@ class LoadedConfig:
         threads: dict[str, dict[str, Any]] | None = None,
         weaves: dict[str, Any] | None = None,
     ) -> None:
+        """Initialize with a hydrated model and its metadata."""
         self._model = model
         self._config_type = config_type
         self._config_name = config_name

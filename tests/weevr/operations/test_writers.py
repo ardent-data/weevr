@@ -8,9 +8,23 @@ from spark_helpers import create_delta_table
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
-from weevr.operations.writers import apply_target_mapping, write_target
+from weevr.operations.writers import _quote_identifier, apply_target_mapping, write_target
 
-pytestmark = pytest.mark.spark
+
+class TestQuoteIdentifier:
+    """Unit tests for _quote_identifier SQL escaping (no Spark needed)."""
+
+    def test_plain_name(self) -> None:
+        assert _quote_identifier("column_name") == "`column_name`"
+
+    def test_name_with_backtick(self) -> None:
+        assert _quote_identifier("col`umn") == "`col``umn`"
+
+    def test_name_with_spaces(self) -> None:
+        assert _quote_identifier("my column") == "`my column`"
+
+    def test_empty_string(self) -> None:
+        assert _quote_identifier("") == "``"
 
 
 @pytest.fixture()
@@ -24,6 +38,7 @@ def source_df(spark: SparkSession):
     )
 
 
+@pytest.mark.spark
 class TestAutoModeNewTarget:
     """auto mode when target does not yet exist — all columns pass through."""
 
@@ -83,6 +98,7 @@ class TestAutoModeNewTarget:
         assert result.count() == source_df.count()
 
 
+@pytest.mark.spark
 class TestAutoModeExistingTarget:
     """auto mode when target table already exists — select matching columns only."""
 
@@ -147,6 +163,7 @@ class TestAutoModeExistingTarget:
         assert result.collect()[0]["label"] == "ALICE"
 
 
+@pytest.mark.spark
 class TestExplicitMode:
     """explicit mode — keep only declared non-dropped columns."""
 
@@ -245,6 +262,7 @@ def simple_df(spark: SparkSession):
     )
 
 
+@pytest.mark.spark
 class TestWriteTargetOverwrite:
     """Overwrite write mode."""
 
@@ -287,6 +305,7 @@ class TestWriteTargetOverwrite:
         assert result.count() == 2
 
 
+@pytest.mark.spark
 class TestWriteTargetAppend:
     """Append write mode."""
 
@@ -308,6 +327,7 @@ class TestWriteTargetAppend:
         assert rows == 2
 
 
+@pytest.mark.spark
 class TestWriteTargetMerge:
     """Merge write mode — all on_match / on_no_match_target / on_no_match_source combos."""
 

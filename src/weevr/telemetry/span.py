@@ -4,6 +4,8 @@ import secrets
 from datetime import UTC, datetime
 from enum import StrEnum
 
+from pydantic import Field
+
 from weevr.model.base import FrozenBase
 
 
@@ -47,7 +49,7 @@ class ExecutionSpan(FrozenBase):
     parent_span_id: str | None = None
     name: str
     status: SpanStatus = SpanStatus.UNSET
-    start_time: datetime = datetime.now(UTC)
+    start_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
     end_time: datetime | None = None
     attributes: dict[str, str | int | float | bool] = {}
     events: list[SpanEvent] = []

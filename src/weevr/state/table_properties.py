@@ -24,6 +24,12 @@ class TablePropertiesStore(WatermarkStore):
     """
 
     def __init__(self, target_path: str) -> None:
+        """Initialize with the path to the Delta target table."""
+        if "`" in target_path:
+            raise StateError(
+                "Target path must not contain backtick characters",
+                store_type="table_properties",
+            )
         self._target_path = target_path
 
     @property

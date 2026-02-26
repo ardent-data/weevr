@@ -7,8 +7,14 @@ on:
     paths:
       - "src/weevr/operations/**"
       - "src/weevr/engine/**"
+      - "src/weevr/state/**"
+      - "src/weevr/context.py"
+      - "src/weevr/result.py"
       - "tests/weevr/operations/**"
       - "tests/weevr/engine/**"
+      - "tests/weevr/state/**"
+      - "tests/weevr/test_context.py"
+      - "tests/weevr/conftest.py"
       - "tests/conftest.py"
       - "tests/spark_helpers.py"
       - "pyproject.toml"
@@ -16,11 +22,20 @@ on:
     paths:
       - "src/weevr/operations/**"
       - "src/weevr/engine/**"
+      - "src/weevr/state/**"
+      - "src/weevr/context.py"
+      - "src/weevr/result.py"
       - "tests/weevr/operations/**"
       - "tests/weevr/engine/**"
+      - "tests/weevr/state/**"
+      - "tests/weevr/test_context.py"
+      - "tests/weevr/conftest.py"
       - "tests/conftest.py"
       - "tests/spark_helpers.py"
       - "pyproject.toml"
+
+permissions:
+  contents: read
 
 jobs:
   spark-tests:

@@ -32,6 +32,12 @@ class MetadataTableStore(WatermarkStore):
     """
 
     def __init__(self, table_path: str) -> None:
+        """Initialize with the path to the watermarks metadata table."""
+        if "`" in table_path:
+            raise StateError(
+                "Table path must not contain backtick characters",
+                store_type="metadata_table",
+            )
         self._table_path = table_path
 
     @property

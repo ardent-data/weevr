@@ -1,6 +1,6 @@
 # Contributing to weevr
 
-Thanks for contributing to **weevr**. This repository is intentionally scaffold-first and design-driven. Early changes should favor clarity, determinism, and ease of review over breadth or premature optimization.
+Thanks for contributing to **weevr**. This repository is intentionally scaffold-first and design-driven.
 
 ## Development prerequisites
 
@@ -53,7 +53,121 @@ uv run pyright .
 uv run pytest
 ```
 
+### Documentation build
+
+```bash
+uv run mkdocs build --strict
+```
+
+### Docstring coverage
+
+```bash
+uv run interrogate src/weevr/ --fail-under 90
+```
+
 All checks run in CI use the same commands and are pinned to the same Python version.
+
+## Documentation
+
+Documentation source files live in `docs/` and are built with [MkDocs](https://www.mkdocs.org/). Site configuration is defined in `mkdocs.yml`.
+
+### Preview locally
+
+Start a local dev server that watches for changes:
+
+```bash
+uv run mkdocs serve
+```
+
+This opens a preview at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+### Build and validate
+
+Run a strict build to catch warnings and broken links:
+
+```bash
+uv run mkdocs build --strict
+```
+
+### Adding a new page
+
+1. Create a new `.md` file under `docs/` (or a subdirectory)
+2. Add the file path to the `nav:` section in `mkdocs.yml`
+3. Verify the page renders correctly with `uv run mkdocs serve`
+
+### Markdown linting
+
+```bash
+npx markdownlint-cli2 "docs/**/*.md"
+```
+
+### Spellcheck
+
+```bash
+npx cspell "docs/**/*.md"
+```
+
+If a term is flagged incorrectly, add it to `.cspell.json`.
+
+## Docstring standards
+
+All public modules, classes, functions, and methods require docstrings following [Google style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
+
+### Required structure
+
+* **One-line summary**: imperative mood, ending with a period.
+* **Args**: document each parameter with name, type, and description.
+* **Returns**: describe the return value and type.
+* **Raises**: list exceptions the function may raise.
+* **Example**: optional usage snippet for non-trivial APIs.
+
+### Example
+
+```python
+def resolve_thread(name: str, config: dict[str, Any]) -> Thread:
+    """Resolve a thread definition from raw config.
+
+    Args:
+        name: Unique thread identifier within the weave.
+        config: Raw YAML-parsed dictionary for this thread.
+
+    Returns:
+        A fully resolved Thread with validated source, transforms, and target.
+
+    Raises:
+        ConfigError: If required keys are missing or values are invalid.
+
+    Example:
+        >>> thread = resolve_thread("orders", raw_config["threads"]["orders"])
+        >>> thread.target.mode
+        'overwrite'
+    """
+```
+
+### Enforcement
+
+* **Ruff D-series rules** check docstring format and content at lint time.
+* **interrogate** measures docstring coverage across the package. The CI threshold is 90%.
+
+## Adding examples
+
+Example YAML configurations live in `examples/`. Each example should be a valid weevr config that includes at minimum:
+
+```yaml
+config_version: "1.0"
+name: my-example
+```
+
+### Guidelines
+
+* Keep examples focused on a single concept or use case
+* Include inline comments explaining non-obvious settings
+* Examples are validated in CI via `tests/weevr/test_examples.py`
+* When adding a new example, update `examples/README.md` with a short description
+
+## A note on documentation contributions
+
+Documentation updates are welcome but not required from external contributors. Maintainers handle doc maintenance for code changes, so feel free to focus on code and tests.
 
 ## Branching model
 

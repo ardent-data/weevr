@@ -19,6 +19,7 @@ class SpanBuilder:
     """
 
     def __init__(self, trace_id: str, span_id: str, name: str, parent_span_id: str | None) -> None:
+        """Initialize a span builder with identity and parent linkage."""
         self._trace_id = trace_id
         self._span_id = span_id
         self._name = name
@@ -91,6 +92,7 @@ class SpanCollector:
     """
 
     def __init__(self, trace_id: str) -> None:
+        """Initialize a collector bound to a trace ID."""
         self._trace_id = trace_id
         self._spans: list[ExecutionSpan] = []
 

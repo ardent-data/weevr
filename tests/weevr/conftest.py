@@ -1,4 +1,4 @@
-"""Spark fixtures for top-level weevr tests."""
+"""Spark fixtures for weevr tests."""
 
 import os
 import sys
@@ -8,13 +8,19 @@ from pathlib import Path
 import pytest
 from pyspark.sql import SparkSession
 
+# Ensure PySpark worker processes use the same Python interpreter as the test
+# runner (i.e., the virtual environment Python, not a system Python).
 os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
 os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 
 @pytest.fixture(scope="session")
 def spark() -> Generator[SparkSession, None, None]:
-    """Session-scoped SparkSession with Delta Lake support."""
+    """Session-scoped SparkSession with Delta Lake support.
+
+    Configures a local Spark session suitable for unit and integration tests.
+    Uses configure_spark_with_delta_pip to handle Delta JAR loading automatically.
+    """
     from delta import configure_spark_with_delta_pip
 
     builder = (
@@ -38,7 +44,11 @@ def spark() -> Generator[SparkSession, None, None]:
 
 @pytest.fixture()
 def tmp_delta_path(tmp_path: Path):
-    """Function-scoped factory for isolated Delta table paths."""
+    """Function-scoped factory for isolated Delta table paths.
+
+    Returns a callable that produces unique subdirectory paths under tmp_path,
+    ensuring each test gets its own isolated Delta table location.
+    """
 
     def _make_path(name: str) -> str:
         table_path = tmp_path / name

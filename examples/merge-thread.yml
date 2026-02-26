@@ -1,0 +1,42 @@
+# Merge Thread Example
+#
+# Reads a Delta source and merges into the target table. Rows are
+# matched on business keys; matched rows are updated, unmatched
+# source rows are inserted, and unmatched target rows are ignored.
+
+config_version: "1.0"
+name: dim_product
+
+sources:
+  products:
+    type: delta
+    alias: staging.products
+
+steps:
+  - select:
+      columns:
+        - product_id
+        - product_name
+        - category
+        - unit_price
+        - is_active
+        - updated_at
+
+  - cast:
+      columns:
+        unit_price: "decimal(12,2)"
+
+target:
+  alias: curated.dim_product
+
+keys:
+  business_key:
+    - product_id
+
+write:
+  mode: merge
+  match_keys:
+    - product_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore

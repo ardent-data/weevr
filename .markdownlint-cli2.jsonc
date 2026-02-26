@@ -1,0 +1,25 @@
+{
+  // Line length: 100 characters (match project standard)
+  "config": {
+    "MD013": {
+      "line_length": 100,
+      "code_blocks": false,
+      "tables": false,
+      "headings": false
+    },
+    // Allow inline HTML (for admonitions and advanced formatting)
+    "MD033": false,
+    // Disable trailing punctuation in headings (project uses colons)
+    "MD026": false,
+    // Allow compact table style (no padding required around pipes)
+    "MD060": false,
+    // Allow mixed code block styles (fenced and indented in lists)
+    "MD046": false,
+    // Allow emphasis for sub-headings in guides
+    "MD036": false,
+    // Use 4-space list indentation (match Python/project convention)
+    "MD007": {
+      "indent": 4
+    }
+  }
+}
