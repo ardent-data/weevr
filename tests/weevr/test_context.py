@@ -210,11 +210,11 @@ write:
 
 
 def _create_weave_yaml(base: Path, name: str, thread_names: list[str]) -> Path:
-    """Create a minimal weave config referencing threads by name."""
+    """Create a minimal weave config referencing threads by ref path."""
     weave_dir = base / "weaves"
     weave_dir.mkdir(parents=True, exist_ok=True)
     file_path = weave_dir / f"{name}.weave"
-    threads_yaml = "\n".join(f"  - {t}" for t in thread_names)
+    threads_yaml = "\n".join(f'  - ref: "threads/{t}.thread"' for t in thread_names)
     file_path.write_text(
         f"""\
 config_version: "1.0"
@@ -226,11 +226,11 @@ threads:
 
 
 def _create_loom_yaml(base: Path, name: str, weave_names: list[str]) -> Path:
-    """Create a minimal loom config referencing weaves."""
+    """Create a minimal loom config referencing weaves by ref path."""
     loom_dir = base / "looms"
     loom_dir.mkdir(parents=True, exist_ok=True)
     file_path = loom_dir / f"{name}.loom"
-    weaves_yaml = "\n".join(f"  - {w}" for w in weave_names)
+    weaves_yaml = "\n".join(f'  - ref: "weaves/{w}.weave"' for w in weave_names)
     file_path.write_text(
         f"""\
 config_version: "1.0"
@@ -261,9 +261,10 @@ class TestContextLoad:
         tgt = str(tmp_path / "tgt_w")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "t1", src, tgt)
-        weave_yaml = _create_weave_yaml(tmp_path, "test_weave", ["t1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "t1", src, tgt)
+        weave_yaml = _create_weave_yaml(project, "test_weave", ["t1"])
+        ctx = Context(spark=spark, project=project)
         loaded = ctx.load(weave_yaml)
 
         assert loaded.config_type == "weave"
@@ -275,10 +276,11 @@ class TestContextLoad:
         tgt = str(tmp_path / "tgt_l")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "t1", src, tgt)
-        _create_weave_yaml(tmp_path, "w1", ["t1"])
-        loom_yaml = _create_loom_yaml(tmp_path, "test_loom", ["w1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "t1", src, tgt)
+        _create_weave_yaml(project, "w1", ["t1"])
+        loom_yaml = _create_loom_yaml(project, "test_loom", ["w1"])
+        ctx = Context(spark=spark, project=project)
         loaded = ctx.load(loom_yaml)
 
         assert loaded.config_type == "loom"
@@ -309,9 +311,10 @@ class TestContextRunExecute:
         tgt = str(tmp_path / "tgt_wexec")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "tw1", src, tgt)
-        weave_yaml = _create_weave_yaml(tmp_path, "wexec", ["tw1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "tw1", src, tgt)
+        weave_yaml = _create_weave_yaml(project, "wexec", ["tw1"])
+        ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml)
 
         assert result.status == "success"
@@ -324,10 +327,11 @@ class TestContextRunExecute:
         tgt = str(tmp_path / "tgt_lexec")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "tl1", src, tgt)
-        _create_weave_yaml(tmp_path, "wl1", ["tl1"])
-        loom_yaml = _create_loom_yaml(tmp_path, "lexec", ["wl1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "tl1", src, tgt)
+        _create_weave_yaml(project, "wl1", ["tl1"])
+        loom_yaml = _create_loom_yaml(project, "lexec", ["wl1"])
+        ctx = Context(spark=spark, project=project)
         result = ctx.run(loom_yaml)
 
         assert result.status == "success"
@@ -359,9 +363,10 @@ class TestContextRunExecute:
         tgt = str(tmp_path / "tgt_filt")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "tf1", src, tgt)
-        weave_yaml = _create_weave_yaml(tmp_path, "wfilt", ["tf1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "tf1", src, tgt)
+        weave_yaml = _create_weave_yaml(project, "wfilt", ["tf1"])
+        ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, threads=["nonexistent"])
 
         assert result.status == "success"
@@ -388,9 +393,10 @@ class TestValidateMode:
         tgt = str(tmp_path / "tgt_vw")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "vt2", src, tgt)
-        weave_yaml = _create_weave_yaml(tmp_path, "vw1", ["vt2"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "vt2", src, tgt)
+        weave_yaml = _create_weave_yaml(project, "vw1", ["vt2"])
+        ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "success"
@@ -427,9 +433,10 @@ class TestPlanMode:
         tgt = str(tmp_path / "tgt_pw")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "pw1", src, tgt)
-        weave_yaml = _create_weave_yaml(tmp_path, "wpln", ["pw1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "pw1", src, tgt)
+        weave_yaml = _create_weave_yaml(project, "wpln", ["pw1"])
+        ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, mode="plan")
 
         assert result.status == "success"
@@ -442,10 +449,11 @@ class TestPlanMode:
         tgt = str(tmp_path / "tgt_pl")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
-        _create_thread_yaml(tmp_path, "pl1", src, tgt)
-        _create_weave_yaml(tmp_path, "wpl1", ["pl1"])
-        loom_yaml = _create_loom_yaml(tmp_path, "lpln", ["wpl1"])
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "pl1", src, tgt)
+        _create_weave_yaml(project, "wpl1", ["pl1"])
+        loom_yaml = _create_loom_yaml(project, "lpln", ["wpl1"])
+        ctx = Context(spark=spark, project=project)
         result = ctx.run(loom_yaml, mode="plan")
 
         assert result.status == "success"
