@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/ardent-data/weevr/compare/weevr-v0.7.4...weevr-v1.0.0) (2026-02-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** typed extensions and project-centric context ([#40](https://github.com/ardent-data/weevr/issues/40))
+
+### Features
+
+* **config:** typed extensions and project-centric context ([#40](https://github.com/ardent-data/weevr/issues/40)) ([ece134a](https://github.com/ardent-data/weevr/commit/ece134a4b53d2928674999647ac812ddbd94e7cc))
+* **engine:** add advanced transforms, config macros, and naming normalization ([#37](https://github.com/ardent-data/weevr/issues/37)) ([cfefb4c](https://github.com/ardent-data/weevr/commit/cfefb4c92bf524ad1a627b5dc79ecb53256c3f56))
+
 ## [0.7.4](https://github.com/ardent-data/weevr/compare/weevr-v0.7.3...weevr-v0.7.4) (2026-02-24)
 
 
