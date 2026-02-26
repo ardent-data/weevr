@@ -348,7 +348,8 @@ def execute_loom(
     # Create root collector and loom span
     trace_id = generate_trace_id()
     collector = SpanCollector(trace_id)
-    loom_span_builder = collector.start_span(f"loom:{loom.name}")
+    loom_span_label = loom.qualified_key or loom.name
+    loom_span_builder = collector.start_span(f"loom:{loom_span_label}")
     loom_span_id = loom_span_builder.span_id
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
@@ -429,7 +430,7 @@ def execute_loom(
     collector.add_span(loom_span)
 
     # Build loom telemetry
-    loom_telemetry = _build_loom_telemetry(loom.name, weave_results, collector)
+    loom_telemetry = _build_loom_telemetry(loom_span_label, weave_results, collector)
 
     logger.debug(
         "Loom '%s' complete — status=%s, duration=%dms",
