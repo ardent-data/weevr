@@ -32,22 +32,21 @@ from weevr import Context
 
 ctx = Context(
     spark=spark,
-    param_file="params/prod.yaml",
+    "my-project.weevr",
     log_level="standard",
 )
 ```
 
 !!! tip "Environment-specific parameters"
-    Use `param_file` to point at the appropriate parameter file for the
-    environment (`params/dev.yaml`, `params/staging.yaml`, `params/prod.yaml`).
-    Runtime parameter overrides can be passed via the `params` argument.
+    Use the `params` argument to pass environment-specific values
+    at runtime. Variables in your YAML configs resolve from these parameters.
 
 ## Step 3 -- Execute the loom
 
 Call `ctx.run()` with the path to your loom config:
 
 ```python
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 ```
 
 The path resolves relative to the notebook's working directory. In Fabric, this
@@ -86,18 +85,17 @@ Override parameter file values or inject execution-specific values through the
 ```python
 ctx = Context(
     spark=spark,
+    "my-project.weevr",
     params={
         "run_date": "2025-06-15",
         "batch_id": "nightly_20250615",
     },
-    param_file="params/prod.yaml",
 )
 
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 ```
 
-Runtime parameters take highest priority, followed by parameter file values,
-then config defaults.
+Runtime parameters take highest priority, followed by config defaults.
 
 ## Step 6 -- Schedule via a Fabric Data Pipeline
 
@@ -120,11 +118,11 @@ run_date = mssparkutils.notebook.params.get("run_date", "")
 
 ctx = Context(
     spark=spark,
+    "my-project.weevr",
     params={"run_date": run_date},
-    param_file="params/prod.yaml",
 )
 
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 
 # Signal success or failure to the pipeline
 if result.status == "failure":

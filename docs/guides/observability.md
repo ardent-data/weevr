@@ -59,15 +59,15 @@ Set the log level when constructing a `Context`:
 ```python
 from weevr import Context
 
-ctx = Context(spark, log_level="verbose")
-result = ctx.run("looms/nightly.yaml")
+ctx = Context(spark, "my-project.weevr", log_level="verbose")
+result = ctx.run("nightly.loom")
 ```
 
 You can also set it in YAML execution settings on a loom or weave, and it
 cascades through configuration inheritance:
 
 ```yaml
-# looms/nightly.yaml
+# nightly.loom
 defaults:
   execution:
     log_level: standard
@@ -164,7 +164,7 @@ the tree into a list of `ExecutionSpan` objects, suitable for export to
 any OTel-compatible backend:
 
 ```python
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 
 # Navigate the tree
 for weave_name, weave_trace in result.detail.trace.weaves.items():
@@ -205,7 +205,7 @@ depends on what was executed:
 ### Accessing telemetry
 
 ```python
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 telemetry = result.telemetry
 
 for weave_name, weave_telem in telemetry.weave_telemetry.items():
@@ -292,8 +292,8 @@ When a thread fails, use this progression:
    in the transform logic or the write step.
 
 ```python
-ctx = Context(spark, log_level="verbose")
-result = ctx.run("looms/nightly.yaml")
+ctx = Context(spark, "my-project.weevr", log_level="verbose")
+result = ctx.run("nightly.loom")
 
 if result.status != "success":
     print(result.summary())

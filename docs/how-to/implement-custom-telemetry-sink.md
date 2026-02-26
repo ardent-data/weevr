@@ -26,8 +26,8 @@ executed:
 ```python
 from weevr import Context
 
-ctx = Context(spark)
-result = ctx.run("looms/daily.yaml")
+ctx = Context(spark, "my-project.weevr")
+result = ctx.run("daily.loom")
 
 telemetry = result.telemetry
 if telemetry is None:
@@ -81,7 +81,7 @@ weevr emits structured JSON log lines during execution. The log level is
 controlled via the `Context` constructor:
 
 ```python
-ctx = Context(spark, log_level="verbose")
+ctx = Context(spark, "my-project.weevr", log_level="verbose")
 ```
 
 Available levels: `minimal`, `standard` (default), `verbose`, `debug`. Each log

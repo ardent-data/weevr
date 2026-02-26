@@ -35,7 +35,7 @@ A thread encapsulates:
 - **Target** -- a single write destination, typically a Delta table
 
 ```yaml
-# threads/dimensions/dim_customer.yaml
+# dimensions/dim_customer.thread
 config_version: "1"
 sources:
   customers:
@@ -81,12 +81,12 @@ Key responsibilities:
   which threads run (e.g., run a seed thread only when the target is empty).
 
 ```yaml
-# weaves/dimensions.yaml
+# dimensions.weave
 config_version: "1"
 threads:
-  - name: dimensions.dim_customer
-  - name: dimensions.dim_product
-  - name: dimensions.dim_store
+  - ref: dimensions/dim_customer.thread
+  - ref: dimensions/dim_product.thread
+  - ref: dimensions/dim_store.thread
     condition:
       when: "table_empty('silver.dim_store')"
 ```
@@ -108,11 +108,11 @@ Key responsibilities:
   release.
 
 ```yaml
-# looms/nightly.yaml
+# nightly.loom
 config_version: "1"
 weaves:
-  - name: dimensions
-  - name: facts
+  - ref: dimensions.weave
+  - ref: facts.weave
 defaults:
   write:
     mode: merge
