@@ -330,9 +330,7 @@ class TestReferenceResolution:
 
         # Create weave file referencing the thread
         weave_file = tmp_path / "dimensions.weave"
-        weave_file.write_text(
-            'config_version: "1.0"\nthreads:\n  - ref: dim_customer.thread\n'
-        )
+        weave_file.write_text('config_version: "1.0"\nthreads:\n  - ref: dim_customer.thread\n')
 
         loom_config = {
             "config_version": "1.0",

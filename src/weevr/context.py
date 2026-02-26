@@ -126,13 +126,9 @@ class Context:
         ):
             project_path = Path(project_str)
             if not project_str.endswith(".weevr"):
-                raise ConfigError(
-                    f"Project directory must have .weevr extension: {project_str}"
-                )
+                raise ConfigError(f"Project directory must have .weevr extension: {project_str}")
             if not project_path.is_dir():
-                raise ConfigError(
-                    f"Project directory not found: {project_str}"
-                )
+                raise ConfigError(f"Project directory not found: {project_str}")
             return project_path
 
         # Tier 2: OneLake qualified — workspace + lakehouse provided
@@ -656,8 +652,7 @@ class Context:
         ext_type = detect_config_type_from_extension(file_path)
         if ext_type is None:
             raise ConfigError(
-                f"Unsupported extension '{file_path.suffix}'. "
-                "Expected .thread, .weave, or .loom",
+                f"Unsupported extension '{file_path.suffix}'. Expected .thread, .weave, or .loom",
                 file_path=str(file_path),
             )
         config_type = ext_type
@@ -677,9 +672,7 @@ class Context:
         resolved = resolve_variables(config_dict, param_context)
 
         # Step 7: Resolve child references
-        resolved_with_refs = resolve_references(
-            resolved, config_type, project_root, self._params
-        )
+        resolved_with_refs = resolve_references(resolved, config_type, project_root, self._params)
 
         # Step 8: Apply inheritance cascade
         if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:

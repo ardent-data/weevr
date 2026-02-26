@@ -76,9 +76,7 @@ target:
 """
         )
 
-        result = load_config(
-            thread_file, runtime_params={"lakehouse": "bronze", "env": "dev"}
-        )
+        result = load_config(thread_file, runtime_params={"lakehouse": "bronze", "env": "dev"})
 
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"

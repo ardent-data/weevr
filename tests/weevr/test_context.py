@@ -58,9 +58,7 @@ class TestContextValidation:
             workspace="ws-id",
             lakehouse="lh-id",
         )
-        expected = (
-            "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
-        )
+        expected = "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
         assert ctx.project_root == expected
 
     def test_missing_project_raises(self) -> None:

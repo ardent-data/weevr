@@ -353,9 +353,7 @@ def resolve_references(
                     # Set qualified key
                     child_dict["qualified_key"] = ref
 
-                    context = build_param_context(
-                        runtime_params, child_dict.get("defaults")
-                    )
+                    context = build_param_context(runtime_params, child_dict.get("defaults"))
                     resolved_child = resolve_variables(child_dict, context)
 
                     resolved_child = resolve_references(
@@ -420,9 +418,7 @@ def resolve_references(
                     # Set qualified key
                     child_dict["qualified_key"] = ref
 
-                    context = build_param_context(
-                        runtime_params, child_dict.get("defaults")
-                    )
+                    context = build_param_context(runtime_params, child_dict.get("defaults"))
                     resolved_child = resolve_variables(child_dict, context)
 
                     # Preserve entry-level overrides (dependencies, condition)
