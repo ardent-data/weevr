@@ -189,11 +189,11 @@ def _project_dir(tmp_path: Path) -> Path:
 
 
 def _create_thread_yaml(base: Path, name: str, src_alias: str, tgt_path: str) -> Path:
-    """Create a minimal thread YAML config at base/threads/<name>.yaml."""
+    """Create a minimal thread config at base/threads/<name>.thread."""
     thread_dir = base / "threads"
     thread_dir.mkdir(parents=True, exist_ok=True)
-    yaml_path = thread_dir / f"{name}.yaml"
-    yaml_path.write_text(
+    file_path = thread_dir / f"{name}.thread"
+    file_path.write_text(
         f"""\
 config_version: "1.0"
 sources:
@@ -206,39 +206,39 @@ write:
   mode: overwrite
 """
     )
-    return yaml_path
+    return file_path
 
 
 def _create_weave_yaml(base: Path, name: str, thread_names: list[str]) -> Path:
-    """Create a minimal weave YAML config referencing threads by name."""
+    """Create a minimal weave config referencing threads by name."""
     weave_dir = base / "weaves"
     weave_dir.mkdir(parents=True, exist_ok=True)
-    yaml_path = weave_dir / f"{name}.yaml"
+    file_path = weave_dir / f"{name}.weave"
     threads_yaml = "\n".join(f"  - {t}" for t in thread_names)
-    yaml_path.write_text(
+    file_path.write_text(
         f"""\
 config_version: "1.0"
 threads:
 {threads_yaml}
 """
     )
-    return yaml_path
+    return file_path
 
 
 def _create_loom_yaml(base: Path, name: str, weave_names: list[str]) -> Path:
-    """Create a minimal loom YAML config referencing weaves."""
+    """Create a minimal loom config referencing weaves."""
     loom_dir = base / "looms"
     loom_dir.mkdir(parents=True, exist_ok=True)
-    yaml_path = loom_dir / f"{name}.yaml"
+    file_path = loom_dir / f"{name}.loom"
     weaves_yaml = "\n".join(f"  - {w}" for w in weave_names)
-    yaml_path.write_text(
+    file_path.write_text(
         f"""\
 config_version: "1.0"
 weaves:
 {weaves_yaml}
 """
     )
-    return yaml_path
+    return file_path
 
 
 @pytest.mark.spark
