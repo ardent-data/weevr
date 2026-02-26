@@ -142,7 +142,7 @@ live in your integration project alongside the YAML configs.
 Start by checking the `RunResult`:
 
 ```python
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 print(result.status)    # "success", "failure", or "partial"
 print(result.summary())
 ```
@@ -150,8 +150,8 @@ print(result.summary())
 If that does not pinpoint the issue, increase the log level:
 
 ```python
-ctx = Context(spark, log_level="verbose")
-result = ctx.run("looms/nightly.yaml")
+ctx = Context(spark, "my-project.weevr", log_level="verbose")
+result = ctx.run("nightly.loom")
 ```
 
 At `verbose` level, weevr logs every step of execution -- source reads,
@@ -163,7 +163,7 @@ For transform logic issues, use preview mode to run against sampled data
 without writing:
 
 ```python
-result = ctx.run("looms/nightly.yaml", mode="preview")
+result = ctx.run("nightly.loom", mode="preview")
 ```
 
 See the [Observability](guides/observability.md) guide for the full
@@ -254,7 +254,7 @@ configuration guide.
 Use validate mode:
 
 ```python
-result = ctx.run("looms/nightly.yaml", mode="validate")
+result = ctx.run("nightly.loom", mode="validate")
 print(result.status)
 print(result.validation_errors)
 ```
@@ -267,7 +267,7 @@ production runs.
 You can also use plan mode to see the execution order without running:
 
 ```python
-result = ctx.run("looms/nightly.yaml", mode="plan")
+result = ctx.run("nightly.loom", mode="plan")
 ```
 
 See [Execution Modes](concepts/execution-modes.md) for the full set of

@@ -102,17 +102,17 @@ Available modes: `overwrite` (replace all data), `append` (add rows), and
 ## Step 5 -- Add the thread to a weave
 
 Reference your new thread in an existing or new weave config. Thread references
-use dot-separated paths that map to the directory structure under `threads/`:
+use paths relative to the project root, with typed extensions:
 
 ```yaml
-# weaves/orders.yaml
+# orders.weave
 config_version: "1.0"
 
 threads:
-  - orders.fact_orders
+  - ref: orders/fact_orders.thread
 ```
 
-This resolves to `threads/orders/fact_orders.yaml`.
+This resolves to the `orders/fact_orders.thread` file in the project directory.
 
 ## Step 6 -- Run and verify
 
@@ -121,8 +121,8 @@ Execute the weave and check the result:
 ```python
 from weevr import Context
 
-ctx = Context(spark)
-result = ctx.run("weaves/orders.yaml")
+ctx = Context(spark, "my-project.weevr")
+result = ctx.run("orders.weave")
 
 assert result.status == "success"
 print(result.summary())
@@ -131,12 +131,12 @@ print(result.summary())
 Use `mode="preview"` to test transforms against sampled data without writing:
 
 ```python
-result = ctx.run("weaves/orders.yaml", mode="preview")
-result.preview_data["orders.fact_orders"].show()
+result = ctx.run("orders.weave", mode="preview")
+result.preview_data["fact_orders"].show()
 ```
 
 ## Putting it together
 
 Combine the sections above into a single file at
-`threads/orders/fact_orders.yaml`. The complete structure is:
+`orders/fact_orders.thread`. The complete structure is:
 `config_version` at the top, then `sources`, `steps`, `target`, and `write`.

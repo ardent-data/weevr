@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
@@ -299,7 +300,11 @@ class LoadedConfig:
 
         elif self._config_type == "loom" and self._weaves is not None and self._threads is not None:
             for weave_entry in self._model.weaves:
-                weave_name = weave_entry.name if hasattr(weave_entry, "name") else str(weave_entry)
+                weave_name = (
+                    getattr(weave_entry, "name", "")
+                    or (Path(weave_entry.ref).stem if getattr(weave_entry, "ref", None) else "")
+                    or str(weave_entry)
+                )
                 weave = self._weaves.get(weave_name)
                 if weave is None:
                     continue

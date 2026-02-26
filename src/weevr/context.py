@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,8 +13,9 @@ from pydantic import ValidationError
 from pyspark.sql import SparkSession
 
 from weevr.config.inheritance import apply_inheritance
+from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
-    detect_config_type,
+    detect_config_type_from_extension,
     extract_config_version,
     parse_yaml,
     validate_config_version,
@@ -27,7 +29,7 @@ from weevr.config.validation import validate_schema
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
 from weevr.engine.runner import execute_loom, execute_weave
-from weevr.errors import DataValidationError, ExecutionError, ModelValidationError
+from weevr.errors import ConfigError, DataValidationError, ExecutionError, ModelValidationError
 from weevr.model.execution import LogLevel
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
@@ -49,31 +51,40 @@ class _ResolvedConfig:
     threads: dict[str, dict[str, Thread]] = field(default_factory=dict)
 
 
-_CONFIG_TYPE_DIRS = {"thread": "threads", "weave": "weaves", "loom": "looms"}
-
-
 class Context:
     """Entry point for all weevr operations.
 
-    Wraps a SparkSession with resolved parameters and execution configuration.
-    Provides ``run()`` for execution and ``load()`` for model inspection.
+    Wraps a SparkSession with a project reference, resolved parameters,
+    and execution configuration. Provides ``run()`` for execution and
+    ``load()`` for model inspection.
 
     Args:
         spark: Active SparkSession (required).
+        project: Project identifier. Accepts three forms:
+
+            - **Simple name** (e.g., ``"my_project"``): resolved via the
+              default lakehouse at ``/lakehouse/default/Files/<name>.weevr/``.
+            - **Qualified** (with *workspace* and *lakehouse*): resolved via
+              OneLake ABFS path.
+            - **Direct path** (e.g., ``"/path/to/project.weevr"``): used as-is.
         params: Runtime parameter overrides.
-        param_file: Path to a YAML parameter file.
         log_level: Logging verbosity — ``"minimal"``, ``"standard"`` (default),
             ``"verbose"``, or ``"debug"``.
+        workspace: Fabric workspace ID for cross-lakehouse resolution.
+        lakehouse: Fabric lakehouse ID for cross-lakehouse resolution.
     """
 
     def __init__(
         self,
         spark: SparkSession,
+        project: str | Path,
+        *,
         params: dict[str, Any] | None = None,
-        param_file: str | Path | None = None,
         log_level: str = "standard",
+        workspace: str | None = None,
+        lakehouse: str | None = None,
     ) -> None:
-        """Initialize a Context with a SparkSession and optional parameters."""
+        """Initialize a Context with a SparkSession and project reference."""
         if not isinstance(spark, SparkSession):
             raise TypeError(f"'spark' must be a SparkSession, got {type(spark).__name__}")
 
@@ -85,9 +96,58 @@ class Context:
 
         self._spark = spark
         self._params = params
-        self._param_file = Path(param_file) if param_file is not None else None
         self._log_level = resolved_level
+        self._project_root = self._resolve_project_path(project, workspace, lakehouse)
         configure_logging(self._log_level)
+
+    @staticmethod
+    def _resolve_project_path(
+        project: str | Path,
+        workspace: str | None,
+        lakehouse: str | None,
+    ) -> Path | str:
+        """Resolve the project path using three-tier resolution.
+
+        Args:
+            project: Project name or direct path.
+            workspace: Optional Fabric workspace ID.
+            lakehouse: Optional Fabric lakehouse ID.
+
+        Returns:
+            Resolved project root path (Path for local, str for ABFS).
+
+        Raises:
+            ConfigError: If the project cannot be resolved.
+        """
+        project_str = str(project)
+
+        # Tier 3: Direct path — absolute path or has .weevr suffix and exists
+        if os.path.isabs(project_str) or (
+            project_str.endswith(".weevr") and os.path.isdir(project_str)
+        ):
+            project_path = Path(project_str)
+            if not project_str.endswith(".weevr"):
+                raise ConfigError(f"Project directory must have .weevr extension: {project_str}")
+            if not project_path.is_dir():
+                raise ConfigError(f"Project directory not found: {project_str}")
+            return project_path
+
+        # Tier 2: OneLake qualified — workspace + lakehouse provided
+        if workspace and lakehouse:
+            return (
+                f"abfss://{workspace}@onelake.dfs.fabric.microsoft.com"
+                f"/{lakehouse}/Files/{project_str}.weevr"
+            )
+
+        # Tier 1: Default lakehouse
+        default_path = Path(f"/lakehouse/default/Files/{project_str}.weevr")
+        if default_path.is_dir():
+            return default_path
+
+        raise ConfigError(
+            "No default lakehouse available. Provide workspace and lakehouse "
+            "parameters or a direct project path."
+        )
 
     @property
     def spark(self) -> SparkSession:
@@ -104,6 +164,11 @@ class Context:
         """Configured logging verbosity."""
         return self._log_level
 
+    @property
+    def project_root(self) -> Path | str:
+        """Resolved project root path."""
+        return self._project_root
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -111,12 +176,13 @@ class Context:
     def load(self, path: str | Path) -> LoadedConfig:
         """Load and validate a config file, returning a model wrapper.
 
-        Parses, resolves, and hydrates the config at *path* without executing
-        anything.  The returned :class:`LoadedConfig` exposes the underlying
-        model and, for weave/loom configs, a lazily-built execution plan.
+        Parses, resolves, and hydrates the config at *path* (relative to
+        the project root) without executing anything. The returned
+        :class:`LoadedConfig` exposes the underlying model and, for
+        weave/loom configs, a lazily-built execution plan.
 
         Args:
-            path: Filesystem path to a thread, weave, or loom YAML file.
+            path: Path to a config file, relative to the project root.
 
         Returns:
             A :class:`LoadedConfig` wrapping the hydrated model.
@@ -142,7 +208,7 @@ class Context:
         """Run a config file in the specified mode.
 
         Args:
-            path: Filesystem path to a thread, weave, or loom YAML file.
+            path: Path to a config file, relative to the project root.
             mode: Execution mode — ``"execute"`` (default), ``"validate"``,
                 ``"plan"``, or ``"preview"``.
             tags: Run only threads matching any of these tags.
@@ -209,7 +275,6 @@ class Context:
             model = resolved.model
             assert isinstance(model, Thread)
             engine_result = execute_thread(self._spark, model)
-            # Direct thread execution never returns "skipped" (only runner does)
             assert engine_result.status in ("success", "failure")
             return RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
@@ -244,7 +309,6 @@ class Context:
                 thread_entries=filtered_entries,
             )
             engine_result = execute_weave(self._spark, plan, weave_threads)
-            # Direct weave execution never returns "skipped" (only loom runner does)
             assert engine_result.status in ("success", "failure", "partial")
             return RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
@@ -261,11 +325,10 @@ class Context:
         assert isinstance(model, Loom)
         all_warnings: list[str] = []
 
-        # Apply filtering per-weave and remove empty weaves
         filtered_weaves: dict[str, Weave] = {}
         filtered_threads: dict[str, dict[str, Thread]] = {}
         for weave_entry in model.weaves:
-            weave_name = weave_entry.name
+            weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
             weave = resolved.weaves.get(weave_name)
             if weave is None:
                 continue
@@ -340,7 +403,6 @@ class Context:
         """Validate config, DAG, and source existence without executing."""
         validation_errors: list[str] = []
 
-        # DAG validation — build plans to detect cycles
         if resolved.config_type == "weave":
             model = resolved.model
             assert isinstance(model, Weave)
@@ -358,7 +420,9 @@ class Context:
             model = resolved.model
             assert isinstance(model, Loom)
             for weave_entry in model.weaves:
-                weave_name = weave_entry.name
+                weave_name = weave_entry.name or (
+                    Path(weave_entry.ref).stem if weave_entry.ref else ""
+                )
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     validation_errors.append(f"Weave '{weave_name}' not found")
@@ -375,7 +439,6 @@ class Context:
                         f"DAG validation failed for weave '{weave_name}': {exc}"
                     )
 
-        # Source existence checking
         all_threads = self._collect_all_threads(resolved)
         source_errors = self._check_source_existence(all_threads)
         validation_errors.extend(source_errors)
@@ -469,7 +532,9 @@ class Context:
             model = resolved.model
             assert isinstance(model, Loom)
             for weave_entry in model.weaves:
-                weave_name = weave_entry.name
+                weave_name = weave_entry.name or (
+                    Path(weave_entry.ref).stem if weave_entry.ref else ""
+                )
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     continue
@@ -524,27 +589,20 @@ class Context:
 
         for thread_name, thread in all_threads.items():
             try:
-                # Read sources with row limit
                 sources_map = read_sources(self._spark, thread.sources)
                 for key in sources_map:
                     sources_map[key] = sources_map[key].limit(sample_rows)
 
-                # Primary DataFrame
                 df = next(iter(sources_map.values()))
-
-                # Run pipeline steps
                 df = run_pipeline(df, thread.steps, sources_map)
 
-                # Run validations (skip assertions per DEC-012)
                 if thread.validations:
                     outcome = validate_dataframe(df, thread.validations)
                     df = outcome.clean_df
 
-                # Compute keys
                 if thread.keys is not None:
                     df = compute_keys(df, thread.keys)
 
-                # Apply column mapping
                 df = apply_target_mapping(df, thread.target, self._spark)
 
                 preview_data[thread_name] = df
@@ -568,6 +626,20 @@ class Context:
     # Config assembly
     # ------------------------------------------------------------------
 
+    def _resolve_config_path(self, path: str | Path) -> Path:
+        """Resolve a config path relative to the project root.
+
+        Args:
+            path: Config file path, relative to the project root.
+
+        Returns:
+            Absolute path to the config file.
+        """
+        p = Path(path)
+        if p.is_absolute():
+            return p
+        return Path(self._project_root) / p
+
     def _load_resolved(self, path: str | Path) -> _ResolvedConfig:
         """Run the config pipeline and return the hydrated model with children.
 
@@ -575,12 +647,20 @@ class Context:
         configs (``_resolved_threads`` / ``_resolved_weaves``) before Pydantic
         hydration strips them.
         """
-        path = Path(path)
+        file_path = self._resolve_config_path(path)
+        project_root = Path(self._project_root)
 
         # Steps 1-3: Parse, version, type
-        raw = parse_yaml(path)
+        raw = parse_yaml(file_path)
         version = extract_config_version(raw)
-        config_type = detect_config_type(raw)
+
+        ext_type = detect_config_type_from_extension(file_path)
+        if ext_type is None:
+            raise ConfigError(
+                f"Unsupported extension '{file_path.suffix}'. Expected .thread, .weave, or .loom",
+                file_path=str(file_path),
+            )
+        config_type = ext_type
         validate_config_version(version, config_type)
 
         # Step 4: Schema validation
@@ -588,13 +668,8 @@ class Context:
         config_dict = validated.model_dump(exclude_unset=True)
 
         # Step 5: Parameter context
-        param_file_data = None
-        if self._param_file:
-            param_file_data = parse_yaml(self._param_file)
-
         param_context = build_param_context(
             self._params,
-            param_file_data,
             config_dict.get("defaults") or config_dict.get("params"),
         )
 
@@ -602,11 +677,7 @@ class Context:
         resolved = resolve_variables(config_dict, param_context)
 
         # Step 7: Resolve child references
-        base_path = self._resolve_base_path(path, config_type)
-        param_file_path = self._param_file
-        resolved_with_refs = resolve_references(
-            resolved, config_type, base_path, self._params, param_file_path
-        )
+        resolved_with_refs = resolve_references(resolved, config_type, project_root, self._params)
 
         # Step 8: Apply inheritance cascade
         if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
@@ -624,13 +695,30 @@ class Context:
                 merged = apply_inheritance(None, weave_defaults, thread)
                 resolved_with_refs["_resolved_threads"][i] = merged
 
-        # Derive config name
-        config_name = self._derive_name(path, config_type)
-        if not resolved_with_refs.get("name"):
+        # Step 8b: Expand foreach macros in thread steps
+        if config_type == "thread" and isinstance(resolved_with_refs.get("steps"), list):
+            resolved_with_refs["steps"] = expand_foreach(resolved_with_refs["steps"])
+
+        # Derive config name from stem and inject
+        config_name = file_path.stem
+        declared_name = resolved_with_refs.get("name", "")
+        if declared_name and declared_name != config_name:
+            raise ConfigError(
+                f"Declared name '{declared_name}' does not match filename stem '{config_name}'",
+                file_path=str(file_path),
+            )
+        if not declared_name:
             resolved_with_refs["name"] = config_name
 
+        # Compute qualified key for top-level config
+        try:
+            rel = file_path.resolve().relative_to(project_root.resolve())
+            resolved_with_refs["qualified_key"] = str(rel)
+        except ValueError:
+            resolved_with_refs["qualified_key"] = str(file_path)
+
         # Step 9: Hydrate top-level model
-        model = self._hydrate_model(resolved_with_refs, config_type, path)
+        model = self._hydrate_model(resolved_with_refs, config_type, file_path)
 
         # Extract and hydrate child models
         weaves: dict[str, Weave] = {}
@@ -641,20 +729,27 @@ class Context:
             thread_map = self._hydrate_threads(
                 resolved_with_refs.get("threads", []),
                 resolved_with_refs.get("_resolved_threads", []),
-                path,
+                file_path,
             )
             threads[weave_name] = thread_map
 
         elif config_type == "loom":
-            for weave_ref, weave_dict in zip(
+            for weave_entry, weave_dict in zip(
                 resolved_with_refs.get("weaves", []),
                 resolved_with_refs.get("_resolved_weaves", []),
                 strict=True,
             ):
-                weave_name = weave_ref if isinstance(weave_ref, str) else str(weave_ref)
+                # Determine weave name from entry or resolved dict
+                if isinstance(weave_entry, dict):
+                    weave_name = weave_entry.get("name", "") or weave_entry.get("ref", "")
+                    if weave_entry.get("ref") and not weave_entry.get("name"):
+                        weave_name = Path(weave_entry["ref"]).stem
+                else:
+                    weave_name = str(weave_entry)
+
                 if not weave_dict.get("name"):
                     weave_dict["name"] = weave_name
-                weave_model = self._hydrate_model(weave_dict, "weave", path)
+                weave_model = self._hydrate_model(weave_dict, "weave", file_path)
                 if not isinstance(weave_model, Weave):  # pragma: no cover
                     continue
                 weaves[weave_name] = weave_model
@@ -662,7 +757,7 @@ class Context:
                 thread_map = self._hydrate_threads(
                     weave_dict.get("threads", []),
                     weave_dict.get("_resolved_threads", []),
-                    path,
+                    file_path,
                 )
                 threads[weave_name] = thread_map
 
@@ -673,35 +768,6 @@ class Context:
             weaves=weaves,
             threads=threads,
         )
-
-    @staticmethod
-    def _resolve_base_path(path: Path, config_type: str) -> Path:
-        """Walk up from the config file to find the project root."""
-        base_path = path.parent
-        if config_type == "thread":
-            base_path = base_path.parent
-            if base_path.name == "threads":
-                base_path = base_path.parent
-        elif config_type == "weave":
-            if base_path.name == "weaves":
-                base_path = base_path.parent
-        elif config_type == "loom":
-            if base_path.name == "looms":
-                base_path = base_path.parent
-        return base_path
-
-    @staticmethod
-    def _derive_name(path: Path, config_type: str) -> str:
-        """Derive a dot-separated config name from a file path."""
-        type_dir = _CONFIG_TYPE_DIRS.get(config_type)
-        if type_dir:
-            parts = path.parts
-            for i, part in enumerate(parts):
-                if part == type_dir and i < len(parts) - 1:
-                    after = parts[i + 1 :]
-                    name_segments = list(after[:-1]) + [Path(after[-1]).stem]
-                    return ".".join(name_segments)
-        return path.stem
 
     @staticmethod
     def _hydrate_model(
@@ -725,15 +791,21 @@ class Context:
 
     @staticmethod
     def _hydrate_threads(
-        thread_names: list[Any],
+        thread_entries: list[Any],
         resolved_dicts: list[dict[str, Any]],
         source_path: Path,
     ) -> dict[str, Thread]:
-        """Hydrate resolved thread dicts into a name→Thread mapping."""
+        """Hydrate resolved thread dicts into a name->Thread mapping."""
         result: dict[str, Thread] = {}
-        for name_entry, thread_dict in zip(thread_names, resolved_dicts, strict=True):
-            # thread_names entries can be strings or dicts with "name" key
-            name = name_entry.get("name", "") if isinstance(name_entry, dict) else str(name_entry)
+        for entry, thread_dict in zip(thread_entries, resolved_dicts, strict=True):
+            # Determine the thread name from the entry or resolved dict
+            if isinstance(entry, dict):
+                name = entry.get("name", "") or entry.get("ref", "")
+                if entry.get("ref") and not entry.get("name"):
+                    name = Path(entry["ref"]).stem
+            else:
+                name = str(entry)
+
             if not thread_dict.get("name"):
                 thread_dict["name"] = name
             try:

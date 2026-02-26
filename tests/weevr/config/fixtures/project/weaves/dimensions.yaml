@@ -1,6 +1,0 @@
-config_version: "1.0"
-threads:
-  - dimensions.dim_customer
-defaults:
-  tags:
-    - dimensions

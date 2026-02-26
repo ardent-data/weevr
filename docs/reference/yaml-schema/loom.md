@@ -12,7 +12,7 @@ runtime settings that cascade down through weaves to threads.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
-| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are treated as `{ name: "<value>" }`. |
+| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings cascaded to weaves and threads |
@@ -22,12 +22,14 @@ runtime settings that cascade down through weaves to threads.
 
 ## weaves (WeaveEntry)
 
-Each entry in the `weaves` list is either a plain string or a `WeaveEntry`
-object.
+Each entry in the `weaves` list is either a plain string (shorthand) or a
+`WeaveEntry` object. Use `ref` to reference an external `.weave` file, or
+`name` for inline weave definitions within the loom.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `name` | `string` | yes | -- | Weave name matching a weave config file |
+| `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with inline `name`. |
+| `name` | `string` | no | `""` | Weave name. Required for inline definitions; derived from filename stem when using `ref`. |
 | `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
 
 ### weaves.condition (ConditionSpec)
@@ -59,11 +61,11 @@ config_version: "1"
 name: daily_etl
 
 weaves:
-  - name: ingest_raw
-  - name: build_curated
+  - ref: ingest_raw.weave
+  - ref: build_curated.weave
     condition:
       when: "${param.run_curated} == 'true'"
-  - name: publish_marts
+  - ref: publish_marts.weave
 
 defaults:
   execution:
@@ -90,11 +92,30 @@ naming:
 
 ### Shorthand weave syntax
 
-Weave entries can be plain strings when no condition is needed:
+Weave entries can be plain strings for inline definitions that need no
+condition:
 
 ```yaml
 weaves:
   - ingest_raw
   - build_curated
   - publish_marts
+```
+
+This is equivalent to:
+
+```yaml
+weaves:
+  - name: ingest_raw
+  - name: build_curated
+  - name: publish_marts
+```
+
+For external file references, use `ref` explicitly:
+
+```yaml
+weaves:
+  - ref: ingest_raw.weave
+  - ref: build_curated.weave
+  - ref: publish_marts.weave
 ```

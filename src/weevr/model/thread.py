@@ -23,6 +23,7 @@ class Thread(FrozenBase):
     """
 
     name: str = ""
+    qualified_key: str = ""
     config_version: str
     sources: dict[str, Source]
     steps: list[Step] = []

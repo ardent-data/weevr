@@ -12,24 +12,24 @@ pip install weevr
 
 ## Quick Start
 
-Define a thread — the smallest unit of work — in YAML:
+Define a thread — the smallest unit of work — using a `.thread` file:
 
 ```yaml
-# customer_dim.yml
+# dim_customer.thread
 config_version: "1.0"
-name: customer_dim
 sources:
   raw_customers:
     type: delta
     path: "${lakehouse_path}/raw/customers"
-transforms:
-  - type: filter
-    condition: "is_active = true"
-  - type: select
-    columns: [customer_id, name, email, region]
+steps:
+  - filter:
+      expr: "is_active = true"
+  - select:
+      columns: [customer_id, name, email, region]
 target:
   path: "${lakehouse_path}/curated/dim_customer"
-  write_mode: overwrite
+write:
+  mode: overwrite
 ```
 
 Run it from a Fabric Notebook or any PySpark environment:
@@ -37,8 +37,9 @@ Run it from a Fabric Notebook or any PySpark environment:
 ```python
 from weevr import Context
 
-result = Context(spark=spark, config_path="customer_dim.yml").run()
-print(result.status)  # ExecutionStatus.SUCCESS
+ctx = Context(spark, "my-project.weevr")
+result = ctx.run("dim_customer.thread")
+print(result.status)  # "success"
 ```
 
 ## Features

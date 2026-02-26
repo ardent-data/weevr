@@ -6,11 +6,12 @@ import pytest
 
 from weevr.config.parser import (
     detect_config_type,
+    detect_config_type_from_extension,
     extract_config_version,
     parse_yaml,
     validate_config_version,
 )
-from weevr.errors import ConfigParseError, ConfigVersionError
+from weevr.errors import ConfigError, ConfigParseError, ConfigVersionError
 
 # Test fixture directory
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -21,7 +22,7 @@ class TestParseYAML:
 
     def test_valid_yaml(self):
         """Parse valid YAML file."""
-        result = parse_yaml(FIXTURES / "valid_thread.yaml")
+        result = parse_yaml(FIXTURES / "valid_thread.thread")
         assert isinstance(result, dict)
         assert "config_version" in result
         assert "sources" in result
@@ -185,7 +186,7 @@ class TestParserIntegration:
 
     def test_parse_valid_thread(self):
         """Parse and validate a complete thread config."""
-        raw = parse_yaml(FIXTURES / "valid_thread.yaml")
+        raw = parse_yaml(FIXTURES / "valid_thread.thread")
         version = extract_config_version(raw)
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
@@ -196,7 +197,7 @@ class TestParserIntegration:
 
     def test_parse_valid_weave(self):
         """Parse and validate a complete weave config."""
-        raw = parse_yaml(FIXTURES / "valid_weave.yaml")
+        raw = parse_yaml(FIXTURES / "valid_weave.weave")
         version = extract_config_version(raw)
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
@@ -207,7 +208,7 @@ class TestParserIntegration:
 
     def test_parse_valid_loom(self):
         """Parse and validate a complete loom config."""
-        raw = parse_yaml(FIXTURES / "valid_loom.yaml")
+        raw = parse_yaml(FIXTURES / "valid_loom.loom")
         version = extract_config_version(raw)
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
@@ -229,3 +230,33 @@ class TestParserIntegration:
         config_type = detect_config_type(raw)
         with pytest.raises(ConfigVersionError):
             validate_config_version(version, config_type)
+
+
+class TestExtensionDetection:
+    """Test detect_config_type_from_extension for typed extensions."""
+
+    def test_thread_extension(self):
+        assert detect_config_type_from_extension("dim_customer.thread") == "thread"
+
+    def test_weave_extension(self):
+        assert detect_config_type_from_extension("dimensions.weave") == "weave"
+
+    def test_loom_extension(self):
+        assert detect_config_type_from_extension("nightly.loom") == "loom"
+
+    def test_yaml_returns_none(self):
+        assert detect_config_type_from_extension("params.yaml") is None
+
+    def test_yml_returns_none(self):
+        assert detect_config_type_from_extension("params.yml") is None
+
+    def test_unsupported_extension_raises(self):
+        with pytest.raises(ConfigError, match="Unsupported extension"):
+            detect_config_type_from_extension("file.json")
+
+    def test_case_insensitive(self):
+        assert detect_config_type_from_extension("file.THREAD") == "thread"
+        assert detect_config_type_from_extension("file.Weave") == "weave"
+
+    def test_path_with_directories(self):
+        assert detect_config_type_from_extension("dims/dim_customer.thread") == "thread"

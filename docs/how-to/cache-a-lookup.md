@@ -41,7 +41,7 @@ thread is not part of a multi-consumer DAG but you know it will be read
 repeatedly), you can force caching with the `cache` flag on the thread:
 
 ```yaml
-# threads/lookups/dim_product.yaml
+# lookups/dim_product.thread
 config_version: "1.0"
 
 sources:
@@ -102,8 +102,8 @@ structured JSON logs:
 ```python
 from weevr import Context
 
-ctx = Context(spark, log_level="verbose")
-result = ctx.run("weaves/orders.yaml")
+ctx = Context(spark, "my-project.weevr", log_level="verbose")
+result = ctx.run("orders.weave")
 ```
 
 Look for log entries containing `Cached output of thread` and

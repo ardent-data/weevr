@@ -92,26 +92,10 @@ sources:
 
 ### Variable injection for Lakehouse paths
 
-Define environment-specific paths in a parameter file and reference them
+Define environment-specific values as runtime parameters and reference them
 in thread configuration:
 
-**params/prod.yaml**
-
-```yaml
-lakehouse_base: "abfss://prod-ws@onelake.dfs.fabric.microsoft.com/prod.Lakehouse"
-bronze_base: "${lakehouse_base}/Tables/bronze"
-silver_base: "${lakehouse_base}/Tables/silver"
-```
-
-**params/dev.yaml**
-
-```yaml
-lakehouse_base: "Tables"
-bronze_base: "${lakehouse_base}/bronze"
-silver_base: "${lakehouse_base}/silver"
-```
-
-**threads/staging/stg_customers.yaml**
+**staging/stg_customers.thread**
 
 ```yaml
 config_version: "1.0"
@@ -128,17 +112,24 @@ write:
   mode: overwrite
 ```
 
-Pass the parameter file through the `Context`:
+Pass environment-specific values through the `Context`:
 
 ```python
 from weevr import Context
 
-ctx = Context(spark, param_file="params/prod.yaml")
-result = ctx.run("looms/nightly.yaml")
+ctx = Context(
+    spark,
+    "my-project.weevr",
+    params={
+        "bronze_base": "abfss://prod-ws@onelake.dfs.fabric.microsoft.com/prod.Lakehouse/Tables/bronze",
+        "silver_base": "abfss://prod-ws@onelake.dfs.fabric.microsoft.com/prod.Lakehouse/Tables/silver",
+    },
+)
+result = ctx.run("nightly.loom")
 ```
 
 This pattern lets the same YAML configs run in any environment by swapping
-the parameter file.
+the runtime parameters.
 
 ## Workspace and capacity considerations
 
@@ -211,10 +202,10 @@ from weevr import Context
 
 ctx = Context(
     spark,
-    param_file="params/prod.yaml",
+    "my-project.weevr",
     log_level="standard",
 )
-result = ctx.run("looms/nightly.yaml")
+result = ctx.run("nightly.loom")
 
 assert result.status == "success", result.summary()
 ```

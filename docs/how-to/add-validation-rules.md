@@ -121,8 +121,8 @@ After execution, inspect the `RunResult` to see validation outcomes:
 ```python
 from weevr import Context
 
-ctx = Context(spark)
-result = ctx.run("threads/staging/stg_customers.yaml")
+ctx = Context(spark, "my-project.weevr")
+result = ctx.run("staging/stg_customers.thread")
 
 # Check overall status
 print(result.status)  # "success", "failure", or "partial"

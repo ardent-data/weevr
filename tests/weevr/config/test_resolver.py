@@ -20,13 +20,6 @@ class TestBuildParamContext:
         assert context["env"] == "prod"
         assert context["lakehouse"] == "gold"
 
-    def test_param_file_only(self):
-        """Build context with only param file data."""
-        param_file = {"env": "dev", "lakehouse": "bronze"}
-        context = build_param_context(param_file_data=param_file)
-        assert context["env"] == "dev"
-        assert context["lakehouse"] == "bronze"
-
     def test_config_defaults_only(self):
         """Build context with only config defaults."""
         defaults = {"env": "dev", "mode": "test"}
@@ -34,30 +27,21 @@ class TestBuildParamContext:
         assert context["env"] == "dev"
         assert context["mode"] == "test"
 
-    def test_runtime_overrides_param_file(self):
-        """Runtime params should override param file."""
+    def test_runtime_overrides_defaults(self):
+        """Runtime params should override config defaults."""
         runtime = {"env": "prod"}
-        param_file = {"env": "dev", "lakehouse": "bronze"}
-        context = build_param_context(runtime, param_file)
+        defaults = {"env": "dev", "lakehouse": "bronze"}
+        context = build_param_context(runtime, defaults)
         assert context["env"] == "prod"  # Runtime wins
-        assert context["lakehouse"] == "bronze"  # From param file
-
-    def test_param_file_overrides_defaults(self):
-        """Param file should override config defaults."""
-        param_file = {"env": "staging"}
-        defaults = {"env": "dev", "mode": "test"}
-        context = build_param_context(None, param_file, defaults)
-        assert context["env"] == "staging"  # Param file wins
-        assert context["mode"] == "test"  # From defaults
+        assert context["lakehouse"] == "bronze"  # From defaults
 
     def test_full_priority_chain(self):
-        """Test full priority: runtime > param_file > defaults."""
+        """Test full priority: runtime > defaults."""
         runtime = {"env": "prod"}
-        param_file = {"env": "staging", "lakehouse": "silver"}
         defaults = {"env": "dev", "lakehouse": "bronze", "mode": "test"}
-        context = build_param_context(runtime, param_file, defaults)
+        context = build_param_context(runtime, defaults)
         assert context["env"] == "prod"  # Runtime wins
-        assert context["lakehouse"] == "silver"  # Param file wins
+        assert context["lakehouse"] == "bronze"  # Defaults (no override)
         assert context["mode"] == "test"  # Defaults (no override)
 
 
@@ -298,52 +282,62 @@ class TestValidateParams:
 class TestReferenceResolution:
     """Test reference resolution functions."""
 
-    def test_resolve_logical_name_thread(self):
-        """Resolve thread logical name to path."""
-        from weevr.config.resolver import resolve_logical_name
+    def test_resolve_ref_path_thread(self, tmp_path):
+        """Resolve path-based thread reference."""
+        from weevr.config.resolver import resolve_ref_path
 
-        base = Path("/project")
-        result = resolve_logical_name("dimensions.dim_customer", "thread", base)
-        # Check path components (resolve() makes it absolute)
-        assert "threads" in result.parts
-        assert "dimensions" in result.parts
-        assert result.name == "dim_customer.yaml"
+        thread_file = tmp_path / "dimensions" / "dim_customer.thread"
+        thread_file.parent.mkdir(parents=True)
+        thread_file.write_text('config_version: "1.0"\nsources:\n  data:\n    type: delta\n')
+        result = resolve_ref_path("dimensions/dim_customer.thread", tmp_path)
+        assert result == thread_file.resolve()
 
-    def test_resolve_logical_name_weave(self):
-        """Resolve weave logical name to path."""
-        from weevr.config.resolver import resolve_logical_name
+    def test_resolve_ref_path_weave(self, tmp_path):
+        """Resolve path-based weave reference."""
+        from weevr.config.resolver import resolve_ref_path
 
-        base = Path("/project")
-        result = resolve_logical_name("dimensions", "weave", base)
-        # Check path components
-        assert "weaves" in result.parts
-        assert result.name == "dimensions.yaml"
+        weave_file = tmp_path / "dimensions.weave"
+        weave_file.write_text('config_version: "1.0"\nthreads: []\n')
+        result = resolve_ref_path("dimensions.weave", tmp_path)
+        assert result == weave_file.resolve()
 
-    def test_resolve_logical_name_loom(self):
-        """Resolve loom logical name to path."""
-        from weevr.config.resolver import resolve_logical_name
+    def test_resolve_ref_path_missing(self, tmp_path):
+        """Raise ReferenceResolutionError for missing file."""
+        from weevr.config.resolver import resolve_ref_path
+        from weevr.errors import ReferenceResolutionError
 
-        base = Path("/project")
-        result = resolve_logical_name("nightly", "loom", base)
-        # Check path components
-        assert "looms" in result.parts
-        assert result.name == "nightly.yaml"
+        with pytest.raises(ReferenceResolutionError, match="not found"):
+            resolve_ref_path("missing.thread", tmp_path)
 
-    def test_resolve_references_loom_to_weave_to_thread(self):
-        """Resolve full hierarchy: loom -> weave -> thread."""
+    def test_resolve_ref_path_bad_extension(self, tmp_path):
+        """Raise ConfigError for unsupported extension."""
+        from weevr.config.resolver import resolve_ref_path
+        from weevr.errors import ConfigError
+
+        with pytest.raises(ConfigError, match="Unsupported extension"):
+            resolve_ref_path("bad.yaml", tmp_path)
+
+    def test_resolve_references_loom_to_weave_to_thread(self, tmp_path):
+        """Resolve full hierarchy via ref entries: loom -> weave -> thread."""
         from weevr.config.resolver import resolve_references
 
-        project_root = FIXTURES / "project"
+        # Create thread file
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nsources:\n  customers:\n    type: delta\n'
+            "    alias: raw_customers\ntarget: {}\n"
+        )
+
+        # Create weave file referencing the thread
+        weave_file = tmp_path / "dimensions.weave"
+        weave_file.write_text('config_version: "1.0"\nthreads:\n  - ref: dim_customer.thread\n')
+
         loom_config = {
             "config_version": "1.0",
-            "weaves": ["dimensions"],
+            "weaves": [{"ref": "dimensions.weave"}],
         }
 
-        result = resolve_references(
-            loom_config,
-            "loom",
-            project_root,
-        )
+        result = resolve_references(loom_config, "loom", tmp_path)
 
         assert "_resolved_weaves" in result
         assert len(result["_resolved_weaves"]) == 1
@@ -353,17 +347,16 @@ class TestReferenceResolution:
         thread = weave["_resolved_threads"][0]
         assert "customers" in thread["sources"]
 
-    def test_resolve_references_missing_file(self):
+    def test_resolve_references_missing_file(self, tmp_path):
         """Raise ReferenceResolutionError for missing referenced file."""
         from weevr.config.resolver import resolve_references
         from weevr.errors import ReferenceResolutionError
 
-        project_root = FIXTURES / "project"
         config = {
             "config_version": "1.0",
-            "weaves": ["nonexistent"],
+            "weaves": [{"ref": "nonexistent.weave"}],
         }
 
         with pytest.raises(ReferenceResolutionError) as exc_info:
-            resolve_references(config, "loom", project_root)
+            resolve_references(config, "loom", tmp_path)
         assert "not found" in str(exc_info.value)

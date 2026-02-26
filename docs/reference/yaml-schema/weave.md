@@ -12,7 +12,7 @@ runtime settings.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
-| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are treated as `{ name: "<value>" }`. |
+| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) cascaded to threads |
@@ -22,12 +22,14 @@ runtime settings.
 
 ## threads (ThreadEntry)
 
-Each entry in the `threads` list is either a plain string (shorthand for a
-thread name with no overrides) or a `ThreadEntry` object.
+Each entry in the `threads` list is either a plain string (shorthand) or a
+`ThreadEntry` object. Use `ref` to reference an external `.thread` file, or
+`name` for inline thread definitions within the weave.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `name` | `string` | yes | -- | Thread name matching a thread config file |
+| `ref` | `string` | no | `null` | Path to an external `.thread` file, relative to the project root. Mutually exclusive with inline `name`. |
+| `name` | `string` | no | `""` | Thread name. Required for inline definitions; derived from filename stem when using `ref`. |
 | `dependencies` | `list[string]` | no | `null` | Explicit upstream thread names. Merged with auto-inferred dependencies from source/target path matching. |
 | `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
 
@@ -73,11 +75,11 @@ config_version: "1"
 name: sales_pipeline
 
 threads:
-  - name: load_orders
-  - name: load_customers
-  - name: build_order_summary
+  - ref: staging/load_orders.thread
+  - ref: staging/load_customers.thread
+  - ref: curated/build_order_summary.thread
     dependencies: [load_orders, load_customers]
-  - name: refresh_snapshot
+  - ref: curated/refresh_snapshot.thread
     dependencies: [build_order_summary]
     condition:
       when: "table_exists('curated.order_summary')"
@@ -103,20 +105,27 @@ naming:
 
 ### Shorthand thread syntax
 
-Thread entries can be plain strings when no overrides are needed:
+Thread entries can be plain strings for inline definitions that need no
+overrides:
 
 ```yaml
 threads:
-  - load_orders
-  - load_customers
-  - build_order_summary
+  - build_snapshot
+  - refresh_index
 ```
 
 This is equivalent to:
 
 ```yaml
 threads:
-  - name: load_orders
-  - name: load_customers
-  - name: build_order_summary
+  - name: build_snapshot
+  - name: refresh_index
+```
+
+For external file references, use `ref` explicitly:
+
+```yaml
+threads:
+  - ref: staging/load_orders.thread
+  - ref: staging/load_customers.thread
 ```

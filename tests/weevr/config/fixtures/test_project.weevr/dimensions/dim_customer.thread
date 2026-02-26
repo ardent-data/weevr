@@ -3,4 +3,5 @@ sources:
   customers:
     type: delta
     alias: lakehouse.raw_customers
-target: {}
+target:
+  path: /data/dim_customer

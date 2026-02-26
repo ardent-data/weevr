@@ -6,6 +6,7 @@ import pytest
 
 from weevr.config import load_config
 from weevr.errors import (
+    ConfigError,
     ConfigParseError,
     ConfigSchemaError,
     ConfigVersionError,
@@ -22,7 +23,7 @@ class TestLoadConfigHappyPath:
 
     def test_load_simple_thread(self):
         """load_config returns a Thread model for a thread config."""
-        result = load_config(FIXTURES / "valid_thread.yaml")
+        result = load_config(FIXTURES / "valid_thread.thread")
         assert isinstance(result, Thread)
         assert result.config_version == "1.0"
         assert "customers" in result.sources
@@ -30,8 +31,8 @@ class TestLoadConfigHappyPath:
 
     def test_load_thread_from_project(self):
         """Load a thread from project fixtures."""
-        thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
-        result = load_config(thread_path)
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions" / "dim_customer.thread", project_root=project)
         assert isinstance(result, Thread)
         assert result.config_version == "1.0"
         assert "customers" in result.sources
@@ -60,17 +61,8 @@ target:
         assert result.sources["data"].alias == "bronze.customers"
         assert result.target.audit_template == "dev_template"
 
-    def test_load_thread_with_param_file(self, tmp_path):
-        """load_config resolves variables from a param file."""
-        param_file = tmp_path / "params.yaml"
-        param_file.write_text(
-            """
-config_version: "1.0"
-lakehouse: bronze
-env: dev
-"""
-        )
-
+    def test_load_thread_with_runtime_params(self, tmp_path):
+        """load_config resolves variables from runtime params."""
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
@@ -84,26 +76,20 @@ target:
 """
         )
 
-        result = load_config(thread_file, param_file=param_file)
+        result = load_config(thread_file, runtime_params={"lakehouse": "bronze", "env": "dev"})
 
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"
         assert result.target.audit_template == "dev_template"
 
-    def test_runtime_params_override_param_file(self, tmp_path):
-        """Runtime params override param file values."""
-        param_file = tmp_path / "params.yaml"
-        param_file.write_text(
-            """
-config_version: "1.0"
-env: dev
-"""
-        )
-
+    def test_runtime_params_override_defaults(self, tmp_path):
+        """Runtime params override config default values."""
         thread_file = tmp_path / "thread.yaml"
         thread_file.write_text(
             """
 config_version: "1.0"
+defaults:
+  env: dev
 sources:
   data:
     type: delta
@@ -116,7 +102,6 @@ target:
         result = load_config(
             thread_file,
             runtime_params={"env": "prod"},
-            param_file=param_file,
         )
 
         assert isinstance(result, Thread)
@@ -144,44 +129,48 @@ target:
 
     def test_load_weave_returns_weave_model(self):
         """load_config returns a Weave model for a weave config."""
-        result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions.weave", project_root=project)
         assert isinstance(result, Weave)
         assert result.config_version == "1.0"
-        assert any(e.name == "dimensions.dim_customer" for e in result.threads)
+        assert any(e.ref == "dimensions/dim_customer.thread" for e in result.threads)
 
     def test_load_loom_returns_loom_model(self):
         """load_config returns a Loom model for a loom config."""
-        result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "nightly.loom", project_root=project)
         assert isinstance(result, Loom)
         assert result.config_version == "1.0"
-        assert any(e.name == "dimensions" for e in result.weaves)
+        assert any(e.ref == "dimensions.weave" for e in result.weaves)
 
 
 class TestLoadConfigNameInjection:
     """Test that load_config() derives and injects name from file path."""
 
     def test_thread_name_from_project_path(self):
-        """Thread loaded from project path gets dot-separated name."""
-        thread_path = FIXTURES / "project" / "threads" / "dimensions" / "dim_customer.yaml"
-        result = load_config(thread_path)
+        """Thread loaded from project path gets stem as name."""
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions" / "dim_customer.thread", project_root=project)
         assert isinstance(result, Thread)
-        assert result.name == "dimensions.dim_customer"
+        assert result.name == "dim_customer"
 
     def test_thread_name_from_top_level_path(self):
         """Thread loaded from a top-level file gets stem as name."""
-        result = load_config(FIXTURES / "valid_thread.yaml")
+        result = load_config(FIXTURES / "valid_thread.thread")
         assert isinstance(result, Thread)
         assert result.name == "valid_thread"
 
     def test_weave_name_derived(self):
         """Weave loaded from project path gets name from stem."""
-        result = load_config(FIXTURES / "project" / "weaves" / "dimensions.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "dimensions.weave", project_root=project)
         assert isinstance(result, Weave)
         assert result.name == "dimensions"
 
     def test_loom_name_derived(self):
         """Loom loaded from project path gets name from stem."""
-        result = load_config(FIXTURES / "project" / "looms" / "nightly.yaml")
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "nightly.loom", project_root=project)
         assert isinstance(result, Loom)
         assert result.name == "nightly"
 
@@ -378,3 +367,61 @@ steps:
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"
         assert len(result.steps) == 2
+
+
+class TestLoadConfigTypedExtensions:
+    """Test M09 typed extension behaviors."""
+
+    def test_name_derived_from_stem(self, tmp_path):
+        """Filename stem becomes the component name."""
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+            "    alias: raw.customers\ntarget: {}\n"
+        )
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert result.name == "dim_customer"
+
+    def test_declared_name_matches_stem(self, tmp_path):
+        """Declared name matching stem passes validation."""
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nname: dim_customer\nsources:\n  data:\n'
+            "    type: delta\n    alias: raw.customers\ntarget: {}\n"
+        )
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert result.name == "dim_customer"
+
+    def test_declared_name_mismatch_raises(self, tmp_path):
+        """Declared name not matching stem raises ConfigError."""
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nname: wrong_name\nsources:\n  data:\n'
+            "    type: delta\n    alias: raw.customers\ntarget: {}\n"
+        )
+        with pytest.raises(ConfigError, match="does not match filename stem"):
+            load_config(thread_file)
+
+    def test_qualified_key_set_with_project_root(self, tmp_path):
+        """Qualified key is set relative to project root."""
+        project = tmp_path / "test.weevr"
+        thread_dir = project / "dims"
+        thread_dir.mkdir(parents=True)
+        thread_file = thread_dir / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+            "    alias: raw.customers\ntarget: {}\n"
+        )
+        result = load_config(thread_file, project_root=project)
+        assert isinstance(result, Thread)
+        assert result.qualified_key == "dims/dim_customer.thread"
+
+    def test_end_to_end_weevr_project(self):
+        """Load full hierarchy from .weevr project fixture."""
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "nightly.loom", project_root=project)
+        assert isinstance(result, Loom)
+        assert result.name == "nightly"
+        assert result.qualified_key == "nightly.loom"

@@ -26,24 +26,23 @@ add it to your notebook's inline install cell:
 
 ## Project structure
 
-Create a project directory with the conventional layout that weevr expects:
+Create a project directory with a `.weevr` extension. Config files use typed
+extensions (`.thread`, `.weave`, `.loom`) and can be organized in any directory
+layout within the project:
 
 ```text
-my-project/
-  threads/
-    staging/
-      stg_customers.yaml
-  weaves/
-    staging.yaml
-  looms/
-    daily.yaml
+my-project.weevr/
+  staging/
+    stg_customers.thread
+  staging.weave
+  daily.loom
   data/
     customers.csv
 ```
 
-The `threads/`, `weaves/`, and `looms/` directories mirror the three layers of
-weevr's execution hierarchy. Each config file lives in its conventional location
-so the engine can resolve references automatically.
+The `.weevr` directory is the project root. Config types are identified by
+file extension, so you can organize files in any folder structure that suits
+your team.
 
 ## Step 1 -- Create source data
 
@@ -62,7 +61,7 @@ customer_id,first_name,last_name,email,status,created_date
 A **thread** is the smallest unit of work: read sources, apply transforms, write
 to a single target.
 
-Create `threads/staging/stg_customers.yaml`:
+Create `staging/stg_customers.thread`:
 
 ```yaml
 config_version: "1.0"
@@ -111,32 +110,33 @@ column, selects and casts the final columns, then overwrites the Delta target.
 A **weave** groups related threads and resolves their execution order via a
 dependency DAG. Even a single-thread weave is valid.
 
-Create `weaves/staging.yaml`:
+Create `staging.weave`:
 
 ```yaml
 config_version: "1.0"
 
 threads:
-  - staging.stg_customers
+  - ref: staging/stg_customers.thread
 ```
 
-The thread reference `staging.stg_customers` resolves to
-`threads/staging/stg_customers.yaml` using dot-separated namespace conventions.
+The thread reference `staging/stg_customers.thread` is a path relative to the
+project root, with the typed extension identifying the config type.
 
 ## Step 4 -- Define a loom
 
 A **loom** is the deployable execution unit. It sequences one or more weaves.
 
-Create `looms/daily.yaml`:
+Create `daily.loom`:
 
 ```yaml
 config_version: "1.0"
 
 weaves:
-  - staging
+  - ref: staging.weave
 ```
 
-The weave reference `staging` resolves to `weaves/staging.yaml`.
+The weave reference `staging.weave` resolves to the `staging.weave` file
+in the project root.
 
 ## Step 5 -- Run the loom
 
@@ -151,18 +151,17 @@ from weevr import Context
 # from pyspark.sql import SparkSession
 # spark = SparkSession.builder.master("local[*]").getOrCreate()
 
-ctx = Context(spark)
-result = ctx.run("looms/daily.yaml")
+ctx = Context(spark, "my-project.weevr")
+result = ctx.run("daily.loom")
 
 print(result.status)
 print(result.summary())
 ```
 
-!!! info "Working directory"
-    The paths in your config files resolve relative to the current working
-    directory. Run your script from the project root (`my-project/`) so that
-    `data/customers.csv` and the `threads/`, `weaves/`, `looms/` directories
-    are all reachable.
+!!! info "Project resolution"
+    The `project` argument tells weevr where your `.weevr` directory lives.
+    All config paths resolve relative to the project root. In Fabric, the
+    project directory sits in the Lakehouse Files section.
 
 ## Step 6 -- Verify the output
 
@@ -206,13 +205,13 @@ useful during development:
 
 ```python
 # Validate config without touching data
-result = ctx.run("looms/daily.yaml", mode="validate")
+result = ctx.run("daily.loom", mode="validate")
 
 # Show the execution plan (DAG order) without running
-result = ctx.run("looms/daily.yaml", mode="plan")
+result = ctx.run("daily.loom", mode="plan")
 
 # Run transforms against sampled data, no writes
-result = ctx.run("looms/daily.yaml", mode="preview")
+result = ctx.run("daily.loom", mode="preview")
 ```
 
 ## Next steps

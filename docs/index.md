@@ -25,8 +25,8 @@ pip install weevr
 ```python
 from weevr import Context
 
-ctx = Context(spark)
-result = ctx.run("loom.yaml")
+ctx = Context(spark, "my-project.weevr")
+result = ctx.run("nightly.loom")
 ```
 
 See the [Your First Loom](tutorials/your-first-loom.md) tutorial for a complete walkthrough.

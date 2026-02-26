@@ -7,7 +7,9 @@ import yaml
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 
-EXAMPLE_FILES = sorted(EXAMPLES_DIR.glob("*.yml"))
+EXAMPLE_FILES = sorted(
+    p for ext in ("*.thread", "*.weave", "*.loom") for p in EXAMPLES_DIR.glob(ext)
+)
 
 
 def _config_type(data: dict) -> str:
@@ -68,4 +70,4 @@ class TestExampleYaml:
         assert len(data["weaves"]) > 0
 
     def test_at_least_one_example_discovered(self, yml_path: Path) -> None:
-        assert len(EXAMPLE_FILES) > 0, "no .yml example files found"
+        assert len(EXAMPLE_FILES) > 0, "no typed extension example files found"
