@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Run Release Please
         id: release
@@ -67,3 +68,40 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
           verbose: true
           attestations: false
+
+  deploy-docs:
+    needs: release
+    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.28"
+          enable-cache: true
+
+      - name: Sync (locked)
+        run: uv sync --locked --dev
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy docs
+        run: |
+          TAG="${{ needs.release.outputs.tag_name }}"
+          VERSION=$(echo "$TAG" | sed -E 's/^(weevr-)?v([0-9]+\.[0-9]+).*/\2/')
+          uv run mike deploy "$VERSION" latest --update-aliases --push
