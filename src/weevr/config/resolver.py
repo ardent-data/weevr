@@ -5,38 +5,32 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from weevr.errors import ConfigSchemaError, VariableResolutionError
+from weevr.config.parser import TYPED_EXTENSIONS
+from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
 
 
 def build_param_context(
     runtime_params: dict[str, Any] | None = None,
-    param_file_data: dict[str, Any] | None = None,
     config_defaults: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build parameter context with proper priority layering.
 
     Priority order (highest to lowest):
     1. runtime_params
-    2. param_file_data
-    3. config_defaults
+    2. config_defaults
 
     Args:
-        runtime_params: Runtime parameter overrides
-        param_file_data: Parameters from param file
-        config_defaults: Default parameters from config
+        runtime_params: Runtime parameter overrides.
+        config_defaults: Default parameters from config.
 
     Returns:
-        Merged parameter context dictionary with dotted key access support
+        Merged parameter context dictionary with dotted key access support.
     """
     context: dict[str, Any] = {}
 
-    # Layer 3: Config defaults (lowest priority)
+    # Layer 2: Config defaults (lowest priority)
     if config_defaults:
         context.update(config_defaults)
-
-    # Layer 2: Param file
-    if param_file_data:
-        context.update(param_file_data)
 
     # Layer 1: Runtime params (highest priority)
     if runtime_params:
@@ -246,76 +240,70 @@ def validate_params(
                 )
 
 
-def resolve_logical_name(name: str, config_type: str, base_path: Path) -> Path:
-    """Resolve a logical config name to a file path.
+def resolve_ref_path(ref: str, project_root: Path) -> Path:
+    """Resolve a path-based reference to an absolute file path.
 
     Args:
-        name: Logical name (e.g., 'dimensions.dim_customer')
-        config_type: Type of config ('thread', 'weave', 'loom')
-        base_path: Project root directory
+        ref: Path-based reference with typed extension, relative to project
+            root (e.g., ``'dimensions/dim_customer.thread'``).
+        project_root: Absolute path to the ``.weevr`` project directory.
 
     Returns:
-        Resolved absolute path to config file
+        Resolved absolute path to the referenced config file.
 
-    Examples:
-        - 'dimensions.dim_customer' (thread) -> base_path/threads/dimensions/dim_customer.yaml
-        - 'dimensions' (weave) -> base_path/weaves/dimensions.yaml
-        - 'nightly' (loom) -> base_path/looms/nightly.yaml
+    Raises:
+        ReferenceResolutionError: If the referenced file does not exist.
+        ConfigError: If the reference does not have a typed extension.
     """
-    # Replace dots with path separators
-    path_parts = name.split(".")
+    from weevr.errors import ReferenceResolutionError
 
-    # Determine directory prefix
-    if config_type == "thread":
-        directory = "threads"
-    elif config_type == "weave":
-        directory = "weaves"
-    elif config_type == "loom":
-        directory = "looms"
-    else:
-        directory = ""
+    suffix = Path(ref).suffix.lower()
+    if suffix not in TYPED_EXTENSIONS:
+        raise ConfigError(
+            f"Unsupported extension '{suffix}'. Expected .thread, .weave, or .loom",
+            file_path=ref,
+        )
 
-    # Build path
-    path = base_path / directory
-    for part in path_parts:
-        path = path / part
-
-    # Add .yaml extension
-    path = path.with_suffix(".yaml")
-
-    return path.resolve()
+    resolved = (project_root / ref).resolve()
+    if not resolved.exists():
+        raise ReferenceResolutionError(
+            f"Referenced file not found: {ref}",
+            file_path=str(resolved),
+        )
+    return resolved
 
 
 def resolve_references(
     config: dict[str, Any],
     config_type: str,
-    base_path: Path,
+    project_root: Path,
     runtime_params: dict[str, Any] | None = None,
-    param_file: Path | None = None,
     visited: set[str] | None = None,
 ) -> dict[str, Any]:
     """Resolve references to other config files.
 
-    Recursively loads referenced configs (threads in weaves, weaves in looms)
-    with circular reference detection.
+    Handles both external references (``ref`` key) and inline definitions
+    (``name`` + body keys). Recursively loads referenced configs with
+    circular reference detection.
 
     Args:
-        config: Config dict to resolve references in
-        config_type: Type of this config
-        base_path: Project root directory
-        runtime_params: Runtime parameters to pass to child configs
-        param_file: Parameter file to pass to child configs
-        visited: Set of already-visited file paths (for cycle detection)
+        config: Config dict to resolve references in.
+        config_type: Type of this config (``'weave'`` or ``'loom'``).
+        project_root: Absolute path to the ``.weevr`` project directory.
+        runtime_params: Runtime parameters to pass to child configs.
+        visited: Set of already-visited ref strings (for cycle detection).
 
     Returns:
         Config dict with resolved child configs attached under
-        '_resolved_threads' or '_resolved_weaves' keys
+        ``'_resolved_threads'`` or ``'_resolved_weaves'`` keys.
 
     Raises:
-        ReferenceResolutionError: If referenced file not found or circular reference
+        ReferenceResolutionError: If referenced file not found or circular
+            reference detected.
+        ConfigError: If an inline definition is missing a ``name`` field.
     """
     from weevr.config.parser import (
-        detect_config_type,
+        detect_config_type_from_extension,
         extract_config_version,
         parse_yaml,
         validate_config_version,
@@ -328,58 +316,70 @@ def resolve_references(
 
     result = config.copy()
 
-    # Pre-load param file once (avoid re-reading per child)
-    param_file_data = None
-    if param_file:
-        param_file_data = parse_yaml(param_file)
-
     # Resolve weaves in loom
     if config_type == "loom" and "weaves" in config:
         resolved_weaves = []
 
-        for weave_name in config["weaves"]:
-            weave_path = resolve_logical_name(weave_name, "weave", base_path)
-            weave_path_str = str(weave_path)
+        for entry in config["weaves"]:
+            # Normalize: string entries become {"name": string}
+            if isinstance(entry, str):
+                entry = {"name": entry}
 
-            if weave_path_str in visited:
-                cycle = " -> ".join(visited) + f" -> {weave_path_str}"
-                raise ReferenceResolutionError(
-                    f"Circular reference detected: {cycle}",
-                    file_path=weave_path_str,
-                )
+            if isinstance(entry, dict) and "ref" in entry:
+                # External reference
+                ref = entry["ref"]
+                if ref in visited:
+                    cycle = " -> ".join(visited) + f" -> {ref}"
+                    raise ReferenceResolutionError(
+                        f"Circular reference detected: {cycle}",
+                        file_path=ref,
+                    )
 
-            if not weave_path.exists():
-                raise ReferenceResolutionError(
-                    f"Referenced weave '{weave_name}' not found at {weave_path}",
-                    file_path=weave_path_str,
-                )
+                weave_path = resolve_ref_path(ref, project_root)
+                visited.add(ref)
+                try:
+                    raw = parse_yaml(weave_path)
+                    version = extract_config_version(raw)
+                    ext_type = detect_config_type_from_extension(weave_path)
+                    child_type = ext_type if ext_type else "weave"
+                    validate_config_version(version, child_type)
+                    validated = validate_schema(raw, child_type)
+                    child_dict = validated.model_dump(exclude_unset=True)
 
-            visited.add(weave_path_str)
-            try:
-                raw = parse_yaml(weave_path)
-                version = extract_config_version(raw)
-                child_type = detect_config_type(raw)
-                validate_config_version(version, child_type)
-                validated = validate_schema(raw, child_type)
-                child_dict = validated.model_dump(exclude_unset=True)
+                    # Inject name from filename stem
+                    if not child_dict.get("name"):
+                        child_dict["name"] = weave_path.stem
 
-                context = build_param_context(
-                    runtime_params, param_file_data, child_dict.get("defaults")
-                )
-                resolved_child = resolve_variables(child_dict, context)
+                    # Set qualified key
+                    child_dict["qualified_key"] = ref
 
-                resolved_child = resolve_references(
-                    resolved_child,
-                    child_type,
-                    base_path,
-                    runtime_params,
-                    param_file,
-                    visited.copy(),
-                )
+                    context = build_param_context(
+                        runtime_params, child_dict.get("defaults")
+                    )
+                    resolved_child = resolve_variables(child_dict, context)
 
-                resolved_weaves.append(resolved_child)
-            finally:
-                visited.discard(weave_path_str)
+                    resolved_child = resolve_references(
+                        resolved_child,
+                        child_type,
+                        project_root,
+                        runtime_params,
+                        visited.copy(),
+                    )
+
+                    resolved_weaves.append(resolved_child)
+                finally:
+                    visited.discard(ref)
+            else:
+                # Inline definition — must have name
+                if isinstance(entry, dict) and not entry.get("name"):
+                    raise ConfigError(
+                        "Inline weave definition requires a 'name' field",
+                    )
+                # Inline entries are passed through as-is (already complete dicts)
+                if isinstance(entry, dict):
+                    inline = entry.copy()
+                    inline["qualified_key"] = entry.get("name", "")
+                    resolved_weaves.append(inline)
 
         result["_resolved_weaves"] = resolved_weaves
 
@@ -387,40 +387,62 @@ def resolve_references(
     elif config_type == "weave" and "threads" in config:
         resolved_threads = []
 
-        for thread_name in config["threads"]:
-            thread_path = resolve_logical_name(thread_name, "thread", base_path)
-            thread_path_str = str(thread_path)
+        for entry in config["threads"]:
+            # Normalize: string entries become {"name": string}
+            if isinstance(entry, str):
+                entry = {"name": entry}
 
-            if thread_path_str in visited:
-                cycle = " -> ".join(visited) + f" -> {thread_path_str}"
-                raise ReferenceResolutionError(
-                    f"Circular reference detected: {cycle}",
-                    file_path=thread_path_str,
-                )
+            if isinstance(entry, dict) and "ref" in entry:
+                # External reference
+                ref = entry["ref"]
+                if ref in visited:
+                    cycle = " -> ".join(visited) + f" -> {ref}"
+                    raise ReferenceResolutionError(
+                        f"Circular reference detected: {cycle}",
+                        file_path=ref,
+                    )
 
-            if not thread_path.exists():
-                raise ReferenceResolutionError(
-                    f"Referenced thread '{thread_name}' not found at {thread_path}",
-                    file_path=thread_path_str,
-                )
+                thread_path = resolve_ref_path(ref, project_root)
+                visited.add(ref)
+                try:
+                    raw = parse_yaml(thread_path)
+                    version = extract_config_version(raw)
+                    ext_type = detect_config_type_from_extension(thread_path)
+                    child_type = ext_type if ext_type else "thread"
+                    validate_config_version(version, child_type)
+                    validated = validate_schema(raw, child_type)
+                    child_dict = validated.model_dump(exclude_unset=True)
 
-            visited.add(thread_path_str)
-            try:
-                raw = parse_yaml(thread_path)
-                version = extract_config_version(raw)
-                child_type = detect_config_type(raw)
-                validate_config_version(version, child_type)
-                validated = validate_schema(raw, child_type)
-                child_dict = validated.model_dump(exclude_unset=True)
+                    # Inject name from filename stem
+                    if not child_dict.get("name"):
+                        child_dict["name"] = thread_path.stem
 
-                context = build_param_context(
-                    runtime_params, param_file_data, child_dict.get("defaults")
-                )
-                resolved_child = resolve_variables(child_dict, context)
+                    # Set qualified key
+                    child_dict["qualified_key"] = ref
 
-                resolved_threads.append(resolved_child)
-            finally:
-                visited.discard(thread_path_str)
+                    context = build_param_context(
+                        runtime_params, child_dict.get("defaults")
+                    )
+                    resolved_child = resolve_variables(child_dict, context)
+
+                    # Preserve entry-level overrides (dependencies, condition)
+                    for key in ("dependencies", "condition"):
+                        if key in entry:
+                            resolved_child[f"_entry_{key}"] = entry[key]
+
+                    resolved_threads.append(resolved_child)
+                finally:
+                    visited.discard(ref)
+            else:
+                # Inline definition — must have name
+                if isinstance(entry, dict) and not entry.get("name"):
+                    raise ConfigError(
+                        "Inline thread definition requires a 'name' field",
+                    )
+                if isinstance(entry, dict):
+                    inline = entry.copy()
+                    inline["qualified_key"] = entry.get("name", "")
+                    resolved_threads.append(inline)
 
         result["_resolved_threads"] = resolved_threads
 
