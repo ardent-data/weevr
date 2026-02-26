@@ -9,7 +9,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from weevr.context import Context
-from weevr.errors import ExecutionError
+from weevr.errors import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.thread import Thread
@@ -40,6 +40,40 @@ class TestContextValidation:
         assert ctx.spark is mock_spark
         assert ctx.params == {"a": "1"}
         assert ctx.log_level.value == "minimal"
+
+    def test_direct_path_resolution(self, tmp_path: Path) -> None:
+        """Direct .weevr path resolves correctly."""
+        mock_spark = MagicMock(spec=SparkSession)
+        project_dir = tmp_path / "myproject.weevr"
+        project_dir.mkdir()
+        ctx = Context(spark=mock_spark, project=str(project_dir))
+        assert ctx.project_root == project_dir
+
+    def test_onelake_resolution(self, tmp_path: Path) -> None:
+        """Workspace + lakehouse produces ABFS path."""
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(
+            spark=mock_spark,
+            project="myproject",
+            workspace="ws-id",
+            lakehouse="lh-id",
+        )
+        expected = (
+            "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
+        )
+        assert ctx.project_root == expected
+
+    def test_missing_project_raises(self) -> None:
+        """Non-absolute path without workspace/lakehouse and no default raises."""
+        mock_spark = MagicMock(spec=SparkSession)
+        with pytest.raises(ConfigError):
+            Context(spark=mock_spark, project="nonexistent")
+
+    def test_non_weevr_extension_raises(self) -> None:
+        """Absolute path without .weevr extension raises ConfigError."""
+        mock_spark = MagicMock(spec=SparkSession)
+        with pytest.raises(ConfigError, match=".weevr extension"):
+            Context(spark=mock_spark, project="/path/without/extension")
 
 
 class TestRunValidation:
@@ -149,6 +183,13 @@ class TestFilterThreads:
 # ---------------------------------------------------------------------------
 
 
+def _project_dir(tmp_path: Path) -> Path:
+    """Create and return a .weevr project directory in tmp_path."""
+    project = tmp_path / "test.weevr"
+    project.mkdir(exist_ok=True)
+    return project
+
+
 def _create_thread_yaml(base: Path, name: str, src_alias: str, tgt_path: str) -> Path:
     """Create a minimal thread YAML config at base/threads/<name>.yaml."""
     thread_dir = base / "threads"
@@ -210,7 +251,7 @@ class TestContextLoad:
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src_path)
 
         thread_yaml = _create_thread_yaml(tmp_path, "dim_test", src_path, tgt_path)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         loaded = ctx.load(thread_yaml)
 
         assert loaded.config_type == "thread"
@@ -224,7 +265,7 @@ class TestContextLoad:
 
         _create_thread_yaml(tmp_path, "t1", src, tgt)
         weave_yaml = _create_weave_yaml(tmp_path, "test_weave", ["t1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         loaded = ctx.load(weave_yaml)
 
         assert loaded.config_type == "weave"
@@ -239,7 +280,7 @@ class TestContextLoad:
         _create_thread_yaml(tmp_path, "t1", src, tgt)
         _create_weave_yaml(tmp_path, "w1", ["t1"])
         loom_yaml = _create_loom_yaml(tmp_path, "test_loom", ["w1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         loaded = ctx.load(loom_yaml)
 
         assert loaded.config_type == "loom"
@@ -255,7 +296,7 @@ class TestContextRunExecute:
         spark.createDataFrame([{"id": 1, "val": "a"}]).write.format("delta").save(src)
 
         thread_yaml = _create_thread_yaml(tmp_path, "t_exec", src, tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(thread_yaml)
 
         assert isinstance(result, RunResult)
@@ -272,7 +313,7 @@ class TestContextRunExecute:
 
         _create_thread_yaml(tmp_path, "tw1", src, tgt)
         weave_yaml = _create_weave_yaml(tmp_path, "wexec", ["tw1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(weave_yaml)
 
         assert result.status == "success"
@@ -288,7 +329,7 @@ class TestContextRunExecute:
         _create_thread_yaml(tmp_path, "tl1", src, tgt)
         _create_weave_yaml(tmp_path, "wl1", ["tl1"])
         loom_yaml = _create_loom_yaml(tmp_path, "lexec", ["wl1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(loom_yaml)
 
         assert result.status == "success"
@@ -304,7 +345,7 @@ class TestContextRunExecute:
 
         yaml1 = _create_thread_yaml(tmp_path / "proj1", "r1", src, tgt1)
         yaml2 = _create_thread_yaml(tmp_path / "proj2", "r2", src, tgt2)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
 
         r1 = ctx.run(yaml1)
         r2 = ctx.run(yaml2)
@@ -322,7 +363,7 @@ class TestContextRunExecute:
 
         _create_thread_yaml(tmp_path, "tf1", src, tgt)
         weave_yaml = _create_weave_yaml(tmp_path, "wfilt", ["tf1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(weave_yaml, threads=["nonexistent"])
 
         assert result.status == "success"
@@ -337,7 +378,7 @@ class TestValidateMode:
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
         yaml_path = _create_thread_yaml(tmp_path, "vt1", src, tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="validate")
 
         assert result.status == "success"
@@ -351,7 +392,7 @@ class TestValidateMode:
 
         _create_thread_yaml(tmp_path, "vt2", src, tgt)
         weave_yaml = _create_weave_yaml(tmp_path, "vw1", ["vt2"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "success"
@@ -360,7 +401,7 @@ class TestValidateMode:
     def test_validate_missing_source(self, spark: SparkSession, tmp_path: Path) -> None:
         tgt = str(tmp_path / "tgt_miss")
         yaml_path = _create_thread_yaml(tmp_path, "vmiss", "/nonexistent/path", tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="validate")
 
         assert result.status == "failure"
@@ -376,7 +417,7 @@ class TestPlanMode:
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
         yaml_path = _create_thread_yaml(tmp_path, "pt1", src, tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="plan")
 
         assert result.status == "success"
@@ -390,7 +431,7 @@ class TestPlanMode:
 
         _create_thread_yaml(tmp_path, "pw1", src, tgt)
         weave_yaml = _create_weave_yaml(tmp_path, "wpln", ["pw1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(weave_yaml, mode="plan")
 
         assert result.status == "success"
@@ -406,7 +447,7 @@ class TestPlanMode:
         _create_thread_yaml(tmp_path, "pl1", src, tgt)
         _create_weave_yaml(tmp_path, "wpl1", ["pl1"])
         loom_yaml = _create_loom_yaml(tmp_path, "lpln", ["wpl1"])
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(loom_yaml, mode="plan")
 
         assert result.status == "success"
@@ -423,7 +464,7 @@ class TestPreviewMode:
         spark.createDataFrame(data).write.format("delta").save(src)
 
         yaml_path = _create_thread_yaml(tmp_path, "prev1", src, tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="preview", sample_rows=10)
 
         assert result.status == "success"
@@ -438,7 +479,7 @@ class TestPreviewMode:
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
 
         yaml_path = _create_thread_yaml(tmp_path, "prev2", src, tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         ctx.run(yaml_path, mode="preview")
 
         # Target should NOT exist after preview
@@ -451,7 +492,7 @@ class TestPreviewMode:
         spark.createDataFrame(data).write.format("delta").save(src)
 
         yaml_path = _create_thread_yaml(tmp_path, "prev3", src, tgt)
-        ctx = Context(spark=spark)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="preview", sample_rows=50)
 
         assert result.preview_data is not None

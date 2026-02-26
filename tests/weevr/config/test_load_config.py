@@ -6,6 +6,7 @@ import pytest
 
 from weevr.config import load_config
 from weevr.errors import (
+    ConfigError,
     ConfigParseError,
     ConfigSchemaError,
     ConfigVersionError,
@@ -368,3 +369,61 @@ steps:
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"
         assert len(result.steps) == 2
+
+
+class TestLoadConfigTypedExtensions:
+    """Test M09 typed extension behaviors."""
+
+    def test_name_derived_from_stem(self, tmp_path):
+        """Filename stem becomes the component name."""
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+            "    alias: raw.customers\ntarget: {}\n"
+        )
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert result.name == "dim_customer"
+
+    def test_declared_name_matches_stem(self, tmp_path):
+        """Declared name matching stem passes validation."""
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nname: dim_customer\nsources:\n  data:\n'
+            "    type: delta\n    alias: raw.customers\ntarget: {}\n"
+        )
+        result = load_config(thread_file)
+        assert isinstance(result, Thread)
+        assert result.name == "dim_customer"
+
+    def test_declared_name_mismatch_raises(self, tmp_path):
+        """Declared name not matching stem raises ConfigError."""
+        thread_file = tmp_path / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nname: wrong_name\nsources:\n  data:\n'
+            "    type: delta\n    alias: raw.customers\ntarget: {}\n"
+        )
+        with pytest.raises(ConfigError, match="does not match filename stem"):
+            load_config(thread_file)
+
+    def test_qualified_key_set_with_project_root(self, tmp_path):
+        """Qualified key is set relative to project root."""
+        project = tmp_path / "test.weevr"
+        thread_dir = project / "dims"
+        thread_dir.mkdir(parents=True)
+        thread_file = thread_dir / "dim_customer.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+            "    alias: raw.customers\ntarget: {}\n"
+        )
+        result = load_config(thread_file, project_root=project)
+        assert isinstance(result, Thread)
+        assert result.qualified_key == "dims/dim_customer.thread"
+
+    def test_end_to_end_weevr_project(self):
+        """Load full hierarchy from .weevr project fixture."""
+        project = FIXTURES / "test_project.weevr"
+        result = load_config(project / "nightly.loom", project_root=project)
+        assert isinstance(result, Loom)
+        assert result.name == "nightly"
+        assert result.qualified_key == "nightly.loom"
