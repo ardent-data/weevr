@@ -58,6 +58,7 @@ def execute_weave(
     parent_span_id: str | None = None,
     thread_conditions: dict[str, ConditionSpec] | None = None,
     params: dict[str, Any] | None = None,
+    weave_span_label: str | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -77,6 +78,8 @@ def execute_weave(
         thread_conditions: Mapping of thread name to condition spec. Threads
             with a condition that evaluates to False are skipped.
         params: Parameters for condition evaluation.
+        weave_span_label: Label for the weave telemetry span. When set, used
+            instead of ``plan.weave_name``. Typically the weave's qualified key.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -92,9 +95,10 @@ def execute_weave(
     # Create weave span if collector is active
     weave_span_builder = None
     weave_span_id = None
+    span_name = weave_span_label or plan.weave_name
     if collector is not None:
         weave_span_builder = collector.start_span(
-            f"weave:{plan.weave_name}", parent_span_id=parent_span_id
+            f"weave:{span_name}", parent_span_id=parent_span_id
         )
         weave_span_id = weave_span_builder.span_id
 
@@ -260,7 +264,7 @@ def execute_weave(
         collector.add_span(weave_span)
 
     # Build weave telemetry from thread results
-    weave_telemetry = _build_weave_telemetry(plan.weave_name, thread_results, collector)
+    weave_telemetry = _build_weave_telemetry(span_name, thread_results, collector)
 
     logger.debug(
         "Weave '%s' complete — status=%s, duration=%dms",
@@ -402,6 +406,7 @@ def execute_loom(
             parent_span_id=loom_span_id,
             thread_conditions=thread_conditions if thread_conditions else None,
             params=params,
+            weave_span_label=weave.qualified_key or weave_name,
         )
         weave_results.append(result)
 

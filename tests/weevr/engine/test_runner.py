@@ -464,6 +464,30 @@ class TestWeaveTelemetry:
         assert result.telemetry.span.name == "weave:tel_weave"
 
     @patch("weevr.engine.runner.execute_thread")
+    def test_weave_telemetry_span_uses_qualified_key(self, mock_exec):
+        """Weave span label uses weave_span_label when provided."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("tel_weave", threads, _entries("A"))
+
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        collector = SpanCollector(generate_trace_id())
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            collector=collector,
+            weave_span_label="staging.weave",
+        )
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.span is not None
+        assert result.telemetry.span.name == "weave:staging.weave"
+
+    @patch("weevr.engine.runner.execute_thread")
     def test_weave_telemetry_none_without_collector(self, mock_exec):
         """WeaveResult.telemetry is None when no collector is provided."""
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
