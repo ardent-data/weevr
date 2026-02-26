@@ -12,7 +12,7 @@ runtime settings that cascade down through weaves to threads.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
-| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are treated as `{ ref: "<value>" }`. |
+| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings cascaded to weaves and threads |
@@ -92,11 +92,30 @@ naming:
 
 ### Shorthand weave syntax
 
-Weave entries can be plain strings when no condition is needed:
+Weave entries can be plain strings for inline definitions that need no
+condition:
 
 ```yaml
 weaves:
-  - ingest_raw.weave
-  - build_curated.weave
-  - publish_marts.weave
+  - ingest_raw
+  - build_curated
+  - publish_marts
+```
+
+This is equivalent to:
+
+```yaml
+weaves:
+  - name: ingest_raw
+  - name: build_curated
+  - name: publish_marts
+```
+
+For external file references, use `ref` explicitly:
+
+```yaml
+weaves:
+  - ref: ingest_raw.weave
+  - ref: build_curated.weave
+  - ref: publish_marts.weave
 ```

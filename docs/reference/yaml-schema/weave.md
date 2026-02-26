@@ -12,7 +12,7 @@ runtime settings.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
-| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are treated as `{ ref: "<value>" }`. |
+| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) cascaded to threads |
@@ -105,20 +105,27 @@ naming:
 
 ### Shorthand thread syntax
 
-Thread entries can be plain strings when no overrides are needed:
+Thread entries can be plain strings for inline definitions that need no
+overrides:
 
 ```yaml
 threads:
-  - staging/load_orders.thread
-  - staging/load_customers.thread
-  - curated/build_order_summary.thread
+  - build_snapshot
+  - refresh_index
 ```
 
 This is equivalent to:
 
 ```yaml
 threads:
+  - name: build_snapshot
+  - name: refresh_index
+```
+
+For external file references, use `ref` explicitly:
+
+```yaml
+threads:
   - ref: staging/load_orders.thread
   - ref: staging/load_customers.thread
-  - ref: curated/build_order_summary.thread
 ```
