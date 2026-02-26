@@ -15,11 +15,15 @@ class WeaveEntry(FrozenBase):
     """A weave reference within a loom, with optional condition.
 
     Attributes:
-        name: Weave name as declared in the loom config.
+        name: Weave name. Required for inline definitions; derived from
+            filename stem for external references.
+        ref: Path to an external ``.weave`` file, relative to project root.
+            Mutually exclusive with inline definition (name + body).
         condition: Optional condition for conditional execution.
     """
 
-    name: str
+    name: str = ""
+    ref: str | None = None
     condition: ConditionSpec | None = None
 
 
@@ -27,6 +31,7 @@ class Loom(FrozenBase):
     """A deployment unit containing weave references with optional shared defaults."""
 
     name: str = ""
+    qualified_key: str = ""
     config_version: str
     weaves: list[WeaveEntry]
     defaults: dict[str, Any] | None = None
@@ -51,6 +56,8 @@ class Loom(FrozenBase):
         for entry in weaves:
             if isinstance(entry, str):
                 normalized.append({"name": entry})
+            elif isinstance(entry, dict):
+                normalized.append(entry)
             else:
                 normalized.append(entry)
         return {**data, "weaves": normalized}
