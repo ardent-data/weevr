@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/ardent-data/weevr/compare/weevr-v1.0.2...weevr-v1.0.3) (2026-02-26)
+
+
+### Bug Fixes
+
+* **ci:** add production PyPI publishing to release workflow ([#45](https://github.com/ardent-data/weevr/issues/45)) ([0aec813](https://github.com/ardent-data/weevr/commit/0aec813f99305f8bab188aa7727a42547e3fd5b7))
+
 ## [1.0.2](https://github.com/ardent-data/weevr/compare/weevr-v1.0.1...weevr-v1.0.2) (2026-02-26)
 
 
