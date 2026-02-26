@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from weevr.errors import ConfigParseError, ConfigVersionError
+from weevr.errors import ConfigError, ConfigParseError, ConfigVersionError
 
 
 def parse_yaml(path: str | Path) -> dict[str, Any]:
@@ -126,6 +126,40 @@ def validate_config_version(version: tuple[int, int], config_type: str) -> None:
             f"Unsupported {config_type} config version {major}.{minor}. "
             f"Expected major version {supported[0]}.x"
         )
+
+
+# Typed extensions map file suffix to config type
+TYPED_EXTENSIONS: dict[str, str] = {
+    ".thread": "thread",
+    ".weave": "weave",
+    ".loom": "loom",
+}
+
+
+def detect_config_type_from_extension(path: str | Path) -> str | None:
+    """Detect config type from file extension.
+
+    Args:
+        path: Path to the config file.
+
+    Returns:
+        Config type string if the extension is a typed extension
+        (``.thread``, ``.weave``, ``.loom``), or ``None`` for
+        ``.yaml``/``.yml`` files.
+
+    Raises:
+        ConfigError: If the extension is ``.yaml`` or ``.yml`` and a
+            typed extension was expected (caller context).
+    """
+    suffix = Path(path).suffix.lower()
+    if suffix in TYPED_EXTENSIONS:
+        return TYPED_EXTENSIONS[suffix]
+    if suffix in (".yaml", ".yml"):
+        return None
+    raise ConfigError(
+        f"Unsupported extension '{suffix}'. Expected .thread, .weave, or .loom",
+        file_path=str(path),
+    )
 
 
 def detect_config_type(raw: dict[str, Any]) -> str:
