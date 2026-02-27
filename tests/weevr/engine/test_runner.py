@@ -166,6 +166,13 @@ class TestWeaveRunnerFailureHandling:
         assert result.status == "failure"
         # B and C should be skipped (abort stops everything)
         assert set(result.threads_skipped) >= {"B", "C"}
+        # Failed thread result carries the error message
+        failed = [r for r in result.thread_results if r.status == "failure"]
+        assert len(failed) == 1
+        assert failed[0].thread_name == "A"
+        assert failed[0].error is not None
+        assert "A failed" in failed[0].error
+        assert failed[0].error.startswith("ExecutionError:")
 
     @patch("weevr.engine.runner.execute_thread")
     def test_skip_downstream_skips_only_dependents(self, mock_exec):

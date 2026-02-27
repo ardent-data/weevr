@@ -20,6 +20,7 @@ class ThreadResult(FrozenBase):
         target_path: Physical path of the Delta table that was written.
         telemetry: Thread-level telemetry with validation/assertion results and row counts.
         skip_reason: The condition expression that caused the thread to be skipped.
+        error: Error message when the thread failed, ``None`` on success or skip.
     """
 
     status: Literal["success", "failure", "skipped"]
@@ -29,6 +30,7 @@ class ThreadResult(FrozenBase):
     target_path: str
     telemetry: ThreadTelemetry | None = None
     skip_reason: str | None = None
+    error: str | None = None
 
 
 class WeaveResult(FrozenBase):

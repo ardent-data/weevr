@@ -33,6 +33,28 @@ class TestThreadResult:
         )
         assert result.status == "failure"
 
+    def test_failure_result_with_error(self) -> None:
+        result = ThreadResult(
+            status="failure",
+            thread_name="fact_orders",
+            rows_written=0,
+            write_mode="",
+            target_path="",
+            error="FileNotFoundError: Source path not found: /data/raw_orders",
+        )
+        assert result.status == "failure"
+        assert result.error == "FileNotFoundError: Source path not found: /data/raw_orders"
+
+    def test_error_defaults_to_none(self) -> None:
+        result = ThreadResult(
+            status="success",
+            thread_name="dim_customer",
+            rows_written=100,
+            write_mode="overwrite",
+            target_path="/data/dim_customer",
+        )
+        assert result.error is None
+
     def test_invalid_status_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
             ThreadResult(
