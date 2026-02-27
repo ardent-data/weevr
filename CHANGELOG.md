@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.4](https://github.com/ardent-data/weevr/compare/weevr-v1.0.3...weevr-v1.0.4) (2026-02-27)
+
+
+### Bug Fixes
+
+* **config:** prevent double .weevr extension in project path resolution ([#47](https://github.com/ardent-data/weevr/issues/47)) ([89b429f](https://github.com/ardent-data/weevr/commit/89b429f1425b8389ca0476e61141ef446c805308))
+* **engine:** surface thread errors in result detail and summary ([#49](https://github.com/ardent-data/weevr/issues/49)) ([c9fce00](https://github.com/ardent-data/weevr/commit/c9fce00e41b5047c1bb45cbb09145c305c365dbe))
+
+
+### Documentation
+
+* **site:** add D2 diagrams, architecture guides, and error catalog ([#53](https://github.com/ardent-data/weevr/issues/53)) ([790f63b](https://github.com/ardent-data/weevr/commit/790f63be4d35eedc0f3e48a99cd99e0ef423e37e))
+
 ## [1.0.3](https://github.com/ardent-data/weevr/compare/weevr-v1.0.2...weevr-v1.0.3) (2026-02-26)
 
 
