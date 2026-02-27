@@ -30,6 +30,8 @@ theme:
 
 plugins:
   - search
+  - d2:
+      layout: elk
   - mkdocstrings:
       handlers:
         python:
