@@ -6,6 +6,70 @@ across all weevr models. Fields are grouped by the model they belong to.
 For YAML syntax and complete examples, see the schema reference pages:
 [Thread](yaml-schema/thread.md) | [Weave](yaml-schema/weave.md) | [Loom](yaml-schema/loom.md)
 
+```d2
+direction: down
+
+data_flow: Data Flow {
+  Thread: Thread {
+    shape: class
+    config_version: str
+    sources: "dict[str, Source]"
+    pipeline_steps: "list[Step]"
+    target: Target
+  }
+  Source: Source {
+    shape: class
+    type: str
+    alias: str
+    path: str
+  }
+  Target: Target {
+    shape: class
+    alias: str
+    path: str
+    mapping_mode: str
+  }
+
+  Thread -> Source: "1..*" {style.stroke: "#1976D2"}
+  Thread -> Target: "1..1" {style.stroke: "#1976D2"}
+}
+
+behavior: Behavior {
+  WriteConfig: WriteConfig {
+    shape: class
+    mode: str
+    match_keys: "list[str]"
+  }
+  LoadConfig: LoadConfig {
+    shape: class
+    mode: str
+    watermark_column: str
+  }
+  KeyConfig: KeyConfig {
+    shape: class
+    business_key: "list[str]"
+    surrogate_key: config
+    change_detection: config
+  }
+  ValidationRule: ValidationRule {
+    shape: class
+    name: str
+    rule: expr
+    severity: str
+  }
+  FailureConfig: FailureConfig {
+    shape: class
+    on_failure: str
+  }
+}
+
+data_flow.Thread -> behavior.WriteConfig: "0..1" {style.stroke: "#388E3C"}
+data_flow.Thread -> behavior.LoadConfig: "0..1" {style.stroke: "#388E3C"}
+data_flow.Thread -> behavior.KeyConfig: "0..1" {style.stroke: "#388E3C"}
+data_flow.Thread -> behavior.ValidationRule: "0..*" {style.stroke: "#388E3C"}
+data_flow.Thread -> behavior.FailureConfig: "0..1" {style.stroke: "#388E3C"}
+```
+
 ---
 
 ## Thread

@@ -21,6 +21,37 @@ Each validation rule has a severity that determines what happens when rows fail:
 | `error` | Failing rows are quarantined to `{target}_quarantine`. Clean rows proceed. |
 | `fatal` | Any failure aborts the thread. No data is written. |
 
+```d2
+direction: down
+
+eval: Evaluate Rules {
+  style.font-size: 18
+}
+
+info: info severity {
+  style.fill: "#E3F2FD"
+  action: Log to telemetry
+}
+warn: warn severity {
+  style.fill: "#FFF3E0"
+  action: Log with elevated visibility
+}
+err: error severity {
+  style.fill: "#FFEBEE"
+  quarantine: Write to quarantine table
+  proceed: Clean rows proceed to target
+}
+fatal_sev: fatal severity {
+  style.fill: "#F8D7DA"
+  abort_action: Abort thread — no data written
+}
+
+eval -> info: rows pass or fail
+eval -> warn: rows pass or fail
+eval -> err: rows fail
+eval -> fatal_sev: any row fails
+```
+
 ## Step 1 -- Add validation rules to a thread
 
 Add a `validations` section to your thread YAML. Each rule needs a `name`, a
