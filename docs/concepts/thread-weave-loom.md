@@ -3,24 +3,39 @@
 weevr organizes work into a three-level hierarchy. Each level has a distinct
 responsibility, and configuration flows downward through inheritance.
 
-```text
-┌─────────────────────────────────────────────────┐
-│  Loom                                           │
-│  Deployment unit — orders weaves, sets defaults  │
-│                                                 │
-│  ┌─────────────────────┐ ┌────────────────────┐ │
-│  │  Weave              │ │  Weave             │ │
-│  │  DAG of threads     │ │  DAG of threads    │ │
-│  │                     │ │                    │ │
-│  │  ┌───┐ ┌───┐ ┌───┐ │ │  ┌───┐ ┌───┐      │ │
-│  │  │ T │→│ T │→│ T │ │ │  │ T │→│ T │      │ │
-│  │  └───┘ └───┘ └───┘ │ │  └───┘ └───┘      │ │
-│  │        ↘     ↗      │ │                    │ │
-│  │        ┌───┐        │ │                    │ │
-│  │        │ T │        │ │                    │ │
-│  │        └───┘        │ │                    │ │
-│  └─────────────────────┘ └────────────────────┘ │
-└─────────────────────────────────────────────────┘
+```d2
+direction: down
+
+Loom: Loom {
+  style.font-size: 20
+
+  dimensions: Weave — dimensions {
+    dim_customer: Thread\ndim_customer
+    dim_product: Thread\ndim_product
+    dim_store: Thread\ndim_store
+
+    dim_customer -> dim_product: dependency {style.stroke-dash: 3}
+    dim_product -> dim_store: dependency {style.stroke-dash: 3}
+  }
+
+  facts: Weave — facts {
+    fact_orders: Thread\nfact_orders
+    fact_returns: Thread\nfact_returns
+  }
+
+  dimensions -> facts: execution order
+}
+
+inheritance: {
+  style.fill: transparent
+  style.stroke: transparent
+
+  Loom defaults -> Weave defaults -> Thread config: {style.stroke: "#4A90D9"}
+  note: |md
+    **Most specific wins**: Thread overrides weave,
+    weave overrides loom.
+  |
+}
 ```
 
 ## Thread -- the smallest unit

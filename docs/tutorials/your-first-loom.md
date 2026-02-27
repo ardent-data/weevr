@@ -214,6 +214,54 @@ result = ctx.run("daily.loom", mode="plan")
 result = ctx.run("daily.loom", mode="preview")
 ```
 
+## Which execution mode should I use?
+
+```d2
+direction: down
+
+start: What does your pipeline need? {
+  style.font-size: 16
+}
+
+q1: Replace all data\neach run?
+q2: Append new rows?
+q3: Update existing +\ninsert new?
+q4: Track changes\nover time?
+q5: Process only\nnew data?
+
+overwrite: full + overwrite {
+  style.fill: "#E3F2FD"
+  style.font-size: 14
+}
+append: incremental + append {
+  style.fill: "#E8F5E9"
+  style.font-size: 14
+}
+merge: full + merge {
+  style.fill: "#FFF3E0"
+  style.font-size: 14
+}
+cdc: cdc + merge {
+  style.fill: "#F3E5F5"
+  style.font-size: 14
+}
+watermark: incremental_watermark\n+ merge {
+  style.fill: "#E0F2F1"
+  style.font-size: 14
+}
+
+start -> q1: yes
+start -> q2
+start -> q3
+q1 -> overwrite
+q2 -> append
+q3 -> q4
+q3 -> q5
+q3 -> merge: simple upsert
+q4 -> cdc
+q5 -> watermark
+```
+
 ## Next steps
 
 You now have a working end-to-end pipeline. From here you can:

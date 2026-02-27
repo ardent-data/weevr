@@ -109,6 +109,59 @@ npx cspell "docs/**/*.md"
 
 If a term is flagged incorrectly, add it to `.cspell.json`.
 
+### D2 diagrams
+
+Documentation pages use [D2](https://d2lang.com/) for inline diagrams. The
+`mkdocs-d2-plugin` renders D2 fenced code blocks into SVG at build time using
+the ELK layout engine.
+
+#### Install D2 locally
+
+D2 is a standalone binary. Install it with the official script:
+
+```bash
+curl -fsSL https://d2lang.com/install.sh | sh -s --
+```
+
+Or download a release from <https://github.com/terrastruct/d2/releases> and
+place the `d2` binary on your `PATH`.
+
+Verify:
+
+```bash
+d2 --version
+```
+
+#### Author a diagram
+
+Add a fenced code block with the `d2` language tag directly in a markdown page:
+
+````markdown
+```d2
+direction: right
+Source -> Transform -> Target
+```
+````
+
+D2 blocks are rendered inline as SVG during `mkdocs build`. No separate image
+files are committed.
+
+#### Preview diagrams
+
+```bash
+uv run mkdocs serve
+```
+
+The local dev server renders D2 blocks live, so you can iterate on diagram
+source and see results immediately.
+
+#### Conventions
+
+* Use `direction: right` for pipeline flows, `direction: down` for hierarchies.
+* Keep diagrams focused — one concept per diagram.
+* Use descriptive node labels, not abbreviations.
+* Diagrams use the ELK layout engine by default (configured in `mkdocs.yml`).
+
 ## Docstring standards
 
 All public modules, classes, functions, and methods require docstrings following [Google style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).

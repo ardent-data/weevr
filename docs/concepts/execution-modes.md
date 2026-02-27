@@ -89,6 +89,43 @@ the same target state.
 
 ## Load modes
 
+```d2
+direction: right
+
+run1: Run 1 (first load) {
+  source: Source\nall rows
+  filter: "watermark: none\n(read everything)"
+  target: Target\nfull dataset
+  wm: "watermark = 2024-04-05"
+
+  source -> filter -> target
+  target -> wm
+}
+
+run2: Run 2 (incremental) {
+  source: Source\nnew + changed
+  filter: "watermark > 2024-04-05"
+  target: Target\nmerged result
+  wm: "watermark = 2024-05-10"
+
+  source -> filter -> target
+  target -> wm
+}
+
+run3: Run 3 (incremental) {
+  source: Source\nnew + changed
+  filter: "watermark > 2024-05-10"
+  target: Target\nmerged result
+  wm: "watermark = 2024-06-01"
+
+  source -> filter -> target
+  target -> wm
+}
+
+run1 -> run2: next execution
+run2 -> run3: next execution
+```
+
 The `load` block on a thread controls how source data is bounded on each
 execution.
 

@@ -20,6 +20,61 @@ between runs, and no implicit state beyond what is explicitly declared.
 
 ## Idempotency by write mode
 
+```d2
+direction: right
+
+overwrite: Overwrite {
+  run1: Run 1 {
+    source: Source\n3 rows
+    target: Target\n3 rows
+    source -> target: write
+  }
+  run2: Run 2 (rerun) {
+    source: Source\n3 rows
+    target: Target\n3 rows
+    source -> target: replace
+  }
+  result: "Idempotent ✓\nSame 3 rows"
+  result.style.font-color: "#2E7D32"
+  run1 -> run2: rerun
+  run2 -> result
+}
+
+append: Append {
+  run1: Run 1 {
+    source: Source\n3 rows
+    target: Target\n3 rows
+    source -> target: insert
+  }
+  run2: Run 2 (rerun) {
+    source: Source\n3 rows
+    target: Target\n6 rows
+    source -> target: insert
+  }
+  result: "Not idempotent ✗\nDuplicate rows"
+  result.style.font-color: "#C62828"
+  run1 -> run2: rerun
+  run2 -> result
+}
+
+merge: Merge {
+  run1: Run 1 {
+    source: Source\n3 rows
+    target: Target\n3 rows
+    source -> target: upsert
+  }
+  run2: Run 2 (rerun) {
+    source: Source\n3 rows
+    target: Target\n3 rows
+    source -> target: match + update
+  }
+  result: "Idempotent ✓\nSame 3 rows"
+  result.style.font-color: "#2E7D32"
+  run1 -> run2: rerun
+  run2 -> result
+}
+```
+
 Each write mode has different rerun characteristics:
 
 | Write mode | Idempotent? | Behavior on rerun |

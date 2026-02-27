@@ -4,6 +4,41 @@
 transformation steps, and writes to a Delta target. Then wire it into a weave
 and verify the output.
 
+```d2
+direction: right
+
+read: Read Sources {
+  style.fill: "#E3F2FD"
+}
+transform: Transform Steps {
+  style.fill: "#E8F5E9"
+}
+validate: Validate Rules {
+  style.fill: "#FFF3E0"
+}
+map: Map Columns {
+  style.fill: "#F3E5F5"
+}
+write: Write Target {
+  style.fill: "#E0F2F1"
+}
+assert: Assert {
+  style.fill: "#FCE4EC"
+}
+
+read -> transform: DataFrame
+transform -> validate: shaped data
+validate -> map: clean rows
+map -> write: final columns
+write -> assert: post-write
+
+quarantine: Quarantine {
+  style.fill: "#FFEBEE"
+  style.stroke-dash: 3
+}
+validate -> quarantine: failed rows {style.stroke-dash: 3}
+```
+
 ## Prerequisites
 
 - A working weevr project with the [conventional directory structure](../tutorials/your-first-loom.md#project-structure)

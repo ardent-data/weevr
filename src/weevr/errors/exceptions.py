@@ -58,43 +58,72 @@ class ConfigError(WeevError):
 
 
 class ConfigParseError(ConfigError):
-    """YAML parsing errors, file not found, or invalid syntax."""
+    """Raised when a YAML config file cannot be read or parsed.
+
+    Common triggers include missing files, empty content, invalid YAML syntax,
+    non-dictionary top-level structures, and malformed ``config_version`` fields.
+    """
 
     pass
 
 
 class ConfigSchemaError(ConfigError):
-    """Schema validation errors from Pydantic."""
+    """Raised when config structure does not match the expected Pydantic schema.
+
+    This covers missing required fields, unknown config types, parameter type
+    mismatches, and invalid format for typed parameters (dates, timestamps).
+    """
 
     pass
 
 
 class ConfigVersionError(ConfigError):
-    """Unsupported or invalid config_version."""
+    """Raised when ``config_version`` specifies an unsupported major version.
+
+    weevr validates that the declared version is compatible with the current
+    parser. Only major version ``1.x`` is supported.
+    """
 
     pass
 
 
 class VariableResolutionError(ConfigError):
-    """Unresolved variable references in config."""
+    """Raised when a ``${variable}`` reference cannot be resolved.
+
+    This occurs when a variable placeholder has no matching entry in the
+    parameter context and no default value (``${var:-default}``) is provided.
+    """
 
     pass
 
 
 class ReferenceResolutionError(ConfigError):
-    """Missing referenced files or circular dependencies."""
+    """Raised when a ``ref:`` entry cannot be loaded or creates a circular chain.
+
+    Common causes include missing referenced files, incorrect relative paths,
+    and circular reference chains between weaves or threads.
+    """
 
     pass
 
 
 class InheritanceError(ConfigError):
-    """Config inheritance cascade failures."""
+    """Raised when the configuration inheritance cascade fails.
+
+    Reserved for failures during the loom → weave → thread default merging
+    process. Not currently raised in v1.0.
+    """
 
     pass
 
 
 class ModelValidationError(ConfigError):
-    """Semantic validation failures during model hydration."""
+    """Raised when a fully resolved config fails to hydrate into a typed model.
+
+    This occurs after variable resolution and inheritance, when the concrete
+    values are validated through the Pydantic domain model (Thread, Weave, or
+    Loom). Semantic constraints that span multiple fields are checked here.
+    """
 
     pass
 
@@ -150,7 +179,12 @@ class ExecutionError(WeevError):
 
 
 class SparkError(ExecutionError):
-    """Spark-specific execution errors."""
+    """Raised for Spark API-level failures during thread execution.
+
+    Intended for errors originating from PySpark operations (reader failures,
+    write exceptions, catalyst errors). Reserved for future use — v1.0 uses
+    ``ExecutionError`` for all runtime failures.
+    """
 
     pass
 
@@ -195,6 +229,11 @@ class StateError(ExecutionError):
 
 
 class DataValidationError(WeevError):
-    """Data validation errors (M05+)."""
+    """Raised when a fatal-severity validation rule has failing rows.
+
+    When any row fails a validation rule declared with ``severity: fatal``,
+    the thread aborts immediately without writing data. Downgrade to
+    ``severity: error`` to quarantine failing rows instead of aborting.
+    """
 
     pass

@@ -30,6 +30,8 @@ theme:
 
 plugins:
   - search
+  - d2:
+      layout: elk
   - mkdocstrings:
       handlers:
         python:
@@ -74,6 +76,9 @@ nav:
   - Guides:
       - Fabric Runtime: guides/fabric-runtime.md
       - Observability: guides/observability.md
+      - Engine Internals: guides/engine-internals.md
+      - Config Resolution: guides/config-resolution.md
+      - Telemetry Architecture: guides/telemetry-architecture.md
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:
