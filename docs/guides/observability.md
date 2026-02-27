@@ -115,15 +115,44 @@ Events mark significant moments within a span. Each `SpanEvent` has a
 
 A loom execution produces a three-level span tree:
 
-```text
-loom:nightly                        ← root span
-  ├── weave:dimensions              ← child of loom
-  │   ├── thread:dim_customer       ← child of weave
-  │   ├── thread:dim_product        ← child of weave
-  │   └── thread:dim_store          ← child of weave
-  └── weave:facts
-      ├── thread:fact_orders        ← child of weave
-      └── thread:fact_returns       ← child of weave
+```d2
+direction: down
+
+loom: loom:nightly {
+  style.font-size: 18
+
+  weave_dim: weave:dimensions {
+    t1: thread:dim_customer {
+      read: read sources
+      transform: transform
+      validate: validate
+      write: write target
+      assert: assert
+
+      read -> transform -> validate -> write -> assert
+    }
+    t2: thread:dim_product
+    t3: thread:dim_store
+  }
+
+  weave_facts: weave:facts {
+    t4: thread:fact_orders
+    t5: thread:fact_returns
+  }
+
+  weave_dim -> weave_facts: sequential
+}
+
+legend: {
+  style.fill: transparent
+  style.stroke: transparent
+
+  note: |md
+    Each span carries **trace_id**, **span_id**, **status**,
+    **start_time**, **end_time**, and **attributes**.
+    Thread spans contain step-level child spans.
+  |
+}
 ```
 
 The `parent_span_id` on each span links it to its parent, forming a
