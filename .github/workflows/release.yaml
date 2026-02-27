@@ -114,6 +114,11 @@ jobs:
       - name: Sync (locked)
         run: uv sync --locked --dev
 
+      - name: Install D2
+        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
+        env:
+          D2_VERSION: "0.6.9"
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
