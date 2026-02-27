@@ -317,6 +317,21 @@ wheels = [
 ]
 
 [[package]]
+name = "mkdocs-d2-plugin"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mkdocs" },
+    { name = "packaging" },
+    { name = "pydantic" },
+    { name = "pymdown-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d1/5e/633f6898f323e5f032415baf18095bd24958986bfd06e8f23e5588a2af5d/mkdocs_d2_plugin-1.6.0.tar.gz", hash = "sha256:42c1f2dc2ee9fa898c620e011f226de0d90ab4cd2640560199d7f919589a591b", size = 8068, upload-time = "2024-12-16T11:39:49.956Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/e1/a9c15e4c351c9c0a7c35ea0e661df728d419838dcf99b078513f807c188d/mkdocs_d2_plugin-1.6.0-py3-none-any.whl", hash = "sha256:7fef28dee4e01595db712ddc0853418b6834ff955f42b2bd2f9fad15c217c3fc", size = 8547, upload-time = "2024-12-16T11:39:48.784Z" },
+]
+
+[[package]]
 name = "mkdocs-get-deps"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -795,6 +810,7 @@ dev = [
     { name = "delta-spark" },
     { name = "interrogate" },
     { name = "mike" },
+    { name = "mkdocs-d2-plugin" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
     { name = "pyright" },
@@ -815,6 +831,7 @@ dev = [
     { name = "delta-spark", specifier = ">=3.2.0,<3.3.0" },
     { name = "interrogate", specifier = ">=1.7.0" },
     { name = "mike", specifier = ">=2.1.3,<3" },
+    { name = "mkdocs-d2-plugin", specifier = ">=1.0.0,<2" },
     { name = "mkdocs-material", specifier = ">=9.7.3,<10" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.3,<2" },
     { name = "pyright", specifier = ">=1.1.408" },
