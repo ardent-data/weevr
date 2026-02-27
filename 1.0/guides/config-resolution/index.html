@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.0/guides/fabric-runtime/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.0/guides/config-resolution/">
       
       
-        <link rel="prev" href="../../concepts/idempotency/">
+        <link rel="prev" href="../engine-internals/">
       
       
-        <link rel="next" href="../observability/">
+        <link rel="next" href="../telemetry-architecture/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Fabric Runtime - weevr</title>
+        <title>Config Resolution - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#fabric-runtime" class="md-skip">
+        <a href="#config-resolution" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Fabric Runtime
+              Config Resolution
             
           </span>
         </div>
@@ -346,7 +346,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../fabric-runtime/" class="md-tabs__link">
           
   
   
@@ -1577,37 +1577,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Fabric Runtime
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../fabric-runtime/" class="md-nav__link">
         
   
   
@@ -1623,287 +1596,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#runtime-compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Runtime compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installing-weevr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installing weevr
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Installing weevr">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-1-pip-install-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1 -- pip install (recommended)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-2-wheel-upload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2 -- wheel upload
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-3-inline-package-in-a-spark-job-definition" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 3 -- inline package in a Spark Job Definition
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lakehouse-integration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lakehouse integration
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Lakehouse integration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#path-formats" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Path formats
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#variable-injection-for-lakehouse-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variable injection for Lakehouse paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workspace-and-capacity-considerations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workspace and capacity considerations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Workspace and capacity considerations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#workspace-level-isolation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workspace-level isolation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capacity-sizing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capacity sizing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#spark-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Spark configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-vs-production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development vs production
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Development vs production">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#local-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Local development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#running-from-a-fabric-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running from a Fabric Pipeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#package-not-found-after-install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Package not found after install
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#permission-denied-on-abfss-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Permission denied on abfss:// paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#slow-first-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Slow first run
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1969,10 +1661,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../config-resolution/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1988,6 +1707,153 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-14-parse-and-validate-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1–4: Parse and validate structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-56-resolve-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5–6: Resolve values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-7-load-child-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 7: Load child configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-89-inherit-and-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 8–9: Inherit and expand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-10-hydrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 10: Hydrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2196,10 +2062,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#runtime-compatibility" class="md-nav__link">
+  <a href="#introduction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Runtime compatibility
+        Introduction
       
     </span>
   </a>
@@ -2207,22 +2073,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installing-weevr" class="md-nav__link">
+  <a href="#key-concepts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installing weevr
+        Key concepts
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Installing weevr">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-1-pip-install-recommended" class="md-nav__link">
+  <a href="#stage-14-parse-and-validate-structure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1 -- pip install (recommended)
+        Stage 1–4: Parse and validate structure
       
     </span>
   </a>
@@ -2230,10 +2107,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-wheel-upload" class="md-nav__link">
+  <a href="#stage-56-resolve-values" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2 -- wheel upload
+        Stage 5–6: Resolve values
       
     </span>
   </a>
@@ -2241,10 +2118,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-3-inline-package-in-a-spark-job-definition" class="md-nav__link">
+  <a href="#stage-7-load-child-configs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 3 -- inline package in a Spark Job Definition
+        Stage 7: Load child configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-89-inherit-and-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 8–9: Inherit and expand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-10-hydrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 10: Hydrate
       
     </span>
   </a>
@@ -2257,199 +2156,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lakehouse-integration" class="md-nav__link">
+  <a href="#module-map" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lakehouse integration
+        Module map
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Lakehouse integration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#path-formats" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Path formats
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#variable-injection-for-lakehouse-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variable injection for Lakehouse paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#workspace-and-capacity-considerations" class="md-nav__link">
+  <a href="#design-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Workspace and capacity considerations
+        Design decisions
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Workspace and capacity considerations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#workspace-level-isolation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workspace-level isolation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capacity-sizing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capacity sizing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#spark-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Spark configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-vs-production" class="md-nav__link">
+  <a href="#further-reading" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Development vs production
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Development vs production">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#local-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Local development
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#production" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Production
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#running-from-a-fabric-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running from a Fabric Pipeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#package-not-found-after-install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Package not found after install
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#permission-denied-on-abfss-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Permission denied on abfss:// paths
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#slow-first-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Slow first run
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
+        Further reading
       
     </span>
   </a>
@@ -2476,221 +2208,248 @@
   
 
 
-<h1 id="fabric-runtime">Fabric Runtime<a class="headerlink" href="#fabric-runtime" title="Permanent link">&para;</a></h1>
-<p>This guide covers running weevr on Microsoft Fabric, including environment
-setup, Lakehouse integration, and tips for moving between development and
-production.</p>
-<h2 id="runtime-compatibility">Runtime compatibility<a class="headerlink" href="#runtime-compatibility" title="Permanent link">&para;</a></h2>
-<p>weevr targets <strong>Fabric Runtime 1.3</strong>, which ships with:</p>
+<h1 id="config-resolution">Config Resolution<a class="headerlink" href="#config-resolution" title="Permanent link">&para;</a></h1>
+<p>This guide explains how weevr transforms raw YAML files into validated,
+typed configuration models. The resolution pipeline is a multi-stage process
+that parses, validates, resolves, inherits, and hydrates configuration.</p>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>A single call to <code>load_config()</code> drives the entire pipeline. The stages are
+designed to fail fast — syntax errors are caught before variable resolution,
+schema errors before reference loading, and semantic constraints after all
+values are concrete.</p>
+<h2 id="key-concepts">Key concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Variable interpolation</strong> — <code>${var}</code> placeholders in YAML values are
+  replaced with concrete values from runtime parameters or config defaults.
+  Default values use the <code>${var:-default}</code> syntax.</li>
+<li><strong>Reference resolution</strong> — <code>ref:</code> entries in weave and loom configs load
+  child configuration files recursively. Circular references are detected
+  and rejected.</li>
+<li><strong>Inheritance cascade</strong> — Defaults flow downward: loom defaults → weave
+  defaults → thread config. The most specific value wins. Replacement is
+  whole-value, not deep merge.</li>
+<li><strong>Typed extensions</strong> — Files use <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> extensions
+  to declare their config type unambiguously.</li>
+<li><strong>Macro expansion</strong> — <code>foreach</code> blocks in step lists expand into repeated
+  step sequences with variable substitution.</li>
+</ul>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p>The pipeline runs in 10 stages:</p>
+<div class="d2"><svg data-d2-version="v0.6.9" preserveAspectRatio="xMinYMin meet" viewBox="0 0 2404 268" role="img" aria-label="Diagram"><svg class="d2-ae5c52e27cc847f08b7a5e795b015cc1 d2-svg" width="2404" height="268" viewBox="-89 -89 2404 268"><rect x="-89.000000" y="-89.000000" width="2404.000000" height="268.000000" rx="0.000000" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-ae5c52e27cc847f08b7a5e795b015cc1 .text-bold {
+	font-family: "d2-ae5c52e27cc847f08b7a5e795b015cc1-font-bold";
+}
+@font-face {
+	font-family: d2-ae5c52e27cc847f08b7a5e795b015cc1-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}</style><style type="text/css">.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N1{fill:#0A0F25;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N2{fill:#676C7E;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N3{fill:#9499AB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N4{fill:#CFD2DD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N5{fill:#DEE1EB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N6{fill:#EEF1F8;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-N7{fill:#FFFFFF;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-B1{fill:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-B2{fill:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-B3{fill:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-B4{fill:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-B5{fill:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-B6{fill:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-AA2{fill:#4A6FF3;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-AA4{fill:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-AA5{fill:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-AB4{fill:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .fill-AB5{fill:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N1{stroke:#0A0F25;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N2{stroke:#676C7E;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N3{stroke:#9499AB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N4{stroke:#CFD2DD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N5{stroke:#DEE1EB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N6{stroke:#EEF1F8;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-N7{stroke:#FFFFFF;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-B1{stroke:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-B2{stroke:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-B3{stroke:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-B4{stroke:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-B5{stroke:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-B6{stroke:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-AA2{stroke:#4A6FF3;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-AA4{stroke:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-AA5{stroke:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-AB4{stroke:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .stroke-AB5{stroke:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N1{background-color:#0A0F25;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N2{background-color:#676C7E;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N3{background-color:#9499AB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N4{background-color:#CFD2DD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N5{background-color:#DEE1EB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N6{background-color:#EEF1F8;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-N7{background-color:#FFFFFF;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-B1{background-color:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-B2{background-color:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-B3{background-color:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-B4{background-color:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-B5{background-color:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-B6{background-color:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-AA2{background-color:#4A6FF3;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-AA4{background-color:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-AA5{background-color:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-AB4{background-color:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .background-color-AB5{background-color:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N1{color:#0A0F25;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N2{color:#676C7E;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N3{color:#9499AB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N4{color:#CFD2DD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N5{color:#DEE1EB;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N6{color:#EEF1F8;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-N7{color:#FFFFFF;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-B1{color:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-B2{color:#0D32B2;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-B3{color:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-B4{color:#E3E9FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-B5{color:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-B6{color:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-AA2{color:#4A6FF3;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-AA4{color:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-AA5{color:#F7F8FE;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-AB4{color:#EDF0FD;}
+		.d2-ae5c52e27cc847f08b7a5e795b015cc1 .color-AB5{color:#F7F8FE;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.sketch-overlay-B1{fill:url(#streaks-darker-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:lighten}.sketch-overlay-B2{fill:url(#streaks-darker-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:lighten}.sketch-overlay-B3{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-B4{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-B5{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-B6{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-AA2{fill:url(#streaks-dark-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:overlay}.sketch-overlay-AA4{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-AA5{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-AB4{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-AB5{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-N1{fill:url(#streaks-darker-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:lighten}.sketch-overlay-N2{fill:url(#streaks-dark-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:overlay}.sketch-overlay-N3{fill:url(#streaks-normal-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:color-burn}.sketch-overlay-N4{fill:url(#streaks-normal-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:color-burn}.sketch-overlay-N5{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-N6{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.sketch-overlay-N7{fill:url(#streaks-bright-d2-ae5c52e27cc847f08b7a5e795b015cc1);mix-blend-mode:darken}.light-code{display: block}.dark-code{display: none}</style><g class="cGFyc2U="><g class="shape"><rect x="12.000000" y="12.000000" width="125.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="74.500000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Parse YAML</text></g><g class="dmVyc2lvbg=="><g class="shape"><rect x="207.000000" y="12.000000" width="152.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="283.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Extract version</text></g><g class="ZGV0ZWN0"><g class="shape"><rect x="429.000000" y="12.000000" width="126.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="492.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Detect type</text></g><g class="c2NoZW1h"><g class="shape"><rect x="625.000000" y="12.000000" width="162.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="706.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Validate schema</text></g><g class="cGFyYW1fY3R4"><g class="shape"><rect x="857.000000" y="12.000000" width="188.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="951.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Build param context</text></g><g class="cmVzb2x2ZV92YXJz"><g class="shape"><rect x="1115.000000" y="12.000000" width="168.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1199.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Resolve variables</text></g><g class="cmVzb2x2ZV9yZWZz"><g class="shape"><rect x="1353.000000" y="12.000000" width="178.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1442.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Resolve references</text></g><g class="aW5oZXJpdA=="><g class="shape"><rect x="1601.000000" y="12.000000" width="171.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1686.500000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Apply inheritance</text></g><g class="ZXhwYW5k"><g class="shape"><rect x="1842.000000" y="12.000000" width="152.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1918.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Expand macros</text></g><g class="aHlkcmF0ZQ=="><g class="shape"><rect x="2064.000000" y="12.000000" width="150.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2139.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Hydrate model</text></g><g class="KHBhcnNlIC0mZ3Q7IHZlcnNpb24pWzBd"><marker id="mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134" markerWidth="10.000000" markerHeight="12.000000" refX="7.000000" refY="6.000000" viewBox="0.000000 0.000000 10.000000 12.000000" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0.000000,0.000000 10.000000,6.000000 0.000000,12.000000" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 139.000000 45.000000 L 203.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KHZlcnNpb24gLSZndDsgZGV0ZWN0KVswXQ=="><path d="M 361.000000 45.000000 L 425.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KGRldGVjdCAtJmd0OyBzY2hlbWEpWzBd"><path d="M 557.000000 45.000000 L 621.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KHNjaGVtYSAtJmd0OyBwYXJhbV9jdHgpWzBd"><path d="M 789.000000 45.000000 L 853.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KHBhcmFtX2N0eCAtJmd0OyByZXNvbHZlX3ZhcnMpWzBd"><path d="M 1047.000000 45.000000 L 1111.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KHJlc29sdmVfdmFycyAtJmd0OyByZXNvbHZlX3JlZnMpWzBd"><path d="M 1285.000000 45.000000 L 1349.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KHJlc29sdmVfcmVmcyAtJmd0OyBpbmhlcml0KVswXQ=="><path d="M 1533.000000 45.000000 L 1597.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KGluaGVyaXQgLSZndDsgZXhwYW5kKVswXQ=="><path d="M 1774.000000 45.000000 L 1838.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><g class="KGV4cGFuZCAtJmd0OyBoeWRyYXRlKVswXQ=="><path d="M 1996.000000 45.000000 L 2060.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-ae5c52e27cc847f08b7a5e795b015cc1-3488378134)" mask="url(#d2-ae5c52e27cc847f08b7a5e795b015cc1)" /></g><mask id="d2-ae5c52e27cc847f08b7a5e795b015cc1" maskUnits="userSpaceOnUse" x="-89" y="-89" width="2404" height="268">
+<rect x="-89" y="-89" width="2404" height="268" fill="white" />
+<rect x="34.500000" y="34.500000" width="80" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="229.500000" y="34.500000" width="107" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="451.500000" y="34.500000" width="81" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="647.500000" y="34.500000" width="117" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="879.500000" y="34.500000" width="143" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="1137.500000" y="34.500000" width="123" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="1375.500000" y="34.500000" width="133" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="1623.500000" y="34.500000" width="126" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="1864.500000" y="34.500000" width="107" height="21" fill="rgba(0,0,0,0.75)" />
+<rect x="2086.500000" y="34.500000" width="105" height="21" fill="rgba(0,0,0,0.75)" />
+</mask></svg></svg></div>
+<h3 id="stage-14-parse-and-validate-structure">Stage 1–4: Parse and validate structure<a class="headerlink" href="#stage-14-parse-and-validate-structure" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Parse YAML</strong> — Read the file and produce a raw dictionary. File-not-found
+   and YAML syntax errors raise <code>ConfigParseError</code>.</li>
+<li><strong>Extract version</strong> — Read <code>config_version</code> and parse into a <code>(major, minor)</code>
+   tuple. Unsupported versions raise <code>ConfigVersionError</code>.</li>
+<li><strong>Detect type</strong> — Determine whether the file is a thread, weave, loom, or
+   params file. Typed extensions (<code>.thread</code>, <code>.weave</code>, <code>.loom</code>) are checked
+   first; if the extension is <code>.yaml</code> or <code>.yml</code>, the structure is inspected.</li>
+<li><strong>Validate schema</strong> — Run the raw dictionary through a Pydantic model for
+   loose structural validation. At this stage, <code>${var}</code> placeholders are
+   permitted (the schema uses <code>extra="allow"</code>), so unresolved variables do not
+   cause errors.</li>
+</ol>
+<h3 id="stage-56-resolve-values">Stage 5–6: Resolve values<a class="headerlink" href="#stage-56-resolve-values" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Build parameter context</strong> — Merge runtime parameters (highest priority)
+   over config-declared defaults (lowest priority) into a flat context
+   dictionary. Dotted keys like <code>env.lakehouse</code> support nested access.</li>
+<li><strong>Resolve variables</strong> — Recursively walk all strings in the config and
+   replace <code>${var}</code> references with values from the parameter context.
+   Unresolved variables without defaults raise <code>VariableResolutionError</code>.</li>
+</ol>
+<h3 id="stage-7-load-child-configs">Stage 7: Load child configs<a class="headerlink" href="#stage-7-load-child-configs" title="Permanent link">&para;</a></h3>
+<p><strong>Resolve references</strong> — For looms and weaves, load child config files:</p>
+<ul>
+<li>Loom → loads referenced weaves</li>
+<li>Weave → loads referenced threads</li>
+</ul>
+<p>Each child is itself run through the full pipeline (recursion). A <code>visited</code>
+set tracks loaded paths to detect circular references. Entry-level
+overrides like <code>dependencies</code> and <code>condition</code> are preserved alongside the
+loaded config.</p>
+<h3 id="stage-89-inherit-and-expand">Stage 8–9: Inherit and expand<a class="headerlink" href="#stage-89-inherit-and-expand" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Apply inheritance</strong> — For multi-level configs, cascade defaults:<ul>
+<li>Loom defaults merge into weave defaults</li>
+<li>Merged defaults merge into each thread config</li>
+<li>Thread values always win (most specific)</li>
+</ul>
+</li>
+</ol>
+<p>Naming configuration cascades separately as a whole block rather than
+   per-field.</p>
+<ol>
+<li><strong>Expand macros</strong> — <code>foreach</code> blocks in thread step lists are expanded
+   into repeated sequences. This happens after variable resolution so that
+   <code>foreach.values</code> can reference parameters.</li>
+</ol>
+<h3 id="stage-10-hydrate">Stage 10: Hydrate<a class="headerlink" href="#stage-10-hydrate" title="Permanent link">&para;</a></h3>
+<p><strong>Hydrate model</strong> — The fully resolved dictionary is validated through
+the typed Pydantic model (<code>Thread</code>, <code>Weave</code>, or <code>Loom</code>). Semantic errors
+at this stage raise <code>ModelValidationError</code>. Incremental-mode constraints
+(e.g., CDC requires merge write mode) are checked as post-resolution
+cross-cutting validations.</p>
+<h2 id="module-map">Module map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Component</th>
-<th>Version</th>
+<th>Module</th>
+<th>Responsibility</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Python</td>
-<td>3.11</td>
+<td><code>config/parser.py</code></td>
+<td>YAML parsing, version extraction, typed extension detection</td>
 </tr>
 <tr>
-<td>PySpark</td>
-<td>3.5.x</td>
+<td><code>config/resolver.py</code></td>
+<td>Variable interpolation, reference loading, circular dependency detection</td>
 </tr>
 <tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
+<td><code>config/inheritance.py</code></td>
+<td>Three-level cascade: loom → weave → thread</td>
+</tr>
+<tr>
+<td><code>config/validation.py</code></td>
+<td>Pre-resolution schema validation, post-resolution constraint checks</td>
+</tr>
+<tr>
+<td><code>config/macros.py</code></td>
+<td><code>foreach</code> block expansion in step lists</td>
+</tr>
+<tr>
+<td><code>config/__init__.py</code></td>
+<td><code>load_config()</code> — orchestrates the full pipeline</td>
 </tr>
 </tbody>
 </table>
-<p>weevr pins <code>requires-python = "&gt;=3.11,&lt;3.12"</code> to match. All transforms,
-readers, writers, and telemetry primitives are tested against PySpark 3.5 and
-Delta 3.2.</p>
-<div class="admonition note">
-<p class="admonition-title">Runtime version lock</p>
-<p>Fabric Runtime versions are fixed per workspace capacity. If you upgrade
-to a newer runtime in the future, check the
-<a href="../../reference/compatibility/">Compatibility</a> page for supported
-version combinations.</p>
-</div>
-<h2 id="installing-weevr">Installing weevr<a class="headerlink" href="#installing-weevr" title="Permanent link">&para;</a></h2>
-<h3 id="option-1-pip-install-recommended">Option 1 -- pip install (recommended)<a class="headerlink" href="#option-1-pip-install-recommended" title="Permanent link">&para;</a></h3>
-<p>In a Fabric Notebook, install weevr at the top of the first cell:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="n">weevr</span>
-</code></pre></div>
-<p>This pulls the latest release from PyPI and makes it available for the
-duration of the Spark session.</p>
-<p>For a persistent installation that survives notebook restarts, add weevr to
-your <strong>Fabric Environment</strong> via the workspace portal:</p>
-<ol>
-<li>Go to <strong>Workspace settings</strong> &gt; <strong>Data Engineering</strong> &gt; <strong>Environment</strong>.</li>
-<li>Under <strong>Public libraries</strong>, add <code>weevr</code> with the desired version pin.</li>
-<li>Save and restart your Spark session.</li>
-</ol>
-<h3 id="option-2-wheel-upload">Option 2 -- wheel upload<a class="headerlink" href="#option-2-wheel-upload" title="Permanent link">&para;</a></h3>
-<p>If your workspace has restricted network access, download the <code>.whl</code> file
-from PyPI and upload it to a Lakehouse Files area:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">/</span><span class="n">lakehouse</span><span class="o">/</span><span class="n">default</span><span class="o">/</span><span class="n">Files</span><span class="o">/</span><span class="n">libs</span><span class="o">/</span><span class="n">weevr</span><span class="o">-</span><span class="mf">0.7.4</span><span class="o">-</span><span class="n">py3</span><span class="o">-</span><span class="n">none</span><span class="o">-</span><span class="nb">any</span><span class="o">.</span><span class="n">whl</span>
-</code></pre></div>
-<p>Replace the version number with the actual wheel filename.</p>
-<h3 id="option-3-inline-package-in-a-spark-job-definition">Option 3 -- inline package in a Spark Job Definition<a class="headerlink" href="#option-3-inline-package-in-a-spark-job-definition" title="Permanent link">&para;</a></h3>
-<p>For production jobs, declare weevr in the Spark Job Definition's
-<strong>Referenced libraries</strong> section. This avoids install latency on each run
-and ensures reproducible builds.</p>
-<h2 id="lakehouse-integration">Lakehouse integration<a class="headerlink" href="#lakehouse-integration" title="Permanent link">&para;</a></h2>
-<p>Fabric Lakehouses expose Delta tables through <code>abfss://</code> paths. weevr reads
-and writes these tables using standard Spark DataFrame APIs, so any path
-that Spark can resolve works in thread configuration.</p>
-<h3 id="path-formats">Path formats<a class="headerlink" href="#path-formats" title="Permanent link">&para;</a></h3>
-<p>Fabric provides several ways to reference Lakehouse tables:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Relative path — resolves within the attached Lakehouse</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/dim_customer</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Absolute abfss:// path — cross-Lakehouse or cross-workspace</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nt">sources</span><span class="p">:</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">raw_orders</span><span class="p">:</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;abfss://workspace@onelake.dfs.fabric.microsoft.com/lakehouse.Lakehouse/Tables/raw_orders&quot;</span>
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Use variables for environment portability</p>
-<p>Hard-coding <code>abfss://</code> paths makes configs environment-specific.
-Use YAML variable injection to keep configs portable across
-dev, staging, and production workspaces.</p>
-</div>
-<h3 id="variable-injection-for-lakehouse-paths">Variable injection for Lakehouse paths<a class="headerlink" href="#variable-injection-for-lakehouse-paths" title="Permanent link">&para;</a></h3>
-<p>Define environment-specific values as runtime parameters and reference them
-in thread configuration:</p>
-<p><strong>staging/stg_customers.thread</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">sources</span><span class="p">:</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">raw_customers</span><span class="p">:</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${bronze_base}/customers&quot;</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${silver_base}/stg_customers&quot;</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nt">write</span><span class="p">:</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">overwrite</span>
-</code></pre></div>
-<p>Pass environment-specific values through the <code>Context</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Context</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">spark</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="s2">&quot;my-project.weevr&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">params</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="s2">&quot;bronze_base&quot;</span><span class="p">:</span> <span class="s2">&quot;abfss://prod-ws@onelake.dfs.fabric.microsoft.com/prod.Lakehouse/Tables/bronze&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="s2">&quot;silver_base&quot;</span><span class="p">:</span> <span class="s2">&quot;abfss://prod-ws@onelake.dfs.fabric.microsoft.com/prod.Lakehouse/Tables/silver&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="p">},</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>This pattern lets the same YAML configs run in any environment by swapping
-the runtime parameters.</p>
-<h2 id="workspace-and-capacity-considerations">Workspace and capacity considerations<a class="headerlink" href="#workspace-and-capacity-considerations" title="Permanent link">&para;</a></h2>
-<h3 id="workspace-level-isolation">Workspace-level isolation<a class="headerlink" href="#workspace-level-isolation" title="Permanent link">&para;</a></h3>
-<p>Each Fabric workspace maps to its own Lakehouse namespace. Keep weevr
-config projects scoped to a single workspace when possible. Cross-workspace
-reads require full <code>abfss://</code> paths and appropriate access permissions.</p>
-<h3 id="capacity-sizing">Capacity sizing<a class="headerlink" href="#capacity-sizing" title="Permanent link">&para;</a></h3>
-<p>weevr executes threads concurrently within a weave using a
-<code>ThreadPoolExecutor</code>. The number of simultaneous Spark operations depends
-on the capacity allocated to your workspace:</p>
+<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Small/Medium capacities</strong> -- Limit weave concurrency to avoid Spark
-  job queue contention. Use sequential weaves for heavy workloads.</li>
-<li><strong>Large capacities</strong> -- Weave-level parallelism is effective. Threads
-  that are independent in the DAG execute simultaneously.</li>
+<li><strong>Pre-resolution loose schema</strong> — Schema validation runs before variable
+  resolution, using <code>extra="allow"</code> to tolerate <code>${...}</code> placeholders. This
+  catches structural errors early without requiring all parameters to be
+  available.</li>
+<li><strong>Whole-value replacement</strong> — Inheritance uses simple replacement, not deep
+  merge. A thread-level <code>write</code> block replaces the entire inherited <code>write</code>
+  block, not individual fields within it. This keeps behavior predictable.</li>
+<li><strong>Typed extensions</strong> — <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> extensions eliminate
+  ambiguity about config type without inspecting file contents.</li>
+<li><strong>Foreach after resolution</strong> — Macro expansion happens after variable
+  resolution so that the <code>values</code> list can come from parameters, but before
+  model hydration so that expanded steps are fully validated.</li>
 </ul>
-<p>Cache configuration also affects memory. If you are caching lookup tables
-across threads, ensure executor memory is sized accordingly. See
-<a href="../../how-to/cache-a-lookup/">Cache a Lookup</a> for details.</p>
-<h3 id="spark-configuration">Spark configuration<a class="headerlink" href="#spark-configuration" title="Permanent link">&para;</a></h3>
-<p>Fabric sets Spark configuration at the capacity and workspace level. weevr
-does not override Spark settings. If you need to tune shuffle partitions,
-executor memory, or other Spark properties, configure them through:</p>
+<h2 id="further-reading">Further reading<a class="headerlink" href="#further-reading" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Workspace Spark settings</strong> in the Fabric portal</li>
-<li><strong>Spark session configuration</strong> in notebook <code>%%configure</code> cells</li>
-<li><strong>Spark Job Definition</strong> configuration for production jobs</li>
-</ul>
-<h2 id="development-vs-production">Development vs production<a class="headerlink" href="#development-vs-production" title="Permanent link">&para;</a></h2>
-<h3 id="local-development">Local development<a class="headerlink" href="#local-development" title="Permanent link">&para;</a></h3>
-<p>For local iteration, use a standalone Spark installation:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">spark</span> <span class="o">=</span> <span class="p">(</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="o">.</span><span class="n">master</span><span class="p">(</span><span class="s2">&quot;local[*]&quot;</span><span class="p">)</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="s2">&quot;spark.sql.extensions&quot;</span><span class="p">,</span> <span class="s2">&quot;io.delta.sql.DeltaSparkSessionExtension&quot;</span><span class="p">)</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="o">.</span><span class="n">config</span><span class="p">(</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="s2">&quot;spark.sql.catalog.spark_catalog&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="s2">&quot;org.apache.spark.sql.delta.catalog.DeltaCatalog&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="p">)</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="p">)</span>
-</code></pre></div>
-<p>Local Delta tables write to the filesystem. Use relative paths in your dev
-parameter file so that <code>Tables/stg_customers</code> resolves to a local directory.</p>
-<p>This approach lets you run the full weevr pipeline -- threads, weaves, and
-looms -- without a Fabric workspace. The same YAML configs work in both
-environments.</p>
-<h3 id="production">Production<a class="headerlink" href="#production" title="Permanent link">&para;</a></h3>
-<p>In production, weevr runs inside a Fabric Notebook or Spark Job Definition
-where the <code>spark</code> variable is pre-initialized by the runtime:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Context</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">spark</span><span class="p">,</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="s2">&quot;my-project.weevr&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;standard&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">)</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">)</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;success&quot;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Do not call <code>SparkSession.builder</code> in Fabric</p>
-<p>Fabric provides a managed <code>spark</code> session. Creating a new session
-with <code>SparkSession.builder</code> can cause unexpected behavior. Always use
-the pre-existing <code>spark</code> variable.</p>
-</div>
-<h3 id="running-from-a-fabric-pipeline">Running from a Fabric Pipeline<a class="headerlink" href="#running-from-a-fabric-pipeline" title="Permanent link">&para;</a></h3>
-<p>Fabric Pipelines can invoke Notebooks as activities. This is the standard
-pattern for scheduled execution:</p>
-<ol>
-<li>Create a Notebook that calls <code>ctx.run()</code>.</li>
-<li>Add the Notebook as a <strong>Notebook activity</strong> in a Fabric Pipeline.</li>
-<li>Pass runtime parameters (e.g., <code>run_date</code>) through Pipeline parameters
-   that map to notebook widgets or cell parameters.</li>
-</ol>
-<p>See <a href="../../how-to/run-from-fabric-pipeline/">Run from Fabric Pipeline</a> for
-a step-by-step walkthrough.</p>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="package-not-found-after-install">Package not found after install<a class="headerlink" href="#package-not-found-after-install" title="Permanent link">&para;</a></h3>
-<p>If <code>%pip install weevr</code> succeeds but <code>from weevr import Context</code> fails,
-restart the Spark session. In-session pip installs require a kernel restart
-to take effect in some Fabric configurations.</p>
-<h3 id="permission-denied-on-abfss-paths">Permission denied on abfss:// paths<a class="headerlink" href="#permission-denied-on-abfss-paths" title="Permanent link">&para;</a></h3>
-<p>Ensure your Fabric workspace identity has <strong>Contributor</strong> or <strong>Admin</strong> access
-to the target Lakehouse. Cross-workspace reads also require explicit sharing.</p>
-<h3 id="slow-first-run">Slow first run<a class="headerlink" href="#slow-first-run" title="Permanent link">&para;</a></h3>
-<p>The first execution in a Fabric session incurs Spark startup overhead. This
-is a Fabric characteristic, not a weevr issue. Subsequent runs reuse the warm
-session and are significantly faster.</p>
-<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="../../tutorials/your-first-loom/">Your First Loom</a> -- Build a complete
-  pipeline from scratch</li>
-<li><a href="../observability/">Observability</a> -- Monitor execution with structured
-  telemetry</li>
-<li><a href="../../reference/compatibility/">Compatibility</a> -- Supported version
-  matrix</li>
+<li><a href="../../reference/configuration-keys/">Configuration Keys</a> — Complete field
+  reference for all config models</li>
+<li><a href="../../concepts/thread-weave-loom/">Thread, Weave, Loom</a> — The three-level
+  hierarchy and inheritance model</li>
 </ul>
 
 

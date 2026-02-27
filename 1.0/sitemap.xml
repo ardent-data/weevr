@@ -2,122 +2,134 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/contributing/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/faq/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/concepts/artifacts-model/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/concepts/execution-modes/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/concepts/idempotency/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/concepts/thread-weave-loom/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/concepts/why-weevr/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
+    </url>
+    <url>
+         <loc>https://ardent-data.github.io/weevr/1.0/guides/config-resolution/</loc>
+         <lastmod>2026-02-27</lastmod>
+    </url>
+    <url>
+         <loc>https://ardent-data.github.io/weevr/1.0/guides/engine-internals/</loc>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/guides/fabric-runtime/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/guides/observability/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
+    </url>
+    <url>
+         <loc>https://ardent-data.github.io/weevr/1.0/guides/telemetry-architecture/</loc>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/how-to/add-a-thread/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/how-to/add-validation-rules/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/how-to/cache-a-lookup/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/how-to/implement-custom-telemetry-sink/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/how-to/run-from-fabric-pipeline/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/compatibility/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/configuration-keys/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/config/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/context/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/engine/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/errors/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/model/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/operations/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/state/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/api/telemetry/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/yaml-schema/loom/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/yaml-schema/thread/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/reference/yaml-schema/weave/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/release-notes/1.0/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.0/tutorials/your-first-loom/</loc>
-         <lastmod>2026-02-26</lastmod>
+         <lastmod>2026-02-27</lastmod>
     </url>
 </urlset>
