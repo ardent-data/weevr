@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/ardent-data/weevr/compare/weevr-v1.0.4...weevr-v1.0.5) (2026-02-27)
+
+
+### Bug Fixes
+
+* **ci:** add D2 binary install to release and release-quality workflows ([#54](https://github.com/ardent-data/weevr/issues/54)) ([d7f7760](https://github.com/ardent-data/weevr/commit/d7f77608983f4a10dc1268b749c553a8f655a2b9))
+
 ## [1.0.4](https://github.com/ardent-data/weevr/compare/weevr-v1.0.3...weevr-v1.0.4) (2026-02-27)
 
 
