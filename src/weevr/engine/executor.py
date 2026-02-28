@@ -24,7 +24,7 @@ from weevr.operations.readers import (
 )
 from weevr.operations.validation import validate_dataframe
 from weevr.operations.writers import apply_target_mapping, execute_cdc_merge, write_target
-from weevr.state.watermark import WatermarkState, WatermarkStore, resolve_store
+from weevr.state import WatermarkState, WatermarkStore, resolve_store
 from weevr.telemetry.collector import SpanBuilder, SpanCollector
 from weevr.telemetry.results import ThreadTelemetry
 from weevr.telemetry.span import ExecutionSpan, SpanStatus, generate_span_id, generate_trace_id

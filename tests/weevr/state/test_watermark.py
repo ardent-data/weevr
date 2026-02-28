@@ -6,9 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from weevr.model.load import LoadConfig, WatermarkStoreConfig
+from weevr.state import WatermarkState, WatermarkStore, resolve_store
 from weevr.state.metadata_table import MetadataTableStore
 from weevr.state.table_properties import TablePropertiesStore
-from weevr.state.watermark import WatermarkState, WatermarkStore, resolve_store
 
 
 class TestWatermarkState:

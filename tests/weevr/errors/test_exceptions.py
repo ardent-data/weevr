@@ -130,51 +130,46 @@ class TestSpecificExceptions:
 
     def test_config_parse_error(self):
         """ConfigParseError can be raised and caught."""
-        with pytest.raises(ConfigParseError) as exc_info:
+        with pytest.raises(ConfigParseError, match="YAML syntax error"):
             raise ConfigParseError("YAML syntax error")
-        assert "YAML syntax error" in str(exc_info.value)
 
     def test_config_schema_error(self):
         """ConfigSchemaError can be raised and caught."""
-        with pytest.raises(ConfigSchemaError) as exc_info:
+        with pytest.raises(ConfigSchemaError, match="Schema validation failed"):
             raise ConfigSchemaError("Schema validation failed")
-        assert "Schema validation failed" in str(exc_info.value)
 
     def test_config_version_error(self):
         """ConfigVersionError can be raised and caught."""
-        with pytest.raises(ConfigVersionError) as exc_info:
+        with pytest.raises(ConfigVersionError, match="Unsupported version"):
             raise ConfigVersionError("Unsupported version")
-        assert "Unsupported version" in str(exc_info.value)
 
     def test_variable_resolution_error(self):
         """VariableResolutionError can be raised and caught."""
-        with pytest.raises(VariableResolutionError) as exc_info:
+        with pytest.raises(VariableResolutionError, match="Unresolved variable"):
             raise VariableResolutionError("Unresolved variable")
-        assert "Unresolved variable" in str(exc_info.value)
 
     def test_reference_resolution_error(self):
         """ReferenceResolutionError can be raised and caught."""
-        with pytest.raises(ReferenceResolutionError) as exc_info:
+        with pytest.raises(ReferenceResolutionError, match="Circular reference"):
             raise ReferenceResolutionError("Circular reference")
-        assert "Circular reference" in str(exc_info.value)
 
     def test_inheritance_error(self):
         """InheritanceError can be raised and caught."""
-        with pytest.raises(InheritanceError) as exc_info:
+        with pytest.raises(InheritanceError, match="Cascade failed"):
             raise InheritanceError("Cascade failed")
-        assert "Cascade failed" in str(exc_info.value)
 
     def test_model_validation_error(self):
         """ModelValidationError can be raised and caught."""
-        with pytest.raises(ModelValidationError) as exc_info:
+        with pytest.raises(ModelValidationError, match="Hydration failed for thread"):
             raise ModelValidationError("Hydration failed for thread")
-        assert "Hydration failed for thread" in str(exc_info.value)
 
-    def test_catch_via_base_type(self):
-        """Specific errors catchable via ConfigError."""
+    def test_catch_config_error_via_base(self):
+        """ConfigParseError catchable via ConfigError."""
         with pytest.raises(ConfigError):
             raise ConfigParseError("test")
 
+    def test_catch_config_error_via_weev_error(self):
+        """ConfigSchemaError catchable via WeevError."""
         with pytest.raises(WeevError):
             raise ConfigSchemaError("test")
 
@@ -245,10 +240,12 @@ class TestExecutionError:
         assert "t1" in str(err)
 
     def test_catchable_as_execution_error(self):
-        """SparkError is catchable as ExecutionError and WeevError."""
+        """SparkError is catchable as ExecutionError."""
         with pytest.raises(ExecutionError):
             raise SparkError("spark failure")
 
+    def test_catchable_as_weev_error(self):
+        """SparkError is catchable as WeevError."""
         with pytest.raises(WeevError):
             raise SparkError("spark failure")
 
