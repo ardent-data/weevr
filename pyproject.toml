@@ -8,10 +8,27 @@ authors = [
     { name = "Pierre LaFromboise", email = "44212292+DataInsightPro@users.noreply.github.com" }
 ]
 requires-python = ">=3.11,<3.12"
+keywords = ["spark", "pyspark", "fabric", "etl", "data-pipeline", "yaml", "configuration", "delta-lake"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "pydantic>=2.0,<3.0",
     "pyyaml>=6.0,<7.0",
 ]
+
+[project.urls]
+Documentation = "https://ardent-data.github.io/weevr/"
+Repository = "https://github.com/ardent-data/weevr"
+Issues = "https://github.com/ardent-data/weevr/issues"
+Changelog = "https://github.com/ardent-data/weevr/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]
