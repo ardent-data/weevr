@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.6](https://github.com/ardent-data/weevr/compare/weevr-v1.0.5...weevr-v1.0.6) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** disable D2 plugin cache to prevent gdbm lock error ([#56](https://github.com/ardent-data/weevr/issues/56)) ([2c93721](https://github.com/ardent-data/weevr/commit/2c93721a6b59d2a93221d9b2761bc5ee2ac21e6f))
+* **state:** resolve CodeQL warnings for unreachable statements and cyclic imports ([#58](https://github.com/ardent-data/weevr/issues/58)) ([6465540](https://github.com/ardent-data/weevr/commit/6465540f77e4d1b595371289ea7171bf5085c2aa))
+
 ## [1.0.5](https://github.com/ardent-data/weevr/compare/weevr-v1.0.4...weevr-v1.0.5) (2026-02-27)
 
 
