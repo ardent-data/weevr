@@ -1345,6 +1345,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.state.LoadConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoadConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.state.resolve_store" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2107,6 +2118,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.state.LoadConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoadConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.state.resolve_store" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2345,6 +2367,59 @@ all watermark types (timestamp, date, int, long).</p>
 
 </div>
 
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.state.LoadConfig" class="doc doc-heading">
+            <code>LoadConfig</code>
+
+
+<a href="#weevr.state.LoadConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Incremental load mode and watermark parameters.</p>
+<p>Cross-field validation:
+- <code>mode == "incremental_watermark"</code> requires <code>watermark_column</code> to be set.
+- <code>mode == "cdc"</code> requires <code>cdc</code> config to be set.
+- <code>mode == "cdc"</code> must not have <code>watermark_column</code> set
+  (CDF version tracking is automatic).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
 
 <div class="doc doc-object doc-function">
 
@@ -2379,7 +2454,7 @@ If the type is <code>metadata_table</code>, returns a :class:<code>MetadataTable
                 <code>load_config</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="LoadConfig (weevr.model.load.LoadConfig)" href="../model/#weevr.model.LoadConfig">LoadConfig</a></code>
+                  <code><a class="autorefs autorefs-internal" title="LoadConfig (weevr.model.load.LoadConfig)" href="#weevr.state.LoadConfig">LoadConfig</a></code>
             </td>
             <td>
               <div class="doc-md-description">
