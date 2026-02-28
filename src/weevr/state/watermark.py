@@ -1,4 +1,4 @@
-"""Watermark state model, store ABC, and store resolution."""
+"""Watermark state model and store ABC."""
 
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ from weevr.model.base import FrozenBase
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
-
-    from weevr.model.load import LoadConfig
 
 
 class WatermarkState(FrozenBase):
@@ -45,29 +43,3 @@ class WatermarkStore(ABC):
 
         Raises ``StateError`` on failure.
         """
-
-
-def resolve_store(load_config: LoadConfig, target_path: str) -> WatermarkStore:
-    """Resolve the appropriate watermark store from config.
-
-    If ``load_config.watermark_store`` is ``None`` or its type is
-    ``table_properties``, returns a :class:`TablePropertiesStore`.
-    If the type is ``metadata_table``, returns a :class:`MetadataTableStore`.
-
-    Args:
-        load_config: Thread-level load configuration.
-        target_path: Path to the thread's Delta target table.
-
-    Returns:
-        A concrete ``WatermarkStore`` implementation.
-    """
-    from weevr.state.metadata_table import MetadataTableStore
-    from weevr.state.table_properties import TablePropertiesStore
-
-    store_config = load_config.watermark_store
-
-    if store_config is None or store_config.type == "table_properties":
-        return TablePropertiesStore(target_path)
-
-    # metadata_table — table_path is validated present by WatermarkStoreConfig
-    return MetadataTableStore(store_config.table_path)  # type: ignore[arg-type]
