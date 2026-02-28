@@ -32,6 +32,7 @@ plugins:
   - search
   - d2:
       layout: elk
+      cache: false
   - mkdocstrings:
       handlers:
         python:
