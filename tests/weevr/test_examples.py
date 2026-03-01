@@ -26,7 +26,7 @@ def _config_type(data: dict) -> str:
 @pytest.mark.parametrize(
     "yml_path",
     EXAMPLE_FILES,
-    ids=[p.stem for p in EXAMPLE_FILES],
+    ids=[str(p.relative_to(EXAMPLES_DIR)) for p in EXAMPLE_FILES],
 )
 class TestExampleYaml:
     def test_parses_as_valid_yaml(self, yml_path: Path) -> None:
