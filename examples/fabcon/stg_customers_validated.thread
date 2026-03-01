@@ -1,0 +1,75 @@
+# Demo 2 — Validations & Quarantine
+#
+# Extends the basic customer thread with pre-write validations that
+# route failing rows to a quarantine table, and post-write assertions
+# that verify the target meets quality expectations.
+#
+# Rows with null emails are quarantined (severity: error).
+# Rows with invalid customer_id are rejected entirely (severity: fatal).
+#
+# Run: ctx.run("stg_customers_validated.thread")
+
+config_version: "1.0"
+name: stg_customers_validated
+
+sources:
+  customers:
+    type: csv
+    path: "data/customers.csv"
+    options:
+      header: true
+      inferSchema: true
+
+steps:
+  - filter:
+      expr: "status = 'active'"
+
+  - derive:
+      columns:
+        full_name: "concat(first_name, ' ', last_name)"
+
+  - select:
+      columns:
+        - customer_id
+        - first_name
+        - last_name
+        - full_name
+        - email
+        - signup_date
+
+  - cast:
+      columns:
+        customer_id: "int"
+        signup_date: "date"
+
+# Pre-write validation rules
+# Rows failing 'error' rules are routed to quarantine with metadata.
+# Rows failing 'fatal' rules halt execution entirely.
+validations:
+  - name: email_not_null
+    rule: "email IS NOT NULL"
+    severity: error
+  - name: customer_id_positive
+    rule: "customer_id > 0"
+    severity: fatal
+
+# Post-write assertions against the target table
+assertions:
+  - type: unique
+    columns:
+      - customer_id
+    severity: error
+  - type: column_not_null
+    columns:
+      - customer_id
+      - full_name
+    severity: error
+  - type: row_count
+    min: 1
+    severity: warn
+
+target:
+  alias: staging.stg_customers
+
+write:
+  mode: overwrite

@@ -18,6 +18,14 @@ serve as reference templates and are validated by CI to ensure structural correc
 | `full-loom.loom` | Complete loom with two weaves, variables, defaults, and execution settings. |
 | `validation-thread.thread` | Thread with data quality validations and post-write assertions. |
 
+## Fabcon 2026 Demos
+
+The `fabcon/` directory contains a progressive demo sequence for the Fabcon 2026
+session. Five demos build from a single thread to a full loom, covering CSV
+ingestion, validations, merge with soft delete, incremental watermarks, DAG
+orchestration, and multi-weave deployment. See [`fabcon/README.md`](fabcon/README.md)
+for the full walkthrough.
+
 ## Configuration Hierarchy
 
 weevr uses a layered configuration model:

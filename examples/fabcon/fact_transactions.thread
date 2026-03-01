@@ -1,0 +1,60 @@
+# Demo 3b — Incremental Watermark
+#
+# Loads transaction records incrementally using a timestamp watermark.
+# Only rows newer than the last successful load are processed. The
+# watermark is persisted in Delta table properties automatically —
+# zero extra infrastructure.
+#
+# Run twice to demonstrate:
+#   1. First run  — full load, watermark initialized
+#   2. Second run — only new rows processed (or zero if no new data)
+#
+# Run: ctx.run("fact_transactions.thread")
+
+config_version: "1.0"
+name: fact_transactions
+
+sources:
+  transactions:
+    type: delta
+    alias: raw.transactions
+
+steps:
+  - filter:
+      expr: "amount > 0"
+
+  - derive:
+      columns:
+        transaction_date: "to_date(transaction_ts)"
+
+  - select:
+      columns:
+        - transaction_id
+        - customer_id
+        - product_id
+        - amount
+        - currency
+        - transaction_ts
+        - transaction_date
+
+  - cast:
+      columns:
+        amount: "decimal(12,2)"
+
+target:
+  alias: silver.fact_transactions
+  partition_by:
+    - transaction_date
+
+load:
+  mode: incremental_watermark
+  watermark_column: transaction_ts
+  watermark_type: timestamp
+
+write:
+  mode: merge
+  match_keys:
+    - transaction_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore

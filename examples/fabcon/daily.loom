@@ -1,0 +1,45 @@
+# Demo 5 — Full Loom
+#
+# Deployment unit packaging two weaves (dimensions and facts) with
+# shared defaults, typed parameters, and conditional execution. The
+# facts weave only runs when dimension tables exist.
+#
+# Configuration cascades: loom defaults -> weave -> thread.
+# Swap params to run the same YAML in dev, staging, or prod.
+#
+# Run: ctx = Context(spark, "fabcon", params={"lakehouse_path": "/lakehouse/default"})
+#      result = ctx.run("daily.loom")
+
+config_version: "1.0"
+name: daily
+
+weaves:
+  - name: dimensions
+  - name: facts
+    condition:
+      when: "table_exists('silver.dim_customer')"
+
+# Shared defaults inherited by all weaves and threads
+defaults:
+  write:
+    mode: overwrite
+  execution:
+    log_level: standard
+
+# Typed parameters — swap for dev/staging/prod
+params:
+  lakehouse_path:
+    name: lakehouse_path
+    type: string
+    required: true
+    description: "Root path for the lakehouse storage layer"
+  run_date:
+    name: run_date
+    type: date
+    required: false
+    default: "2026-01-01"
+    description: "Logical run date for the pipeline"
+
+execution:
+  log_level: standard
+  trace: true

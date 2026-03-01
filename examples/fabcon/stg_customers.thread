@@ -1,0 +1,49 @@
+# Demo 1 — Basic Thread
+#
+# Reads customer CSV data, filters to active customers, derives a
+# full_name column, selects the output columns, and writes to Delta.
+#
+# Run: ctx.run("stg_customers.thread")
+
+config_version: "1.0"
+name: stg_customers
+
+sources:
+  customers:
+    type: csv
+    path: "data/customers.csv"
+    options:
+      header: true
+      inferSchema: true
+
+steps:
+  # Keep only active customers
+  - filter:
+      expr: "status = 'active'"
+
+  # Derive a display name
+  - derive:
+      columns:
+        full_name: "concat(first_name, ' ', last_name)"
+
+  # Select the columns we need
+  - select:
+      columns:
+        - customer_id
+        - first_name
+        - last_name
+        - full_name
+        - email
+        - signup_date
+
+  # Enforce consistent types
+  - cast:
+      columns:
+        customer_id: "int"
+        signup_date: "date"
+
+target:
+  alias: staging.stg_customers
+
+write:
+  mode: overwrite

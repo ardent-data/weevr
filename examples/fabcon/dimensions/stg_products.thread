@@ -1,0 +1,31 @@
+# Pipeline — Stage Products
+#
+# Reads raw products, selects and casts columns, writes to staging.
+# Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
+
+config_version: "1.0"
+name: stg_products
+
+sources:
+  products:
+    type: delta
+    alias: raw.products
+
+steps:
+  - select:
+      columns:
+        - product_id
+        - product_name
+        - category
+        - unit_price
+        - supplier
+
+  - cast:
+      columns:
+        unit_price: "decimal(10,2)"
+
+target:
+  alias: staging.stg_products
+
+write:
+  mode: overwrite
