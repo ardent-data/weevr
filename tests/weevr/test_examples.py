@@ -8,7 +8,7 @@ import yaml
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 
 EXAMPLE_FILES = sorted(
-    p for ext in ("*.thread", "*.weave", "*.loom") for p in EXAMPLES_DIR.glob(ext)
+    p for ext in ("**/*.thread", "**/*.weave", "**/*.loom") for p in EXAMPLES_DIR.glob(ext)
 )
 
 
