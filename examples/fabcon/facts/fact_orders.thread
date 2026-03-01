@@ -1,0 +1,64 @@
+# Pipeline — Orders Fact
+#
+# Reads raw orders and enriches with dimension lookups via joins.
+# Derives order_total from quantity and unit_price.
+# Used by: customer_pipeline.weave (Demo 4), facts.weave (Demo 5)
+
+config_version: "1.0"
+name: fact_orders
+
+sources:
+  orders:
+    type: delta
+    alias: raw.orders
+  dim_customer:
+    type: delta
+    alias: silver.dim_customer
+  dim_product:
+    type: delta
+    alias: silver.dim_product
+
+steps:
+  # Enrich with customer dimension
+  - join:
+      source: dim_customer
+      type: left
+      on:
+        - customer_id
+
+  # Enrich with product dimension
+  - join:
+      source: dim_product
+      type: left
+      on:
+        - product_id
+
+  # Compute order total
+  - derive:
+      columns:
+        order_total: "quantity * unit_price"
+
+  # Select final columns
+  - select:
+      columns:
+        - order_id
+        - order_date
+        - customer_id
+        - customer_sk
+        - product_id
+        - quantity
+        - unit_price
+        - order_total
+
+  - cast:
+      columns:
+        unit_price: "decimal(10,2)"
+        order_total: "decimal(12,2)"
+
+target:
+  alias: silver.fact_orders
+  partition_by:
+    - order_date
+
+write:
+  mode: overwrite

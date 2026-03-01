@@ -1,0 +1,11 @@
+customer_id,first_name,last_name,email,status,signup_date
+1,Alice,Johnson,alice.johnson@example.com,active,2024-03-15
+2,Bob,Smith,bob.smith@example.com,active,2024-05-20
+3,Carol,Williams,,active,2024-06-10
+4,David,Brown,david.brown@example.com,inactive,2023-11-01
+5,Eve,Davis,eve.davis@example.com,active,2024-08-22
+6,Frank,Miller,,active,2024-09-05
+7,Grace,Wilson,grace.wilson@example.com,active,2024-10-18
+8,Henry,Taylor,henry.taylor@example.com,inactive,2023-07-30
+9,Iris,Anderson,iris.anderson@example.com,active,2025-01-12
+10,Jack,Thomas,jack.thomas@example.com,active,2025-02-28

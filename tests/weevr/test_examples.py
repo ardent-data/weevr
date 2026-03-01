@@ -8,7 +8,7 @@ import yaml
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 
 EXAMPLE_FILES = sorted(
-    p for ext in ("*.thread", "*.weave", "*.loom") for p in EXAMPLES_DIR.glob(ext)
+    p for ext in ("**/*.thread", "**/*.weave", "**/*.loom") for p in EXAMPLES_DIR.glob(ext)
 )
 
 
@@ -26,7 +26,7 @@ def _config_type(data: dict) -> str:
 @pytest.mark.parametrize(
     "yml_path",
     EXAMPLE_FILES,
-    ids=[p.stem for p in EXAMPLE_FILES],
+    ids=[str(p.relative_to(EXAMPLES_DIR)) for p in EXAMPLE_FILES],
 )
 class TestExampleYaml:
     def test_parses_as_valid_yaml(self, yml_path: Path) -> None:

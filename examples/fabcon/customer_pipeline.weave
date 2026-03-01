@@ -1,0 +1,38 @@
+# Demo 4 — Multi-Thread Weave
+#
+# Orchestrates five threads into a dependency DAG. Independent threads
+# execute in parallel; dependent threads wait for their upstream to
+# complete. The engine infers execution groups automatically.
+#
+# Execution plan:
+#   Group 1: [stg_customers, stg_products]     <- parallel
+#   Group 2: [dim_customer, dim_product]        <- parallel
+#   Group 3: [fact_orders]
+#
+# Run in plan mode first:  ctx.run("customer_pipeline.weave", mode="plan")
+# Then execute:            ctx.run("customer_pipeline.weave")
+
+config_version: "1.0"
+name: customer_pipeline
+
+threads:
+  - name: stg_customers
+    ref: dimensions/stg_customers.thread
+  - name: stg_products
+    ref: dimensions/stg_products.thread
+  - name: dim_customer
+    ref: dimensions/dim_customer.thread
+    dependencies:
+      - stg_customers
+  - name: dim_product
+    ref: dimensions/dim_product.thread
+    dependencies:
+      - stg_products
+  - name: fact_orders
+    ref: facts/fact_orders.thread
+    dependencies:
+      - dim_customer
+      - dim_product
+
+execution:
+  log_level: verbose

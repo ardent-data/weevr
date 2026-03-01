@@ -1,0 +1,43 @@
+# Pipeline — Stage Customers
+#
+# Reads customer CSV, filters active, derives full_name, writes to staging.
+# Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
+
+config_version: "1.0"
+name: stg_customers
+
+sources:
+  customers:
+    type: csv
+    path: "data/customers.csv"
+    options:
+      header: true
+      inferSchema: true
+
+steps:
+  - filter:
+      expr: "status = 'active'"
+
+  - derive:
+      columns:
+        full_name: "concat(first_name, ' ', last_name)"
+
+  - select:
+      columns:
+        - customer_id
+        - first_name
+        - last_name
+        - full_name
+        - email
+        - signup_date
+
+  - cast:
+      columns:
+        customer_id: "int"
+        signup_date: "date"
+
+target:
+  alias: staging.stg_customers
+
+write:
+  mode: overwrite

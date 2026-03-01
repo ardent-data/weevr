@@ -1,0 +1,36 @@
+# Pipeline — Product Dimension
+#
+# Reads staged products and merges into the silver dimension table.
+# Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
+
+config_version: "1.0"
+name: dim_product
+
+sources:
+  products:
+    type: delta
+    alias: staging.stg_products
+
+steps:
+  - select:
+      columns:
+        - product_id
+        - product_name
+        - category
+        - unit_price
+        - supplier
+
+target:
+  alias: silver.dim_product
+
+keys:
+  business_key:
+    - product_id
+
+write:
+  mode: merge
+  match_keys:
+    - product_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore

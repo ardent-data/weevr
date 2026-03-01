@@ -1,0 +1,21 @@
+# Dimensions Weave
+#
+# Stages and builds the customer and product dimension tables.
+# Referenced by: daily.loom (Demo 5)
+
+config_version: "1.0"
+name: dimensions
+
+threads:
+  - name: stg_customers
+    ref: dimensions/stg_customers.thread
+  - name: stg_products
+    ref: dimensions/stg_products.thread
+  - name: dim_customer
+    ref: dimensions/dim_customer.thread
+    dependencies:
+      - stg_customers
+  - name: dim_product
+    ref: dimensions/dim_product.thread
+    dependencies:
+      - stg_products

@@ -1,0 +1,12 @@
+# Facts Weave
+#
+# Builds the orders fact table by joining raw orders with dimension
+# tables. Should run after the dimensions weave completes.
+# Referenced by: daily.loom (Demo 5)
+
+config_version: "1.0"
+name: facts
+
+threads:
+  - name: fact_orders
+    ref: facts/fact_orders.thread
