@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from pyspark.sql import functions as F
@@ -143,7 +144,7 @@ def cleanup_lookups(cached: dict[str, DataFrame]) -> None:
 
 
 def resolve_thread_lookups(
-    thread_sources: dict[str, object],
+    thread_sources: Mapping[str, object],
     weave_lookups: dict[str, Lookup],
     cached_dfs: dict[str, DataFrame],
     spark: SparkSession,

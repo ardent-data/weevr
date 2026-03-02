@@ -6,8 +6,9 @@ from pyspark.sql import SparkSession
 from spark_helpers import create_delta_table
 from weevr.engine.executor import execute_thread
 from weevr.engine.result import ThreadResult
-from weevr.errors.exceptions import DataValidationError, ExecutionError
+from weevr.errors.exceptions import DataValidationError, ExecutionError, LookupResolutionError
 from weevr.model.keys import KeyConfig, SurrogateKeyConfig
+from weevr.model.lookup import Lookup
 from weevr.model.pipeline import FilterParams, FilterStep, Step
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -287,3 +288,125 @@ class TestExecuteThreadAssertions:
         assert result.telemetry is not None
         assert len(result.telemetry.assertion_results) == 1
         assert result.telemetry.assertion_results[0].passed is True
+
+
+class TestExecuteThreadLookups:
+    """Lookup source resolution in execute_thread."""
+
+    def test_lookup_source_resolved_from_cached(self, spark: SparkSession, tmp_delta_path) -> None:
+        """A lookup source is resolved from a pre-cached DataFrame."""
+        tgt = tmp_delta_path("lkp_cached_tgt")
+        lookup_src = tmp_delta_path("lkp_data")
+        create_delta_table(spark, lookup_src, [{"id": 1, "val": "x"}, {"id": 2, "val": "y"}])
+
+        # Thread with a single lookup-based source
+        thread = Thread(
+            name="lookup_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="my_lookup")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        # Pre-cached DataFrame
+        cached_df = spark.read.format("delta").load(lookup_src)
+        cached_lookups = {"my_lookup": cached_df}
+
+        # Lookup definition (not used since it's cached)
+        weave_lookups = {
+            "my_lookup": Lookup(source=Source(type="delta", alias=lookup_src)),
+        }
+
+        result = execute_thread(
+            spark, thread, cached_lookups=cached_lookups, weave_lookups=weave_lookups
+        )
+
+        assert result.status == "success"
+        assert result.rows_written == 2
+
+    def test_lookup_source_read_on_demand(self, spark: SparkSession, tmp_delta_path) -> None:
+        """A non-materialized lookup source is read on-demand from the definition."""
+        tgt = tmp_delta_path("lkp_demand_tgt")
+        lookup_src = tmp_delta_path("lkp_demand_data")
+        create_delta_table(spark, lookup_src, [{"id": 10}])
+
+        thread = Thread(
+            name="demand_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="demand_lookup")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        # No cached DataFrame — only the definition
+        weave_lookups = {
+            "demand_lookup": Lookup(source=Source(type="delta", alias=lookup_src)),
+        }
+
+        result = execute_thread(spark, thread, weave_lookups=weave_lookups)
+
+        assert result.status == "success"
+        assert result.rows_written == 1
+
+    def test_mixed_lookup_and_normal_sources(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread with both a normal source and a lookup source works correctly."""
+        normal_src = tmp_delta_path("lkp_mix_normal")
+        lookup_src = tmp_delta_path("lkp_mix_lookup")
+        tgt = tmp_delta_path("lkp_mix_tgt")
+        create_delta_table(spark, normal_src, [{"id": 1}, {"id": 2}])
+        create_delta_table(spark, lookup_src, [{"id": 100}])
+
+        thread = Thread(
+            name="mixed_thread",
+            config_version="1",
+            sources={
+                "main": Source(type="delta", alias=normal_src),
+                "ref": Source(lookup="ref_lookup"),
+            },
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        cached_df = spark.read.format("delta").load(lookup_src)
+        cached_lookups = {"ref_lookup": cached_df}
+        weave_lookups = {
+            "ref_lookup": Lookup(source=Source(type="delta", alias=lookup_src)),
+        }
+
+        result = execute_thread(
+            spark, thread, cached_lookups=cached_lookups, weave_lookups=weave_lookups
+        )
+
+        # Primary source (main) drives the write — 2 rows
+        assert result.status == "success"
+        assert result.rows_written == 2
+
+    def test_undefined_lookup_raises_error(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Referencing an undefined lookup raises ExecutionError wrapping the resolution error."""
+        tgt = tmp_delta_path("lkp_undef_tgt")
+
+        thread = Thread(
+            name="undef_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="nonexistent")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_thread(spark, thread, weave_lookups={})
+
+        assert isinstance(exc_info.value.__cause__, LookupResolutionError)
+        assert "nonexistent" in str(exc_info.value.__cause__)
+
+    def test_no_lookups_backward_compatible(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread without lookups works as before (no cached_lookups / weave_lookups)."""
+        src = tmp_delta_path("lkp_compat_src")
+        tgt = tmp_delta_path("lkp_compat_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        thread = _make_thread("compat_thread", src, tgt)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 1

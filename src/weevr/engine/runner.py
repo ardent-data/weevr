@@ -225,10 +225,20 @@ def execute_weave(
                                 threads[name],
                                 collector=tc,
                                 parent_span_id=weave_span_id,
+                                cached_lookups=cached_lookup_dfs or None,
+                                weave_lookups=lookups,
                             )
                         ] = name
                     else:
-                        future_to_name[executor.submit(execute_thread, spark, threads[name])] = name
+                        future_to_name[
+                            executor.submit(
+                                execute_thread,
+                                spark,
+                                threads[name],
+                                cached_lookups=cached_lookup_dfs or None,
+                                weave_lookups=lookups,
+                            )
+                        ] = name
 
                 for future in as_completed(future_to_name):
                     name = future_to_name[future]

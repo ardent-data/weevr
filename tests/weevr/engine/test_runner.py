@@ -95,7 +95,7 @@ class TestWeaveRunnerHappyPath:
     @patch("weevr.engine.runner.execute_thread")
     def test_independent_threads_all_complete(self, mock_exec):
         """Independent threads all execute and all complete."""
-        mock_exec.side_effect = lambda spark, thread: _make_result(thread.name)
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
         threads = {
             "A": _make_thread("A"),
             "B": _make_thread("B"),
@@ -111,7 +111,7 @@ class TestWeaveRunnerHappyPath:
         """B depends on A — both succeed, result contains both."""
         completed: list[str] = []
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             completed.append(thread.name)
             return _make_result(thread.name)
 
@@ -150,7 +150,7 @@ class TestWeaveRunnerFailureHandling:
         so they are still pending when abort_weave triggers.
         """
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
                 raise ExecutionError("A failed", thread_name="A")
             return _make_result(thread.name)
@@ -178,7 +178,7 @@ class TestWeaveRunnerFailureHandling:
     def test_skip_downstream_skips_only_dependents(self, mock_exec):
         """on_failure=skip_downstream: A fails → B (depends on A) skipped, C continues."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
                 raise ExecutionError("A failed", thread_name="A")
             return _make_result(thread.name)
@@ -200,7 +200,7 @@ class TestWeaveRunnerFailureHandling:
     def test_continue_same_as_skip_downstream(self, mock_exec):
         """on_failure=continue: dependents skipped, independents continue (DEC-007)."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
                 raise ExecutionError("A failed", thread_name="A")
             return _make_result(thread.name)
@@ -220,7 +220,7 @@ class TestWeaveRunnerFailureHandling:
     @patch("weevr.engine.runner.execute_thread")
     def test_all_threads_succeed_status_success(self, mock_exec):
         """All threads succeed → status='success'."""
-        mock_exec.side_effect = lambda spark, thread: _make_result(thread.name)
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
         threads = {"A": _make_thread("A"), "B": _make_thread("B")}
         result = _run_weave(threads)
         assert result.status == "success"
@@ -229,7 +229,7 @@ class TestWeaveRunnerFailureHandling:
     def test_all_threads_fail_abort_weave_status_failure(self, mock_exec):
         """All threads fail → status='failure'."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             raise ExecutionError(f"{thread.name} failed", thread_name=thread.name)
 
         mock_exec.side_effect = side_effect
@@ -244,7 +244,7 @@ class TestWeaveRunnerFailureHandling:
     def test_mix_success_and_failure_partial_status(self, mock_exec):
         """Some succeed, some fail → status='partial'."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "B":
                 raise ExecutionError("B failed", thread_name="B")
             return _make_result(thread.name)
@@ -261,7 +261,7 @@ class TestWeaveRunnerFailureHandling:
     def test_threads_skipped_contains_correct_names(self, mock_exec):
         """threads_skipped accurately tracks which threads were skipped."""
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
                 raise ExecutionError("A failed", thread_name="A")
             return _make_result(thread.name)
@@ -281,7 +281,7 @@ class TestWeaveRunnerFailureHandling:
         A is alone at level 0; B and C are at level 1 (both depend on A).
         """
 
-        def side_effect(spark, thread):
+        def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
                 raise ExecutionError("A failed", thread_name="A")
             return _make_result(thread.name)
