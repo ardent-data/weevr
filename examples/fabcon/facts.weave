@@ -7,6 +7,20 @@
 config_version: "1.0"
 name: facts
 
+lookups:
+  dim_customer:
+    source:
+      type: delta
+      alias: silver.dim_customer
+    materialize: true
+    strategy: broadcast
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    strategy: broadcast
+
 threads:
   - name: fact_orders
     ref: facts/fact_orders.thread

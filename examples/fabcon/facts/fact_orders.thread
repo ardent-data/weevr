@@ -12,11 +12,9 @@ sources:
     type: delta
     alias: raw.orders
   dim_customer:
-    type: delta
-    alias: silver.dim_customer
+    lookup: dim_customer
   dim_product:
-    type: delta
-    alias: silver.dim_product
+    lookup: dim_product
 
 steps:
   # Enrich with customer dimension

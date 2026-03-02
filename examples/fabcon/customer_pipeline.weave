@@ -34,5 +34,19 @@ threads:
       - dim_customer
       - dim_product
 
+lookups:
+  dim_customer:
+    source:
+      type: delta
+      alias: silver.dim_customer
+    materialize: true
+    strategy: broadcast
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    strategy: broadcast
+
 execution:
   log_level: verbose
