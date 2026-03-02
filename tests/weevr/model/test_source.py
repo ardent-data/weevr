@@ -118,3 +118,29 @@ class TestSource:
         """options defaults to empty dict, not None."""
         s = Source(type="api")
         assert s.options == {}
+
+
+class TestSourceLookupReference:
+    """Test Source with lookup references."""
+
+    def test_lookup_only(self):
+        """Lookup-only source is valid."""
+        s = Source(lookup="ref_categories")
+        assert s.lookup == "ref_categories"
+        assert s.type is None
+
+    def test_lookup_rejects_type(self):
+        """Lookup source with type set is rejected."""
+        with pytest.raises(ValidationError, match="lookup sources must not set 'type'"):
+            Source(lookup="ref_categories", type="delta")
+
+    def test_no_type_no_lookup_rejected(self):
+        """Source without type or lookup is rejected."""
+        with pytest.raises(ValidationError, match="require either 'type' or 'lookup'"):
+            Source()
+
+    def test_lookup_from_dict(self):
+        """Construct lookup source from dict (YAML-like)."""
+        s = Source.model_validate({"lookup": "dim_region"})
+        assert s.lookup == "dim_region"
+        assert s.type is None
