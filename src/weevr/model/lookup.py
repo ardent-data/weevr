@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import model_validator
+
 from weevr.model.base import FrozenBase
 from weevr.model.source import Source
 
@@ -13,6 +15,11 @@ class Lookup(FrozenBase):
     When ``materialize`` is true, the data is read once and cached (or broadcast)
     before threads execute.
 
+    Narrow lookup fields (``key``, ``values``, ``filter``) control projection
+    and filtering applied during materialization or on-demand reads.  When set,
+    only the declared key and value columns are retained, reducing memory and
+    improving join performance.
+
     Attributes:
         source: Source definition for the lookup data.
         materialize: Whether to pre-read and cache/broadcast the data before
@@ -20,8 +27,36 @@ class Lookup(FrozenBase):
         strategy: Materialization strategy. Only meaningful when ``materialize``
             is true. ``"broadcast"`` uses Spark broadcast join hints;
             ``"cache"`` uses DataFrame caching.
+        key: Column(s) used for matching (join key). Kept in the cached
+            projection alongside ``values``.
+        values: Payload column(s) to retrieve. When set, only ``key`` + ``values``
+            columns are retained in the cached DataFrame.
+        filter: SQL WHERE expression applied to the source before projection.
+        unique_key: When true, validate that ``key`` columns form a unique key
+            after filtering and projection.
+        on_failure: Behavior when ``unique_key`` check finds duplicates.
+            Only meaningful when ``unique_key`` is true.
     """
 
     source: Source
     materialize: bool = False
     strategy: Literal["broadcast", "cache"] = "cache"
+
+    # Narrow lookup fields
+    key: list[str] | None = None
+    values: list[str] | None = None
+    filter: str | None = None
+    unique_key: bool = False
+    on_failure: Literal["abort", "warn"] = "abort"
+
+    @model_validator(mode="after")
+    def _validate_narrow_fields(self) -> "Lookup":
+        if self.values and not self.key:
+            raise ValueError("'values' requires 'key' to be set")
+        if self.key and self.values:
+            overlap = set(self.key) & set(self.values)
+            if overlap:
+                raise ValueError(f"'key' and 'values' must not overlap: {sorted(overlap)}")
+        if self.on_failure != "abort" and not self.unique_key:
+            raise ValueError("'on_failure' is only valid when 'unique_key' is true")
+        return self

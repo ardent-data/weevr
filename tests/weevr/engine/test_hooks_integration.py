@@ -14,7 +14,7 @@ from spark_helpers import create_delta_table
 from weevr.engine.planner import build_plan
 from weevr.engine.result import ThreadResult
 from weevr.engine.runner import execute_weave
-from weevr.errors.exceptions import HookError
+from weevr.errors.exceptions import HookError, LookupResolutionError
 from weevr.model.hooks import LogMessageStep, QualityGateStep, SqlStatementStep
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
@@ -307,3 +307,366 @@ class TestLookupOnDemand:
         assert result.telemetry is not None
         assert len(result.telemetry.lookup_results) == 1
         assert result.telemetry.lookup_results[0].materialized is False
+
+
+# ---------------------------------------------------------------------------
+# Test 7: Narrow lookup — projection reduces columns
+# ---------------------------------------------------------------------------
+
+
+class TestNarrowLookupMaterialization:
+    """Narrow lookups apply filter, projection, and unique_key during materialization."""
+
+    def test_narrow_broadcast_projection(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Lookup with key + values projects to only those columns."""
+        lookup_src = tmp_delta_path("narrow_proj_src")
+        tgt = tmp_delta_path("narrow_proj_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [
+                {"id": 1, "code": "A", "name": "Alpha", "region": "US", "flag": True},
+                {"id": 2, "code": "B", "name": "Beta", "region": "EU", "flag": False},
+            ],
+        )
+
+        thread = Thread(
+            name="narrow_proj_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="dim")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "dim": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="broadcast",
+                key=["id"],
+                values=["code"],
+            ),
+        }
+
+        threads: dict[str, Thread] = {"narrow_proj_thread": thread}
+        plan = build_plan("narrow_proj", threads, _entries("narrow_proj_thread"))
+        collector = SpanCollector(generate_trace_id())
+
+        result = execute_weave(spark, plan, threads, collector=collector, lookups=lookups)
+
+        assert result.status == "success"
+        assert result.thread_results[0].rows_written == 2
+
+        # Verify the target has only projected columns
+        written = spark.read.format("delta").load(tgt)
+        assert set(written.columns) == {"id", "code"}
+
+        # Verify telemetry metadata
+        assert result.telemetry is not None
+        lkp_result = result.telemetry.lookup_results[0]
+        assert lkp_result.key_columns == ["id"]
+        assert lkp_result.value_columns == ["code"]
+
+    def test_narrow_filter(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Lookup with filter retains only matching rows."""
+        lookup_src = tmp_delta_path("narrow_filt_src")
+        tgt = tmp_delta_path("narrow_filt_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [
+                {"id": 1, "is_active": True},
+                {"id": 2, "is_active": False},
+                {"id": 3, "is_active": True},
+            ],
+        )
+
+        thread = Thread(
+            name="narrow_filt_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="active_dim")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "active_dim": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="cache",
+                filter="is_active = true",
+            ),
+        }
+
+        threads: dict[str, Thread] = {"narrow_filt_thread": thread}
+        plan = build_plan("narrow_filt", threads, _entries("narrow_filt_thread"))
+
+        result = execute_weave(spark, plan, threads, lookups=lookups)
+
+        assert result.status == "success"
+        assert result.thread_results[0].rows_written == 2
+
+    def test_narrow_filter_and_projection(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Filter + projection compose: filter first, then select columns."""
+        lookup_src = tmp_delta_path("narrow_combo_src")
+        tgt = tmp_delta_path("narrow_combo_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [
+                {"id": 1, "code": "A", "is_current": True},
+                {"id": 2, "code": "B", "is_current": False},
+                {"id": 3, "code": "C", "is_current": True},
+            ],
+        )
+
+        thread = Thread(
+            name="narrow_combo_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="filtered_dim")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "filtered_dim": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="broadcast",
+                key=["id"],
+                values=["code"],
+                filter="is_current = true",
+            ),
+        }
+
+        threads: dict[str, Thread] = {"narrow_combo_thread": thread}
+        plan = build_plan("narrow_combo", threads, _entries("narrow_combo_thread"))
+
+        result = execute_weave(spark, plan, threads, lookups=lookups)
+
+        assert result.status == "success"
+        # 2 rows pass filter, only id + code columns
+        assert result.thread_results[0].rows_written == 2
+        written = spark.read.format("delta").load(tgt)
+        assert set(written.columns) == {"id", "code"}
+
+    def test_unique_key_pass(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Unique key check passes when keys are unique."""
+        lookup_src = tmp_delta_path("uk_pass_src")
+        tgt = tmp_delta_path("uk_pass_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [{"id": 1, "sk": 100}, {"id": 2, "sk": 200}],
+        )
+
+        thread = Thread(
+            name="uk_pass_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="uk_dim")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "uk_dim": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="cache",
+                key=["id"],
+                values=["sk"],
+                unique_key=True,
+            ),
+        }
+
+        threads: dict[str, Thread] = {"uk_pass_thread": thread}
+        plan = build_plan("uk_pass", threads, _entries("uk_pass_thread"))
+        collector = SpanCollector(generate_trace_id())
+
+        result = execute_weave(spark, plan, threads, collector=collector, lookups=lookups)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        lkp = result.telemetry.lookup_results[0]
+        assert lkp.unique_key_checked is True
+        assert lkp.unique_key_passed is True
+
+    def test_unique_key_fail_abort(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Duplicate keys with on_failure=abort raises LookupResolutionError."""
+        lookup_src = tmp_delta_path("uk_abort_src")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [{"id": 1, "sk": 100}, {"id": 1, "sk": 101}, {"id": 2, "sk": 200}],
+        )
+
+        thread = Thread(
+            name="uk_abort_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="dup_dim")},
+            steps=[],
+            target=Target(path=tmp_delta_path("uk_abort_tgt")),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "dup_dim": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="cache",
+                key=["id"],
+                values=["sk"],
+                unique_key=True,
+                on_failure="abort",
+            ),
+        }
+
+        threads: dict[str, Thread] = {"uk_abort_thread": thread}
+        plan = build_plan("uk_abort", threads, _entries("uk_abort_thread"))
+
+        with pytest.raises(LookupResolutionError, match="unique_key check failed"):
+            execute_weave(spark, plan, threads, lookups=lookups)
+
+    def test_unique_key_fail_warn(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Duplicate keys with on_failure=warn succeeds with warning."""
+        lookup_src = tmp_delta_path("uk_warn_src")
+        tgt = tmp_delta_path("uk_warn_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [{"id": 1, "sk": 100}, {"id": 1, "sk": 101}, {"id": 2, "sk": 200}],
+        )
+
+        thread = Thread(
+            name="uk_warn_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="warn_dim")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "warn_dim": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="cache",
+                key=["id"],
+                values=["sk"],
+                unique_key=True,
+                on_failure="warn",
+            ),
+        }
+
+        threads: dict[str, Thread] = {"uk_warn_thread": thread}
+        plan = build_plan("uk_warn", threads, _entries("uk_warn_thread"))
+        collector = SpanCollector(generate_trace_id())
+
+        result = execute_weave(spark, plan, threads, collector=collector, lookups=lookups)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        lkp = result.telemetry.lookup_results[0]
+        assert lkp.unique_key_checked is True
+        assert lkp.unique_key_passed is False
+
+
+# ---------------------------------------------------------------------------
+# Test 8: Narrow lookup — on-demand read with narrow pipeline
+# ---------------------------------------------------------------------------
+
+
+class TestNarrowLookupOnDemand:
+    """Non-materialized narrow lookups apply the pipeline at read time."""
+
+    def test_on_demand_narrow(self, spark: SparkSession, tmp_delta_path) -> None:
+        """On-demand lookup with key + values + filter narrows the DataFrame."""
+        lookup_src = tmp_delta_path("narrow_demand_src")
+        tgt = tmp_delta_path("narrow_demand_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [
+                {"id": 1, "code": "A", "active": True},
+                {"id": 2, "code": "B", "active": False},
+                {"id": 3, "code": "C", "active": True},
+            ],
+        )
+
+        thread = Thread(
+            name="narrow_demand_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="lazy_narrow")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "lazy_narrow": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=False,
+                key=["id"],
+                values=["code"],
+                filter="active = true",
+            ),
+        }
+
+        threads: dict[str, Thread] = {"narrow_demand_thread": thread}
+        plan = build_plan("narrow_demand", threads, _entries("narrow_demand_thread"))
+
+        result = execute_weave(spark, plan, threads, lookups=lookups)
+
+        assert result.status == "success"
+        assert result.thread_results[0].rows_written == 2
+
+        written = spark.read.format("delta").load(tgt)
+        assert set(written.columns) == {"id", "code"}
+
+
+# ---------------------------------------------------------------------------
+# Test 9: Backward compatibility — lookup without narrow fields
+# ---------------------------------------------------------------------------
+
+
+class TestNarrowLookupBackwardCompat:
+    """Lookups without narrow fields work identically to M101 behavior."""
+
+    def test_full_table_lookup_unchanged(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Lookup without narrow fields caches the full source table."""
+        lookup_src = tmp_delta_path("compat_src")
+        tgt = tmp_delta_path("compat_tgt")
+        create_delta_table(
+            spark,
+            lookup_src,
+            [
+                {"id": 1, "code": "A", "name": "Alpha"},
+                {"id": 2, "code": "B", "name": "Beta"},
+                {"id": 3, "code": "C", "name": "Charlie"},
+            ],
+        )
+
+        thread = Thread(
+            name="compat_thread",
+            config_version="1",
+            sources={"ref": Source(lookup="full_ref")},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        lookups: dict[str, Lookup] = {
+            "full_ref": Lookup(
+                source=Source(type="delta", alias=lookup_src),
+                materialize=True,
+                strategy="cache",
+            ),
+        }
+
+        threads: dict[str, Thread] = {"compat_thread": thread}
+        plan = build_plan("compat_weave", threads, _entries("compat_thread"))
+
+        result = execute_weave(spark, plan, threads, lookups=lookups)
+
+        assert result.status == "success"
+        assert result.thread_results[0].rows_written == 3
+
+        # All columns preserved — no narrow projection
+        written = spark.read.format("delta").load(tgt)
+        assert set(written.columns) == {"id", "code", "name"}

@@ -33,6 +33,11 @@ class LookupResult(FrozenBase):
         strategy: Materialization strategy used (broadcast or cache).
         row_count: Number of rows in the materialized DataFrame.
         duration_ms: Materialization time in milliseconds.
+        key_columns: Key columns declared on the lookup, if any.
+        value_columns: Value columns declared on the lookup, if any.
+        filter_applied: Whether a filter expression was applied.
+        unique_key_checked: Whether a unique-key check was performed.
+        unique_key_passed: Result of the unique-key check, if performed.
     """
 
     name: str
@@ -40,6 +45,114 @@ class LookupResult(FrozenBase):
     strategy: str = "cache"
     row_count: int = 0
     duration_ms: float = 0.0
+    key_columns: list[str] | None = None
+    value_columns: list[str] | None = None
+    filter_applied: bool = False
+    unique_key_checked: bool = False
+    unique_key_passed: bool | None = None
+
+
+def _validate_columns(df: DataFrame, columns: list[str], lookup_name: str) -> None:
+    """Validate that all declared columns exist in the DataFrame.
+
+    Args:
+        df: DataFrame to check.
+        columns: Column names that must be present.
+        lookup_name: Lookup name for error messages.
+
+    Raises:
+        LookupResolutionError: If any column is missing.
+    """
+    available = set(df.columns)
+    for col in columns:
+        if col not in available:
+            raise LookupResolutionError(
+                f"Lookup '{lookup_name}': column '{col}' not found in source. "
+                f"Available: {sorted(available)}"
+            )
+
+
+def _check_unique_key(
+    df: DataFrame,
+    key_columns: list[str],
+    lookup_name: str,
+    on_failure: str,
+) -> bool:
+    """Validate that key columns form a unique key.
+
+    Args:
+        df: DataFrame to check.
+        key_columns: Columns that should form a unique key.
+        lookup_name: Lookup name for error messages.
+        on_failure: Behavior on duplicate keys (``"abort"`` or ``"warn"``).
+
+    Returns:
+        True if keys are unique, False if duplicates found (and on_failure is warn).
+
+    Raises:
+        LookupResolutionError: If duplicates found and on_failure is ``"abort"``.
+    """
+    dup_count = df.groupBy(*key_columns).count().filter("count > 1").count()
+    if dup_count > 0:
+        msg = (
+            f"Lookup '{lookup_name}': unique_key check failed — "
+            f"{dup_count} duplicate key group(s) found in {key_columns}"
+        )
+        if on_failure == "abort":
+            raise LookupResolutionError(msg)
+        logger.warning(msg)
+        return False
+    return True
+
+
+def _apply_narrow_pipeline(
+    df: DataFrame,
+    lookup: Lookup,
+    name: str,
+) -> tuple[DataFrame, bool, bool, bool | None]:
+    """Apply filter, projection, and unique-key check to a lookup DataFrame.
+
+    Called by both :func:`materialize_lookups` and :func:`resolve_thread_lookups`
+    to ensure consistent narrow semantics.
+
+    Args:
+        df: Raw DataFrame from source read.
+        lookup: Lookup definition with optional narrow fields.
+        name: Lookup name for error messages.
+
+    Returns:
+        Tuple of (narrowed DataFrame, filter_applied, unique_key_checked,
+        unique_key_passed).
+
+    Raises:
+        LookupResolutionError: On missing columns or unique-key abort.
+    """
+    filter_applied = False
+    unique_key_checked = False
+    unique_key_passed: bool | None = None
+
+    # 1. Filter
+    if lookup.filter:
+        df = df.filter(F.expr(lookup.filter))
+        filter_applied = True
+
+    # 2. Validate + project
+    if lookup.values:
+        if lookup.key is None:
+            raise LookupResolutionError(f"Lookup '{name}': 'values' requires 'key' to be set")
+        _validate_columns(df, lookup.key + lookup.values, name)
+        df = df.select(*lookup.key, *lookup.values)
+    elif lookup.key:
+        _validate_columns(df, lookup.key, name)
+
+    # 3. Unique-key check
+    if lookup.unique_key:
+        if lookup.key is None:
+            raise LookupResolutionError(f"Lookup '{name}': 'unique_key' requires 'key' to be set")
+        unique_key_checked = True
+        unique_key_passed = _check_unique_key(df, lookup.key, name, lookup.on_failure)
+
+    return df, filter_applied, unique_key_checked, unique_key_passed
 
 
 def materialize_lookups(
@@ -80,6 +193,9 @@ def materialize_lookups(
         try:
             df = read_source(spark, name, lookup.source)
 
+            # Apply narrow pipeline (filter → project → unique_key)
+            df, filter_applied, uk_checked, uk_passed = _apply_narrow_pipeline(df, lookup, name)
+
             if lookup.strategy == "broadcast":
                 df = F.broadcast(df)
             else:
@@ -100,11 +216,22 @@ def materialize_lookups(
                     strategy=lookup.strategy,
                     row_count=row_count,
                     duration_ms=elapsed_ms,
+                    key_columns=lookup.key,
+                    value_columns=lookup.values,
+                    filter_applied=filter_applied,
+                    unique_key_checked=uk_checked,
+                    unique_key_passed=uk_passed,
                 )
             )
 
             if span:
                 span.set_attribute("lookup.row_count", row_count)
+                if lookup.key:
+                    span.set_attribute("lookup.key_columns", ",".join(lookup.key))
+                if lookup.values:
+                    span.set_attribute("lookup.value_columns", ",".join(lookup.values))
+                span.set_attribute("lookup.filter_applied", filter_applied)
+                span.set_attribute("lookup.unique_key_checked", uk_checked)
                 collector.add_span(span.finish(SpanStatus.OK))  # type: ignore[union-attr]
 
             logger.info(
@@ -119,6 +246,8 @@ def materialize_lookups(
             if span:
                 span.add_event("error", {"message": str(exc)})
                 collector.add_span(span.finish(SpanStatus.ERROR))  # type: ignore[union-attr]
+            if isinstance(exc, LookupResolutionError):
+                raise
             raise LookupResolutionError(
                 f"Failed to materialize lookup '{name}': {exc}",
                 cause=exc,
@@ -153,7 +282,7 @@ def resolve_thread_lookups(
 
     For each thread source that has a ``lookup`` field, resolves it to
     either a pre-cached DataFrame (materialized) or reads it on-demand
-    (non-materialized).
+    (non-materialized) with the narrow pipeline applied.
 
     Args:
         thread_sources: Thread source definitions with optional lookup field.
@@ -183,6 +312,9 @@ def resolve_thread_lookups(
             resolved[alias] = cached_dfs[lookup_name]
         else:
             lookup_def = weave_lookups[lookup_name]
-            resolved[alias] = read_source(spark, lookup_name, lookup_def.source)
+            df = read_source(spark, lookup_name, lookup_def.source)
+            # Apply narrow pipeline for on-demand reads (DEC-001)
+            df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
+            resolved[alias] = df
 
     return resolved
