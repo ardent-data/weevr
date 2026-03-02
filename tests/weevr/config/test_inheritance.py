@@ -1,5 +1,7 @@
 """Tests for config inheritance cascade."""
 
+from typing import Any
+
 from weevr.config.inheritance import apply_inheritance, cascade
 
 
@@ -284,3 +286,127 @@ class TestNamingInheritance:
         # Thread had naming, so loom naming is NOT applied
         assert result["target"]["naming"] == {"columns": "camelCase"}
         assert "exclude" not in result["target"]["naming"]
+
+
+def _hook_step(check: str, name: str | None = None) -> dict[str, Any]:
+    """Build a minimal quality_gate hook step dict for testing."""
+    step: dict[str, Any] = {"type": "quality_gate", "check": check}
+    if name:
+        step["name"] = name
+    return step
+
+
+class TestHookInheritance:
+    """Verify hooks, lookups, and variables cascade correctly (DEC-010)."""
+
+    def test_weave_pre_steps_replace_loom_defaults(self):
+        """Weave pre_steps entirely replaces loom defaults pre_steps."""
+        loom: dict[str, Any] = {
+            "pre_steps": [_hook_step("table_exists", "loom_gate")],
+        }
+        weave: dict[str, Any] = {
+            "pre_steps": [_hook_step("row_count", "weave_gate")],
+        }
+        result = cascade(loom, weave)
+        assert len(result["pre_steps"]) == 1
+        assert result["pre_steps"][0]["check"] == "row_count"
+
+    def test_weave_post_steps_replace_loom_defaults(self):
+        """Weave post_steps entirely replaces loom defaults post_steps."""
+        loom: dict[str, Any] = {
+            "post_steps": [
+                {"type": "log_message", "message": "loom done"},
+                {"type": "log_message", "message": "loom extra"},
+            ],
+        }
+        weave: dict[str, Any] = {
+            "post_steps": [{"type": "log_message", "message": "weave done"}],
+        }
+        result = cascade(loom, weave)
+        assert len(result["post_steps"]) == 1
+        assert result["post_steps"][0]["message"] == "weave done"
+
+    def test_lookups_replaced_entirely(self):
+        """Weave lookups dict replaces loom defaults lookups entirely."""
+        loom: dict[str, Any] = {
+            "lookups": {
+                "ref_a": {"source": {"type": "delta", "alias": "db.ref_a"}, "materialize": True},
+                "ref_b": {"source": {"type": "delta", "alias": "db.ref_b"}},
+            },
+        }
+        weave: dict[str, Any] = {
+            "lookups": {
+                "ref_c": {"source": {"type": "delta", "alias": "db.ref_c"}},
+            },
+        }
+        result = cascade(loom, weave)
+        # Weave's lookups dict replaces entirely — only ref_c remains
+        assert "ref_c" in result["lookups"]
+        assert "ref_a" not in result["lookups"]
+        assert "ref_b" not in result["lookups"]
+
+    def test_variables_replaced_entirely(self):
+        """Weave variables dict replaces loom defaults variables entirely."""
+        loom: dict[str, Any] = {
+            "variables": {
+                "batch_id": {"type": "string", "default": "loom-default"},
+                "run_ts": {"type": "timestamp"},
+            },
+        }
+        weave: dict[str, Any] = {
+            "variables": {
+                "batch_id": {"type": "string", "default": "weave-override"},
+            },
+        }
+        result = cascade(loom, weave)
+        # Weave replaces entirely — only batch_id with weave value, no run_ts
+        assert result["variables"]["batch_id"]["default"] == "weave-override"
+        assert "run_ts" not in result["variables"]
+
+    def test_loom_defaults_inherited_when_weave_absent(self):
+        """Loom hooks/lookups/variables inherited when weave has none."""
+        loom: dict[str, Any] = {
+            "pre_steps": [_hook_step("source_freshness", "freshness_check")],
+            "lookups": {"ref": {"source": {"type": "delta", "alias": "db.ref"}}},
+            "variables": {"run_ts": {"type": "timestamp"}},
+        }
+        weave: dict[str, Any] = {"name": "my_weave"}
+        result = cascade(loom, weave)
+        # All loom defaults inherited
+        assert len(result["pre_steps"]) == 1
+        assert result["pre_steps"][0]["check"] == "source_freshness"
+        assert "ref" in result["lookups"]
+        assert "run_ts" in result["variables"]
+        assert result["name"] == "my_weave"
+
+    def test_hooks_in_three_level_cascade(self):
+        """Full loom → weave → thread cascade with hook keys at loom level."""
+        loom: dict[str, Any] = {
+            "pre_steps": [_hook_step("table_exists")],
+            "variables": {"v1": {"type": "string"}},
+            "mode": "overwrite",
+        }
+        weave: dict[str, Any] = {"mode": "append"}
+        thread: dict[str, Any] = {"mode": "merge", "table": "out"}
+        result = apply_inheritance(loom, weave, thread)
+        # Thread wins mode
+        assert result["mode"] == "merge"
+        # Loom's pre_steps inherited (weave didn't override)
+        assert result["pre_steps"][0]["check"] == "table_exists"
+        # Loom's variables inherited
+        assert "v1" in result["variables"]
+        # Thread's table kept
+        assert result["table"] == "out"
+
+    def test_weave_hooks_override_loom_in_cascade(self):
+        """Weave hooks replace loom hooks when both present in cascade."""
+        loom: dict[str, Any] = {
+            "pre_steps": [_hook_step("table_exists", "loom_check")],
+        }
+        weave: dict[str, Any] = {
+            "pre_steps": [_hook_step("row_count", "weave_check")],
+        }
+        thread: dict[str, Any] = {"table": "out"}
+        result = apply_inheritance(loom, weave, thread)
+        assert len(result["pre_steps"]) == 1
+        assert result["pre_steps"][0]["name"] == "weave_check"
