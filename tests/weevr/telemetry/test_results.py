@@ -135,6 +135,40 @@ class TestWeaveTelemetry:
         assert "customer" in wt.thread_telemetry
         assert wt.thread_telemetry["customer"].rows_read == 50
 
+    def test_empty_hook_lookup_defaults(self) -> None:
+        """New fields default to empty (backward compat)."""
+        wt = WeaveTelemetry(span=_make_span("weave:test"))
+        assert wt.hook_results == []
+        assert wt.lookup_results == []
+        assert wt.variables == {}
+
+    def test_with_hook_results(self) -> None:
+        """WeaveTelemetry accepts hook results."""
+        from weevr.engine.hooks import HookResult
+
+        hr = HookResult(step_type="quality_gate", phase="pre", status="passed")
+        wt = WeaveTelemetry(span=_make_span("weave:test"), hook_results=[hr])
+        assert len(wt.hook_results) == 1
+        assert wt.hook_results[0].step_type == "quality_gate"
+
+    def test_with_lookup_results(self) -> None:
+        """WeaveTelemetry accepts lookup results."""
+        from weevr.engine.lookups import LookupResult
+
+        lr = LookupResult(name="ref", materialized=True, strategy="cache", row_count=100)
+        wt = WeaveTelemetry(span=_make_span("weave:test"), lookup_results=[lr])
+        assert len(wt.lookup_results) == 1
+        assert wt.lookup_results[0].row_count == 100
+
+    def test_with_variables(self) -> None:
+        """WeaveTelemetry accepts final variable snapshot."""
+        wt = WeaveTelemetry(
+            span=_make_span("weave:test"),
+            variables={"batch_id": "B001", "count": 42},
+        )
+        assert wt.variables["batch_id"] == "B001"
+        assert wt.variables["count"] == 42
+
 
 class TestLoomTelemetry:
     def test_create_empty(self) -> None:
