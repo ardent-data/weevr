@@ -14,7 +14,7 @@ adoption path — from a single thread to a full deployment loom.
 | 2 | `stg_customers_validated.thread` | Pre-write validations, quarantine routing, post-write assertions |
 | 3a | `dim_product.thread` | Merge with soft delete (update, insert, soft-delete in 3 YAML keys) |
 | 3b | `fact_transactions.thread` | Incremental watermark loading (zero-config persistence) |
-| 4 | `customer_pipeline.weave` | 5-thread DAG with auto-inferred parallel execution groups |
+| 4 | `customer_pipeline.weave` | 5-thread DAG with parallel execution groups and broadcast lookups |
 | 5 | `daily.loom` | Multi-weave loom with config inheritance, typed params, conditional execution |
 
 ## Source Data
@@ -22,16 +22,23 @@ adoption path — from a single thread to a full deployment loom.
 | File | Description |
 |------|-------------|
 | `data/customers.csv` | 10 customer rows — 2 inactive, 2 with null emails (for quarantine demo) |
+| `data/products.csv` | 12 products across Electronics, Books, Home, and Office categories |
+| `data/orders.csv` | 18 orders referencing customers (1–10) and products (101–112) |
+| `data/transactions.csv` | 21 transactions — includes 3 bad rows (amount <= 0) for filter demo |
 
-Delta source tables (`staging.products`, `raw.transactions`, `raw.orders`) must be
-pre-staged in the Fabric Lakehouse before running Demos 3–5.
+CSV files can be uploaded to the Lakehouse `Files` area and registered as Delta tables
+for Demos 3–5. The `orders.csv` and `transactions.csv` files reference valid customer
+and product IDs from the other source files.
 
 ## File Layout
 
 ```
 fabcon/
 ├── data/
-│   └── customers.csv                  # Source CSV for Demos 1–2
+│   ├── customers.csv                  # Source CSV for Demos 1–2
+│   ├── products.csv                   # Product catalog (12 rows)
+│   ├── orders.csv                     # Order records (18 rows)
+│   └── transactions.csv              # Transactions with timestamps (21 rows)
 │
 ├── stg_customers.thread               # Demo 1: Basic thread
 ├── stg_customers_validated.thread     # Demo 2: Validations & quarantine

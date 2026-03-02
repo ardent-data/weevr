@@ -1,0 +1,13 @@
+product_id,product_name,category,unit_price,supplier
+101,Wireless Mouse,Electronics,29.99,TechCorp
+102,Mechanical Keyboard,Electronics,89.99,TechCorp
+103,USB-C Hub,Electronics,45.00,ConnectPro
+104,Desk Lamp,Home,34.50,BrightLiving
+105,Notebook Set,Office,12.99,PaperCo
+106,Standing Desk Mat,Home,49.99,ErgoWorks
+107,Python Crash Course,Books,39.95,O'Reilly
+108,Data Engineering Handbook,Books,54.99,O'Reilly
+109,Monitor Stand,Electronics,79.00,ErgoWorks
+110,Whiteboard Markers,Office,8.49,PaperCo
+111,Webcam HD,Electronics,64.99,TechCorp
+112,Cable Management Kit,Home,15.99,ConnectPro
