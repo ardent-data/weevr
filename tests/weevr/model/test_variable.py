@@ -15,7 +15,7 @@ class TestVariableSpec:
     )
     def test_all_types_accepted(self, var_type: str):
         """All declared scalar types are accepted."""
-        spec = VariableSpec(type=var_type)
+        spec = VariableSpec(type=var_type)  # type: ignore[arg-type]
         assert spec.type == var_type
         assert spec.default is None
 
@@ -47,7 +47,7 @@ class TestVariableSpec:
     def test_unknown_type_rejected(self):
         """Unknown type raises ValidationError."""
         with pytest.raises(ValidationError):
-            VariableSpec(type="binary")
+            VariableSpec(type="binary")  # type: ignore[arg-type]
 
     def test_frozen(self):
         """VariableSpec is immutable."""
