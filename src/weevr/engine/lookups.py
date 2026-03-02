@@ -138,7 +138,8 @@ def _apply_narrow_pipeline(
 
     # 2. Validate + project
     if lookup.values:
-        assert lookup.key is not None  # enforced by model validator
+        if lookup.key is None:
+            raise LookupResolutionError(f"Lookup '{name}': 'values' requires 'key' to be set")
         _validate_columns(df, lookup.key + lookup.values, name)
         df = df.select(*lookup.key, *lookup.values)
     elif lookup.key:
@@ -146,7 +147,8 @@ def _apply_narrow_pipeline(
 
     # 3. Unique-key check
     if lookup.unique_key:
-        assert lookup.key is not None  # unique_key without key is meaningless
+        if lookup.key is None:
+            raise LookupResolutionError(f"Lookup '{name}': 'unique_key' requires 'key' to be set")
         unique_key_checked = True
         unique_key_passed = _check_unique_key(df, lookup.key, name, lookup.on_failure)
 
