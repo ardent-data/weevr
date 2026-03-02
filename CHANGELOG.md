@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/ardent-data/weevr/compare/weevr-v1.0.6...weevr-v1.1.0) (2026-03-02)
+
+
+### Features
+
+* **engine:** add execution hooks, lookups, and quality gates ([#62](https://github.com/ardent-data/weevr/issues/62)) ([7b1f79b](https://github.com/ardent-data/weevr/commit/7b1f79b663b1110eab786de166b02d39117cea83))
+* **examples:** add Fabcon 2026 progressive demo configs ([#60](https://github.com/ardent-data/weevr/issues/60)) ([d11899a](https://github.com/ardent-data/weevr/commit/d11899ad81e7b3bd420e642c3390ee56d3fb3bd0))
+
 ## [1.0.6](https://github.com/ardent-data/weevr/compare/weevr-v1.0.5...weevr-v1.0.6) (2026-02-28)
 
 
