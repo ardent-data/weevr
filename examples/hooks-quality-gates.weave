@@ -1,0 +1,70 @@
+# Hooks & Quality Gates Example
+#
+# Demonstrates pre/post execution hooks on a weave:
+#   - Pre-step: source freshness check ensures data is recent.
+#   - Pre-step: table_exists guard prevents execution if source missing.
+#   - Post-step: row_count_delta check validates write didn't lose rows.
+#   - Post-step: log_message reports a SQL-derived variable.
+#
+# Variables are used to capture a SQL result and reference it in a log step.
+
+config_version: "1.0"
+name: orders_pipeline
+
+variables:
+  batch_ts:
+    type: timestamp
+  record_count:
+    type: int
+
+pre_steps:
+  - type: quality_gate
+    name: check_source_exists
+    check: table_exists
+    source: raw.orders
+
+  - type: quality_gate
+    name: check_freshness
+    check: source_freshness
+    source: raw.orders
+    max_age: "24h"
+
+  - type: sql_statement
+    name: capture_batch_ts
+    sql: "SELECT current_timestamp()"
+    set_var: batch_ts
+
+post_steps:
+  - type: quality_gate
+    name: check_row_delta
+    check: row_count_delta
+    target: curated.fact_orders
+    max_decrease_pct: 10.0
+    on_failure: warn
+
+  - type: quality_gate
+    name: check_min_rows
+    check: row_count
+    target: curated.fact_orders
+    min_count: 1
+    on_failure: warn
+
+  - type: quality_gate
+    name: verify_expression
+    check: expression
+    sql: "SELECT COUNT(*) > 0 FROM curated.fact_orders WHERE order_date IS NOT NULL"
+    on_failure: warn
+
+  - type: log_message
+    name: pipeline_summary
+    message: "Orders pipeline complete at ${var.batch_ts}"
+    level: info
+
+threads:
+  - name: staging_orders
+  - name: fact_orders
+    dependencies:
+      - staging_orders
+
+execution:
+  log_level: verbose

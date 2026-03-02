@@ -17,6 +17,8 @@ serve as reference templates and are validated by CI to ensure structural correc
 | `multi-thread-weave.weave` | Weave orchestrating three threads with explicit dependencies. |
 | `full-loom.loom` | Complete loom with two weaves, variables, defaults, and execution settings. |
 | `validation-thread.thread` | Thread with data quality validations and post-write assertions. |
+| `hooks-quality-gates.weave` | Weave with pre/post quality gates, SQL variables, and log messages. |
+| `hooks-lookups.weave` | Weave with materialized (broadcast) and on-demand lookup definitions. |
 
 ## Fabcon 2026 Demos
 
