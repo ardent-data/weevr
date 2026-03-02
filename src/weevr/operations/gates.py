@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from weevr.config.duration import parse_duration
+from weevr.duration import parse_duration
+from weevr.model.base import FrozenBase
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
 
-@dataclass(frozen=True)
-class GateResult:
+class GateResult(FrozenBase):
     """Result of a quality gate check.
 
     Attributes:

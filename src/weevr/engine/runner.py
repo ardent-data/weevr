@@ -312,7 +312,10 @@ def execute_weave(
                                 sorted(downstream),
                             )
 
-        # Execute post-steps after all threads complete
+        # Execute post-steps after all threads complete.
+        # Note: row_counts is not populated, so row_count_delta checks in post-hooks
+        # compare against before_count=0. Use row_count (absolute bounds) in post-hooks
+        # for target validation instead.
         if post_steps:
             post_results = run_hook_steps(
                 spark,

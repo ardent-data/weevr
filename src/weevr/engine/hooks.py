@@ -231,6 +231,7 @@ def run_hook_steps(
         collector: Optional span collector for telemetry.
         parent_span_id: Optional parent span ID for hierarchy.
         row_counts: Pre-snapshot row counts for row_count_delta checks.
+            When ``None``, defaults to an empty dict (before_count=0 for all tables).
 
     Returns:
         List of HookResult objects, one per step.

@@ -105,6 +105,31 @@ class TestCheckRowCountDelta:
         result = check_row_count_delta(spark, "db.table", before_count=1)
         assert result.passed is True
 
+    def test_before_count_zero_no_change(self):
+        """Zero before_count with zero after_count passes."""
+        spark = self._mock_count(0)
+        result = check_row_count_delta(spark, "db.table", before_count=0, max_increase_pct=50.0)
+        assert result.passed is True
+
+    def test_before_count_zero_with_increase(self):
+        """Zero before_count with increase produces infinite pct, exceeds threshold."""
+        spark = self._mock_count(10)
+        result = check_row_count_delta(spark, "db.table", before_count=0, max_increase_pct=50.0)
+        assert result.passed is False
+
+    def test_min_delta_failing(self):
+        """Delta below min_delta threshold fails."""
+        spark = self._mock_count(102)
+        result = check_row_count_delta(spark, "db.table", before_count=100, min_delta=10)
+        assert result.passed is False
+        assert "delta 2 < min 10" in result.message
+
+    def test_min_delta_passing(self):
+        """Delta above min_delta threshold passes."""
+        spark = self._mock_count(115)
+        result = check_row_count_delta(spark, "db.table", before_count=100, min_delta=10)
+        assert result.passed is True
+
 
 class TestCheckRowCount:
     """Test check_row_count."""

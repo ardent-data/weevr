@@ -463,6 +463,8 @@ class Context:
 
         for thread_name, thread in threads.items():
             for source_name, source in thread.sources.items():
+                if source.lookup is not None or source.type is None:
+                    continue
                 resolve_path = source.alias if source.type == "delta" else source.path
                 if resolve_path is None or resolve_path in checked:
                     continue

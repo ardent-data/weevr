@@ -404,3 +404,177 @@ class TestRunHookStepsTelemetry:
         spans = collector.get_spans()
         assert len(spans) == 1
         assert spans[0].status == "ERROR"
+
+
+class TestRunHookStepsGateDispatch:
+    """Test quality gate dispatch for all check types through run_hook_steps."""
+
+    def _mock_count(self, spark: MagicMock, count: int) -> None:
+        """Configure spark.sql to return a specific count."""
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(return_value=count)
+        spark.sql.return_value.collect.return_value = [mock_row]
+
+    def test_row_count_passing(self):
+        """row_count gate dispatches through hook executor."""
+        spark = MagicMock()
+        self._mock_count(spark, 50)
+        step = QualityGateStep(
+            type="quality_gate", check="row_count", target="db.table", min_count=10
+        )
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "pre", ctx)
+
+        assert len(results) == 1
+        assert results[0].status == "passed"
+        assert results[0].gate_result is not None
+        assert results[0].gate_result.passed is True
+
+    def test_row_count_failing(self):
+        """Failing row_count gate aborts in pre phase."""
+        spark = MagicMock()
+        self._mock_count(spark, 5)
+        step = QualityGateStep(
+            type="quality_gate", check="row_count", target="db.table", min_count=10
+        )
+        ctx = VariableContext()
+
+        with pytest.raises(HookError):
+            run_hook_steps(spark, [step], "pre", ctx)
+
+    def test_row_count_delta_passing(self):
+        """row_count_delta gate dispatches with row_counts dict."""
+        spark = MagicMock()
+        self._mock_count(spark, 110)
+        step = QualityGateStep(
+            type="quality_gate",
+            check="row_count_delta",
+            target="db.table",
+            max_increase_pct=20.0,
+        )
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "post", ctx, row_counts={"db.table": 100})
+
+        assert len(results) == 1
+        assert results[0].status == "passed"
+        assert results[0].gate_result is not None
+        assert results[0].gate_result.passed is True
+
+    def test_row_count_delta_failing(self):
+        """Failing row_count_delta gate warns in post phase."""
+        spark = MagicMock()
+        self._mock_count(spark, 200)
+        step = QualityGateStep(
+            type="quality_gate",
+            check="row_count_delta",
+            target="db.table",
+            max_increase_pct=10.0,
+        )
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "post", ctx, row_counts={"db.table": 100})
+
+        assert results[0].status == "warned"
+
+    def test_row_count_delta_before_zero(self):
+        """row_count_delta handles before_count=0 gracefully."""
+        spark = MagicMock()
+        self._mock_count(spark, 10)
+        step = QualityGateStep(
+            type="quality_gate",
+            check="row_count_delta",
+            target="db.table",
+            max_increase_pct=50.0,
+        )
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "post", ctx, row_counts={"db.table": 0})
+
+        # 0→10 is infinite % increase, exceeds 50% threshold
+        assert results[0].status == "warned"
+        assert results[0].gate_result is not None
+        assert results[0].gate_result.passed is False
+
+    def test_row_count_delta_min_delta(self):
+        """row_count_delta min_delta threshold works through dispatcher."""
+        spark = MagicMock()
+        self._mock_count(spark, 102)
+        step = QualityGateStep(
+            type="quality_gate",
+            check="row_count_delta",
+            target="db.table",
+            min_delta=10,
+        )
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "post", ctx, row_counts={"db.table": 100})
+
+        # delta=2 < min_delta=10
+        assert results[0].status == "warned"
+        assert results[0].gate_result is not None
+        assert results[0].gate_result.passed is False
+
+    def test_source_freshness_passing(self):
+        """source_freshness gate dispatches through hook executor."""
+        from datetime import UTC, datetime, timedelta
+
+        recent = datetime.now(tz=UTC) - timedelta(hours=1)
+        spark = MagicMock()
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(return_value=recent)
+        spark.sql.return_value.collect.return_value = [mock_row]
+
+        step = QualityGateStep(
+            type="quality_gate",
+            check="source_freshness",
+            source="db.table",
+            max_age="24h",
+        )
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "pre", ctx)
+
+        assert len(results) == 1
+        assert results[0].status == "passed"
+        assert results[0].gate_result is not None
+        assert results[0].gate_result.passed is True
+
+    def test_source_freshness_failing(self):
+        """Failing source_freshness gate aborts in pre phase."""
+        from datetime import UTC, datetime, timedelta
+
+        old = datetime.now(tz=UTC) - timedelta(days=3)
+        spark = MagicMock()
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(return_value=old)
+        spark.sql.return_value.collect.return_value = [mock_row]
+
+        step = QualityGateStep(
+            type="quality_gate",
+            check="source_freshness",
+            source="db.table",
+            max_age="24h",
+        )
+        ctx = VariableContext()
+
+        with pytest.raises(HookError):
+            run_hook_steps(spark, [step], "pre", ctx)
+
+    def test_expression_passing(self):
+        """expression gate dispatches through hook executor."""
+        spark = MagicMock()
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(return_value=True)
+        spark.sql.return_value.collect.return_value = [mock_row]
+
+        step = QualityGateStep(type="quality_gate", check="expression", sql="1 = 1")
+        ctx = VariableContext()
+
+        results = run_hook_steps(spark, [step], "pre", ctx)
+
+        assert len(results) == 1
+        assert results[0].status == "passed"
+        assert results[0].gate_result is not None
+        assert results[0].gate_result.passed is True
