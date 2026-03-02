@@ -116,7 +116,6 @@ def materialize_lookups(
             )
 
         except Exception as exc:
-            elapsed_ms = (time.monotonic() - start) * 1000
             if span:
                 span.add_event("error", {"message": str(exc)})
                 collector.add_span(span.finish(SpanStatus.ERROR))  # type: ignore[union-attr]
