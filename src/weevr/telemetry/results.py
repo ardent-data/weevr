@@ -1,6 +1,6 @@
 """Telemetry result models — validation, assertion, and execution telemetry."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from weevr.model.base import FrozenBase
 from weevr.telemetry.span import ExecutionSpan
@@ -92,10 +92,16 @@ class WeaveTelemetry(FrozenBase):
     Attributes:
         span: The execution span for this weave.
         thread_telemetry: Per-thread telemetry keyed by thread name.
+        hook_results: Results from pre/post hook step execution.
+        lookup_results: Results from lookup materialization.
+        variables: Final variable values at end of weave execution.
     """
 
     span: ExecutionSpan
     thread_telemetry: dict[str, ThreadTelemetry] = {}
+    hook_results: list[Any] = []  # list[engine.hooks.HookResult] at runtime
+    lookup_results: list[Any] = []  # list[engine.lookups.LookupResult] at runtime
+    variables: dict[str, Any] = {}
 
 
 class LoomTelemetry(FrozenBase):

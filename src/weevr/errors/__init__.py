@@ -7,7 +7,9 @@ from weevr.errors.exceptions import (
     ConfigVersionError,
     DataValidationError,
     ExecutionError,
+    HookError,
     InheritanceError,
+    LookupResolutionError,
     ModelValidationError,
     ReferenceResolutionError,
     SparkError,
@@ -29,5 +31,7 @@ __all__ = [
     "ExecutionError",
     "SparkError",
     "StateError",
+    "HookError",
+    "LookupResolutionError",
     "DataValidationError",
 ]

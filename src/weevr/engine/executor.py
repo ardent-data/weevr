@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.engine.lookups import resolve_thread_lookups
 from weevr.engine.result import ThreadResult
 from weevr.errors.exceptions import DataValidationError, ExecutionError, StateError
+from weevr.model.lookup import Lookup
 from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
@@ -37,24 +40,27 @@ def execute_thread(
     thread: Thread,
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    cached_lookups: dict[str, Any] | None = None,
+    weave_lookups: dict[str, Lookup] | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
     Execution order:
-    1. Read all declared sources into DataFrames.
+    1. Resolve lookup-based sources from cached or on-demand DataFrames.
+    2. Read all remaining declared sources into DataFrames.
        - For ``incremental_watermark``: load prior HWM, apply filter, capture new HWM.
        - For ``cdc``: read via CDF or generic CDC source.
-    2. Set the primary (first) source as the working DataFrame.
-    3. Run pipeline steps against the working DataFrame.
-    4. Run validation rules (if configured) — quarantine or abort on failures.
-    5. Compute business keys and hashes if configured.
-    6. Resolve the target write path.
-    7. Apply target column mapping.
-    8. Write to the Delta target.
+    3. Set the primary (first) source as the working DataFrame.
+    4. Run pipeline steps against the working DataFrame.
+    5. Run validation rules (if configured) — quarantine or abort on failures.
+    6. Compute business keys and hashes if configured.
+    7. Resolve the target write path.
+    8. Apply target column mapping.
+    9. Write to the Delta target.
        - For ``cdc``: use CDC merge routing instead of standard write.
-    9. Persist watermark state (if applicable).
-    10. Run post-write assertions (if configured).
-    11. Build telemetry and return ThreadResult.
+    10. Persist watermark state (if applicable).
+    11. Run post-write assertions (if configured).
+    12. Build telemetry and return ThreadResult.
 
     Args:
         spark: Active SparkSession.
@@ -62,6 +68,11 @@ def execute_thread(
         collector: Optional span collector for telemetry. When provided,
             a thread span is created and finalized.
         parent_span_id: Optional parent span ID for trace tree linkage.
+        cached_lookups: Pre-materialized lookup DataFrames keyed by lookup name.
+            Runtime type is ``dict[str, DataFrame]``; ``Any`` avoids coupling
+            the signature to PySpark types.
+        weave_lookups: Weave-level lookup definitions for on-demand resolution
+            of non-materialized lookups.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -117,6 +128,16 @@ def execute_thread(
                 prior_state.last_value if prior_state else None,
             )
 
+        # --- Step 0: Resolve lookup-based sources ---
+        lookup_dfs: dict[str, Any] = {}
+        if cached_lookups is not None or weave_lookups is not None:
+            lookup_dfs = resolve_thread_lookups(
+                thread.sources,
+                weave_lookups or {},
+                cached_lookups or {},
+                spark,
+            )
+
         # --- Step 1: Read sources ---
         if load_mode == "incremental_watermark" and thread.load is not None:
             # Read primary source with watermark filter
@@ -126,11 +147,12 @@ def execute_thread(
                 spark, primary_alias, primary_source, thread.load, prior_state
             )
 
-            # Read secondary sources normally
+            # Read secondary sources normally (skip lookup-resolved ones)
             sources_map = {primary_alias: primary_df}
             for alias, source in thread.sources.items():
-                if alias != primary_alias:
+                if alias != primary_alias and alias not in lookup_dfs:
                     sources_map[alias] = read_source(spark, alias, source)
+            sources_map.update(lookup_dfs)
 
         elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
             # Read CDC source
@@ -154,13 +176,17 @@ def execute_thread(
                 if max_row and max_row[0]["mv"] is not None:
                     new_hwm = str(max_row[0]["mv"])
 
+            # Read secondary sources normally (skip lookup-resolved ones)
             sources_map = {primary_alias: primary_df}
             for alias, source in thread.sources.items():
-                if alias != primary_alias:
+                if alias != primary_alias and alias not in lookup_dfs:
                     sources_map[alias] = read_source(spark, alias, source)
+            sources_map.update(lookup_dfs)
         else:
-            # Full mode or incremental_parameter — read all sources normally
-            sources_map = read_sources(spark, thread.sources)
+            # Full mode or incremental_parameter — read non-lookup sources normally
+            normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
+            sources_map = read_sources(spark, normal_sources)
+            sources_map.update(lookup_dfs)
 
         # Step 2 — primary DataFrame is the first declared source
         df = next(iter(sources_map.values()))

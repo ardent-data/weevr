@@ -6,8 +6,11 @@ from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.execution import ExecutionConfig
+from weevr.model.hooks import HookStep
+from weevr.model.lookup import Lookup
 from weevr.model.naming import NamingConfig
 from weevr.model.params import ParamSpec
+from weevr.model.variable import VariableSpec
 
 
 class ConditionSpec(FrozenBase):
@@ -53,6 +56,10 @@ class Weave(FrozenBase):
     params: dict[str, ParamSpec] | None = None
     execution: ExecutionConfig | None = None
     naming: NamingConfig | None = None
+    lookups: dict[str, Lookup] | None = None
+    variables: dict[str, VariableSpec] | None = None
+    pre_steps: list[HookStep] | None = None
+    post_steps: list[HookStep] | None = None
 
     @model_validator(mode="before")
     @classmethod

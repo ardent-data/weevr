@@ -228,6 +228,61 @@ class StateError(ExecutionError):
         return base_msg
 
 
+class HookError(ExecutionError):
+    """Raised when a hook step fails with on_failure: abort.
+
+    Carries hook-specific context to identify which step failed and
+    in which phase of the weave lifecycle.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        hook_name: str | None = None,
+        hook_type: str | None = None,
+        phase: str | None = None,
+    ) -> None:
+        """Initialize HookError.
+
+        Args:
+            message: Human-readable error message.
+            cause: Optional underlying exception.
+            hook_name: Name of the hook step that failed.
+            hook_type: Step type key (e.g. "quality_gate", "sql_statement").
+            phase: Execution phase ("pre" or "post").
+        """
+        super().__init__(message, cause=cause)
+        self.hook_name = hook_name
+        self.hook_type = hook_type
+        self.phase = phase
+
+    def __str__(self) -> str:
+        """Return string representation with hook context."""
+        parts = [self.message]
+        if self.phase:
+            parts.append(f"in {self.phase} phase")
+        if self.hook_type:
+            label = self.hook_type
+            if self.hook_name:
+                label += f" '{self.hook_name}'"
+            parts.append(f"at {label}")
+        base_msg = " ".join(parts)
+        if self.cause:
+            return f"{base_msg} (caused by: {self.cause})"
+        return base_msg
+
+
+class LookupResolutionError(ConfigError):
+    """Raised when a thread references a lookup not defined in the weave.
+
+    This is a fail-fast validation error caught during config resolution,
+    before any data is read or threads are executed.
+    """
+
+    pass
+
+
 class DataValidationError(WeevError):
     """Raised when a fatal-severity validation rule has failing rows.
 

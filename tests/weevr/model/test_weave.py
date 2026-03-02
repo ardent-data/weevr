@@ -3,6 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
+from weevr.model.hooks import LogMessageStep, QualityGateStep
+from weevr.model.lookup import Lookup
+from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
 
 
@@ -222,6 +225,132 @@ class TestThreadEntryCondition:
                     {"name": "a", "condition": {"when": "true"}},
                     {"name": "b", "dependencies": ["a"]},
                 ],
+            }
+        )
+        restored = Weave.model_validate(w.model_dump())
+        assert restored == w
+
+
+class TestWeaveHookFields:
+    """Test Weave with lookups, variables, pre_steps, post_steps."""
+
+    def test_backward_compatible(self):
+        """Existing weaves without hook fields still work."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        assert w.lookups is None
+        assert w.variables is None
+        assert w.pre_steps is None
+        assert w.post_steps is None
+
+    def test_with_lookups(self):
+        """Weave with lookups dict."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "lookups": {
+                    "categories": {
+                        "source": {"type": "delta", "alias": "ref.categories"},
+                        "materialize": True,
+                        "strategy": "broadcast",
+                    }
+                },
+            }
+        )
+        assert w.lookups is not None
+        assert "categories" in w.lookups
+        assert isinstance(w.lookups["categories"], Lookup)
+        assert w.lookups["categories"].materialize is True
+
+    def test_with_variables(self):
+        """Weave with variables dict."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "variables": {
+                    "batch_id": {"type": "string"},
+                    "row_count": {"type": "int", "default": 0},
+                },
+            }
+        )
+        assert w.variables is not None
+        assert "batch_id" in w.variables
+        assert isinstance(w.variables["batch_id"], VariableSpec)
+        assert w.variables["row_count"].default == 0
+
+    def test_with_pre_steps(self):
+        """Weave with pre_steps list."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "pre_steps": [
+                    {
+                        "type": "quality_gate",
+                        "check": "table_exists",
+                        "source": "raw_data",
+                    },
+                    {
+                        "type": "log_message",
+                        "message": "Starting weave",
+                    },
+                ],
+            }
+        )
+        assert w.pre_steps is not None
+        assert len(w.pre_steps) == 2
+        assert isinstance(w.pre_steps[0], QualityGateStep)
+        assert isinstance(w.pre_steps[1], LogMessageStep)
+
+    def test_with_post_steps(self):
+        """Weave with post_steps list."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "post_steps": [
+                    {
+                        "type": "log_message",
+                        "message": "Weave complete",
+                        "level": "info",
+                    }
+                ],
+            }
+        )
+        assert w.post_steps is not None
+        assert len(w.post_steps) == 1
+
+    def test_with_all_hook_fields(self):
+        """Weave with all hook-related fields set."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "lookups": {
+                    "regions": {
+                        "source": {"type": "delta", "alias": "ref.regions"},
+                    }
+                },
+                "variables": {"status": {"type": "string", "default": "pending"}},
+                "pre_steps": [{"type": "log_message", "message": "starting"}],
+                "post_steps": [{"type": "log_message", "message": "done"}],
+            }
+        )
+        assert w.lookups is not None
+        assert w.variables is not None
+        assert w.pre_steps is not None
+        assert w.post_steps is not None
+
+    def test_round_trip_with_hooks(self):
+        """Weave with hook fields round-trips."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "lookups": {"cats": {"source": {"type": "delta", "alias": "ref.cats"}}},
+                "variables": {"x": {"type": "int"}},
+                "pre_steps": [{"type": "log_message", "message": "hi"}],
             }
         )
         restored = Weave.model_validate(w.model_dump())

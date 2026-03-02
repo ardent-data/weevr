@@ -9,7 +9,9 @@ from weevr.errors import (
     ConfigVersionError,
     DataValidationError,
     ExecutionError,
+    HookError,
     InheritanceError,
+    LookupResolutionError,
     ModelValidationError,
     ReferenceResolutionError,
     SparkError,
@@ -38,8 +40,13 @@ class TestExceptionHierarchy:
         assert issubclass(ModelValidationError, ConfigError)
 
     def test_execution_error_hierarchy(self):
-        """SparkError should inherit from ExecutionError."""
+        """Execution error subclasses should inherit from ExecutionError."""
         assert issubclass(SparkError, ExecutionError)
+        assert issubclass(HookError, ExecutionError)
+
+    def test_lookup_resolution_error_hierarchy(self):
+        """LookupResolutionError should inherit from ConfigError."""
+        assert issubclass(LookupResolutionError, ConfigError)
 
     def test_catchable_via_base(self):
         """All errors should be catchable via WeevError."""
@@ -285,3 +292,78 @@ class TestModelValidationError:
         assert "model hydration failed" in result
         assert "/path/to/thread.yaml" in result
         assert "nested detail" in result
+
+
+class TestHookError:
+    """Test HookError context fields."""
+
+    def test_minimal_construction(self):
+        """HookError constructs with message only."""
+        err = HookError("gate failed")
+        assert str(err) == "gate failed"
+        assert err.hook_name is None
+        assert err.hook_type is None
+        assert err.phase is None
+
+    def test_with_phase(self):
+        """Phase appears in string representation."""
+        err = HookError("gate failed", phase="pre")
+        assert "pre phase" in str(err)
+
+    def test_with_hook_type_and_name(self):
+        """Hook type and name appear in string representation."""
+        err = HookError("check failed", hook_type="quality_gate", hook_name="freshness")
+        result = str(err)
+        assert "quality_gate" in result
+        assert "freshness" in result
+
+    def test_with_all_context(self):
+        """All context fields appear in string representation."""
+        cause = RuntimeError("spark error")
+        err = HookError(
+            "gate failed",
+            cause=cause,
+            hook_name="row_check",
+            hook_type="quality_gate",
+            phase="post",
+        )
+        result = str(err)
+        assert "gate failed" in result
+        assert "post phase" in result
+        assert "quality_gate" in result
+        assert "row_check" in result
+        assert "caused by" in result
+
+    def test_catchable_as_execution_error(self):
+        """HookError is catchable as ExecutionError."""
+        with pytest.raises(ExecutionError):
+            raise HookError("hook failed")
+
+    def test_catchable_as_weev_error(self):
+        """HookError is catchable as WeevError."""
+        with pytest.raises(WeevError):
+            raise HookError("hook failed")
+
+
+class TestLookupResolutionError:
+    """Test LookupResolutionError."""
+
+    def test_is_config_error(self):
+        """LookupResolutionError is a ConfigError."""
+        err = LookupResolutionError("lookup 'categories' not found")
+        assert isinstance(err, ConfigError)
+        assert isinstance(err, WeevError)
+
+    def test_file_path_context(self):
+        """LookupResolutionError accepts file_path context."""
+        err = LookupResolutionError(
+            "lookup 'categories' not found",
+            file_path="/configs/weave.yaml",
+        )
+        assert err.file_path == "/configs/weave.yaml"
+        assert "/configs/weave.yaml" in str(err)
+
+    def test_catchable_as_config_error(self):
+        """LookupResolutionError is catchable as ConfigError."""
+        with pytest.raises(ConfigError):
+            raise LookupResolutionError("missing lookup")
