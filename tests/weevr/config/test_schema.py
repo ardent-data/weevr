@@ -141,6 +141,53 @@ class TestWeaveConfig:
         with pytest.raises(ValidationError):
             WeaveConfig.model_validate(data)
 
+    def test_weave_with_lookups(self):
+        """Weave config with lookups passes schema validation."""
+        data = {
+            "config_version": "1.0",
+            "threads": ["t1"],
+            "lookups": {
+                "categories": {
+                    "source": {"type": "delta", "alias": "ref.cats"},
+                    "materialize": True,
+                }
+            },
+        }
+        config = WeaveConfig.model_validate(data)
+        assert config.lookups is not None
+        assert "categories" in config.lookups
+
+    def test_weave_with_variables(self):
+        """Weave config with variables passes schema validation."""
+        data = {
+            "config_version": "1.0",
+            "threads": ["t1"],
+            "variables": {"batch_id": {"type": "string"}},
+        }
+        config = WeaveConfig.model_validate(data)
+        assert config.variables is not None
+
+    def test_weave_with_pre_steps(self):
+        """Weave config with pre_steps passes schema validation."""
+        data = {
+            "config_version": "1.0",
+            "threads": ["t1"],
+            "pre_steps": [{"type": "quality_gate", "check": "table_exists", "source": "raw"}],
+        }
+        config = WeaveConfig.model_validate(data)
+        assert config.pre_steps is not None
+        assert len(config.pre_steps) == 1
+
+    def test_weave_with_post_steps(self):
+        """Weave config with post_steps passes schema validation."""
+        data = {
+            "config_version": "1.0",
+            "threads": ["t1"],
+            "post_steps": [{"type": "log_message", "message": "done"}],
+        }
+        config = WeaveConfig.model_validate(data)
+        assert config.post_steps is not None
+
 
 class TestLoomConfig:
     """Test LoomConfig schema."""
