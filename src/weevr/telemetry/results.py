@@ -99,8 +99,8 @@ class WeaveTelemetry(FrozenBase):
 
     span: ExecutionSpan
     thread_telemetry: dict[str, ThreadTelemetry] = {}
-    hook_results: list[Any] = []
-    lookup_results: list[Any] = []
+    hook_results: list[Any] = []  # list[engine.hooks.HookResult] at runtime
+    lookup_results: list[Any] = []  # list[engine.lookups.LookupResult] at runtime
     variables: dict[str, Any] = {}
 
 

@@ -347,6 +347,23 @@ class TestRunHookStepsTelemetry:
         assert spans[1].name == "hook:pre:log_message:named"
         assert spans[0].parent_span_id == "parent123"
 
+    def test_log_message_span_event(self):
+        """Log message step emits a span event with message content."""
+        spark = MagicMock()
+        collector = SpanCollector(generate_trace_id())
+        step = LogMessageStep(type="log_message", message="Pipeline done", level="info")
+        ctx = VariableContext()
+
+        with patch("weevr.engine.hooks.logger"):
+            run_hook_steps(spark, [step], "post", ctx, collector=collector)
+
+        spans = collector.get_spans()
+        assert len(spans) == 1
+        assert len(spans[0].events) == 1
+        assert spans[0].events[0].name == "log"
+        assert spans[0].events[0].attributes["message"] == "Pipeline done"
+        assert spans[0].events[0].attributes["level"] == "info"
+
     def test_error_span_on_warn(self):
         """Warned step creates OK span with warning event."""
         spark = MagicMock()

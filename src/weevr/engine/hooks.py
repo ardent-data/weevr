@@ -184,7 +184,7 @@ def _execute_log_message(
     variable_ctx: VariableContext,
     params: dict[str, Any],
     span_id: str | None = None,
-) -> None:
+) -> str:
     """Execute a log message step.
 
     Args:
@@ -192,6 +192,9 @@ def _execute_log_message(
         variable_ctx: Variable context for interpolation.
         params: Parameter mapping for interpolation.
         span_id: Optional span ID for correlation.
+
+    Returns:
+        The resolved message string (for telemetry span event emission).
     """
     resolved_msg = _resolve_text(step.message, variable_ctx, params)
 
@@ -201,6 +204,7 @@ def _execute_log_message(
 
     level_map = {"info": logging.INFO, "warn": logging.WARNING, "error": logging.ERROR}
     logger.log(level_map.get(step.level, logging.INFO), resolved_msg, extra=extra)
+    return resolved_msg
 
 
 def run_hook_steps(
@@ -274,12 +278,14 @@ def run_hook_steps(
                 _execute_sql_statement(spark, step, variable_ctx, params)
 
             elif isinstance(step, LogMessageStep):
-                _execute_log_message(
+                resolved_msg = _execute_log_message(
                     step,
                     variable_ctx,
                     params,
                     span_id=span.span_id if span else None,
                 )
+                if span:
+                    span.add_event("log", {"message": resolved_msg, "level": step.level})
 
         except HookError:
             raise

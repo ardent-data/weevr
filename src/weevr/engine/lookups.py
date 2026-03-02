@@ -12,6 +12,7 @@ from pyspark.sql import functions as F
 from weevr.errors.exceptions import LookupResolutionError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
+from weevr.model.source import Source
 from weevr.operations.readers import read_source
 from weevr.telemetry.span import SpanStatus
 
@@ -144,7 +145,7 @@ def cleanup_lookups(cached: dict[str, DataFrame]) -> None:
 
 
 def resolve_thread_lookups(
-    thread_sources: Mapping[str, object],
+    thread_sources: Mapping[str, Source],
     weave_lookups: dict[str, Lookup],
     cached_dfs: dict[str, DataFrame],
     spark: SparkSession,
@@ -156,7 +157,7 @@ def resolve_thread_lookups(
     (non-materialized).
 
     Args:
-        thread_sources: Thread source definitions (Source objects with optional lookup field).
+        thread_sources: Thread source definitions with optional lookup field.
         weave_lookups: Weave-level lookup definitions.
         cached_dfs: Pre-materialized DataFrames from :func:`materialize_lookups`.
         spark: Active SparkSession for on-demand reads.
@@ -170,7 +171,7 @@ def resolve_thread_lookups(
     resolved: dict[str, DataFrame] = {}
 
     for alias, source in thread_sources.items():
-        lookup_name = getattr(source, "lookup", None)
+        lookup_name = source.lookup
         if lookup_name is None:
             continue
 
