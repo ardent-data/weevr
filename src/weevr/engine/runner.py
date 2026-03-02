@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Literal
@@ -13,10 +14,17 @@ from pyspark.sql import SparkSession
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.conditions import evaluate_condition
 from weevr.engine.executor import execute_thread
+from weevr.engine.hooks import HookResult, run_hook_steps
+from weevr.engine.lookups import LookupResult, cleanup_lookups, materialize_lookups
 from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+from weevr.engine.variables import VariableContext
+from weevr.errors.exceptions import HookError
+from weevr.model.hooks import HookStep
+from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
+from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, Weave
 from weevr.telemetry.collector import SpanCollector
 from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
@@ -60,6 +68,10 @@ def execute_weave(
     thread_conditions: dict[str, ConditionSpec] | None = None,
     params: dict[str, Any] | None = None,
     weave_span_label: str | None = None,
+    pre_steps: Sequence[HookStep] | None = None,
+    post_steps: Sequence[HookStep] | None = None,
+    lookups: dict[str, Lookup] | None = None,
+    variables: dict[str, VariableSpec] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -67,6 +79,14 @@ def execute_weave(
     group to a :class:`~concurrent.futures.ThreadPoolExecutor` for concurrent
     execution. Respects ``on_failure`` config on each thread and manages the
     cache lifecycle via :class:`~weevr.engine.cache_manager.CacheManager`.
+
+    When hooks are provided, the lifecycle is:
+    1. Initialize ``VariableContext`` from ``variables``.
+    2. Materialize lookups (``materialize=True``).
+    3. Execute ``pre_steps``.
+    4. Execute threads (with cached lookup DataFrames).
+    5. Execute ``post_steps``.
+    6. Cleanup lookups.
 
     Args:
         spark: Active SparkSession.
@@ -81,6 +101,10 @@ def execute_weave(
         params: Parameters for condition evaluation.
         weave_span_label: Label for the weave telemetry span. When set, used
             instead of ``plan.weave_name``. Typically the weave's qualified key.
+        pre_steps: Optional pre-execution hook steps.
+        post_steps: Optional post-execution hook steps.
+        lookups: Optional weave-level lookup definitions.
+        variables: Optional weave-level variable specs.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -105,7 +129,36 @@ def execute_weave(
 
     logger.debug("Starting weave '%s' — %d threads", plan.weave_name, len(plan.threads))
 
+    # Initialize hook lifecycle components
+    variable_ctx = VariableContext(variables)
+    cached_lookup_dfs: dict[str, Any] = {}
+    all_hook_results: list[HookResult] = []
+    all_lookup_results: list[LookupResult] = []
+
     try:
+        # Materialize lookups before any hook or thread execution
+        if lookups:
+            cached_lookup_dfs, all_lookup_results = materialize_lookups(
+                spark, lookups, collector=collector, parent_span_id=weave_span_id
+            )
+
+        # Execute pre-steps
+        if pre_steps:
+            try:
+                pre_results = run_hook_steps(
+                    spark,
+                    pre_steps,
+                    "pre",
+                    variable_ctx,
+                    params=params,
+                    collector=collector,
+                    parent_span_id=weave_span_id,
+                )
+                all_hook_results.extend(pre_results)
+            except HookError:
+                cleanup_lookups(cached_lookup_dfs)
+                raise
+
         for group in plan.execution_order:
             if aborted:
                 for name in group:
@@ -249,8 +302,22 @@ def execute_weave(
                                 sorted(downstream),
                             )
 
+        # Execute post-steps after all threads complete
+        if post_steps:
+            post_results = run_hook_steps(
+                spark,
+                post_steps,
+                "post",
+                variable_ctx,
+                params=params,
+                collector=collector,
+                parent_span_id=weave_span_id,
+            )
+            all_hook_results.extend(post_results)
+
     finally:
         cache.cleanup()
+        cleanup_lookups(cached_lookup_dfs)
 
     # Collect any pending threads that weren't processed (shouldn't happen, but be safe)
     for name, state in thread_states.items():
@@ -267,7 +334,14 @@ def execute_weave(
         collector.add_span(weave_span)
 
     # Build weave telemetry from thread results
-    weave_telemetry = _build_weave_telemetry(span_name, thread_results, collector)
+    weave_telemetry = _build_weave_telemetry(
+        span_name,
+        thread_results,
+        collector,
+        hook_results=all_hook_results,
+        lookup_results=all_lookup_results,
+        variables=variable_ctx.snapshot(),
+    )
 
     logger.debug(
         "Weave '%s' complete — status=%s, duration=%dms",
@@ -290,6 +364,9 @@ def _build_weave_telemetry(
     weave_name: str,
     thread_results: list[ThreadResult],
     collector: SpanCollector | None,
+    hook_results: list[HookResult] | None = None,
+    lookup_results: list[LookupResult] | None = None,
+    variables: dict[str, Any] | None = None,
 ) -> WeaveTelemetry | None:
     """Build WeaveTelemetry from thread results."""
     if collector is None:
@@ -321,6 +398,9 @@ def _build_weave_telemetry(
     return WeaveTelemetry(
         span=weave_span,
         thread_telemetry=thread_telemetry,
+        hook_results=hook_results or [],
+        lookup_results=lookup_results or [],
+        variables=variables or {},
     )
 
 
@@ -410,6 +490,10 @@ def execute_loom(
             thread_conditions=thread_conditions if thread_conditions else None,
             params=params,
             weave_span_label=weave.qualified_key or weave_name,
+            pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
+            post_steps=list(weave.post_steps) if weave.post_steps else None,
+            lookups=dict(weave.lookups) if weave.lookups else None,
+            variables=dict(weave.variables) if weave.variables else None,
         )
         weave_results.append(result)
 

@@ -812,3 +812,180 @@ class TestConditionalWeaveExecution:
         # Verify params passed through to execute_weave
         call_kwargs = mock_weave_exec.call_args
         assert call_kwargs.kwargs.get("params") == {"env": "prod"}
+
+
+# ---------------------------------------------------------------------------
+# Hook and lookup integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestWeaveHooksIntegration:
+    """Test hook lifecycle in execute_weave."""
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_pre_steps_execute_before_threads(self, mock_exec):
+        """Pre-steps run before threads."""
+        mock_exec.return_value = _make_result("A")
+
+        from weevr.model.hooks import LogMessageStep
+
+        pre = [LogMessageStep(type="log_message", message="starting")]
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        with patch("weevr.engine.runner.run_hook_steps", return_value=[]) as mock_hooks:
+            result = execute_weave(_MOCK_SPARK, plan, threads, pre_steps=pre)
+
+        assert result.status == "success"
+        mock_hooks.assert_called_once()
+        call_args = mock_hooks.call_args
+        assert call_args[0][2] == "pre"  # phase arg
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_post_steps_execute_after_threads(self, mock_exec):
+        """Post-steps run after threads complete."""
+        mock_exec.return_value = _make_result("A")
+
+        from weevr.model.hooks import LogMessageStep
+
+        post = [LogMessageStep(type="log_message", message="done")]
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        with patch("weevr.engine.runner.run_hook_steps", return_value=[]) as mock_hooks:
+            execute_weave(_MOCK_SPARK, plan, threads, post_steps=post)
+
+        mock_hooks.assert_called_once()
+        call_args = mock_hooks.call_args
+        assert call_args[0][2] == "post"
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_pre_abort_skips_threads(self, mock_exec):
+        """HookError from pre-steps prevents thread execution."""
+        from weevr.errors.exceptions import HookError
+        from weevr.model.hooks import QualityGateStep
+
+        pre = [
+            QualityGateStep(
+                type="quality_gate",
+                check="table_exists",
+                source="db.missing",
+            )
+        ]
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        import contextlib
+
+        with (
+            patch(
+                "weevr.engine.runner.run_hook_steps",
+                side_effect=HookError("gate failed"),
+            ),
+            contextlib.suppress(HookError),
+        ):
+            execute_weave(_MOCK_SPARK, plan, threads, pre_steps=pre)
+
+        mock_exec.assert_not_called()
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_no_hooks_backward_compat(self, mock_exec):
+        """execute_weave without hooks works as before."""
+        mock_exec.return_value = _make_result("A")
+        threads = {"A": _make_thread("A")}
+        result = _run_weave(threads)
+        assert result.status == "success"
+
+
+class TestWeaveLookupIntegration:
+    """Test lookup lifecycle in execute_weave."""
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_lookups_materialized(self, mock_mat, mock_exec):
+        """Lookups are materialized before thread execution."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=10)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "ref": Lookup(
+                source=Source(type="delta", alias="db.ref"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+
+        assert result.status == "success"
+        mock_mat.assert_called_once()
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_lookups_cleaned_up(self, mock_mat, mock_cleanup, mock_exec):
+        """Lookups are cleaned up after execution."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "ref": Lookup(
+                source=Source(type="delta", alias="db.ref"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+
+        mock_cleanup.assert_called_once_with({"ref": mock_df})
+
+
+class TestWeaveVariableIntegration:
+    """Test variable context in execute_weave."""
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_variables_initialized(self, mock_exec):
+        """VariableContext is initialized from variable specs."""
+        mock_exec.return_value = _make_result("A")
+
+        from weevr.model.variable import VariableSpec
+
+        variables = {"batch": VariableSpec(type="string", default="B001")}
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        collector = SpanCollector(generate_trace_id())
+
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            collector=collector,
+            variables=variables,
+        )
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.variables == {"batch": "B001"}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from weevr.engine.variables import VariableContext
@@ -204,7 +205,7 @@ def _execute_log_message(
 
 def run_hook_steps(
     spark: SparkSession,
-    steps: list[HookStep],
+    steps: Sequence[HookStep],
     phase: str,
     variable_ctx: VariableContext,
     params: dict[str, Any] | None = None,
