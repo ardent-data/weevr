@@ -6,13 +6,16 @@
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {},
         "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/copilot-cli:1": {},
         "ghcr.io/devcontainers/features/node:1": {},
         "ghcr.io/devcontainers/features/java:1": {
             "version": "17.0.12-tem"
         },
         "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
-        "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
-        "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {}
+        "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},
+        "ghcr.io/ksh5022/devcontainer-features/d2:1": {},
+        "ghcr.io/devcontainers-extra/features/actionlint:1": {},
+        "ghcr.io/devcontainers-extra/features/shellcheck:1": {}
     },
 
     "mounts": [
@@ -24,8 +27,7 @@
         "source=${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
-    // Sync all dev dependencies (including pyspark + delta-spark) on first open.
-    "postCreateCommand": "uv sync --dev",
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | sh && uv sync --dev",
 
     // Keep the venv current on every container start (not just first create).
     "postStartCommand": "uv sync",
