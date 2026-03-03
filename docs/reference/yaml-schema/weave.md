@@ -10,9 +10,13 @@ runtime settings.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
-| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
+| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (local name references). Use `ref` for external file references. |
+| `lookups` | `dict[string, Lookup]` | no | `null` | Named lookup sources shared across threads in this weave |
+| `variables` | `dict[string, VariableSpec]` | no | `null` | Weave-scoped typed variables, settable by hook steps |
+| `pre_steps` | `list[HookStep]` | no | `null` | Hook steps executed before any thread runs |
+| `post_steps` | `list[HookStep]` | no | `null` | Hook steps executed after all threads complete |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) cascaded to threads |
@@ -38,6 +42,163 @@ Each entry in the `threads` list is either a plain string (shorthand) or a
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `when` | `string` | yes | -- | Condition expression. Supports `${param.x}` references, `table_exists()`, `table_empty()`, `row_count()`, and boolean operators. |
+
+---
+
+## lookups
+
+Named lookup data sources shared across threads. Each key is a lookup name
+that threads can reference via `source.lookup` instead of declaring a direct
+source type.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `source` | `Source` | yes | -- | Source definition for the lookup data |
+| `materialize` | `bool` | no | `false` | Pre-read and cache/broadcast the data before thread execution |
+| `strategy` | `string` | no | `"cache"` | Materialization strategy: `"broadcast"` (Spark broadcast join hints) or `"cache"` (DataFrame caching). Only meaningful when `materialize` is true. |
+| `key` | `list[string]` | no | `null` | Column(s) used for matching (join key). When set with `values`, only these columns plus `values` columns are retained. |
+| `values` | `list[string]` | no | `null` | Payload column(s) to retrieve. Requires `key` to be set. Must not overlap with `key`. |
+| `filter` | `string` | no | `null` | SQL WHERE expression applied to the source before projection |
+| `unique_key` | `bool` | no | `false` | Validate that `key` columns form a unique key after filtering and projection |
+| `on_failure` | `string` | no | `"abort"` | Behavior when `unique_key` check finds duplicates: `"abort"` or `"warn"`. Only valid when `unique_key` is true. |
+
+```yaml
+lookups:
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    strategy: cache
+    key: [product_id]
+    values: [product_name, category]
+    unique_key: true
+
+  exchange_rates:
+    source:
+      type: delta
+      alias: ref.exchange_rates
+    filter: "effective_date = current_date()"
+    materialize: true
+    strategy: broadcast
+```
+
+Threads reference lookups via the `lookup` field on a source:
+
+```yaml
+# In a thread's sources block
+sources:
+  products:
+    lookup: dim_product   # resolved from the weave's lookups map
+```
+
+---
+
+## pre_steps / post_steps (HookStep)
+
+Hook steps that run before or after thread execution within a weave.
+`pre_steps` run before any thread starts; `post_steps` run after all
+threads complete.
+
+Each hook step is a discriminated union with three types, identified by
+the `type` field.
+
+### Common fields
+
+All hook step types share these fields:
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `type` | `string` | yes | -- | Step type: `"quality_gate"`, `"sql_statement"`, or `"log_message"` |
+| `name` | `string` | no | `null` | Optional name for telemetry and diagnostics |
+| `on_failure` | `string` | no | phase default | Failure behavior: `"abort"` or `"warn"`. Defaults to `"abort"` for pre_steps and `"warn"` for post_steps. |
+
+### quality_gate
+
+Runs a predefined quality check against a data source or target.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `check` | `string` | yes | -- | Check type: `"source_freshness"`, `"row_count_delta"`, `"row_count"`, `"table_exists"`, `"expression"` |
+| `source` | `string` | conditional | `null` | Table alias. Required for `source_freshness` and `table_exists`. |
+| `max_age` | `string` | conditional | `null` | Duration string (e.g. `"24h"`). Required for `source_freshness`. |
+| `target` | `string` | conditional | `null` | Table alias. Required for `row_count_delta` and `row_count`. |
+| `max_decrease_pct` | `float` | no | `null` | Max allowed decrease percentage for `row_count_delta` |
+| `max_increase_pct` | `float` | no | `null` | Max allowed increase percentage for `row_count_delta` |
+| `min_delta` | `int` | no | `null` | Minimum absolute row change for `row_count_delta` |
+| `max_delta` | `int` | no | `null` | Maximum absolute row change for `row_count_delta` |
+| `min_count` | `int` | conditional | `null` | Minimum row count for `row_count`. At least one of `min_count` or `max_count` required. |
+| `max_count` | `int` | conditional | `null` | Maximum row count for `row_count` |
+| `sql` | `string` | conditional | `null` | Spark SQL boolean expression for `expression` check. Required for `expression`. |
+| `message` | `string` | no | `null` | Failure message for `expression` check diagnostics |
+
+### sql_statement
+
+Executes an arbitrary Spark SQL statement. Optionally captures the scalar
+result into a weave-scoped variable.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `sql` | `string` | yes | -- | Spark SQL statement to execute |
+| `set_var` | `string` | no | `null` | Variable name to capture the scalar result into. The variable must be declared in `variables`. |
+
+### log_message
+
+Emits a log message. Supports `${var.name}` placeholders resolved from
+weave variables.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `message` | `string` | yes | -- | Message template. Supports `${var.name}` placeholders. |
+| `level` | `string` | no | `"info"` | Log level: `"info"`, `"warn"`, `"error"` |
+
+```yaml
+pre_steps:
+  - type: quality_gate
+    name: check_source_freshness
+    check: source_freshness
+    source: raw.orders
+    max_age: "24h"
+
+  - type: sql_statement
+    name: capture_baseline
+    sql: "SELECT count(*) FROM silver.fact_orders"
+    set_var: baseline_count
+
+post_steps:
+  - type: quality_gate
+    name: check_row_count
+    check: row_count
+    target: silver.fact_orders
+    min_count: 1
+
+  - type: log_message
+    message: "Pipeline complete. Baseline was ${var.baseline_count} rows."
+    level: info
+```
+
+---
+
+## variables (VariableSpec)
+
+Typed scalar variables scoped to the weave. Variables can be set by
+`sql_statement` hook steps via `set_var` and referenced in downstream
+config as `${var.name}`.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `type` | `string` | yes | -- | Scalar type: `"string"`, `"int"`, `"long"`, `"float"`, `"double"`, `"boolean"`, `"timestamp"`, `"date"` |
+| `default` | `string\|int\|float\|bool` | no | `null` | Default value used when no hook step sets the variable |
+
+```yaml
+variables:
+  baseline_count:
+    type: int
+    default: 0
+  run_label:
+    type: string
+    default: "scheduled"
+```
 
 ---
 
@@ -71,8 +232,35 @@ Supported patterns: `snake_case`, `camelCase`, `PascalCase`, `UPPER_SNAKE_CASE`,
 ## Complete example
 
 ```yaml
-config_version: "1"
+config_version: "1.0"
 name: sales_pipeline
+
+lookups:
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    strategy: cache
+    key: [product_id]
+    values: [product_name, category]
+    unique_key: true
+
+variables:
+  baseline_count:
+    type: int
+    default: 0
+
+pre_steps:
+  - type: quality_gate
+    name: check_orders_freshness
+    check: source_freshness
+    source: raw.orders
+    max_age: "24h"
+  - type: sql_statement
+    name: capture_baseline
+    sql: "SELECT count(*) FROM curated.order_summary"
+    set_var: baseline_count
 
 threads:
   - ref: staging/load_orders.thread
@@ -83,6 +271,16 @@ threads:
     dependencies: [build_order_summary]
     condition:
       when: "table_exists('curated.order_summary')"
+
+post_steps:
+  - type: quality_gate
+    name: verify_row_count
+    check: row_count
+    target: curated.order_summary
+    min_count: 1
+  - type: log_message
+    message: "Pipeline complete. Baseline was ${var.baseline_count} rows."
+    level: info
 
 defaults:
   write:

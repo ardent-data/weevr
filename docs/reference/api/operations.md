@@ -1,8 +1,8 @@
 # Operations API
 
 The `weevr.operations` module implements the concrete readers, transformation
-steps, and writers that the engine dispatches to. Each pipeline step type maps
-to an operation function.
+steps, writers, and quality gates that the engine dispatches to. Each pipeline
+step type maps to an operation function.
 
 ::: weevr.operations
     options:

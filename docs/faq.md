@@ -84,14 +84,13 @@ explanation.
 
 ## What write modes are supported?
 
-weevr supports four write modes:
+weevr supports three write modes:
 
 | Mode           | Behavior |
 |----------------|----------|
 | `overwrite`    | Replace the entire target table (default) |
 | `append`       | Insert new rows without modifying existing data |
 | `merge`        | Upsert: match on keys, update/insert/delete as configured |
-| `insert_only`  | Insert rows that do not already exist in the target |
 
 Merge mode is the most configurable, with separate controls for
 `on_match`, `on_no_match_target`, and `on_no_match_source` behaviors
@@ -225,27 +224,76 @@ participate in joins as expected.
 
 ## Can I cache lookup tables?
 
-Yes. weevr's `CacheManager` handles caching automatically within a weave
-execution. When the DAG analysis detects that a thread's output feeds
-multiple downstream consumers, it persists the output at
-`MEMORY_AND_DISK` storage level after the producing thread completes.
+Yes. There are two approaches:
 
-You can also force caching on a specific thread:
+**Thread-level auto-caching** — The `CacheManager` analyzes the thread
+dependency DAG within a weave. When it detects that a thread's output
+feeds multiple downstream consumers, it persists the output at
+`MEMORY_AND_DISK` level automatically. You can force caching on a
+specific thread with `cache: true` or disable it with `cache: false`.
+
+**Weave-level lookups** — Define named lookups in the weave's `lookups`
+block. Lookups can be pre-materialized (read once, cached or broadcast
+before threads run) and shared across threads via the `lookup` source
+field:
 
 ```yaml
-cache: true
+# In the weave
+lookups:
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    strategy: cache
+    key: [product_id]
+    values: [product_name, category]
+
+# In a thread's sources
+sources:
+  products:
+    lookup: dim_product
 ```
 
-Or disable auto-caching for a thread whose output is too large to hold
-in memory:
+Narrow lookups (`key`, `values`, `filter`) reduce memory by retaining
+only the columns needed for the join. See
+[Cache a Lookup](how-to/cache-a-lookup.md) for the full guide.
+
+---
+
+## What are execution hooks?
+
+Hooks are steps that run before or after thread execution within a weave.
+Define them with `pre_steps` (run before any thread) and `post_steps`
+(run after all threads complete).
+
+Three hook step types are available:
+
+| Type | Purpose |
+|------|---------|
+| `quality_gate` | Run predefined quality checks (source freshness, row counts, table existence, expressions) |
+| `sql_statement` | Execute arbitrary Spark SQL. Optionally capture a scalar result into a weave variable. |
+| `log_message` | Emit a log message with variable placeholders |
+
+Each step has an `on_failure` policy (`abort` or `warn`). Pre-steps
+default to `abort`; post-steps default to `warn`.
 
 ```yaml
-cache: false
+pre_steps:
+  - type: quality_gate
+    check: source_freshness
+    source: raw.orders
+    max_age: "24h"
+
+post_steps:
+  - type: log_message
+    message: "Pipeline complete."
 ```
 
-Cache failures are non-fatal -- consumers fall back to reading from Delta
-directly. See [Cache a Lookup](how-to/cache-a-lookup.md) for the full
-configuration guide.
+See the [Weave YAML Schema](reference/yaml-schema/weave.md) for the full
+field reference.
+
+---
 
 ---
 
