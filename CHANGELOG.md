@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/ardent-data/weevr/compare/weevr-v1.1.0...weevr-v1.2.0) (2026-03-03)
+
+
+### Features
+
+* **engine:** add narrow lookup projection, filtering, and key validation ([#65](https://github.com/ardent-data/weevr/issues/65)) ([1db7eeb](https://github.com/ardent-data/weevr/commit/1db7eeb8dc4145b720460ab52de1f61b2df9915d))
+* **engine:** expand hash algorithms and add output mode ([#66](https://github.com/ardent-data/weevr/issues/66)) ([311c2a2](https://github.com/ardent-data/weevr/commit/311c2a21d59800a74dc83fc70d01ebfaa898de9a))
+
+
+### Documentation
+
+* **examples:** add M101 lookups and sample data to Fabcon demos ([#63](https://github.com/ardent-data/weevr/issues/63)) ([d86464b](https://github.com/ardent-data/weevr/commit/d86464b529bf6c8de5fcb6d0eb0b4a9d7e44eaeb))
+* **examples:** enhance Fabcon demo configs with narrow lookups and hooks ([#67](https://github.com/ardent-data/weevr/issues/67)) ([2d11bea](https://github.com/ardent-data/weevr/commit/2d11bea90533f1241080366120aef3eb3940ba15))
+
 ## [1.1.0](https://github.com/ardent-data/weevr/compare/weevr-v1.0.6...weevr-v1.1.0) (2026-03-02)
 
 
