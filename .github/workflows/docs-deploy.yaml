@@ -1,0 +1,58 @@
+name: Deploy Docs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "src/weevr/**"
+      - "CONTRIBUTING.md"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-docs:
+    # Skip release-please commits — the release workflow handles those
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      !startsWith(github.event.head_commit.message, 'chore(main): release')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.28"
+          enable-cache: true
+
+      - name: Sync (locked)
+        run: uv sync --locked --dev
+
+      - name: Install D2
+        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
+        env:
+          D2_VERSION: "0.6.9"
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy docs
+        run: |
+          TAG=$(git describe --tags --abbrev=0)
+          VERSION=$(echo "$TAG" | sed -E 's/^(weevr-)?v([0-9]+\.[0-9]+).*/\2/')
+          uv run mike deploy "$VERSION" latest --update-aliases --push
+          uv run mike set-default latest --push
