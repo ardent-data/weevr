@@ -1,6 +1,6 @@
 """Hashing operations — surrogate key generation and change detection."""
 
-from pyspark.sql import DataFrame
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ExecutionError
@@ -91,7 +91,7 @@ def _compute_change_hash(df: DataFrame, config: ChangeDetectionConfig) -> DataFr
     return df.withColumn(config.name, hash_col)
 
 
-def _build_concat_expr(columns: list[str]):  # type: ignore[return]
+def _build_concat_expr(columns: list[str]) -> Column:
     """Build a Spark Column that concatenates the named columns with a separator.
 
     Each column is cast to string and null values are replaced with the sentinel
@@ -101,7 +101,7 @@ def _build_concat_expr(columns: list[str]):  # type: ignore[return]
     return F.concat_ws(_KEY_SEPARATOR, *coerced)
 
 
-def _apply_hash(col_expr, algorithm: str, output: str = "native"):  # type: ignore[return]
+def _apply_hash(col_expr: Column, algorithm: str, output: str = "native") -> Column:
     """Apply the specified hash algorithm to a Column expression.
 
     Note:

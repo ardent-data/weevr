@@ -295,6 +295,28 @@ class TestChangeDetection:
         lengths = {len(r["ch"]) for r in result.collect()}
         assert lengths == {40}
 
+    def test_change_hash_sha384(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="sha384"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert "ch" in result.columns
+        lengths = {len(r["ch"]) for r in result.collect()}
+        assert lengths == {96}
+
+    def test_change_hash_sha512(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="sha512"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert "ch" in result.columns
+        lengths = {len(r["ch"]) for r in result.collect()}
+        assert lengths == {128}
+
     def test_change_hash_crc32(self, people_df) -> None:
         keys = KeyConfig(
             change_detection=ChangeDetectionConfig(name="ch", columns=["dept"], algorithm="crc32")
@@ -302,12 +324,30 @@ class TestChangeDetection:
         result = compute_keys(people_df, keys)
         assert result.schema["ch"].dataType == LongType()
 
+    def test_change_hash_crc32_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["dept"], algorithm="crc32", output="string"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == StringType()
+
     def test_change_hash_murmur3(self, people_df) -> None:
         keys = KeyConfig(
             change_detection=ChangeDetectionConfig(name="ch", columns=["dept"], algorithm="murmur3")
         )
         result = compute_keys(people_df, keys)
         assert result.schema["ch"].dataType == IntegerType()
+
+    def test_change_hash_murmur3_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["dept"], algorithm="murmur3", output="string"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == StringType()
 
 
 class TestComputeKeysCombined:

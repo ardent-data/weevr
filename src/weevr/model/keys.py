@@ -36,7 +36,7 @@ class ChangeDetectionConfig(FrozenBase):
         algorithm: Hash algorithm to use. ``crc32`` has a small 32-bit output
             space with higher collision risk. ``murmur3`` (Spark's ``hash()``)
             may produce different results across Spark major versions. Neither
-            is recommended for high-cardinality surrogate key use cases.
+            is recommended for high-cardinality change detection use cases.
         output: Controls the output type for integer-returning algorithms
             (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's
             return type; ``string`` casts to StringType. Has no practical
