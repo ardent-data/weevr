@@ -32,10 +32,12 @@ WeevError: WeevError {
     ReferenceResolutionError
     InheritanceError
     ModelValidationError
+    LookupResolutionError
   }
   ExecutionError: ExecutionError {
     SparkError
     StateError
+    HookError
   }
   DataValidationError
 }
@@ -322,6 +324,46 @@ result = ctx.run("daily.loom", mode="validate")
 
 ---
 
+### LookupResolutionError
+
+Raised when a thread references a lookup name that is not defined in the
+weave's `lookups` map. This is a fail-fast validation error caught during
+config resolution, before any data is read.
+
+**Common causes:**
+
+- Typo in the `lookup` field of a source definition
+- Thread uses `lookup: foo` but the weave does not declare a `foo` entry
+  in its `lookups` block
+- Thread was moved to a different weave that does not define the lookup
+
+**Resolution:**
+
+1. Check that the lookup name in the thread's source matches a key in the
+   weave's `lookups` block
+2. Verify the thread is referenced by the correct weave
+3. If the lookup was renamed, update all thread references
+
+**Example:**
+
+```yaml
+# Thread source references a lookup
+sources:
+  products:
+    lookup: dim_product   # must exist in the weave's lookups
+
+# Weave must define it
+lookups:
+  dim_product:            # matches the thread's lookup reference
+    source:
+      type: delta
+      alias: silver.dim_product
+```
+
+**Related:** [YAML Schema: Weave](../yaml-schema/weave.md)
+
+---
+
 ### ExecutionError
 
 Base exception for runtime execution failures. Carries optional context:
@@ -404,6 +446,53 @@ target:
 
 **Related:** [Idempotency](../../concepts/idempotency.md),
 [Execution Modes](../../concepts/execution-modes.md)
+
+---
+
+### HookError
+
+Raised when a hook step (in `pre_steps` or `post_steps`) fails and its
+`on_failure` policy is set to `abort`. Carries hook-specific context:
+`hook_name`, `hook_type`, and `phase`.
+
+**Common causes:**
+
+- A `quality_gate` check failed (e.g., source freshness exceeded
+  `max_age`, row count outside bounds, table does not exist)
+- A `sql_statement` hook produced an error
+- An `expression` quality gate evaluated to false
+
+**Resolution:**
+
+1. Check the error message for the hook name and phase (`pre` or `post`)
+2. For quality gate failures, verify the underlying data condition
+   (source freshness, row counts, table existence)
+3. To make the hook non-blocking, set `on_failure: warn` instead of
+   `abort`
+4. For SQL statement errors, test the SQL directly in Spark
+
+**Example:**
+
+```yaml
+pre_steps:
+  # This will raise HookError if the source is older than 24h
+  - type: quality_gate
+    name: check_freshness
+    check: source_freshness
+    source: raw.orders
+    max_age: "24h"
+    on_failure: abort    # raise HookError on failure
+
+  # Change to warn to log the issue without aborting
+  - type: quality_gate
+    name: check_freshness
+    check: source_freshness
+    source: raw.orders
+    max_age: "24h"
+    on_failure: warn     # log warning and continue
+```
+
+**Related:** [YAML Schema: Weave](../yaml-schema/weave.md)
 
 ---
 

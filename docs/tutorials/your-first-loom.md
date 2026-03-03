@@ -151,7 +151,7 @@ from weevr import Context
 # from pyspark.sql import SparkSession
 # spark = SparkSession.builder.master("local[*]").getOrCreate()
 
-ctx = Context(spark, "my-project")
+ctx = Context(spark, "my-project.weevr")
 result = ctx.run("daily.loom")
 
 print(result.status)

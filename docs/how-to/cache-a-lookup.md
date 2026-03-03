@@ -94,6 +94,78 @@ This overrides the engine's auto-cache decision for that specific thread.
 - **Scope:** Caching operates within a single weave execution. Cached
   DataFrames do not persist across weave boundaries or Spark sessions.
 
+## Step 4 -- Use weave-level lookups
+
+For shared reference datasets, weave-level lookups provide more control than
+thread-level caching. Define the lookup in the weave's `lookups` block and
+reference it from thread sources:
+
+```yaml
+# orders.weave
+config_version: "1.0"
+
+lookups:
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    strategy: cache
+
+threads:
+  - ref: facts/fact_orders.thread
+  - ref: facts/fact_returns.thread
+```
+
+```yaml
+# facts/fact_orders.thread — references the lookup
+sources:
+  orders:
+    type: delta
+    alias: raw.orders
+  products:
+    lookup: dim_product   # resolved from the weave's lookups map
+
+steps:
+  - join:
+      source: products
+      type: left
+      on: [product_id]
+```
+
+The lookup is read once before threads start and shared across all threads
+that reference it. Choose `strategy: broadcast` for small datasets that
+benefit from Spark broadcast join hints, or `strategy: cache` (the default)
+for larger datasets.
+
+## Step 5 -- Narrow a lookup for efficiency
+
+When a lookup table has many columns but threads only need a few, use narrow
+lookup fields to reduce memory:
+
+```yaml
+lookups:
+  dim_product:
+    source:
+      type: delta
+      alias: silver.dim_product
+    materialize: true
+    key: [product_id]
+    values: [product_name, category]
+    filter: "is_active = true"
+    unique_key: true
+```
+
+| Field | Purpose |
+|-------|---------|
+| `key` | Join key columns — always retained in the projection |
+| `values` | Payload columns to keep. Only `key` + `values` columns are cached. |
+| `filter` | SQL WHERE expression applied before projection |
+| `unique_key` | Validate that `key` columns are unique after filtering |
+| `on_failure` | Behavior on duplicate keys: `"abort"` (default) or `"warn"` |
+
+`key` and `values` must not overlap. If `values` is set, `key` is required.
+
 ## Verify caching behavior
 
 Use `verbose` or `debug` log level to see cache lifecycle events in the

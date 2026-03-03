@@ -82,31 +82,45 @@ Thread execution is orchestrated at two levels:
 
 **Loom level** (`execute_loom`) — Iterates weaves in declared order. Each weave
 gets its own plan and executor pass. Weave-level conditions are evaluated before
-planning; a false condition skips the entire weave.
+planning; a false condition skips the entire weave. If a weave's status is
+`"failure"`, the loom stops executing further weaves — remaining weaves are
+skipped.
 
-**Weave level** (`execute_weave`) — Processes parallel groups sequentially.
-Within each group, threads are submitted to a `ThreadPoolExecutor` for
-concurrent execution. After each thread completes:
+**Weave level** (`execute_weave`) — Orchestrates the full weave lifecycle:
+
+1. **Pre-steps** — If the weave defines `pre_steps`, hook steps run before
+   any thread executes. Failures with `on_failure: abort` stop the weave.
+2. **Lookup materialization** — Named lookups are pre-read and cached or
+   broadcast according to their `strategy`. Threads reference lookups via
+   `source.lookup` and receive the cached DataFrame.
+3. **Thread execution** — Parallel groups are processed sequentially. Within
+   each group, threads are submitted to a `ThreadPoolExecutor` for concurrent
+   execution.
+4. **Post-steps** — After all threads complete, `post_steps` hook steps run.
+   Failures with `on_failure: abort` mark the weave as failed.
+
+After each thread completes:
 
 - If it is a cache target, the output DataFrame is persisted.
 - Consumer reference counts are decremented; caches are unpersisted when no
   consumers remain.
 - Thread-level telemetry collectors are merged into the weave collector.
 
-**Thread level** (`execute_thread`) — A single thread runs through an 11-step
+**Thread level** (`execute_thread`) — A single thread runs through a 12-step
 pipeline:
 
-1. Read all declared sources (with watermark/CDC filtering if applicable)
-2. Set the primary source as the working DataFrame
-3. Run transform steps sequentially
-4. Evaluate validation rules; quarantine or abort on failures
-5. Apply column naming normalization
+1. Resolve lookup-based sources from cached or on-demand DataFrames
+2. Read all remaining declared sources (with watermark/CDC filtering if applicable)
+3. Set the primary (first) source as the working DataFrame
+4. Run pipeline steps against the working DataFrame
+5. Evaluate validation rules; quarantine or abort on failures
 6. Compute business keys and change detection hashes
-7. Apply target column mapping
-8. Write to the Delta target (standard write or CDC merge routing)
-9. Persist watermark or CDC state
-10. Run post-write assertions
-11. Build telemetry and return `ThreadResult`
+7. Resolve the target write path
+8. Apply target column mapping
+9. Write to the Delta target (standard write or CDC merge routing)
+10. Persist watermark or CDC state
+11. Run post-write assertions
+12. Build telemetry and return `ThreadResult`
 
 ### Failure handling
 
@@ -124,8 +138,8 @@ Transitive dependents are computed via BFS over the reverse dependency graph.
 
 The `CacheManager` uses reference counting to manage in-memory DataFrames:
 
-1. When a cache-target thread completes, its output is read from Delta and
-   persisted at `MEMORY_AND_DISK` level.
+1. When a cache-target thread completes, its output DataFrame is persisted
+   directly at `MEMORY_AND_DISK` level (no re-read from Delta).
 2. Each downstream consumer calls `notify_complete()` after finishing, which
    decrements the consumer count.
 3. When the count reaches zero, the cached DataFrame is automatically
@@ -146,6 +160,9 @@ without the cache optimization.
 | `engine/result.py` | Immutable result models: `ThreadResult`, `WeaveResult`, `LoomResult` |
 | `engine/cache_manager.py` | Reference-counted DataFrame caching |
 | `engine/conditions.py` | Condition evaluation: parameter resolution, built-in functions, boolean parsing |
+| `engine/hooks.py` | Pre/post hook step execution: quality gates, SQL statements, log messages |
+| `engine/lookups.py` | Lookup materialization: pre-read, narrow projection, caching/broadcast |
+| `engine/variables.py` | Weave-scoped variable binding and resolution |
 
 ## Design decisions
 

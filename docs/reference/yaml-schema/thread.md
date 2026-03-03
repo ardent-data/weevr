@@ -36,7 +36,8 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `type` | `string` | yes | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"` |
+| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`. Required when `lookup` is not set. |
+| `lookup` | `string` | conditional | `null` | Weave-level lookup name. Mutually exclusive with `type`. When set, the source is resolved from the weave's `lookups` map at execution time. |
 | `alias` | `string` | no | `null` | Lakehouse table alias. Required when `type` is `"delta"`. |
 | `path` | `string` | no | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
@@ -63,6 +64,8 @@ sources:
     options:
       header: "true"
       delimiter: ","
+  products:
+    lookup: dim_product   # resolved from the weave's lookups map
 ```
 
 ---
@@ -502,7 +505,14 @@ Key management for business keys, surrogate keys, and change detection hashes.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `name` | `string` | yes | -- | Output column name for the surrogate key |
-| `algorithm` | `string` | no | `"sha256"` | Hash algorithm: `"sha256"` or `"md5"` |
+| `algorithm` | `string` | no | `"sha256"` | Hash algorithm: `"xxhash64"`, `"sha1"`, `"sha256"`, `"sha384"`, `"sha512"`, `"md5"`, `"crc32"`, `"murmur3"` |
+| `output` | `string` | no | `"native"` | Output type for integer-returning algorithms (xxhash64, crc32, murmur3). `"native"` preserves the algorithm's return type; `"string"` casts to StringType. Has no effect on sha*/md5. |
+
+!!! note "Algorithm choice"
+    `crc32` has a small 32-bit output space with higher collision risk.
+    `murmur3` (Spark's `hash()`) may produce different results across
+    Spark major versions. Neither is recommended for high-cardinality
+    surrogate key use cases.
 
 ### keys.change_detection
 
@@ -510,7 +520,8 @@ Key management for business keys, surrogate keys, and change detection hashes.
 |-----|------|----------|---------|-------------|
 | `name` | `string` | yes | -- | Output column name for the change hash |
 | `columns` | `list[string]` | yes | -- | Columns included in the hash |
-| `algorithm` | `string` | no | `"md5"` | Hash algorithm: `"md5"` or `"sha256"` |
+| `algorithm` | `string` | no | `"md5"` | Hash algorithm: `"xxhash64"`, `"sha1"`, `"sha256"`, `"sha384"`, `"sha512"`, `"md5"`, `"crc32"`, `"murmur3"` |
+| `output` | `string` | no | `"native"` | Output type for integer-returning algorithms. `"native"` preserves the algorithm's return type; `"string"` casts to StringType. |
 
 ```yaml
 keys:

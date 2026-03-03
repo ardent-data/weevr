@@ -14,7 +14,7 @@ data_flow: Data Flow {
     shape: class
     config_version: str
     sources: "dict[str, Source]"
-    pipeline_steps: "list[Step]"
+    step_list: "list[Step]"
     target: Target
   }
   Source: Source {
@@ -22,6 +22,7 @@ data_flow: Data Flow {
     type: str
     alias: str
     path: str
+    lookup: str
   }
   Target: Target {
     shape: class
@@ -32,6 +33,24 @@ data_flow: Data Flow {
 
   Thread -> Source: "1..*" {style.stroke: "#1976D2"}
   Thread -> Target: "1..1" {style.stroke: "#1976D2"}
+}
+
+orchestration: Orchestration {
+  Weave: Weave {
+    shape: class
+    threads: "list[ThreadEntry]"
+    lookups: "dict[str, Lookup]"
+    pre_steps: "list[HookStep]"
+    post_steps: "list[HookStep]"
+    variables: "dict[str, VariableSpec]"
+  }
+  Loom: Loom {
+    shape: class
+    weaves: "list[WeaveEntry]"
+    defaults: dict
+  }
+  Loom -> Weave: "1..*" {style.stroke: "#7B1FA2"}
+  Weave -> data_flow.Thread: "1..*" {style.stroke: "#7B1FA2"}
 }
 
 behavior: Behavior {
@@ -99,11 +118,14 @@ The top-level configuration unit for a single data pipeline.
 
 ## Source
 
-A data source declaration referenced by alias within a thread.
+A data source declaration referenced by alias within a thread. A source
+is either a direct data reference (with `type`) or a lookup reference
+(with `lookup`). These are mutually exclusive.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | `str` | *required* | Source type: `delta`, `csv`, `json`, `parquet`, `excel` |
+| `type` | `str` | conditional | Source type: `delta`, `csv`, `json`, `parquet`, `excel`. Required when `lookup` is not set. |
+| `lookup` | `str` | `None` | Weave-level lookup name. Mutually exclusive with `type`. |
 | `alias` | `str` | `None` | Table alias (required for `delta`) |
 | `path` | `str` | `None` | File path (required for file-based types) |
 | `options` | `dict[str, Any]` | `{}` | Spark reader options |
@@ -207,7 +229,8 @@ Business key, surrogate key, and change detection settings.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `name` | `str` | *required* | Output column name |
-| `algorithm` | `"sha256" \| "md5"` | `"sha256"` | Hash algorithm |
+| `algorithm` | `"xxhash64" \| "sha1" \| "sha256" \| "sha384" \| "sha512" \| "md5" \| "crc32" \| "murmur3"` | `"sha256"` | Hash algorithm |
+| `output` | `"native" \| "string"` | `"native"` | Output type for integer-returning algorithms (xxhash64, crc32, murmur3). `native` preserves the return type; `string` casts to StringType. |
 
 ### ChangeDetectionConfig
 
@@ -215,7 +238,8 @@ Business key, surrogate key, and change detection settings.
 |-------|------|---------|-------------|
 | `name` | `str` | *required* | Output column name |
 | `columns` | `list[str]` | *required* | Columns included in the hash |
-| `algorithm` | `"md5" \| "sha256"` | `"md5"` | Hash algorithm |
+| `algorithm` | `"xxhash64" \| "sha1" \| "sha256" \| "sha384" \| "sha512" \| "md5" \| "crc32" \| "murmur3"` | `"md5"` | Hash algorithm |
+| `output` | `"native" \| "string"` | `"native"` | Output type for integer-returning algorithms. `native` preserves the return type; `string` casts to StringType. |
 
 ---
 
@@ -294,3 +318,138 @@ Column and table naming normalization. Cascades through loom/weave/thread/target
 Supported `NamingPattern` values: `snake_case`, `camelCase`, `PascalCase`,
 `UPPER_SNAKE_CASE`, `Title_Snake_Case`, `Title Case`, `lowercase`, `UPPERCASE`,
 `none`.
+
+---
+
+## Weave
+
+A collection of threads with shared lookups, hooks, and defaults.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `config_version` | `str` | *required* | Schema version identifier |
+| `name` | `str` | `""` | Weave name |
+| `threads` | `list[ThreadEntry]` | *required* | Thread references |
+| `lookups` | `dict[str, Lookup]` | `None` | Named lookup sources shared across threads |
+| `variables` | `dict[str, VariableSpec]` | `None` | Weave-scoped typed variables |
+| `pre_steps` | `list[HookStep]` | `None` | Hook steps run before threads |
+| `post_steps` | `list[HookStep]` | `None` | Hook steps run after threads |
+| `defaults` | `dict[str, Any]` | `None` | Default values cascaded to threads |
+| `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
+| `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded to threads |
+| `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
+
+### ThreadEntry
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | `""` | Thread name (required for inline definitions) |
+| `ref` | `str` | `None` | Path to an external `.thread` file |
+| `dependencies` | `list[str]` | `None` | Explicit upstream thread names |
+| `condition` | `ConditionSpec` | `None` | Conditional execution gate |
+
+### ConditionSpec
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `when` | `str` | *required* | Condition expression. Supports `${param.x}` references, `table_exists()`, `table_empty()`, `row_count()`, and boolean operators. |
+
+---
+
+## Loom
+
+Deployment unit grouping one or more weaves.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `config_version` | `str` | *required* | Schema version identifier |
+| `name` | `str` | `""` | Loom name |
+| `weaves` | `list[WeaveEntry]` | *required* | Weave references |
+| `defaults` | `dict[str, Any]` | `None` | Default values cascaded to weaves and threads |
+| `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
+| `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded down |
+| `naming` | `NamingConfig` | `None` | Naming normalization cascaded down |
+
+### WeaveEntry
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | `""` | Weave name (required for inline definitions) |
+| `ref` | `str` | `None` | Path to an external `.weave` file |
+| `condition` | `ConditionSpec` | `None` | Conditional execution gate |
+
+---
+
+## Lookup
+
+A weave-level named data definition referenced by threads via `source.lookup`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `source` | `Source` | *required* | Source definition for the lookup data |
+| `materialize` | `bool` | `False` | Pre-read and cache/broadcast before thread execution |
+| `strategy` | `"broadcast" \| "cache"` | `"cache"` | Materialization strategy |
+| `key` | `list[str]` | `None` | Join key columns for narrow projection |
+| `values` | `list[str]` | `None` | Payload columns to retain (requires `key`) |
+| `filter` | `str` | `None` | SQL WHERE expression applied before projection |
+| `unique_key` | `bool` | `False` | Validate key uniqueness after filtering |
+| `on_failure` | `"abort" \| "warn"` | `"abort"` | Behavior on duplicate keys (only valid when `unique_key` is true) |
+
+---
+
+## HookStep
+
+Discriminated union of hook step types, dispatched on the `type` field.
+Used in weave `pre_steps` and `post_steps`.
+
+### QualityGateStep
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `"quality_gate"` | *required* | Step type discriminator |
+| `name` | `str` | `None` | Step name for telemetry |
+| `on_failure` | `"abort" \| "warn"` | phase default | Failure behavior |
+| `check` | `str` | *required* | Check type: `source_freshness`, `row_count_delta`, `row_count`, `table_exists`, `expression` |
+| `source` | `str` | `None` | Table alias (for `source_freshness`, `table_exists`) |
+| `max_age` | `str` | `None` | Duration string (for `source_freshness`) |
+| `target` | `str` | `None` | Table alias (for `row_count_delta`, `row_count`) |
+| `max_decrease_pct` | `float` | `None` | Max decrease % (for `row_count_delta`) |
+| `max_increase_pct` | `float` | `None` | Max increase % (for `row_count_delta`) |
+| `min_delta` | `int` | `None` | Min absolute row change (for `row_count_delta`) |
+| `max_delta` | `int` | `None` | Max absolute row change (for `row_count_delta`) |
+| `min_count` | `int` | `None` | Min row count (for `row_count`) |
+| `max_count` | `int` | `None` | Max row count (for `row_count`) |
+| `sql` | `str` | `None` | SQL expression (for `expression`) |
+| `message` | `str` | `None` | Failure message (for `expression`) |
+
+### SqlStatementStep
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `"sql_statement"` | *required* | Step type discriminator |
+| `name` | `str` | `None` | Step name for telemetry |
+| `on_failure` | `"abort" \| "warn"` | phase default | Failure behavior |
+| `sql` | `str` | *required* | Spark SQL statement to execute |
+| `set_var` | `str` | `None` | Variable name to capture scalar result into |
+
+### LogMessageStep
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `"log_message"` | *required* | Step type discriminator |
+| `name` | `str` | `None` | Step name for telemetry |
+| `on_failure` | `"abort" \| "warn"` | phase default | Failure behavior |
+| `message` | `str` | *required* | Message template (supports `${var.name}`) |
+| `level` | `"info" \| "warn" \| "error"` | `"info"` | Log level |
+
+---
+
+## VariableSpec
+
+Weave-scoped variable declaration. Set by hook steps via `set_var`,
+referenced as `${var.name}` in config expressions.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `str` | *required* | Scalar type: `string`, `int`, `long`, `float`, `double`, `boolean`, `timestamp`, `date` |
+| `default` | `str \| int \| float \| bool` | `None` | Default value when no hook sets the variable |

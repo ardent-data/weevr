@@ -6,10 +6,11 @@ that parses, validates, resolves, inherits, and hydrates configuration.
 
 ## Introduction
 
-A single call to `load_config()` drives the entire pipeline. The stages are
-designed to fail fast — syntax errors are caught before variable resolution,
-schema errors before reference loading, and semantic constraints after all
-values are concrete.
+When you call `Context.run()` or `Context.load()`, weevr runs the full
+config resolution pipeline internally. The stages are designed to fail
+fast — syntax errors are caught before variable resolution, schema errors
+before reference loading, and semantic constraints after all values are
+concrete.
 
 ## Key concepts
 
