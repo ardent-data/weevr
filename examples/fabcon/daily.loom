@@ -25,6 +25,8 @@ defaults:
     mode: overwrite
   execution:
     log_level: standard
+  naming:
+    columns: snake_case
 
 # Typed parameters — swap for dev/staging/prod
 params:

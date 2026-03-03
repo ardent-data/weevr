@@ -1,0 +1,5 @@
+transaction_id,customer_id,product_id,amount,currency,transaction_ts
+TXN-1022,3,113,299.99,USD,2026-03-01 09:15:00
+TXN-1023,1,114,59.99,USD,2026-03-05 14:30:22
+TXN-1024,7,101,34.99,EUR,2026-03-10 10:45:00
+TXN-1025,5,107,39.95,USD,2026-03-15 16:20:11

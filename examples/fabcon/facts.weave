@@ -2,6 +2,7 @@
 #
 # Builds the orders fact table by joining raw orders with dimension
 # tables. Should run after the dimensions weave completes.
+# Uses narrow lookups to project only surrogate keys from dimensions.
 # Referenced by: daily.loom (Demo 5)
 
 config_version: "1.0"
@@ -14,12 +15,20 @@ lookups:
       alias: silver.dim_customer
     materialize: true
     strategy: broadcast
+    key: [customer_id]
+    values: [customer_sk]
+    unique_key: true
+    on_failure: warn
   dim_product:
     source:
       type: delta
       alias: silver.dim_product
     materialize: true
     strategy: broadcast
+    key: [product_id]
+    values: [product_sk]
+    unique_key: true
+    on_failure: warn
 
 threads:
   - name: fact_orders

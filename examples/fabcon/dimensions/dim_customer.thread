@@ -1,7 +1,8 @@
 # Pipeline — Customer Dimension
 #
 # Reads staged customers and merges into the silver dimension table.
-# Generates a surrogate key from the business key.
+# Generates an xxhash64 surrogate key (customer_sk) and a change
+# detection hash (row_hash) for tracking attribute changes.
 # Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
 
 config_version: "1.0"
@@ -30,7 +31,11 @@ keys:
     - customer_id
   surrogate_key:
     name: customer_sk
-    algorithm: sha256
+    algorithm: xxhash64
+  change_detection:
+    name: row_hash
+    columns: [first_name, last_name, full_name, email]
+    algorithm: xxhash64
 
 write:
   mode: merge

@@ -4,6 +4,12 @@
 # execute in parallel; dependent threads wait for their upstream to
 # complete. The engine infers execution groups automatically.
 #
+# Features demonstrated:
+#   - Narrow lookups: project only surrogate keys from dimensions
+#   - Variables: weave-scoped batch_ts set by a pre-step hook
+#   - Pre-steps: quality gate (table_exists) and SQL statement (capture timestamp)
+#   - Post-steps: row count check and log message with variable interpolation
+#
 # Execution plan:
 #   Group 1: [stg_customers, stg_products]     <- parallel
 #   Group 2: [dim_customer, dim_product]        <- parallel
@@ -41,12 +47,46 @@ lookups:
       alias: silver.dim_customer
     materialize: true
     strategy: broadcast
+    key: [customer_id]
+    values: [customer_sk]
+    unique_key: true
+    on_failure: warn
   dim_product:
     source:
       type: delta
       alias: silver.dim_product
     materialize: true
     strategy: broadcast
+    key: [product_id]
+    values: [product_sk]
+    unique_key: true
+    on_failure: warn
+
+variables:
+  batch_ts:
+    type: timestamp
+
+pre_steps:
+  - type: quality_gate
+    name: check_source_exists
+    check: table_exists
+    source: raw.orders
+  - type: sql_statement
+    name: capture_batch_ts
+    sql: "SELECT current_timestamp()"
+    set_var: batch_ts
+
+post_steps:
+  - type: quality_gate
+    name: check_fact_rows
+    check: row_count
+    target: silver.fact_orders
+    min_count: 1
+    on_failure: warn
+  - type: log_message
+    name: pipeline_complete
+    message: "Pipeline completed at ${var.batch_ts}"
+    level: info
 
 execution:
   log_level: verbose

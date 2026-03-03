@@ -1,6 +1,7 @@
 # Pipeline — Product Dimension
 #
 # Reads staged products and merges into the silver dimension table.
+# Generates an xxhash64 surrogate key (product_sk) from the business key.
 # Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
 
 config_version: "1.0"
@@ -26,6 +27,9 @@ target:
 keys:
   business_key:
     - product_id
+  surrogate_key:
+    name: product_sk
+    algorithm: xxhash64
 
 write:
   mode: merge
