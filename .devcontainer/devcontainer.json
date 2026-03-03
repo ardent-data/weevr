@@ -13,7 +13,9 @@
         },
         "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
         "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},
-        "ghcr.io/ksh5022/devcontainer-features/d2:1": {},
+        "ghcr.io/ksh5022/devcontainer-features/d2:1": {
+            "version": "0.7.1"
+        },
         "ghcr.io/devcontainers-extra/features/actionlint:1": {},
         "ghcr.io/devcontainers-extra/features/shellcheck:1": {}
     },
