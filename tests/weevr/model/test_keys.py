@@ -20,10 +20,25 @@ class TestSurrogateKeyConfig:
         s = SurrogateKeyConfig(name="sk_id", algorithm="md5")
         assert s.algorithm == "md5"
 
+    def test_xxhash64_algorithm(self):
+        """SurrogateKeyConfig accepts xxhash64 algorithm."""
+        s = SurrogateKeyConfig(name="sk_id", algorithm="xxhash64")
+        assert s.algorithm == "xxhash64"
+
+    def test_output_default_native(self):
+        """SurrogateKeyConfig defaults output to native."""
+        s = SurrogateKeyConfig(name="sk_id")
+        assert s.output == "native"
+
+    def test_output_string(self):
+        """SurrogateKeyConfig accepts string output."""
+        s = SurrogateKeyConfig(name="sk_id", algorithm="xxhash64", output="string")
+        assert s.output == "string"
+
     def test_invalid_algorithm_raises(self):
         """Unknown algorithm raises ValidationError."""
         with pytest.raises(ValidationError):
-            SurrogateKeyConfig(name="sk", algorithm="sha512")  # type: ignore[arg-type]
+            SurrogateKeyConfig(name="sk", algorithm="blake2")  # type: ignore[arg-type]
 
     def test_frozen(self):
         """SurrogateKeyConfig is immutable."""
