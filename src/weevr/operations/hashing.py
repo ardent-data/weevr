@@ -1,6 +1,6 @@
 """Hashing operations — surrogate key generation and change detection."""
 
-from pyspark.sql import DataFrame
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ExecutionError
@@ -68,7 +68,7 @@ def _compute_surrogate_key(
         DataFrame with the surrogate key column appended.
     """
     concat_expr = _build_concat_expr(business_key_columns)
-    hash_col = _apply_hash(concat_expr, config.algorithm)
+    hash_col = _apply_hash(concat_expr, config.algorithm, config.output)
     return df.withColumn(config.name, hash_col)
 
 
@@ -87,11 +87,11 @@ def _compute_change_hash(df: DataFrame, config: ChangeDetectionConfig) -> DataFr
         DataFrame with the change detection hash column appended.
     """
     concat_expr = _build_concat_expr(config.columns)
-    hash_col = _apply_hash(concat_expr, config.algorithm)
+    hash_col = _apply_hash(concat_expr, config.algorithm, config.output)
     return df.withColumn(config.name, hash_col)
 
 
-def _build_concat_expr(columns: list[str]):  # type: ignore[return]
+def _build_concat_expr(columns: list[str]) -> Column:
     """Build a Spark Column that concatenates the named columns with a separator.
 
     Each column is cast to string and null values are replaced with the sentinel
@@ -101,10 +101,34 @@ def _build_concat_expr(columns: list[str]):  # type: ignore[return]
     return F.concat_ws(_KEY_SEPARATOR, *coerced)
 
 
-def _apply_hash(col_expr, algorithm: str):  # type: ignore[return]
-    """Apply the specified hash algorithm to a Column expression."""
-    if algorithm == "sha256":
-        return F.sha2(col_expr, 256)
-    if algorithm == "md5":
-        return F.md5(col_expr)
-    raise ExecutionError(f"Unsupported hash algorithm: '{algorithm}'")
+def _apply_hash(col_expr: Column, algorithm: str, output: str = "native") -> Column:
+    """Apply the specified hash algorithm to a Column expression.
+
+    Note:
+        ``crc32`` has a 32-bit output space with higher collision risk.
+        ``murmur3`` (Spark's ``hash()``) may vary across Spark major versions.
+        Neither is recommended for high-cardinality surrogate keys.
+    """
+    if algorithm == "xxhash64":
+        result = F.xxhash64(col_expr)
+    elif algorithm == "sha1":
+        result = F.sha1(col_expr)
+    elif algorithm == "sha256":
+        result = F.sha2(col_expr, 256)
+    elif algorithm == "sha384":
+        result = F.sha2(col_expr, 384)
+    elif algorithm == "sha512":
+        result = F.sha2(col_expr, 512)
+    elif algorithm == "md5":
+        result = F.md5(col_expr)
+    elif algorithm == "crc32":
+        result = F.crc32(col_expr)
+    elif algorithm == "murmur3":
+        result = F.hash(col_expr)
+    else:
+        raise ExecutionError(f"Unsupported hash algorithm: '{algorithm}'")
+
+    if output == "string":
+        result = result.cast("string")
+
+    return result

@@ -2,7 +2,7 @@
 
 import pytest
 from pyspark.sql import SparkSession
-from pyspark.sql.types import LongType, StringType, StructField, StructType
+from pyspark.sql.types import IntegerType, LongType, StringType, StructField, StructType
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
@@ -115,6 +115,87 @@ class TestSurrogateKey:
         # Hash must be non-null
         assert None not in hashes
 
+    def test_surrogate_key_xxhash64_added(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="xxhash64"),
+        )
+        result = compute_keys(people_df, keys)
+        assert "sk" in result.columns
+        assert result.schema["sk"].dataType == LongType()
+
+    def test_surrogate_key_xxhash64_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="xxhash64", output="string"),
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["sk"].dataType == StringType()
+
+    def test_surrogate_key_sha1_added(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="sha1"),
+        )
+        result = compute_keys(people_df, keys)
+        assert "sk" in result.columns
+        lengths = {len(r["sk"]) for r in result.collect()}
+        assert lengths == {40}  # SHA-1 hex digest is 40 chars
+
+    def test_surrogate_key_sha384_added(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="sha384"),
+        )
+        result = compute_keys(people_df, keys)
+        assert "sk" in result.columns
+        lengths = {len(r["sk"]) for r in result.collect()}
+        assert lengths == {96}  # SHA-384 hex digest is 96 chars
+
+    def test_surrogate_key_sha512_added(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="sha512"),
+        )
+        result = compute_keys(people_df, keys)
+        assert "sk" in result.columns
+        lengths = {len(r["sk"]) for r in result.collect()}
+        assert lengths == {128}  # SHA-512 hex digest is 128 chars
+
+    def test_surrogate_key_crc32_added(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="crc32"),
+        )
+        result = compute_keys(people_df, keys)
+        assert "sk" in result.columns
+        assert result.schema["sk"].dataType == LongType()
+
+    def test_surrogate_key_crc32_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="crc32", output="string"),
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["sk"].dataType == StringType()
+
+    def test_surrogate_key_murmur3_added(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="murmur3"),
+        )
+        result = compute_keys(people_df, keys)
+        assert "sk" in result.columns
+        assert result.schema["sk"].dataType == IntegerType()
+
+    def test_surrogate_key_murmur3_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="murmur3", output="string"),
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["sk"].dataType == StringType()
+
 
 class TestChangeDetection:
     """Tests for change detection hash via compute_keys."""
@@ -184,6 +265,90 @@ class TestChangeDetection:
         assert dept_hashes["eng"] == dept_hashes["eng"]
         assert dept_hashes["eng"] != dept_hashes["ops"]
 
+    def test_change_hash_xxhash64(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="xxhash64"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert "ch" in result.columns
+        assert result.schema["ch"].dataType == LongType()
+
+    def test_change_hash_xxhash64_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="xxhash64", output="string"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == StringType()
+
+    def test_change_hash_sha1(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="sha1"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert "ch" in result.columns
+        lengths = {len(r["ch"]) for r in result.collect()}
+        assert lengths == {40}
+
+    def test_change_hash_sha384(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="sha384"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert "ch" in result.columns
+        lengths = {len(r["ch"]) for r in result.collect()}
+        assert lengths == {96}
+
+    def test_change_hash_sha512(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["first", "dept"], algorithm="sha512"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert "ch" in result.columns
+        lengths = {len(r["ch"]) for r in result.collect()}
+        assert lengths == {128}
+
+    def test_change_hash_crc32(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(name="ch", columns=["dept"], algorithm="crc32")
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == LongType()
+
+    def test_change_hash_crc32_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["dept"], algorithm="crc32", output="string"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == StringType()
+
+    def test_change_hash_murmur3(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(name="ch", columns=["dept"], algorithm="murmur3")
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == IntegerType()
+
+    def test_change_hash_murmur3_string_output(self, people_df) -> None:
+        keys = KeyConfig(
+            change_detection=ChangeDetectionConfig(
+                name="ch", columns=["dept"], algorithm="murmur3", output="string"
+            )
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["ch"].dataType == StringType()
+
 
 class TestComputeKeysCombined:
     """Tests for combined key configs."""
@@ -218,3 +383,14 @@ class TestComputeKeysCombined:
             compute_keys(people_df, keys)
         assert "missing_a" in str(exc_info.value)
         assert "missing_b" in str(exc_info.value)
+
+    def test_xxhash64_surrogate_with_md5_change_detection(self, people_df) -> None:
+        keys = KeyConfig(
+            business_key=["first", "last"],
+            surrogate_key=SurrogateKeyConfig(name="sk", algorithm="xxhash64"),
+            change_detection=ChangeDetectionConfig(name="ch", columns=["dept"], algorithm="md5"),
+        )
+        result = compute_keys(people_df, keys)
+        assert result.schema["sk"].dataType == LongType()
+        assert result.schema["ch"].dataType == StringType()
+        assert result.count() == 3

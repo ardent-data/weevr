@@ -20,10 +20,25 @@ class TestSurrogateKeyConfig:
         s = SurrogateKeyConfig(name="sk_id", algorithm="md5")
         assert s.algorithm == "md5"
 
+    def test_xxhash64_algorithm(self):
+        """SurrogateKeyConfig accepts xxhash64 algorithm."""
+        s = SurrogateKeyConfig(name="sk_id", algorithm="xxhash64")
+        assert s.algorithm == "xxhash64"
+
+    def test_output_default_native(self):
+        """SurrogateKeyConfig defaults output to native."""
+        s = SurrogateKeyConfig(name="sk_id")
+        assert s.output == "native"
+
+    def test_output_string(self):
+        """SurrogateKeyConfig accepts string output."""
+        s = SurrogateKeyConfig(name="sk_id", algorithm="xxhash64", output="string")
+        assert s.output == "string"
+
     def test_invalid_algorithm_raises(self):
         """Unknown algorithm raises ValidationError."""
         with pytest.raises(ValidationError):
-            SurrogateKeyConfig(name="sk", algorithm="sha512")  # type: ignore[arg-type]
+            SurrogateKeyConfig(name="sk", algorithm="blake2")  # type: ignore[arg-type]
 
     def test_frozen(self):
         """SurrogateKeyConfig is immutable."""
@@ -51,6 +66,26 @@ class TestChangeDetectionConfig:
         """ChangeDetectionConfig accepts sha256."""
         c = ChangeDetectionConfig(name="h", columns=["x"], algorithm="sha256")
         assert c.algorithm == "sha256"
+
+    def test_xxhash64_algorithm(self):
+        """ChangeDetectionConfig accepts xxhash64 algorithm."""
+        c = ChangeDetectionConfig(name="h", columns=["x"], algorithm="xxhash64")
+        assert c.algorithm == "xxhash64"
+
+    def test_output_default_native(self):
+        """ChangeDetectionConfig defaults output to native."""
+        c = ChangeDetectionConfig(name="h", columns=["x"])
+        assert c.output == "native"
+
+    def test_output_string(self):
+        """ChangeDetectionConfig accepts string output."""
+        c = ChangeDetectionConfig(name="h", columns=["x"], algorithm="xxhash64", output="string")
+        assert c.output == "string"
+
+    def test_invalid_algorithm_raises(self):
+        """Unknown algorithm raises ValidationError."""
+        with pytest.raises(ValidationError):
+            ChangeDetectionConfig(name="h", columns=["x"], algorithm="blake2")  # type: ignore[arg-type]
 
     def test_frozen(self):
         """ChangeDetectionConfig is immutable."""
