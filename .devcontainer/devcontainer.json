@@ -29,7 +29,7 @@
         "source=${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | sh && uv sync --dev",
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | bash && uv sync --dev",
 
     // Keep the venv current on every container start (not just first create).
     "postStartCommand": "uv sync",
