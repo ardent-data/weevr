@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../release-notes/1.0/" class="md-tabs__link">
+        <a href="../release-notes/1.2/" class="md-tabs__link">
           
   
   
@@ -1925,6 +1925,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-are-execution-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What are execution hooks?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-do-i-validate-my-config-without-running-a-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2021,6 +2032,62 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -2227,6 +2294,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-are-execution-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What are execution hooks?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-do-i-validate-my-config-without-running-a-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2317,7 +2395,7 @@ anything the weave set. Scalar values are replaced outright; collections
 explanation.</p>
 <hr />
 <h2 id="what-write-modes-are-supported">What write modes are supported?<a class="headerlink" href="#what-write-modes-are-supported" title="Permanent link">&para;</a></h2>
-<p>weevr supports four write modes:</p>
+<p>weevr supports three write modes:</p>
 <table>
 <thead>
 <tr>
@@ -2337,10 +2415,6 @@ explanation.</p>
 <tr>
 <td><code>merge</code></td>
 <td>Upsert: match on keys, update/insert/delete as configured</td>
-</tr>
-<tr>
-<td><code>insert_only</code></td>
-<td>Insert rows that do not already exist in the target</td>
 </tr>
 </tbody>
 </table>
@@ -2434,20 +2508,78 @@ before the join and restored afterward. This ensures rows with null keys
 participate in joins as expected.</p>
 <hr />
 <h2 id="can-i-cache-lookup-tables">Can I cache lookup tables?<a class="headerlink" href="#can-i-cache-lookup-tables" title="Permanent link">&para;</a></h2>
-<p>Yes. weevr's <code>CacheManager</code> handles caching automatically within a weave
-execution. When the DAG analysis detects that a thread's output feeds
-multiple downstream consumers, it persists the output at
-<code>MEMORY_AND_DISK</code> storage level after the producing thread completes.</p>
-<p>You can also force caching on a specific thread:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">cache</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<p>Yes. There are two approaches:</p>
+<p><strong>Thread-level auto-caching</strong> — The <code>CacheManager</code> analyzes the thread
+dependency DAG within a weave. When it detects that a thread's output
+feeds multiple downstream consumers, it persists the output at
+<code>MEMORY_AND_DISK</code> level automatically. You can force caching on a
+specific thread with <code>cache: true</code> or disable it with <code>cache: false</code>.</p>
+<p><strong>Weave-level lookups</strong> — Define named lookups in the weave's <code>lookups</code>
+block. Lookups can be pre-materialized (read once, cached or broadcast
+before threads run) and shared across threads via the <code>lookup</code> source
+field:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># In the weave</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">lookups</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">dim_product</span><span class="p">:</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">silver.dim_product</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="nt">materialize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cache</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">product_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">values</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">product_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">category</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="c1"># In a thread&#39;s sources</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span>
 </code></pre></div>
-<p>Or disable auto-caching for a thread whose output is too large to hold
-in memory:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">cache</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<p>Narrow lookups (<code>key</code>, <code>values</code>, <code>filter</code>) reduce memory by retaining
+only the columns needed for the join. See
+<a href="../how-to/cache-a-lookup/">Cache a Lookup</a> for the full guide.</p>
+<hr />
+<h2 id="what-are-execution-hooks">What are execution hooks?<a class="headerlink" href="#what-are-execution-hooks" title="Permanent link">&para;</a></h2>
+<p>Hooks are steps that run before or after thread execution within a weave.
+Define them with <code>pre_steps</code> (run before any thread) and <code>post_steps</code>
+(run after all threads complete).</p>
+<p>Three hook step types are available:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quality_gate</code></td>
+<td>Run predefined quality checks (source freshness, row counts, table existence, expressions)</td>
+</tr>
+<tr>
+<td><code>sql_statement</code></td>
+<td>Execute arbitrary Spark SQL. Optionally capture a scalar result into a weave variable.</td>
+</tr>
+<tr>
+<td><code>log_message</code></td>
+<td>Emit a log message with variable placeholders</td>
+</tr>
+</tbody>
+</table>
+<p>Each step has an <code>on_failure</code> policy (<code>abort</code> or <code>warn</code>). Pre-steps
+default to <code>abort</code>; post-steps default to <code>warn</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">pre_steps</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;24h&quot;</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">post_steps</span><span class="p">:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log_message</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Pipeline</span><span class="nv"> </span><span class="s">complete.&quot;</span>
 </code></pre></div>
-<p>Cache failures are non-fatal -- consumers fall back to reading from Delta
-directly. See <a href="../how-to/cache-a-lookup/">Cache a Lookup</a> for the full
-configuration guide.</p>
+<p>See the <a href="../reference/yaml-schema/weave/">Weave YAML Schema</a> for the full
+field reference.</p>
+<hr />
 <hr />
 <h2 id="how-do-i-validate-my-config-without-running-a-pipeline">How do I validate my config without running a pipeline?<a class="headerlink" href="#how-do-i-validate-my-config-without-running-a-pipeline" title="Permanent link">&para;</a></h2>
 <p>Use validate mode:</p>

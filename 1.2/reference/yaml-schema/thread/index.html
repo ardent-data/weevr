@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.0/" class="md-tabs__link">
+        <a href="../../../release-notes/1.2/" class="md-tabs__link">
           
   
   
@@ -2349,6 +2349,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.0/" class="md-nav__link">
         
   
@@ -3031,9 +3087,16 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <tr>
 <td><code>type</code></td>
 <td><code>string</code></td>
-<td>yes</td>
+<td>conditional</td>
 <td>--</td>
-<td>Source type: <code>"delta"</code>, <code>"csv"</code>, <code>"json"</code>, <code>"parquet"</code>, <code>"excel"</code></td>
+<td>Source type: <code>"delta"</code>, <code>"csv"</code>, <code>"json"</code>, <code>"parquet"</code>, <code>"excel"</code>. Required when <code>lookup</code> is not set.</td>
+</tr>
+<tr>
+<td><code>lookup</code></td>
+<td><code>string</code></td>
+<td>conditional</td>
+<td><code>null</code></td>
+<td>Weave-level lookup name. Mutually exclusive with <code>type</code>. When set, the source is resolved from the weave's <code>lookups</code> map at execution time.</td>
 </tr>
 <tr>
 <td><code>alias</code></td>
@@ -3106,6 +3169,8 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">options</span><span class="p">:</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">      </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,&quot;</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span><span class="w">   </span><span class="c1"># resolved from the weave&#39;s lookups map</span>
 </code></pre></div>
 <hr />
 <h2 id="steps">steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
@@ -4151,10 +4216,24 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"sha256"</code></td>
-<td>Hash algorithm: <code>"sha256"</code> or <code>"md5"</code></td>
+<td>Hash algorithm: <code>"xxhash64"</code>, <code>"sha1"</code>, <code>"sha256"</code>, <code>"sha384"</code>, <code>"sha512"</code>, <code>"md5"</code>, <code>"crc32"</code>, <code>"murmur3"</code></td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"native"</code></td>
+<td>Output type for integer-returning algorithms (xxhash64, crc32, murmur3). <code>"native"</code> preserves the algorithm's return type; <code>"string"</code> casts to StringType. Has no effect on sha*/md5.</td>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Algorithm choice</p>
+<p><code>crc32</code> has a small 32-bit output space with higher collision risk.
+<code>murmur3</code> (Spark's <code>hash()</code>) may produce different results across
+Spark major versions. Neither is recommended for high-cardinality
+surrogate key use cases.</p>
+</div>
 <h3 id="keyschange_detection">keys.change_detection<a class="headerlink" href="#keyschange_detection" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -4186,7 +4265,14 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"md5"</code></td>
-<td>Hash algorithm: <code>"md5"</code> or <code>"sha256"</code></td>
+<td>Hash algorithm: <code>"xxhash64"</code>, <code>"sha1"</code>, <code>"sha256"</code>, <code>"sha384"</code>, <code>"sha512"</code>, <code>"md5"</code>, <code>"crc32"</code>, <code>"murmur3"</code></td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"native"</code></td>
+<td>Output type for integer-returning algorithms. <code>"native"</code> preserves the algorithm's return type; <code>"string"</code> casts to StringType.</td>
 </tr>
 </tbody>
 </table>

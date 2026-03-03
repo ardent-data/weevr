@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.0/" class="md-tabs__link">
+        <a href="../../../release-notes/1.2/" class="md-tabs__link">
           
   
   
@@ -1755,6 +1755,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lookupresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LookupResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#executionerror" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1781,6 +1792,17 @@
     <span class="md-ellipsis">
       
         StateError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hookerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HookError
       
     </span>
   </a>
@@ -2394,6 +2416,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.0/" class="md-nav__link">
         
   
@@ -2904,6 +2982,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lookupresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LookupResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#executionerror" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2930,6 +3019,17 @@
     <span class="md-ellipsis">
       
         StateError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hookerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HookError
       
     </span>
   </a>
@@ -4385,20 +4485,20 @@ parameter context and no default value (<code>${var:-default}</code>) is provide
 <code>weevr.errors</code>. Each entry explains when the error is raised, common
 causes, and how to resolve it.</p>
 <h3 id="exception-hierarchy">Exception hierarchy<a class="headerlink" href="#exception-hierarchy" title="Permanent link">&para;</a></h3>
-<div class="d2"><svg data-d2-version="v0.7.1" preserveAspectRatio="xMinYMin meet" viewBox="0 0 2461 468" role="img" aria-label="Diagram"><svg class="d2-3b53113d65f3476ea3c8f6cb54a680c2 d2-svg" width="2461" height="468" viewBox="-89 -89 2461 468"><rect x="-89.000000" y="-89.000000" width="2461.000000" height="468.000000" rx="0.000000" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
-.d2-3b53113d65f3476ea3c8f6cb54a680c2 .text {
-	font-family: "d2-3b53113d65f3476ea3c8f6cb54a680c2-font-regular";
+<div class="d2"><svg data-d2-version="v0.7.1" preserveAspectRatio="xMinYMin meet" viewBox="0 0 2831 468" role="img" aria-label="Diagram"><svg class="d2-4f328d407cd54382b3465ed08671a057 d2-svg" width="2831" height="468" viewBox="-89 -89 2831 468"><rect x="-89.000000" y="-89.000000" width="2831.000000" height="468.000000" rx="0.000000" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-4f328d407cd54382b3465ed08671a057 .text {
+	font-family: "d2-4f328d407cd54382b3465ed08671a057-font-regular";
 }
 @font-face {
-	font-family: d2-3b53113d65f3476ea3c8f6cb54a680c2-font-regular;
-	src: url("data:application/font-woff;base64,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");
+	font-family: d2-4f328d407cd54382b3465ed08671a057-font-regular;
+	src: url("data:application/font-woff;base64,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");
 }
-.d2-3b53113d65f3476ea3c8f6cb54a680c2 .text-bold {
-	font-family: "d2-3b53113d65f3476ea3c8f6cb54a680c2-font-bold";
+.d2-4f328d407cd54382b3465ed08671a057 .text-bold {
+	font-family: "d2-4f328d407cd54382b3465ed08671a057-font-bold";
 }
 @font-face {
-	font-family: d2-3b53113d65f3476ea3c8f6cb54a680c2-font-bold;
-	src: url("data:application/font-woff;base64,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");
+	font-family: d2-4f328d407cd54382b3465ed08671a057-font-bold;
+	src: url("data:application/font-woff;base64,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");
 }</style><style type="text/css">.shape {
   shape-rendering: geometricPrecision;
   stroke-linejoin: round;
@@ -4412,79 +4512,79 @@ causes, and how to resolve it.</p>
   opacity: 0.5;
 }
 
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N1{fill:#0A0F25;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N2{fill:#676C7E;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N3{fill:#9499AB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N4{fill:#CFD2DD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N5{fill:#DEE1EB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N6{fill:#EEF1F8;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-N7{fill:#FFFFFF;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-B1{fill:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-B2{fill:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-B3{fill:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-B4{fill:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-B5{fill:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-B6{fill:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-AA2{fill:#4A6FF3;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-AA4{fill:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-AA5{fill:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-AB4{fill:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .fill-AB5{fill:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N1{stroke:#0A0F25;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N2{stroke:#676C7E;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N3{stroke:#9499AB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N4{stroke:#CFD2DD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N5{stroke:#DEE1EB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N6{stroke:#EEF1F8;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-N7{stroke:#FFFFFF;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-B1{stroke:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-B2{stroke:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-B3{stroke:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-B4{stroke:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-B5{stroke:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-B6{stroke:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-AA2{stroke:#4A6FF3;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-AA4{stroke:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-AA5{stroke:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-AB4{stroke:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .stroke-AB5{stroke:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N1{background-color:#0A0F25;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N2{background-color:#676C7E;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N3{background-color:#9499AB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N4{background-color:#CFD2DD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N5{background-color:#DEE1EB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N6{background-color:#EEF1F8;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-N7{background-color:#FFFFFF;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-B1{background-color:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-B2{background-color:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-B3{background-color:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-B4{background-color:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-B5{background-color:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-B6{background-color:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-AA2{background-color:#4A6FF3;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-AA4{background-color:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-AA5{background-color:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-AB4{background-color:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .background-color-AB5{background-color:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N1{color:#0A0F25;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N2{color:#676C7E;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N3{color:#9499AB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N4{color:#CFD2DD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N5{color:#DEE1EB;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N6{color:#EEF1F8;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-N7{color:#FFFFFF;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-B1{color:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-B2{color:#0D32B2;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-B3{color:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-B4{color:#E3E9FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-B5{color:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-B6{color:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-AA2{color:#4A6FF3;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-AA4{color:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-AA5{color:#F7F8FE;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-AB4{color:#EDF0FD;}
-		.d2-3b53113d65f3476ea3c8f6cb54a680c2 .color-AB5{color:#F7F8FE;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.sketch-overlay-B1{fill:url(#streaks-darker-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:lighten}.sketch-overlay-B2{fill:url(#streaks-darker-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:lighten}.sketch-overlay-B3{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-B4{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-B5{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-B6{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-AA2{fill:url(#streaks-dark-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:overlay}.sketch-overlay-AA4{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-AA5{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-AB4{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-AB5{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-N1{fill:url(#streaks-darker-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:lighten}.sketch-overlay-N2{fill:url(#streaks-dark-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:overlay}.sketch-overlay-N3{fill:url(#streaks-normal-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:color-burn}.sketch-overlay-N4{fill:url(#streaks-normal-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:color-burn}.sketch-overlay-N5{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-N6{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.sketch-overlay-N7{fill:url(#streaks-bright-d2-3b53113d65f3476ea3c8f6cb54a680c2);mix-blend-mode:darken}.light-code{display: block}.dark-code{display: none}</style><g class="V2VldkVycm9y"><g class="shape"><rect x="12.000000" y="12.000000" width="2259.000000" height="266.000000" stroke="#0D32B2" fill="#E3E9FD" class=" stroke-B1 fill-B4" style="stroke-width:2;" /></g><text x="1141.500000" y="45.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">WeevError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9y"><g class="shape"><rect x="62.000000" y="62.000000" width="1565.000000" height="166.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="844.500000" y="91.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">ConfigError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9y"><g class="shape"><rect x="1647.000000" y="62.000000" width="366.000000" height="166.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="1830.000000" y="91.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">ExecutionError</text></g><g class="V2VldkVycm9yLkRhdGFWYWxpZGF0aW9uRXJyb3I="><g class="shape"><rect x="2033.000000" y="112.000000" width="188.000000" height="66.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2127.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">DataValidationError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1BhcnNlRXJyb3I="><g class="shape"><rect x="112.000000" y="112.000000" width="168.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="196.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigParseError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1NjaGVtYUVycm9y"><g class="shape"><rect x="300.000000" y="112.000000" width="185.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="392.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigSchemaError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1ZlcnNpb25FcnJvcg=="><g class="shape"><rect x="505.000000" y="112.000000" width="182.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="596.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigVersionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLlZhcmlhYmxlUmVzb2x1dGlvbkVycm9y"><g class="shape"><rect x="707.000000" y="112.000000" width="219.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="816.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">VariableResolutionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLlJlZmVyZW5jZVJlc29sdXRpb25FcnJvcg=="><g class="shape"><rect x="946.000000" y="112.000000" width="230.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1061.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ReferenceResolutionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkluaGVyaXRhbmNlRXJyb3I="><g class="shape"><rect x="1196.000000" y="112.000000" width="164.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1278.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">InheritanceError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLk1vZGVsVmFsaWRhdGlvbkVycm9y"><g class="shape"><rect x="1380.000000" y="112.000000" width="197.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1478.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ModelValidationError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlNwYXJrRXJyb3I="><g class="shape"><rect x="1697.000000" y="112.000000" width="125.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1759.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">SparkError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlN0YXRlRXJyb3I="><g class="shape"><rect x="1842.000000" y="112.000000" width="121.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1902.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">StateError</text></g><mask id="d2-3b53113d65f3476ea3c8f6cb54a680c2" maskUnits="userSpaceOnUse" x="-89" y="-89" width="2461" height="468">
-<rect x="-89" y="-89" width="2461" height="468" fill="white" />
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N1{fill:#0A0F25;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N2{fill:#676C7E;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N3{fill:#9499AB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N4{fill:#CFD2DD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N5{fill:#DEE1EB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N6{fill:#EEF1F8;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-N7{fill:#FFFFFF;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-B1{fill:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-B2{fill:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-B3{fill:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-B4{fill:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-B5{fill:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-B6{fill:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-AA2{fill:#4A6FF3;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-AA4{fill:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-AA5{fill:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-AB4{fill:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .fill-AB5{fill:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N1{stroke:#0A0F25;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N2{stroke:#676C7E;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N3{stroke:#9499AB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N4{stroke:#CFD2DD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N5{stroke:#DEE1EB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N6{stroke:#EEF1F8;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-N7{stroke:#FFFFFF;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-B1{stroke:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-B2{stroke:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-B3{stroke:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-B4{stroke:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-B5{stroke:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-B6{stroke:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-AA2{stroke:#4A6FF3;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-AA4{stroke:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-AA5{stroke:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-AB4{stroke:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .stroke-AB5{stroke:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N1{background-color:#0A0F25;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N2{background-color:#676C7E;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N3{background-color:#9499AB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N4{background-color:#CFD2DD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N5{background-color:#DEE1EB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N6{background-color:#EEF1F8;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-N7{background-color:#FFFFFF;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-B1{background-color:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-B2{background-color:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-B3{background-color:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-B4{background-color:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-B5{background-color:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-B6{background-color:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-AA2{background-color:#4A6FF3;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-AA4{background-color:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-AA5{background-color:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-AB4{background-color:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .background-color-AB5{background-color:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N1{color:#0A0F25;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N2{color:#676C7E;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N3{color:#9499AB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N4{color:#CFD2DD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N5{color:#DEE1EB;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N6{color:#EEF1F8;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-N7{color:#FFFFFF;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-B1{color:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-B2{color:#0D32B2;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-B3{color:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-B4{color:#E3E9FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-B5{color:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-B6{color:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-AA2{color:#4A6FF3;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-AA4{color:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-AA5{color:#F7F8FE;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-AB4{color:#EDF0FD;}
+		.d2-4f328d407cd54382b3465ed08671a057 .color-AB5{color:#F7F8FE;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.sketch-overlay-B1{fill:url(#streaks-darker-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:lighten}.sketch-overlay-B2{fill:url(#streaks-darker-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:lighten}.sketch-overlay-B3{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-B4{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-B5{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-B6{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-AA2{fill:url(#streaks-dark-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:overlay}.sketch-overlay-AA4{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-AA5{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-AB4{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-AB5{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-N1{fill:url(#streaks-darker-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:lighten}.sketch-overlay-N2{fill:url(#streaks-dark-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:overlay}.sketch-overlay-N3{fill:url(#streaks-normal-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:color-burn}.sketch-overlay-N4{fill:url(#streaks-normal-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:color-burn}.sketch-overlay-N5{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-N6{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.sketch-overlay-N7{fill:url(#streaks-bright-d2-4f328d407cd54382b3465ed08671a057);mix-blend-mode:darken}.light-code{display: block}.dark-code{display: none}</style><g class="V2VldkVycm9y"><g class="shape"><rect x="12.000000" y="12.000000" width="2629.000000" height="266.000000" stroke="#0D32B2" fill="#E3E9FD" class=" stroke-B1 fill-B4" style="stroke-width:2;" /></g><text x="1326.500000" y="45.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">WeevError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9y"><g class="shape"><rect x="62.000000" y="62.000000" width="1796.000000" height="166.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="960.000000" y="91.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">ConfigError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9y"><g class="shape"><rect x="1878.000000" y="62.000000" width="505.000000" height="166.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2130.500000" y="91.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">ExecutionError</text></g><g class="V2VldkVycm9yLkRhdGFWYWxpZGF0aW9uRXJyb3I="><g class="shape"><rect x="2403.000000" y="112.000000" width="188.000000" height="66.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2497.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">DataValidationError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1BhcnNlRXJyb3I="><g class="shape"><rect x="112.000000" y="112.000000" width="168.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="196.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigParseError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1NjaGVtYUVycm9y"><g class="shape"><rect x="300.000000" y="112.000000" width="185.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="392.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigSchemaError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1ZlcnNpb25FcnJvcg=="><g class="shape"><rect x="505.000000" y="112.000000" width="182.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="596.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigVersionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLlZhcmlhYmxlUmVzb2x1dGlvbkVycm9y"><g class="shape"><rect x="707.000000" y="112.000000" width="219.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="816.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">VariableResolutionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLlJlZmVyZW5jZVJlc29sdXRpb25FcnJvcg=="><g class="shape"><rect x="946.000000" y="112.000000" width="230.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1061.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ReferenceResolutionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkluaGVyaXRhbmNlRXJyb3I="><g class="shape"><rect x="1196.000000" y="112.000000" width="164.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1278.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">InheritanceError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLk1vZGVsVmFsaWRhdGlvbkVycm9y"><g class="shape"><rect x="1380.000000" y="112.000000" width="197.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1478.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ModelValidationError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkxvb2t1cFJlc29sdXRpb25FcnJvcg=="><g class="shape"><rect x="1597.000000" y="112.000000" width="211.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1702.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">LookupResolutionError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlNwYXJrRXJyb3I="><g class="shape"><rect x="1928.000000" y="112.000000" width="125.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1990.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">SparkError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlN0YXRlRXJyb3I="><g class="shape"><rect x="2073.000000" y="112.000000" width="121.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2133.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">StateError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLkhvb2tFcnJvcg=="><g class="shape"><rect x="2214.000000" y="112.000000" width="119.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2273.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">HookError</text></g><mask id="d2-4f328d407cd54382b3465ed08671a057" maskUnits="userSpaceOnUse" x="-89" y="-89" width="2831" height="468">
+<rect x="-89" y="-89" width="2831" height="468" fill="white" />
 
 </mask></svg></svg></div>
 <hr />
@@ -4710,6 +4810,39 @@ typed model (Thread, Weave, or Loom).</p>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;daily.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;validate&quot;</span><span class="p">)</span>
 </code></pre></div>
 <hr />
+<h3 id="lookupresolutionerror">LookupResolutionError<a class="headerlink" href="#lookupresolutionerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a thread references a lookup name that is not defined in the
+weave's <code>lookups</code> map. This is a fail-fast validation error caught during
+config resolution, before any data is read.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Typo in the <code>lookup</code> field of a source definition</li>
+<li>Thread uses <code>lookup: foo</code> but the weave does not declare a <code>foo</code> entry
+  in its <code>lookups</code> block</li>
+<li>Thread was moved to a different weave that does not define the lookup</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check that the lookup name in the thread's source matches a key in the
+   weave's <code>lookups</code> block</li>
+<li>Verify the thread is referenced by the correct weave</li>
+<li>If the lookup was renamed, update all thread references</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Thread source references a lookup</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span><span class="w">   </span><span class="c1"># must exist in the weave&#39;s lookups</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># Weave must define it</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">lookups</span><span class="p">:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">dim_product</span><span class="p">:</span><span class="w">            </span><span class="c1"># matches the thread&#39;s lookup reference</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">silver.dim_product</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../yaml-schema/weave/">YAML Schema: Weave</a></p>
+<hr />
 <h3 id="executionerror">ExecutionError<a class="headerlink" href="#executionerror" title="Permanent link">&para;</a></h3>
 <p>Base exception for runtime execution failures. Carries optional context:
 <code>thread_name</code>, <code>step_index</code>, <code>step_type</code>, and <code>source_name</code>.</p>
@@ -4730,15 +4863,15 @@ typed model (Thread, Weave, or Loom).</p>
 <li>Test expressions in Spark SQL directly to isolate syntax issues</li>
 </ol>
 <p><strong>Example:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Will fail — merge mode requires match_keys</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">write</span><span class="p">:</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="c1"># Missing: match_keys</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># Fixed</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">write</span><span class="p">:</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Will fail — merge mode requires match_keys</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="c1"># Missing: match_keys</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Fixed</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <p><strong>Related:</strong> <a href="../../../how-to/add-a-thread/">Add a Thread</a>,
 <a href="../../../concepts/execution-modes/">Execution Modes</a></p>
@@ -4767,16 +4900,56 @@ configured store. Carries optional <code>store_type</code> context.</p>
 <li>Check Spark permissions for reading/writing table properties</li>
 </ol>
 <p><strong>Example:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Will fail with StateError — backticks not allowed</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Tables/`my_table`&quot;</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># Fixed</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/my_table</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Will fail with StateError — backticks not allowed</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Tables/`my_table`&quot;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Fixed</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/my_table</span>
 </code></pre></div>
 <p><strong>Related:</strong> <a href="../../../concepts/idempotency/">Idempotency</a>,
 <a href="../../../concepts/execution-modes/">Execution Modes</a></p>
+<hr />
+<h3 id="hookerror">HookError<a class="headerlink" href="#hookerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a hook step (in <code>pre_steps</code> or <code>post_steps</code>) fails and its
+<code>on_failure</code> policy is set to <code>abort</code>. Carries hook-specific context:
+<code>hook_name</code>, <code>hook_type</code>, and <code>phase</code>.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>A <code>quality_gate</code> check failed (e.g., source freshness exceeded
+  <code>max_age</code>, row count outside bounds, table does not exist)</li>
+<li>A <code>sql_statement</code> hook produced an error</li>
+<li>An <code>expression</code> quality gate evaluated to false</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check the error message for the hook name and phase (<code>pre</code> or <code>post</code>)</li>
+<li>For quality gate failures, verify the underlying data condition
+   (source freshness, row counts, table existence)</li>
+<li>To make the hook non-blocking, set <code>on_failure: warn</code> instead of
+   <code>abort</code></li>
+<li>For SQL statement errors, test the SQL directly in Spark</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">pre_steps</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="c1"># This will raise HookError if the source is older than 24h</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_freshness</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;24h&quot;</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span><span class="w">    </span><span class="c1"># raise HookError on failure</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="c1"># Change to warn to log the issue without aborting</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_freshness</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;24h&quot;</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">     </span><span class="c1"># log warning and continue</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../yaml-schema/weave/">YAML Schema: Weave</a></p>
 <hr />
 <h3 id="datavalidationerror">DataValidationError<a class="headerlink" href="#datavalidationerror" title="Permanent link">&para;</a></h3>
 <p>Raised when a validation rule with <code>fatal</code> severity has failing rows.
@@ -4794,16 +4967,16 @@ The thread aborts immediately — no data is written.</p>
    should allow partial writes</li>
 </ol>
 <p><strong>Example:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">validations</span><span class="p">:</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="c1"># This will abort the thread if ANY row has a null customer_id</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id_required</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id</span><span class="nv"> </span><span class="s">IS</span><span class="nv"> </span><span class="s">NOT</span><span class="nv"> </span><span class="s">NULL&quot;</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fatal</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="c1"># Downgrade to error to quarantine bad rows instead of aborting</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id_required</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id</span><span class="nv"> </span><span class="s">IS</span><span class="nv"> </span><span class="s">NOT</span><span class="nv"> </span><span class="s">NULL&quot;</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span><span class="w">  </span><span class="c1"># bad rows go to quarantine table</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">validations</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="c1"># This will abort the thread if ANY row has a null customer_id</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id_required</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id</span><span class="nv"> </span><span class="s">IS</span><span class="nv"> </span><span class="s">NOT</span><span class="nv"> </span><span class="s">NULL&quot;</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fatal</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span><span class="c1"># Downgrade to error to quarantine bad rows instead of aborting</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id_required</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id</span><span class="nv"> </span><span class="s">IS</span><span class="nv"> </span><span class="s">NOT</span><span class="nv"> </span><span class="s">NULL&quot;</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span><span class="w">  </span><span class="c1"># bad rows go to quarantine table</span>
 </code></pre></div>
 <p><strong>Related:</strong> <a href="../../../how-to/add-validation-rules/">Add Validation Rules</a></p>
 

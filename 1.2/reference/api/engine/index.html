@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.0/" class="md-tabs__link">
+        <a href="../../../release-notes/1.2/" class="md-tabs__link">
           
   
   
@@ -2078,6 +2078,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.0/" class="md-nav__link">
         
   
@@ -2343,7 +2399,9 @@
 <h1 id="engine-api">Engine API<a class="headerlink" href="#engine-api" title="Permanent link">&para;</a></h1>
 <p>The <code>weevr.engine</code> module contains the execution planner and executor. It
 resolves the thread dependency DAG, schedules execution order, and runs each
-thread through its read-transform-write lifecycle.</p>
+thread through its read-transform-write lifecycle. The engine also handles
+pre/post weave hooks, lookup pre-materialization, conditional thread
+execution, and weave-scoped variable binding.</p>
 
 
 <div class="doc doc-object doc-module">
@@ -2923,7 +2981,7 @@ if some weaves succeeded before a failure.</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.engine.LoomResult.telemetry">telemetry</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="LoomTelemetry (weevr.telemetry.results.LoomTelemetry)" href="../telemetry/#weevr.telemetry.LoomTelemetry">LoomTelemetry</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="LoomTelemetry (weevr.telemetry.results.LoomTelemetry)" href="../context/#weevr.result.LoomTelemetry">LoomTelemetry</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3052,7 +3110,7 @@ if some weaves succeeded before a failure.</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.engine.ThreadResult.telemetry">telemetry</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="ThreadTelemetry (weevr.telemetry.results.ThreadTelemetry)" href="../telemetry/#weevr.telemetry.ThreadTelemetry">ThreadTelemetry</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="ThreadTelemetry (weevr.telemetry.results.ThreadTelemetry)" href="../context/#weevr.result.ThreadTelemetry">ThreadTelemetry</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3205,7 +3263,7 @@ if the weave was conditionally skipped at loom level.</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.engine.WeaveResult.telemetry">telemetry</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="WeaveTelemetry (weevr.telemetry.results.WeaveTelemetry)" href="../telemetry/#weevr.telemetry.WeaveTelemetry">WeaveTelemetry</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="WeaveTelemetry (weevr.telemetry.results.WeaveTelemetry)" href="../context/#weevr.result.WeaveTelemetry">WeaveTelemetry</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">

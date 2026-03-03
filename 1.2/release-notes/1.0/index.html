@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://ardent-data.github.io/weevr/1.2/release-notes/1.0/">
       
       
-        <link rel="prev" href="../../contributing/">
+        <link rel="prev" href="../1.1/">
       
       
       
@@ -402,7 +402,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../1.2/" class="md-tabs__link">
           
   
   
@@ -1828,6 +1828,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2355,14 +2411,12 @@ orchestration.</p>
   compatibility as the schema evolves.</li>
 </ul>
 <h2 id="write-modes">Write Modes<a class="headerlink" href="#write-modes" title="Permanent link">&para;</a></h2>
-<p>Four write modes cover the most common data landing patterns:</p>
+<p>Three write modes cover the most common data landing patterns:</p>
 <ul>
 <li><strong>overwrite</strong> — Full table replacement. The target is rewritten on every run.</li>
 <li><strong>append</strong> — Adds rows to an existing table without modifying existing data.</li>
 <li><strong>merge</strong> — Upsert semantics using match keys. Configurable update and insert
   behavior with support for soft deletes.</li>
-<li><strong>insert_only</strong> — Inserts only new rows that do not match existing keys. No
-  updates are applied on match.</li>
 </ul>
 <h2 id="data-quality">Data Quality<a class="headerlink" href="#data-quality" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2454,9 +2508,9 @@ orchestration.</p>
 </ul>
 <h3 id="writers">Writers<a class="headerlink" href="#writers" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Delta writer</strong> — Writes to Delta Lake tables with support for all four
-  write modes (overwrite, append, merge, insert_only), partition management,
-  and schema evolution options.</li>
+<li><strong>Delta writer</strong> — Writes to Delta Lake tables with support for all three
+  write modes (overwrite, append, merge), partition management, and schema
+  evolution options.</li>
 </ul>
 <h2 id="engine">Engine<a class="headerlink" href="#engine" title="Permanent link">&para;</a></h2>
 <ul>
@@ -2509,21 +2563,9 @@ building a complete pipeline from scratch — defining a thread, composing it in
 a weave and loom, and running it through the Python API.</p>
 <p>For task-oriented recipes, see the <a href="../../how-to/add-a-thread/">How-to Guides</a>.</p>
 <h2 id="whats-next">What's Next<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
-<p>The v1.0 release delivers the core execution engine. Upcoming development will
-focus on:</p>
-<ul>
-<li><strong>Naming normalization</strong> — Automatic column name standardization</li>
-<li><strong>Advanced merge patterns</strong> — More flexible merge strategies for complex
-  slowly changing dimension scenarios</li>
-<li><strong>Extensibility</strong> — Stitch patterns for reusable transform sequences, helper
-  function registries, and project-level UDF registration</li>
-<li><strong>Operational resilience</strong> — Retry policies, circuit breakers, and mirror
-  targets for fault-tolerant pipelines</li>
-<li><strong>Developer tooling</strong> — CLI-based config validation, dry-run modes, and a
-  test framework for integration projects</li>
-</ul>
-<p>Follow the <a href="https://github.com/DataInsightPro/weevr">GitHub repository</a> for
-updates and release announcements.</p>
+<p>See the <a href="../1.1/">v1.1</a> and <a href="../1.2/">v1.2</a> release notes for features
+delivered since this release, including execution hooks, weave-level lookups,
+narrow lookup projection, and expanded hash algorithms.</p>
 
 
 
