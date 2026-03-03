@@ -1,6 +1,7 @@
 # Pipeline — Stage Customers
 #
-# Reads customer CSV, filters active, derives full_name, writes to staging.
+# Reads customer CSV, filters active, deduplicates by customer_id,
+# derives full_name, writes to staging.
 # Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
 
 config_version: "1.0"
@@ -17,6 +18,10 @@ sources:
 steps:
   - filter:
       expr: "status = 'active'"
+
+  - dedup:
+      keys: [customer_id]
+      order_by: "signup_date DESC"
 
   - derive:
       columns:

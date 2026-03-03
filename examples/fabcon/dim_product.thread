@@ -1,6 +1,7 @@
 # Demo 3a — Merge with Soft Delete
 #
 # Reads a staging products table and merges into a dimension table.
+# Generates an xxhash64 surrogate key (product_sk) from the business key.
 # Matched rows are updated, new rows are inserted, and rows that
 # disappear from the source are soft-deleted rather than removed.
 #
@@ -37,6 +38,9 @@ target:
 keys:
   business_key:
     - product_id
+  surrogate_key:
+    name: product_sk
+    algorithm: xxhash64
 
 write:
   mode: merge

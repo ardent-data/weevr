@@ -44,6 +44,7 @@ steps:
         - customer_id
         - customer_sk
         - product_id
+        - product_sk
         - quantity
         - unit_price
         - order_total
