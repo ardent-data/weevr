@@ -21,6 +21,9 @@ Usage::
 # Adjust this path to match where the fabcon data directory is uploaded.
 DATA_DIR = "Files/fabcon.weevr/data"
 
+# Schemas used by the demo tables.
+_SCHEMAS = ["raw", "staging", "silver"]
+
 
 def _load_csv(spark, csv_name, table_name, mode="overwrite"):
     """Read a CSV file and write it as a Delta table.
@@ -38,6 +41,16 @@ def _load_csv(spark, csv_name, table_name, mode="overwrite"):
     print(f"  {table_name}: {count} rows ({mode})")
 
 
+def _ensure_schemas(spark):
+    """Create demo schemas if they don't already exist.
+
+    Args:
+        spark: Active SparkSession.
+    """
+    for schema in _SCHEMAS:
+        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")  # noqa: S608
+
+
 def stage_all(spark):
     """Load all base CSVs into Delta tables for the demo sequence.
 
@@ -52,6 +65,7 @@ def stage_all(spark):
         spark: Active SparkSession.
     """
     print("Staging base data...")
+    _ensure_schemas(spark)
     _load_csv(spark, "customers.csv", "raw.customers")
     _load_csv(spark, "orders.csv", "raw.orders")
     _load_csv(spark, "transactions.csv", "raw.transactions")
