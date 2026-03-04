@@ -723,6 +723,10 @@ class Context:
         except ValueError:
             resolved_with_refs["qualified_key"] = str(file_path)
 
+        # Step 8c: Resolve relative source paths against project root
+        if config_type == "thread":
+            self._resolve_source_paths(resolved_with_refs, self._project_root)
+
         # Step 9: Hydrate top-level model
         model = self._hydrate_model(resolved_with_refs, config_type, file_path)
 
@@ -736,6 +740,7 @@ class Context:
                 resolved_with_refs.get("threads", []),
                 resolved_with_refs.get("_resolved_threads", []),
                 file_path,
+                project_root=self._project_root,
             )
             threads[weave_name] = thread_map
 
@@ -764,6 +769,7 @@ class Context:
                     weave_dict.get("threads", []),
                     weave_dict.get("_resolved_threads", []),
                     file_path,
+                    project_root=self._project_root,
                 )
                 threads[weave_name] = thread_map
 
@@ -800,6 +806,7 @@ class Context:
         thread_entries: list[Any],
         resolved_dicts: list[dict[str, Any]],
         source_path: Path,
+        project_root: Path | str | None = None,
     ) -> dict[str, Thread]:
         """Hydrate resolved thread dicts into a name->Thread mapping."""
         result: dict[str, Thread] = {}
@@ -814,6 +821,10 @@ class Context:
 
             if not thread_dict.get("name"):
                 thread_dict["name"] = name
+
+            if project_root is not None:
+                Context._resolve_source_paths(thread_dict, project_root)
+
             try:
                 result[name] = Thread.model_validate(thread_dict)
             except ValidationError as exc:
@@ -823,3 +834,32 @@ class Context:
                     file_path=str(source_path),
                 ) from exc
         return result
+
+    @staticmethod
+    def _resolve_source_paths(thread_dict: dict[str, Any], project_root: Path | str) -> None:
+        """Resolve relative source file paths against the project root.
+
+        Modifies the thread config dict in place, prepending the project root
+        to any relative ``path`` values in file-based sources (csv, json,
+        parquet, excel).
+
+        Args:
+            thread_dict: Thread configuration dict (pre-hydration).
+            project_root: Resolved project root (Path for local, str for ABFS).
+        """
+        sources = thread_dict.get("sources")
+        if not sources or not isinstance(sources, dict):
+            return
+        for source_cfg in sources.values():
+            if not isinstance(source_cfg, dict):
+                continue
+            path = source_cfg.get("path")
+            if path is None:
+                continue
+            # Skip already-absolute paths and URIs
+            if os.path.isabs(path) or "://" in path:
+                continue
+            if isinstance(project_root, Path):
+                source_cfg["path"] = str(project_root / path)
+            else:
+                source_cfg["path"] = f"{project_root.rstrip('/')}/{path}"
