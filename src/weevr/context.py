@@ -860,6 +860,13 @@ class Context:
             if os.path.isabs(path) or "://" in path:
                 continue
             if isinstance(project_root, Path):
-                source_cfg["path"] = str(project_root / path)
+                resolved = str(project_root / path)
+                # Fabric mount paths (/lakehouse/default/...) are valid for
+                # Python file I/O but not for Spark reads which bypass the
+                # FUSE mount.  Strip the mount prefix so Spark gets a
+                # lakehouse-relative path (e.g. "Files/project.weevr/...").
+                if resolved.startswith("/lakehouse/default/"):
+                    resolved = resolved[len("/lakehouse/default/") :]
+                source_cfg["path"] = resolved
             else:
                 source_cfg["path"] = f"{project_root.rstrip('/')}/{path}"

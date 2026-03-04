@@ -143,6 +143,15 @@ class TestResolveSourcePaths:
         Context._resolve_source_paths(thread_dict, Path("/project.weevr"))
         assert thread_dict == {"name": "test"}
 
+    def test_fabric_mount_prefix_stripped(self) -> None:
+        root = Path("/lakehouse/default/Files/fabcon.weevr")
+        thread_dict: dict = {
+            "sources": {"customers": {"type": "csv", "path": "data/customers.csv"}}
+        }
+        Context._resolve_source_paths(thread_dict, root)
+        expected = "Files/fabcon.weevr/data/customers.csv"
+        assert thread_dict["sources"]["customers"]["path"] == expected
+
     def test_abfs_root_trailing_slash_normalized(self) -> None:
         root = "abfss://ws@onelake.dfs.fabric.microsoft.com/lh/Files/project.weevr/"
         thread_dict: dict = {"sources": {"main": {"type": "json", "path": "data/events.json"}}}
