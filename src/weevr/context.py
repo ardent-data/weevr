@@ -33,7 +33,7 @@ from weevr.errors import ConfigError, DataValidationError, ExecutionError, Model
 from weevr.model.execution import LogLevel
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
-from weevr.model.weave import Weave
+from weevr.model.weave import ConditionSpec, Weave
 from weevr.result import ExecutionMode, LoadedConfig, RunResult
 from weevr.telemetry.logging import configure_logging
 
@@ -312,7 +312,23 @@ class Context:
                 threads=weave_threads,
                 thread_entries=filtered_entries,
             )
-            engine_result = execute_weave(self._spark, plan, weave_threads)
+            # Build thread condition map from ThreadEntry conditions
+            thread_conditions: dict[str, ConditionSpec] = {}
+            for te in model.threads:
+                if te.condition is not None:
+                    thread_conditions[te.name] = te.condition
+
+            engine_result = execute_weave(
+                self._spark,
+                plan,
+                weave_threads,
+                thread_conditions=thread_conditions if thread_conditions else None,
+                params=self._params,
+                pre_steps=list(model.pre_steps) if model.pre_steps else None,
+                post_steps=list(model.post_steps) if model.post_steps else None,
+                lookups=dict(model.lookups) if model.lookups else None,
+                variables=dict(model.variables) if model.variables else None,
+            )
             assert engine_result.status in ("success", "failure", "partial")
             return RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
