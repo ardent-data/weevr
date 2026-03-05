@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/ardent-data/weevr/compare/weevr-v1.2.0...weevr-v1.2.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* **config:** resolve relative source paths against project root ([#75](https://github.com/ardent-data/weevr/issues/75)) ([c574b68](https://github.com/ardent-data/weevr/commit/c574b68c1146beeff9828a73020727b491a464c4))
+* **examples:** create schemas before staging demo tables ([#73](https://github.com/ardent-data/weevr/issues/73)) ([be396dc](https://github.com/ardent-data/weevr/commit/be396dc70d312dbc9e4cd432dc001c6b17adeb52))
+* Fabric runtime compatibility and engine bug fixes ([#76](https://github.com/ardent-data/weevr/issues/76)) ([43716e5](https://github.com/ardent-data/weevr/commit/43716e59da7c895e66d415a99bcaea721bec1f5a))
+
 ## [1.2.0](https://github.com/ardent-data/weevr/compare/weevr-v1.1.0...weevr-v1.2.0) (2026-03-03)
 
 
