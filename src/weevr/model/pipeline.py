@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, Literal
 
-from pydantic import Discriminator, Tag, field_validator
+from pydantic import Discriminator, Tag, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
@@ -99,6 +99,14 @@ class JoinParams(FrozenBase):
     type: Literal["inner", "left", "right", "full", "cross", "semi", "anti"] = "inner"
     on: list[JoinKeyPair]
     null_safe: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fix_yaml_on_key(cls, data: Any) -> Any:
+        """YAML 1.1 parses bare ``on`` as boolean True. Remap it."""
+        if isinstance(data, dict) and True in data and "on" not in data:
+            data = {("on" if k is True else k): v for k, v in data.items()}
+        return data
 
     @field_validator("on", mode="before")
     @classmethod
