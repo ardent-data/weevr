@@ -50,9 +50,24 @@ class TablePropertiesStore(WatermarkStore):
             return DeltaTable.forName(spark, self._target_path)
         return DeltaTable.forPath(spark, self._target_path)
 
+    def _table_exists(self, spark: SparkSession) -> bool:
+        """Return True if the target Delta table exists."""
+        try:
+            if self._is_table_alias(self._target_path):
+                spark.read.format("delta").table(self._target_path).limit(0).collect()
+                return True
+            from delta.tables import DeltaTable
+
+            return DeltaTable.isDeltaTable(spark, self._target_path)
+        except Exception:
+            return False
+
     def read(self, spark: SparkSession, thread_name: str) -> WatermarkState | None:
         """Load watermark state from target table properties."""
         try:
+            if not self._table_exists(spark):
+                return None
+
             detail = self._resolve_delta_table(spark).detail()
             props_row = detail.select("properties").collect()
 
