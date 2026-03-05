@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from delta.tables import DeltaTable
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.load import CdcConfig
 from weevr.model.target import Target
@@ -62,8 +62,11 @@ def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> 
     # Narrow column set according to mapping mode.
     if target.mapping_mode == "auto":
         target_path = target.alias or target.path
-        if target_path and _delta_table_exists(spark, target_path):
-            existing_cols = spark.read.format("delta").load(target_path).columns
+        if target_path and delta_table_exists(spark, target_path):
+            if is_table_alias(target_path):
+                existing_cols = spark.read.format("delta").table(target_path).columns
+            else:
+                existing_cols = spark.read.format("delta").load(target_path).columns
             keep = [c for c in existing_cols if c in result.columns and c not in cols_to_drop]
             return result.select(keep)
         # New target — pass all columns through, honoring drop markers.
@@ -89,12 +92,16 @@ def write_target(
 ) -> int:
     """Write a DataFrame to a Delta table.
 
+    If *target_path* is a table alias (e.g. ``staging.stg_customers``), the
+    write uses ``saveAsTable`` so the metastore manages the table location.
+    Otherwise, ``save`` writes directly to the file path.
+
     Args:
         spark: Active SparkSession.
         df: DataFrame to write.
         target: Target configuration (partition_by).
         write_config: Write mode and merge parameters. Defaults to overwrite when None.
-        target_path: Physical path for the Delta table.
+        target_path: Table alias or physical path for the Delta table.
 
     Returns:
         Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
@@ -104,23 +111,41 @@ def write_target(
     """
     mode = write_config.mode if write_config else "overwrite"
     partition_cols = target.partition_by or []
-    target_exists = _delta_table_exists(spark, target_path)
+    use_table_api = is_table_alias(target_path)
+    target_exists = delta_table_exists(spark, target_path)
 
     try:
         row_count = df.count()
 
         if mode == "overwrite" or not target_exists:
             # First write (any mode) and overwrite: write as overwrite to create/replace table.
+            # For merge with soft_delete, add the column so the schema includes it from the start.
+            if (
+                not target_exists
+                and mode == "merge"
+                and write_config
+                and write_config.soft_delete_column
+            ):
+                df = df.withColumn(
+                    write_config.soft_delete_column,
+                    F.lit(None).cast("boolean"),
+                )
             writer = df.write.format("delta").mode("overwrite")
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
-            writer.save(target_path)
+            if use_table_api:
+                writer.saveAsTable(target_path)
+            else:
+                writer.save(target_path)
 
         elif mode == "append":
             writer = df.write.format("delta").mode("append")
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
-            writer.save(target_path)
+            if use_table_api:
+                writer.saveAsTable(target_path)
+            else:
+                writer.save(target_path)
 
         elif mode == "merge":
             if write_config is None:
@@ -153,7 +178,14 @@ def _execute_merge(
         f"target.{_quote_identifier(k)} = source.{_quote_identifier(k)}"
         for k in write_config.match_keys
     )
-    delta_table = DeltaTable.forPath(spark, target_path)
+    delta_table = resolve_delta_table(spark, target_path)
+
+    # Add soft-delete column to source so updateAll/insertAll can resolve it.
+    # Matched rows get null (clearing any prior soft-delete flag);
+    # unmatched target rows are handled by whenNotMatchedBySourceUpdate.
+    if write_config.soft_delete_column and write_config.soft_delete_column not in df.columns:
+        df = df.withColumn(write_config.soft_delete_column, F.lit(None).cast("boolean"))
+
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
 
     has_when_clause = False
@@ -185,14 +217,6 @@ def _execute_merge(
     # Delta requires at least one WHEN clause; if all are "ignore", nothing to do.
     if has_when_clause:
         merger.execute()
-
-
-def _delta_table_exists(spark: SparkSession, path: str) -> bool:
-    """Return True if a Delta table exists at the given path."""
-    try:
-        return DeltaTable.isDeltaTable(spark, path)
-    except Exception:
-        return False
 
 
 def resolve_cdc_columns(cdc_config: CdcConfig) -> dict[str, str | None]:
@@ -270,7 +294,7 @@ def execute_cdc_merge(
         df = df.filter(F.col(op_col).isin(recognized_ops))
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
-    target_exists = _delta_table_exists(spark, target_path)
+    target_exists = delta_table_exists(spark, target_path)
 
     try:
         # Count operations
@@ -286,10 +310,21 @@ def execute_cdc_merge(
             insert_df = df
             if delete_val:
                 insert_df = df.filter(F.col(op_col) != delete_val)
-            insert_df.select(data_cols).write.format("delta").mode("overwrite").save(target_path)
+            first_write_df = insert_df.select(data_cols)
+            # Add soft-delete column so the schema includes it from the start.
+            if cdc_config.on_delete == "soft_delete" and write_config.soft_delete_column:
+                first_write_df = first_write_df.withColumn(
+                    write_config.soft_delete_column,
+                    F.lit(None).cast("boolean"),
+                )
+            cdc_writer = first_write_df.write.format("delta").mode("overwrite")
+            if is_table_alias(target_path):
+                cdc_writer.saveAsTable(target_path)
+            else:
+                cdc_writer.save(target_path)
             return counts
 
-        delta_table = DeltaTable.forPath(spark, target_path)
+        delta_table = resolve_delta_table(spark, target_path)
         merger = delta_table.alias("target").merge(
             df.select(data_cols + [op_col]).alias("source"),
             merge_condition,

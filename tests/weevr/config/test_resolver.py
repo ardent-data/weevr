@@ -360,3 +360,37 @@ class TestReferenceResolution:
         with pytest.raises(ReferenceResolutionError) as exc_info:
             resolve_references(config, "loom", tmp_path)
         assert "not found" in str(exc_info.value)
+
+    def test_resolve_variables_var_namespace_passthrough(self):
+        """var.* references pass through resolve_variables unchanged."""
+        config = {"alias": "${var.target_schema}.customers"}
+        context = {}
+        result = resolve_variables(config, context)
+        assert result["alias"] == "${var.target_schema}.customers"
+
+    def test_resolve_variables_var_namespace_mixed(self):
+        """var.* references coexist with resolved variables."""
+        config = {"path": "${base_path}/${var.filename}"}
+        context = {"base_path": "/data"}
+        result = resolve_variables(config, context)
+        assert result["path"] == "/data/${var.filename}"
+
+    def test_convention_based_loom_weave_resolution(self, tmp_path):
+        """Loom name-only weave entries resolve via {name}.weave convention."""
+        from weevr.config.resolver import resolve_references
+
+        # Create a weave file at the project root
+        weave_file = tmp_path / "dimensions.weave"
+        weave_file.write_text('config_version: "1.0"\nthreads: []\n')
+
+        loom_config = {
+            "config_version": "1.0",
+            "weaves": [{"name": "dimensions"}],
+        }
+
+        result = resolve_references(loom_config, "loom", tmp_path)
+
+        assert "_resolved_weaves" in result
+        assert len(result["_resolved_weaves"]) == 1
+        assert result["_resolved_weaves"][0]["name"] == "dimensions"
+        assert result["_resolved_weaves"][0]["qualified_key"] == "dimensions.weave"

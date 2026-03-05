@@ -441,6 +441,64 @@ class TestWriteTargetMerge:
         result = spark.read.format("delta").load(path)
         assert result.count() == 2
 
+    def test_merge_soft_delete_seeds_schema_on_new_target(
+        self, spark: SparkSession, tmp_delta_path, simple_df
+    ) -> None:
+        """Initial merge with soft_delete adds the soft-delete column to the schema."""
+        path = tmp_delta_path("merge_sd_seed")
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_no_match_source="soft_delete",
+            soft_delete_column="is_deleted",
+        )
+        write_target(spark, simple_df, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        assert "is_deleted" in result.columns
+        # All rows should have null (no soft-delete flag yet)
+        assert all(r["is_deleted"] is None for r in result.collect())
+
+    def test_merge_soft_delete_marks_unmatched_rows(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Merge with soft_delete sets flag on unmatched target rows."""
+        from pyspark.sql.types import BooleanType, LongType, StringType, StructField, StructType
+
+        path = tmp_delta_path("merge_sd_mark")
+        schema = StructType(
+            [
+                StructField("id", LongType()),
+                StructField("val", StringType()),
+                StructField("is_deleted", BooleanType(), nullable=True),
+            ]
+        )
+        create_delta_table(
+            spark,
+            path,
+            [
+                {"id": 1, "val": "a", "is_deleted": None},
+                {"id": 2, "val": "b", "is_deleted": None},
+            ],
+            schema=schema,
+        )
+        incoming = spark.createDataFrame([{"id": 1, "val": "a_updated"}])
+        target = Target(path=path)
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            on_match="update",
+            on_no_match_source="soft_delete",
+            soft_delete_column="is_deleted",
+        )
+        write_target(spark, incoming, target, write_config, path)
+        result = spark.read.format("delta").load(path)
+        rows = {r["id"]: r for r in result.collect()}
+        # id=1 matched — soft-delete column cleared to null
+        assert rows[1]["is_deleted"] is None
+        # id=2 unmatched — soft-delete flag set to True
+        assert rows[2]["is_deleted"] is True
+
     def test_merge_soft_delete_without_column_raises_validation_error(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:

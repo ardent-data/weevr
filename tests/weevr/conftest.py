@@ -32,6 +32,7 @@ def spark() -> Generator[SparkSession, None, None]:
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
         .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.driver.memory", "2g")
         .config("spark.ui.enabled", "false")
         .config("spark.driver.bindAddress", "127.0.0.1")
         .config("spark.driver.host", "127.0.0.1")

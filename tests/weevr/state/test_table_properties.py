@@ -104,15 +104,15 @@ class TestTablePropertiesStore:
         with pytest.raises(StateError, match="Failed to write watermark"):
             store.write(spark, state)
 
-    def test_read_nonexistent_target_raises_state_error(
+    def test_read_nonexistent_target_returns_none(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """Reading from a non-existent target table raises StateError."""
+        """Reading from a non-existent target table returns None."""
         path = tmp_delta_path("tbl_read_missing") + "/nope"
         store = TablePropertiesStore(path)
 
-        with pytest.raises(StateError, match="Failed to read watermark"):
-            store.read(spark, "t1")
+        result = store.read(spark, "t1")
+        assert result is None
 
     def test_multiple_threads_on_same_table(self, spark: SparkSession, tmp_delta_path) -> None:
         """Multiple threads can store watermarks on the same target table."""

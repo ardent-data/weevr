@@ -8,6 +8,7 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.delta import delta_table_exists, read_delta
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.weave import ConditionSpec
 
@@ -20,38 +21,28 @@ _PARAM_REF = re.compile(r"\$\{param\.([^}]+)\}")
 _BUILTIN_CALL = re.compile(r"(table_exists|table_empty|row_count)\s*\(\s*'([^']+)'\s*\)")
 
 
-def _table_exists(spark: SparkSession, path: str) -> bool:
-    """Check if a Delta table exists at the given path."""
-    try:
-        from delta.tables import DeltaTable
-
-        return DeltaTable.isDeltaTable(spark, path)
-    except Exception:
-        return False
-
-
 def _table_empty(spark: SparkSession, path: str) -> bool:
     """Check if a table is empty or doesn't exist."""
-    if not _table_exists(spark, path):
+    if not delta_table_exists(spark, path):
         return True
     try:
-        return spark.read.format("delta").load(path).limit(1).count() == 0
+        return read_delta(spark, path).limit(1).count() == 0
     except Exception:
         return True
 
 
 def _row_count(spark: SparkSession, path: str) -> int:
     """Count rows in a Delta table. Returns 0 if table doesn't exist."""
-    if not _table_exists(spark, path):
+    if not delta_table_exists(spark, path):
         return 0
     try:
-        return spark.read.format("delta").load(path).count()
+        return read_delta(spark, path).count()
     except Exception:
         return 0
 
 
 _BUILTIN_FUNCS: dict[str, Any] = {
-    "table_exists": _table_exists,
+    "table_exists": delta_table_exists,
     "table_empty": _table_empty,
     "row_count": _row_count,
 }

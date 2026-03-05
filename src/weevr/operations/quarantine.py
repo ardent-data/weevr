@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pyspark.sql import DataFrame, SparkSession
 
+from weevr.delta import is_table_alias
+
 
 def write_quarantine(
     spark: SparkSession,
@@ -34,6 +36,11 @@ def write_quarantine(
         return 0
 
     quarantine_path = f"{target_path}_quarantine"
-    quarantine_df.write.format("delta").mode("overwrite").save(quarantine_path)
+    writer = quarantine_df.write.format("delta").mode("overwrite")
+    # Table aliases (schema.table) use the metastore; file paths use save().
+    if is_table_alias(quarantine_path):
+        writer.saveAsTable(quarantine_path)
+    else:
+        writer.save(quarantine_path)
 
     return row_count

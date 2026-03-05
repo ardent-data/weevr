@@ -26,6 +26,7 @@ from weevr.config.resolver import (
     resolve_variables,
 )
 from weevr.config.validation import validate_schema
+from weevr.delta import is_table_alias
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
 from weevr.engine.runner import execute_loom, execute_weave
@@ -33,7 +34,7 @@ from weevr.errors import ConfigError, DataValidationError, ExecutionError, Model
 from weevr.model.execution import LogLevel
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
-from weevr.model.weave import Weave
+from weevr.model.weave import ConditionSpec, Weave
 from weevr.result import ExecutionMode, LoadedConfig, RunResult
 from weevr.telemetry.logging import configure_logging
 
@@ -312,7 +313,23 @@ class Context:
                 threads=weave_threads,
                 thread_entries=filtered_entries,
             )
-            engine_result = execute_weave(self._spark, plan, weave_threads)
+            # Build thread condition map from ThreadEntry conditions
+            thread_conditions: dict[str, ConditionSpec] = {}
+            for te in model.threads:
+                if te.condition is not None:
+                    thread_conditions[te.name] = te.condition
+
+            engine_result = execute_weave(
+                self._spark,
+                plan,
+                weave_threads,
+                thread_conditions=thread_conditions if thread_conditions else None,
+                params=self._params,
+                pre_steps=list(model.pre_steps) if model.pre_steps else None,
+                post_steps=list(model.post_steps) if model.post_steps else None,
+                lookups=dict(model.lookups) if model.lookups else None,
+                variables=dict(model.variables) if model.variables else None,
+            )
             assert engine_result.status in ("success", "failure", "partial")
             return RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
@@ -471,9 +488,11 @@ class Context:
                 checked.add(resolve_path)
 
                 try:
-                    self._spark.read.format(
-                        source.type if source.type != "excel" else "com.crealytics.spark.excel"
-                    ).load(resolve_path).limit(0).collect()
+                    fmt = source.type if source.type != "excel" else "com.crealytics.spark.excel"
+                    if source.type == "delta" and is_table_alias(resolve_path):
+                        self._spark.read.format(fmt).table(resolve_path).limit(0).collect()
+                    else:
+                        self._spark.read.format(fmt).load(resolve_path).limit(0).collect()
                 except Exception:
                     errors.append(
                         f"Source '{source_name}' in thread '{thread_name}' "
@@ -860,6 +879,13 @@ class Context:
             if os.path.isabs(path) or "://" in path:
                 continue
             if isinstance(project_root, Path):
-                source_cfg["path"] = str(project_root / path)
+                resolved = str(project_root / path)
+                # Fabric mount paths (/lakehouse/default/...) are valid for
+                # Python file I/O but not for Spark reads which bypass the
+                # FUSE mount.  Strip the mount prefix so Spark gets a
+                # lakehouse-relative path (e.g. "Files/project.weevr/...").
+                if resolved.startswith("/lakehouse/default/"):
+                    resolved = resolved[len("/lakehouse/default/") :]
+                source_cfg["path"] = resolved
             else:
                 source_cfg["path"] = f"{project_root.rstrip('/')}/{path}"

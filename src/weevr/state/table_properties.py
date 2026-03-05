@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal, TypeAlias, cast
 
+from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import StateError
 from weevr.state.watermark import WatermarkState, WatermarkStore
 
@@ -40,9 +41,10 @@ class TablePropertiesStore(WatermarkStore):
     def read(self, spark: SparkSession, thread_name: str) -> WatermarkState | None:
         """Load watermark state from target table properties."""
         try:
-            from delta.tables import DeltaTable
+            if not delta_table_exists(spark, self._target_path):
+                return None
 
-            detail = DeltaTable.forPath(spark, self._target_path).detail()
+            detail = resolve_delta_table(spark, self._target_path).detail()
             props_row = detail.select("properties").collect()
 
             if not props_row:
@@ -90,7 +92,11 @@ class TablePropertiesStore(WatermarkStore):
             props_sql = ", ".join(
                 f"'{k}' = '{v.replace(chr(39), chr(39) + chr(39))}'" for k, v in props.items()
             )
-            spark.sql(f"ALTER TABLE delta.`{self._target_path}` SET TBLPROPERTIES ({props_sql})")
+            if is_table_alias(self._target_path):
+                table_ref = self._target_path
+            else:
+                table_ref = f"delta.`{self._target_path}`"
+            spark.sql(f"ALTER TABLE {table_ref} SET TBLPROPERTIES ({props_sql})")
         except Exception as e:
             if isinstance(e, StateError):
                 raise

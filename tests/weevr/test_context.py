@@ -143,6 +143,15 @@ class TestResolveSourcePaths:
         Context._resolve_source_paths(thread_dict, Path("/project.weevr"))
         assert thread_dict == {"name": "test"}
 
+    def test_fabric_mount_prefix_stripped(self) -> None:
+        root = Path("/lakehouse/default/Files/fabcon.weevr")
+        thread_dict: dict = {
+            "sources": {"customers": {"type": "csv", "path": "data/customers.csv"}}
+        }
+        Context._resolve_source_paths(thread_dict, root)
+        expected = "Files/fabcon.weevr/data/customers.csv"
+        assert thread_dict["sources"]["customers"]["path"] == expected
+
     def test_abfs_root_trailing_slash_normalized(self) -> None:
         root = "abfss://ws@onelake.dfs.fabric.microsoft.com/lh/Files/project.weevr/"
         thread_dict: dict = {"sources": {"main": {"type": "json", "path": "data/events.json"}}}
@@ -434,6 +443,37 @@ class TestContextRunExecute:
         assert r1.status == "success"
         assert r2.status == "success"
         assert r1.config_name != r2.config_name
+
+    def test_weave_level_lookups_passed_through(self, spark: SparkSession, tmp_path: Path) -> None:
+        """Weave-level lookups are forwarded from context to execute_weave."""
+        src = str(tmp_path / "src_lkp")
+        tgt = str(tmp_path / "tgt_lkp")
+        lkp = str(tmp_path / "lkp_src")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+        spark.createDataFrame([{"id": 1, "label": "test"}]).write.format("delta").save(lkp)
+
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "tw_lkp", src, tgt)
+
+        # Create a weave with a lookups section
+        weave_dir = project / "weaves"
+        weave_dir.mkdir(parents=True, exist_ok=True)
+        weave_file = weave_dir / "wlkp.weave"
+        weave_file.write_text(f"""\
+config_version: "1.0"
+lookups:
+  labels:
+    source:
+      type: delta
+      alias: "{lkp}"
+threads:
+  - ref: "threads/tw_lkp.thread"
+""")
+        ctx = Context(spark=spark, project=project)
+        result = ctx.run(weave_file)
+
+        assert result.status == "success"
+        assert result.config_type == "weave"
 
     def test_filter_zero_matches_returns_success_with_warning(
         self, spark: SparkSession, tmp_path: Path

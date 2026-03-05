@@ -37,7 +37,15 @@ def apply_join(
         return df.crossJoin(right_df)
 
     condition = _build_join_condition(df, right_df, params)
-    return df.join(right_df, on=condition, how=params.type)
+    result = df.join(right_df, on=condition, how=params.type)
+
+    # Column-expression joins keep both sides of matching key columns,
+    # causing ambiguous references downstream. Drop the right-side
+    # duplicates when the left and right key names are the same.
+    for pair in params.on:
+        if pair.left == pair.right:
+            result = result.drop(right_df[pair.right])
+    return result
 
 
 def apply_union(

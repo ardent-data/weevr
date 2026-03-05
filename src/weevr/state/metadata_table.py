@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType, StructField, StructType, TimestampType
 
+from weevr.delta import is_table_alias, read_delta, resolve_delta_table
 from weevr.errors.exceptions import StateError
 from weevr.state.watermark import WatermarkState, WatermarkStore
 
@@ -47,8 +48,12 @@ class MetadataTableStore(WatermarkStore):
 
     def _ensure_table_exists(self, spark: SparkSession) -> None:
         """Create the watermarks table if it does not exist."""
+        if is_table_alias(self._table_path):
+            table_ref = self._table_path
+        else:
+            table_ref = f"delta.`{self._table_path}`"
         spark.sql(f"""
-            CREATE TABLE IF NOT EXISTS delta.`{self._table_path}` (
+            CREATE TABLE IF NOT EXISTS {table_ref} (
                 thread_name STRING,
                 watermark_column STRING,
                 watermark_type STRING,
@@ -65,8 +70,7 @@ class MetadataTableStore(WatermarkStore):
             self._ensure_table_exists(spark)
 
             rows = (
-                spark.read.format("delta")
-                .load(self._table_path)
+                read_delta(spark, self._table_path)
                 .filter(F.col("thread_name") == thread_name)
                 .collect()
             )
@@ -98,8 +102,6 @@ class MetadataTableStore(WatermarkStore):
         try:
             self._ensure_table_exists(spark)
 
-            from delta.tables import DeltaTable
-
             state_df = spark.createDataFrame(
                 [
                     (
@@ -114,7 +116,7 @@ class MetadataTableStore(WatermarkStore):
                 schema=_WATERMARK_SCHEMA,
             )
 
-            target = DeltaTable.forPath(spark, self._table_path)
+            target = resolve_delta_table(spark, self._table_path)
             (
                 target.alias("target")
                 .merge(state_df.alias("source"), "target.thread_name = source.thread_name")

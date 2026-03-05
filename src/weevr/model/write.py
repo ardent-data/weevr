@@ -23,7 +23,7 @@ class WriteConfig(FrozenBase):
     on_no_match_target: Literal["insert", "ignore"] = "insert"
     on_no_match_source: Literal["delete", "soft_delete", "ignore"] = "ignore"
     soft_delete_column: str | None = None
-    soft_delete_value: str = "true"
+    soft_delete_value: bool = True
 
     @model_validator(mode="after")
     def _validate_merge_keys(self) -> WriteConfig:
