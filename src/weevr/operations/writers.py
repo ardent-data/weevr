@@ -128,6 +128,17 @@ def write_target(
 
         if mode == "overwrite" or not target_exists:
             # First write (any mode) and overwrite: write as overwrite to create/replace table.
+            # For merge with soft_delete, add the column so the schema includes it from the start.
+            if (
+                not target_exists
+                and mode == "merge"
+                and write_config
+                and write_config.soft_delete_column
+            ):
+                df = df.withColumn(
+                    write_config.soft_delete_column,
+                    F.lit(None).cast("string"),
+                )
             writer = df.write.format("delta").mode("overwrite")
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
@@ -319,7 +330,14 @@ def execute_cdc_merge(
             insert_df = df
             if delete_val:
                 insert_df = df.filter(F.col(op_col) != delete_val)
-            cdc_writer = insert_df.select(data_cols).write.format("delta").mode("overwrite")
+            first_write_df = insert_df.select(data_cols)
+            # Add soft-delete column so the schema includes it from the start.
+            if cdc_config.on_delete == "soft_delete" and write_config.soft_delete_column:
+                first_write_df = first_write_df.withColumn(
+                    write_config.soft_delete_column,
+                    F.lit(None).cast("string"),
+                )
+            cdc_writer = first_write_df.write.format("delta").mode("overwrite")
             if _is_table_alias(target_path):
                 cdc_writer.saveAsTable(target_path)
             else:
