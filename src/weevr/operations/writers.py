@@ -188,6 +188,13 @@ def _execute_merge(
         for k in write_config.match_keys
     )
     delta_table = _resolve_delta_table(spark, target_path)
+
+    # Add soft-delete column to source so updateAll/insertAll can resolve it.
+    # Matched rows get null (clearing any prior soft-delete flag);
+    # unmatched target rows are handled by whenNotMatchedBySourceUpdate.
+    if write_config.soft_delete_column and write_config.soft_delete_column not in df.columns:
+        df = df.withColumn(write_config.soft_delete_column, F.lit(None).cast("string"))
+
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
 
     has_when_clause = False
