@@ -1260,6 +1260,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.ConditionSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConditionSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.Weave" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1612,6 +1623,17 @@
     <span class="md-ellipsis">
       
         validate_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.is_table_alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_table_alias
       
     </span>
   </a>
@@ -2981,6 +3003,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.ConditionSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConditionSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.Weave" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3333,6 +3366,17 @@
     <span class="md-ellipsis">
       
         validate_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.is_table_alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_table_alias
       
     </span>
   </a>
@@ -4308,6 +4352,81 @@ execution. Maps to Python logging levels internally.</p>
         <p>Complete domain model for a thread configuration.</p>
 <p>A thread is the smallest unit of work: one or more sources, a sequence
 of transformation steps, and a single target.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.context.ConditionSpec" class="doc doc-heading">
+            <code>ConditionSpec</code>
+
+
+<a href="#weevr.context.ConditionSpec" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A condition expression for conditional execution.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.ConditionSpec.when">when</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Condition expression string. Supports parameter references
+(<code>${param.x}</code>), built-in checks (<code>table_exists()</code>,
+<code>table_empty()</code>, <code>row_count()</code>), and simple boolean operators.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
 
@@ -6596,6 +6715,26 @@ reference detected.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="weevr.context.is_table_alias" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">is_table_alias</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></code>
+
+<a href="#weevr.context.is_table_alias" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return True if <em>path</em> looks like a table alias (e.g. <code>schema.table</code>).</p>
+<p>Table aliases are dot-separated identifiers resolved by the Spark metastore.
+File paths contain slashes or URI schemes (<code>://</code>).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="weevr.context.execute_thread" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
@@ -7213,7 +7352,7 @@ per-thread collectors are created and merged after execution.</p>
                 <code>thread_conditions</code>
             </td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ConditionSpec (weevr.model.weave.ConditionSpec)" href="../model/#weevr.model.ConditionSpec">ConditionSpec</a>] | None</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ConditionSpec (weevr.model.weave.ConditionSpec)" href="#weevr.context.ConditionSpec">ConditionSpec</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">

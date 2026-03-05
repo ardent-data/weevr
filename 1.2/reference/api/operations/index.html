@@ -3410,6 +3410,9 @@ Then the column set is narrowed according to the mapping mode:</p>
     <div class="doc doc-contents ">
 
         <p>Write a DataFrame to a Delta table.</p>
+<p>If <em>target_path</em> is a table alias (e.g. <code>staging.stg_customers</code>), the
+write uses <code>saveAsTable</code> so the metastore manages the table location.
+Otherwise, <code>save</code> writes directly to the file path.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3496,7 +3499,7 @@ Then the column set is narrowed according to the mapping mode:</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Physical path for the Delta table.</p>
+                <p>Table alias or physical path for the Delta table.</p>
               </div>
             </td>
             <td>
