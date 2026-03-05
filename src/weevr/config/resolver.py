@@ -100,6 +100,10 @@ def resolve_variables(
             var_name = match.group(1).strip()
             default_value = match.group(2)
 
+            # Skip runtime variable namespace — resolved later by VariableContext
+            if var_name.startswith("var."):
+                return match.group(0)
+
             try:
                 # Try dotted key access first
                 value = _get_dotted_value(context, var_name)
