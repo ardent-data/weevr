@@ -463,8 +463,9 @@ class TestContextRunExecute:
 config_version: "1.0"
 lookups:
   labels:
-    type: delta
-    alias: "{lkp}"
+    source:
+      type: delta
+      alias: "{lkp}"
 threads:
   - ref: "threads/tw_lkp.thread"
 """)

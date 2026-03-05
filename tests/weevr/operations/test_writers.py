@@ -463,7 +463,16 @@ class TestWriteTargetMerge:
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
         """Merge with soft_delete sets flag on unmatched target rows."""
+        from pyspark.sql.types import BooleanType, LongType, StringType, StructField, StructType
+
         path = tmp_delta_path("merge_sd_mark")
+        schema = StructType(
+            [
+                StructField("id", LongType()),
+                StructField("val", StringType()),
+                StructField("is_deleted", BooleanType(), nullable=True),
+            ]
+        )
         create_delta_table(
             spark,
             path,
@@ -471,6 +480,7 @@ class TestWriteTargetMerge:
                 {"id": 1, "val": "a", "is_deleted": None},
                 {"id": 2, "val": "b", "is_deleted": None},
             ],
+            schema=schema,
         )
         incoming = spark.createDataFrame([{"id": 1, "val": "a_updated"}])
         target = Target(path=path)
