@@ -56,7 +56,10 @@ class CacheManager:
         if thread_name not in self._cache_targets:
             return
         try:
-            df = spark.read.format("delta").load(target_path)
+            if "://" not in target_path and "/" not in target_path:
+                df = spark.read.format("delta").table(target_path)
+            else:
+                df = spark.read.format("delta").load(target_path)
             df.persist(StorageLevel.MEMORY_AND_DISK)
             self._cached[thread_name] = df
             logger.debug("Cached output of thread '%s' from path '%s'", thread_name, target_path)

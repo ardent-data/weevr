@@ -471,9 +471,12 @@ class Context:
                 checked.add(resolve_path)
 
                 try:
-                    self._spark.read.format(
-                        source.type if source.type != "excel" else "com.crealytics.spark.excel"
-                    ).load(resolve_path).limit(0).collect()
+                    fmt = source.type if source.type != "excel" else "com.crealytics.spark.excel"
+                    is_alias = "://" not in resolve_path and "/" not in resolve_path
+                    if source.type == "delta" and is_alias:
+                        self._spark.read.format(fmt).table(resolve_path).limit(0).collect()
+                    else:
+                        self._spark.read.format(fmt).load(resolve_path).limit(0).collect()
                 except Exception:
                     errors.append(
                         f"Source '{source_name}' in thread '{thread_name}' "

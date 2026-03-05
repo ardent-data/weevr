@@ -34,6 +34,11 @@ def write_quarantine(
         return 0
 
     quarantine_path = f"{target_path}_quarantine"
-    quarantine_df.write.format("delta").mode("overwrite").save(quarantine_path)
+    writer = quarantine_df.write.format("delta").mode("overwrite")
+    # Table aliases (schema.table) use the metastore; file paths use save().
+    if "://" not in quarantine_path and "/" not in quarantine_path:
+        writer.saveAsTable(quarantine_path)
+    else:
+        writer.save(quarantine_path)
 
     return row_count

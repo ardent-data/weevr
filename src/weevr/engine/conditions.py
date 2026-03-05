@@ -20,9 +20,24 @@ _PARAM_REF = re.compile(r"\$\{param\.([^}]+)\}")
 _BUILTIN_CALL = re.compile(r"(table_exists|table_empty|row_count)\s*\(\s*'([^']+)'\s*\)")
 
 
+def _is_table_alias(path: str) -> bool:
+    """Return True if *path* looks like a metastore table alias (e.g. ``schema.table``)."""
+    return "://" not in path and "/" not in path
+
+
+def _read_delta(spark: SparkSession, path: str) -> Any:
+    """Read a Delta table from a file path or table alias."""
+    if _is_table_alias(path):
+        return spark.read.format("delta").table(path)
+    return spark.read.format("delta").load(path)
+
+
 def _table_exists(spark: SparkSession, path: str) -> bool:
-    """Check if a Delta table exists at the given path."""
+    """Check if a Delta table exists at the given path or alias."""
     try:
+        if _is_table_alias(path):
+            spark.read.format("delta").table(path).limit(0).collect()
+            return True
         from delta.tables import DeltaTable
 
         return DeltaTable.isDeltaTable(spark, path)
@@ -35,7 +50,7 @@ def _table_empty(spark: SparkSession, path: str) -> bool:
     if not _table_exists(spark, path):
         return True
     try:
-        return spark.read.format("delta").load(path).limit(1).count() == 0
+        return _read_delta(spark, path).limit(1).count() == 0
     except Exception:
         return True
 
@@ -45,7 +60,7 @@ def _row_count(spark: SparkSession, path: str) -> int:
     if not _table_exists(spark, path):
         return 0
     try:
-        return spark.read.format("delta").load(path).count()
+        return _read_delta(spark, path).count()
     except Exception:
         return 0
 
