@@ -372,16 +372,48 @@ def resolve_references(
                 finally:
                     visited.discard(ref)
             else:
-                # Inline definition — must have name
+                # Name-only entry — resolve by convention to {name}.weave
                 if isinstance(entry, dict) and not entry.get("name"):
                     raise ConfigError(
                         "Inline weave definition requires a 'name' field",
                     )
-                # Inline entries are passed through as-is (already complete dicts)
                 if isinstance(entry, dict):
-                    inline = entry.copy()
-                    inline["qualified_key"] = entry.get("name", "")
-                    resolved_weaves.append(inline)
+                    weave_name = entry["name"]
+                    convention_ref = f"{weave_name}.weave"
+                    convention_path = project_root / convention_ref
+                    if convention_path.exists():
+                        # Load the weave file by convention
+                        conv_raw = parse_yaml(convention_path)
+                        conv_version = extract_config_version(conv_raw)
+                        conv_type = detect_config_type_from_extension(convention_path)
+                        child_type = conv_type if conv_type else "weave"
+                        validate_config_version(conv_version, child_type)
+                        validated = validate_schema(conv_raw, child_type)
+                        child_dict = validated.model_dump(exclude_unset=True)
+                        if not child_dict.get("name"):
+                            child_dict["name"] = weave_name
+                        child_dict["qualified_key"] = convention_ref
+
+                        # Preserve entry-level overrides (condition)
+                        for key in ("condition",):
+                            if key in entry:
+                                child_dict[key] = entry[key]
+
+                        context = build_param_context(runtime_params, child_dict.get("defaults"))
+                        resolved_child = resolve_variables(child_dict, context)
+                        resolved_child = resolve_references(
+                            resolved_child,
+                            child_type,
+                            project_root,
+                            runtime_params,
+                            visited.copy(),
+                        )
+                        resolved_weaves.append(resolved_child)
+                    else:
+                        # Truly inline — pass through as-is
+                        inline = entry.copy()
+                        inline["qualified_key"] = entry.get("name", "")
+                        resolved_weaves.append(inline)
 
         result["_resolved_weaves"] = resolved_weaves
 
