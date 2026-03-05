@@ -5,6 +5,7 @@ from __future__ import annotations
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
+from weevr.delta import is_table_alias
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
@@ -59,7 +60,7 @@ def _read_raw(spark: SparkSession, source: Source) -> DataFrame:
         if source.alias is None:
             raise ExecutionError("Delta source requires 'alias' to be set")
         # Table aliases (schema.table) use the metastore; file paths use load().
-        if "://" not in source.alias and "/" not in source.alias:
+        if is_table_alias(source.alias):
             return spark.read.format("delta").table(source.alias)
         return spark.read.format("delta").load(source.alias)
 
@@ -215,7 +216,7 @@ def read_cdc_source(
         reader = spark.read.format("delta").option("readChangeFeed", "true")
         if last_version is not None:
             reader = reader.option("startingVersion", last_version + 1)
-        if "://" not in source.alias and "/" not in source.alias:
+        if is_table_alias(source.alias):
             return reader.table(source.alias)
         return reader.load(source.alias)
 

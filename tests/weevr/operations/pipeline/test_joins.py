@@ -165,6 +165,17 @@ class TestApplyJoin:
         assert "score" in result.columns
         assert "name" in result.columns
 
+    def test_same_name_join_keys_deduplicated(self, left_df, sources) -> None:
+        """Join on same-name keys drops the right-side duplicate column."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+        )
+        result = apply_join(left_df, params, sources)
+        # 'id' should appear exactly once, not twice
+        assert result.columns.count("id") == 1
+
     def test_missing_source_raises_execution_error(self, left_df, sources) -> None:
         params = JoinParams(
             source="nonexistent",

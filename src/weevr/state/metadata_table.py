@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType, StructField, StructType, TimestampType
 
+from weevr.delta import is_table_alias, read_delta, resolve_delta_table
 from weevr.errors.exceptions import StateError
 from weevr.state.watermark import WatermarkState, WatermarkStore
 
@@ -45,14 +46,9 @@ class MetadataTableStore(WatermarkStore):
         """Path to the watermarks metadata table."""
         return self._table_path
 
-    @staticmethod
-    def _is_table_alias(path: str) -> bool:
-        """Return True if *path* looks like a metastore table alias."""
-        return "://" not in path and "/" not in path
-
     def _ensure_table_exists(self, spark: SparkSession) -> None:
         """Create the watermarks table if it does not exist."""
-        if self._is_table_alias(self._table_path):
+        if is_table_alias(self._table_path):
             table_ref = self._table_path
         else:
             table_ref = f"delta.`{self._table_path}`"
@@ -73,11 +69,11 @@ class MetadataTableStore(WatermarkStore):
         try:
             self._ensure_table_exists(spark)
 
-            if self._is_table_alias(self._table_path):
-                reader = spark.read.format("delta").table(self._table_path)
-            else:
-                reader = spark.read.format("delta").load(self._table_path)
-            rows = reader.filter(F.col("thread_name") == thread_name).collect()
+            rows = (
+                read_delta(spark, self._table_path)
+                .filter(F.col("thread_name") == thread_name)
+                .collect()
+            )
 
             if not rows:
                 return None
@@ -106,8 +102,6 @@ class MetadataTableStore(WatermarkStore):
         try:
             self._ensure_table_exists(spark)
 
-            from delta.tables import DeltaTable
-
             state_df = spark.createDataFrame(
                 [
                     (
@@ -122,10 +116,7 @@ class MetadataTableStore(WatermarkStore):
                 schema=_WATERMARK_SCHEMA,
             )
 
-            if self._is_table_alias(self._table_path):
-                target = DeltaTable.forName(spark, self._table_path)
-            else:
-                target = DeltaTable.forPath(spark, self._table_path)
+            target = resolve_delta_table(spark, self._table_path)
             (
                 target.alias("target")
                 .merge(state_df.alias("source"), "target.thread_name = source.thread_name")

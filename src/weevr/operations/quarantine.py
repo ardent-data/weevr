@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pyspark.sql import DataFrame, SparkSession
 
+from weevr.delta import is_table_alias
+
 
 def write_quarantine(
     spark: SparkSession,
@@ -36,7 +38,7 @@ def write_quarantine(
     quarantine_path = f"{target_path}_quarantine"
     writer = quarantine_df.write.format("delta").mode("overwrite")
     # Table aliases (schema.table) use the metastore; file paths use save().
-    if "://" not in quarantine_path and "/" not in quarantine_path:
+    if is_table_alias(quarantine_path):
         writer.saveAsTable(quarantine_path)
     else:
         writer.save(quarantine_path)

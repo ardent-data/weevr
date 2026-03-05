@@ -26,6 +26,7 @@ from weevr.config.resolver import (
     resolve_variables,
 )
 from weevr.config.validation import validate_schema
+from weevr.delta import is_table_alias
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
 from weevr.engine.runner import execute_loom, execute_weave
@@ -488,8 +489,7 @@ class Context:
 
                 try:
                     fmt = source.type if source.type != "excel" else "com.crealytics.spark.excel"
-                    is_alias = "://" not in resolve_path and "/" not in resolve_path
-                    if source.type == "delta" and is_alias:
+                    if source.type == "delta" and is_table_alias(resolve_path):
                         self._spark.read.format(fmt).table(resolve_path).limit(0).collect()
                     else:
                         self._spark.read.format(fmt).load(resolve_path).limit(0).collect()

@@ -5,6 +5,8 @@ import logging
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.storagelevel import StorageLevel
 
+from weevr.delta import read_delta
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,10 +58,7 @@ class CacheManager:
         if thread_name not in self._cache_targets:
             return
         try:
-            if "://" not in target_path and "/" not in target_path:
-                df = spark.read.format("delta").table(target_path)
-            else:
-                df = spark.read.format("delta").load(target_path)
+            df = read_delta(spark, target_path)
             df.persist(StorageLevel.MEMORY_AND_DISK)
             self._cached[thread_name] = df
             logger.debug("Cached output of thread '%s' from path '%s'", thread_name, target_path)

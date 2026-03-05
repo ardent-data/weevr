@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias, cast
+from typing import TYPE_CHECKING, Literal, TypeAlias, cast
 
+from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import StateError
 from weevr.state.watermark import WatermarkState, WatermarkStore
 
@@ -37,38 +38,13 @@ class TablePropertiesStore(WatermarkStore):
         """Path to the Delta target table."""
         return self._target_path
 
-    @staticmethod
-    def _is_table_alias(path: str) -> bool:
-        """Return True if *path* looks like a metastore table alias."""
-        return "://" not in path and "/" not in path
-
-    def _resolve_delta_table(self, spark: SparkSession) -> Any:
-        """Resolve the target as a DeltaTable, handling both paths and aliases."""
-        from delta.tables import DeltaTable
-
-        if self._is_table_alias(self._target_path):
-            return DeltaTable.forName(spark, self._target_path)
-        return DeltaTable.forPath(spark, self._target_path)
-
-    def _table_exists(self, spark: SparkSession) -> bool:
-        """Return True if the target Delta table exists."""
-        try:
-            if self._is_table_alias(self._target_path):
-                spark.read.format("delta").table(self._target_path).limit(0).collect()
-                return True
-            from delta.tables import DeltaTable
-
-            return DeltaTable.isDeltaTable(spark, self._target_path)
-        except Exception:
-            return False
-
     def read(self, spark: SparkSession, thread_name: str) -> WatermarkState | None:
         """Load watermark state from target table properties."""
         try:
-            if not self._table_exists(spark):
+            if not delta_table_exists(spark, self._target_path):
                 return None
 
-            detail = self._resolve_delta_table(spark).detail()
+            detail = resolve_delta_table(spark, self._target_path).detail()
             props_row = detail.select("properties").collect()
 
             if not props_row:
@@ -116,7 +92,7 @@ class TablePropertiesStore(WatermarkStore):
             props_sql = ", ".join(
                 f"'{k}' = '{v.replace(chr(39), chr(39) + chr(39))}'" for k, v in props.items()
             )
-            if self._is_table_alias(self._target_path):
+            if is_table_alias(self._target_path):
                 table_ref = self._target_path
             else:
                 table_ref = f"delta.`{self._target_path}`"

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import SparkSession
 
+from weevr.delta import read_delta
 from weevr.model.validation import Assertion
 from weevr.telemetry.results import AssertionResult
 
@@ -69,20 +70,13 @@ def _evaluate_one(
     )
 
 
-def _read_delta_target(spark: SparkSession, target_path: str) -> DataFrame:
-    """Read a Delta target table, handling both file paths and table aliases."""
-    if "://" not in target_path and "/" not in target_path:
-        return spark.read.format("delta").table(target_path)
-    return spark.read.format("delta").load(target_path)
-
-
 def _eval_row_count(
     spark: SparkSession,
     assertion: Assertion,
     target_path: str,
 ) -> AssertionResult:
     """Check row count is within min/max bounds."""
-    df = _read_delta_target(spark, target_path)
+    df = read_delta(spark, target_path)
     count = df.count()
 
     if assertion.min is not None and count < assertion.min:
@@ -122,7 +116,7 @@ def _eval_column_not_null(
             details="No columns specified for column_not_null assertion",
         )
 
-    df = _read_delta_target(spark, target_path)
+    df = read_delta(spark, target_path)
 
     null_counts: dict[str, int] = {}
     for col in columns:
@@ -163,7 +157,7 @@ def _eval_unique(
             details="No columns specified for unique assertion",
         )
 
-    df = _read_delta_target(spark, target_path)
+    df = read_delta(spark, target_path)
 
     total = df.count()
     distinct = df.select(*columns).distinct().count()
@@ -192,7 +186,7 @@ def _eval_expression(
     target_path: str,
 ) -> AssertionResult:
     """Evaluate a Spark SQL expression against the target table."""
-    df = _read_delta_target(spark, target_path)
+    df = read_delta(spark, target_path)
     expr = assertion.expression
 
     if not expr:

@@ -117,6 +117,13 @@ class TestJoinParams:
         jp = JoinParams(source="t", on=["id"], null_safe=False)  # type: ignore[list-item]
         assert jp.null_safe is False
 
+    def test_yaml_boolean_on_key_coercion(self):
+        """YAML 1.1 parses bare 'on' as boolean True; model remaps it."""
+        data = {True: ["id"], "source": "orders", "type": "inner"}
+        jp = JoinParams.model_validate(data)
+        assert jp.on[0].left == "id"
+        assert jp.on[0].right == "id"
+
 
 class TestStepDiscriminator:
     """Test Step discriminated union dispatch for all 10 step types."""

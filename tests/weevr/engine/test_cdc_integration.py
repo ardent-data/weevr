@@ -97,12 +97,12 @@ class TestCdcSoftDelete:
             spark,
             tgt,
             [
-                {"id": 1, "name": "Alice", "is_deleted": "false"},
-                {"id": 2, "name": "Bob", "is_deleted": "false"},
+                {"id": 1, "name": "Alice", "is_deleted": False},
+                {"id": 2, "name": "Bob", "is_deleted": False},
             ],
         )
 
-        cdc_df = spark.createDataFrame([{"id": 2, "name": "Bob", "op": "D", "is_deleted": "false"}])
+        cdc_df = spark.createDataFrame([{"id": 2, "name": "Bob", "op": "D", "is_deleted": False}])
 
         cdc_config = CdcConfig(
             operation_column="op",
@@ -115,7 +115,6 @@ class TestCdcSoftDelete:
             mode="merge",
             match_keys=["id"],
             soft_delete_column="is_deleted",
-            soft_delete_value="true",
         )
 
         execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config)
@@ -123,8 +122,8 @@ class TestCdcSoftDelete:
         result = spark.read.format("delta").load(tgt)
         rows = {r["id"]: r for r in result.collect()}
         assert result.count() == 2  # Row not physically removed
-        assert rows[1]["is_deleted"] == "false"  # unchanged
-        assert rows[2]["is_deleted"] == "true"  # soft deleted
+        assert rows[1]["is_deleted"] is False  # unchanged
+        assert rows[2]["is_deleted"] is True  # soft deleted
 
     def test_hard_delete_removes_row(self, spark: SparkSession, tmp_delta_path) -> None:
         """on_delete=hard_delete physically removes the matching row."""
