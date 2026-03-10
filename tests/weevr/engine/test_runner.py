@@ -959,6 +959,229 @@ class TestWeaveLookupIntegration:
         mock_cleanup.assert_called_once_with({"ref": mock_df})
 
 
+class TestDeferredLookupMaterialization:
+    """Test schedule-aware lookup materialization in execute_weave."""
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_deferred_lookup_materialized_at_scheduled_group(self, mock_mat, mock_exec):
+        """Internal lookup is materialized after its producer group, not upfront."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        # Track call ordering to verify materialization happens after producer
+        call_order: list[str] = []
+
+        mock_df = MagicMock()
+        mock_mat.side_effect = lambda spark, lk_dict, **kwargs: (
+            call_order.append(f"materialize:{','.join(lk_dict.keys())}"),
+            (
+                {n: mock_df for n in lk_dict},
+                [LookupResult(name=n, materialized=True, row_count=10) for n in lk_dict],
+            ),
+        )[1]
+
+        def exec_side_effect(spark, thread, **kwargs):
+            call_order.append(f"execute:{thread.name}")
+            return _make_result(thread.name)
+
+        mock_exec.side_effect = exec_side_effect
+
+        # A produces silver.dim_customer; lookup reads it; B consumes lookup
+        lookups = {
+            "cust": Lookup(
+                source=Source(type="delta", alias="silver.dim_customer"),
+                materialize=True,
+            )
+        }
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": Thread.model_validate(
+                {
+                    "name": "B",
+                    "config_version": "1.0",
+                    "sources": {"lk_cust": {"lookup": "cust"}},
+                    "target": {},
+                }
+            ),
+        }
+        plan = build_plan("test_weave", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+        assert 1 in plan.lookup_schedule
+        assert "cust" in plan.lookup_schedule[1]
+
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+        assert result.status == "success"
+        # materialize_lookups should be called once (deferred to after group 0)
+        assert mock_mat.call_count == 1
+        # The call should be for the "cust" lookup only
+        call_lookups = mock_mat.call_args[0][1]
+        assert "cust" in call_lookups
+        # Producer must execute BEFORE the lookup is materialized
+        assert call_order.index("execute:A") < call_order.index("materialize:cust")
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_no_schedule_falls_back_to_upfront(self, mock_mat, mock_exec):
+        """Without lookup_schedule, all lookups are materialized upfront."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "ref": Lookup(
+                source=Source(type="delta", alias="ext.table"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        # Build plan without lookups → no schedule
+        plan = build_plan("test_weave", threads, _entries("A"))
+        assert plan.lookup_schedule is None
+
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+        assert result.status == "success"
+        # Upfront materialization should be called once with all lookups
+        mock_mat.assert_called_once()
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_external_lookup_materialized_at_group_0(self, mock_mat, mock_exec):
+        """External lookup (no producer) is materialized before first group."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ext": mock_df},
+            [LookupResult(name="ext", materialized=True, row_count=3)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "ext": Lookup(
+                source=Source(type="delta", alias="external.codes"),
+                materialize=True,
+            )
+        }
+        threads = {
+            "A": Thread.model_validate(
+                {
+                    "name": "A",
+                    "config_version": "1.0",
+                    "sources": {"lk_ext": {"lookup": "ext"}},
+                    "target": {},
+                }
+            )
+        }
+        plan = build_plan("test_weave", threads, _entries("A"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+        assert 0 in plan.lookup_schedule
+
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+        assert result.status == "success"
+        mock_mat.assert_called_once()
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_cleanup_handles_deferred_lookups(self, mock_mat, mock_cleanup, mock_exec):
+        """Cleanup receives all cached lookups regardless of materialization timing."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"cust": mock_df},
+            [LookupResult(name="cust", materialized=True, row_count=5)],
+        )
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+
+        lookups = {
+            "cust": Lookup(
+                source=Source(type="delta", alias="silver.dim"),
+                materialize=True,
+            )
+        }
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim"),
+            "B": Thread.model_validate(
+                {
+                    "name": "B",
+                    "config_version": "1.0",
+                    "sources": {"lk_cust": {"lookup": "cust"}},
+                    "target": {},
+                }
+            ),
+        }
+        plan = build_plan("test_weave", threads, _entries("A", "B"), lookups=lookups)
+        execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+
+        mock_cleanup.assert_called_once()
+        cleaned = mock_cleanup.call_args[0][0]
+        assert "cust" in cleaned
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_mixed_lookups_materialized_at_different_groups(self, mock_mat, mock_exec):
+        """External lookup at group 0, internal lookup deferred to after producer."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        call_log: list[dict] = []
+
+        def mat_side_effect(spark, lk_dict, **kwargs):
+            names = list(lk_dict.keys())
+            call_log.append({"lookups": names})
+            result_dfs = {n: MagicMock() for n in names}
+            results = [LookupResult(name=n, materialized=True, row_count=1) for n in names]
+            return result_dfs, results
+
+        mock_mat.side_effect = mat_side_effect
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+
+        lookups = {
+            "ext_codes": Lookup(
+                source=Source(type="delta", alias="external.codes"),
+                materialize=True,
+            ),
+            "cust": Lookup(
+                source=Source(type="delta", alias="silver.dim"),
+                materialize=True,
+            ),
+        }
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim"),
+            "B": Thread.model_validate(
+                {
+                    "name": "B",
+                    "config_version": "1.0",
+                    "sources": {"lk_cust": {"lookup": "cust"}, "lk_ext": {"lookup": "ext_codes"}},
+                    "target": {},
+                }
+            ),
+        }
+        plan = build_plan("test_weave", threads, _entries("A", "B"), lookups=lookups)
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups)
+
+        assert result.status == "success"
+        # Two separate calls: ext_codes at group 0, cust after group 0
+        assert len(call_log) == 2
+        assert "ext_codes" in call_log[0]["lookups"]
+        assert "cust" in call_log[1]["lookups"]
+
+
 class TestWeaveVariableIntegration:
     """Test variable context in execute_weave."""
 

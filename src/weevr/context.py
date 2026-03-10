@@ -308,10 +308,12 @@ class Context:
                 )
 
             filtered_entries = [e for e in model.threads if e.name in weave_threads]
+            weave_lookups = dict(model.lookups) if model.lookups else None
             plan = build_plan(
                 weave_name=resolved.config_name,
                 threads=weave_threads,
                 thread_entries=filtered_entries,
+                lookups=weave_lookups,
             )
             # Build thread condition map from ThreadEntry conditions
             thread_conditions: dict[str, ConditionSpec] = {}
@@ -433,6 +435,7 @@ class Context:
                     weave_name=resolved.config_name,
                     threads=wt,
                     thread_entries=list(model.threads),
+                    lookups=dict(model.lookups) if model.lookups else None,
                 )
             except Exception as exc:
                 validation_errors.append(f"DAG validation failed: {exc}")
@@ -454,6 +457,7 @@ class Context:
                         weave_name=weave_name,
                         threads=wt,
                         thread_entries=list(weave.threads),
+                        lookups=dict(weave.lookups) if weave.lookups else None,
                     )
                 except Exception as exc:
                     validation_errors.append(
@@ -550,6 +554,7 @@ class Context:
                         weave_name=resolved.config_name,
                         threads=wt,
                         thread_entries=filtered_entries,
+                        lookups=dict(model.lookups) if model.lookups else None,
                     )
                 )
 
@@ -573,6 +578,7 @@ class Context:
                             weave_name=weave_name,
                             threads=wt,
                             thread_entries=filtered_entries,
+                            lookups=dict(weave.lookups) if weave.lookups else None,
                         )
                     )
 

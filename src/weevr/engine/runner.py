@@ -135,9 +135,27 @@ def execute_weave(
     all_hook_results: list[HookResult] = []
     all_lookup_results: list[LookupResult] = []
 
+    def _materialize_scheduled(sched_key: int) -> None:
+        """Materialize lookups assigned to ``sched_key`` in the lookup schedule."""
+        if not lookups or plan.lookup_schedule is None or sched_key not in plan.lookup_schedule:
+            return
+        subset = {k: v for k, v in lookups.items() if k in plan.lookup_schedule[sched_key]}
+        if not subset:
+            return
+        new_cached, new_results = materialize_lookups(
+            spark, subset, collector=collector, parent_span_id=weave_span_id
+        )
+        cached_lookup_dfs.update(new_cached)
+        all_lookup_results.extend(new_results)
+
     try:
-        # Materialize lookups before any hook or thread execution
-        if lookups:
+        # Materialize lookups: when a lookup schedule is available, defer
+        # internal lookups to the correct group boundary. Otherwise (backward
+        # compat) materialize everything upfront.
+        if lookups and plan.lookup_schedule is not None:
+            # Materialize only lookups scheduled at group 0 (external / pre-thread)
+            _materialize_scheduled(0)
+        elif lookups:
             cached_lookup_dfs, all_lookup_results = materialize_lookups(
                 spark, lookups, collector=collector, parent_span_id=weave_span_id
             )
@@ -159,7 +177,14 @@ def execute_weave(
                 cleanup_lookups(cached_lookup_dfs)
                 raise
 
-        for group in plan.execution_order:
+        for group_idx, group in enumerate(plan.execution_order):
+            # Materialize lookups whose producers completed in prior groups.
+            # Schedule key N (N>=1) means "after group N-1 finishes" — at the
+            # top of group N's iteration all prior groups have already executed.
+            # Key 0 is handled before the loop (pre-thread external lookups).
+            if group_idx > 0:
+                _materialize_scheduled(group_idx)
+
             if aborted:
                 for name in group:
                     if thread_states[name] == "pending":
@@ -482,10 +507,12 @@ def execute_loom(
         weave = weaves[weave_name]
         weave_threads = threads[weave_name]
 
+        weave_lookups = dict(weave.lookups) if weave.lookups else None
         plan = build_plan(
             weave_name=weave_name,
             threads=weave_threads,
             thread_entries=list(weave.threads),
+            lookups=weave_lookups,
         )
 
         # Build thread condition map from ThreadEntry conditions
