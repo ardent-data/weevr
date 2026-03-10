@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/ardent-data/weevr/compare/weevr-v1.2.1...weevr-v1.3.0) (2026-03-10)
+
+
+### Features
+
+* **engine:** defer lookup materialization to schedule-aware group boundaries ([#77](https://github.com/ardent-data/weevr/issues/77)) ([9faa8c8](https://github.com/ardent-data/weevr/commit/9faa8c8a9c85ee75aca26a22f015988a961ec08a))
+
 ## [1.2.1](https://github.com/ardent-data/weevr/compare/weevr-v1.2.0...weevr-v1.2.1) (2026-03-05)
 
 
