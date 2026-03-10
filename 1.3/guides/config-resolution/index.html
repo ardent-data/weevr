@@ -1,0 +1,2566 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.3/guides/config-resolution/">
+      
+      
+        <link rel="prev" href="../engine-internals/">
+      
+      
+        <link rel="next" href="../telemetry-architecture/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Config Resolution - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/mkdocs_d2_plugin.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#config-resolution" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Config Resolution
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/yaml-schema/thread/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../release-notes/1.2/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-14-parse-and-validate-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1–4: Parse and validate structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-56-resolve-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5–6: Resolve values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-7-load-child-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 7: Load child configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-89-inherit-and-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 8–9: Inherit and expand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-10-hydrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 10: Hydrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-14-parse-and-validate-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1–4: Parse and validate structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-56-resolve-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5–6: Resolve values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-7-load-child-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 7: Load child configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-89-inherit-and-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 8–9: Inherit and expand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-10-hydrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 10: Hydrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="config-resolution">Config Resolution<a class="headerlink" href="#config-resolution" title="Permanent link">&para;</a></h1>
+<p>This guide explains how weevr transforms raw YAML files into validated,
+typed configuration models. The resolution pipeline is a multi-stage process
+that parses, validates, resolves, inherits, and hydrates configuration.</p>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>When you call <code>Context.run()</code> or <code>Context.load()</code>, weevr runs the full
+config resolution pipeline internally. The stages are designed to fail
+fast — syntax errors are caught before variable resolution, schema errors
+before reference loading, and semantic constraints after all values are
+concrete.</p>
+<h2 id="key-concepts">Key concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Variable interpolation</strong> — <code>${var}</code> placeholders in YAML values are
+  replaced with concrete values from runtime parameters or config defaults.
+  Default values use the <code>${var:-default}</code> syntax.</li>
+<li><strong>Reference resolution</strong> — <code>ref:</code> entries in weave and loom configs load
+  child configuration files recursively. Circular references are detected
+  and rejected.</li>
+<li><strong>Inheritance cascade</strong> — Defaults flow downward: loom defaults → weave
+  defaults → thread config. The most specific value wins. Replacement is
+  whole-value, not deep merge.</li>
+<li><strong>Typed extensions</strong> — Files use <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> extensions
+  to declare their config type unambiguously.</li>
+<li><strong>Macro expansion</strong> — <code>foreach</code> blocks in step lists expand into repeated
+  step sequences with variable substitution.</li>
+</ul>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p>The pipeline runs in 10 stages:</p>
+<div class="d2"><svg data-d2-version="v0.7.1" preserveAspectRatio="xMinYMin meet" viewBox="0 0 2404 268" role="img" aria-label="Diagram"><svg class="d2-e85c2bf56f93468ab6422c9645339b17 d2-svg" width="2404" height="268" viewBox="-89 -89 2404 268"><rect x="-89.000000" y="-89.000000" width="2404.000000" height="268.000000" rx="0.000000" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-e85c2bf56f93468ab6422c9645339b17 .text-bold {
+	font-family: "d2-e85c2bf56f93468ab6422c9645339b17-font-bold";
+}
+@font-face {
+	font-family: d2-e85c2bf56f93468ab6422c9645339b17-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}</style><style type="text/css">.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N1{fill:#0A0F25;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N2{fill:#676C7E;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N3{fill:#9499AB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N4{fill:#CFD2DD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N5{fill:#DEE1EB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N6{fill:#EEF1F8;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-N7{fill:#FFFFFF;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-B1{fill:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-B2{fill:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-B3{fill:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-B4{fill:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-B5{fill:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-B6{fill:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-AA2{fill:#4A6FF3;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-AA4{fill:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-AA5{fill:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-AB4{fill:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .fill-AB5{fill:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N1{stroke:#0A0F25;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N2{stroke:#676C7E;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N3{stroke:#9499AB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N4{stroke:#CFD2DD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N5{stroke:#DEE1EB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N6{stroke:#EEF1F8;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-N7{stroke:#FFFFFF;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-B1{stroke:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-B2{stroke:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-B3{stroke:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-B4{stroke:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-B5{stroke:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-B6{stroke:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-AA2{stroke:#4A6FF3;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-AA4{stroke:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-AA5{stroke:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-AB4{stroke:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .stroke-AB5{stroke:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N1{background-color:#0A0F25;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N2{background-color:#676C7E;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N3{background-color:#9499AB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N4{background-color:#CFD2DD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N5{background-color:#DEE1EB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N6{background-color:#EEF1F8;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-N7{background-color:#FFFFFF;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-B1{background-color:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-B2{background-color:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-B3{background-color:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-B4{background-color:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-B5{background-color:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-B6{background-color:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-AA2{background-color:#4A6FF3;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-AA4{background-color:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-AA5{background-color:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-AB4{background-color:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .background-color-AB5{background-color:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N1{color:#0A0F25;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N2{color:#676C7E;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N3{color:#9499AB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N4{color:#CFD2DD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N5{color:#DEE1EB;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N6{color:#EEF1F8;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-N7{color:#FFFFFF;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-B1{color:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-B2{color:#0D32B2;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-B3{color:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-B4{color:#E3E9FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-B5{color:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-B6{color:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-AA2{color:#4A6FF3;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-AA4{color:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-AA5{color:#F7F8FE;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-AB4{color:#EDF0FD;}
+		.d2-e85c2bf56f93468ab6422c9645339b17 .color-AB5{color:#F7F8FE;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.sketch-overlay-B1{fill:url(#streaks-darker-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:lighten}.sketch-overlay-B2{fill:url(#streaks-darker-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:lighten}.sketch-overlay-B3{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-B4{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-B5{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-B6{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-AA2{fill:url(#streaks-dark-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:overlay}.sketch-overlay-AA4{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-AA5{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-AB4{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-AB5{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-N1{fill:url(#streaks-darker-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:lighten}.sketch-overlay-N2{fill:url(#streaks-dark-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:overlay}.sketch-overlay-N3{fill:url(#streaks-normal-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:color-burn}.sketch-overlay-N4{fill:url(#streaks-normal-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:color-burn}.sketch-overlay-N5{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-N6{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.sketch-overlay-N7{fill:url(#streaks-bright-d2-e85c2bf56f93468ab6422c9645339b17);mix-blend-mode:darken}.light-code{display: block}.dark-code{display: none}</style><g class="cGFyc2U="><g class="shape"><rect x="12.000000" y="12.000000" width="125.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="74.500000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Parse YAML</text></g><g class="dmVyc2lvbg=="><g class="shape"><rect x="207.000000" y="12.000000" width="152.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="283.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Extract version</text></g><g class="ZGV0ZWN0"><g class="shape"><rect x="429.000000" y="12.000000" width="126.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="492.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Detect type</text></g><g class="c2NoZW1h"><g class="shape"><rect x="625.000000" y="12.000000" width="162.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="706.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Validate schema</text></g><g class="cGFyYW1fY3R4"><g class="shape"><rect x="857.000000" y="12.000000" width="188.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="951.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Build param context</text></g><g class="cmVzb2x2ZV92YXJz"><g class="shape"><rect x="1115.000000" y="12.000000" width="168.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1199.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Resolve variables</text></g><g class="cmVzb2x2ZV9yZWZz"><g class="shape"><rect x="1353.000000" y="12.000000" width="178.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1442.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Resolve references</text></g><g class="aW5oZXJpdA=="><g class="shape"><rect x="1601.000000" y="12.000000" width="171.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1686.500000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Apply inheritance</text></g><g class="ZXhwYW5k"><g class="shape"><rect x="1842.000000" y="12.000000" width="152.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1918.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Expand macros</text></g><g class="aHlkcmF0ZQ=="><g class="shape"><rect x="2064.000000" y="12.000000" width="150.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2139.000000" y="50.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">Hydrate model</text></g><g class="KHBhcnNlIC0mZ3Q7IHZlcnNpb24pWzBd"><marker id="mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134" markerWidth="10.000000" markerHeight="12.000000" refX="7.000000" refY="6.000000" viewBox="0.000000 0.000000 10.000000 12.000000" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0.000000,0.000000 10.000000,6.000000 0.000000,12.000000" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 139.000000 45.000000 L 203.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KHZlcnNpb24gLSZndDsgZGV0ZWN0KVswXQ=="><path d="M 361.000000 45.000000 L 425.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KGRldGVjdCAtJmd0OyBzY2hlbWEpWzBd"><path d="M 557.000000 45.000000 L 621.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KHNjaGVtYSAtJmd0OyBwYXJhbV9jdHgpWzBd"><path d="M 789.000000 45.000000 L 853.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KHBhcmFtX2N0eCAtJmd0OyByZXNvbHZlX3ZhcnMpWzBd"><path d="M 1047.000000 45.000000 L 1111.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KHJlc29sdmVfdmFycyAtJmd0OyByZXNvbHZlX3JlZnMpWzBd"><path d="M 1285.000000 45.000000 L 1349.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KHJlc29sdmVfcmVmcyAtJmd0OyBpbmhlcml0KVswXQ=="><path d="M 1533.000000 45.000000 L 1597.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KGluaGVyaXQgLSZndDsgZXhwYW5kKVswXQ=="><path d="M 1774.000000 45.000000 L 1838.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><g class="KGV4cGFuZCAtJmd0OyBoeWRyYXRlKVswXQ=="><path d="M 1996.000000 45.000000 L 2060.000000 45.000000" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-e85c2bf56f93468ab6422c9645339b17-3488378134)" mask="url(#d2-e85c2bf56f93468ab6422c9645339b17)" /></g><mask id="d2-e85c2bf56f93468ab6422c9645339b17" maskUnits="userSpaceOnUse" x="-89" y="-89" width="2404" height="268">
+<rect x="-89" y="-89" width="2404" height="268" fill="white" />
+
+</mask></svg></svg></div>
+<h3 id="stage-14-parse-and-validate-structure">Stage 1–4: Parse and validate structure<a class="headerlink" href="#stage-14-parse-and-validate-structure" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Parse YAML</strong> — Read the file and produce a raw dictionary. File-not-found
+   and YAML syntax errors raise <code>ConfigParseError</code>.</li>
+<li><strong>Extract version</strong> — Read <code>config_version</code> and parse into a <code>(major, minor)</code>
+   tuple. Unsupported versions raise <code>ConfigVersionError</code>.</li>
+<li><strong>Detect type</strong> — Determine whether the file is a thread, weave, loom, or
+   params file. Typed extensions (<code>.thread</code>, <code>.weave</code>, <code>.loom</code>) are checked
+   first; if the extension is <code>.yaml</code> or <code>.yml</code>, the structure is inspected.</li>
+<li><strong>Validate schema</strong> — Run the raw dictionary through a Pydantic model for
+   loose structural validation. At this stage, <code>${var}</code> placeholders are
+   permitted (the schema uses <code>extra="allow"</code>), so unresolved variables do not
+   cause errors.</li>
+</ol>
+<h3 id="stage-56-resolve-values">Stage 5–6: Resolve values<a class="headerlink" href="#stage-56-resolve-values" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Build parameter context</strong> — Merge runtime parameters (highest priority)
+   over config-declared defaults (lowest priority) into a flat context
+   dictionary. Dotted keys like <code>env.lakehouse</code> support nested access.</li>
+<li><strong>Resolve variables</strong> — Recursively walk all strings in the config and
+   replace <code>${var}</code> references with values from the parameter context.
+   Unresolved variables without defaults raise <code>VariableResolutionError</code>.</li>
+</ol>
+<h3 id="stage-7-load-child-configs">Stage 7: Load child configs<a class="headerlink" href="#stage-7-load-child-configs" title="Permanent link">&para;</a></h3>
+<p><strong>Resolve references</strong> — For looms and weaves, load child config files:</p>
+<ul>
+<li>Loom → loads referenced weaves</li>
+<li>Weave → loads referenced threads</li>
+</ul>
+<p>Each child is itself run through the full pipeline (recursion). A <code>visited</code>
+set tracks loaded paths to detect circular references. Entry-level
+overrides like <code>dependencies</code> and <code>condition</code> are preserved alongside the
+loaded config.</p>
+<h3 id="stage-89-inherit-and-expand">Stage 8–9: Inherit and expand<a class="headerlink" href="#stage-89-inherit-and-expand" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Apply inheritance</strong> — For multi-level configs, cascade defaults:<ul>
+<li>Loom defaults merge into weave defaults</li>
+<li>Merged defaults merge into each thread config</li>
+<li>Thread values always win (most specific)</li>
+</ul>
+</li>
+</ol>
+<p>Naming configuration cascades separately as a whole block rather than
+   per-field.</p>
+<ol>
+<li><strong>Expand macros</strong> — <code>foreach</code> blocks in thread step lists are expanded
+   into repeated sequences. This happens after variable resolution so that
+   <code>foreach.values</code> can reference parameters.</li>
+</ol>
+<h3 id="stage-10-hydrate">Stage 10: Hydrate<a class="headerlink" href="#stage-10-hydrate" title="Permanent link">&para;</a></h3>
+<p><strong>Hydrate model</strong> — The fully resolved dictionary is validated through
+the typed Pydantic model (<code>Thread</code>, <code>Weave</code>, or <code>Loom</code>). Semantic errors
+at this stage raise <code>ModelValidationError</code>. Incremental-mode constraints
+(e.g., CDC requires merge write mode) are checked as post-resolution
+cross-cutting validations.</p>
+<h2 id="module-map">Module map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config/parser.py</code></td>
+<td>YAML parsing, version extraction, typed extension detection</td>
+</tr>
+<tr>
+<td><code>config/resolver.py</code></td>
+<td>Variable interpolation, reference loading, circular dependency detection</td>
+</tr>
+<tr>
+<td><code>config/inheritance.py</code></td>
+<td>Three-level cascade: loom → weave → thread</td>
+</tr>
+<tr>
+<td><code>config/validation.py</code></td>
+<td>Pre-resolution schema validation, post-resolution constraint checks</td>
+</tr>
+<tr>
+<td><code>config/macros.py</code></td>
+<td><code>foreach</code> block expansion in step lists</td>
+</tr>
+<tr>
+<td><code>config/__init__.py</code></td>
+<td><code>load_config()</code> — orchestrates the full pipeline</td>
+</tr>
+</tbody>
+</table>
+<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Pre-resolution loose schema</strong> — Schema validation runs before variable
+  resolution, using <code>extra="allow"</code> to tolerate <code>${...}</code> placeholders. This
+  catches structural errors early without requiring all parameters to be
+  available.</li>
+<li><strong>Whole-value replacement</strong> — Inheritance uses simple replacement, not deep
+  merge. A thread-level <code>write</code> block replaces the entire inherited <code>write</code>
+  block, not individual fields within it. This keeps behavior predictable.</li>
+<li><strong>Typed extensions</strong> — <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> extensions eliminate
+  ambiguity about config type without inspecting file contents.</li>
+<li><strong>Foreach after resolution</strong> — Macro expansion happens after variable
+  resolution so that the <code>values</code> list can come from parameters, but before
+  model hydration so that expanded steps are fully validated.</li>
+</ul>
+<h2 id="further-reading">Further reading<a class="headerlink" href="#further-reading" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../reference/configuration-keys/">Configuration Keys</a> — Complete field
+  reference for all config models</li>
+<li><a href="../../concepts/thread-weave-loom/">Thread, Weave, Loom</a> — The three-level
+  hierarchy and inheritance model</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
