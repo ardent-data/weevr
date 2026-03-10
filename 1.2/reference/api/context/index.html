@@ -6951,7 +6951,7 @@ of non-materialized lookups.</p>
 
 
 <h3 id="weevr.context.build_plan" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">build_plan</span><span class="p">(</span><span class="n">weave_name</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">thread_entries</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">build_plan</span><span class="p">(</span><span class="n">weave_name</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">thread_entries</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.build_plan" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -6961,6 +6961,14 @@ of non-materialized lookups.</p>
         <p>Build an execution plan from a weave's threads and declared/inferred dependencies.</p>
 <p>Performs DAG construction, cycle detection, topological sort, and cache analysis
 to produce an immutable :class:<code>ExecutionPlan</code>.</p>
+<p>When <code>lookups</code> are provided, the planner also:</p>
+<ul>
+<li>Infers implicit dependencies between threads mediated by lookups (a
+  thread consuming a lookup whose source is produced by another thread
+  depends on that producer).</li>
+<li>Computes a <strong>lookup schedule</strong> mapping each execution group boundary to
+  the lookups that should be materialized before that group runs.</li>
+</ul>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7021,6 +7029,24 @@ carry explicit dependency declarations.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookups</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="../model/#weevr.model.Lookup">Lookup</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional weave-level lookup definitions. When provided, lookup-
+mediated dependencies are inferred and a materialization schedule is
+computed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -7762,6 +7788,20 @@ determined by matching target paths to source paths across threads.</p>
               <div class="doc-md-description">
                 <p>The explicitly declared subset of <code>dependencies</code>,
 sourced from <code>ThreadEntry.dependencies</code> in the weave config.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ExecutionPlan.lookup_schedule">lookup_schedule</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="int">int</span>, <span title="list">list</span>[<span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maps execution group indices to lookups that should
+be materialized at that boundary. Key 0 means before the first
+group; key N (N &gt; 0) means after group N-1 finishes. <code>None</code>
+when <code>build_plan</code> was called without lookups.</p>
               </div>
             </td>
           </tr>
