@@ -8,6 +8,8 @@ import pytest
 
 from weevr.engine.planner import build_plan
 from weevr.errors.exceptions import ConfigError
+from weevr.model.lookup import Lookup
+from weevr.model.source import Source
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry
 
@@ -387,3 +389,150 @@ class TestExecutionPlanInspectability:
         }
         plan = build_plan("w", threads, _entries("A", "B"))
         assert "A" in plan.dependencies["B"]
+
+
+# ---------------------------------------------------------------------------
+# Helpers — lookups
+# ---------------------------------------------------------------------------
+
+
+def _make_lookup(alias: str, materialize: bool = True) -> Lookup:
+    """Create a minimal Lookup pointing at the given source alias."""
+    return Lookup(source=Source(type="delta", alias=alias), materialize=materialize)
+
+
+def _make_thread_with_lookup(
+    name: str,
+    lookup_name: str,
+    target_alias: str | None = None,
+    source_aliases: list[str] | None = None,
+) -> Thread:
+    """Create a Thread with a lookup-based source."""
+    sources: dict = {}
+    if source_aliases:
+        for alias in source_aliases:
+            sources[alias] = {"type": "delta", "alias": alias}
+    sources[f"lk_{lookup_name}"] = {"lookup": lookup_name}
+
+    target: dict = {}
+    if target_alias:
+        target["alias"] = target_alias
+
+    return Thread.model_validate(
+        {
+            "name": name,
+            "config_version": "1.0",
+            "sources": sources,
+            "target": target,
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Lookup dependency inference tests
+# ---------------------------------------------------------------------------
+
+
+class TestLookupDependencyInference:
+    def test_lookup_creates_implicit_dependency(self):
+        """Thread A produces data → lookup reads it → Thread B consumes lookup → B depends on A."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert "A" in plan.dependencies["B"]
+
+    def test_consumer_moves_to_later_group(self):
+        """Lookup-mediated dep forces consumer into a later group than producer."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.execution_order == [["A"], ["B"]]
+
+    def test_external_lookup_scheduled_at_group_0(self):
+        """Lookup with no producer thread is scheduled at group 0."""
+        threads = {"A": _make_thread_with_lookup("A", "ext_lookup")}
+        lookups = {"ext_lookup": _make_lookup("external.ref_table")}
+        plan = build_plan("w", threads, _entries("A"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+        assert 0 in plan.lookup_schedule
+        assert "ext_lookup" in plan.lookup_schedule[0]
+
+    def test_internal_lookup_scheduled_after_producer(self):
+        """Lookup whose source is produced by thread in group 0 → scheduled at group 1."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+        assert 1 in plan.lookup_schedule
+        assert "cust_lookup" in plan.lookup_schedule[1]
+        # Should not be at group 0
+        assert "cust_lookup" not in plan.lookup_schedule.get(0, [])
+
+    def test_mixed_external_and_internal_lookups(self):
+        """External lookup at group 0, internal lookup at producer_group + 1."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+        }
+        lookups = {
+            "cust_lookup": _make_lookup("silver.dim_customer"),
+            "ext_ref": _make_lookup("external.codes"),
+        }
+        # B also has a normal source for ext_ref — but the lookup schedule is about lookups
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+        assert "ext_ref" in plan.lookup_schedule.get(0, [])
+        assert "cust_lookup" in plan.lookup_schedule.get(1, [])
+
+    def test_cycle_through_lookup_raises(self):
+        """Circular dependency through a lookup is caught."""
+        # A produces silver.dim → lookup reads silver.dim → B consumes lookup
+        # B produces silver.fact → A reads silver.fact
+        # This creates: A → B (via lookup) and B → A (via source) = cycle
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim", source_aliases=["silver.fact"]),
+            "B": _make_thread_with_lookup("B", "dim_lk", target_alias="silver.fact"),
+        }
+        lookups = {"dim_lk": _make_lookup("silver.dim")}
+        with pytest.raises(ConfigError, match="Circular dependency"):
+            build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+
+    def test_no_lookups_schedule_is_none(self):
+        """Without lookups, lookup_schedule is None."""
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("w", threads, _entries("A"))
+        assert plan.lookup_schedule is None
+
+    def test_non_materialized_lookup_excluded_from_schedule(self):
+        """Lookup with materialize=False is not in the schedule."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim"),
+            "B": _make_thread_with_lookup("B", "dim_lk"),
+        }
+        lookups = {"dim_lk": _make_lookup("silver.dim", materialize=False)}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+        # Schedule should be empty (no materialized lookups)
+        all_scheduled = [lk for lks in plan.lookup_schedule.values() for lk in lks]
+        assert "dim_lk" not in all_scheduled
+
+    def test_lookup_dep_still_inferred_when_not_materialized(self):
+        """Even non-materialized lookups create implicit dependencies for ordering."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim"),
+            "B": _make_thread_with_lookup("B", "dim_lk"),
+        }
+        lookups = {"dim_lk": _make_lookup("silver.dim", materialize=False)}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        # B still depends on A via the lookup
+        assert "A" in plan.dependencies["B"]
+        assert plan.execution_order == [["A"], ["B"]]

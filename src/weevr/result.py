@@ -325,11 +325,13 @@ class LoadedConfig:
             typed_threads: dict[str, Thread] = {}
             for name, t in thread_map.items():
                 typed_threads[name] = t if isinstance(t, Thread) else Thread.model_validate(t)
+            weave_lookups = dict(weave.lookups) if weave.lookups else None
             plans.append(
                 build_plan(
                     weave_name=weave_name,
                     threads=typed_threads,
                     thread_entries=list(weave.threads),
+                    lookups=weave_lookups,
                 )
             )
 
@@ -348,11 +350,13 @@ class LoadedConfig:
                 typed_threads = {}
                 for name, t in thread_map.items():
                     typed_threads[name] = t if isinstance(t, Thread) else Thread.model_validate(t)
+                lk = dict(weave_obj.lookups) if weave_obj.lookups else None
                 plans.append(
                     build_plan(
                         weave_name=weave_name,
                         threads=typed_threads,
                         thread_entries=list(weave_obj.threads),
+                        lookups=lk,
                     )
                 )
 
