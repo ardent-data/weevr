@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
+from weevr.engine.planner import ExecutionPlan
 from weevr.model.loom import Loom, WeaveEntry
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -180,8 +183,6 @@ class TestRunResult:
         assert "Source 'raw' not found" in s
 
     def test_summary_plan(self) -> None:
-        from weevr.engine.planner import ExecutionPlan
-
         plan = ExecutionPlan(
             weave_name="dimensions",
             threads=["dim_product", "dim_customer"],
@@ -422,8 +423,6 @@ class TestSummaryPlanEnriched:
         cache_targets: list[str] | None = None,
         lookup_schedule: dict[int, list[str]] | None = None,
     ) -> RunResult:
-        from weevr.engine.planner import ExecutionPlan
-
         plan = ExecutionPlan(
             weave_name="dimensions",
             threads=["a", "b", "c"],
@@ -477,6 +476,210 @@ class TestSummaryPlanEnriched:
         )
         s = result.summary()
         assert "2 lookups" in s
+
+
+class TestExplain:
+    """Tests for the explain() method on RunResult."""
+
+    def _make_plan(
+        self,
+        *,
+        threads: list[str] | None = None,
+        dependencies: dict[str, list[str]] | None = None,
+        execution_order: list[list[str]] | None = None,
+        cache_targets: list[str] | None = None,
+        lookup_schedule: dict[int, list[str]] | None = None,
+        inferred_dependencies: dict[str, list[str]] | None = None,
+        explicit_dependencies: dict[str, list[str]] | None = None,
+        weave_name: str = "dimensions",
+    ) -> ExecutionPlan:
+        t = threads or ["a", "b", "c"]
+        deps = dependencies or {"a": [], "b": ["a"], "c": ["b"]}
+        dependents: dict[str, list[str]] = {n: [] for n in t}
+        for name, upstream in deps.items():
+            for u in upstream:
+                if name not in dependents.get(u, []):
+                    dependents.setdefault(u, []).append(name)
+        return ExecutionPlan(
+            weave_name=weave_name,
+            threads=t,
+            dependencies=deps,
+            dependents=dependents,
+            execution_order=execution_order or [["a"], ["b"], ["c"]],
+            cache_targets=cache_targets or [],
+            inferred_dependencies=inferred_dependencies or {n: deps.get(n, []) for n in t},
+            explicit_dependencies=explicit_dependencies or {n: [] for n in t},
+            lookup_schedule=lookup_schedule,
+        )
+
+    def _make_result(
+        self,
+        plans: list[ExecutionPlan],
+        *,
+        config_type: str = "weave",
+        config_name: str = "dimensions",
+    ) -> RunResult:
+        return RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type=config_type,
+            config_name=config_name,
+            execution_plan=plans,
+        )
+
+    def test_explain_non_plan_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="test",
+        )
+        assert result.explain() == ""
+
+    def test_explain_execution_order(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Execution order:" in text
+        assert "1. [a]" in text
+        assert "2. [b]" in text
+        assert "3. [c]" in text
+
+    def test_explain_dependencies_inferred(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "b: a [inferred]" in text
+
+    def test_explain_dependencies_explicit(self) -> None:
+        plan = self._make_plan(
+            inferred_dependencies={"a": [], "b": [], "c": []},
+            explicit_dependencies={"a": [], "b": ["a"], "c": ["b"]},
+        )
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "b: a [explicit]" in text
+
+    def test_explain_dependencies_mixed(self) -> None:
+        plan = self._make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": [], "c": ["a", "b"]},
+            execution_order=[["a", "b"], ["c"]],
+            inferred_dependencies={"a": [], "b": [], "c": ["a"]},
+            explicit_dependencies={"a": [], "b": [], "c": ["b"]},
+        )
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "a [inferred]" in text
+        assert "b [explicit]" in text
+
+    def test_explain_dependencies_none(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "a: (none)" in text
+
+    def test_explain_cache_targets(self) -> None:
+        plan = self._make_plan(cache_targets=["a"])
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Cache targets:" in text
+        assert "a → b" in text
+
+    def test_explain_cache_targets_omitted(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Cache targets:" not in text
+
+    def test_explain_lookup_schedule(self) -> None:
+        plan = self._make_plan(lookup_schedule={0: ["ext_ref"]})
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Lookup schedule:" in text
+        assert "before group 0: ext_ref" in text
+
+    def test_explain_lookup_schedule_omitted(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Lookup schedule:" not in text
+
+    def test_explain_thread_detail(self) -> None:
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/customers"
+            path = None
+
+        class _FakeTarget:
+            alias = None
+            path = "/data/curated/customers"
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps: list[Any] = []
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "Thread detail:" in text
+        assert "delta:raw/customers" in text
+        assert "/data/curated/customers" in text
+        assert "0 steps" in text
+
+    def test_explain_thread_detail_with_joins(self) -> None:
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeJoinStep:
+            join = True
+
+        class _FakeOtherStep:
+            rename = True
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/data"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/data"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps = [_FakeJoinStep(), _FakeOtherStep(), _FakeJoinStep()]
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "3 steps" in text
+        assert "2 joins" in text
+
+    def test_explain_thread_detail_missing(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Thread detail:" not in text
+
+    def test_explain_loom_header(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan], config_type="loom", config_name="nightly")
+        text = result.explain()
+        assert "Loom: nightly" in text
+        assert "1 weaves" in text
+
+    def test_explain_multi_weave(self) -> None:
+        plan1 = self._make_plan(weave_name="dims")
+        plan2 = self._make_plan(weave_name="facts")
+        result = self._make_result([plan1, plan2], config_type="loom", config_name="nightly")
+        text = result.explain()
+        assert "Plan: dims" in text
+        assert "Plan: facts" in text
+        assert "2 weaves" in text
 
 
 class TestLoadedConfig:

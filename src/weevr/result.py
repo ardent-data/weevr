@@ -73,6 +73,7 @@ class RunResult:
         "preview_data",
         "validation_errors",
         "warnings",
+        "_resolved_threads",
     )
 
     def __init__(
@@ -102,6 +103,108 @@ class RunResult:
         self.preview_data = preview_data
         self.validation_errors = validation_errors
         self.warnings: list[str] = warnings if warnings is not None else []
+        self._resolved_threads: dict[str, Any] | None = None
+
+    def explain(self) -> str:
+        """Return a detailed text breakdown of the execution plan.
+
+        Includes dependency provenance, cache targets, lookup schedule,
+        and per-thread source/target/step summary. Sections with no data
+        are omitted. Returns empty string for non-plan modes.
+        """
+        if self.mode is not ExecutionMode.PLAN or not self.execution_plan:
+            return ""
+
+        lines: list[str] = []
+        plans = self.execution_plan
+
+        if self.config_type == "loom":
+            lines.append(f"Loom: {self.config_name} — {len(plans)} weaves")
+            lines.append("")
+
+        for plan_idx, plan in enumerate(plans):
+            if plan_idx > 0:
+                lines.append("")
+            lines.append(f"Plan: {plan.weave_name}")
+            lines.append("═" * (len(f"Plan: {plan.weave_name}") + 2))
+
+            # Section 1: Execution order
+            lines.append("")
+            lines.append("Execution order:")
+            for i, group in enumerate(plan.execution_order, 1):
+                lines.append(f"  {i}. [{', '.join(group)}]")
+
+            # Section 2: Dependencies with provenance
+            lines.append("")
+            lines.append("Dependencies:")
+            for thread_name in plan.threads:
+                deps = plan.dependencies.get(thread_name, [])
+                if not deps:
+                    lines.append(f"  {thread_name}: (none)")
+                else:
+                    inferred = set(plan.inferred_dependencies.get(thread_name, []))
+                    explicit = set(plan.explicit_dependencies.get(thread_name, []))
+                    dep_parts: list[str] = []
+                    for d in deps:
+                        if d in explicit:
+                            dep_parts.append(f"{d} [explicit]")
+                        elif d in inferred:
+                            dep_parts.append(f"{d} [inferred]")
+                        else:
+                            dep_parts.append(d)
+                    lines.append(f"  {thread_name}: {', '.join(dep_parts)}")
+
+            # Section 3: Cache targets
+            if plan.cache_targets:
+                lines.append("")
+                lines.append("Cache targets:")
+                for ct in plan.cache_targets:
+                    consumers = plan.dependents.get(ct, [])
+                    consumer_str = ", ".join(consumers) if consumers else "(no consumers)"
+                    lines.append(f"  {ct} → {consumer_str}")
+
+            # Section 4: Lookup schedule
+            if plan.lookup_schedule:
+                lines.append("")
+                lines.append("Lookup schedule:")
+                for group_idx, names in sorted(plan.lookup_schedule.items()):
+                    label = f"before group {group_idx}"
+                    lines.append(f"  {label}: {', '.join(names)}")
+
+            # Section 5: Thread detail
+            if self._resolved_threads:
+                lines.append("")
+                lines.append("Thread detail:")
+                for thread_name in plan.threads:
+                    thread = self._resolved_threads.get(thread_name)
+                    if thread is None:
+                        lines.append(f"  {thread_name}: (unavailable)")
+                        continue
+                    sources = getattr(thread, "sources", {})
+                    if sources:
+                        first_src = next(iter(sources.values()))
+                        src_type = getattr(first_src, "type", "unknown")
+                        src_path = getattr(first_src, "alias", None) or getattr(
+                            first_src, "path", ""
+                        )
+                        src_str = f"{src_type}:{src_path}"
+                    else:
+                        src_str = "(no source)"
+                    target = getattr(thread, "target", None)
+                    tgt_str = (
+                        getattr(target, "alias", None) or getattr(target, "path", "")
+                        if target
+                        else "(no target)"
+                    )
+                    steps = getattr(thread, "steps", [])
+                    step_count = len(steps)
+                    join_count = sum(1 for s in steps if hasattr(s, "join"))
+                    detail = f"{src_str} → {tgt_str}, {step_count} steps"
+                    if join_count > 0:
+                        detail += f", {join_count} joins"
+                    lines.append(f"  {thread_name}: {detail}")
+
+        return "\n".join(lines)
 
     def summary(self) -> str:
         """Return a formatted, human-readable execution summary."""
