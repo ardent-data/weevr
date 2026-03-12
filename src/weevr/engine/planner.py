@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from collections import deque
+from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry
+
+if TYPE_CHECKING:
+    from weevr.engine.display import DAGDiagram
 
 
 class ExecutionPlan(FrozenBase):
@@ -42,6 +46,25 @@ class ExecutionPlan(FrozenBase):
     inferred_dependencies: dict[str, list[str]]
     explicit_dependencies: dict[str, list[str]]
     lookup_schedule: dict[int, list[str]] | None = None
+
+    def dag(self) -> DAGDiagram:
+        """Return an inline SVG DAG diagram of this execution plan.
+
+        The returned :class:`DAGDiagram` auto-renders in IPython/Jupyter
+        via ``_repr_svg_()`` and can be exported via ``save()``.
+        """
+        from weevr.engine.display import DAGDiagram, render_dag_svg
+
+        return DAGDiagram(render_dag_svg(self))
+
+    def _repr_html_(self) -> str:
+        """IPython rich display protocol.
+
+        Renders DAG visualization and dependency table for this plan.
+        """
+        from weevr.engine.display import render_execution_plan_html
+
+        return render_execution_plan_html(self)
 
 
 def _normalize_path(path: str) -> str:

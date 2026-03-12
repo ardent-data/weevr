@@ -6,7 +6,7 @@ from dicts using model_validate with controlled source and target paths.
 
 import pytest
 
-from weevr.engine.planner import build_plan
+from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.errors.exceptions import ConfigError
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
@@ -536,3 +536,46 @@ class TestLookupDependencyInference:
         # B still depends on A via the lookup
         assert "A" in plan.dependencies["B"]
         assert plan.execution_order == [["A"], ["B"]]
+
+
+class TestExecutionPlanDisplay:
+    """Tests for dag() and _repr_html_() on ExecutionPlan."""
+
+    def _simple_plan(self) -> ExecutionPlan:
+        return ExecutionPlan(
+            weave_name="test_weave",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+
+    def test_dag_returns_diagram(self) -> None:
+        from weevr.engine.display import DAGDiagram
+
+        plan = self._simple_plan()
+        diagram = plan.dag()
+        assert isinstance(diagram, DAGDiagram)
+
+    def test_dag_valid_svg(self) -> None:
+        import xml.etree.ElementTree as ET
+
+        plan = self._simple_plan()
+        diagram = plan.dag()
+        ET.fromstring(diagram.svg)
+
+    def test_repr_html(self) -> None:
+        plan = self._simple_plan()
+        html_out = plan._repr_html_()
+        assert "<svg" in html_out
+        assert "<table>" in html_out
+
+    def test_repr_html_dependency_table(self) -> None:
+        plan = self._simple_plan()
+        html_out = plan._repr_html_()
+        # Thread names appear in the HTML
+        assert ">a<" in html_out
+        assert ">b<" in html_out
