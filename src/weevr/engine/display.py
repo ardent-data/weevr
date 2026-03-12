@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -397,3 +398,154 @@ def render_dag_svg(
 
     parts.append("</svg>")
     return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# HTML rendering
+# ---------------------------------------------------------------------------
+
+_HTML_STYLE = """\
+<style>
+.weevr-plan{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#2d3748}
+.weevr-plan table{border-collapse:collapse;width:100%;margin:8px 0}
+.weevr-plan th,.weevr-plan td{border:1px solid #e2e8f0;padding:6px 10px;text-align:left}
+.weevr-plan th{background:#f7fafc;font-weight:600}
+.weevr-plan .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:12px}
+.weevr-plan .badge-cache{background:#ebf8ff;color:#2c5282;border:1px solid #bee3f8}
+.weevr-plan .badge-inferred{background:#f0fff4;color:#276749;border:1px solid #c6f6d5}
+.weevr-plan .badge-explicit{background:#faf5ff;color:#553c9a;border:1px solid #e9d8fd}
+.weevr-plan .badge-status{background:#f0fff4;color:#276749;border:1px solid #c6f6d5}
+.weevr-plan h3{margin:16px 0 8px;font-size:16px}
+.weevr-plan h4{margin:12px 0 6px;font-size:14px}
+@media(prefers-color-scheme:dark){
+.weevr-plan{color:#e2e8f0}
+.weevr-plan th,.weevr-plan td{border-color:#4a5568}
+.weevr-plan th{background:#2d3748}
+.weevr-plan .badge-cache{background:#2a4365;color:#bee3f8;border-color:#2c5282}
+.weevr-plan .badge-inferred{background:#22543d;color:#c6f6d5;border-color:#276749}
+.weevr-plan .badge-explicit{background:#44337a;color:#e9d8fd;border-color:#553c9a}
+.weevr-plan .badge-status{background:#22543d;color:#c6f6d5;border-color:#276749}
+}
+</style>"""
+
+
+def _html_dep_badges(
+    thread_name: str,
+    plan: ExecutionPlan,
+) -> str:
+    """Build HTML badges for a thread's dependencies with provenance."""
+    deps = plan.dependencies.get(thread_name, [])
+    if not deps:
+        return "<em>(none)</em>"
+
+    inferred = set(plan.inferred_dependencies.get(thread_name, []))
+    explicit = set(plan.explicit_dependencies.get(thread_name, []))
+
+    badges: list[str] = []
+    for dep in deps:
+        name = html.escape(dep)
+        if dep in explicit:
+            badges.append(f'<span class="badge badge-explicit">{name}</span>')
+        elif dep in inferred:
+            badges.append(f'<span class="badge badge-inferred">{name}</span>')
+        else:
+            badges.append(html.escape(dep))
+    return " ".join(badges)
+
+
+def render_execution_plan_html(
+    plan: ExecutionPlan,
+    resolved_threads: dict[str, Any] | None = None,
+) -> str:
+    """Generate styled HTML for a single ExecutionPlan.
+
+    Includes DAG visualization and dependency table.
+
+    Args:
+        plan: The execution plan to render.
+        resolved_threads: Optional thread models for detail rows.
+
+    Returns:
+        Complete HTML fragment as a string.
+    """
+    parts: list[str] = []
+
+    weave_name = html.escape(plan.weave_name)
+    parts.append(f"<h4>Weave: {weave_name}</h4>")
+
+    # Dependency table
+    cache_set = set(plan.cache_targets)
+    parts.append("<table>")
+    parts.append("<tr><th>Group</th><th>Thread</th><th>Dependencies</th><th>Cache</th></tr>")
+    for group_idx, group in enumerate(plan.execution_order):
+        for thread_name in sorted(group):
+            name_esc = html.escape(thread_name)
+            cache_badge = (
+                '<span class="badge badge-cache">cached</span>' if thread_name in cache_set else ""
+            )
+            dep_badges = _html_dep_badges(thread_name, plan)
+            parts.append(
+                f"<tr><td>{group_idx}</td><td>{name_esc}</td>"
+                f"<td>{dep_badges}</td><td>{cache_badge}</td></tr>"
+            )
+    parts.append("</table>")
+
+    # Embedded DAG SVG
+    svg = render_dag_svg(plan, resolved_threads)
+    parts.append(f'<div class="weevr-dag">{svg}</div>')
+
+    return "\n".join(parts)
+
+
+def render_plan_html(
+    result: Any,
+) -> str:
+    """Generate styled HTML for a plan mode RunResult.
+
+    Accepts a duck-typed result object to avoid circular imports.
+    Uses attributes: ``status``, ``mode``, ``config_type``, ``config_name``,
+    ``execution_plan``, ``_resolved_threads``.
+
+    Args:
+        result: A RunResult in plan mode.
+
+    Returns:
+        Complete HTML fragment as a string.
+    """
+    parts: list[str] = ['<div class="weevr-plan">']
+    parts.append(_HTML_STYLE)
+
+    # Summary table
+    status = html.escape(str(getattr(result, "status", "")))
+    config_type = html.escape(str(getattr(result, "config_type", "")))
+    config_name = html.escape(str(getattr(result, "config_name", "")))
+    plans: list[Any] = getattr(result, "execution_plan", []) or []
+    resolved = getattr(result, "_resolved_threads", None)
+
+    total_threads = sum(len(p.threads) for p in plans)
+    total_cached = sum(len(p.cache_targets) for p in plans)
+    total_lookups = sum(sum(len(v) for v in (p.lookup_schedule or {}).values()) for p in plans)
+
+    parts.append("<h3>Plan Summary</h3>")
+    parts.append("<table>")
+    parts.append(
+        f"<tr><td><strong>Status</strong></td><td>"
+        f'<span class="badge badge-status">{status}</span></td></tr>'
+    )
+    parts.append(f"<tr><td><strong>Scope</strong></td><td>{config_type}: {config_name}</td></tr>")
+    counts = f"{total_threads} threads | {total_cached} cached"
+    if total_lookups > 0:
+        counts += f" | {total_lookups} lookups"
+    parts.append(f"<tr><td><strong>Counts</strong></td><td>{counts}</td></tr>")
+    parts.append("</table>")
+
+    # Loom header if multiple plans
+    if len(plans) > 1:
+        parts.append(f"<h3>Loom: {config_name} &mdash; {len(plans)} weaves</h3>")
+
+    # Per-plan sections
+    for plan in plans:
+        parts.append(render_execution_plan_html(plan, resolved))
+
+    parts.append("</div>")
+    return "\n".join(parts)

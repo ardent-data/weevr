@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from weevr.engine.display import DAGDiagram, render_dag_svg
+from weevr.engine.display import (
+    DAGDiagram,
+    render_dag_svg,
+    render_execution_plan_html,
+    render_plan_html,
+)
 from weevr.engine.planner import ExecutionPlan
 
 _SAMPLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
@@ -190,3 +195,143 @@ class TestRenderDagSvg:
         svg = render_dag_svg(plan)
         assert "<svg" in svg
         assert "Empty plan" in svg
+
+
+# ---------------------------------------------------------------------------
+# HTML rendering tests
+# ---------------------------------------------------------------------------
+
+
+class _FakeResult:
+    """Minimal duck-typed result for render_plan_html testing."""
+
+    def __init__(
+        self,
+        plans: list[ExecutionPlan],
+        *,
+        resolved_threads: dict | None = None,
+    ) -> None:
+        self.status = "PLANNED"
+        self.mode = "plan"
+        self.config_type = "weave"
+        self.config_name = "test_weave"
+        self.execution_plan = plans
+        self._resolved_threads = resolved_threads
+
+
+class TestRenderExecutionPlanHtml:
+    def test_valid_html(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            execution_order=[["a"], ["b"], ["c"]],
+        )
+        html_out = render_execution_plan_html(plan)
+        assert "<table>" in html_out
+        assert "</table>" in html_out
+        assert "test_weave" in html_out
+
+    def test_dependency_table_rows(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+        )
+        html_out = render_execution_plan_html(plan)
+        # Header row + 2 data rows
+        assert html_out.count("<tr>") == 3
+
+    def test_embedded_svg(self) -> None:
+        plan = _make_plan(
+            threads=["a"],
+            execution_order=[["a"]],
+        )
+        html_out = render_execution_plan_html(plan)
+        assert "<svg" in html_out
+
+    def test_cache_badge(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            cache_targets=["a"],
+        )
+        html_out = render_execution_plan_html(plan)
+        assert "badge-cache" in html_out
+        assert "cached" in html_out
+
+    def test_dependency_provenance_badges(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+        )
+        html_out = render_execution_plan_html(plan)
+        # "a" is an inferred dependency of "b" (via _make_plan)
+        assert "badge-inferred" in html_out
+
+
+class TestRenderPlanHtml:
+    def test_summary_table(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+        )
+        result = _FakeResult([plan])
+        html_out = render_plan_html(result)
+        assert "PLANNED" in html_out
+        assert "weave: test_weave" in html_out
+        assert "2 threads" in html_out
+        assert "0 cached" in html_out
+
+    def test_multi_weave(self) -> None:
+        plan1 = _make_plan(
+            threads=["a"],
+            execution_order=[["a"]],
+        )
+        plan2 = ExecutionPlan(
+            weave_name="second_weave",
+            threads=["x"],
+            dependencies={"x": []},
+            dependents={"x": []},
+            execution_order=[["x"]],
+            cache_targets=[],
+            inferred_dependencies={"x": []},
+            explicit_dependencies={"x": []},
+            lookup_schedule=None,
+        )
+        result = _FakeResult([plan1, plan2])
+        html_out = render_plan_html(result)
+        # Should have loom header
+        assert "2 weaves" in html_out
+        # Both SVGs present
+        assert html_out.count("<svg") == 2
+
+    def test_html_escaping(self) -> None:
+        plan = _make_plan(
+            threads=["<script>alert(1)</script>"],
+            execution_order=[["<script>alert(1)</script>"]],
+        )
+        result = _FakeResult([plan])
+        html_out = render_plan_html(result)
+        assert "<script>" not in html_out
+        assert "&lt;script&gt;" in html_out
+
+    def test_lookup_counts(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            lookup_schedule={0: ["ext_ref", "ext_ref2"]},
+        )
+        result = _FakeResult([plan])
+        html_out = render_plan_html(result)
+        assert "2 lookups" in html_out
+
+    def test_style_block(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        result = _FakeResult([plan])
+        html_out = render_plan_html(result)
+        assert "<style>" in html_out
+        assert "prefers-color-scheme:dark" in html_out
