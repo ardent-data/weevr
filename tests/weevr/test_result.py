@@ -682,6 +682,93 @@ class TestExplain:
         assert "2 weaves" in text
 
 
+class TestReprHtml:
+    """Tests for _repr_html_() on RunResult."""
+
+    def test_repr_html_non_plan(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="test",
+            duration_ms=1200,
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<pre" in html_out
+        assert "success" in html_out
+
+    def test_repr_html_plan_mode(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<svg" in html_out
+        assert "weevr-plan" in html_out
+
+    def test_repr_html_plan_mode_summary_table(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["a"],
+            dependencies={"a": []},
+            dependents={"a": []},
+            execution_order=[["a"]],
+            cache_targets=[],
+            inferred_dependencies={"a": []},
+            explicit_dependencies={"a": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "PLANNED" not in html_out  # status is "success"
+        assert "success" in html_out
+        assert "1 threads" in html_out
+
+    def test_repr_html_escapes_user_strings(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="<script>alert(1)</script>",
+            threads=["<b>bold</b>"],
+            dependencies={"<b>bold</b>": []},
+            dependents={"<b>bold</b>": []},
+            execution_order=[["<b>bold</b>"]],
+            cache_targets=[],
+            inferred_dependencies={"<b>bold</b>": []},
+            explicit_dependencies={"<b>bold</b>": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="test",
+            execution_plan=[plan],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<script>" not in html_out
+        assert "<b>bold</b>" not in html_out
+
+
 class TestLoadedConfig:
     @pytest.fixture()
     def sample_thread(self) -> Thread:
