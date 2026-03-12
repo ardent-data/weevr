@@ -332,6 +332,20 @@ class TestLookupNodes:
         assert 'class="dag-lookup-line"' in svg
         assert 'class="dag-lookup-node"' not in svg
 
+    def test_lookup_name_matches_thread_name(self) -> None:
+        """Lookup with same name as a thread should not cause KeyError."""
+        plan = _make_plan(
+            threads=["fact_orders", "dim_customer"],
+            dependencies={"fact_orders": [], "dim_customer": ["fact_orders"]},
+            execution_order=[["fact_orders"], ["dim_customer"]],
+            lookup_schedule={1: ["fact_orders"]},
+            lookup_producers={"fact_orders": "fact_orders"},
+            lookup_consumers={"fact_orders": ["dim_customer"]},
+        )
+        svg = render_dag_svg(plan)
+        assert 'class="dag-lookup-node"' in svg
+        ET.fromstring(svg)  # valid XML
+
     def test_lookup_arrowhead_marker(self) -> None:
         plan = _make_plan(
             threads=["a", "b"],

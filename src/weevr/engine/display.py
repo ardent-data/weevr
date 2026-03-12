@@ -428,23 +428,23 @@ def render_dag_svg(
     # Lookup rendering — use nodes if available, fall back to dashed lines
     if lookup_nodes:
         # Draw lookup edges (dashed, orange)
-        for src, tgt, _is_producer in lookup_edges:
-            if src in nodes:
+        for src, tgt, is_producer in lookup_edges:
+            if is_producer:
+                # producer edge: thread → lookup node
+                if src not in nodes or tgt not in lookup_nodes:
+                    continue
                 sx, sy, sw, sh = nodes[src]
                 tx, ty, tw, _th = lookup_nodes[tgt]
-                x1 = sx + sw / 2
-                y1 = sy + sh
-                x2 = tx + tw / 2
-                y2 = ty
-            elif src in lookup_nodes:
+            else:
+                # consumer edge: lookup node → thread
+                if src not in lookup_nodes or tgt not in nodes:
+                    continue
                 sx, sy, sw, sh = lookup_nodes[src]
                 tx, ty, tw, _th = nodes[tgt]
-                x1 = sx + sw / 2
-                y1 = sy + sh
-                x2 = tx + tw / 2
-                y2 = ty
-            else:
-                continue
+            x1 = sx + sw / 2
+            y1 = sy + sh
+            x2 = tx + tw / 2
+            y2 = ty
             parts.append(
                 f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
                 f'class="dag-lookup-edge" marker-end="url(#dag-arrowhead-lookup)"/>'
@@ -652,15 +652,17 @@ def render_loom_dag_svg(
         offset_y = content_y
 
         # Lookup edges
-        for src, tgt, _is_producer in lk_edges:
-            if src in nodes:
+        for src, tgt, is_producer in lk_edges:
+            if is_producer:
+                if src not in nodes or tgt not in lk_nodes:
+                    continue
                 sx, sy, sw, sh = nodes[src]
                 tx, ty, tw, _th = lk_nodes[tgt]
-            elif src in lk_nodes:
+            else:
+                if src not in lk_nodes or tgt not in nodes:
+                    continue
                 sx, sy, sw, sh = lk_nodes[src]
                 tx, ty, tw, _th = nodes[tgt]
-            else:
-                continue
             x1 = offset_x + sx + sw / 2
             y1 = offset_y + sy + sh
             x2 = offset_x + tx + tw / 2
