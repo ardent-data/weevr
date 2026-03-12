@@ -850,3 +850,140 @@ class TestLoadedConfig:
         # Access it — no threads provided so plan won't build
         _ = loaded.execution_plan
         assert loaded._plan_built  # noqa: SLF001
+
+
+class TestPlanDisplayIntegration:
+    """Integration tests verifying the full plan mode display workflow."""
+
+    def _build_plan_result(self) -> RunResult:
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["raw", "staging", "curated"],
+            dependencies={"raw": [], "staging": ["raw"], "curated": ["staging"]},
+            dependents={"raw": ["staging"], "staging": ["curated"], "curated": []},
+            execution_order=[["raw"], ["staging"], ["curated"]],
+            cache_targets=["raw"],
+            inferred_dependencies={
+                "raw": [],
+                "staging": ["raw"],
+                "curated": ["staging"],
+            },
+            explicit_dependencies={"raw": [], "staging": [], "curated": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        return result
+
+    def test_plan_result_full_workflow(self) -> None:
+        result = self._build_plan_result()
+        # summary has cache markers and footer
+        s = result.summary()
+        assert "raw*" in s
+        assert "3 threads" in s
+        assert "1 cached" in s
+
+        # explain has key sections
+        e = result.explain()
+        assert "Execution order:" in e
+        assert "Dependencies:" in e
+        assert "Cache targets:" in e
+        assert "raw → staging" in e
+
+        # _repr_html_ returns valid HTML with SVG
+        h = result._repr_html_()
+        assert h is not None
+        assert "<svg" in h
+        assert "weevr-plan" in h
+
+    def test_plan_result_with_lookups(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="facts",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+            lookup_schedule={0: ["customer_dim"]},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="facts",
+            execution_plan=[plan],
+        )
+        e = result.explain()
+        assert "Lookup schedule:" in e
+        assert "customer_dim" in e
+
+    def test_loom_plan_result(self) -> None:
+        plan1 = ExecutionPlan(
+            weave_name="dims",
+            threads=["a"],
+            dependencies={"a": []},
+            dependents={"a": []},
+            execution_order=[["a"]],
+            cache_targets=[],
+            inferred_dependencies={"a": []},
+            explicit_dependencies={"a": []},
+        )
+        plan2 = ExecutionPlan(
+            weave_name="facts",
+            threads=["x"],
+            dependencies={"x": []},
+            dependents={"x": []},
+            execution_order=[["x"]],
+            cache_targets=[],
+            inferred_dependencies={"x": []},
+            explicit_dependencies={"x": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="loom",
+            config_name="nightly",
+            execution_plan=[plan1, plan2],
+        )
+        e = result.explain()
+        assert "Loom: nightly" in e
+        assert "2 weaves" in e
+        assert "Plan: dims" in e
+        assert "Plan: facts" in e
+
+        h = result._repr_html_()
+        assert h is not None
+        assert h.count("<svg") == 2
+
+    def test_plan_result_no_resolved_threads(self) -> None:
+        result = self._build_plan_result()
+        e = result.explain()
+        assert "Thread detail:" not in e
+
+    def test_dag_export_roundtrip(self, tmp_path: Any) -> None:
+        plan = ExecutionPlan(
+            weave_name="test",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        diagram = plan.dag()
+        out_path = str(tmp_path / "test.svg")
+        diagram.save(out_path)
+
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+
+        content = Path(out_path).read_text(encoding="utf-8")
+        assert "<svg" in content
+        ET.fromstring(content)
