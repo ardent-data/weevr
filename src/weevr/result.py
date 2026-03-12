@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import html as _html
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -253,18 +252,14 @@ class RunResult:
     def _repr_html_(self) -> str | None:
         """Notebook rich display protocol.
 
-        Plan mode: styled HTML summary table with embedded DAG SVG.
-        Other modes: summary() text wrapped in styled ``<pre>`` block.
+        Renders a styled HTML report appropriate for the execution mode:
+        plan mode gets a summary table with embedded DAG SVG, execute mode
+        gets a thread results table, validate mode gets a check/error report,
+        and preview mode gets an output shape table.
         """
-        if self.mode is not ExecutionMode.PLAN:
-            escaped = _html.escape(self.summary())
-            return (
-                f'<pre style="font-family:monospace;padding:12px;border-radius:4px">{escaped}</pre>'
-            )
+        from weevr.engine.display import render_result_html
 
-        from weevr.engine.display import render_plan_html
-
-        return render_plan_html(self)
+        return render_result_html(self)
 
     def _summary_execute(self) -> list[str]:
         lines: list[str] = [f"Scope:  {self.config_type}:{self.config_name}"]

@@ -13,6 +13,7 @@ from weevr.engine.display import (
     render_execution_plan_html,
     render_loom_dag_svg,
     render_plan_html,
+    render_result_html,
 )
 from weevr.engine.planner import ExecutionPlan
 
@@ -468,3 +469,243 @@ class TestRenderPlanHtml:
         assert "<style>" not in html_out or "<style>" in html_out.split("<svg")[1]
         # Container has explicit background
         assert "background:#ffffff" in html_out
+
+
+class TestRenderResultHtml:
+    """Tests for the unified render_result_html dispatcher."""
+
+    def test_execute_mode(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "dims",
+                "duration_ms": 1200,
+                "detail": None,
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Execution Summary" in html_out
+        assert "success" in html_out
+        assert "1.2s" in html_out
+
+    def test_execute_with_thread_detail(self) -> None:
+        thread = type(
+            "TR",
+            (),
+            {
+                "status": "success",
+                "thread_name": "dim_cust",
+                "rows_written": 500,
+                "write_mode": "overwrite",
+                "target_path": "Tables/dim_cust",
+                "error": None,
+            },
+        )()
+        detail = type("WR", (), {"thread_results": [thread]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "dims",
+                "duration_ms": 800,
+                "detail": detail,
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "dim_cust" in html_out
+        assert "500" in html_out
+        assert "overwrite" in html_out
+
+    def test_execute_loom_level(self) -> None:
+        t1 = type(
+            "TR",
+            (),
+            {
+                "status": "success",
+                "thread_name": "dim_a",
+                "rows_written": 100,
+                "write_mode": "overwrite",
+                "target_path": "Tables/dim_a",
+                "error": None,
+            },
+        )()
+        t2 = type(
+            "TR",
+            (),
+            {
+                "status": "success",
+                "thread_name": "fact_b",
+                "rows_written": 2000,
+                "write_mode": "append",
+                "target_path": "Tables/fact_b",
+                "error": None,
+            },
+        )()
+        w1 = type("WR", (), {"thread_results": [t1]})()
+        w2 = type("WR", (), {"thread_results": [t2]})()
+        detail = type("LR", (), {"weave_results": [w1, w2]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "loom",
+                "config_name": "pipeline",
+                "duration_ms": 5000,
+                "detail": detail,
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "dim_a" in html_out
+        assert "fact_b" in html_out
+        assert "2,100" in html_out  # total rows: 100 + 2000
+        assert "Threads" in html_out
+
+    def test_execute_with_errors(self) -> None:
+        thread = type(
+            "TR",
+            (),
+            {
+                "status": "failure",
+                "thread_name": "bad_thread",
+                "rows_written": 0,
+                "write_mode": "append",
+                "target_path": "t",
+                "error": "something broke",
+            },
+        )()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "failure",
+                "config_type": "thread",
+                "config_name": "bad_thread",
+                "duration_ms": 50,
+                "detail": thread,
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Errors" in html_out
+        assert "something broke" in html_out
+
+    def test_validate_success(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "validate",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "validation_errors": [],
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Validation Summary" in html_out
+        assert "\u2713" in html_out
+
+    def test_validate_failure(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "validate",
+                "status": "failure",
+                "config_type": "weave",
+                "config_name": "test",
+                "validation_errors": ["bad config"],
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "bad config" in html_out
+
+    def test_preview_mode(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "preview",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "preview_data": {},
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Preview Summary" in html_out
+
+    def test_plan_delegates(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        result = _FakeResult([plan])
+        html_out = render_result_html(result)
+        assert "Plan Summary" in html_out
+
+    def test_warnings_rendered(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": None,
+                "warnings": ["No threads matched filter"],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Warnings" in html_out
+        assert "No threads matched filter" in html_out
+
+    def test_inline_styles_only(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": None,
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "<style>" not in html_out
+        assert "background:#ffffff" in html_out
+
+    def test_html_escaping(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "validate",
+                "status": "failure",
+                "config_type": "weave",
+                "config_name": "<script>x</script>",
+                "validation_errors": ["<img onerror=alert(1)>"],
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "<script>" not in html_out
+        assert "<img" not in html_out

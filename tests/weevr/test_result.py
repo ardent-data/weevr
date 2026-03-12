@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from weevr.engine.planner import ExecutionPlan
+from weevr.engine.result import ThreadResult, WeaveResult
 from weevr.model.loom import Loom, WeaveEntry
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -714,7 +715,7 @@ class TestExplain:
 class TestReprHtml:
     """Tests for _repr_html_() on RunResult."""
 
-    def test_repr_html_non_plan(self) -> None:
+    def test_repr_html_execute_mode(self) -> None:
         result = RunResult(
             status="success",
             mode=ExecutionMode.EXECUTE,
@@ -724,8 +725,110 @@ class TestReprHtml:
         )
         html_out = result._repr_html_()
         assert html_out is not None
-        assert "<pre" in html_out
+        assert "Execution Summary" in html_out
         assert "success" in html_out
+        assert "weave" in html_out
+        assert "test" in html_out
+
+    def test_repr_html_validate_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.VALIDATE,
+            config_type="weave",
+            config_name="test",
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Validation Summary" in html_out
+        assert "\u2713" in html_out  # checkmarks for passed
+
+    def test_repr_html_validate_with_errors(self) -> None:
+        result = RunResult(
+            status="failure",
+            mode=ExecutionMode.VALIDATE,
+            config_type="weave",
+            config_name="test",
+            validation_errors=["Missing source: raw_customers"],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "failure" in html_out
+        assert "Missing source: raw_customers" in html_out
+
+    def test_repr_html_preview_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="weave",
+            config_name="test",
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Preview Summary" in html_out
+
+    def test_repr_html_execute_with_thread_results(self) -> None:
+        tr1 = ThreadResult(
+            status="success",
+            thread_name="dim_customer",
+            rows_written=1500,
+            write_mode="overwrite",
+            target_path="Tables/dim_customer",
+        )
+        tr2 = ThreadResult(
+            status="failure",
+            thread_name="fact_orders",
+            rows_written=0,
+            write_mode="append",
+            target_path="Tables/fact_orders",
+            error="Column 'order_id' not found in source",
+        )
+        detail = WeaveResult(
+            status="partial",
+            weave_name="pipeline",
+            thread_results=[tr1, tr2],
+            threads_skipped=[],
+            duration_ms=3200,
+        )
+        result = RunResult(
+            status="partial",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="pipeline",
+            duration_ms=3200,
+            detail=detail,
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Threads" in html_out
+        assert "dim_customer" in html_out
+        assert "fact_orders" in html_out
+        assert "1,500" in html_out
+        assert "overwrite" in html_out
+        assert "Column &#x27;order_id&#x27; not found in source" in html_out
+        assert "Errors" in html_out
+
+    def test_repr_html_execute_escapes_html(self) -> None:
+        tr = ThreadResult(
+            status="failure",
+            thread_name="<script>x</script>",
+            rows_written=0,
+            write_mode="overwrite",
+            target_path="Tables/<b>bad</b>",
+            error="<img onerror=alert(1)>",
+        )
+        result = RunResult(
+            status="failure",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="test",
+            duration_ms=100,
+            detail=tr,
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<script>" not in html_out
+        assert "<b>bad</b>" not in html_out
+        assert "<img" not in html_out
 
     def test_repr_html_plan_mode(self) -> None:
         plan = ExecutionPlan(

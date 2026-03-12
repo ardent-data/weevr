@@ -1,10 +1,12 @@
-"""Plan display — DAG visualization and rich rendering for execution plans."""
+"""Plan display — DAG visualization and rich rendering for execution results."""
 
 from __future__ import annotations
 
 import html
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from weevr.result import _format_duration
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
@@ -757,6 +759,18 @@ _S_BADGE_INFERRED = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px sol
 _S_BADGE_EXPLICIT = f"{_S_BADGE};background:#faf5ff;color:#553c9a;border:1px solid #e9d8fd"
 _S_BADGE_STATUS = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px solid #c6f6d5"
 _S_NONE = "color:#a0aec0;font-style:italic"
+_S_ERROR_BOX = (
+    "background:#fff5f5;border:1px solid #feb2b2;border-radius:4px;"
+    "padding:8px 12px;color:#9b2c2c;font-family:monospace;font-size:13px;margin:4px 0"
+)
+_S_WARN_BOX = (
+    "background:#fffff0;border:1px solid #fefcbf;border-radius:4px;"
+    "padding:8px 12px;color:#975a16;font-size:13px;margin:4px 0"
+)
+_S_CHECK_BOX = (
+    "background:#f0fff4;border:1px solid #c6f6d5;border-radius:4px;"
+    "padding:8px 12px;color:#276749;font-size:13px;margin:8px 0"
+)
 
 
 def _html_dep_badges(
@@ -891,3 +905,298 @@ def render_plan_html(
 
     parts.append("</div>")
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Status badge styling
+# ---------------------------------------------------------------------------
+
+_S_BADGE_SUCCESS = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px solid #c6f6d5"
+_S_BADGE_FAILURE = f"{_S_BADGE};background:#fff5f5;color:#9b2c2c;border:1px solid #feb2b2"
+_S_BADGE_PARTIAL = f"{_S_BADGE};background:#fffff0;color:#975a16;border:1px solid #fefcbf"
+_S_BADGE_SKIPPED = f"{_S_BADGE};background:#f7fafc;color:#718096;border:1px solid #e2e8f0"
+
+_STATUS_BADGE_MAP = {
+    "success": _S_BADGE_SUCCESS,
+    "failure": _S_BADGE_FAILURE,
+    "partial": _S_BADGE_PARTIAL,
+    "skipped": _S_BADGE_SKIPPED,
+}
+
+
+def _status_badge(status: str) -> str:
+    """Return an inline-styled badge for a status value."""
+    style = _STATUS_BADGE_MAP.get(status, _S_BADGE)
+    return f'<span style="{style}">{html.escape(status)}</span>'
+
+
+# ---------------------------------------------------------------------------
+# Rich HTML renderers for non-plan modes
+# ---------------------------------------------------------------------------
+
+
+def render_result_html(result: Any) -> str:
+    """Generate styled HTML for any RunResult mode.
+
+    Dispatches to mode-specific renderers based on ``result.mode``.
+    Accepts a duck-typed result object to avoid circular imports.
+
+    Args:
+        result: A RunResult instance.
+
+    Returns:
+        Complete HTML fragment as a string.
+    """
+    mode = str(getattr(result, "mode", ""))
+    if mode == "plan":
+        return render_plan_html(result)
+    if mode == "execute":
+        return _render_execute_html(result)
+    if mode == "validate":
+        return _render_validate_html(result)
+    if mode == "preview":
+        return _render_preview_html(result)
+    # Unknown mode — fall back to escaped summary
+    escaped = html.escape(str(getattr(result, "summary", lambda: "")()))
+    return f'<pre style="font-family:monospace;padding:12px;border-radius:4px">{escaped}</pre>'
+
+
+def _render_execute_html(result: Any) -> str:
+    """Render a styled HTML report for execute mode results."""
+    parts: list[str] = [f'<div style="{_S_CONTAINER}">']
+
+    status = str(getattr(result, "status", ""))
+    config_type = html.escape(str(getattr(result, "config_type", "")))
+    config_name = html.escape(str(getattr(result, "config_name", "")))
+    duration_ms = getattr(result, "duration_ms", 0) or 0
+    warnings: list[str] = getattr(result, "warnings", []) or []
+
+    parts.append(f'<h3 style="{_S_H3}">Execution Summary</h3>')
+
+    # Summary table
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Status</strong></td>'
+        f'<td style="{_S_TD}">{_status_badge(status)}</td></tr>'
+    )
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
+        f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
+    )
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Duration</strong></td>'
+        f'<td style="{_S_TD}">{_format_duration(duration_ms)}</td></tr>'
+    )
+
+    # Total rows
+    total_rows = _count_total_rows(result)
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Rows Written</strong></td>'
+        f'<td style="{_S_TD}">{total_rows:,}</td></tr>'
+    )
+    parts.append("</table>")
+
+    # Thread results table
+    thread_results = _collect_thread_results(result)
+    if thread_results:
+        parts.append(f'<h4 style="{_S_H4}">Threads</h4>')
+        parts.append(f'<table style="{_S_TABLE}">')
+        parts.append(
+            f'<tr><th style="{_S_TH}">Thread</th><th style="{_S_TH}">Status</th>'
+            f'<th style="{_S_TH}">Rows</th><th style="{_S_TH}">Mode</th>'
+            f'<th style="{_S_TH}">Target</th></tr>'
+        )
+        for tr in thread_results:
+            name = html.escape(getattr(tr, "thread_name", ""))
+            tr_status = str(getattr(tr, "status", ""))
+            rows = getattr(tr, "rows_written", 0)
+            write_mode = html.escape(getattr(tr, "write_mode", ""))
+            target = html.escape(getattr(tr, "target_path", ""))
+            # Truncate long paths
+            target_display = target if len(target) <= 60 else "\u2026" + target[-57:]
+            parts.append(
+                f'<tr><td style="{_S_TD}">{name}</td>'
+                f'<td style="{_S_TD}">{_status_badge(tr_status)}</td>'
+                f'<td style="{_S_TD}">{rows:,}</td>'
+                f'<td style="{_S_TD}">{write_mode}</td>'
+                f'<td style="{_S_TD}" title="{target}">{target_display}</td></tr>'
+            )
+        parts.append("</table>")
+
+    # Errors
+    errors = _collect_errors(result)
+    if errors:
+        parts.append(f'<h4 style="{_S_H4}">Errors</h4>')
+        for err in errors:
+            parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(err)}</div>')
+
+    # Warnings
+    if warnings:
+        parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')
+        for w in warnings:
+            parts.append(f'<div style="{_S_WARN_BOX}">{html.escape(w)}</div>')
+
+    parts.append("</div>")
+    return "\n".join(parts)
+
+
+def _render_validate_html(result: Any) -> str:
+    """Render a styled HTML report for validate mode results."""
+    parts: list[str] = [f'<div style="{_S_CONTAINER}">']
+
+    status = str(getattr(result, "status", ""))
+    config_type = html.escape(str(getattr(result, "config_type", "")))
+    config_name = html.escape(str(getattr(result, "config_name", "")))
+    validation_errors: list[str] = getattr(result, "validation_errors", []) or []
+    warnings: list[str] = getattr(result, "warnings", []) or []
+
+    parts.append(f'<h3 style="{_S_H3}">Validation Summary</h3>')
+
+    # Summary table
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Status</strong></td>'
+        f'<td style="{_S_TD}">{_status_badge(status)}</td></tr>'
+    )
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
+        f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
+    )
+    parts.append("</table>")
+
+    if not validation_errors:
+        # Checks passed
+        parts.append(
+            f'<div style="{_S_CHECK_BOX}">'
+            "\u2713 config schema &nbsp; \u2713 DAG &nbsp; \u2713 sources"
+            "</div>"
+        )
+    else:
+        parts.append(f'<h4 style="{_S_H4}">Errors</h4>')
+        for err in validation_errors:
+            parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(err)}</div>')
+
+    if warnings:
+        parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')
+        for w in warnings:
+            parts.append(f'<div style="{_S_WARN_BOX}">{html.escape(w)}</div>')
+
+    parts.append("</div>")
+    return "\n".join(parts)
+
+
+def _render_preview_html(result: Any) -> str:
+    """Render a styled HTML report for preview mode results."""
+    parts: list[str] = [f'<div style="{_S_CONTAINER}">']
+
+    status = str(getattr(result, "status", ""))
+    config_type = html.escape(str(getattr(result, "config_type", "")))
+    config_name = html.escape(str(getattr(result, "config_name", "")))
+    preview_data: dict[str, Any] = getattr(result, "preview_data", None) or {}
+    warnings: list[str] = getattr(result, "warnings", []) or []
+
+    parts.append(f'<h3 style="{_S_H3}">Preview Summary</h3>')
+
+    # Summary table
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Status</strong></td>'
+        f'<td style="{_S_TD}">{_status_badge(status)}</td></tr>'
+    )
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
+        f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
+    )
+    if preview_data:
+        parts.append(
+            f'<tr><td style="{_S_TD}"><strong>Threads</strong></td>'
+            f'<td style="{_S_TD}">{len(preview_data)}</td></tr>'
+        )
+    parts.append("</table>")
+
+    # Preview data table
+    if preview_data:
+        parts.append(f'<h4 style="{_S_H4}">Output Shape</h4>')
+        parts.append(f'<table style="{_S_TABLE}">')
+        parts.append(
+            f'<tr><th style="{_S_TH}">Thread</th>'
+            f'<th style="{_S_TH}">Columns</th>'
+            f'<th style="{_S_TH}">Rows</th></tr>'
+        )
+        for name, df in preview_data.items():
+            name_esc = html.escape(name)
+            try:
+                cols = len(df.columns)
+                rows = df.count()
+                parts.append(
+                    f'<tr><td style="{_S_TD}">{name_esc}</td>'
+                    f'<td style="{_S_TD}">{cols}</td>'
+                    f'<td style="{_S_TD}">{rows:,}</td></tr>'
+                )
+            except Exception:
+                parts.append(
+                    f'<tr><td style="{_S_TD}">{name_esc}</td>'
+                    f'<td style="{_S_TD}" colspan="2">'
+                    f'<span style="{_S_NONE}">(unavailable)</span></td></tr>'
+                )
+        parts.append("</table>")
+
+    if warnings:
+        parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')
+        for w in warnings:
+            parts.append(f'<div style="{_S_WARN_BOX}">{html.escape(w)}</div>')
+
+    parts.append("</div>")
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for extracting result data (duck-typed to avoid circular imports)
+# ---------------------------------------------------------------------------
+
+
+def _count_total_rows(result: Any) -> int:
+    """Sum rows_written across all threads in the result detail tree."""
+    detail = getattr(result, "detail", None)
+    if detail is None:
+        return 0
+    config_type = str(getattr(result, "config_type", ""))
+    if config_type == "thread":
+        return getattr(detail, "rows_written", 0)
+    if config_type == "weave":
+        return sum(getattr(tr, "rows_written", 0) for tr in getattr(detail, "thread_results", []))
+    if config_type == "loom":
+        total = 0
+        for wr in getattr(detail, "weave_results", []):
+            total += sum(getattr(tr, "rows_written", 0) for tr in getattr(wr, "thread_results", []))
+        return total
+    return 0
+
+
+def _collect_thread_results(result: Any) -> list[Any]:
+    """Flatten all ThreadResult objects from the result detail tree."""
+    detail = getattr(result, "detail", None)
+    if detail is None:
+        return []
+    config_type = str(getattr(result, "config_type", ""))
+    if config_type == "thread":
+        return [detail]
+    if config_type == "weave":
+        return list(getattr(detail, "thread_results", []))
+    if config_type == "loom":
+        results: list[Any] = []
+        for wr in getattr(detail, "weave_results", []):
+            results.extend(getattr(wr, "thread_results", []))
+        return results
+    return []
+
+
+def _collect_errors(result: Any) -> list[str]:
+    """Extract error messages from failed threads."""
+    errors: list[str] = []
+    for tr in _collect_thread_results(result):
+        error = getattr(tr, "error", None)
+        if error:
+            name = getattr(tr, "thread_name", "unknown")
+            errors.append(f"[{name}] {error}")
+    return errors
