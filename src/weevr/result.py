@@ -141,19 +141,19 @@ class RunResult:
             for thread_name in plan.threads:
                 deps = plan.dependencies.get(thread_name, [])
                 if not deps:
-                    lines.append(f"  {thread_name}: (none)")
+                    lines.append(f"  {thread_name}  (none)")
                 else:
                     inferred = set(plan.inferred_dependencies.get(thread_name, []))
                     explicit = set(plan.explicit_dependencies.get(thread_name, []))
                     dep_parts: list[str] = []
                     for d in deps:
                         if d in explicit:
-                            dep_parts.append(f"{d} [explicit]")
+                            dep_parts.append(f"{d} (explicit)")
                         elif d in inferred:
-                            dep_parts.append(f"{d} [inferred]")
+                            dep_parts.append(f"{d} (inferred)")
                         else:
                             dep_parts.append(d)
-                    lines.append(f"  {thread_name}: {', '.join(dep_parts)}")
+                    lines.append(f"  {thread_name} \u2190 {', '.join(dep_parts)}")
 
             # Section 3: Cache targets
             if plan.cache_targets:
@@ -161,8 +161,12 @@ class RunResult:
                 lines.append("Cache targets:")
                 for ct in plan.cache_targets:
                     consumers = plan.dependents.get(ct, [])
-                    consumer_str = ", ".join(consumers) if consumers else "(no consumers)"
-                    lines.append(f"  {ct} → {consumer_str}")
+                    n = len(consumers)
+                    if consumers:
+                        consumer_str = ", ".join(consumers)
+                        lines.append(f"  {ct}  {n} consumer{'s' if n != 1 else ''}: {consumer_str}")
+                    else:
+                        lines.append(f"  {ct}  (no consumers)")
 
             # Section 4: Lookup schedule
             if plan.lookup_schedule:
@@ -200,9 +204,11 @@ class RunResult:
                     steps = getattr(thread, "steps", [])
                     step_count = len(steps)
                     join_count = sum(1 for s in steps if hasattr(s, "join"))
-                    detail = f"{src_str} → {tgt_str}, {step_count} steps"
+                    step_label = "step" if step_count == 1 else "steps"
+                    detail = f"{src_str} → {tgt_str}  {step_count} {step_label}"
                     if join_count > 0:
-                        detail += f", {join_count} joins"
+                        join_label = "join" if join_count == 1 else "joins"
+                        detail += f", {join_count} {join_label}"
                     lines.append(f"  {thread_name}: {detail}")
 
         return "\n".join(lines)

@@ -549,7 +549,7 @@ class TestExplain:
         plan = self._make_plan()
         result = self._make_result([plan])
         text = result.explain()
-        assert "b: a [inferred]" in text
+        assert "b \u2190 a (inferred)" in text
 
     def test_explain_dependencies_explicit(self) -> None:
         plan = self._make_plan(
@@ -558,7 +558,7 @@ class TestExplain:
         )
         result = self._make_result([plan])
         text = result.explain()
-        assert "b: a [explicit]" in text
+        assert "b \u2190 a (explicit)" in text
 
     def test_explain_dependencies_mixed(self) -> None:
         plan = self._make_plan(
@@ -570,21 +570,21 @@ class TestExplain:
         )
         result = self._make_result([plan])
         text = result.explain()
-        assert "a [inferred]" in text
-        assert "b [explicit]" in text
+        assert "a (inferred)" in text
+        assert "b (explicit)" in text
 
     def test_explain_dependencies_none(self) -> None:
         plan = self._make_plan()
         result = self._make_result([plan])
         text = result.explain()
-        assert "a: (none)" in text
+        assert "a  (none)" in text
 
     def test_explain_cache_targets(self) -> None:
         plan = self._make_plan(cache_targets=["a"])
         result = self._make_result([plan])
         text = result.explain()
         assert "Cache targets:" in text
-        assert "a → b" in text
+        assert "a  1 consumer: b" in text
 
     def test_explain_cache_targets_omitted(self) -> None:
         plan = self._make_plan()
@@ -658,6 +658,35 @@ class TestExplain:
         text = result.explain()
         assert "3 steps" in text
         assert "2 joins" in text
+
+    def test_explain_thread_detail_singular(self) -> None:
+        """Verify singular 'step' and 'join' when count is 1."""
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeJoinStep:
+            join = True
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/data"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/data"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps = [_FakeJoinStep()]
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "1 step," in text
+        assert "1 join" in text
+        assert "1 steps" not in text
+        assert "1 joins" not in text
 
     def test_explain_thread_detail_missing(self) -> None:
         plan = self._make_plan()
@@ -892,7 +921,7 @@ class TestPlanDisplayIntegration:
         assert "Execution order:" in e
         assert "Dependencies:" in e
         assert "Cache targets:" in e
-        assert "raw → staging" in e
+        assert "raw  1 consumer: staging" in e
 
         # _repr_html_ returns valid HTML with SVG
         h = result._repr_html_()
