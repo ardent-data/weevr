@@ -748,7 +748,7 @@ class TestReprHtml:
         html_out = result._repr_html_()
         assert html_out is not None
         assert "<svg" in html_out
-        assert "weevr-plan" in html_out
+        assert "Plan Summary" in html_out
 
     def test_repr_html_plan_mode_summary_table(self) -> None:
         plan = ExecutionPlan(
@@ -927,7 +927,7 @@ class TestPlanDisplayIntegration:
         h = result._repr_html_()
         assert h is not None
         assert "<svg" in h
-        assert "weevr-plan" in h
+        assert "Plan Summary" in h
 
     def test_plan_result_with_lookups(self) -> None:
         plan = ExecutionPlan(

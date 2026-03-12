@@ -50,7 +50,7 @@ class ExecutionPlan(FrozenBase):
     def dag(self) -> DAGDiagram:
         """Return an inline SVG DAG diagram of this execution plan.
 
-        The returned :class:`DAGDiagram` auto-renders in IPython/Jupyter
+        The returned :class:`DAGDiagram` auto-renders in notebooks
         via ``_repr_svg_()`` and can be exported via ``save()``.
         """
         from weevr.engine.display import DAGDiagram, render_dag_svg
@@ -58,7 +58,7 @@ class ExecutionPlan(FrozenBase):
         return DAGDiagram(render_dag_svg(self))
 
     def _repr_html_(self) -> str:
-        """IPython rich display protocol.
+        """Notebook rich display protocol.
 
         Renders DAG visualization and dependency table for this plan.
         """

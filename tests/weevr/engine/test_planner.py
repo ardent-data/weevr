@@ -571,7 +571,7 @@ class TestExecutionPlanDisplay:
         plan = self._simple_plan()
         html_out = plan._repr_html_()
         assert "<svg" in html_out
-        assert "<table>" in html_out
+        assert "<table" in html_out
 
     def test_repr_html_dependency_table(self) -> None:
         plan = self._simple_plan()

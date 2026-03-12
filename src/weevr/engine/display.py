@@ -59,7 +59,7 @@ _DARK = {
 class DAGDiagram:
     """Inline SVG diagram of a weave execution plan.
 
-    Auto-renders in IPython/Jupyter notebooks via ``_repr_svg_()``.
+    Auto-renders in notebooks via the ``_repr_svg_()`` display protocol.
     SVG markup available as string via ``__str__()`` or the ``svg`` property.
     Export to file via ``save()``.
 
@@ -79,7 +79,7 @@ class DAGDiagram:
         return self._svg
 
     def _repr_svg_(self) -> str:
-        """IPython SVG display protocol."""
+        """Notebook SVG display protocol."""
         return self._svg
 
     def __str__(self) -> str:
@@ -404,29 +404,29 @@ def render_dag_svg(
 # HTML rendering
 # ---------------------------------------------------------------------------
 
-_HTML_STYLE = """\
-<style>
-.weevr-plan{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#2d3748}
-.weevr-plan table{border-collapse:collapse;width:100%;margin:8px 0}
-.weevr-plan th,.weevr-plan td{border:1px solid #e2e8f0;padding:6px 10px;text-align:left}
-.weevr-plan th{background:#f7fafc;font-weight:600}
-.weevr-plan .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:12px}
-.weevr-plan .badge-cache{background:#ebf8ff;color:#2c5282;border:1px solid #bee3f8}
-.weevr-plan .badge-inferred{background:#f0fff4;color:#276749;border:1px solid #c6f6d5}
-.weevr-plan .badge-explicit{background:#faf5ff;color:#553c9a;border:1px solid #e9d8fd}
-.weevr-plan .badge-status{background:#f0fff4;color:#276749;border:1px solid #c6f6d5}
-.weevr-plan h3{margin:16px 0 8px;font-size:16px}
-.weevr-plan h4{margin:12px 0 6px;font-size:14px}
-@media(prefers-color-scheme:dark){
-.weevr-plan{color:#e2e8f0}
-.weevr-plan th,.weevr-plan td{border-color:#4a5568}
-.weevr-plan th{background:#2d3748}
-.weevr-plan .badge-cache{background:#2a4365;color:#bee3f8;border-color:#2c5282}
-.weevr-plan .badge-inferred{background:#22543d;color:#c6f6d5;border-color:#276749}
-.weevr-plan .badge-explicit{background:#44337a;color:#e9d8fd;border-color:#553c9a}
-.weevr-plan .badge-status{background:#22543d;color:#c6f6d5;border-color:#276749}
-}
-</style>"""
+# Inline style constants — notebook HTML sanitizers strip <style> blocks,
+# so all styling must be applied directly on elements.  The plan renders as
+# a self-contained card with explicit backgrounds to avoid inheriting the
+# host page's theme (which caused unreadable text on Fabric dark mode).
+
+_S_CONTAINER = (
+    "font-family:system-ui,-apple-system,sans-serif;font-size:14px;"
+    "color:#2d3748;background:#ffffff;padding:12px 16px;border-radius:8px"
+)
+_S_TABLE = "border-collapse:collapse;width:100%;margin:8px 0"
+_S_TH = (
+    "border:1px solid #e2e8f0;padding:6px 10px;text-align:left;"
+    "background:#f7fafc;font-weight:600;color:#2d3748"
+)
+_S_TD = "border:1px solid #e2e8f0;padding:6px 10px;text-align:left;background:#ffffff;color:#2d3748"
+_S_H3 = "margin:16px 0 8px;font-size:16px;color:#2d3748"
+_S_H4 = "margin:12px 0 6px;font-size:14px;color:#2d3748"
+_S_BADGE = "display:inline-block;padding:1px 6px;border-radius:3px;font-size:12px"
+_S_BADGE_CACHE = f"{_S_BADGE};background:#ebf8ff;color:#2c5282;border:1px solid #bee3f8"
+_S_BADGE_INFERRED = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px solid #c6f6d5"
+_S_BADGE_EXPLICIT = f"{_S_BADGE};background:#faf5ff;color:#553c9a;border:1px solid #e9d8fd"
+_S_BADGE_STATUS = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px solid #c6f6d5"
+_S_NONE = "color:#a0aec0;font-style:italic"
 
 
 def _html_dep_badges(
@@ -436,7 +436,7 @@ def _html_dep_badges(
     """Build HTML badges for a thread's dependencies with provenance."""
     deps = plan.dependencies.get(thread_name, [])
     if not deps:
-        return "<em>(none)</em>"
+        return f'<span style="{_S_NONE}">(none)</span>'
 
     inferred = set(plan.inferred_dependencies.get(thread_name, []))
     explicit = set(plan.explicit_dependencies.get(thread_name, []))
@@ -445,9 +445,9 @@ def _html_dep_badges(
     for dep in deps:
         name = html.escape(dep)
         if dep in explicit:
-            badges.append(f'<span class="badge badge-explicit">{name}</span>')
+            badges.append(f'<span style="{_S_BADGE_EXPLICIT}">{name}</span>')
         elif dep in inferred:
-            badges.append(f'<span class="badge badge-inferred">{name}</span>')
+            badges.append(f'<span style="{_S_BADGE_INFERRED}">{name}</span>')
         else:
             badges.append(html.escape(dep))
     return " ".join(badges)
@@ -471,28 +471,33 @@ def render_execution_plan_html(
     parts: list[str] = []
 
     weave_name = html.escape(plan.weave_name)
-    parts.append(f"<h4>Weave: {weave_name}</h4>")
+    parts.append(f'<h4 style="{_S_H4}">Weave: {weave_name}</h4>')
 
     # Dependency table
     cache_set = set(plan.cache_targets)
-    parts.append("<table>")
-    parts.append("<tr><th>Group</th><th>Thread</th><th>Dependencies</th><th>Cache</th></tr>")
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Group</th><th style="{_S_TH}">Thread</th>'
+        f'<th style="{_S_TH}">Dependencies</th><th style="{_S_TH}">Cache</th></tr>'
+    )
     for group_idx, group in enumerate(plan.execution_order):
         for thread_name in sorted(group):
             name_esc = html.escape(thread_name)
             cache_badge = (
-                '<span class="badge badge-cache">cached</span>' if thread_name in cache_set else ""
+                f'<span style="{_S_BADGE_CACHE}">cached</span>' if thread_name in cache_set else ""
             )
             dep_badges = _html_dep_badges(thread_name, plan)
             parts.append(
-                f"<tr><td>{group_idx}</td><td>{name_esc}</td>"
-                f"<td>{dep_badges}</td><td>{cache_badge}</td></tr>"
+                f'<tr><td style="{_S_TD}">{group_idx}</td>'
+                f'<td style="{_S_TD}">{name_esc}</td>'
+                f'<td style="{_S_TD}">{dep_badges}</td>'
+                f'<td style="{_S_TD}">{cache_badge}</td></tr>'
             )
     parts.append("</table>")
 
     # Embedded DAG SVG
     svg = render_dag_svg(plan, resolved_threads)
-    parts.append(f'<div class="weevr-dag">{svg}</div>')
+    parts.append(f"<div>{svg}</div>")
 
     return "\n".join(parts)
 
@@ -512,8 +517,7 @@ def render_plan_html(
     Returns:
         Complete HTML fragment as a string.
     """
-    parts: list[str] = ['<div class="weevr-plan">']
-    parts.append(_HTML_STYLE)
+    parts: list[str] = [f'<div style="{_S_CONTAINER}">']
 
     # Summary table
     status = html.escape(str(getattr(result, "status", "")))
@@ -526,22 +530,28 @@ def render_plan_html(
     total_cached = sum(len(p.cache_targets) for p in plans)
     total_lookups = sum(sum(len(v) for v in (p.lookup_schedule or {}).values()) for p in plans)
 
-    parts.append("<h3>Plan Summary</h3>")
-    parts.append("<table>")
+    parts.append(f'<h3 style="{_S_H3}">Plan Summary</h3>')
+    parts.append(f'<table style="{_S_TABLE}">')
     parts.append(
-        f"<tr><td><strong>Status</strong></td><td>"
-        f'<span class="badge badge-status">{status}</span></td></tr>'
+        f'<tr><td style="{_S_TD}"><strong>Status</strong></td><td style="{_S_TD}">'
+        f'<span style="{_S_BADGE_STATUS}">{status}</span></td></tr>'
     )
-    parts.append(f"<tr><td><strong>Scope</strong></td><td>{config_type}: {config_name}</td></tr>")
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
+        f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
+    )
     counts = f"{total_threads} threads | {total_cached} cached"
     if total_lookups > 0:
         counts += f" | {total_lookups} lookups"
-    parts.append(f"<tr><td><strong>Counts</strong></td><td>{counts}</td></tr>")
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Counts</strong></td>'
+        f'<td style="{_S_TD}">{counts}</td></tr>'
+    )
     parts.append("</table>")
 
     # Loom header if multiple plans
     if len(plans) > 1:
-        parts.append(f"<h3>Loom: {config_name} &mdash; {len(plans)} weaves</h3>")
+        parts.append(f'<h3 style="{_S_H3}">Loom: {config_name} &mdash; {len(plans)} weaves</h3>')
 
     # Per-plan sections
     for plan in plans:

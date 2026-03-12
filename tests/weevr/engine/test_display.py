@@ -227,7 +227,7 @@ class TestRenderExecutionPlanHtml:
             execution_order=[["a"], ["b"], ["c"]],
         )
         html_out = render_execution_plan_html(plan)
-        assert "<table>" in html_out
+        assert "<table" in html_out
         assert "</table>" in html_out
         assert "test_weave" in html_out
 
@@ -257,7 +257,7 @@ class TestRenderExecutionPlanHtml:
             cache_targets=["a"],
         )
         html_out = render_execution_plan_html(plan)
-        assert "badge-cache" in html_out
+        assert "#ebf8ff" in html_out  # cache badge background
         assert "cached" in html_out
 
     def test_dependency_provenance_badges(self) -> None:
@@ -267,8 +267,8 @@ class TestRenderExecutionPlanHtml:
             execution_order=[["a"], ["b"]],
         )
         html_out = render_execution_plan_html(plan)
-        # "a" is an inferred dependency of "b" (via _make_plan)
-        assert "badge-inferred" in html_out
+        # "a" is an inferred dependency of "b" — inline style includes green bg
+        assert "#f0fff4" in html_out
 
 
 class TestRenderPlanHtml:
@@ -329,9 +329,11 @@ class TestRenderPlanHtml:
         html_out = render_plan_html(result)
         assert "2 lookups" in html_out
 
-    def test_style_block(self) -> None:
+    def test_inline_styles(self) -> None:
         plan = _make_plan(threads=["a"], execution_order=[["a"]])
         result = _FakeResult([plan])
         html_out = render_plan_html(result)
-        assert "<style>" in html_out
-        assert "prefers-color-scheme:dark" in html_out
+        # Uses inline styles (no <style> block) for notebook sanitizer compat
+        assert "<style>" not in html_out or "<style>" in html_out.split("<svg")[1]
+        # Container has explicit background
+        assert "background:#ffffff" in html_out

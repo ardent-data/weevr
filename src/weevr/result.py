@@ -235,7 +235,7 @@ class RunResult:
         return "\n".join(lines)
 
     def _repr_html_(self) -> str | None:
-        """IPython rich display protocol.
+        """Notebook rich display protocol.
 
         Plan mode: styled HTML summary table with embedded DAG SVG.
         Other modes: summary() text wrapped in styled ``<pre>`` block.
