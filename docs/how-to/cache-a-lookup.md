@@ -168,16 +168,26 @@ lookups:
 
 ## Verify caching behavior
 
-Use `verbose` or `debug` log level to see cache lifecycle events in the
-structured JSON logs:
+Use plan mode to check which threads are cache targets before running:
 
 ```python
-from weevr import Context
+result = ctx.run("orders.weave", mode="plan")
+print(result.summary())      # cache targets are marked with an asterisk (e.g., dim_product*)
+print(result.explain())      # "Cache targets" section lists each target and consumer count
+```
 
+To observe cache lifecycle events at runtime, use `verbose` or `debug`
+log level:
+
+```python
 ctx = Context(spark, "my-project.weevr", log_level="verbose")
 result = ctx.run("orders.weave")
 ```
 
-Look for log entries containing `Cached output of thread` and
-`Unpersisted cached output of thread` to confirm that caching is active and
-cleanup is occurring as expected.
+Look for these log entries:
+
+- **Thread auto-caching** — `Cached output of thread` and
+  `Unpersisted cached output of thread` confirm the `CacheManager` is
+  persisting and releasing thread outputs.
+- **Lookup materialization** — `Materialized lookup '<name>'` confirms
+  weave-level lookups are being pre-read and cached.

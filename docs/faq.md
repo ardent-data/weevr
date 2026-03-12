@@ -316,7 +316,18 @@ You can also use plan mode to see the execution order without running:
 
 ```python
 result = ctx.run("nightly.loom", mode="plan")
+print(result.summary())      # compact view with cache markers (e.g., dim_product*)
+print(result.explain())      # detailed breakdown: dependencies, cache targets, thread detail
 ```
+
+Plan mode builds the full execution plan — thread ordering, dependency
+analysis, and cache target selection — without reading or writing any data.
+The `summary()` output marks cache targets with an asterisk and includes
+footer counts (threads, cached, lookups). `explain()` provides a
+section-by-section breakdown including dependency provenance (inferred vs
+explicit), cache consumers, lookup schedule, and per-thread source/target
+detail. In notebooks, the result renders automatically as styled HTML
+with an embedded DAG diagram.
 
 See [Execution Modes](concepts/execution-modes.md) for the full set of
 available modes.
