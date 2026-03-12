@@ -213,11 +213,29 @@ class RunResult:
         ]
 
         if self.execution_plan:
+            total_threads = 0
+            total_cached = 0
+            total_lookups = 0
+
             lines.append("")
             lines.append("Execution order:")
             for plan in self.execution_plan:
+                cache_set = set(plan.cache_targets)
+                total_threads += len(plan.threads)
+                total_cached += len(plan.cache_targets)
+                if plan.lookup_schedule:
+                    for names in plan.lookup_schedule.values():
+                        total_lookups += len(names)
+
                 for i, group in enumerate(plan.execution_order, 1):
-                    lines.append(f"  {i}. [{', '.join(group)}]")
+                    labeled = [f"{t}*" if t in cache_set else t for t in group]
+                    lines.append(f"  {i}. [{', '.join(labeled)}]")
+
+            footer = f"{total_threads} threads | {total_cached} cached"
+            if total_lookups > 0:
+                footer += f" | {total_lookups} lookups"
+            lines.append("")
+            lines.append(footer)
 
         return lines
 

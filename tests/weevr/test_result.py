@@ -413,6 +413,72 @@ class TestRunResult:
         assert "Errors:" not in s
 
 
+class TestSummaryPlanEnriched:
+    """Tests for enriched plan summary with cache markers and footer counts."""
+
+    def _make_plan_result(
+        self,
+        *,
+        cache_targets: list[str] | None = None,
+        lookup_schedule: dict[int, list[str]] | None = None,
+    ) -> RunResult:
+        from weevr.engine.planner import ExecutionPlan
+
+        plan = ExecutionPlan(
+            weave_name="dimensions",
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            dependents={"a": ["b"], "b": ["c"], "c": []},
+            execution_order=[["a"], ["b"], ["c"]],
+            cache_targets=cache_targets or [],
+            inferred_dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            explicit_dependencies={"a": [], "b": [], "c": []},
+            lookup_schedule=lookup_schedule,
+        )
+        return RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dimensions",
+            execution_plan=[plan],
+        )
+
+    def test_summary_plan_cache_markers(self) -> None:
+        result = self._make_plan_result(cache_targets=["a"])
+        s = result.summary()
+        assert "a*" in s
+        assert "b*" not in s
+
+    def test_summary_plan_no_cache(self) -> None:
+        result = self._make_plan_result()
+        s = result.summary()
+        assert "*" not in s
+
+    def test_summary_plan_footer_counts(self) -> None:
+        result = self._make_plan_result(
+            cache_targets=["a"],
+            lookup_schedule={0: ["ext"]},
+        )
+        s = result.summary()
+        assert "3 threads" in s
+        assert "1 cached" in s
+        assert "1 lookups" in s
+
+    def test_summary_plan_footer_no_lookups(self) -> None:
+        result = self._make_plan_result(cache_targets=["a"])
+        s = result.summary()
+        assert "3 threads" in s
+        assert "1 cached" in s
+        assert "lookups" not in s
+
+    def test_summary_plan_footer_with_lookups(self) -> None:
+        result = self._make_plan_result(
+            lookup_schedule={0: ["ext1", "ext2"]},
+        )
+        s = result.summary()
+        assert "2 lookups" in s
+
+
 class TestLoadedConfig:
     @pytest.fixture()
     def sample_thread(self) -> Thread:
