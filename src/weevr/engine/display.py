@@ -25,6 +25,14 @@ _FONT_SIZE_ANNOTATION = 11
 _CHAR_WIDTH_ESTIMATE = 7.8  # approximate px per character at 13px
 _SVG_PADDING = 20  # canvas padding around all content
 _LOOKUP_MARKER_HEIGHT = 20  # height reserved for lookup markers between groups
+_LOOKUP_NODE_HEIGHT = 26
+_LOOKUP_NODE_PADDING = 14
+_LOOKUP_CORNER_RADIUS = 13  # pill shape
+
+# Loom-level DAG swimlane constants
+_SWIMLANE_PADDING = 16
+_SWIMLANE_HEADER_HEIGHT = 28
+_SWIMLANE_GAP = 40
 
 # Color palettes
 _LIGHT = {
@@ -116,10 +124,23 @@ def _estimate_node_width(name: str) -> float:
     return max(text_width + _NODE_PADDING * 2, 100.0)
 
 
+def _estimate_lookup_node_width(name: str) -> float:
+    """Estimate lookup node width in pixels from the lookup name length."""
+    text_width = len(name) * _CHAR_WIDTH_ESTIMATE
+    return max(text_width + _LOOKUP_NODE_PADDING * 2, 80.0)
+
+
 def _compute_layout(
     plan: ExecutionPlan,
     resolved_threads: dict[str, Any] | None = None,
-) -> tuple[dict[str, tuple[float, float, float, float]], list[tuple[str, str]], float, float]:
+) -> tuple[
+    dict[str, tuple[float, float, float, float]],
+    list[tuple[str, str]],
+    float,
+    float,
+    dict[str, tuple[float, float, float, float]],
+    list[tuple[str, str, bool]],
+]:
     """Compute node positions and edges for the DAG layout.
 
     Uses the execution_order groups as Y layers and a barycenter heuristic
@@ -130,24 +151,43 @@ def _compute_layout(
         resolved_threads: Optional thread models (unused by layout, reserved).
 
     Returns:
-        A tuple of (nodes, edges, total_width, total_height) where:
+        A tuple of (nodes, edges, width, height, lookup_nodes, lookup_edges):
         - nodes maps thread_name to (x, y, width, height)
         - edges is a list of (source_thread, target_thread)
         - total_width and total_height are the canvas dimensions
+        - lookup_nodes maps lookup_name to (x, y, width, height)
+        - lookup_edges is a list of (source_id, target_id, is_producer_edge)
+          where source/target are thread or lookup names
     """
     nodes: dict[str, tuple[float, float, float, float]] = {}
     edges: list[tuple[str, str]] = []
+    lookup_nodes: dict[str, tuple[float, float, float, float]] = {}
+    lookup_edges: list[tuple[str, str, bool]] = []
 
     if not plan.execution_order:
-        return nodes, edges, 0.0, 0.0
+        return nodes, edges, 0.0, 0.0, lookup_nodes, lookup_edges
 
     # Pre-compute node widths
     widths: dict[str, float] = {name: _estimate_node_width(name) for name in plan.threads}
+
+    # Check if we have full lookup node data
+    has_lookup_nodes = (
+        plan.lookup_producers is not None
+        and plan.lookup_consumers is not None
+        and plan.lookup_schedule is not None
+    )
 
     # Determine lookup marker slots (group boundaries that have lookups)
     lookup_groups: set[int] = set()
     if plan.lookup_schedule:
         lookup_groups = set(plan.lookup_schedule.keys())
+
+    # Pre-compute lookup node widths
+    lookup_widths: dict[str, float] = {}
+    if has_lookup_nodes and plan.lookup_schedule:
+        for lk_names in plan.lookup_schedule.values():
+            for lk in lk_names:
+                lookup_widths[lk] = _estimate_lookup_node_width(lk)
 
     # Barycenter ordering: for each layer, order nodes by average X of upstream neighbors
     # First layer uses alphabetical order (no upstream)
@@ -157,9 +197,12 @@ def _compute_layout(
     max_row_width = 0.0
 
     for group_idx, group in enumerate(plan.execution_order):
-        # Add space for lookup marker if this group boundary has one
+        # Add space for lookup row if this group boundary has lookups
         if group_idx in lookup_groups:
-            y += _LOOKUP_MARKER_HEIGHT
+            if has_lookup_nodes:
+                y += _V_SPACING / 2
+            else:
+                y += _LOOKUP_MARKER_HEIGHT
 
         # Barycenter ordering
         if group_idx == 0:
@@ -173,6 +216,21 @@ def _compute_layout(
                 return sum(node_x_center.get(u, 0.0) for u in ups) / len(ups)
 
             ordered = sorted(group, key=_barycenter)
+
+        # Place lookup nodes between groups if we have full data
+        if has_lookup_nodes and group_idx in lookup_groups and plan.lookup_schedule:
+            lk_names = plan.lookup_schedule[group_idx]
+            lk_row_width = sum(lookup_widths[lk] for lk in lk_names) + _H_SPACING * max(
+                len(lk_names) - 1, 0
+            )
+            max_row_width = max(max_row_width, lk_row_width)
+            lk_x = float(_SVG_PADDING)
+            for lk in lk_names:
+                lk_w = lookup_widths[lk]
+                lookup_nodes[lk] = (lk_x, y, lk_w, float(_LOOKUP_NODE_HEIGHT))
+                node_x_center[f"__lk__{lk}"] = lk_x + lk_w / 2
+                lk_x += lk_w + _H_SPACING
+            y += _LOOKUP_NODE_HEIGHT + _V_SPACING / 2
 
         # Compute row width and center it
         row_width = sum(widths[n] for n in ordered) + _H_SPACING * max(len(ordered) - 1, 0)
@@ -191,7 +249,6 @@ def _compute_layout(
     canvas_width = max_row_width + _SVG_PADDING * 2
     for name, (nx, ny, nw, nh) in list(nodes.items()):
         group_idx = _find_group_index(name, plan.execution_order)
-        group = plan.execution_order[group_idx]
         ordered_in_group = [
             n for n in nodes if _find_group_index(n, plan.execution_order) == group_idx
         ]
@@ -202,14 +259,36 @@ def _compute_layout(
         nodes[name] = (nx + offset, ny, nw, nh)
         node_x_center[name] = nx + offset + nw / 2
 
+    # Center lookup node rows
+    for lk_name, (lx, ly, lw, lh) in list(lookup_nodes.items()):
+        # Find all lookups at the same Y
+        same_row = [ln for ln, (_, ry, _, _) in lookup_nodes.items() if ry == ly]
+        row_width = sum(lookup_nodes[ln][2] for ln in same_row) + _H_SPACING * max(
+            len(same_row) - 1, 0
+        )
+        offset = (canvas_width - row_width) / 2 - _SVG_PADDING
+        lookup_nodes[lk_name] = (lx + offset, ly, lw, lh)
+        node_x_center[f"__lk__{lk_name}"] = lx + offset + lw / 2
+
     # Build edges from dependencies
     for name, deps in plan.dependencies.items():
         for dep in deps:
             if dep in nodes and name in nodes:
                 edges.append((dep, name))
 
+    # Build lookup edges: producer → lookup, lookup → consumer
+    if has_lookup_nodes and plan.lookup_producers and plan.lookup_consumers:
+        for lk_name in lookup_nodes:
+            producer = plan.lookup_producers.get(lk_name)
+            if producer is not None and producer in nodes:
+                lookup_edges.append((producer, lk_name, True))
+            consumers = plan.lookup_consumers.get(lk_name, [])
+            for consumer in consumers:
+                if consumer in nodes:
+                    lookup_edges.append((lk_name, consumer, False))
+
     canvas_height = y - _V_SPACING + _NODE_HEIGHT + _SVG_PADDING
-    return nodes, edges, canvas_width, canvas_height
+    return nodes, edges, canvas_width, canvas_height, lookup_nodes, lookup_edges
 
 
 def _find_group_index(name: str, execution_order: list[list[str]]) -> int:
@@ -236,6 +315,11 @@ def _build_svg_style() -> str:
     clbl = f"fill:{lt['cached_text']};font-family:{font};font-size:{fs}px"
     lkl = f"fill:{lt['lookup_text']};font-family:{font};font-size:{fa}px"
 
+    lkn = (
+        f"fill:{lt['lookup_fill']};stroke:{lt['lookup_stroke']};"
+        "stroke-width:1.5;stroke-dasharray:4 2"
+    )
+
     lines = [
         "<style>",
         f"  .dag-node{{{nf};stroke-width:1.5}}",
@@ -244,8 +328,16 @@ def _build_svg_style() -> str:
         f"  .dag-label-cached{{{clbl};{ta}}}",
         f"  .dag-edge{{stroke:{lt['edge_stroke']};stroke-width:1.5;fill:none}}",
         f"  .dag-arrow{{fill:{lt['edge_stroke']}}}",
+        f"  .dag-lookup-node{{{lkn}}}",
+        f"  .dag-lookup-node-label{{{lkl};{ta}}}",
+        (
+            f"  .dag-lookup-edge{{stroke:{lt['lookup_stroke']};stroke-width:1.5;"
+            "fill:none;stroke-dasharray:6 3}"
+        ),
         f"  .dag-lookup-line{{stroke:{lt['lookup_stroke']};stroke-width:1;stroke-dasharray:6 3}}",
         f"  .dag-lookup-label{{{lkl};{ta}}}",
+        f"  .dag-swimlane{{fill:none;stroke:{lt['node_stroke']};stroke-width:1;rx:8}}",
+        f"  .dag-swimlane-header{{{lbl};{ta};font-weight:600}}",
         f"  .dag-bg{{fill:{lt['bg']}}}",
         "  @media(prefers-color-scheme:dark){",
         f"    .dag-node{{fill:{dk['node_fill']};stroke:{dk['node_stroke']}}}",
@@ -254,8 +346,13 @@ def _build_svg_style() -> str:
         f"    .dag-label-cached{{fill:{dk['cached_text']}}}",
         f"    .dag-edge{{stroke:{dk['edge_stroke']}}}",
         f"    .dag-arrow{{fill:{dk['edge_stroke']}}}",
+        (f"    .dag-lookup-node{{fill:{dk['lookup_fill']};stroke:{dk['lookup_stroke']}}}"),
+        f"    .dag-lookup-node-label{{fill:{dk['lookup_text']}}}",
+        f"    .dag-lookup-edge{{stroke:{dk['lookup_stroke']}}}",
         f"    .dag-lookup-line{{stroke:{dk['lookup_stroke']}}}",
         f"    .dag-lookup-label{{fill:{dk['lookup_text']}}}",
+        f"    .dag-swimlane{{stroke:{dk['node_stroke']}}}",
+        f"    .dag-swimlane-header{{fill:{dk['node_text']}}}",
         f"    .dag-bg{{fill:{dk['bg']}}}",
         "  }",
         "</style>",
@@ -281,7 +378,9 @@ def render_dag_svg(
     Returns:
         Complete SVG markup as a string.
     """
-    nodes, edges, width, height = _compute_layout(plan, resolved_threads)
+    nodes, edges, width, height, lookup_nodes, lookup_edges = _compute_layout(
+        plan, resolved_threads
+    )
 
     if not nodes:
         return (
@@ -302,7 +401,8 @@ def render_dag_svg(
     # Style block
     parts.append(_build_svg_style())
 
-    # Arrowhead marker
+    # Arrowhead markers
+    lt = _LIGHT
     parts.append("<defs>")
     parts.append(
         f'<marker id="dag-arrowhead" markerWidth="{_ARROWHEAD_SIZE}" '
@@ -312,20 +412,60 @@ def render_dag_svg(
         f'class="dag-arrow"/>'
         "</marker>"
     )
+    parts.append(
+        f'<marker id="dag-arrowhead-lookup" markerWidth="{_ARROWHEAD_SIZE}" '
+        f'markerHeight="{_ARROWHEAD_SIZE}" refX="{_ARROWHEAD_SIZE}" refY="{_ARROWHEAD_SIZE // 2}" '
+        f'orient="auto-start-reverse">'
+        f'<polygon points="0 0, {_ARROWHEAD_SIZE} {_ARROWHEAD_SIZE // 2}, 0 {_ARROWHEAD_SIZE}" '
+        f'fill="{lt["lookup_stroke"]}"/>'
+        "</marker>"
+    )
     parts.append("</defs>")
 
     # Background
     parts.append(f'<rect width="{width:.0f}" height="{height:.0f}" class="dag-bg"/>')
 
-    # Lookup materialization markers
-    if plan.lookup_schedule:
+    # Lookup rendering — use nodes if available, fall back to dashed lines
+    if lookup_nodes:
+        # Draw lookup edges (dashed, orange)
+        for src, tgt, _is_producer in lookup_edges:
+            if src in nodes:
+                sx, sy, sw, sh = nodes[src]
+                tx, ty, tw, _th = lookup_nodes[tgt]
+                x1 = sx + sw / 2
+                y1 = sy + sh
+                x2 = tx + tw / 2
+                y2 = ty
+            elif src in lookup_nodes:
+                sx, sy, sw, sh = lookup_nodes[src]
+                tx, ty, tw, _th = nodes[tgt]
+                x1 = sx + sw / 2
+                y1 = sy + sh
+                x2 = tx + tw / 2
+                y2 = ty
+            else:
+                continue
+            parts.append(
+                f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'class="dag-lookup-edge" marker-end="url(#dag-arrowhead-lookup)"/>'
+            )
+
+        # Draw lookup node rects (pill shape)
+        for lk_name, (lx, ly, lw, lh) in lookup_nodes.items():
+            parts.append(
+                f'<rect x="{lx:.1f}" y="{ly:.1f}" width="{lw:.1f}" height="{lh:.1f}" '
+                f'rx="{_LOOKUP_CORNER_RADIUS}" class="dag-lookup-node"/>'
+            )
+            parts.append(
+                f'<text x="{lx + lw / 2:.1f}" y="{ly + lh / 2:.1f}" '
+                f'class="dag-lookup-node-label">{_xml_escape(lk_name)}</text>'
+            )
+    elif plan.lookup_schedule:
+        # Fallback: dashed-line rendering for plans without producer/consumer data
         for group_idx, lookup_names in sorted(plan.lookup_schedule.items()):
             if group_idx == 0:
-                # Before first group — place marker just above first group
                 marker_y = _SVG_PADDING - _LOOKUP_MARKER_HEIGHT / 2
             else:
-                # Find Y of the group that this marker precedes
-                # Marker goes between group (group_idx-1) and group_idx
                 first_in_group = (
                     plan.execution_order[group_idx][0]
                     if group_idx < len(plan.execution_order)
@@ -395,6 +535,194 @@ def render_dag_svg(
                 len(parts) - 2,
                 f"<title>{_xml_escape(tooltip)}</title>",
             )
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def render_loom_dag_svg(
+    plans: list[ExecutionPlan],
+    resolved_threads: dict[str, Any] | None = None,
+) -> str:
+    """Generate a loom-level DAG SVG with swimlanes for each weave.
+
+    For a single plan, delegates to :func:`render_dag_svg`. For multiple
+    plans, stacks each weave's DAG inside a labelled swimlane container
+    with sequential arrows between them.
+
+    Args:
+        plans: Execution plans for each weave in execution order.
+        resolved_threads: Optional thread models for tooltip content.
+
+    Returns:
+        Complete SVG markup as a string.
+    """
+    if len(plans) <= 1:
+        return render_dag_svg(plans[0], resolved_threads) if plans else ""
+
+    # Compute internal layouts for each weave
+    weave_layouts: list[
+        tuple[
+            str,
+            dict[str, tuple[float, float, float, float]],
+            list[tuple[str, str]],
+            float,
+            float,
+            dict[str, tuple[float, float, float, float]],
+            list[tuple[str, str, bool]],
+        ]
+    ] = []
+    for plan in plans:
+        result = _compute_layout(plan, resolved_threads)
+        weave_layouts.append((plan.weave_name, *result))
+
+    # Calculate container dimensions
+    max_inner_width = max(w for _, _, _, w, _, _, _ in weave_layouts)
+    container_width = max_inner_width + _SWIMLANE_PADDING * 2
+    canvas_width = container_width + _SVG_PADDING * 2
+
+    # Build SVG
+    parts: list[str] = []
+
+    # First pass: compute total height
+    total_height = float(_SVG_PADDING)
+    container_tops: list[float] = []
+    container_heights: list[float] = []
+    for _, nodes, _, _w, h, _lk_nodes, _ in weave_layouts:
+        container_tops.append(total_height)
+        inner_h = max(h, _NODE_HEIGHT + _SVG_PADDING * 2) if nodes else _NODE_HEIGHT * 2
+        ch = _SWIMLANE_HEADER_HEIGHT + inner_h + _SWIMLANE_PADDING
+        container_heights.append(ch)
+        total_height += ch + _SWIMLANE_GAP
+    total_height = total_height - _SWIMLANE_GAP + _SVG_PADDING
+
+    vb = f"0 0 {canvas_width:.0f} {total_height:.0f}"
+    parts.append(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
+        f'width="{canvas_width:.0f}" height="{total_height:.0f}">'
+    )
+    parts.append(_build_svg_style())
+
+    # Arrowhead markers
+    lt = _LIGHT
+    parts.append("<defs>")
+    parts.append(
+        f'<marker id="dag-arrowhead" markerWidth="{_ARROWHEAD_SIZE}" '
+        f'markerHeight="{_ARROWHEAD_SIZE}" refX="{_ARROWHEAD_SIZE}" refY="{_ARROWHEAD_SIZE // 2}" '
+        f'orient="auto-start-reverse">'
+        f'<polygon points="0 0, {_ARROWHEAD_SIZE} {_ARROWHEAD_SIZE // 2}, 0 {_ARROWHEAD_SIZE}" '
+        f'class="dag-arrow"/>'
+        "</marker>"
+    )
+    parts.append(
+        f'<marker id="dag-arrowhead-lookup" markerWidth="{_ARROWHEAD_SIZE}" '
+        f'markerHeight="{_ARROWHEAD_SIZE}" refX="{_ARROWHEAD_SIZE}" refY="{_ARROWHEAD_SIZE // 2}" '
+        f'orient="auto-start-reverse">'
+        f'<polygon points="0 0, {_ARROWHEAD_SIZE} {_ARROWHEAD_SIZE // 2}, 0 {_ARROWHEAD_SIZE}" '
+        f'fill="{lt["lookup_stroke"]}"/>'
+        "</marker>"
+    )
+    parts.append("</defs>")
+
+    # Background
+    parts.append(f'<rect width="{canvas_width:.0f}" height="{total_height:.0f}" class="dag-bg"/>')
+
+    # Draw each weave container
+    container_x = float(_SVG_PADDING)
+    for idx, (wname, nodes, edges, _w, _h, lk_nodes, lk_edges) in enumerate(weave_layouts):
+        cy = container_tops[idx]
+        ch = container_heights[idx]
+
+        # Swimlane container rect
+        parts.append(
+            f'<rect x="{container_x:.1f}" y="{cy:.1f}" '
+            f'width="{container_width:.1f}" height="{ch:.1f}" class="dag-swimlane"/>'
+        )
+
+        # Header label
+        header_y = cy + _SWIMLANE_HEADER_HEIGHT / 2
+        parts.append(
+            f'<text x="{container_x + container_width / 2:.1f}" y="{header_y:.1f}" '
+            f'class="dag-swimlane-header">{_xml_escape("Weave: " + wname)}</text>'
+        )
+
+        # Translate internal content
+        content_y = cy + _SWIMLANE_HEADER_HEIGHT
+        offset_x = container_x + _SWIMLANE_PADDING
+        offset_y = content_y
+
+        # Lookup edges
+        for src, tgt, _is_producer in lk_edges:
+            if src in nodes:
+                sx, sy, sw, sh = nodes[src]
+                tx, ty, tw, _th = lk_nodes[tgt]
+            elif src in lk_nodes:
+                sx, sy, sw, sh = lk_nodes[src]
+                tx, ty, tw, _th = nodes[tgt]
+            else:
+                continue
+            x1 = offset_x + sx + sw / 2
+            y1 = offset_y + sy + sh
+            x2 = offset_x + tx + tw / 2
+            y2 = offset_y + ty
+            parts.append(
+                f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'class="dag-lookup-edge" marker-end="url(#dag-arrowhead-lookup)"/>'
+            )
+
+        # Lookup nodes
+        for lk_name, (lx, ly, lw, lh) in lk_nodes.items():
+            ax = offset_x + lx
+            ay = offset_y + ly
+            parts.append(
+                f'<rect x="{ax:.1f}" y="{ay:.1f}" width="{lw:.1f}" height="{lh:.1f}" '
+                f'rx="{_LOOKUP_CORNER_RADIUS}" class="dag-lookup-node"/>'
+            )
+            parts.append(
+                f'<text x="{ax + lw / 2:.1f}" y="{ay + lh / 2:.1f}" '
+                f'class="dag-lookup-node-label">{_xml_escape(lk_name)}</text>'
+            )
+
+        # Thread edges
+        for src, tgt in edges:
+            sx, sy, sw, sh = nodes[src]
+            tx, ty, tw, _th = nodes[tgt]
+            x1 = offset_x + sx + sw / 2
+            y1 = offset_y + sy + sh
+            x2 = offset_x + tx + tw / 2
+            y2 = offset_y + ty
+            parts.append(
+                f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'class="dag-edge" marker-end="url(#dag-arrowhead)"/>'
+            )
+
+        # Thread nodes
+        plan = plans[idx]
+        cache_set = set(plan.cache_targets)
+        for name, (nx, ny, nw, nh) in nodes.items():
+            ax = offset_x + nx
+            ay = offset_y + ny
+            is_cached = name in cache_set
+            node_class = "dag-node-cached" if is_cached else "dag-node"
+            label_class = "dag-label-cached" if is_cached else "dag-label"
+            parts.append(
+                f'<rect x="{ax:.1f}" y="{ay:.1f}" width="{nw:.1f}" height="{nh:.1f}" '
+                f'rx="{_NODE_CORNER_RADIUS}" class="{node_class}"/>'
+            )
+            parts.append(
+                f'<text x="{ax + nw / 2:.1f}" y="{ay + nh / 2:.1f}" '
+                f'class="{label_class}">{_xml_escape(name)}</text>'
+            )
+
+    # Sequential arrows between containers
+    mid_x = container_x + container_width / 2
+    for idx in range(len(weave_layouts) - 1):
+        y1 = container_tops[idx] + container_heights[idx]
+        y2 = container_tops[idx + 1]
+        parts.append(
+            f'<line x1="{mid_x:.1f}" y1="{y1:.1f}" x2="{mid_x:.1f}" y2="{y2:.1f}" '
+            f'class="dag-edge" marker-end="url(#dag-arrowhead)"/>'
+        )
 
     parts.append("</svg>")
     return "".join(parts)
@@ -549,9 +877,11 @@ def render_plan_html(
     )
     parts.append("</table>")
 
-    # Loom header if multiple plans
+    # Loom header and combined DAG for multiple plans
     if len(plans) > 1:
         parts.append(f'<h3 style="{_S_H3}">Loom: {config_name} &mdash; {len(plans)} weaves</h3>')
+        loom_svg = render_loom_dag_svg(plans, resolved)
+        parts.append(f"<div>{loom_svg}</div>")
 
     # Per-plan sections
     for plan in plans:

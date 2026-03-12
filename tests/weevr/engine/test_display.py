@@ -11,6 +11,7 @@ from weevr.engine.display import (
     DAGDiagram,
     render_dag_svg,
     render_execution_plan_html,
+    render_loom_dag_svg,
     render_plan_html,
 )
 from weevr.engine.planner import ExecutionPlan
@@ -30,6 +31,9 @@ def _make_plan(
     execution_order: list[list[str]] | None = None,
     cache_targets: list[str] | None = None,
     lookup_schedule: dict[int, list[str]] | None = None,
+    lookup_producers: dict[str, str | None] | None = None,
+    lookup_consumers: dict[str, list[str]] | None = None,
+    weave_name: str = "test_weave",
 ) -> ExecutionPlan:
     """Build a minimal ExecutionPlan for display testing."""
     t = threads or []
@@ -40,7 +44,7 @@ def _make_plan(
             if name not in dependents.get(u, []):
                 dependents.setdefault(u, []).append(name)
     return ExecutionPlan(
-        weave_name="test_weave",
+        weave_name=weave_name,
         threads=t,
         dependencies=deps,
         dependents=dependents,
@@ -49,6 +53,8 @@ def _make_plan(
         inferred_dependencies={n: deps.get(n, []) for n in t},
         explicit_dependencies={n: [] for n in t},
         lookup_schedule=lookup_schedule,
+        lookup_producers=lookup_producers,
+        lookup_consumers=lookup_consumers,
     )
 
 
@@ -156,7 +162,7 @@ class TestRenderDagSvg:
         # Verify no overlapping X positions within same group
         from weevr.engine.display import _compute_layout
 
-        nodes, _edges, _w, _h = _compute_layout(plan)
+        nodes, _edges, _w, _h, _lk_nodes, _lk_edges = _compute_layout(plan)
         for group in order:
             positions = [(nodes[n][0], nodes[n][0] + nodes[n][2]) for n in group]
             positions.sort()
@@ -271,6 +277,117 @@ class TestRenderExecutionPlanHtml:
         assert "#f0fff4" in html_out
 
 
+class TestLookupNodes:
+    """Tests for lookup node rendering with producer/consumer data."""
+
+    def test_lookup_nodes_rendered(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            lookup_schedule={1: ["cust_lookup"]},
+            lookup_producers={"cust_lookup": "a"},
+            lookup_consumers={"cust_lookup": ["b"]},
+        )
+        svg = render_dag_svg(plan)
+        assert 'class="dag-lookup-node"' in svg
+        assert "cust_lookup" in svg
+        assert 'class="dag-lookup-edge"' in svg
+
+    def test_lookup_node_valid_xml(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            lookup_schedule={0: ["ext_ref"]},
+            lookup_producers={"ext_ref": None},
+            lookup_consumers={"ext_ref": ["a"]},
+        )
+        svg = render_dag_svg(plan)
+        ET.fromstring(svg)
+
+    def test_external_lookup_no_producer_edge(self) -> None:
+        plan = _make_plan(
+            threads=["a"],
+            dependencies={"a": []},
+            execution_order=[["a"]],
+            lookup_schedule={0: ["ext_ref"]},
+            lookup_producers={"ext_ref": None},
+            lookup_consumers={"ext_ref": ["a"]},
+        )
+        svg = render_dag_svg(plan)
+        assert 'class="dag-lookup-node"' in svg
+        # Should have a consumer edge (lookup → a) but no producer edge
+        assert 'class="dag-lookup-edge"' in svg
+
+    def test_lookup_fallback_without_producers(self) -> None:
+        """Plans without lookup_producers/consumers fall back to dashed lines."""
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            lookup_schedule={0: ["ext_ref"]},
+        )
+        svg = render_dag_svg(plan)
+        assert 'class="dag-lookup-line"' in svg
+        assert 'class="dag-lookup-node"' not in svg
+
+    def test_lookup_arrowhead_marker(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            lookup_schedule={1: ["lk"]},
+            lookup_producers={"lk": "a"},
+            lookup_consumers={"lk": ["b"]},
+        )
+        svg = render_dag_svg(plan)
+        assert "dag-arrowhead-lookup" in svg
+
+
+class TestLoomDagSvg:
+    """Tests for the loom-level DAG renderer."""
+
+    def test_single_plan_delegates(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        svg = render_loom_dag_svg([plan])
+        # Should delegate to render_dag_svg, no swimlane chrome
+        assert 'class="dag-swimlane"' not in svg
+        assert "<svg" in svg
+
+    def test_multi_weave_swimlanes(self) -> None:
+        plan1 = _make_plan(threads=["a"], execution_order=[["a"]], weave_name="dims")
+        plan2 = _make_plan(threads=["x"], execution_order=[["x"]], weave_name="facts")
+        svg = render_loom_dag_svg([plan1, plan2])
+        assert 'class="dag-swimlane"' in svg
+        assert "Weave: dims" in svg
+        assert "Weave: facts" in svg
+
+    def test_multi_weave_valid_xml(self) -> None:
+        plan1 = _make_plan(threads=["a"], execution_order=[["a"]], weave_name="dims")
+        plan2 = _make_plan(threads=["x"], execution_order=[["x"]], weave_name="facts")
+        svg = render_loom_dag_svg([plan1, plan2])
+        ET.fromstring(svg)
+
+    def test_multi_weave_sequential_arrows(self) -> None:
+        plan1 = _make_plan(threads=["a"], execution_order=[["a"]], weave_name="dims")
+        plan2 = _make_plan(threads=["x"], execution_order=[["x"]], weave_name="facts")
+        svg = render_loom_dag_svg([plan1, plan2])
+        # Should have at least one edge between containers
+        assert svg.count('class="dag-edge"') >= 1
+
+    def test_multi_weave_thread_nodes(self) -> None:
+        plan1 = _make_plan(threads=["a", "b"], execution_order=[["a", "b"]], weave_name="w1")
+        plan2 = _make_plan(threads=["x"], execution_order=[["x"]], weave_name="w2")
+        svg = render_loom_dag_svg([plan1, plan2])
+        assert ">a<" in svg
+        assert ">b<" in svg
+        assert ">x<" in svg
+
+    def test_empty_plans_returns_empty(self) -> None:
+        assert render_loom_dag_svg([]) == ""
+
+
 class TestRenderPlanHtml:
     def test_summary_table(self) -> None:
         plan = _make_plan(
@@ -305,8 +422,8 @@ class TestRenderPlanHtml:
         html_out = render_plan_html(result)
         # Should have loom header
         assert "2 weaves" in html_out
-        # Both SVGs present
-        assert html_out.count("<svg") == 2
+        # Loom DAG + 2 per-weave SVGs = 3 total
+        assert html_out.count("<svg") == 3
 
     def test_html_escaping(self) -> None:
         plan = _make_plan(

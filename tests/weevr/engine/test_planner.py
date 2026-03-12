@@ -525,6 +525,44 @@ class TestLookupDependencyInference:
         all_scheduled = [lk for lks in plan.lookup_schedule.values() for lk in lks]
         assert "dim_lk" not in all_scheduled
 
+    def test_lookup_producers_populated(self):
+        """build_plan populates lookup_producers with producer thread mappings."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.lookup_producers is not None
+        assert plan.lookup_producers["cust_lookup"] == "A"
+
+    def test_lookup_producers_external_is_none(self):
+        """External lookups have None as their producer."""
+        threads = {"A": _make_thread_with_lookup("A", "ext_lookup")}
+        lookups = {"ext_lookup": _make_lookup("external.ref_table")}
+        plan = build_plan("w", threads, _entries("A"), lookups=lookups)
+        assert plan.lookup_producers is not None
+        assert plan.lookup_producers["ext_lookup"] is None
+
+    def test_lookup_consumers_populated(self):
+        """build_plan populates lookup_consumers with consuming threads."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+            "C": _make_thread_with_lookup("C", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B", "C"), lookups=lookups)
+        assert plan.lookup_consumers is not None
+        assert sorted(plan.lookup_consumers["cust_lookup"]) == ["B", "C"]
+
+    def test_lookup_fields_none_without_lookups(self):
+        """Without lookups, lookup_producers and lookup_consumers are None."""
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("w", threads, _entries("A"))
+        assert plan.lookup_producers is None
+        assert plan.lookup_consumers is None
+
     def test_lookup_dep_still_inferred_when_not_materialized(self):
         """Even non-materialized lookups create implicit dependencies for ordering."""
         threads = {

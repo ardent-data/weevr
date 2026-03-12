@@ -798,6 +798,91 @@ class TestReprHtml:
         assert "<b>bold</b>" not in html_out
 
 
+class TestRunResultDag:
+    """Tests for the RunResult.dag() method."""
+
+    def test_dag_returns_none_for_non_plan(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="test",
+        )
+        assert result.dag() is None
+
+    def test_dag_returns_none_without_plans(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="test",
+            execution_plan=None,
+        )
+        assert result.dag() is None
+
+    def test_dag_single_plan(self) -> None:
+        from weevr.engine.display import DAGDiagram
+
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        diagram = result.dag()
+        assert isinstance(diagram, DAGDiagram)
+        assert "<svg" in diagram.svg
+        # Single plan — no swimlane rects
+        assert 'class="dag-swimlane"' not in diagram.svg
+
+    def test_dag_multi_plan_loom(self) -> None:
+        from weevr.engine.display import DAGDiagram
+
+        plan1 = ExecutionPlan(
+            weave_name="dims",
+            threads=["a"],
+            dependencies={"a": []},
+            dependents={"a": []},
+            execution_order=[["a"]],
+            cache_targets=[],
+            inferred_dependencies={"a": []},
+            explicit_dependencies={"a": []},
+        )
+        plan2 = ExecutionPlan(
+            weave_name="facts",
+            threads=["x"],
+            dependencies={"x": []},
+            dependents={"x": []},
+            execution_order=[["x"]],
+            cache_targets=[],
+            inferred_dependencies={"x": []},
+            explicit_dependencies={"x": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="loom",
+            config_name="nightly",
+            execution_plan=[plan1, plan2],
+        )
+        diagram = result.dag()
+        assert isinstance(diagram, DAGDiagram)
+        assert "dag-swimlane" in diagram.svg
+        assert "Weave: dims" in diagram.svg
+        assert "Weave: facts" in diagram.svg
+
+
 class TestLoadedConfig:
     @pytest.fixture()
     def sample_thread(self) -> Thread:
@@ -988,7 +1073,8 @@ class TestPlanDisplayIntegration:
 
         h = result._repr_html_()
         assert h is not None
-        assert h.count("<svg") == 2
+        # Loom DAG + 2 per-weave SVGs = 3 total
+        assert h.count("<svg") == 3
 
     def test_plan_result_no_resolved_threads(self) -> None:
         result = self._build_plan_result()

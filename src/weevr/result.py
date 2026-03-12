@@ -106,6 +106,22 @@ class RunResult:
         self.warnings: list[str] = warnings if warnings is not None else []
         self._resolved_threads: dict[str, Any] | None = None
 
+    def dag(self) -> Any:
+        """Return a DAG diagram for plan mode results.
+
+        Returns a :class:`~weevr.engine.display.DAGDiagram` for plan mode,
+        or ``None`` for other modes. For multi-weave loom results, returns
+        a loom-level swimlane DAG.
+        """
+        if self.mode is not ExecutionMode.PLAN or not self.execution_plan:
+            return None
+        from weevr.engine.display import DAGDiagram, render_dag_svg, render_loom_dag_svg
+
+        plans = self.execution_plan
+        if len(plans) == 1:
+            return DAGDiagram(render_dag_svg(plans[0], self._resolved_threads))
+        return DAGDiagram(render_loom_dag_svg(plans, self._resolved_threads))
+
     def explain(self) -> str:
         """Return a detailed text breakdown of the execution plan.
 
