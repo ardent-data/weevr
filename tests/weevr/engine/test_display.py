@@ -2,13 +2,49 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 
-from weevr.engine.display import DAGDiagram
+from weevr.engine.display import DAGDiagram, render_dag_svg
+from weevr.engine.planner import ExecutionPlan
 
 _SAMPLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_plan(
+    *,
+    threads: list[str] | None = None,
+    dependencies: dict[str, list[str]] | None = None,
+    execution_order: list[list[str]] | None = None,
+    cache_targets: list[str] | None = None,
+    lookup_schedule: dict[int, list[str]] | None = None,
+) -> ExecutionPlan:
+    """Build a minimal ExecutionPlan for display testing."""
+    t = threads or []
+    deps = dependencies or {n: [] for n in t}
+    dependents: dict[str, list[str]] = {n: [] for n in t}
+    for name, upstream in deps.items():
+        for u in upstream:
+            if name not in dependents.get(u, []):
+                dependents.setdefault(u, []).append(name)
+    return ExecutionPlan(
+        weave_name="test_weave",
+        threads=t,
+        dependencies=deps,
+        dependents=dependents,
+        execution_order=execution_order or [],
+        cache_targets=cache_targets or [],
+        inferred_dependencies={n: deps.get(n, []) for n in t},
+        explicit_dependencies={n: [] for n in t},
+        lookup_schedule=lookup_schedule,
+    )
 
 
 class TestDAGDiagram:
@@ -34,3 +70,123 @@ class TestDAGDiagram:
         diagram = DAGDiagram(_SAMPLE_SVG)
         with pytest.raises(FileNotFoundError):
             diagram.save("/nonexistent/dir/test.svg")
+
+
+class TestRenderDagSvg:
+    def test_single_thread(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        svg = render_dag_svg(plan)
+        assert "<svg" in svg
+        assert "a" in svg
+        # No edges for a single thread
+        assert 'class="dag-edge"' not in svg
+
+    def test_linear_chain(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            execution_order=[["a"], ["b"], ["c"]],
+        )
+        svg = render_dag_svg(plan)
+        # 3 nodes
+        assert svg.count('class="dag-node"') == 3
+        # 2 edges
+        assert svg.count('class="dag-edge"') == 2
+
+    def test_parallel_groups(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": [], "c": ["a", "b"]},
+            execution_order=[["a", "b"], ["c"]],
+        )
+        svg = render_dag_svg(plan)
+        assert svg.count('class="dag-edge"') == 2
+
+    def test_cache_markers(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": ["a"], "c": ["a"]},
+            execution_order=[["a"], ["b", "c"]],
+            cache_targets=["a"],
+        )
+        svg = render_dag_svg(plan)
+        assert 'class="dag-node-cached"' in svg
+        assert 'class="dag-label-cached"' in svg
+
+    def test_lookup_schedule(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            execution_order=[["a"], ["b"]],
+            lookup_schedule={0: ["ext_ref"]},
+        )
+        svg = render_dag_svg(plan)
+        assert "ext_ref" in svg
+        assert 'class="dag-lookup-line"' in svg
+
+    def test_valid_xml(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            execution_order=[["a"], ["b"], ["c"]],
+        )
+        svg = render_dag_svg(plan)
+        # Should parse as valid XML
+        ET.fromstring(svg)
+
+    def test_20_threads(self) -> None:
+        threads = [f"thread_{i:02d}" for i in range(20)]
+        # 4 groups of 5
+        order = [threads[i : i + 5] for i in range(0, 20, 5)]
+        deps: dict[str, list[str]] = {t: [] for t in threads}
+        # Each group depends on first thread of previous group
+        for g in range(1, 4):
+            for t in order[g]:
+                deps[t] = [order[g - 1][0]]
+        plan = _make_plan(threads=threads, dependencies=deps, execution_order=order)
+        svg = render_dag_svg(plan)
+        # All 20 nodes present
+        for t in threads:
+            assert t in svg
+        # Verify no overlapping X positions within same group
+        from weevr.engine.display import _compute_layout
+
+        nodes, _edges, _w, _h = _compute_layout(plan)
+        for group in order:
+            positions = [(nodes[n][0], nodes[n][0] + nodes[n][2]) for n in group]
+            positions.sort()
+            for i in range(len(positions) - 1):
+                assert positions[i][1] <= positions[i + 1][0], (
+                    f"Overlap in group: {positions[i]} overlaps {positions[i + 1]}"
+                )
+
+    def test_dark_theme_css(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        svg = render_dag_svg(plan)
+        assert "prefers-color-scheme:dark" in svg
+
+    def test_tooltips_with_resolved_threads(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/customers"
+            path = None
+
+        class _FakeTarget:
+            alias = "staging/customers"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+
+        svg = render_dag_svg(plan, resolved_threads={"a": _FakeThread()})
+        assert "raw/customers" in svg
+        assert "staging/customers" in svg
+
+    def test_empty_plan(self) -> None:
+        plan = _make_plan(threads=[], execution_order=[])
+        svg = render_dag_svg(plan)
+        assert "<svg" in svg
+        assert "Empty plan" in svg
