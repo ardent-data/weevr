@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.4/release-notes/1.1/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.4/release-notes/1.4/">
       
       
-        <link rel="prev" href="../1.2/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.0/">
+        <link rel="next" href="../1.3/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.1 - weevr</title>
+        <title>1.4 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v11" class="md-skip">
+        <a href="#release-notes-v14" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.1
+              1.4
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.4/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -1830,10 +1830,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.4/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1849,6 +1876,159 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#plan-mode-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan Mode Enhancements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plan Mode Enhancements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#explain-detailed-plan-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        explain() — Detailed Plan Breakdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-compact-plan-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        summary() — Compact Plan View
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dag-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DAG Visualization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DAG Visualization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resultdag-exportable-svg-dags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        result.dag() — Exportable SVG DAGs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup-nodes-in-dags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup Nodes in DAGs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionplandag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionPlan.dag()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rich-notebook-rendering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rich Notebook Rendering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolved-thread-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolved Thread Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#planner-lookup-producerconsumer-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planner: Lookup Producer/Consumer Tracking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1942,37 +2122,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.1
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.1/" class="md-nav__link">
         
   
   
@@ -1988,81 +2141,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#execution-hooks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution Hooks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#weave-level-lookups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Weave-Level Lookups
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#weave-scoped-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Weave-Scoped Variables
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-exception-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Exception Types
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2130,10 +2208,99 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#execution-hooks" class="md-nav__link">
+  <a href="#plan-mode-enhancements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution Hooks
+        Plan Mode Enhancements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plan Mode Enhancements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#explain-detailed-plan-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        explain() — Detailed Plan Breakdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-compact-plan-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        summary() — Compact Plan View
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dag-visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DAG Visualization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DAG Visualization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resultdag-exportable-svg-dags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        result.dag() — Exportable SVG DAGs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup-nodes-in-dags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup Nodes in DAGs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionplandag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionPlan.dag()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rich-notebook-rendering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rich Notebook Rendering
       
     </span>
   </a>
@@ -2141,10 +2308,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#weave-level-lookups" class="md-nav__link">
+  <a href="#resolved-thread-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Weave-Level Lookups
+        Resolved Thread Context
       
     </span>
   </a>
@@ -2152,21 +2319,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#weave-scoped-variables" class="md-nav__link">
+  <a href="#planner-lookup-producerconsumer-tracking" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Weave-Scoped Variables
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-exception-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Exception Types
+        Planner: Lookup Producer/Consumer Tracking
       
     </span>
   </a>
@@ -2206,89 +2362,88 @@
 
 <!-- markdownlint-disable MD033 -->
 
-<h1 id="release-notes-v11">Release Notes — v1.1<a class="headerlink" href="#release-notes-v11" title="Permanent link">&para;</a></h1>
+<h1 id="release-notes-v14">Release Notes — v1.4<a class="headerlink" href="#release-notes-v14" title="Permanent link">&para;</a></h1>
 <p><strong>Release date:</strong> March 2026</p>
-<p>This release introduces <strong>execution hooks</strong>, <strong>weave-level lookups</strong>, and
-<strong>quality gates</strong> — expanding the weave lifecycle with pre/post processing
-capabilities.</p>
+<p>This release adds <strong>plan display, DAG visualization, and rich result
+rendering</strong> — bringing notebook-native display, structured plan
+inspection, and exportable SVG DAGs to the engine.</p>
 <hr />
-<h2 id="execution-hooks">Execution Hooks<a class="headerlink" href="#execution-hooks" title="Permanent link">&para;</a></h2>
-<p>Weaves now support <code>pre_steps</code> and <code>post_steps</code> — hook steps that run before
-and after thread execution within a weave.</p>
-<p>Three hook step types are available:</p>
+<h2 id="plan-mode-enhancements">Plan Mode Enhancements<a class="headerlink" href="#plan-mode-enhancements" title="Permanent link">&para;</a></h2>
+<h3 id="explain-detailed-plan-breakdown"><code>explain()</code> — Detailed Plan Breakdown<a class="headerlink" href="#explain-detailed-plan-breakdown" title="Permanent link">&para;</a></h3>
+<p>Plan mode results now include an <code>explain()</code> method that produces a
+section-by-section breakdown of the execution plan:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;plan&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">explain</span><span class="p">())</span>
+</code></pre></div>
+<p>The output includes:</p>
 <ul>
-<li><strong>quality_gate</strong> — Run predefined quality checks against data sources and
-  targets. Supported checks: <code>source_freshness</code>, <code>row_count_delta</code>,
-  <code>row_count</code>, <code>table_exists</code>, and <code>expression</code>.</li>
-<li><strong>sql_statement</strong> — Execute arbitrary Spark SQL. Optionally capture the
-  scalar result into a weave-scoped variable via <code>set_var</code>.</li>
-<li><strong>log_message</strong> — Emit a log message with <code>${var.name}</code> placeholders
-  resolved from weave variables.</li>
+<li><strong>Dependencies</strong> with provenance (inferred vs explicit)</li>
+<li><strong>Cache targets</strong> and their downstream consumers</li>
+<li><strong>Lookup schedule</strong> with materialization points</li>
+<li><strong>Per-thread detail</strong> — sources, targets, write modes, and step counts</li>
 </ul>
-<p>Each step has an <code>on_failure</code> policy: <code>abort</code> (stop the weave) or <code>warn</code>
-(log and continue). Pre-steps default to <code>abort</code>; post-steps default to
-<code>warn</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">pre_steps</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_freshness</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;24h&quot;</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nt">post_steps</span><span class="p">:</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log_message</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Pipeline</span><span class="nv"> </span><span class="s">complete.&quot;</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">info</span>
+<p>For loom-scoped results, the output opens with a loom summary line
+showing the loom name and weave count.</p>
+<h3 id="summary-compact-plan-view"><code>summary()</code> — Compact Plan View<a class="headerlink" href="#summary-compact-plan-view" title="Permanent link">&para;</a></h3>
+<p>The <code>summary()</code> method provides a compact execution group view with
+cache markers (asterisk suffix) and footer counts for threads, cached
+targets, and lookups:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
 </code></pre></div>
-<h2 id="weave-level-lookups">Weave-Level Lookups<a class="headerlink" href="#weave-level-lookups" title="Permanent link">&para;</a></h2>
-<p>Weaves can now define named <strong>lookups</strong> — shared reference datasets that
-threads access via <code>source.lookup</code> instead of declaring a direct source type.</p>
-<p>Lookups support two materialization strategies:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Group 0: dim_product*
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Group 1: fact_orders, fact_returns
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>3 threads, 1 cached, 1 lookup
+</code></pre></div>
+<h2 id="dag-visualization">DAG Visualization<a class="headerlink" href="#dag-visualization" title="Permanent link">&para;</a></h2>
+<h3 id="resultdag-exportable-svg-dags"><code>result.dag()</code> — Exportable SVG DAGs<a class="headerlink" href="#resultdag-exportable-svg-dags" title="Permanent link">&para;</a></h3>
+<p>Plan mode results expose a <code>dag()</code> method that returns a <code>DAGDiagram</code>
+object:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;plan&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">dag</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">dag</span><span class="p">()</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">dag</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;plan.svg&quot;</span><span class="p">)</span>    <span class="c1"># export to file</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">dag</span>                      <span class="c1"># renders inline in a notebook</span>
+</code></pre></div>
+<p>For multi-weave looms, <code>dag()</code> returns a loom-level swimlane diagram
+with weave containers stacked vertically. Single-weave results get a
+standard DAG.</p>
+<h3 id="lookup-nodes-in-dags">Lookup Nodes in DAGs<a class="headerlink" href="#lookup-nodes-in-dags" title="Permanent link">&para;</a></h3>
+<p>Lookups are rendered as distinct pill-shaped nodes in the DAG with
+directed edges showing producer-to-lookup and lookup-to-consumer
+relationships. Internal lookups (produced by a thread in the weave) show
+the producer edge; external lookups appear as standalone nodes feeding
+into their consumers.</p>
+<h3 id="executionplandag"><code>ExecutionPlan.dag()</code><a class="headerlink" href="#executionplandag" title="Permanent link">&para;</a></h3>
+<p>Individual execution plans also expose a <code>dag()</code> method for per-weave
+access:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">plan</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">execution_plan</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">dag</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">dag</span><span class="p">()</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">dag</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;weave.svg&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="rich-notebook-rendering">Rich Notebook Rendering<a class="headerlink" href="#rich-notebook-rendering" title="Permanent link">&para;</a></h2>
+<p>All result modes now render automatically as styled HTML when evaluated
+in a notebook cell:</p>
 <ul>
-<li><strong>cache</strong> — Pre-read the data and persist it as a cached DataFrame</li>
-<li><strong>broadcast</strong> — Pre-read and apply Spark broadcast join hints</li>
+<li><strong>Execute</strong> — thread results table with status badges, row counts,
+  write modes, and target paths</li>
+<li><strong>Validate</strong> — check/error report with color-coded status</li>
+<li><strong>Plan</strong> — summary table with embedded DAG diagram</li>
+<li><strong>Preview</strong> — output shape table (columns x rows per thread)</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">lookups</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">dim_product</span><span class="p">:</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">silver.dim_product</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">materialize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cache</span>
-</code></pre></div>
-<p>Threads reference lookups by name:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">sources</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span>
-</code></pre></div>
-<h2 id="weave-scoped-variables">Weave-Scoped Variables<a class="headerlink" href="#weave-scoped-variables" title="Permanent link">&para;</a></h2>
-<p>Weaves can declare typed variables via the <code>variables</code> block. Variables are
-set by <code>sql_statement</code> hook steps and referenced in downstream config as
-<code>${var.name}</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">variables</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">baseline_count</span><span class="p">:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">pre_steps</span><span class="p">:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sql_statement</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SELECT</span><span class="nv"> </span><span class="s">count(*)</span><span class="nv"> </span><span class="s">FROM</span><span class="nv"> </span><span class="s">silver.fact_orders&quot;</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">set_var</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">baseline_count</span>
-</code></pre></div>
-<p>Supported types: <code>string</code>, <code>int</code>, <code>long</code>, <code>float</code>, <code>double</code>, <code>boolean</code>,
-<code>timestamp</code>, <code>date</code>.</p>
-<h2 id="new-exception-types">New Exception Types<a class="headerlink" href="#new-exception-types" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong><code>HookError</code></strong> — Raised when a hook step fails with <code>on_failure: abort</code>.
-  Carries <code>hook_name</code>, <code>hook_type</code>, and <code>phase</code> context.</li>
-<li><strong><code>LookupResolutionError</code></strong> — Raised when a thread references a lookup
-  name not defined in the weave's <code>lookups</code> map. Caught during config
-  resolution before any data is read.</li>
-</ul>
+<p>The HTML rendering uses inline styles for compatibility with both light
+and dark Fabric notebook themes.</p>
+<h2 id="resolved-thread-context">Resolved Thread Context<a class="headerlink" href="#resolved-thread-context" title="Permanent link">&para;</a></h2>
+<p>Plan mode results now carry resolved thread metadata (sources, targets,
+step counts) through to display rendering. This enables the <code>explain()</code>
+output and the enriched DAG nodes.</p>
+<h2 id="planner-lookup-producerconsumer-tracking">Planner: Lookup Producer/Consumer Tracking<a class="headerlink" href="#planner-lookup-producerconsumer-tracking" title="Permanent link">&para;</a></h2>
+<p>The <code>ExecutionPlan</code> model now includes <code>lookup_producers</code> and
+<code>lookup_consumers</code> mappings that track which threads produce and consume
+each lookup. These fields power the lookup node rendering in DAGs and
+the lookup section in <code>explain()</code> output.</p>
 <h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All existing configurations continue to work without
-modification. The new weave fields (<code>lookups</code>, <code>variables</code>, <code>pre_steps</code>,
-<code>post_steps</code>) are optional and default to <code>null</code>.</p>
+<p>No breaking changes. All existing configurations and API usage continue
+to work without modification.</p>
 <table>
 <thead>
 <tr>

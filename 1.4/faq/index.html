@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../release-notes/1.3/" class="md-tabs__link">
+        <a href="../release-notes/1.4/" class="md-tabs__link">
           
   
   
@@ -2040,6 +2040,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../release-notes/1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../release-notes/1.3/" class="md-nav__link">
         
   
@@ -2658,7 +2686,8 @@ The <code>summary()</code> output marks cache targets with an asterisk and inclu
 footer counts (threads, cached, lookups). <code>explain()</code> provides a
 section-by-section breakdown including dependency provenance (inferred vs
 explicit), cache consumers, lookup schedule, and per-thread source/target
-detail. In notebooks, all result modes render automatically as styled
+detail. For loom-scoped results, <code>explain()</code> opens with a loom summary
+line showing the loom name and weave count. In notebooks, all result modes render automatically as styled
 HTML. Plan mode includes an embedded DAG diagram; execute mode shows a
 thread results table with status badges and row counts.</p>
 <p>See <a href="../concepts/execution-modes/">Execution Modes</a> for the full set of
