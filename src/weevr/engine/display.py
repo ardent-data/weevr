@@ -1313,7 +1313,8 @@ def render_timeline_svg(
 
     # Compute canvas height
     total_bars = sum(len(bars) for _, bars in phases)
-    canvas_h = pad * 2 + total_bars * (bar_h + 4) + (len(phases) - 1) * phase_gap
+    phase_label_h = len(phases) * (bar_h + 2)  # each phase has a label row
+    canvas_h = pad * 2 + total_bars * (bar_h + 4) + phase_label_h + (len(phases) - 1) * phase_gap
     canvas_w = pad * 2 + label_w + bar_area_w + 60  # 60 for duration text
 
     status_colors = {
