@@ -1652,7 +1652,8 @@ _S_BADGE_STATUS = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px solid
 _S_NONE = "color:#a0aec0;font-style:italic"
 _S_ERROR_BOX = (
     "background:#fff5f5;border:1px solid #feb2b2;border-radius:4px;"
-    "padding:8px 12px;color:#9b2c2c;font-family:monospace;font-size:13px;margin:4px 0"
+    "padding:8px 12px;color:#9b2c2c;font-family:monospace;font-size:13px;margin:4px 0;"
+    "word-wrap:break-word;overflow-wrap:break-word;white-space:pre-wrap"
 )
 _S_WARN_BOX = (
     "background:#fffff0;border:1px solid #fefcbf;border-radius:4px;"
