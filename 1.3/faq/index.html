@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../release-notes/1.2/" class="md-tabs__link">
+        <a href="../release-notes/1.3/" class="md-tabs__link">
           
   
   
@@ -2040,6 +2040,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../release-notes/1.2/" class="md-nav__link">
         
   
@@ -2593,7 +2649,18 @@ reading or writing any data. Use it in CI or as a pre-flight check before
 production runs.</p>
 <p>You can also use plan mode to see the execution order without running:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;plan&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>      <span class="c1"># compact view with cache markers (e.g., dim_product*)</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">explain</span><span class="p">())</span>      <span class="c1"># detailed breakdown: dependencies, cache targets, thread detail</span>
 </code></pre></div>
+<p>Plan mode builds the full execution plan — thread ordering, dependency
+analysis, and cache target selection — without reading or writing any data.
+The <code>summary()</code> output marks cache targets with an asterisk and includes
+footer counts (threads, cached, lookups). <code>explain()</code> provides a
+section-by-section breakdown including dependency provenance (inferred vs
+explicit), cache consumers, lookup schedule, and per-thread source/target
+detail. In notebooks, all result modes render automatically as styled
+HTML. Plan mode includes an embedded DAG diagram; execute mode shows a
+thread results table with status badges and row counts.</p>
 <p>See <a href="../concepts/execution-modes/">Execution Modes</a> for the full set of
 available modes.</p>
 

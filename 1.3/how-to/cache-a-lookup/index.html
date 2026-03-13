@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../release-notes/1.2/" class="md-tabs__link">
+        <a href="../../release-notes/1.3/" class="md-tabs__link">
           
   
   
@@ -1979,6 +1979,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../release-notes/1.2/" class="md-nav__link">
         
   
@@ -2367,16 +2423,24 @@ lookup fields to reduce memory:</p>
 </table>
 <p><code>key</code> and <code>values</code> must not overlap. If <code>values</code> is set, <code>key</code> is required.</p>
 <h2 id="verify-caching-behavior">Verify caching behavior<a class="headerlink" href="#verify-caching-behavior" title="Permanent link">&para;</a></h2>
-<p>Use <code>verbose</code> or <code>debug</code> log level to see cache lifecycle events in the
-structured JSON logs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Context</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="s2">&quot;my-project.weevr&quot;</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;verbose&quot;</span><span class="p">)</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;orders.weave&quot;</span><span class="p">)</span>
+<p>Use plan mode to check which threads are cache targets before running:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;orders.weave&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;plan&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>      <span class="c1"># cache targets are marked with an asterisk (e.g., dim_product*)</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">explain</span><span class="p">())</span>      <span class="c1"># &quot;Cache targets&quot; section lists each target and consumer count</span>
 </code></pre></div>
-<p>Look for log entries containing <code>Cached output of thread</code> and
-<code>Unpersisted cached output of thread</code> to confirm that caching is active and
-cleanup is occurring as expected.</p>
+<p>To observe cache lifecycle events at runtime, use <code>verbose</code> or <code>debug</code>
+log level:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="s2">&quot;my-project.weevr&quot;</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;verbose&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;orders.weave&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Look for these log entries:</p>
+<ul>
+<li><strong>Thread auto-caching</strong> — <code>Cached output of thread</code> and
+  <code>Unpersisted cached output of thread</code> confirm the <code>CacheManager</code> is
+  persisting and releasing thread outputs.</li>
+<li><strong>Lookup materialization</strong> — <code>Materialized lookup '&lt;name&gt;'</code> confirms
+  weave-level lookups are being pre-read and cached.</li>
+</ul>
 
 
 
