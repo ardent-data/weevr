@@ -2400,6 +2400,15 @@ data flow clearly. Primary sources appear on the left with horizontal
 arrows through the transform chain.</p>
 <p><code>flow()</code> is only available for thread configs — weave and loom configs
 return <code>None</code>.</p>
+<figure>
+  <img src="../assets/svg/flow-example.svg"
+    alt="Thread flow diagram showing sources, joins,
+    transforms, and target">
+  <figcaption>Example flow diagram for a
+    <code>fact_orders</code> thread with two join sources,
+    filters, derives, and a merge target.</figcaption>
+</figure>
+
 <h3 id="dark-mode-support">Dark Mode Support<a class="headerlink" href="#dark-mode-support" title="Permanent link">&para;</a></h3>
 <p>All SVG renderers accept a <code>dark</code> keyword argument to force a specific
 color palette:</p>
@@ -2412,13 +2421,40 @@ color palette:</p>
 execution timeline Gantt chart. The timeline shows lookups, pre-hooks,
 thread execution groups, and post-hooks as sequential phases with
 wall-clock duration bars.</p>
+<figure>
+  <img src="../assets/svg/timeline-example.svg"
+    alt="Execution timeline Gantt chart showing
+    phased execution">
+  <figcaption>Timeline for a weave with a lookup
+    materialization, quality gate pre-hook, two parallel
+    execution groups, and a post-hook.</figcaption>
+</figure>
+
 <h2 id="data-waterfall-svg">Data Waterfall SVG<a class="headerlink" href="#data-waterfall-svg" title="Permanent link">&para;</a></h2>
 <p>Per-thread results include a data waterfall chart showing row counts at
 each processing stage: rows read, after transforms, quarantined, and
 rows written. Preview mode shows the first two stages only.</p>
+<figure>
+  <img src="../assets/svg/waterfall-example.svg"
+    alt="Data waterfall chart showing row counts
+    through processing stages">
+  <figcaption>Waterfall for <code>fact_orders</code>:
+    15,000 rows read, 14,200 after transforms,
+    85 quarantined, 14,115 written.</figcaption>
+</figure>
+
 <h2 id="annotated-dag-svg">Annotated DAG SVG<a class="headerlink" href="#annotated-dag-svg" title="Permanent link">&para;</a></h2>
 <p>Execute mode results include an annotated DAG with colored status badges
 (success/failure/skipped) and duration annotations on each thread node.</p>
+<figure>
+  <img src="../assets/svg/annotated-dag-example.svg"
+    alt="Annotated DAG with status badges and
+    duration labels">
+  <figcaption>Post-execution DAG for a loom with six
+    threads across three execution groups, showing
+    success badges and per-thread durations.</figcaption>
+</figure>
+
 <h2 id="enhanced-execute-mode-reports">Enhanced Execute Mode Reports<a class="headerlink" href="#enhanced-execute-mode-reports" title="Permanent link">&para;</a></h2>
 <p>Execute mode notebook rendering now includes:</p>
 <ul>

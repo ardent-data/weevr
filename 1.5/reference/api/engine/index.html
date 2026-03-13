@@ -3747,7 +3747,7 @@ called with lookups.</p>
 
 
 <h4 id="weevr.engine.ExecutionPlan.dag" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">dag</span><span class="p">()</span></code>
+            <code class="highlight language-python"><span class="n">dag</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">dark</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.engine.ExecutionPlan.dag" class="headerlink" title="Permanent link">&para;</a></h4>
 
@@ -3757,6 +3757,38 @@ called with lookups.</p>
         <p>Return an inline SVG DAG diagram of this execution plan.</p>
 <p>The returned :class:<code>DAGDiagram</code> auto-renders in notebooks
 via <code>_repr_svg_()</code> and can be exported via <code>save()</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dark</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Force dark (<code>True</code>) or light (<code>False</code>) palette. <code>None</code>
+uses <code>prefers-color-scheme</code> media query (default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
