@@ -279,7 +279,13 @@ class Context:
         if resolved.config_type == "thread":
             model = resolved.model
             assert isinstance(model, Thread)
-            engine_result = execute_thread(self._spark, model, resolved_params=self._params)
+            from weevr.telemetry.collector import SpanCollector
+            from weevr.telemetry.span import generate_trace_id
+
+            thread_collector = SpanCollector(generate_trace_id())
+            engine_result = execute_thread(
+                self._spark, model, collector=thread_collector, resolved_params=self._params
+            )
             assert engine_result.status in ("success", "failure")
             result = RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
