@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.4/" class="md-tabs__link">
+        <a href="../../../release-notes/1.5/" class="md-tabs__link">
           
   
   
@@ -1360,6 +1360,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.LoadedConfig.flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.LoadedConfig.__getattr__" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1972,6 +1983,17 @@
     <span class="md-ellipsis">
       
         __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.LoadedConfig.flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow
       
     </span>
   </a>
@@ -2797,6 +2819,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.4/" class="md-nav__link">
         
   
@@ -3241,6 +3291,17 @@
     <span class="md-ellipsis">
       
         __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.LoadedConfig.flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow
       
     </span>
   </a>
@@ -3860,6 +3921,17 @@
     <span class="md-ellipsis">
       
         __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.LoadedConfig.flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flow
       
     </span>
   </a>
@@ -5024,6 +5096,92 @@ single-element list. For loom configs, returns one plan per weave.</p>
 <div class="doc doc-object doc-function">
 
 
+<h4 id="weevr.context.LoadedConfig.flow" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">flow</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">dark</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.context.LoadedConfig.flow" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a thread flow diagram for thread configs.</p>
+<p>Generates an inline SVG showing the thread's processing pipeline:
+sources, joins, transforms, and target. Returns <code>None</code> for
+weave/loom configs (use per-thread flow in result reports instead).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dark</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Force dark (<code>True</code>) or light (<code>False</code>) palette. <code>None</code>
+uses <code>prefers-color-scheme</code> media query (default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>A</code></td>            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>class:<code>~weevr.engine.display.FlowDiagram</code>, or <code>None</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+<td></td>            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>for non-thread configs.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h4 id="weevr.context.LoadedConfig.__getattr__" class="doc doc-heading">
             <code class="highlight language-python"><span class="fm">__getattr__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></code>
 
@@ -5235,7 +5393,7 @@ fields are <code>None</code> when not applicable.</p>
 
 
 <h4 id="weevr.context.RunResult.dag" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">dag</span><span class="p">()</span></code>
+            <code class="highlight language-python"><span class="n">dag</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">dark</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.RunResult.dag" class="headerlink" title="Permanent link">&para;</a></h4>
 
@@ -5246,6 +5404,38 @@ fields are <code>None</code> when not applicable.</p>
 <p>Returns a :class:<code>~weevr.engine.display.DAGDiagram</code> for plan mode,
 or <code>None</code> for other modes. For multi-weave loom results, returns
 a loom-level swimlane DAG.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dark</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Force dark (<code>True</code>) or light (<code>False</code>) palette. <code>None</code>
+uses <code>prefers-color-scheme</code> media query (default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -6984,7 +7174,7 @@ File paths contain slashes or URI schemes (<code>://</code>).</p>
 
 
 <h3 id="weevr.context.execute_thread" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_thread" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7115,6 +7305,23 @@ the signature to PySpark types.</p>
               <div class="doc-md-description">
                 <p>Weave-level lookup definitions for on-demand resolution
 of non-materialized lookups.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>resolved_params</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values for telemetry capture.
+Stored on ThreadTelemetry for thread-level runs.</p>
               </div>
             </td>
             <td>
@@ -8369,6 +8576,31 @@ if some weaves succeeded before a failure.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ThreadResult.output_schema">output_schema</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="str">str</span>, <span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column names and Spark data types captured from the output
+DataFrame before write. Each tuple is <code>(column_name, type_string)</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ThreadResult.samples">samples</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Data samples captured before write, keyed by category. Contains
+<code>"output"</code> (up to 10 rows) and optionally <code>"quarantine"</code> (up to 10
+rows from the quarantine DataFrame).</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -8595,6 +8827,18 @@ if the weave was conditionally skipped at loom level.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.LoomTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (loom-level runs).</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -8724,6 +8968,17 @@ if the weave was conditionally skipped at loom level.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ThreadTelemetry.rows_after_transforms">rows_after_transforms</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Row count after transforms, before validation.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="weevr.result.ThreadTelemetry.load_mode">load_mode</span></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
@@ -8819,6 +9074,18 @@ if the weave was conditionally skipped at loom level.</p>
             <td>
               <div class="doc-md-description">
                 <p>Number of CDC delete operations.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ThreadTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (thread-level runs).</p>
               </div>
             </td>
           </tr>
@@ -8936,6 +9203,18 @@ if the weave was conditionally skipped at loom level.</p>
             <td>
               <div class="doc-md-description">
                 <p>Final variable values at end of weave execution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.WeaveTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (weave-level runs).</p>
               </div>
             </td>
           </tr>
@@ -9261,7 +9540,7 @@ fields are <code>None</code> when not applicable.</p>
 
 
 <h4 id="weevr.result.RunResult.dag" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">dag</span><span class="p">()</span></code>
+            <code class="highlight language-python"><span class="n">dag</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">dark</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.result.RunResult.dag" class="headerlink" title="Permanent link">&para;</a></h4>
 
@@ -9272,6 +9551,38 @@ fields are <code>None</code> when not applicable.</p>
 <p>Returns a :class:<code>~weevr.engine.display.DAGDiagram</code> for plan mode,
 or <code>None</code> for other modes. For multi-weave loom results, returns
 a loom-level swimlane DAG.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dark</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Force dark (<code>True</code>) or light (<code>False</code>) palette. <code>None</code>
+uses <code>prefers-color-scheme</code> media query (default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -9536,6 +9847,92 @@ single-element list. For loom configs, returns one plan per weave.</p>
 <div class="doc doc-object doc-function">
 
 
+<h4 id="weevr.result.LoadedConfig.flow" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">flow</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">dark</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.result.LoadedConfig.flow" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a thread flow diagram for thread configs.</p>
+<p>Generates an inline SVG showing the thread's processing pipeline:
+sources, joins, transforms, and target. Returns <code>None</code> for
+weave/loom configs (use per-thread flow in result reports instead).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dark</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Force dark (<code>True</code>) or light (<code>False</code>) palette. <code>None</code>
+uses <code>prefers-color-scheme</code> media query (default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>A</code></td>            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>class:<code>~weevr.engine.display.FlowDiagram</code>, or <code>None</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+<td></td>            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>for non-thread configs.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h4 id="weevr.result.LoadedConfig.__getattr__" class="doc doc-heading">
             <code class="highlight language-python"><span class="fm">__getattr__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></code>
 
@@ -9590,7 +9987,7 @@ single-element list. For loom configs, returns one plan per weave.</p>
                 <code>ms</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> | <span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">

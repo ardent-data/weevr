@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.4/" class="md-tabs__link">
+        <a href="../../../release-notes/1.5/" class="md-tabs__link">
           
   
   
@@ -2350,6 +2350,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.4/" class="md-nav__link">
         
   
@@ -4020,6 +4048,18 @@ logger, message, and any extra attributes attached to the log record.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LoomTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (loom-level runs).</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4149,6 +4189,17 @@ logger, message, and any extra attributes attached to the log record.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.rows_after_transforms">rows_after_transforms</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Row count after transforms, before validation.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="weevr.telemetry.ThreadTelemetry.load_mode">load_mode</span></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
@@ -4244,6 +4295,18 @@ logger, message, and any extra attributes attached to the log record.</p>
             <td>
               <div class="doc-md-description">
                 <p>Number of CDC delete operations.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (thread-level runs).</p>
               </div>
             </td>
           </tr>
@@ -4489,6 +4552,18 @@ logger, message, and any extra attributes attached to the log record.</p>
             <td>
               <div class="doc-md-description">
                 <p>Final variable values at end of weave execution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (weave-level runs).</p>
               </div>
             </td>
           </tr>
