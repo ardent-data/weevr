@@ -6,22 +6,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from weevr.engine.formatting import format_duration as _format_duration
+
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
-
-
-def _format_duration(ms: int) -> str:
-    """Format milliseconds as a human-readable duration string."""
-    if ms < 1000:
-        return f"{ms}ms"
-    seconds = ms / 1000
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    minutes = int(seconds // 60)
-    remaining = seconds % 60
-    return f"{minutes}m {remaining:.1f}s"
 
 
 class ExecutionMode(StrEnum):

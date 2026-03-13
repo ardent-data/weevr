@@ -6,7 +6,7 @@ import html
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from weevr.result import _format_duration
+from weevr.engine.formatting import format_duration as _format_duration
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
