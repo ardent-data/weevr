@@ -1990,10 +1990,11 @@ def _render_sample_table(
     # Build table from list of dicts
     columns = list(rows[0].keys())
     parts.append(f'<table style="{_S_TABLE}">')
-    header = "".join(f'<th style="{_S_TH}">{html.escape(str(c))}</th>' for c in columns)
+    header = f'<th style="{_S_TH}">#</th>'
+    header += "".join(f'<th style="{_S_TH}">{html.escape(str(c))}</th>' for c in columns)
     parts.append(f"<tr>{header}</tr>")
-    for row in rows:
-        cells = ""
+    for idx, row in enumerate(rows, 1):
+        cells = f'<td style="{_S_TD}">{idx}</td>'
         for col in columns:
             val = str(row.get(col, ""))
             # Truncate long values for display
