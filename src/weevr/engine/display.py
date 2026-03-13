@@ -2282,7 +2282,7 @@ def _render_execute_thread_detail(
             flow_svg = render_flow_svg(thread_model)
             parts.append(f"<div>{flow_svg}</div>")
         except Exception:
-            pass
+            pass  # SVG is best-effort; don't break the report
 
     # Data flow waterfall SVG
     if telemetry:
@@ -2290,7 +2290,7 @@ def _render_execute_thread_detail(
             wf_svg = render_waterfall_svg(tr, telemetry, mode="execute")
             parts.append(f"<div>{wf_svg}</div>")
         except Exception:
-            pass
+            pass  # SVG is best-effort; don't break the report
 
     # Validation rules
     if telemetry:
@@ -2383,7 +2383,7 @@ def _render_execute_html(result: Any) -> str:
             parts.append(f'<h4 style="{_S_H4}">Execution DAG</h4>')
             parts.append(f"<div>{dag_svg}</div>")
         except Exception:
-            pass
+            pass  # SVG is best-effort; don't break the report
 
     # Execution timeline (weave/loom)
     if config_type == "weave" and detail:
@@ -2395,7 +2395,7 @@ def _render_execute_html(result: Any) -> str:
             parts.append(f'<h4 style="{_S_H4}">Execution Timeline</h4>')
             parts.append(f"<div>{tl_svg}</div>")
         except Exception:
-            pass
+            pass  # SVG is best-effort; don't break the report
     elif config_type == "loom" and detail:
         # Render timeline for each weave in the loom
         weave_results = getattr(detail, "weave_results", []) or []
@@ -2412,7 +2412,7 @@ def _render_execute_html(result: Any) -> str:
                 parts.append(f'<h4 style="{_S_H4}">Timeline: {wname_esc}</h4>')
                 parts.append(f"<div>{tl_svg}</div>")
             except Exception:
-                pass
+                pass  # SVG is best-effort; don't break the report
 
     # Thread results summary table
     if thread_results:
@@ -2704,7 +2704,7 @@ def _render_preview_html(result: Any) -> str:
                 flow_svg = render_flow_svg(thread_model)
                 parts.append(f"<div>{flow_svg}</div>")
             except Exception:
-                pass
+                pass  # SVG is best-effort; don't break the report
 
         # Data flow waterfall SVG (partial: preview mode)
         if meta:
@@ -2723,7 +2723,7 @@ def _render_preview_html(result: Any) -> str:
                 wf_svg = render_waterfall_svg(pr, pt, mode="preview")
                 parts.append(f"<div>{wf_svg}</div>")
             except Exception:
-                pass
+                pass  # SVG is best-effort; don't break the report
 
         # Variables (weave-level, from telemetry)
         if telemetry:
