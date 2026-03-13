@@ -328,8 +328,8 @@ section-by-section breakdown including dependency provenance (inferred vs
 explicit), cache consumers, lookup schedule, and per-thread source/target
 detail. For loom-scoped results, `explain()` opens with a loom summary
 line showing the loom name and weave count. In notebooks, all result modes render automatically as styled
-HTML. Plan mode includes an embedded DAG diagram; execute mode shows a
-thread results table with status badges and row counts.
+HTML. Plan mode includes an embedded DAG diagram; execute mode shows an
+executive summary with per-thread detail, flow diagrams, and data waterfalls.
 
 See [Execution Modes](concepts/execution-modes.md) for the full set of
 available modes.

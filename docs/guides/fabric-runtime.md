@@ -166,6 +166,47 @@ executor memory, or other Spark properties, configure them through:
 
 ## Development vs production
 
+```d2
+direction: right
+
+local: Local Development {
+  style.fill: "#E3F2FD"
+  spark_local: "SparkSession\nmaster('local[*]')" {style.fill: "#BBDEFB"}
+  delta_local: "Delta Lake\n(filesystem)" {style.fill: "#BBDEFB"}
+  params_dev: "params_dev.yaml\nbronze_base: ./data/bronze\nsilver_base: ./data/silver" {style.fill: "#BBDEFB"}
+}
+
+staging: Staging Workspace {
+  style.fill: "#FFF3E0"
+  spark_stg: "Fabric Spark\n(managed session)" {style.fill: "#FFE0B2"}
+  delta_stg: "Delta Lake\n(OneLake)" {style.fill: "#FFE0B2"}
+  params_stg: "params_stg.yaml\nbronze_base: abfss://stg-ws@...\nsilver_base: abfss://stg-ws@..." {style.fill: "#FFE0B2"}
+}
+
+prod: Production Workspace {
+  style.fill: "#E8F5E9"
+  spark_prod: "Fabric Spark\n(managed session)" {style.fill: "#C8E6C9"}
+  delta_prod: "Delta Lake\n(OneLake)" {style.fill: "#C8E6C9"}
+  params_prod: "params_prod.yaml\nbronze_base: abfss://prod-ws@...\nsilver_base: abfss://prod-ws@..." {style.fill: "#C8E6C9"}
+}
+
+yaml: Same YAML Configs {
+  style.fill: "#F3E5F5"
+  note: |md
+    Thread, weave, and loom configs
+    are **identical** across environments.
+    Only parameter files differ.
+  |
+}
+
+yaml -> local: params_dev
+yaml -> staging: params_stg
+yaml -> prod: params_prod
+
+local -> staging: promote {style.stroke-dash: 3}
+staging -> prod: promote {style.stroke-dash: 3}
+```
+
 ### Local development
 
 For local iteration, use a standalone Spark installation:

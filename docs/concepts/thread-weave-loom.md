@@ -49,6 +49,35 @@ A thread encapsulates:
 - **Steps** -- an ordered list of transformations (filter, join, derive, etc.)
 - **Target** -- a single write destination, typically a Delta table
 
+```d2
+direction: right
+
+sources: Sources {
+  style.fill: "#E3F2FD"
+  raw_customers: raw.customers {style.fill: "#BBDEFB"}
+  ref_regions: ref.regions {style.fill: "#BBDEFB"}
+}
+
+pipeline: Transform Pipeline {
+  style.fill: "#FFF3E0"
+  filter: filter\nstatus = 'active' {style.fill: "#FFE0B2"}
+  join: join\nregions on region_id {style.fill: "#FFE0B2"}
+  derive: derive\nfull_name, region_name {style.fill: "#FFE0B2"}
+  select: select\nfinal columns {style.fill: "#FFE0B2"}
+
+  filter -> join -> derive -> select
+}
+
+target: Target {
+  style.fill: "#E8F5E9"
+  table: silver.dim_customer {style.fill: "#C8E6C9"}
+}
+
+sources.raw_customers -> pipeline.filter: primary source
+sources.ref_regions -> pipeline.join: join source
+pipeline.select -> target.table: write (merge)
+```
+
 ```yaml
 # dimensions/dim_customer.thread
 config_version: "1.0"
@@ -172,6 +201,47 @@ merged.
     is used effectively.
 
 ### Example
+
+```d2
+direction: down
+
+loom: Loom — nightly {
+  style.fill: "#E3F2FD"
+
+  loom_defaults: "write.mode = overwrite\nlog_level = standard" {
+    style.fill: "#BBDEFB"
+  }
+
+  weave_dim: Weave — dimensions {
+    style.fill: "#E8F5E9"
+    weave_defaults: "write.mode = merge\n(overrides loom)" {
+      style.fill: "#C8E6C9"
+    }
+    dim_customer: Thread — dim_customer\nwrite.mode = merge (inherited) {
+      style.fill: "#A5D6A7"
+    }
+    dim_product: Thread — dim_product\nwrite.mode = append (override) {
+      style.fill: "#FFE0B2"
+    }
+    weave_defaults -> dim_customer: inherit {style.stroke-dash: 3}
+    weave_defaults -> dim_product: override {style.stroke: "#E65100"}
+  }
+
+  weave_facts: Weave — facts {
+    style.fill: "#FFF3E0"
+    fact_defaults: "(no override)\nwrite.mode = overwrite (inherited)" {
+      style.fill: "#FFE0B2"
+    }
+    fact_orders: Thread — fact_orders\nwrite.mode = overwrite (inherited) {
+      style.fill: "#FFCC80"
+    }
+    fact_defaults -> fact_orders: inherit {style.stroke-dash: 3}
+  }
+
+  loom_defaults -> weave_dim.weave_defaults: cascade {style.stroke-dash: 3}
+  loom_defaults -> weave_facts.fact_defaults: cascade {style.stroke-dash: 3}
+}
+```
 
 A loom sets `write.mode: overwrite` as the default. One weave overrides
 it to `merge` for its threads. A single thread within that weave overrides

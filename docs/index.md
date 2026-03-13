@@ -31,6 +31,45 @@ result = ctx.run("nightly.loom")
 
 See the [Your First Loom](tutorials/your-first-loom.md) tutorial for a complete walkthrough.
 
+## How it works
+
+```d2
+direction: right
+
+yaml: YAML Configuration {
+  style.fill: "#E3F2FD"
+  thread: "Thread\nsources → steps → target" {style.fill: "#BBDEFB"}
+  weave: "Weave\nthread DAG + lookups" {style.fill: "#BBDEFB"}
+  loom: "Loom\nordered weaves + defaults" {style.fill: "#BBDEFB"}
+  thread -> weave -> loom
+}
+
+engine: weevr Engine {
+  style.fill: "#FFF3E0"
+  config_res: Config Resolution\nparse → validate → resolve {style.fill: "#FFE0B2"}
+  planner: Planner\nDAG → groups → cache {style.fill: "#FFE0B2"}
+  executor: Executor\nread → transform → write {style.fill: "#FFE0B2"}
+  telemetry: Telemetry\nspans + metrics {style.fill: "#FFE0B2"}
+  config_res -> planner -> executor -> telemetry
+}
+
+spark: Spark + Delta Lake {
+  style.fill: "#E8F5E9"
+  df: DataFrame APIs {style.fill: "#C8E6C9"}
+  delta: Delta transactions {style.fill: "#C8E6C9"}
+}
+
+fabric: Microsoft Fabric {
+  style.fill: "#F3E5F5"
+  lakehouse: OneLake / Lakehouse {style.fill: "#E1BEE7"}
+  notebook: Notebooks / Pipelines {style.fill: "#E1BEE7"}
+}
+
+yaml -> engine: interprets
+engine -> spark: executes
+spark -> fabric: reads / writes
+```
+
 ## Learn more
 
 | | |

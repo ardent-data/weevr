@@ -30,23 +30,38 @@ concrete.
 
 ## How it works
 
-The pipeline runs in 10 stages:
+The pipeline runs in 10 stages, grouped into three phases:
 
 ```d2
 direction: right
 
-parse: Parse YAML
-version: Extract version
-detect: Detect type
-schema: Validate schema
-param_ctx: Build param context
-resolve_vars: Resolve variables
-resolve_refs: Resolve references
-inherit: Apply inheritance
-expand: Expand macros
-hydrate: Hydrate model
+structure: "Phase 1: Structure" {
+  style.fill: "#E3F2FD"
+  parse: "1. Parse YAML"
+  version: "2. Extract version"
+  detect: "3. Detect type"
+  schema: "4. Validate schema"
+  parse -> version -> detect -> schema
+}
 
-parse -> version -> detect -> schema -> param_ctx -> resolve_vars -> resolve_refs -> inherit -> expand -> hydrate
+resolve: "Phase 2: Resolve" {
+  style.fill: "#E8F5E9"
+  param_ctx: "5. Build param context"
+  resolve_vars: "6. Resolve variables"
+  resolve_refs: "7. Resolve references"
+  param_ctx -> resolve_vars -> resolve_refs
+}
+
+finalize: "Phase 3: Finalize" {
+  style.fill: "#FFF3E0"
+  inherit: "8. Apply inheritance"
+  expand: "9. Expand macros"
+  hydrate: "10. Hydrate model"
+  inherit -> expand -> hydrate
+}
+
+structure -> resolve: "all strings\nconcrete" {style.stroke: "#4A90D9"}
+resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 ```
 
 ### Stage 1–4: Parse and validate structure

@@ -55,15 +55,19 @@ class ExecutionPlan(FrozenBase):
     lookup_producers: dict[str, str | None] | None = None
     lookup_consumers: dict[str, list[str]] | None = None
 
-    def dag(self) -> DAGDiagram:
+    def dag(self, *, dark: bool | None = None) -> DAGDiagram:
         """Return an inline SVG DAG diagram of this execution plan.
 
         The returned :class:`DAGDiagram` auto-renders in notebooks
         via ``_repr_svg_()`` and can be exported via ``save()``.
+
+        Args:
+            dark: Force dark (``True``) or light (``False``) palette. ``None``
+                uses ``prefers-color-scheme`` media query (default).
         """
         from weevr.engine.display import DAGDiagram, render_dag_svg
 
-        return DAGDiagram(render_dag_svg(self))
+        return DAGDiagram(render_dag_svg(self, dark=dark))
 
     def _repr_html_(self) -> str:
         """Notebook rich display protocol.
