@@ -1190,7 +1190,7 @@ def render_timeline_svg(
         lk_bars: list[tuple[str, int, str]] = []
         for lk in lookup_results:
             name = getattr(lk, "name", "lookup")
-            dur = getattr(lk, "duration_ms", 0)
+            dur = int(getattr(lk, "duration_ms", 0))
             status = "success" if getattr(lk, "success", True) else "failure"
             lk_bars.append((name, dur, status))
         if lk_bars:
@@ -1203,7 +1203,7 @@ def render_timeline_svg(
         for hr in hook_results:
             phase = getattr(hr, "phase", "")
             name = getattr(hr, "step_type", "hook")
-            dur = getattr(hr, "duration_ms", 0)
+            dur = int(getattr(hr, "duration_ms", 0))
             status = "success" if getattr(hr, "success", True) else "failure"
             if phase == "pre":
                 pre_bars.append((name, dur, status))
@@ -1298,6 +1298,7 @@ def render_timeline_svg(
         for bar_label, dur, status in bars:
             colors = status_colors.get(status, status_colors["success"])
             fill_lt = colors[0]
+            text_lt = colors[1]
             bar_w = max((dur / max_dur) * bar_area_w, 4)
 
             bx = pad + label_w
@@ -1307,7 +1308,8 @@ def render_timeline_svg(
             )
             parts.append(
                 f'<text x="{bx + 6:.1f}" y="{y + bar_h / 2:.1f}" '
-                f'dominant-baseline="central" class="tl-label">'
+                f'dominant-baseline="central" font-family="{font}" font-size="12" '
+                f'fill="{text_lt}">'
                 f"{_xml_escape(bar_label)}</text>"
             )
             # Duration text after bar
