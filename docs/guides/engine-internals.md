@@ -14,10 +14,13 @@ conditional execution, and structured result collection.
 ## Key concepts
 
 - **ExecutionPlan** — An immutable snapshot of thread ordering, dependency
-  edges, parallel execution groups, and cache targets. Produced by the planner
+  edges, parallel execution groups, cache targets, and lookup dependency
+  mappings (`lookup_producers`, `lookup_consumers`). Produced by the planner
   before any data is read. In notebooks, an `ExecutionPlan` renders
   automatically via `_repr_html_()`. Call `plan.dag()` to get a `DAGDiagram`
-  SVG that can be saved with `dag.save("plan.svg")`.
+  SVG that can be saved with `dag.save("plan.svg")`. For plan mode results,
+  `result.dag()` returns either a single-weave DAG or a loom-level swimlane
+  diagram depending on how many weaves are present.
 - **DAG** — A directed acyclic graph of thread dependencies. Dependencies are
   inferred from source/target path overlap and can also be declared explicitly.
 - **Parallel execution group** — A set of threads with no mutual dependencies

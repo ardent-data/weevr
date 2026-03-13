@@ -217,8 +217,10 @@ result = ctx.run("daily.loom", mode="preview")
 ```
 
 !!! tip "Notebook display"
-    In notebooks, plan mode results render automatically as styled HTML
-    with an embedded DAG diagram. Just evaluate `result` in a cell.
+    In notebooks, all result modes render automatically as styled HTML
+    when you evaluate `result` in a cell. Plan mode includes an embedded
+    DAG diagram; execute mode shows a thread results table with status
+    badges and row counts.
 
 ## Which execution mode should I use?
 

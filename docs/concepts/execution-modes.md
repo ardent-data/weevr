@@ -35,15 +35,25 @@ print(result.explain())     # detailed: dependencies, cache targets, thread deta
 result = ctx.run("nightly.loom", mode="preview")
 ```
 
-In notebooks, plan mode results render automatically as styled HTML with
-an embedded DAG diagram. You can also retrieve the DAG directly:
+In notebooks, results render automatically as styled HTML when you
+evaluate the result in a cell. Each mode gets a tailored report:
+
+- **execute** — thread results table with status badges, row counts,
+  write modes, and target paths
+- **validate** — check/error report with color-coded status
+- **plan** — summary table with embedded DAG diagram
+- **preview** — output shape table (columns × rows per thread)
+
+For plan mode, you can also retrieve the DAG diagram directly:
 
 ```python
 result = ctx.run("nightly.loom", mode="plan")
-dag = result.execution_plan[0].dag()
-dag.save("plan.svg")        # export to file
+dag = result.dag()           # single-weave DAG or loom-level swimlane
+dag.save("plan.svg")         # export to file
 dag                          # renders inline in a notebook
 ```
+
+For per-weave access in a loom, use `result.execution_plan[0].dag()`.
 
 ## Data modes
 
