@@ -207,6 +207,41 @@ all_spans = result.detail.trace.to_spans()
 
 ## Telemetry results
 
+```d2
+direction: down
+
+run: ctx.run("nightly.loom") {style.fill: "#E3F2FD"}
+
+result: RunResult {
+  style.fill: "#E8F5E9"
+
+  telemetry: LoomTelemetry {
+    style.fill: "#C8E6C9"
+
+    loom_span: loom span\ntrace_id, duration, status
+
+    weave_dim: WeaveTelemetry — dimensions {
+      style.fill: "#FFF3E0"
+      weave_span: weave span
+
+      t1: ThreadTelemetry\ndim_customer {
+        style.fill: "#FFE0B2"
+        rows: "rows_read: 5000\nrows_written: 4800\nrows_quarantined: 12"
+      }
+      t2: ThreadTelemetry\ndim_product {style.fill: "#FFE0B2"}
+    }
+
+    weave_facts: WeaveTelemetry — facts {
+      style.fill: "#F3E5F5"
+      t3: ThreadTelemetry\nfact_orders {style.fill: "#E1BEE7"}
+      t4: ThreadTelemetry\nfact_returns {style.fill: "#E1BEE7"}
+    }
+  }
+}
+
+run -> result
+```
+
 Every `ctx.run()` call in execute mode returns a `RunResult` with a
 `telemetry` attribute containing structured telemetry data. The type
 depends on what was executed:

@@ -34,6 +34,67 @@ These are not Spark problems. Spark is the right engine for the work. The
 problem is the absence of a disciplined layer between user intent and Spark
 execution.
 
+```d2
+direction: right
+
+notebooks: Notebooks {
+  style.fill: "#FFEBEE"
+
+  nb1: Notebook 1\nread → transform → write {
+    style.fill: "#FFCDD2"
+  }
+  nb2: Notebook 2\nread → transform → write {
+    style.fill: "#FFCDD2"
+  }
+  nb3: Notebook 3\nread → transform → write {
+    style.fill: "#FFCDD2"
+  }
+  nb4: Notebook N\n... {
+    style.fill: "#FFCDD2"
+  }
+
+  problems: {
+    style.fill: transparent
+    style.stroke: transparent
+    note: |md
+      - Duplicated logic
+      - No dependency graph
+      - Manual orchestration
+      - Inconsistent patterns
+    |
+  }
+}
+
+weevr_approach: weevr {
+  style.fill: "#E8F5E9"
+
+  yaml: YAML Config {
+    style.fill: "#C8E6C9"
+    threads: "threads + weaves + looms"
+    params: "variables + inheritance"
+  }
+  engine: weevr Engine {
+    style.fill: "#A5D6A7"
+    plan: plan
+    execute: execute
+    telemetry: telemetry
+    plan -> execute -> telemetry
+  }
+  spark: Spark {
+    style.fill: "#81C784"
+    delta: Delta Lake
+  }
+
+  yaml -> engine: interprets
+  engine -> spark: executes
+}
+
+notebooks -> weevr_approach: replaces {
+  style.stroke: "#4A90D9"
+  style.stroke-dash: 3
+}
+```
+
 ## The solution
 
 weevr is a **configuration-driven execution framework** that separates

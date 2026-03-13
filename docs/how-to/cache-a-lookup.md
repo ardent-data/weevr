@@ -96,6 +96,45 @@ This overrides the engine's auto-cache decision for that specific thread.
 
 ## Step 4 -- Use weave-level lookups
 
+```d2
+direction: down
+
+plan: Execution Plan {
+  style.fill: "#E3F2FD"
+
+  group0: "Group 0: dim_product*" {
+    style.fill: "#BBDEFB"
+    dim_product: dim_product {style.fill: "#90CAF9"}
+  }
+
+  materialize: "Lookup materialization point\ndim_product → cache (internal)" {
+    style.fill: "#FFF3E0"
+  }
+
+  group1: "Group 1: fact_orders, fact_returns" {
+    style.fill: "#E8F5E9"
+    fact_orders: fact_orders {style.fill: "#A5D6A7"}
+    fact_returns: fact_returns {style.fill: "#A5D6A7"}
+  }
+
+  group0 -> materialize: "producer completes" {style.stroke: "#E65100"}
+  materialize -> group1: "lookup available" {style.stroke: "#2E7D32"}
+}
+
+external: External Lookups {
+  style.fill: "#F3E5F5"
+  ref_regions: ref.regions\n(pre-materialized) {style.fill: "#E1BEE7"}
+
+  note: |md
+    External lookups (not produced by any thread
+    in the weave) are materialized **before** the
+    first execution group.
+  |
+}
+
+external.ref_regions -> plan.group0: "available from start" {style.stroke-dash: 3}
+```
+
 For shared reference datasets, weave-level lookups provide more control than
 thread-level caching. Define the lookup in the weave's `lookups` block and
 reference it from thread sources:

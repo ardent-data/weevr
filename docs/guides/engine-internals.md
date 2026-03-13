@@ -119,6 +119,46 @@ After each thread completes:
 **Thread level** (`execute_thread`) — A single thread runs through a 12-step
 pipeline:
 
+```d2
+direction: down
+
+sources: Sources {
+  style.fill: "#E3F2FD"
+  s1: "1. Resolve lookups"
+  s2: "2. Read sources\n(watermark/CDC filter)"
+  s3: "3. Set primary DataFrame"
+  s1 -> s2 -> s3
+}
+
+transforms: Transforms {
+  style.fill: "#FFF3E0"
+  s4: "4. Run pipeline steps"
+  s5: "5. Validate rules\n(quarantine on failure)"
+  s6: "6. Compute business keys\n+ change hashes"
+  s4 -> s5 -> s6
+}
+
+write: Write {
+  style.fill: "#E8F5E9"
+  s7: "7. Resolve target path"
+  s8: "8. Apply column mapping"
+  s9: "9. Write to Delta\n(overwrite/append/merge/CDC)"
+  s7 -> s8 -> s9
+}
+
+finalize: Finalize {
+  style.fill: "#F3E5F5"
+  s10: "10. Persist watermark/CDC state"
+  s11: "11. Post-write assertions"
+  s12: "12. Build telemetry\n→ ThreadResult"
+  s10 -> s11 -> s12
+}
+
+sources -> transforms
+transforms -> write
+write -> finalize
+```
+
 1. Resolve lookup-based sources from cached or on-demand DataFrames
 2. Read all remaining declared sources (with watermark/CDC filtering if applicable)
 3. Set the primary (first) source as the working DataFrame
@@ -134,6 +174,50 @@ pipeline:
 
 ### Failure handling
 
+```d2
+direction: down
+
+abort: abort_weave (default) {
+  style.fill: "#FFEBEE"
+
+  dim_product_a: dim_product ✓ {style.fill: "#C8E6C9"}
+  dim_store_a: dim_store ✗ {style.fill: "#FFCDD2"}
+  fact_orders_a: fact_orders ⊘ {style.fill: "#E0E0E0"}
+  fact_returns_a: fact_returns ⊘ {style.fill: "#E0E0E0"}
+  agg_revenue_a: agg_revenue ⊘ {style.fill: "#E0E0E0"}
+
+  dim_product_a -> fact_orders_a
+  dim_store_a -> fact_orders_a
+  dim_store_a -> fact_returns_a
+  fact_orders_a -> agg_revenue_a
+}
+
+skip: skip_downstream {
+  style.fill: "#FFF3E0"
+
+  dim_product_s: dim_product ✓ {style.fill: "#C8E6C9"}
+  dim_store_s: dim_store ✗ {style.fill: "#FFCDD2"}
+  fact_orders_s: fact_orders ⊘ {style.fill: "#E0E0E0"}
+  fact_returns_s: fact_returns ⊘ {style.fill: "#E0E0E0"}
+  agg_revenue_s: agg_revenue ⊘ {style.fill: "#E0E0E0"}
+  fact_shipments_s: fact_shipments ✓ {style.fill: "#C8E6C9"}
+
+  dim_product_s -> fact_orders_s
+  dim_store_s -> fact_orders_s
+  dim_store_s -> fact_returns_s
+  fact_orders_s -> agg_revenue_s
+  dim_product_s -> fact_shipments_s
+}
+
+legend: {
+  style.fill: transparent
+  style.stroke: transparent
+  note: |md
+    ✓ = success, ✗ = failed, ⊘ = skipped
+  |
+}
+```
+
 Each thread has a configurable failure policy:
 
 | Policy | Behavior |
@@ -145,6 +229,45 @@ Each thread has a configurable failure policy:
 Transitive dependents are computed via BFS over the reverse dependency graph.
 
 ### Cache lifecycle
+
+```d2
+direction: right
+
+produce: dim_product completes {
+  style.fill: "#E3F2FD"
+}
+
+cache: CacheManager.persist()\nMEMORY_AND_DISK\nconsumers = 2 {
+  style.fill: "#FFF3E0"
+}
+
+consumer1: fact_orders completes {
+  style.fill: "#E8F5E9"
+}
+
+decrement1: notify_complete()\nconsumers = 1 {
+  style.fill: "#FFF3E0"
+}
+
+consumer2: fact_returns completes {
+  style.fill: "#E8F5E9"
+}
+
+decrement2: notify_complete()\nconsumers = 0 {
+  style.fill: "#FFEBEE"
+}
+
+unpersist: unpersist()\nmemory released {
+  style.fill: "#F3E5F5"
+}
+
+produce -> cache: output DataFrame
+cache -> consumer1: read from cache
+consumer1 -> decrement1
+cache -> consumer2: read from cache
+consumer2 -> decrement2
+decrement2 -> unpersist: count = 0
+```
 
 The `CacheManager` uses reference counting to manage in-memory DataFrames:
 

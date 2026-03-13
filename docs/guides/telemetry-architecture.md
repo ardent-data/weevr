@@ -66,6 +66,50 @@ immutable -> collect: stored in collector
 
 ### Collector isolation during parallel execution
 
+```d2
+direction: down
+
+weave_collector: Weave SpanCollector {
+  style.fill: "#E3F2FD"
+  trace: "trace_id: a1b2c3..."
+}
+
+parallel: Parallel Execution Group {
+  style.fill: "#FFF3E0"
+
+  t1: Thread: dim_customer {
+    style.fill: "#FFE0B2"
+    c1: SpanCollector (isolated) {style.fill: "#FFCC80"}
+    b1: SpanBuilder → finish() {style.fill: "#FFCC80"}
+    c1 -> b1
+  }
+
+  t2: Thread: dim_product {
+    style.fill: "#FFE0B2"
+    c2: SpanCollector (isolated) {style.fill: "#FFCC80"}
+    b2: SpanBuilder → finish() {style.fill: "#FFCC80"}
+    c2 -> b2
+  }
+
+  t3: Thread: dim_store {
+    style.fill: "#FFE0B2"
+    c3: SpanCollector (isolated) {style.fill: "#FFCC80"}
+    b3: SpanBuilder → finish() {style.fill: "#FFCC80"}
+    c3 -> b3
+  }
+}
+
+merge: Merge after completion {
+  style.fill: "#E8F5E9"
+  op: "weave_collector.merge(\n  thread_collector\n)"
+}
+
+parallel.t1 -> merge: complete {style.stroke: "#2E7D32"}
+parallel.t2 -> merge: complete {style.stroke: "#2E7D32"}
+parallel.t3 -> merge: complete {style.stroke: "#2E7D32"}
+merge -> weave_collector: all spans unified {style.stroke: "#1565C0"}
+```
+
 When threads run concurrently within a weave, each thread gets its own
 `SpanCollector`. This avoids lock contention — no shared mutable state
 between threads.

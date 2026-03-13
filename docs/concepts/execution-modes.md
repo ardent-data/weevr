@@ -14,6 +14,68 @@ This page covers both.
 The `mode` argument to `Context.run()` controls how far the engine
 progresses through the plan → execute → aggregate pipeline.
 
+```d2
+direction: right
+
+config: YAML Config {style.fill: "#E3F2FD"}
+
+validate_phase: Validate {
+  style.fill: "#FFF3E0"
+  parse: Parse
+  resolve: Resolve
+  check: Check DAG
+  parse -> resolve -> check
+}
+
+plan_phase: Plan {
+  style.fill: "#E8F5E9"
+  deps: Build dependencies
+  topo: Topological sort
+  cache: Cache analysis
+  deps -> topo -> cache
+}
+
+preview_phase: Preview {
+  style.fill: "#F3E5F5"
+  read: Read sources
+  transform: Transform (sampled)
+  read -> transform
+}
+
+execute_phase: Execute {
+  style.fill: "#FFEBEE"
+  read_all: Read sources
+  transform_all: Transform
+  write: Write targets
+  read_all -> transform_all -> write
+}
+
+config -> validate_phase
+validate_phase -> plan_phase
+plan_phase -> preview_phase
+plan_phase -> execute_phase
+
+validate_stop: "validate stops here" {
+  style.fill: transparent
+  style.stroke: transparent
+  style.font-color: "#E65100"
+}
+plan_stop: "plan stops here" {
+  style.fill: transparent
+  style.stroke: transparent
+  style.font-color: "#2E7D32"
+}
+preview_stop: "preview stops here" {
+  style.fill: transparent
+  style.stroke: transparent
+  style.font-color: "#6A1B9A"
+}
+
+validate_phase -> validate_stop: {style.stroke-dash: 3; style.stroke: "#E65100"}
+plan_phase -> plan_stop: {style.stroke-dash: 3; style.stroke: "#2E7D32"}
+preview_phase -> preview_stop: {style.stroke-dash: 3; style.stroke: "#6A1B9A"}
+```
+
 | Mode | What happens | Result contains |
 |------|-------------|-----------------|
 | `execute` | Full execution: read, transform, write (default) | Status, row counts, telemetry |

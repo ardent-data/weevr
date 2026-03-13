@@ -99,6 +99,49 @@ updated to the same values and unmatched rows are inserted identically.
 
 ## Watermarks and state
 
+```d2
+direction: right
+
+run1: Run 1 {
+  style.fill: "#E3F2FD"
+  source1: Source\nall rows\n(no prior watermark)
+  target1: Target\n1,000 rows written
+  wm1: "watermark = 2024-03-15" {style.fill: "#BBDEFB"}
+  source1 -> target1: full read
+  target1 -> wm1: persist
+}
+
+run2: Run 2 {
+  style.fill: "#E8F5E9"
+  source2: Source\nmodified_date >\n2024-03-15
+  target2: Target\n150 new rows merged
+  wm2: "watermark = 2024-04-22" {style.fill: "#C8E6C9"}
+  source2 -> target2: incremental read
+  target2 -> wm2: persist
+}
+
+run3: Run 3 {
+  style.fill: "#FFF3E0"
+  source3: Source\nmodified_date >\n2024-04-22
+  target3: Target\n80 new rows merged
+  wm3: "watermark = 2024-05-10" {style.fill: "#FFE0B2"}
+  source3 -> target3: incremental read
+  target3 -> wm3: persist
+}
+
+boundary: {
+  style.fill: transparent
+  style.stroke: transparent
+  note: |md
+    Each run processes a **non-overlapping window**.
+    Combined with merge, this is idempotent incremental processing.
+  |
+}
+
+run1 -> run2: next run
+run2 -> run3: next run
+```
+
 Incremental watermark loads maintain state between runs. After a successful
 execution, weevr persists the high-water mark (the maximum value of the
 watermark column from the source data that was just processed). On the next
@@ -135,17 +178,12 @@ Null values in key columns are a common source of silent data quality
 issues in Spark. weevr applies **opinionated null-safe defaults** across
 all key operations:
 
-- **Surrogate keys** -- Null values in key columns are replaced with
-  deterministic sentinel values before hashing. This ensures surrogate
-  keys are always non-null and consistent.
-- **Join keys** -- Null-safe equality (`<=>`) is used by default for all
-  join conditions, preventing silent data loss when key columns contain
-  nulls.
-- **Change detection hashes** -- Null values are replaced with
-  type-appropriate sentinels before hashing, ensuring that a null-to-value
-  change is correctly detected.
-- **Merge match keys** -- Null-safe comparison ensures that rows with null
-  key values are matched correctly rather than silently dropped.
+| Operation | Standard Spark behavior | weevr behavior |
+|---|---|---|
+| **Surrogate keys** | `hash(NULL)` produces inconsistent results | Null → sentinel before hashing; keys always non-null |
+| **Join keys** | `NULL = NULL` → `NULL` (row dropped) | Null-safe `<=>` equality; null keys participate in joins |
+| **Change detection** | `hash(NULL)` masks null↔value changes | Null → type-appropriate sentinel before hashing |
+| **Merge match keys** | `NULL = NULL` → no match (row orphaned) | Null-safe comparison; null keys match correctly |
 
 These defaults prevent the most common Spark null-related pitfalls without
 requiring authors to add defensive logic to every thread.

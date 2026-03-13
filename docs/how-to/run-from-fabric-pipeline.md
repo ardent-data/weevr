@@ -4,6 +4,44 @@
 results, and schedule the notebook through a Fabric Data Pipeline for automated
 production runs.
 
+```d2
+direction: right
+
+pipeline: Fabric Data Pipeline {
+  style.fill: "#E3F2FD"
+
+  trigger: Schedule Trigger\n(daily, hourly) {style.fill: "#BBDEFB"}
+  params: Pipeline Parameters\nrun_date, batch_id {style.fill: "#BBDEFB"}
+
+  notebook_activity: Notebook Activity {
+    style.fill: "#FFF3E0"
+
+    cell1: "from weevr import Context" {style.fill: "#FFE0B2"}
+    cell2: "ctx = Context(spark, ...)\nresult = ctx.run('nightly.loom')" {style.fill: "#FFE0B2"}
+    cell3: "if result.status == 'failure':\n    raise RuntimeError(...)" {style.fill: "#FFE0B2"}
+    cell4: "mssparkutils.notebook.exit(\n    result.status\n)" {style.fill: "#FFE0B2"}
+
+    cell1 -> cell2 -> cell3 -> cell4
+  }
+
+  trigger -> params -> notebook_activity
+}
+
+lakehouse: Lakehouse {
+  style.fill: "#E8F5E9"
+  configs: "Files/\n  my-project.weevr/\n    nightly.loom\n    dimensions.weave\n    ..." {style.fill: "#C8E6C9"}
+  tables: "Tables/\n  bronze.*/\n  silver.*/" {style.fill: "#C8E6C9"}
+}
+
+pipeline.notebook_activity -> lakehouse: "read configs\nwrite targets" {style.stroke: "#2E7D32"}
+
+success: Pipeline Success {style.fill: "#C8E6C9"}
+failure: Pipeline Failure {style.fill: "#FFCDD2"}
+
+pipeline.notebook_activity -> success: "exit('success')" {style.stroke: "#2E7D32"}
+pipeline.notebook_activity -> failure: "raise RuntimeError" {style.stroke: "#C62828"}
+```
+
 ## Prerequisites
 
 - A Microsoft Fabric workspace with a Lakehouse attached
