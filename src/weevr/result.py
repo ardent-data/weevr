@@ -510,6 +510,23 @@ class LoadedConfig:
         self._execution_plan = plans if plans else None
         return self._execution_plan
 
+    def flow(self) -> Any:
+        """Return a thread flow diagram for thread configs.
+
+        Generates an inline SVG showing the thread's processing pipeline:
+        sources, joins, transforms, and target. Returns ``None`` for
+        weave/loom configs (use per-thread flow in result reports instead).
+
+        Returns:
+            A :class:`~weevr.engine.display.FlowDiagram`, or ``None``
+            for non-thread configs.
+        """
+        if self._config_type != "thread":
+            return None
+        from weevr.engine.display import FlowDiagram, render_flow_svg
+
+        return FlowDiagram(render_flow_svg(self._model))
+
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying model."""
         try:
