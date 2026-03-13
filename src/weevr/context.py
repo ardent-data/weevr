@@ -279,9 +279,9 @@ class Context:
         if resolved.config_type == "thread":
             model = resolved.model
             assert isinstance(model, Thread)
-            engine_result = execute_thread(self._spark, model)
+            engine_result = execute_thread(self._spark, model, resolved_params=self._params)
             assert engine_result.status in ("success", "failure")
-            return RunResult(
+            result = RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="thread",
@@ -289,6 +289,8 @@ class Context:
                 detail=engine_result,
                 telemetry=engine_result.telemetry,
             )
+            result._resolved_threads = {resolved.config_name: model}
+            return result
 
         if resolved.config_type == "weave":
             model = resolved.model
@@ -321,10 +323,16 @@ class Context:
                 if te.condition is not None:
                     thread_conditions[te.name] = te.condition
 
+            from weevr.telemetry.collector import SpanCollector
+            from weevr.telemetry.span import generate_trace_id
+
+            weave_collector = SpanCollector(generate_trace_id())
+
             engine_result = execute_weave(
                 self._spark,
                 plan,
                 weave_threads,
+                collector=weave_collector,
                 thread_conditions=thread_conditions if thread_conditions else None,
                 params=self._params,
                 pre_steps=list(model.pre_steps) if model.pre_steps else None,
@@ -333,7 +341,7 @@ class Context:
                 variables=dict(model.variables) if model.variables else None,
             )
             assert engine_result.status in ("success", "failure", "partial")
-            return RunResult(
+            result = RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="weave",
@@ -342,6 +350,8 @@ class Context:
                 telemetry=engine_result.telemetry,
                 warnings=warnings,
             )
+            result._resolved_threads = dict(weave_threads)
+            return result
 
         # loom
         model = resolved.model
@@ -371,8 +381,10 @@ class Context:
                 warnings=all_warnings,
             )
 
-        engine_result = execute_loom(self._spark, model, filtered_weaves, filtered_threads)
-        return RunResult(
+        engine_result = execute_loom(
+            self._spark, model, filtered_weaves, filtered_threads, params=self._params
+        )
+        result = RunResult(
             status=engine_result.status,
             mode=ExecutionMode.EXECUTE,
             config_type="loom",
@@ -381,6 +393,11 @@ class Context:
             telemetry=engine_result.telemetry,
             warnings=all_warnings,
         )
+        merged_threads: dict[str, Any] = {}
+        for thread_map in filtered_threads.values():
+            merged_threads.update(thread_map)
+        result._resolved_threads = merged_threads
+        return result
 
     # ------------------------------------------------------------------
     # Thread filtering
@@ -616,6 +633,8 @@ class Context:
         sample_rows: int = 100,
     ) -> RunResult:
         """Execute with sampled data — no writes, no assertions."""
+        import contextlib
+
         from weevr.operations.hashing import compute_keys
         from weevr.operations.pipeline import run_pipeline
         from weevr.operations.readers import read_sources
@@ -628,6 +647,7 @@ class Context:
         )
 
         preview_data: dict[str, Any] = {}
+        preview_metadata: dict[str, dict[str, Any]] = {}
         errors: list[str] = []
 
         for thread_name, thread in all_threads.items():
@@ -649,6 +669,14 @@ class Context:
                 df = apply_target_mapping(df, thread.target, self._spark)
 
                 preview_data[thread_name] = df
+
+                # Capture preview metadata for enhanced HTML rendering
+                meta: dict[str, Any] = {
+                    "output_schema": [(name, str(dtype)) for name, dtype in df.dtypes],
+                }
+                with contextlib.suppress(Exception):
+                    meta["samples"] = {"output": df.limit(10).toPandas().to_dict("records")}
+                preview_metadata[thread_name] = meta
             except Exception as exc:
                 errors.append(f"Preview failed for thread '{thread_name}': {exc}")
 
@@ -656,7 +684,7 @@ class Context:
         if errors and preview_data:
             status = "partial"
 
-        return RunResult(
+        result = RunResult(
             status=status,
             mode=ExecutionMode.PREVIEW,
             config_type=resolved.config_type,
@@ -664,6 +692,9 @@ class Context:
             preview_data=preview_data if preview_data else None,
             warnings=warnings + errors,
         )
+        result._preview_metadata = preview_metadata if preview_metadata else None
+        result._resolved_threads = dict(all_threads)
+        return result
 
     # ------------------------------------------------------------------
     # Config assembly

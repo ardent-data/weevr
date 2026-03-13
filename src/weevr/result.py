@@ -64,6 +64,7 @@ class RunResult:
         "validation_errors",
         "warnings",
         "_resolved_threads",
+        "_preview_metadata",
     )
 
     def __init__(
@@ -94,6 +95,7 @@ class RunResult:
         self.validation_errors = validation_errors
         self.warnings: list[str] = warnings if warnings is not None else []
         self._resolved_threads: dict[str, Any] | None = None
+        self._preview_metadata: dict[str, dict[str, Any]] | None = None
 
     def dag(self) -> Any:
         """Return a DAG diagram for plan mode results.
