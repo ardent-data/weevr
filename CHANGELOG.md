@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/ardent-data/weevr/compare/weevr-v1.4.0...weevr-v1.5.0) (2026-03-13)
+
+
+### Features
+
+* **engine:** add thread flow, timeline, and rich result rendering ([#82](https://github.com/ardent-data/weevr/issues/82)) ([55359e4](https://github.com/ardent-data/weevr/commit/55359e40680b59c39e79f90c4c92733a0c5f0bd6))
+
 ## [1.4.0](https://github.com/ardent-data/weevr/compare/weevr-v1.3.0...weevr-v1.4.0) (2026-03-13)
 
 
