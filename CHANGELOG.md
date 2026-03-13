@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/ardent-data/weevr/compare/weevr-v1.3.0...weevr-v1.4.0) (2026-03-13)
+
+
+### Features
+
+* **engine:** add plan display, DAG visualization, and rich result rendering ([#79](https://github.com/ardent-data/weevr/issues/79)) ([937be3b](https://github.com/ardent-data/weevr/commit/937be3bdfcf445ebc8cd76db73037c3b5d7d16af))
+
 ## [1.3.0](https://github.com/ardent-data/weevr/compare/weevr-v1.2.1...weevr-v1.3.0) (2026-03-10)
 
 
