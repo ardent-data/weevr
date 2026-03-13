@@ -38,8 +38,8 @@ result = ctx.run("nightly.loom", mode="preview")
 In notebooks, results render automatically as styled HTML when you
 evaluate the result in a cell. Each mode gets a tailored report:
 
-- **execute** — thread results table with status badges, row counts,
-  write modes, and target paths
+- **execute** — executive summary, per-thread detail with flow diagrams
+  and data waterfalls, execution timeline, and annotated DAG
 - **validate** — check/error report with color-coded status
 - **plan** — summary table with embedded DAG diagram
 - **preview** — output shape table (columns × rows per thread)

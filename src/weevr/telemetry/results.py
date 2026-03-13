@@ -58,6 +58,7 @@ class ThreadTelemetry(FrozenBase):
         rows_read: Total rows read from sources.
         rows_written: Rows written to the target.
         rows_quarantined: Rows written to the quarantine table.
+        rows_after_transforms: Row count after transforms, before validation.
         load_mode: Load mode used (full, incremental_watermark, etc.).
         watermark_column: Watermark column name, if applicable.
         watermark_previous_value: Prior HWM value before this run.
@@ -67,6 +68,8 @@ class ThreadTelemetry(FrozenBase):
         cdc_inserts: Number of CDC insert operations.
         cdc_updates: Number of CDC update operations.
         cdc_deletes: Number of CDC delete operations.
+        resolved_params: Runtime parameter values that drove this execution.
+            Populated on the outermost telemetry object only (thread-level runs).
     """
 
     span: ExecutionSpan
@@ -75,6 +78,7 @@ class ThreadTelemetry(FrozenBase):
     rows_read: int = 0
     rows_written: int = 0
     rows_quarantined: int = 0
+    rows_after_transforms: int = 0
     load_mode: str | None = None
     watermark_column: str | None = None
     watermark_previous_value: str | None = None
@@ -84,6 +88,7 @@ class ThreadTelemetry(FrozenBase):
     cdc_inserts: int | None = None
     cdc_updates: int | None = None
     cdc_deletes: int | None = None
+    resolved_params: dict[str, Any] | None = None
 
 
 class WeaveTelemetry(FrozenBase):
@@ -95,6 +100,8 @@ class WeaveTelemetry(FrozenBase):
         hook_results: Results from pre/post hook step execution.
         lookup_results: Results from lookup materialization.
         variables: Final variable values at end of weave execution.
+        resolved_params: Runtime parameter values that drove this execution.
+            Populated on the outermost telemetry object only (weave-level runs).
     """
 
     span: ExecutionSpan
@@ -102,6 +109,7 @@ class WeaveTelemetry(FrozenBase):
     hook_results: list[Any] = []  # list[engine.hooks.HookResult] at runtime
     lookup_results: list[Any] = []  # list[engine.lookups.LookupResult] at runtime
     variables: dict[str, Any] = {}
+    resolved_params: dict[str, Any] | None = None
 
 
 class LoomTelemetry(FrozenBase):
@@ -110,7 +118,10 @@ class LoomTelemetry(FrozenBase):
     Attributes:
         span: The execution span for this loom.
         weave_telemetry: Per-weave telemetry keyed by weave name.
+        resolved_params: Runtime parameter values that drove this execution.
+            Populated on the outermost telemetry object only (loom-level runs).
     """
 
     span: ExecutionSpan
     weave_telemetry: dict[str, WeaveTelemetry] = {}
+    resolved_params: dict[str, Any] | None = None

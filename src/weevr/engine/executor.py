@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -42,6 +43,7 @@ def execute_thread(
     parent_span_id: str | None = None,
     cached_lookups: dict[str, Any] | None = None,
     weave_lookups: dict[str, Lookup] | None = None,
+    resolved_params: dict[str, Any] | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -73,6 +75,8 @@ def execute_thread(
             the signature to PySpark types.
         weave_lookups: Weave-level lookup definitions for on-demand resolution
             of non-materialized lookups.
+        resolved_params: Runtime parameter values for telemetry capture.
+            Stored on ThreadTelemetry for thread-level runs.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -92,6 +96,10 @@ def execute_thread(
     rows_read = 0
     rows_written = 0
     rows_quarantined = 0
+    rows_after_transforms = 0
+    output_schema: list[tuple[str, str]] | None = None
+    output_sample: list[dict[str, Any]] | None = None
+    quarantine_sample: list[dict[str, Any]] | None = None
 
     # Incremental processing state
     load_mode = thread.load.mode if thread.load else "full"
@@ -195,6 +203,9 @@ def execute_thread(
         # Step 3 — run pipeline steps
         df = run_pipeline(df, thread.steps, sources_map)
 
+        # Capture intermediate row count for waterfall visualization
+        rows_after_transforms = df.count()
+
         # Step 4 — run validation rules
         if thread.validations:
             outcome = validate_dataframe(df, thread.validations)
@@ -208,6 +219,10 @@ def execute_thread(
             # Write quarantine rows if present
             if outcome.quarantine_df is not None:
                 rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
+                with contextlib.suppress(Exception):
+                    quarantine_sample = (
+                        outcome.quarantine_df.limit(10).toPandas().to_dict("records")
+                    )
 
             # Continue with clean_df
             df = outcome.clean_df
@@ -227,12 +242,18 @@ def execute_thread(
             # CDC merge routing — skip target column mapping because
             # execute_cdc_merge handles column selection internally
             # (it must retain the operation column for row routing).
+            output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+            with contextlib.suppress(Exception):
+                output_sample = df.limit(10).toPandas().to_dict("records")
             cdc_write = _validate_cdc_write_config(thread)
             cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
             rows_written = sum(cdc_counts.values())
         else:
             # Apply target column mapping for non-CDC writes
             df = apply_target_mapping(df, thread.target, spark)
+            output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+            with contextlib.suppress(Exception):
+                output_sample = df.limit(10).toPandas().to_dict("records")
             rows_written = write_target(spark, df, thread.target, thread.write, target_path)
 
         # Step 9 — persist watermark state
@@ -275,6 +296,12 @@ def execute_thread(
             assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
 
         # Step 11 — build result
+        samples: dict[str, list[dict[str, Any]]] | None = None
+        if output_sample:
+            samples = {"output": output_sample}
+            if quarantine_sample:
+                samples["quarantine"] = quarantine_sample
+
         telemetry = _build_telemetry(
             span_builder,
             validation_results,
@@ -290,6 +317,8 @@ def execute_thread(
             watermark_persisted=watermark_persisted,
             watermark_first_run=watermark_first_run,
             cdc_counts=cdc_counts,
+            rows_after_transforms=rows_after_transforms,
+            resolved_params=resolved_params,
         )
 
         return ThreadResult(
@@ -299,6 +328,8 @@ def execute_thread(
             write_mode=write_mode,
             target_path=target_path,
             telemetry=telemetry,
+            output_schema=output_schema,
+            samples=samples,
         )
 
     except DataValidationError:
@@ -391,6 +422,8 @@ def _build_telemetry(
     watermark_persisted: bool = False,
     watermark_first_run: bool = False,
     cdc_counts: dict[str, int] | None = None,
+    rows_after_transforms: int = 0,
+    resolved_params: dict[str, Any] | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
@@ -414,6 +447,7 @@ def _build_telemetry(
         rows_read=rows_read,
         rows_written=rows_written,
         rows_quarantined=rows_quarantined,
+        rows_after_transforms=rows_after_transforms,
         load_mode=load_mode,
         watermark_column=watermark_column,
         watermark_previous_value=watermark_previous_value,
@@ -423,4 +457,5 @@ def _build_telemetry(
         cdc_inserts=cdc_counts["inserts"] if cdc_counts else None,
         cdc_updates=cdc_counts["updates"] if cdc_counts else None,
         cdc_deletes=cdc_counts["deletes"] if cdc_counts else None,
+        resolved_params=resolved_params,
     )

@@ -64,6 +64,7 @@ class RunResult:
         "validation_errors",
         "warnings",
         "_resolved_threads",
+        "_preview_metadata",
     )
 
     def __init__(
@@ -94,13 +95,18 @@ class RunResult:
         self.validation_errors = validation_errors
         self.warnings: list[str] = warnings if warnings is not None else []
         self._resolved_threads: dict[str, Any] | None = None
+        self._preview_metadata: dict[str, dict[str, Any]] | None = None
 
-    def dag(self) -> Any:
+    def dag(self, *, dark: bool | None = None) -> Any:
         """Return a DAG diagram for plan mode results.
 
         Returns a :class:`~weevr.engine.display.DAGDiagram` for plan mode,
         or ``None`` for other modes. For multi-weave loom results, returns
         a loom-level swimlane DAG.
+
+        Args:
+            dark: Force dark (``True``) or light (``False``) palette. ``None``
+                uses ``prefers-color-scheme`` media query (default).
         """
         if self.mode is not ExecutionMode.PLAN or not self.execution_plan:
             return None
@@ -108,8 +114,8 @@ class RunResult:
 
         plans = self.execution_plan
         if len(plans) == 1:
-            return DAGDiagram(render_dag_svg(plans[0], self._resolved_threads))
-        return DAGDiagram(render_loom_dag_svg(plans, self._resolved_threads))
+            return DAGDiagram(render_dag_svg(plans[0], self._resolved_threads, dark=dark))
+        return DAGDiagram(render_loom_dag_svg(plans, self._resolved_threads, dark=dark))
 
     def explain(self) -> str:
         """Return a detailed text breakdown of the execution plan.
@@ -507,6 +513,27 @@ class LoadedConfig:
 
         self._execution_plan = plans if plans else None
         return self._execution_plan
+
+    def flow(self, *, dark: bool | None = None) -> Any:
+        """Return a thread flow diagram for thread configs.
+
+        Generates an inline SVG showing the thread's processing pipeline:
+        sources, joins, transforms, and target. Returns ``None`` for
+        weave/loom configs (use per-thread flow in result reports instead).
+
+        Args:
+            dark: Force dark (``True``) or light (``False``) palette. ``None``
+                uses ``prefers-color-scheme`` media query (default).
+
+        Returns:
+            A :class:`~weevr.engine.display.FlowDiagram`, or ``None``
+            for non-thread configs.
+        """
+        if self._config_type != "thread":
+            return None
+        from weevr.engine.display import FlowDiagram, render_flow_svg
+
+        return FlowDiagram(render_flow_svg(self._model, dark=dark))
 
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying model."""

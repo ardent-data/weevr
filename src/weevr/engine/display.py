@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import html
+import types
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +12,7 @@ from weevr.engine.formatting import format_duration as _format_duration
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
+    from weevr.model.thread import Thread
 
 # ---------------------------------------------------------------------------
 # SVG layout constants
@@ -65,6 +68,42 @@ _DARK = {
     "lookup_text": "#fbd38d",
 }
 
+# Thread flow diagram constants
+_FLOW_NODE_HEIGHT = 36
+_FLOW_H_GAP = 40  # horizontal gap between pipeline stages
+_FLOW_V_GAP = 12  # vertical gap between stacked sources
+_FLOW_ARROW_SIZE = 8
+
+# Flow node type palettes
+_FLOW_LIGHT = {
+    "source_fill": "#f7fafc",
+    "source_stroke": "#a0aec0",
+    "join_fill": "#fefcbf",
+    "join_stroke": "#d69e2e",
+    "transform_fill": "#f0fff4",
+    "transform_stroke": "#48bb78",
+    "target_fill": "#ebf8ff",
+    "target_stroke": "#3182ce",
+    "text": "#2d3748",
+    "edge": "#a0aec0",
+    "bg": "#ffffff",
+    "badge_bg": "#e2e8f0",
+}
+_FLOW_DARK = {
+    "source_fill": "#2d3748",
+    "source_stroke": "#718096",
+    "join_fill": "#744210",
+    "join_stroke": "#d69e2e",
+    "transform_fill": "#22543d",
+    "transform_stroke": "#48bb78",
+    "target_fill": "#2a4365",
+    "target_stroke": "#63b3ed",
+    "text": "#e2e8f0",
+    "edge": "#718096",
+    "bg": "#1a202c",
+    "badge_bg": "#4a5568",
+}
+
 
 class DAGDiagram:
     """Inline SVG diagram of a weave execution plan.
@@ -91,6 +130,51 @@ class DAGDiagram:
     def _repr_svg_(self) -> str:
         """Notebook SVG display protocol."""
         return self._svg
+
+    def __str__(self) -> str:
+        """Return SVG markup as string."""
+        return self._svg
+
+    def save(self, path: str) -> None:
+        """Write SVG to a file.
+
+        Args:
+            path: File path to write. Parent directory must exist.
+
+        Raises:
+            FileNotFoundError: If the parent directory does not exist.
+        """
+        Path(path).write_text(self._svg, encoding="utf-8")
+
+
+class FlowDiagram:
+    """Inline SVG diagram of a thread's processing pipeline.
+
+    Visualizes the flow from sources through transforms to the target.
+    Auto-renders in notebooks via the ``_repr_svg_()`` display protocol.
+
+    Args:
+        svg: The raw SVG markup string.
+    """
+
+    __slots__ = ("_svg",)
+
+    def __init__(self, svg: str) -> None:
+        """Initialize with SVG markup."""
+        self._svg = svg
+
+    @property
+    def svg(self) -> str:
+        """The raw SVG markup."""
+        return self._svg
+
+    def _repr_svg_(self) -> str:
+        """Notebook SVG display protocol."""
+        return self._svg
+
+    def _repr_html_(self) -> str:
+        """Notebook HTML display protocol — wraps SVG in a div."""
+        return f"<div>{self._svg}</div>"
 
     def __str__(self) -> str:
         """Return SVG markup as string."""
@@ -301,9 +385,14 @@ def _find_group_index(name: str, execution_order: list[list[str]]) -> int:
     return 0
 
 
-def _build_svg_style() -> str:
-    """Build the CSS style block with prefers-color-scheme media query."""
-    lt = _LIGHT
+def _build_svg_style(dark: bool | None = None) -> str:
+    """Build the CSS style block with prefers-color-scheme media query.
+
+    Args:
+        dark: Force dark (True) or light (False) palette. None uses
+            ``prefers-color-scheme`` media query for automatic switching.
+    """
+    lt = _DARK if dark is True else _LIGHT
     dk = _DARK
     font = _FONT_FAMILY
     fs = _FONT_SIZE_LABEL
@@ -341,24 +430,29 @@ def _build_svg_style() -> str:
         f"  .dag-swimlane{{fill:none;stroke:{lt['node_stroke']};stroke-width:1;rx:8}}",
         f"  .dag-swimlane-header{{{lbl};{ta};font-weight:600}}",
         f"  .dag-bg{{fill:{lt['bg']}}}",
-        "  @media(prefers-color-scheme:dark){",
-        f"    .dag-node{{fill:{dk['node_fill']};stroke:{dk['node_stroke']}}}",
-        f"    .dag-node-cached{{fill:{dk['cached_fill']};stroke:{dk['cached_stroke']}}}",
-        f"    .dag-label{{fill:{dk['node_text']}}}",
-        f"    .dag-label-cached{{fill:{dk['cached_text']}}}",
-        f"    .dag-edge{{stroke:{dk['edge_stroke']}}}",
-        f"    .dag-arrow{{fill:{dk['edge_stroke']}}}",
-        (f"    .dag-lookup-node{{fill:{dk['lookup_fill']};stroke:{dk['lookup_stroke']}}}"),
-        f"    .dag-lookup-node-label{{fill:{dk['lookup_text']}}}",
-        f"    .dag-lookup-edge{{stroke:{dk['lookup_stroke']}}}",
-        f"    .dag-lookup-line{{stroke:{dk['lookup_stroke']}}}",
-        f"    .dag-lookup-label{{fill:{dk['lookup_text']}}}",
-        f"    .dag-swimlane{{stroke:{dk['node_stroke']}}}",
-        f"    .dag-swimlane-header{{fill:{dk['node_text']}}}",
-        f"    .dag-bg{{fill:{dk['bg']}}}",
-        "  }",
-        "</style>",
     ]
+    if dark is None:
+        lines.extend(
+            [
+                "  @media(prefers-color-scheme:dark){",
+                f"    .dag-node{{fill:{dk['node_fill']};stroke:{dk['node_stroke']}}}",
+                f"    .dag-node-cached{{fill:{dk['cached_fill']};stroke:{dk['cached_stroke']}}}",
+                f"    .dag-label{{fill:{dk['node_text']}}}",
+                f"    .dag-label-cached{{fill:{dk['cached_text']}}}",
+                f"    .dag-edge{{stroke:{dk['edge_stroke']}}}",
+                f"    .dag-arrow{{fill:{dk['edge_stroke']}}}",
+                f"    .dag-lookup-node{{fill:{dk['lookup_fill']};stroke:{dk['lookup_stroke']}}}",
+                f"    .dag-lookup-node-label{{fill:{dk['lookup_text']}}}",
+                f"    .dag-lookup-edge{{stroke:{dk['lookup_stroke']}}}",
+                f"    .dag-lookup-line{{stroke:{dk['lookup_stroke']}}}",
+                f"    .dag-lookup-label{{fill:{dk['lookup_text']}}}",
+                f"    .dag-swimlane{{stroke:{dk['node_stroke']}}}",
+                f"    .dag-swimlane-header{{fill:{dk['node_text']}}}",
+                f"    .dag-bg{{fill:{dk['bg']}}}",
+                "  }",
+            ]
+        )
+    lines.append("</style>")
     return "\n".join(lines)
 
 
@@ -370,12 +464,16 @@ def _build_svg_style() -> str:
 def render_dag_svg(
     plan: ExecutionPlan,
     resolved_threads: dict[str, Any] | None = None,
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate inline SVG markup for an execution plan DAG.
 
     Args:
         plan: The execution plan to visualize.
         resolved_threads: Optional thread models for tooltip content.
+        dark: Force dark (``True``) or light (``False``) palette.
+            ``None`` (default) uses the browser's color scheme preference.
 
     Returns:
         Complete SVG markup as a string.
@@ -388,7 +486,7 @@ def render_dag_svg(
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" '
             'viewBox="0 0 200 40" width="200" height="40">'
-            f"{_build_svg_style()}"
+            f"{_build_svg_style(dark)}"
             '<text x="100" y="20" class="dag-label">Empty plan</text>'
             "</svg>"
         )
@@ -401,7 +499,7 @@ def render_dag_svg(
     )
 
     # Style block
-    parts.append(_build_svg_style())
+    parts.append(_build_svg_style(dark))
 
     # Arrowhead markers
     lt = _LIGHT
@@ -545,6 +643,8 @@ def render_dag_svg(
 def render_loom_dag_svg(
     plans: list[ExecutionPlan],
     resolved_threads: dict[str, Any] | None = None,
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate a loom-level DAG SVG with swimlanes for each weave.
 
@@ -555,12 +655,14 @@ def render_loom_dag_svg(
     Args:
         plans: Execution plans for each weave in execution order.
         resolved_threads: Optional thread models for tooltip content.
+        dark: Force dark (``True``) or light (``False``) palette.
+            ``None`` (default) uses the browser's color scheme preference.
 
     Returns:
         Complete SVG markup as a string.
     """
     if len(plans) <= 1:
-        return render_dag_svg(plans[0], resolved_threads) if plans else ""
+        return render_dag_svg(plans[0], resolved_threads, dark=dark) if plans else ""
 
     # Compute internal layouts for each weave
     weave_layouts: list[
@@ -733,6 +835,841 @@ def render_loom_dag_svg(
 
 
 # ---------------------------------------------------------------------------
+# Thread flow SVG renderer
+# ---------------------------------------------------------------------------
+
+# Step types recognized as the key attribute on discriminated-union step models.
+_STEP_TYPES = frozenset(
+    {
+        "filter",
+        "derive",
+        "join",
+        "select",
+        "drop",
+        "rename",
+        "cast",
+        "dedup",
+        "sort",
+        "union",
+        "aggregate",
+        "window",
+        "pivot",
+        "unpivot",
+        "case_when",
+        "fill_null",
+        "coalesce",
+        "string_ops",
+        "date_ops",
+    }
+)
+
+
+def _get_step_type(step: Any) -> str:
+    """Determine the step type key from a discriminated-union step model."""
+    for attr in _STEP_TYPES:
+        if hasattr(step, attr) and getattr(step, attr) is not None:
+            return attr
+    return "unknown"
+
+
+def _get_join_detail(step: Any) -> str:
+    """Extract a short label for a join step (type + key columns)."""
+    params = getattr(step, "join", None)
+    if params is None:
+        return "join"
+    jtype = getattr(params, "type", "inner")
+    keys = getattr(params, "on", [])
+    key_names = [getattr(k, "left", str(k)) for k in keys[:3]]
+    suffix = ", \u2026" if len(keys) > 3 else ""
+    return f"{jtype}({', '.join(key_names)}{suffix})"
+
+
+def _group_transforms(
+    steps: list[Any],
+) -> list[tuple[str, str, int, str | None]]:
+    """Walk pipeline steps and group consecutive same-type transforms.
+
+    Returns a list of ``(node_type, label, count, join_source)`` tuples.
+    ``node_type`` is ``"join"`` or ``"transform"``.
+    ``join_source`` is the source name for join steps, ``None`` otherwise.
+    """
+    nodes: list[tuple[str, str, int, str | None]] = []
+    for step in steps:
+        stype = _get_step_type(step)
+        if stype == "join":
+            params = getattr(step, "join", None)
+            join_src = getattr(params, "source", None) if params else None
+            nodes.append(("join", _get_join_detail(step), 1, join_src))
+        elif nodes and nodes[-1][0] == "transform" and nodes[-1][1] == stype:
+            # Merge with previous same-type transform
+            prev_type, prev_label, prev_count, prev_src = nodes[-1]
+            nodes[-1] = (prev_type, prev_label, prev_count + 1, prev_src)
+        else:
+            nodes.append(("transform", stype, 1, None))
+    return nodes
+
+
+def _build_flow_svg_style(dark: bool | None = None) -> str:
+    """Build CSS style block for thread flow diagrams.
+
+    Args:
+        dark: Force dark (True) or light (False) palette. None uses
+            ``prefers-color-scheme`` media query for automatic switching.
+    """
+    lt = _FLOW_DARK if dark is True else _FLOW_LIGHT
+    dk = _FLOW_DARK
+    font = _FONT_FAMILY
+    fs = _FONT_SIZE_LABEL
+    fa = _FONT_SIZE_ANNOTATION
+    ta = "text-anchor:middle;dominant-baseline:central"
+
+    lines = [
+        "<style>",
+        f"  .flow-bg{{fill:{lt['bg']}}}",
+        f"  .flow-source{{fill:{lt['source_fill']};stroke:{lt['source_stroke']};stroke-width:1.5}}",
+        f"  .flow-join{{fill:{lt['join_fill']};stroke:{lt['join_stroke']};stroke-width:1.5}}",
+        (
+            f"  .flow-transform{{fill:{lt['transform_fill']};"
+            f"stroke:{lt['transform_stroke']};stroke-width:1.5}}"
+        ),
+        f"  .flow-target{{fill:{lt['target_fill']};stroke:{lt['target_stroke']};stroke-width:2}}",
+        f"  .flow-label{{fill:{lt['text']};font-family:{font};font-size:{fs}px;{ta}}}",
+        f"  .flow-sublabel{{fill:{lt['text']};font-family:{font};font-size:{fa}px;{ta};"
+        "opacity:0.7}}",
+        f"  .flow-badge{{fill:{lt['badge_bg']};rx:8}}",
+        f"  .flow-edge{{stroke:{lt['edge']};stroke-width:1.5;fill:none}}",
+        f"  .flow-arrow{{fill:{lt['edge']}}}",
+    ]
+    if dark is None:
+        lines.extend(
+            [
+                "  @media(prefers-color-scheme:dark){",
+                f"    .flow-bg{{fill:{dk['bg']}}}",
+                f"    .flow-source{{fill:{dk['source_fill']};stroke:{dk['source_stroke']}}}",
+                f"    .flow-join{{fill:{dk['join_fill']};stroke:{dk['join_stroke']}}}",
+                f"    .flow-transform{{fill:{dk['transform_fill']};"
+                f"stroke:{dk['transform_stroke']}}}",
+                f"    .flow-target{{fill:{dk['target_fill']};stroke:{dk['target_stroke']}}}",
+                f"    .flow-label{{fill:{dk['text']}}}",
+                f"    .flow-sublabel{{fill:{dk['text']}}}",
+                f"    .flow-badge{{fill:{dk['badge_bg']}}}",
+                f"    .flow-edge{{stroke:{dk['edge']}}}",
+                f"    .flow-arrow{{fill:{dk['edge']}}}",
+                "  }",
+            ]
+        )
+    lines.append("</style>")
+    return "\n".join(lines)
+
+
+def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
+    """Generate an inline SVG showing a thread's processing pipeline.
+
+    Renders a horizontal flow diagram: sources on the left, transforms in
+    the middle, target on the right. Consecutive same-type transforms are
+    grouped with a count badge.
+
+    Args:
+        thread: Thread configuration model.
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
+
+    Returns:
+        Complete SVG markup as a string.
+    """
+    pad = _SVG_PADDING
+    nh = _FLOW_NODE_HEIGHT
+    hgap = _FLOW_H_GAP
+    vgap = _FLOW_V_GAP
+    cw = _CHAR_WIDTH_ESTIMATE
+    np = _NODE_PADDING
+
+    # --- Build node list ---
+    # Source nodes
+    source_nodes: list[tuple[str, str]] = []  # (alias, type_label)
+    for alias, src in thread.sources.items():
+        src_type = getattr(src, "type", None) or "lookup"
+        src_ref = getattr(src, "alias", None) or getattr(src, "path", "") or ""
+        # Shorten long paths
+        if len(src_ref) > 25:
+            src_ref = "\u2026" + src_ref[-22:]
+        label = f"{alias}" if alias == src_ref or not src_ref else alias
+        source_nodes.append((label, src_type))
+
+    # Pipeline nodes (joins + transforms, grouped)
+    pipeline_nodes = _group_transforms(list(thread.steps))
+
+    # Target node
+    target = thread.target
+    tgt_label = getattr(target, "alias", None) or getattr(target, "path", "") or "target"
+    if len(tgt_label) > 30:
+        tgt_label = "\u2026" + tgt_label[-27:]
+    write_mode = thread.write.mode if thread.write else "overwrite"
+
+    # --- Estimate widths ---
+    def _est_w(text: str) -> float:
+        return max(len(text) * cw + np * 2, 80.0)
+
+    source_widths = {label: _est_w(label) for label, _ in source_nodes}
+
+    pipe_widths: list[float] = []
+    for ntype, label, count, _jsrc in pipeline_nodes:
+        if ntype == "join":
+            pipe_widths.append(_est_w(label))
+        elif count > 1:
+            pipe_widths.append(_est_w(f"{label} ({count})"))
+        else:
+            pipe_widths.append(_est_w(label))
+
+    target_w = _est_w(tgt_label)
+
+    # --- Classify sources: primary (left-stacked) vs join (above their join node) ---
+    join_source_names: set[str] = set()
+    join_source_to_pipe_idx: dict[str, int] = {}
+    for pidx, (_ntype, _label, _count, jsrc) in enumerate(pipeline_nodes):
+        if _ntype == "join" and jsrc:
+            for slabel, _stype in source_nodes:
+                if slabel == jsrc:
+                    join_source_names.add(slabel)
+                    join_source_to_pipe_idx[slabel] = pidx
+                    break
+
+    primary_sources = [(sn, st) for sn, st in source_nodes if sn not in join_source_names]
+    join_sources = [(sn, st) for sn, st in source_nodes if sn in join_source_names]
+
+    # --- Compute positions ---
+    # Primary sources: stacked vertically at x=pad
+    max_primary_w = max((source_widths[sn] for sn, _ in primary_sources), default=80.0)
+    primary_count = len(primary_sources)
+    primary_total_h = primary_count * nh + max(primary_count - 1, 0) * vgap
+
+    # Join sources sit above the pipeline, so the pipeline row needs vertical room
+    has_join_sources = len(join_sources) > 0
+    join_row_h = (nh + vgap) if has_join_sources else 0
+
+    # Pipeline center Y
+    center_y = pad + join_row_h
+    if primary_sources:
+        center_y = max(center_y, pad + join_row_h + primary_total_h / 2 - nh / 2)
+        # If primary stack is taller, it determines center_y
+        if primary_total_h > nh:
+            center_y = pad + join_row_h
+
+    primary_positions: dict[str, tuple[float, float, float]] = {}
+    sy = center_y + nh / 2 - primary_total_h / 2 if primary_count > 0 else center_y
+    for slabel, _stype in primary_sources:
+        primary_positions[slabel] = (pad, sy, max_primary_w)
+        sy += nh + vgap
+
+    # Pipeline nodes: left to right after primary sources
+    px = pad + (max_primary_w + hgap if primary_sources else 0.0)
+    pipe_positions: list[tuple[float, float, float]] = []
+    for idx, (_ntype, _label, _count, _jsrc) in enumerate(pipeline_nodes):
+        w = pipe_widths[idx]
+        pipe_positions.append((px, center_y, w))
+        px += w + hgap
+
+    # Join source positions: centered above their join node
+    join_positions: dict[str, tuple[float, float, float]] = {}
+    for slabel in join_source_names:
+        pidx = join_source_to_pipe_idx[slabel]
+        jpx, _jpy, jpw = pipe_positions[pidx]
+        sw = source_widths[slabel]
+        # Center the source above the join node
+        jx = jpx + jpw / 2 - sw / 2
+        jy = center_y - nh - vgap
+        join_positions[slabel] = (jx, jy, sw)
+
+    # Build combined source position list (in original order, for node rendering)
+    src_positions: list[tuple[float, float, float]] = []
+    for slabel, _stype in source_nodes:
+        if slabel in primary_positions:
+            src_positions.append(primary_positions[slabel])
+        else:
+            src_positions.append(join_positions[slabel])
+
+    # Target: after pipeline
+    if not pipeline_nodes:
+        px = pad + (max_primary_w + hgap if primary_sources else 0.0)
+    target_pos = (px, center_y, target_w)
+
+    # Canvas dimensions
+    top_edge = min(y for _, y, _ in src_positions) if src_positions else pad
+    bot_edge = max(y + nh for _, y, _ in src_positions) if src_positions else center_y + nh
+    bot_edge = max(bot_edge, center_y + nh)
+    canvas_w = px + target_w + pad
+    canvas_h = bot_edge - top_edge + pad * 2
+
+    # Shift everything so top_edge aligns with pad
+    y_offset = pad - top_edge
+    src_positions = [(x, y + y_offset, w) for x, y, w in src_positions]
+    pipe_positions = [(x, y + y_offset, w) for x, y, w in pipe_positions]
+    target_pos = (target_pos[0], target_pos[1] + y_offset, target_pos[2])
+    center_y += y_offset
+
+    # --- Render SVG ---
+    parts: list[str] = []
+    vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
+    parts.append(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
+        f'width="{canvas_w:.0f}" height="{canvas_h:.0f}">'
+    )
+    parts.append(_build_flow_svg_style(dark))
+
+    # Arrowhead marker
+    asz = _FLOW_ARROW_SIZE
+    parts.append("<defs>")
+    parts.append(
+        f'<marker id="flow-arrow" markerWidth="{asz}" '
+        f'markerHeight="{asz}" refX="{asz}" refY="{asz // 2}" '
+        f'orient="auto-start-reverse">'
+        f'<polygon points="0 0, {asz} {asz // 2}, 0 {asz}" class="flow-arrow"/>'
+        "</marker>"
+    )
+    parts.append("</defs>")
+
+    # Background
+    parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="flow-bg"/>')
+
+    # --- Edges (draw first, behind nodes) ---
+    # Primary sources → first pipeline node or target
+    first_target_x = pipe_positions[0][0] if pipe_positions else target_pos[0]
+    first_target_y = pipe_positions[0][1] if pipe_positions else target_pos[1]
+    for (slabel, _stype), (sx, sy, sw) in zip(source_nodes, src_positions, strict=True):
+        if slabel in join_source_names:
+            # Join source → its join node (vertical arrow down)
+            pidx = join_source_to_pipe_idx[slabel]
+            tx, ty, tw = pipe_positions[pidx]
+            x1, y1 = sx + sw / 2, sy + nh
+            x2, y2 = tx + tw / 2, ty
+        else:
+            # Primary source → first pipeline node (or target)
+            x1, y1 = sx + sw, sy + nh / 2
+            x2, y2 = first_target_x, first_target_y + nh / 2
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # Pipeline node → next pipeline node
+    for i in range(len(pipe_positions) - 1):
+        x1 = pipe_positions[i][0] + pipe_positions[i][2]
+        y1 = pipe_positions[i][1] + nh / 2
+        x2 = pipe_positions[i + 1][0]
+        y2 = pipe_positions[i + 1][1] + nh / 2
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # Last pipeline node → target
+    if pipe_positions:
+        last = pipe_positions[-1]
+        x1 = last[0] + last[2]
+        y1 = last[1] + nh / 2
+        x2 = target_pos[0]
+        y2 = target_pos[1] + nh / 2
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # --- Source nodes ---
+    cr = _NODE_CORNER_RADIUS
+    for (label, stype), (sx, sy, sw) in zip(source_nodes, src_positions, strict=True):
+        parts.append(
+            f'<rect x="{sx:.1f}" y="{sy:.1f}" width="{sw:.1f}" height="{nh}" '
+            f'rx="{cr}" class="flow-source"/>'
+        )
+        parts.append(
+            f'<text x="{sx + sw / 2:.1f}" y="{sy + nh / 2 - 5:.1f}" '
+            f'class="flow-label">{_xml_escape(label)}</text>'
+        )
+        parts.append(
+            f'<text x="{sx + sw / 2:.1f}" y="{sy + nh / 2 + 8:.1f}" '
+            f'class="flow-sublabel">{_xml_escape(stype)}</text>'
+        )
+
+    # --- Pipeline nodes ---
+    for (ntype, label, count, _jsrc), (px, py, pw) in zip(
+        pipeline_nodes, pipe_positions, strict=True
+    ):
+        css_class = "flow-join" if ntype == "join" else "flow-transform"
+        display_label = label if count <= 1 else f"{label} ({count})"
+
+        if ntype == "join":
+            # Hexagon shape for joins
+            hh = nh / 2
+            indent = 12
+            points = (
+                f"{px + indent:.1f},{py:.1f} "
+                f"{px + pw - indent:.1f},{py:.1f} "
+                f"{px + pw:.1f},{py + hh:.1f} "
+                f"{px + pw - indent:.1f},{py + nh:.1f} "
+                f"{px + indent:.1f},{py + nh:.1f} "
+                f"{px:.1f},{py + hh:.1f}"
+            )
+            parts.append(f'<polygon points="{points}" class="{css_class}"/>')
+        else:
+            parts.append(
+                f'<rect x="{px:.1f}" y="{py:.1f}" width="{pw:.1f}" height="{nh}" '
+                f'rx="{cr}" class="{css_class}"/>'
+            )
+
+        parts.append(
+            f'<text x="{px + pw / 2:.1f}" y="{py + nh / 2:.1f}" '
+            f'class="flow-label">{_xml_escape(display_label)}</text>'
+        )
+
+    # --- Target node (double border via nested rects) ---
+    tx, ty, tw = target_pos
+    parts.append(
+        f'<rect x="{tx:.1f}" y="{ty:.1f}" width="{tw:.1f}" height="{nh}" '
+        f'rx="{cr}" class="flow-target"/>'
+    )
+    parts.append(
+        f'<rect x="{tx + 3:.1f}" y="{ty + 3:.1f}" width="{tw - 6:.1f}" height="{nh - 6}" '
+        f'rx="{max(cr - 2, 0)}" class="flow-target" style="fill:none"/>'
+    )
+    parts.append(
+        f'<text x="{tx + tw / 2:.1f}" y="{ty + nh / 2 - 5:.1f}" '
+        f'class="flow-label">{_xml_escape(tgt_label)}</text>'
+    )
+    parts.append(
+        f'<text x="{tx + tw / 2:.1f}" y="{ty + nh / 2 + 8:.1f}" '
+        f'class="flow-sublabel">{_xml_escape(write_mode)}</text>'
+    )
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Execution timeline SVG renderer
+# ---------------------------------------------------------------------------
+
+
+def render_timeline_svg(
+    weave_result: Any,
+    hook_results: list[Any] | None = None,
+    lookup_results: list[Any] | None = None,
+    *,
+    dark: bool | None = None,
+) -> str:
+    """Generate a phased execution timeline Gantt SVG.
+
+    Shows lookups, pre-hooks, thread execution groups, and post-hooks as
+    sequential phases with wall-clock duration bars.
+
+    Args:
+        weave_result: A WeaveResult with thread_results and telemetry.
+        hook_results: Hook execution results (from WeaveTelemetry).
+        lookup_results: Lookup materialization results (from WeaveTelemetry).
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
+
+    Returns:
+        Complete SVG markup as a string.
+    """
+    lt = _FLOW_DARK if dark is True else _FLOW_LIGHT
+    dk = _FLOW_DARK
+    font = _FONT_FAMILY
+    pad = _SVG_PADDING
+    bar_h = 24
+    phase_gap = 16
+    label_w = 120
+    bar_area_w = 400
+
+    # Collect phases with bars: [(phase_label, [(bar_label, duration_ms, status)])]
+    phases: list[tuple[str, list[tuple[str, int, str]]]] = []
+
+    # Lookup phase
+    if lookup_results:
+        lk_bars: list[tuple[str, int, str]] = []
+        for lk in lookup_results:
+            name = getattr(lk, "name", "lookup")
+            dur = int(getattr(lk, "duration_ms", 0))
+            status = "success" if getattr(lk, "success", True) else "failure"
+            lk_bars.append((name, dur, status))
+        if lk_bars:
+            phases.append(("Lookups", lk_bars))
+
+    # Pre/post-hooks phases
+    post_bars: list[tuple[str, int, str]] = []
+    if hook_results:
+        pre_bars: list[tuple[str, int, str]] = []
+        for hr in hook_results:
+            phase = getattr(hr, "phase", "")
+            name = getattr(hr, "step_type", "hook")
+            dur = int(getattr(hr, "duration_ms", 0))
+            status = "success" if getattr(hr, "success", True) else "failure"
+            if phase == "pre":
+                pre_bars.append((name, dur, status))
+            elif phase == "post":
+                post_bars.append((name, dur, status))
+        if pre_bars:
+            phases.append(("Pre-hooks", pre_bars))
+
+    # Thread execution phase
+    thread_results = getattr(weave_result, "thread_results", []) or []
+    if thread_results:
+        thread_bars: list[tuple[str, int, str]] = []
+        for tr in thread_results:
+            name = getattr(tr, "thread_name", "thread")
+            telem = getattr(tr, "telemetry", None)
+            dur = 0
+            if telem:
+                span = getattr(telem, "span", None)
+                if span:
+                    start = getattr(span, "start_time", None)
+                    end = getattr(span, "end_time", None)
+                    if start and end:
+                        dur = int((end - start).total_seconds() * 1000)
+            status = str(getattr(tr, "status", "success"))
+            thread_bars.append((name, dur, status))
+        if thread_bars:
+            phases.append(("Threads", thread_bars))
+
+    # Post-hooks phase
+    if hook_results and post_bars:
+        phases.append(("Post-hooks", post_bars))
+
+    if not phases:
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" '
+            'width="200" height="40">'
+            f'<text x="100" y="20" text-anchor="middle" '
+            f'font-family="{font}" font-size="13" fill="{lt["text"]}">'
+            "No timeline data</text></svg>"
+        )
+
+    # Find max duration for scaling
+    max_dur = max(dur for _, bars in phases for _, dur, _ in bars) or 1
+
+    # Compute canvas height
+    total_bars = sum(len(bars) for _, bars in phases)
+    phase_label_h = len(phases) * (bar_h + 2)  # each phase has a label row
+    canvas_h = pad * 2 + total_bars * (bar_h + 4) + phase_label_h + (len(phases) - 1) * phase_gap
+    canvas_w = pad * 2 + label_w + bar_area_w + 60  # 60 for duration text
+
+    status_colors = {
+        "success": ("#c6f6d5", "#276749", "#22543d", "#48bb78"),
+        "failure": ("#feb2b2", "#9b2c2c", "#742a2a", "#fc8181"),
+        "skipped": ("#e2e8f0", "#718096", "#4a5568", "#a0aec0"),
+    }
+
+    parts: list[str] = []
+    vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
+    parts.append(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
+        f'width="{canvas_w:.0f}" height="{canvas_h:.0f}">'
+    )
+
+    # Inline style for dark/light
+    parts.append("<style>")
+    parts.append(f"  .tl-bg{{fill:{lt['bg']}}}")
+    parts.append(f"  .tl-label{{fill:{lt['text']};font-family:{font};font-size:12px}}")
+    parts.append(
+        f"  .tl-phase{{fill:{lt['text']};font-family:{font};font-size:13px;font-weight:600}}"
+    )
+    parts.append(f"  .tl-dur{{fill:{lt['text']};font-family:{font};font-size:11px;opacity:0.7}}")
+    if dark is None:
+        parts.append("  @media(prefers-color-scheme:dark){")
+        parts.append(f"    .tl-bg{{fill:{dk['bg']}}}")
+        parts.append(f"    .tl-label{{fill:{dk['text']}}}")
+        parts.append(f"    .tl-phase{{fill:{dk['text']}}}")
+        parts.append(f"    .tl-dur{{fill:{dk['text']}}}")
+        parts.append("  }")
+    parts.append("</style>")
+
+    # Background
+    parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="tl-bg"/>')
+
+    y = float(pad)
+    for phase_label, bars in phases:
+        # Phase label
+        parts.append(
+            f'<text x="{pad}" y="{y + bar_h / 2:.1f}" '
+            f'dominant-baseline="central" class="tl-phase">'
+            f"{_xml_escape(phase_label)}</text>"
+        )
+        y += bar_h + 2
+
+        for bar_label, dur, status in bars:
+            colors = status_colors.get(status, status_colors["success"])
+            fill_lt = colors[0]
+            bar_w = max((dur / max_dur) * bar_area_w, 4)
+
+            bx = pad + label_w
+            # Name label left of bar
+            parts.append(
+                f'<text x="{bx - 6:.1f}" y="{y + bar_h / 2:.1f}" '
+                f'dominant-baseline="central" text-anchor="end" class="tl-label">'
+                f"{_xml_escape(bar_label)}</text>"
+            )
+            parts.append(
+                f'<rect x="{bx:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
+                f'height="{bar_h}" rx="4" fill="{fill_lt}"/>'
+            )
+            # Duration text after bar
+            dur_text = _format_duration(dur)
+            parts.append(
+                f'<text x="{bx + bar_w + 6:.1f}" y="{y + bar_h / 2:.1f}" '
+                f'dominant-baseline="central" class="tl-dur">'
+                f"{_xml_escape(dur_text)}</text>"
+            )
+            y += bar_h + 4
+
+        y += phase_gap
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Data flow waterfall SVG renderer
+# ---------------------------------------------------------------------------
+
+
+def render_waterfall_svg(
+    thread_result: Any,
+    thread_telemetry: Any | None,
+    mode: str = "execute",
+    *,
+    dark: bool | None = None,
+) -> str:
+    """Generate a data flow waterfall SVG showing row counts at each stage.
+
+    Execute mode shows 4 stages: read, transforms, quarantine, written.
+    Preview mode shows 2 stages: read, transforms.
+
+    Args:
+        thread_result: A ThreadResult (used for rows_written).
+        thread_telemetry: ThreadTelemetry with row counts.
+        mode: ``"execute"`` or ``"preview"``.
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
+
+    Returns:
+        Complete SVG markup as a string.
+    """
+    lt = _FLOW_DARK if dark is True else _FLOW_LIGHT
+    dk = _FLOW_DARK
+    font = _FONT_FAMILY
+    pad = _SVG_PADDING
+    bar_h = 28
+    bar_gap = 8
+    label_w = 140
+    bar_area_w = 300
+
+    # Extract row counts
+    rows_read = 0
+    rows_after = 0
+    rows_quarantined = 0
+    rows_written = getattr(thread_result, "rows_written", 0)
+    if thread_telemetry:
+        rows_read = getattr(thread_telemetry, "rows_read", 0)
+        rows_after = getattr(thread_telemetry, "rows_after_transforms", 0)
+        rows_quarantined = getattr(thread_telemetry, "rows_quarantined", 0)
+
+    # Build stages
+    stages: list[tuple[str, int, str]] = []  # (label, count, color)
+    stages.append(("Rows read", rows_read, "#bee3f8"))
+    stages.append(("After transforms", rows_after, "#c6f6d5"))
+    if mode == "execute":
+        if rows_quarantined > 0:
+            stages.append(("Quarantined", rows_quarantined, "#fefcbf"))
+        stages.append(("Rows written", rows_written, "#bee3f8"))
+
+    max_count = max((c for _, c, _ in stages), default=1) or 1
+    canvas_h = pad * 2 + len(stages) * (bar_h + bar_gap)
+    canvas_w = pad * 2 + label_w + bar_area_w + 80
+
+    parts: list[str] = []
+    vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
+    parts.append(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
+        f'width="{canvas_w:.0f}" height="{canvas_h:.0f}">'
+    )
+    parts.append("<style>")
+    parts.append(f"  .wf-bg{{fill:{lt['bg']}}}")
+    parts.append(f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:13px}}")
+    parts.append(f"  .wf-count{{fill:{lt['text']};font-family:{font};font-size:12px;opacity:0.7}}")
+    if dark is None:
+        parts.append("  @media(prefers-color-scheme:dark){")
+        parts.append(f"    .wf-bg{{fill:{dk['bg']}}}")
+        parts.append(f"    .wf-label{{fill:{dk['text']}}}")
+        parts.append(f"    .wf-count{{fill:{dk['text']}}}")
+        parts.append("  }")
+    parts.append("</style>")
+
+    parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
+
+    y = float(pad)
+    for stage_label, count, color in stages:
+        bar_w = max((count / max_count) * bar_area_w, 4) if count > 0 else 4
+        bx = pad + label_w
+
+        # Label
+        parts.append(
+            f'<text x="{bx - 8:.1f}" y="{y + bar_h / 2:.1f}" '
+            f'text-anchor="end" dominant-baseline="central" class="wf-label">'
+            f"{_xml_escape(stage_label)}</text>"
+        )
+        # Bar
+        parts.append(
+            f'<rect x="{bx:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
+            f'height="{bar_h}" rx="4" fill="{color}" opacity="0.8"/>'
+        )
+        # Count text
+        parts.append(
+            f'<text x="{bx + bar_w + 6:.1f}" y="{y + bar_h / 2:.1f}" '
+            f'dominant-baseline="central" class="wf-count">{count:,}</text>'
+        )
+        y += bar_h + bar_gap
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Annotated DAG SVG renderer
+# ---------------------------------------------------------------------------
+
+
+def render_annotated_dag_svg(
+    plan: ExecutionPlan,
+    thread_results: dict[str, Any] | None = None,
+    resolved_threads: dict[str, Any] | None = None,
+    *,
+    dark: bool | None = None,
+) -> str:
+    """Generate a DAG SVG with status badges and duration annotations.
+
+    Builds on the standard DAG layout, overlaying colored status indicators
+    and timing information on each thread node.
+
+    Args:
+        plan: The execution plan to visualize.
+        thread_results: Mapping of thread name to ThreadResult.
+        resolved_threads: Optional thread models for tooltip content.
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
+
+    Returns:
+        Complete SVG markup as a string.
+    """
+    nodes, edges, width, height, lookup_nodes, lookup_edges = _compute_layout(
+        plan, resolved_threads
+    )
+    if not nodes:
+        return render_dag_svg(plan, resolved_threads, dark=dark)
+
+    # Extend height for duration annotations below nodes
+    annotation_space = 18
+    height += annotation_space
+
+    parts: list[str] = []
+    vb = f"0 0 {width:.0f} {height:.0f}"
+    parts.append(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
+        f'width="{width:.0f}" height="{height:.0f}">'
+    )
+    parts.append(_build_svg_style(dark))
+
+    # Additional styles for annotations
+    lt = _DARK if dark is True else _LIGHT
+    dk = _DARK
+    parts.append("<style>")
+    parts.append(
+        f"  .dag-dur{{fill:{lt['node_text']};font-family:{_FONT_FAMILY};"
+        f"font-size:{_FONT_SIZE_ANNOTATION}px;text-anchor:middle;opacity:0.7}}"
+    )
+    if dark is None:
+        parts.append(f"  @media(prefers-color-scheme:dark){{.dag-dur{{fill:{dk['node_text']}}}}}")
+    parts.append("</style>")
+
+    # Arrowhead markers
+    parts.append("<defs>")
+    parts.append(
+        f'<marker id="dag-arrowhead" markerWidth="{_ARROWHEAD_SIZE}" '
+        f'markerHeight="{_ARROWHEAD_SIZE}" refX="{_ARROWHEAD_SIZE}" '
+        f'refY="{_ARROWHEAD_SIZE // 2}" orient="auto-start-reverse">'
+        f'<polygon points="0 0, {_ARROWHEAD_SIZE} {_ARROWHEAD_SIZE // 2}, '
+        f'0 {_ARROWHEAD_SIZE}" class="dag-arrow"/></marker>'
+    )
+    parts.append("</defs>")
+
+    # Background
+    parts.append(f'<rect width="{width:.0f}" height="{height:.0f}" class="dag-bg"/>')
+
+    # Edges
+    for src, tgt in edges:
+        sx, sy, sw, sh = nodes[src]
+        tx, ty, tw, _th = nodes[tgt]
+        x1 = sx + sw / 2
+        y1 = sy + sh
+        x2 = tx + tw / 2
+        y2 = ty
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="dag-edge" marker-end="url(#dag-arrowhead)"/>'
+        )
+
+    # Nodes with status badges
+    cache_set = set(plan.cache_targets)
+    status_colors = {
+        "success": "#48bb78",
+        "failure": "#fc8181",
+        "skipped": "#a0aec0",
+    }
+
+    for name, (x, y, w, h) in nodes.items():
+        is_cached = name in cache_set
+        node_class = "dag-node-cached" if is_cached else "dag-node"
+        label_class = "dag-label-cached" if is_cached else "dag-label"
+
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
+            f'rx="{_NODE_CORNER_RADIUS}" class="{node_class}"/>'
+        )
+        parts.append(
+            f'<text x="{x + w / 2:.1f}" y="{y + h / 2:.1f}" '
+            f'class="{label_class}">{_xml_escape(name)}</text>'
+        )
+
+        # Status badge (small circle in top-right corner)
+        tr = (thread_results or {}).get(name)
+        if tr is not None:
+            status = str(getattr(tr, "status", ""))
+            badge_color = status_colors.get(status, "#a0aec0")
+            bx = x + w - 8
+            by = y + 8
+            parts.append(
+                f'<circle cx="{bx:.1f}" cy="{by:.1f}" r="5" '
+                f'fill="{badge_color}" stroke="white" stroke-width="1.5"/>'
+            )
+
+            # Duration annotation below node
+            telem = getattr(tr, "telemetry", None)
+            if telem:
+                span = getattr(telem, "span", None)
+                if span:
+                    start = getattr(span, "start_time", None)
+                    end = getattr(span, "end_time", None)
+                    if start and end:
+                        dur_ms = int((end - start).total_seconds() * 1000)
+                        dur_text = _format_duration(dur_ms)
+                        parts.append(
+                            f'<text x="{x + w / 2:.1f}" y="{y + h + 14:.1f}" '
+                            f'class="dag-dur">{_xml_escape(dur_text)}</text>'
+                        )
+
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # HTML rendering
 # ---------------------------------------------------------------------------
 
@@ -761,7 +1698,8 @@ _S_BADGE_STATUS = f"{_S_BADGE};background:#f0fff4;color:#276749;border:1px solid
 _S_NONE = "color:#a0aec0;font-style:italic"
 _S_ERROR_BOX = (
     "background:#fff5f5;border:1px solid #feb2b2;border-radius:4px;"
-    "padding:8px 12px;color:#9b2c2c;font-family:monospace;font-size:13px;margin:4px 0"
+    "padding:8px 12px;color:#9b2c2c;font-family:monospace;font-size:13px;margin:4px 0;"
+    "word-wrap:break-word;overflow-wrap:break-word;white-space:pre-wrap"
 )
 _S_WARN_BOX = (
     "background:#fffff0;border:1px solid #fefcbf;border-radius:4px;"
@@ -771,6 +1709,12 @@ _S_CHECK_BOX = (
     "background:#f0fff4;border:1px solid #c6f6d5;border-radius:4px;"
     "padding:8px 12px;color:#276749;font-size:13px;margin:8px 0"
 )
+_S_DETAILS = "margin:8px 0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden"
+_S_SUMMARY = (
+    "padding:8px 12px;cursor:pointer;font-weight:600;font-size:14px;"
+    "color:#2d3748;background:#f7fafc;list-style:none"
+)
+_S_DETAIL_BODY = "padding:8px 12px"
 
 
 def _html_dep_badges(
@@ -893,6 +1837,11 @@ def render_plan_html(
     )
     parts.append("</table>")
 
+    # Resolved parameters
+    telemetry = getattr(result, "telemetry", None)
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
     # Loom header and combined DAG for multiple plans
     if len(plans) > 1:
         parts.append(f'<h3 style="{_S_H3}">Loom: {config_name} &mdash; {len(plans)} weaves</h3>')
@@ -902,6 +1851,21 @@ def render_plan_html(
     # Per-plan sections
     for plan in plans:
         parts.append(render_execution_plan_html(plan, resolved))
+
+    # Per-thread flow diagrams
+    if resolved:
+        parts.append(f'<h3 style="{_S_H3}">Thread Pipelines</h3>')
+        for tname, thread_model in resolved.items():
+            tname_esc = html.escape(tname)
+            parts.append(f'<details style="{_S_DETAILS}">')
+            parts.append(f'<summary style="{_S_SUMMARY}">{tname_esc}</summary>')
+            parts.append(f'<div style="{_S_DETAIL_BODY}">')
+            try:
+                flow_svg = render_flow_svg(thread_model)
+                parts.append(f"<div>{flow_svg}</div>")
+            except Exception:
+                parts.append(f'<span style="{_S_NONE}">(flow diagram unavailable)</span>')
+            parts.append("</div></details>")
 
     parts.append("</div>")
     return "\n".join(parts)
@@ -928,6 +1892,321 @@ def _status_badge(status: str) -> str:
     """Return an inline-styled badge for a status value."""
     style = _STATUS_BADGE_MAP.get(status, _S_BADGE)
     return f'<span style="{style}">{html.escape(status)}</span>'
+
+
+# ---------------------------------------------------------------------------
+# Shared HTML section renderers
+# ---------------------------------------------------------------------------
+
+
+def _render_params_table(params: dict[str, Any] | None) -> str:
+    """Render resolved parameters as an HTML table. Empty if no params."""
+    if not params:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Resolved Parameters</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Parameter</th><th style="{_S_TH}">Value</th></tr>')
+    for name, value in params.items():
+        parts.append(
+            f'<tr><td style="{_S_TD}">{html.escape(str(name))}</td>'
+            f'<td style="{_S_TD}">{html.escape(str(value))}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_variables_table(variables: dict[str, Any] | None) -> str:
+    """Render weave-scoped variable values as an HTML table."""
+    if not variables:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Variables</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Variable</th><th style="{_S_TH}">Value</th></tr>')
+    for name, value in variables.items():
+        parts.append(
+            f'<tr><td style="{_S_TD}">{html.escape(str(name))}</td>'
+            f'<td style="{_S_TD}">{html.escape(str(value))}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_hook_results_table(hook_results: list[Any] | None) -> str:
+    """Render hook execution results as an HTML table."""
+    if not hook_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Hook Results</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Phase</th>'
+        f'<th style="{_S_TH}">Type</th>'
+        f'<th style="{_S_TH}">Name</th>'
+        f'<th style="{_S_TH}">Status</th>'
+        f'<th style="{_S_TH}">Duration</th></tr>'
+    )
+    for hr in hook_results:
+        phase = html.escape(str(getattr(hr, "phase", "")))
+        step_type = html.escape(str(getattr(hr, "step_type", "")))
+        step_name = html.escape(str(getattr(hr, "step_name", "") or ""))
+        status = str(getattr(hr, "status", "passed"))
+        dur = _format_duration(int(getattr(hr, "duration_ms", 0)))
+        gate = getattr(hr, "gate_result", None)
+        status_html = _status_badge(status)
+        if gate and not getattr(gate, "passed", True):
+            msg = html.escape(str(getattr(gate, "message", "")))
+            status_html += f' <span style="font-size:12px;color:#9b2c2c">{msg}</span>'
+        parts.append(
+            f'<tr><td style="{_S_TD}">{phase}</td>'
+            f'<td style="{_S_TD}">{step_type}</td>'
+            f'<td style="{_S_TD}">{step_name}</td>'
+            f'<td style="{_S_TD}">{status_html}</td>'
+            f'<td style="{_S_TD}">{dur}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_lookup_results_table(lookup_results: list[Any] | None) -> str:
+    """Render lookup materialization results as an HTML table."""
+    if not lookup_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Lookup Results</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Lookup</th>'
+        f'<th style="{_S_TH}">Strategy</th>'
+        f'<th style="{_S_TH}">Rows</th>'
+        f'<th style="{_S_TH}">Duration</th>'
+        f'<th style="{_S_TH}">Key Check</th></tr>'
+    )
+    for lk in lookup_results:
+        name = html.escape(str(getattr(lk, "name", "")))
+        strategy = html.escape(str(getattr(lk, "strategy", "cache")))
+        rows = getattr(lk, "row_count", 0)
+        dur = _format_duration(int(getattr(lk, "duration_ms", 0)))
+        uk_checked = getattr(lk, "unique_key_checked", False)
+        if uk_checked:
+            uk_passed = getattr(lk, "unique_key_passed", None)
+            key_check = _status_badge("success" if uk_passed else "failure")
+        else:
+            key_check = f'<span style="{_S_NONE}">—</span>'
+        parts.append(
+            f'<tr><td style="{_S_TD}">{name}</td>'
+            f'<td style="{_S_TD}">{strategy}</td>'
+            f'<td style="{_S_TD}">{rows:,}</td>'
+            f'<td style="{_S_TD}">{dur}</td>'
+            f'<td style="{_S_TD}">{key_check}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_validation_table(validation_results: list[Any] | None) -> str:
+    """Render validation rule results as an HTML table."""
+    if not validation_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Validation Rules</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Rule</th>'
+        f'<th style="{_S_TH}">Expression</th>'
+        f'<th style="{_S_TH}">Severity</th>'
+        f'<th style="{_S_TH}">Passed</th>'
+        f'<th style="{_S_TH}">Failed</th></tr>'
+    )
+    for vr in validation_results:
+        rule_name = html.escape(str(getattr(vr, "rule_name", "")))
+        expr = html.escape(str(getattr(vr, "expression", "")))
+        severity = html.escape(str(getattr(vr, "severity", "")))
+        passed = getattr(vr, "rows_passed", 0)
+        failed = getattr(vr, "rows_failed", 0)
+        failed_style = _S_TD
+        if failed > 0:
+            failed_style = f"{_S_TD};color:#9b2c2c;font-weight:600"
+        parts.append(
+            f'<tr><td style="{_S_TD}">{rule_name}</td>'
+            f'<td style="{_S_TD}"><code>{expr}</code></td>'
+            f'<td style="{_S_TD}">{severity}</td>'
+            f'<td style="{_S_TD}">{passed:,}</td>'
+            f'<td style="{failed_style}">{failed:,}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_assertion_table(assertion_results: list[Any] | None) -> str:
+    """Render post-execution assertion results as an HTML table."""
+    if not assertion_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Assertions</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Type</th>'
+        f'<th style="{_S_TH}">Severity</th>'
+        f'<th style="{_S_TH}">Result</th>'
+        f'<th style="{_S_TH}">Details</th></tr>'
+    )
+    for ar in assertion_results:
+        atype = html.escape(str(getattr(ar, "assertion_type", "")))
+        severity = html.escape(str(getattr(ar, "severity", "")))
+        passed = getattr(ar, "passed", False)
+        details = html.escape(str(getattr(ar, "details", "")))
+        result_badge = _status_badge("success" if passed else "failure")
+        parts.append(
+            f'<tr><td style="{_S_TD}">{atype}</td>'
+            f'<td style="{_S_TD}">{severity}</td>'
+            f'<td style="{_S_TD}">{result_badge}</td>'
+            f'<td style="{_S_TD}">{details}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_schema_table(output_schema: list[tuple[str, str]] | None) -> str:
+    """Render output schema as an HTML table."""
+    if not output_schema:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Output Schema</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Column</th><th style="{_S_TH}">Type</th></tr>')
+    for col_name, col_type in output_schema:
+        parts.append(
+            f'<tr><td style="{_S_TD}">{html.escape(str(col_name))}</td>'
+            f'<td style="{_S_TD}"><code>{html.escape(str(col_type))}</code></td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_sample_table(
+    samples: dict[str, list[dict[str, Any]]] | None,
+    key: str,
+    title: str | None = None,
+) -> str:
+    """Render a data sample as an HTML table.
+
+    Args:
+        samples: Combined samples dict from ThreadResult.
+        key: Sample category key (``"output"`` or ``"quarantine"``).
+        title: Optional section title override.
+    """
+    if not samples or key not in samples:
+        return ""
+    rows = samples[key]
+    if not rows:
+        return ""
+    heading = title or f"Data Sample ({key.title()})"
+    parts = [f'<h4 style="{_S_H4}">{html.escape(heading)}</h4>']
+    # Build table from list of dicts
+    columns = list(rows[0].keys())
+    parts.append(f'<table style="{_S_TABLE}">')
+    header = f'<th style="{_S_TH}">#</th>'
+    header += "".join(f'<th style="{_S_TH}">{html.escape(str(c))}</th>' for c in columns)
+    parts.append(f"<tr>{header}</tr>")
+    for idx, row in enumerate(rows, 1):
+        cells = f'<td style="{_S_TD}">{idx}</td>'
+        for col in columns:
+            val = str(row.get(col, ""))
+            # Truncate long values for display
+            if len(val) > 80:
+                val = val[:77] + "\u2026"
+            cells += f'<td style="{_S_TD}">{html.escape(val)}</td>'
+        parts.append(f"<tr>{cells}</tr>")
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_watermark_section(telemetry: Any) -> str:
+    """Render watermark state for incremental threads."""
+    wm_col = getattr(telemetry, "watermark_column", None)
+    if not wm_col:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Watermark State</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Property</th><th style="{_S_TH}">Value</th></tr>')
+    parts.append(
+        f'<tr><td style="{_S_TD}">Column</td>'
+        f'<td style="{_S_TD}">{html.escape(str(wm_col))}</td></tr>'
+    )
+    prev = getattr(telemetry, "watermark_previous_value", None)
+    new = getattr(telemetry, "watermark_new_value", None)
+    first = getattr(telemetry, "watermark_first_run", False)
+    if first:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Previous</td><td style="{_S_TD}"><em>first run</em></td></tr>'
+        )
+    elif prev is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Previous</td>'
+            f'<td style="{_S_TD}">{html.escape(str(prev))}</td></tr>'
+        )
+    if new is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">New</td><td style="{_S_TD}">{html.escape(str(new))}</td></tr>'
+        )
+    persisted = getattr(telemetry, "watermark_persisted", False)
+    parts.append(
+        f'<tr><td style="{_S_TD}">Persisted</td>'
+        f'<td style="{_S_TD}">{"yes" if persisted else "no"}</td></tr>'
+    )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_cdc_section(telemetry: Any) -> str:
+    """Render CDC breakdown for merge writes."""
+    inserts = getattr(telemetry, "cdc_inserts", None)
+    updates = getattr(telemetry, "cdc_updates", None)
+    deletes = getattr(telemetry, "cdc_deletes", None)
+    if inserts is None and updates is None and deletes is None:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">CDC Breakdown</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Operation</th><th style="{_S_TH}">Rows</th></tr>')
+    if inserts is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Inserts</td><td style="{_S_TD}">{inserts:,}</td></tr>'
+        )
+    if updates is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Updates</td><td style="{_S_TD}">{updates:,}</td></tr>'
+        )
+    if deletes is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Deletes</td><td style="{_S_TD}">{deletes:,}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_row_counts(telemetry: Any, rows_written: int = 0) -> str:
+    """Render rows read vs written summary."""
+    rows_read = getattr(telemetry, "rows_read", 0)
+    rows_quarantined = getattr(telemetry, "rows_quarantined", 0)
+    if rows_read == 0 and rows_written == 0:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Row Counts</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Metric</th><th style="{_S_TH}">Count</th></tr>')
+    parts.append(
+        f'<tr><td style="{_S_TD}">Rows read</td><td style="{_S_TD}">{rows_read:,}</td></tr>'
+    )
+    rows_after = getattr(telemetry, "rows_after_transforms", 0)
+    if rows_after > 0:
+        parts.append(
+            f'<tr><td style="{_S_TD}">After transforms</td>'
+            f'<td style="{_S_TD}">{rows_after:,}</td></tr>'
+        )
+    if rows_quarantined > 0:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Quarantined</td>'
+            f'<td style="{_S_TD}">{rows_quarantined:,}</td></tr>'
+        )
+    parts.append(
+        f'<tr><td style="{_S_TD}">Rows written</td><td style="{_S_TD}">{rows_written:,}</td></tr>'
+    )
+    parts.append("</table>")
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -961,19 +2240,112 @@ def render_result_html(result: Any) -> str:
     return f'<pre style="font-family:monospace;padding:12px;border-radius:4px">{escaped}</pre>'
 
 
+def _render_execute_thread_detail(
+    tr: Any,
+    telemetry: Any | None,
+    thread_model: Any | None,
+) -> str:
+    """Render a single thread's collapsible detail section for execute mode."""
+    name = html.escape(getattr(tr, "thread_name", ""))
+    tr_status = str(getattr(tr, "status", ""))
+    rows = getattr(tr, "rows_written", 0)
+    dur_text = ""
+    if telemetry:
+        span = getattr(telemetry, "span", None)
+        if span:
+            start = getattr(span, "start_time", None)
+            end = getattr(span, "end_time", None)
+            if start and end:
+                dur_text = _format_duration(int((end - start).total_seconds() * 1000))
+
+    # Auto-expand failed threads (DEC-001)
+    open_attr = " open" if tr_status == "failure" else ""
+    parts = [f'<details style="{_S_DETAILS}"{open_attr}>']
+    summary_detail = f"{rows:,} rows"
+    if dur_text:
+        summary_detail += f", {dur_text}"
+    parts.append(
+        f'<summary style="{_S_SUMMARY}">'
+        f"{_status_badge(tr_status)} {name} &mdash; {summary_detail}"
+        "</summary>"
+    )
+    parts.append(f'<div style="{_S_DETAIL_BODY}">')
+
+    # Error banner for failed threads (DEC-014)
+    error = getattr(tr, "error", None)
+    if error:
+        parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(str(error))}</div>')
+
+    # Thread flow SVG
+    if thread_model is not None:
+        try:
+            flow_svg = render_flow_svg(thread_model)
+            parts.append(f"<div>{flow_svg}</div>")
+        except Exception:
+            pass  # SVG is best-effort; don't break the report
+
+    # Data flow waterfall SVG
+    if telemetry:
+        try:
+            wf_svg = render_waterfall_svg(tr, telemetry, mode="execute")
+            parts.append(f"<div>{wf_svg}</div>")
+        except Exception:
+            pass  # SVG is best-effort; don't break the report
+
+    # Validation rules
+    if telemetry:
+        parts.append(_render_validation_table(getattr(telemetry, "validation_results", None)))
+
+    # Assertions
+    if telemetry:
+        parts.append(_render_assertion_table(getattr(telemetry, "assertion_results", None)))
+
+    # Output schema
+    parts.append(_render_schema_table(getattr(tr, "output_schema", None)))
+
+    # Data sample (output)
+    parts.append(_render_sample_table(getattr(tr, "samples", None), "output"))
+
+    # Quarantine sample
+    parts.append(
+        _render_sample_table(getattr(tr, "samples", None), "quarantine", "Quarantine Sample")
+    )
+
+    # Watermark state
+    if telemetry:
+        parts.append(_render_watermark_section(telemetry))
+
+    # CDC breakdown
+    if telemetry:
+        parts.append(_render_cdc_section(telemetry))
+
+    # Row counts
+    if telemetry:
+        parts.append(_render_row_counts(telemetry, rows_written=rows))
+
+    parts.append("</div></details>")
+    return "\n".join(parts)
+
+
 def _render_execute_html(result: Any) -> str:
     """Render a styled HTML report for execute mode results."""
     parts: list[str] = [f'<div style="{_S_CONTAINER}">']
 
     status = str(getattr(result, "status", ""))
-    config_type = html.escape(str(getattr(result, "config_type", "")))
+    config_type = str(getattr(result, "config_type", ""))
+    config_type_esc = html.escape(config_type)
     config_name = html.escape(str(getattr(result, "config_name", "")))
     duration_ms = getattr(result, "duration_ms", 0) or 0
     warnings: list[str] = getattr(result, "warnings", []) or []
+    detail = getattr(result, "detail", None)
+    telemetry = getattr(result, "telemetry", None)
+    resolved = getattr(result, "_resolved_threads", None) or {}
 
     parts.append(f'<h3 style="{_S_H3}">Execution Summary</h3>')
 
     # Summary table
+    thread_results = _collect_thread_results(result)
+    total_rows = _count_total_rows(result)
     parts.append(f'<table style="{_S_TABLE}">')
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Status</strong></td>'
@@ -981,47 +2353,148 @@ def _render_execute_html(result: Any) -> str:
     )
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
-        f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
+        f'<td style="{_S_TD}">{config_type_esc}: {config_name}</td></tr>'
     )
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Duration</strong></td>'
         f'<td style="{_S_TD}">{_format_duration(duration_ms)}</td></tr>'
     )
-
-    # Total rows
-    total_rows = _count_total_rows(result)
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Rows Written</strong></td>'
         f'<td style="{_S_TD}">{total_rows:,}</td></tr>'
     )
+    if len(thread_results) > 1:
+        parts.append(
+            f'<tr><td style="{_S_TD}"><strong>Threads</strong></td>'
+            f'<td style="{_S_TD}">{len(thread_results)}</td></tr>'
+        )
     parts.append("</table>")
 
-    # Thread results table
-    thread_results = _collect_thread_results(result)
+    # Resolved parameters (from outermost telemetry)
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
+    # Annotated DAG (weave/loom — requires execution plan)
+    plans: list[Any] = getattr(result, "execution_plan", None) or []
+    if plans and thread_results:
+        try:
+            tr_map = {getattr(t, "thread_name", ""): t for t in thread_results}
+            dag_svg = render_annotated_dag_svg(plans[0], tr_map, resolved)
+            parts.append(f'<h4 style="{_S_H4}">Execution DAG</h4>')
+            parts.append(f"<div>{dag_svg}</div>")
+        except Exception:
+            pass  # SVG is best-effort; don't break the report
+
+    # Execution timeline (weave/loom)
+    if config_type == "weave" and detail:
+        weave_telem = telemetry
+        hook_results = getattr(weave_telem, "hook_results", None)
+        lookup_results = getattr(weave_telem, "lookup_results", None)
+        try:
+            tl_svg = render_timeline_svg(detail, hook_results, lookup_results)
+            parts.append(f'<h4 style="{_S_H4}">Execution Timeline</h4>')
+            parts.append(f"<div>{tl_svg}</div>")
+        except Exception:
+            pass  # SVG is best-effort; don't break the report
+    elif config_type == "loom" and detail:
+        # Render timeline for each weave in the loom
+        weave_results = getattr(detail, "weave_results", []) or []
+        loom_telem = telemetry
+        weave_telem_map = getattr(loom_telem, "weave_telemetry", {}) or {}
+        for wr in weave_results:
+            wname = getattr(wr, "weave_name", "")
+            wt = weave_telem_map.get(wname)
+            hook_results = getattr(wt, "hook_results", None) if wt else None
+            lookup_results = getattr(wt, "lookup_results", None) if wt else None
+            try:
+                tl_svg = render_timeline_svg(wr, hook_results, lookup_results)
+                wname_esc = html.escape(wname)
+                parts.append(f'<h4 style="{_S_H4}">Timeline: {wname_esc}</h4>')
+                parts.append(f"<div>{tl_svg}</div>")
+            except Exception:
+                pass  # SVG is best-effort; don't break the report
+
+    # Thread results summary table
     if thread_results:
-        parts.append(f'<h4 style="{_S_H4}">Threads</h4>')
+        parts.append(f'<h4 style="{_S_H4}">Thread Results</h4>')
         parts.append(f'<table style="{_S_TABLE}">')
         parts.append(
-            f'<tr><th style="{_S_TH}">Thread</th><th style="{_S_TH}">Status</th>'
-            f'<th style="{_S_TH}">Rows</th><th style="{_S_TH}">Mode</th>'
-            f'<th style="{_S_TH}">Target</th></tr>'
+            f'<tr><th style="{_S_TH}">Thread</th>'
+            f'<th style="{_S_TH}">Status</th>'
+            f'<th style="{_S_TH}">Rows</th>'
+            f'<th style="{_S_TH}">Duration</th>'
+            f'<th style="{_S_TH}">Write Mode</th>'
+            f'<th style="{_S_TH}">Load Mode</th></tr>'
         )
         for tr in thread_results:
             name = html.escape(getattr(tr, "thread_name", ""))
             tr_status = str(getattr(tr, "status", ""))
             rows = getattr(tr, "rows_written", 0)
-            write_mode = html.escape(getattr(tr, "write_mode", ""))
-            target = html.escape(getattr(tr, "target_path", ""))
-            # Truncate long paths
-            target_display = target if len(target) <= 60 else "\u2026" + target[-57:]
+            write_mode = html.escape(str(getattr(tr, "write_mode", "") or ""))
+            telem = getattr(tr, "telemetry", None)
+            load_mode = html.escape(str(getattr(telem, "load_mode", "") or ""))
+            dur_text = ""
+            if telem:
+                span = getattr(telem, "span", None)
+                if span:
+                    start = getattr(span, "start_time", None)
+                    end = getattr(span, "end_time", None)
+                    if start and end:
+                        dur_text = _format_duration(int((end - start).total_seconds() * 1000))
             parts.append(
                 f'<tr><td style="{_S_TD}">{name}</td>'
                 f'<td style="{_S_TD}">{_status_badge(tr_status)}</td>'
                 f'<td style="{_S_TD}">{rows:,}</td>'
+                f'<td style="{_S_TD}">{dur_text}</td>'
                 f'<td style="{_S_TD}">{write_mode}</td>'
-                f'<td style="{_S_TD}" title="{target}">{target_display}</td></tr>'
+                f'<td style="{_S_TD}">{load_mode}</td></tr>'
             )
         parts.append("</table>")
+
+    # Weave-level context: variables, hooks, lookups
+    if config_type == "weave" and telemetry:
+        parts.append(_render_variables_table(getattr(telemetry, "variables", None)))
+        parts.append(_render_hook_results_table(getattr(telemetry, "hook_results", None)))
+        parts.append(_render_lookup_results_table(getattr(telemetry, "lookup_results", None)))
+
+    # Per-thread detail sections (collapsible)
+    if config_type == "loom" and detail:
+        # Two-level collapse for loom: weave → thread (DEC-010)
+        weave_results = getattr(detail, "weave_results", []) or []
+        loom_telem = telemetry
+        weave_telem_map = getattr(loom_telem, "weave_telemetry", {}) or {}
+        for wr in weave_results:
+            wname = getattr(wr, "weave_name", "")
+            wr_status = str(getattr(wr, "status", ""))
+            open_attr = " open" if wr_status == "failure" else ""
+            wname_esc = html.escape(wname)
+            parts.append(f'<details style="{_S_DETAILS}"{open_attr}>')
+            parts.append(
+                f'<summary style="{_S_SUMMARY}">'
+                f"{_status_badge(wr_status)} Weave: {wname_esc}</summary>"
+            )
+            parts.append(f'<div style="{_S_DETAIL_BODY}">')
+            # Weave-level sections
+            wt = weave_telem_map.get(wname)
+            if wt:
+                parts.append(_render_variables_table(getattr(wt, "variables", None)))
+                parts.append(_render_hook_results_table(getattr(wt, "hook_results", None)))
+                parts.append(_render_lookup_results_table(getattr(wt, "lookup_results", None)))
+            # Per-thread details within weave
+            wt_thread_telem = getattr(wt, "thread_telemetry", {}) or {} if wt else {}
+            for wtr in getattr(wr, "thread_results", []):
+                tname = getattr(wtr, "thread_name", "")
+                t_telem = wt_thread_telem.get(tname) or getattr(wtr, "telemetry", None)
+                t_model = resolved.get(tname)
+                parts.append(_render_execute_thread_detail(wtr, t_telem, t_model))
+            parts.append("</div></details>")
+    else:
+        # Weave or thread: flat per-thread details
+        for tr in thread_results:
+            tname = getattr(tr, "thread_name", "")
+            t_telem = getattr(tr, "telemetry", None)
+            t_model = resolved.get(tname)
+            parts.append(_render_execute_thread_detail(tr, t_telem, t_model))
 
     # Errors
     errors = _collect_errors(result)
@@ -1049,6 +2522,8 @@ def _render_validate_html(result: Any) -> str:
     config_name = html.escape(str(getattr(result, "config_name", "")))
     validation_errors: list[str] = getattr(result, "validation_errors", []) or []
     warnings: list[str] = getattr(result, "warnings", []) or []
+    telemetry = getattr(result, "telemetry", None)
+    resolved = getattr(result, "_resolved_threads", None) or {}
 
     parts.append(f'<h3 style="{_S_H3}">Validation Summary</h3>')
 
@@ -1064,6 +2539,10 @@ def _render_validate_html(result: Any) -> str:
     )
     parts.append("</table>")
 
+    # Resolved parameters
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
     if not validation_errors:
         # Checks passed
         parts.append(
@@ -1075,6 +2554,62 @@ def _render_validate_html(result: Any) -> str:
         parts.append(f'<h4 style="{_S_H4}">Errors</h4>')
         for err in validation_errors:
             parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(err)}</div>')
+
+    # Per-thread validation rules and assertions from config (DEC-012)
+    for tname, thread_model in resolved.items():
+        tname_esc = html.escape(tname)
+        validations = getattr(thread_model, "validations", None) or []
+        assertions = getattr(thread_model, "assertions", None) or []
+        if not validations and not assertions:
+            continue
+        parts.append(f'<details style="{_S_DETAILS}">')
+        parts.append(f'<summary style="{_S_SUMMARY}">{tname_esc}</summary>')
+        parts.append(f'<div style="{_S_DETAIL_BODY}">')
+        # Validation rules defined in config
+        if validations:
+            parts.append(f'<h4 style="{_S_H4}">Validation Rules</h4>')
+            parts.append(f'<table style="{_S_TABLE}">')
+            parts.append(
+                f'<tr><th style="{_S_TH}">Rule</th>'
+                f'<th style="{_S_TH}">Expression</th>'
+                f'<th style="{_S_TH}">Severity</th></tr>'
+            )
+            for v in validations:
+                rule_name = html.escape(str(getattr(v, "name", "")))
+                expr = html.escape(str(getattr(v, "expression", "")))
+                severity = html.escape(str(getattr(v, "severity", "")))
+                parts.append(
+                    f'<tr><td style="{_S_TD}">{rule_name}</td>'
+                    f'<td style="{_S_TD}"><code>{expr}</code></td>'
+                    f'<td style="{_S_TD}">{severity}</td></tr>'
+                )
+            parts.append("</table>")
+        # Assertion definitions from config
+        if assertions:
+            parts.append(f'<h4 style="{_S_H4}">Assertions</h4>')
+            parts.append(f'<table style="{_S_TABLE}">')
+            parts.append(
+                f'<tr><th style="{_S_TH}">Type</th>'
+                f'<th style="{_S_TH}">Severity</th>'
+                f'<th style="{_S_TH}">Details</th></tr>'
+            )
+            for a in assertions:
+                atype = html.escape(str(getattr(a, "type", "")))
+                severity = html.escape(str(getattr(a, "severity", "")))
+                # Build detail string from assertion config
+                detail_parts = []
+                for attr in ("columns", "expression", "min", "max"):
+                    val = getattr(a, attr, None)
+                    if val is not None:
+                        detail_parts.append(f"{attr}={val}")
+                details = html.escape(", ".join(detail_parts)) if detail_parts else ""
+                parts.append(
+                    f'<tr><td style="{_S_TD}">{atype}</td>'
+                    f'<td style="{_S_TD}">{severity}</td>'
+                    f'<td style="{_S_TD}">{details}</td></tr>'
+                )
+            parts.append("</table>")
+        parts.append("</div></details>")
 
     if warnings:
         parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')
@@ -1092,7 +2627,11 @@ def _render_preview_html(result: Any) -> str:
     status = str(getattr(result, "status", ""))
     config_type = html.escape(str(getattr(result, "config_type", "")))
     config_name = html.escape(str(getattr(result, "config_name", "")))
+    duration_ms = getattr(result, "duration_ms", 0) or 0
     preview_data: dict[str, Any] = getattr(result, "preview_data", None) or {}
+    preview_meta: dict[str, dict[str, Any]] = getattr(result, "_preview_metadata", None) or {}
+    telemetry = getattr(result, "telemetry", None)
+    resolved = getattr(result, "_resolved_threads", None) or {}
     warnings: list[str] = getattr(result, "warnings", []) or []
 
     parts.append(f'<h3 style="{_S_H3}">Preview Summary</h3>')
@@ -1107,6 +2646,10 @@ def _render_preview_html(result: Any) -> str:
         f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
         f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
     )
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Duration</strong></td>'
+        f'<td style="{_S_TD}">{_format_duration(duration_ms)}</td></tr>'
+    )
     if preview_data:
         parts.append(
             f'<tr><td style="{_S_TD}"><strong>Threads</strong></td>'
@@ -1114,7 +2657,11 @@ def _render_preview_html(result: Any) -> str:
         )
     parts.append("</table>")
 
-    # Preview data table
+    # Resolved parameters
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
+    # Output shape table
     if preview_data:
         parts.append(f'<h4 style="{_S_H4}">Output Shape</h4>')
         parts.append(f'<table style="{_S_TABLE}">')
@@ -1140,6 +2687,57 @@ def _render_preview_html(result: Any) -> str:
                     f'<span style="{_S_NONE}">(unavailable)</span></td></tr>'
                 )
         parts.append("</table>")
+
+    # Per-thread detail sections
+    for name in preview_data:
+        name_esc = html.escape(name)
+        meta = preview_meta.get(name, {})
+        thread_model = resolved.get(name)
+
+        parts.append(f'<details style="{_S_DETAILS}">')
+        parts.append(f'<summary style="{_S_SUMMARY}">{name_esc}</summary>')
+        parts.append(f'<div style="{_S_DETAIL_BODY}">')
+
+        # Thread flow SVG
+        if thread_model is not None:
+            try:
+                flow_svg = render_flow_svg(thread_model)
+                parts.append(f"<div>{flow_svg}</div>")
+            except Exception:
+                pass  # SVG is best-effort; don't break the report
+
+        # Data flow waterfall SVG (partial: preview mode)
+        if meta:
+            try:
+                row_count = 0
+                df = preview_data.get(name)
+                if df is not None:
+                    with contextlib.suppress(Exception):
+                        row_count = df.count()
+                pt = types.SimpleNamespace(
+                    rows_read=row_count,
+                    rows_after_transforms=row_count,
+                    rows_quarantined=0,
+                )
+                pr = types.SimpleNamespace(rows_written=0)
+                wf_svg = render_waterfall_svg(pr, pt, mode="preview")
+                parts.append(f"<div>{wf_svg}</div>")
+            except Exception:
+                pass  # SVG is best-effort; don't break the report
+
+        # Variables (weave-level, from telemetry)
+        if telemetry:
+            parts.append(_render_variables_table(getattr(telemetry, "variables", None)))
+
+        # Output schema (from preview metadata per AMD-001)
+        output_schema = meta.get("output_schema")
+        parts.append(_render_schema_table(output_schema))
+
+        # Data sample (from preview metadata per AMD-001, DEC-017: no annotation)
+        samples = meta.get("samples")
+        parts.append(_render_sample_table(samples, "output", "Data Sample"))
+
+        parts.append("</div></details>")
 
     if warnings:
         parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')

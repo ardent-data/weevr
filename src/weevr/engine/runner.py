@@ -379,6 +379,7 @@ def execute_weave(
         hook_results=all_hook_results,
         lookup_results=all_lookup_results,
         variables=variable_ctx.snapshot(),
+        resolved_params=params,
     )
 
     logger.debug(
@@ -405,6 +406,7 @@ def _build_weave_telemetry(
     hook_results: list[HookResult] | None = None,
     lookup_results: list[LookupResult] | None = None,
     variables: dict[str, Any] | None = None,
+    resolved_params: dict[str, Any] | None = None,
 ) -> WeaveTelemetry | None:
     """Build WeaveTelemetry from thread results."""
     if collector is None:
@@ -439,6 +441,7 @@ def _build_weave_telemetry(
         hook_results=hook_results or [],
         lookup_results=lookup_results or [],
         variables=variables or {},
+        resolved_params=resolved_params,
     )
 
 
@@ -562,7 +565,9 @@ def execute_loom(
     collector.add_span(loom_span)
 
     # Build loom telemetry
-    loom_telemetry = _build_loom_telemetry(loom_span_label, weave_results, collector)
+    loom_telemetry = _build_loom_telemetry(
+        loom_span_label, weave_results, collector, resolved_params=params
+    )
 
     logger.debug(
         "Loom '%s' complete — status=%s, duration=%dms",
@@ -584,6 +589,7 @@ def _build_loom_telemetry(
     loom_name: str,
     weave_results: list[WeaveResult],
     collector: SpanCollector,
+    resolved_params: dict[str, Any] | None = None,
 ) -> LoomTelemetry:
     """Build LoomTelemetry from weave results."""
     from weevr.telemetry.span import ExecutionSpan, generate_span_id
@@ -612,4 +618,5 @@ def _build_loom_telemetry(
     return LoomTelemetry(
         span=loom_span,
         weave_telemetry=weave_telemetry,
+        resolved_params=resolved_params,
     )

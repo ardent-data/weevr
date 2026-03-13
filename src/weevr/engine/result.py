@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from weevr.model.base import FrozenBase
 from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
@@ -21,6 +21,11 @@ class ThreadResult(FrozenBase):
         telemetry: Thread-level telemetry with validation/assertion results and row counts.
         skip_reason: The condition expression that caused the thread to be skipped.
         error: Error message when the thread failed, ``None`` on success or skip.
+        output_schema: Column names and Spark data types captured from the output
+            DataFrame before write. Each tuple is ``(column_name, type_string)``.
+        samples: Data samples captured before write, keyed by category. Contains
+            ``"output"`` (up to 10 rows) and optionally ``"quarantine"`` (up to 10
+            rows from the quarantine DataFrame).
     """
 
     status: Literal["success", "failure", "skipped"]
@@ -31,6 +36,8 @@ class ThreadResult(FrozenBase):
     telemetry: ThreadTelemetry | None = None
     skip_reason: str | None = None
     error: str | None = None
+    output_schema: list[tuple[str, str]] | None = None
+    samples: dict[str, list[dict[str, Any]]] | None = None
 
 
 class WeaveResult(FrozenBase):
