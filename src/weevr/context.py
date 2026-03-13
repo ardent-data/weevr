@@ -582,7 +582,7 @@ class Context:
                         )
                     )
 
-        return RunResult(
+        result = RunResult(
             status="success",
             mode=ExecutionMode.PLAN,
             config_type=resolved.config_type,
@@ -590,6 +590,18 @@ class Context:
             execution_plan=plans if plans else None,
             warnings=all_warnings,
         )
+
+        # Populate resolved threads for explain() thread detail
+        if resolved.config_type == "weave":
+            wt = resolved.threads.get(resolved.config_name, {})
+            result._resolved_threads = dict(wt)
+        elif resolved.config_type == "loom":
+            merged: dict[str, Any] = {}
+            for thread_map in resolved.threads.values():
+                merged.update(thread_map)
+            result._resolved_threads = merged
+
+        return result
 
     # ------------------------------------------------------------------
     # Preview mode

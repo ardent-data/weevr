@@ -209,10 +209,18 @@ result = ctx.run("daily.loom", mode="validate")
 
 # Show the execution plan (DAG order) without running
 result = ctx.run("daily.loom", mode="plan")
+print(result.summary())      # compact execution order with cache markers
+print(result.explain())      # detailed breakdown: dependencies, cache targets, thread detail
 
 # Run transforms against sampled data, no writes
 result = ctx.run("daily.loom", mode="preview")
 ```
+
+!!! tip "Notebook display"
+    In notebooks, all result modes render automatically as styled HTML
+    when you evaluate `result` in a cell. Plan mode includes an embedded
+    DAG diagram; execute mode shows a thread results table with status
+    badges and row counts.
 
 ## Which execution mode should I use?
 

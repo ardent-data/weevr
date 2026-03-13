@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from collections import deque
+from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry
+
+if TYPE_CHECKING:
+    from weevr.engine.display import DAGDiagram
 
 
 class ExecutionPlan(FrozenBase):
@@ -31,6 +35,12 @@ class ExecutionPlan(FrozenBase):
             be materialized at that boundary. Key 0 means before the first
             group; key N (N > 0) means after group N-1 finishes. ``None``
             when ``build_plan`` was called without lookups.
+        lookup_producers: Maps lookup names to the thread that produces
+            their source data, or ``None`` for external lookups. Only
+            populated when ``build_plan`` was called with lookups.
+        lookup_consumers: Maps lookup names to the list of threads that
+            consume each lookup. Only populated when ``build_plan`` was
+            called with lookups.
     """
 
     weave_name: str
@@ -42,6 +52,27 @@ class ExecutionPlan(FrozenBase):
     inferred_dependencies: dict[str, list[str]]
     explicit_dependencies: dict[str, list[str]]
     lookup_schedule: dict[int, list[str]] | None = None
+    lookup_producers: dict[str, str | None] | None = None
+    lookup_consumers: dict[str, list[str]] | None = None
+
+    def dag(self) -> DAGDiagram:
+        """Return an inline SVG DAG diagram of this execution plan.
+
+        The returned :class:`DAGDiagram` auto-renders in notebooks
+        via ``_repr_svg_()`` and can be exported via ``save()``.
+        """
+        from weevr.engine.display import DAGDiagram, render_dag_svg
+
+        return DAGDiagram(render_dag_svg(self))
+
+    def _repr_html_(self) -> str:
+        """Notebook rich display protocol.
+
+        Renders DAG visualization and dependency table for this plan.
+        """
+        from weevr.engine.display import render_execution_plan_html
+
+        return render_execution_plan_html(self)
 
 
 def _normalize_path(path: str) -> str:
@@ -285,7 +316,7 @@ def _infer_lookup_dependencies(
     threads: dict[str, Thread],
     lookups: dict[str, Lookup],
     target_index: dict[str, str],
-) -> tuple[dict[str, list[str]], dict[str, str | None]]:
+) -> tuple[dict[str, list[str]], dict[str, str | None], dict[str, list[str]]]:
     """Infer implicit thread dependencies mediated by lookups.
 
     When a lookup's source reads from a table produced by thread A, and
@@ -297,11 +328,13 @@ def _infer_lookup_dependencies(
         target_index: Pre-built target path to thread name index.
 
     Returns:
-        A tuple of ``(lookup_deps, lookup_producer)`` where:
+        A tuple of ``(lookup_deps, lookup_producer, lookup_consumers)`` where:
         - ``lookup_deps`` maps consumer thread names to the list of producer
           thread names they implicitly depend on (via lookups).
         - ``lookup_producer`` maps lookup names to the producing thread name,
           or ``None`` for external lookups.
+        - ``lookup_consumers`` maps lookup names to the list of thread names
+          that consume each lookup.
     """
     # Find the producer thread for each lookup
     lookup_producer: dict[str, str | None] = {}
@@ -334,7 +367,7 @@ def _infer_lookup_dependencies(
             if consumer != producer and producer not in lookup_deps[consumer]:
                 lookup_deps[consumer].append(producer)
 
-    return lookup_deps, lookup_producer
+    return lookup_deps, lookup_producer, lookup_consumers
 
 
 def _compute_lookup_schedule(
@@ -425,8 +458,11 @@ def build_plan(
     # 1b. Infer lookup-mediated dependencies when lookups are provided
     lookup_deps: dict[str, list[str]] | None = None
     lookup_producer: dict[str, str | None] | None = None
+    lookup_consumers: dict[str, list[str]] | None = None
     if lookups:
-        lookup_deps, lookup_producer = _infer_lookup_dependencies(threads, lookups, target_index)
+        lookup_deps, lookup_producer, lookup_consumers = _infer_lookup_dependencies(
+            threads, lookups, target_index
+        )
         # Merge lookup deps into inferred deps
         for name, deps in lookup_deps.items():
             for dep in deps:
@@ -466,4 +502,6 @@ def build_plan(
         inferred_dependencies=inferred,
         explicit_dependencies=explicit,
         lookup_schedule=lookup_schedule,
+        lookup_producers=lookup_producer,
+        lookup_consumers=lookup_consumers,
     )

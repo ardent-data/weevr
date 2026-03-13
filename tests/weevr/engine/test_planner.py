@@ -6,7 +6,7 @@ from dicts using model_validate with controlled source and target paths.
 
 import pytest
 
-from weevr.engine.planner import build_plan
+from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.errors.exceptions import ConfigError
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
@@ -525,6 +525,44 @@ class TestLookupDependencyInference:
         all_scheduled = [lk for lks in plan.lookup_schedule.values() for lk in lks]
         assert "dim_lk" not in all_scheduled
 
+    def test_lookup_producers_populated(self):
+        """build_plan populates lookup_producers with producer thread mappings."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+        assert plan.lookup_producers is not None
+        assert plan.lookup_producers["cust_lookup"] == "A"
+
+    def test_lookup_producers_external_is_none(self):
+        """External lookups have None as their producer."""
+        threads = {"A": _make_thread_with_lookup("A", "ext_lookup")}
+        lookups = {"ext_lookup": _make_lookup("external.ref_table")}
+        plan = build_plan("w", threads, _entries("A"), lookups=lookups)
+        assert plan.lookup_producers is not None
+        assert plan.lookup_producers["ext_lookup"] is None
+
+    def test_lookup_consumers_populated(self):
+        """build_plan populates lookup_consumers with consuming threads."""
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": _make_thread_with_lookup("B", "cust_lookup"),
+            "C": _make_thread_with_lookup("C", "cust_lookup"),
+        }
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        plan = build_plan("w", threads, _entries("A", "B", "C"), lookups=lookups)
+        assert plan.lookup_consumers is not None
+        assert sorted(plan.lookup_consumers["cust_lookup"]) == ["B", "C"]
+
+    def test_lookup_fields_none_without_lookups(self):
+        """Without lookups, lookup_producers and lookup_consumers are None."""
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("w", threads, _entries("A"))
+        assert plan.lookup_producers is None
+        assert plan.lookup_consumers is None
+
     def test_lookup_dep_still_inferred_when_not_materialized(self):
         """Even non-materialized lookups create implicit dependencies for ordering."""
         threads = {
@@ -536,3 +574,46 @@ class TestLookupDependencyInference:
         # B still depends on A via the lookup
         assert "A" in plan.dependencies["B"]
         assert plan.execution_order == [["A"], ["B"]]
+
+
+class TestExecutionPlanDisplay:
+    """Tests for dag() and _repr_html_() on ExecutionPlan."""
+
+    def _simple_plan(self) -> ExecutionPlan:
+        return ExecutionPlan(
+            weave_name="test_weave",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+
+    def test_dag_returns_diagram(self) -> None:
+        from weevr.engine.display import DAGDiagram
+
+        plan = self._simple_plan()
+        diagram = plan.dag()
+        assert isinstance(diagram, DAGDiagram)
+
+    def test_dag_valid_svg(self) -> None:
+        import xml.etree.ElementTree as ET
+
+        plan = self._simple_plan()
+        diagram = plan.dag()
+        ET.fromstring(diagram.svg)
+
+    def test_repr_html(self) -> None:
+        plan = self._simple_plan()
+        html_out = plan._repr_html_()
+        assert "<svg" in html_out
+        assert "<table" in html_out
+
+    def test_repr_html_dependency_table(self) -> None:
+        plan = self._simple_plan()
+        html_out = plan._repr_html_()
+        # Thread names appear in the HTML
+        assert ">a<" in html_out
+        assert ">b<" in html_out

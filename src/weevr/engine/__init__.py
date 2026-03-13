@@ -1,6 +1,7 @@
 """weevr engine — thread, weave, and loom execution orchestration."""
 
 from weevr.engine.cache_manager import CacheManager
+from weevr.engine.display import DAGDiagram
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
@@ -13,6 +14,8 @@ __all__ = [
     # Planner
     "ExecutionPlan",
     "build_plan",
+    # Display
+    "DAGDiagram",
     # Weave execution
     "execute_weave",
     "WeaveResult",

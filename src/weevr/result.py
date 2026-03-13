@@ -6,22 +6,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from weevr.engine.formatting import format_duration as _format_duration
+
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
-
-
-def _format_duration(ms: int) -> str:
-    """Format milliseconds as a human-readable duration string."""
-    if ms < 1000:
-        return f"{ms}ms"
-    seconds = ms / 1000
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    minutes = int(seconds // 60)
-    remaining = seconds % 60
-    return f"{minutes}m {remaining:.1f}s"
 
 
 class ExecutionMode(StrEnum):
@@ -73,6 +63,7 @@ class RunResult:
         "preview_data",
         "validation_errors",
         "warnings",
+        "_resolved_threads",
     )
 
     def __init__(
@@ -102,6 +93,130 @@ class RunResult:
         self.preview_data = preview_data
         self.validation_errors = validation_errors
         self.warnings: list[str] = warnings if warnings is not None else []
+        self._resolved_threads: dict[str, Any] | None = None
+
+    def dag(self) -> Any:
+        """Return a DAG diagram for plan mode results.
+
+        Returns a :class:`~weevr.engine.display.DAGDiagram` for plan mode,
+        or ``None`` for other modes. For multi-weave loom results, returns
+        a loom-level swimlane DAG.
+        """
+        if self.mode is not ExecutionMode.PLAN or not self.execution_plan:
+            return None
+        from weevr.engine.display import DAGDiagram, render_dag_svg, render_loom_dag_svg
+
+        plans = self.execution_plan
+        if len(plans) == 1:
+            return DAGDiagram(render_dag_svg(plans[0], self._resolved_threads))
+        return DAGDiagram(render_loom_dag_svg(plans, self._resolved_threads))
+
+    def explain(self) -> str:
+        """Return a detailed text breakdown of the execution plan.
+
+        Includes dependency provenance, cache targets, lookup schedule,
+        and per-thread source/target/step summary. Sections with no data
+        are omitted. Returns empty string for non-plan modes.
+        """
+        if self.mode is not ExecutionMode.PLAN or not self.execution_plan:
+            return ""
+
+        lines: list[str] = []
+        plans = self.execution_plan
+
+        if self.config_type == "loom":
+            lines.append(f"Loom: {self.config_name} — {len(plans)} weaves")
+            lines.append("")
+
+        for plan_idx, plan in enumerate(plans):
+            if plan_idx > 0:
+                lines.append("")
+            lines.append(f"Plan: {plan.weave_name}")
+            lines.append("═" * (len(f"Plan: {plan.weave_name}") + 2))
+
+            # Section 1: Execution order
+            lines.append("")
+            lines.append("Execution order:")
+            for i, group in enumerate(plan.execution_order, 1):
+                lines.append(f"  {i}. [{', '.join(group)}]")
+
+            # Section 2: Dependencies with provenance
+            lines.append("")
+            lines.append("Dependencies:")
+            for thread_name in plan.threads:
+                deps = plan.dependencies.get(thread_name, [])
+                if not deps:
+                    lines.append(f"  {thread_name}  (none)")
+                else:
+                    inferred = set(plan.inferred_dependencies.get(thread_name, []))
+                    explicit = set(plan.explicit_dependencies.get(thread_name, []))
+                    dep_parts: list[str] = []
+                    for d in deps:
+                        if d in explicit:
+                            dep_parts.append(f"{d} (explicit)")
+                        elif d in inferred:
+                            dep_parts.append(f"{d} (inferred)")
+                        else:
+                            dep_parts.append(d)
+                    lines.append(f"  {thread_name} \u2190 {', '.join(dep_parts)}")
+
+            # Section 3: Cache targets
+            if plan.cache_targets:
+                lines.append("")
+                lines.append("Cache targets:")
+                for ct in plan.cache_targets:
+                    consumers = plan.dependents.get(ct, [])
+                    n = len(consumers)
+                    if consumers:
+                        consumer_str = ", ".join(consumers)
+                        lines.append(f"  {ct}  {n} consumer{'s' if n != 1 else ''}: {consumer_str}")
+                    else:
+                        lines.append(f"  {ct}  (no consumers)")
+
+            # Section 4: Lookup schedule
+            if plan.lookup_schedule:
+                lines.append("")
+                lines.append("Lookup schedule:")
+                for group_idx, names in sorted(plan.lookup_schedule.items()):
+                    label = f"before group {group_idx}"
+                    lines.append(f"  {label}: {', '.join(names)}")
+
+            # Section 5: Thread detail
+            if self._resolved_threads:
+                lines.append("")
+                lines.append("Thread detail:")
+                for thread_name in plan.threads:
+                    thread = self._resolved_threads.get(thread_name)
+                    if thread is None:
+                        lines.append(f"  {thread_name}: (unavailable)")
+                        continue
+                    sources = getattr(thread, "sources", {})
+                    if sources:
+                        first_src = next(iter(sources.values()))
+                        src_type = getattr(first_src, "type", "unknown")
+                        src_path = getattr(first_src, "alias", None) or getattr(
+                            first_src, "path", ""
+                        )
+                        src_str = f"{src_type}:{src_path}"
+                    else:
+                        src_str = "(no source)"
+                    target = getattr(thread, "target", None)
+                    tgt_str = (
+                        getattr(target, "alias", None) or getattr(target, "path", "")
+                        if target
+                        else "(no target)"
+                    )
+                    steps = getattr(thread, "steps", [])
+                    step_count = len(steps)
+                    join_count = sum(1 for s in steps if hasattr(s, "join"))
+                    step_label = "step" if step_count == 1 else "steps"
+                    detail = f"{src_str} → {tgt_str}  {step_count} {step_label}"
+                    if join_count > 0:
+                        join_label = "join" if join_count == 1 else "joins"
+                        detail += f", {join_count} {join_label}"
+                    lines.append(f"  {thread_name}: {detail}")
+
+        return "\n".join(lines)
 
     def summary(self) -> str:
         """Return a formatted, human-readable execution summary."""
@@ -123,6 +238,18 @@ class RunResult:
                 lines.append(f"  - {w}")
 
         return "\n".join(lines)
+
+    def _repr_html_(self) -> str | None:
+        """Notebook rich display protocol.
+
+        Renders a styled HTML report appropriate for the execution mode:
+        plan mode gets a summary table with embedded DAG SVG, execute mode
+        gets a thread results table, validate mode gets a check/error report,
+        and preview mode gets an output shape table.
+        """
+        from weevr.engine.display import render_result_html
+
+        return render_result_html(self)
 
     def _summary_execute(self) -> list[str]:
         lines: list[str] = [f"Scope:  {self.config_type}:{self.config_name}"]
@@ -213,11 +340,29 @@ class RunResult:
         ]
 
         if self.execution_plan:
+            total_threads = 0
+            total_cached = 0
+            total_lookups = 0
+
             lines.append("")
             lines.append("Execution order:")
             for plan in self.execution_plan:
+                cache_set = set(plan.cache_targets)
+                total_threads += len(plan.threads)
+                total_cached += len(plan.cache_targets)
+                if plan.lookup_schedule:
+                    for names in plan.lookup_schedule.values():
+                        total_lookups += len(names)
+
                 for i, group in enumerate(plan.execution_order, 1):
-                    lines.append(f"  {i}. [{', '.join(group)}]")
+                    labeled = [f"{t}*" if t in cache_set else t for t in group]
+                    lines.append(f"  {i}. [{', '.join(labeled)}]")
+
+            footer = f"{total_threads} threads | {total_cached} cached"
+            if total_lookups > 0:
+                footer += f" | {total_lookups} lookups"
+            lines.append("")
+            lines.append(footer)
 
         return lines
 

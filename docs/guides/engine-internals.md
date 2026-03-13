@@ -14,8 +14,13 @@ conditional execution, and structured result collection.
 ## Key concepts
 
 - **ExecutionPlan** — An immutable snapshot of thread ordering, dependency
-  edges, parallel execution groups, and cache targets. Produced by the planner
-  before any data is read.
+  edges, parallel execution groups, cache targets, and lookup dependency
+  mappings (`lookup_producers`, `lookup_consumers`). Produced by the planner
+  before any data is read. In notebooks, an `ExecutionPlan` renders
+  automatically via `_repr_html_()`. Call `plan.dag()` to get a `DAGDiagram`
+  SVG that can be saved with `dag.save("plan.svg")`. For plan mode results,
+  `result.dag()` returns either a single-weave DAG or a loom-level swimlane
+  diagram depending on how many weaves are present.
 - **DAG** — A directed acyclic graph of thread dependencies. Dependencies are
   inferred from source/target path overlap and can also be declared explicitly.
 - **Parallel execution group** — A set of threads with no mutual dependencies
@@ -90,9 +95,13 @@ skipped.
 
 1. **Pre-steps** — If the weave defines `pre_steps`, hook steps run before
    any thread executes. Failures with `on_failure: abort` stop the weave.
-2. **Lookup materialization** — Named lookups are pre-read and cached or
-   broadcast according to their `strategy`. Threads reference lookups via
-   `source.lookup` and receive the cached DataFrame.
+2. **Lookup materialization** — Named lookups are materialized according to
+   the planner's lookup schedule. External lookups (those not produced by a
+   thread in the weave) are pre-read before the first group. Internal lookups
+   whose source is produced by a thread in group N are deferred and
+   materialized at the group N+1 boundary — after their producer completes.
+   Threads reference lookups via `source.lookup` and receive the cached
+   DataFrame.
 3. **Thread execution** — Parallel groups are processed sequentially. Within
    each group, threads are submitted to a `ThreadPoolExecutor` for concurrent
    execution.
@@ -163,6 +172,7 @@ without the cache optimization.
 | `engine/hooks.py` | Pre/post hook step execution: quality gates, SQL statements, log messages |
 | `engine/lookups.py` | Lookup materialization: pre-read, narrow projection, caching/broadcast |
 | `engine/variables.py` | Weave-scoped variable binding and resolution |
+| `engine/display.py` | SVG DAG visualization, HTML plan rendering for notebook display |
 
 ## Design decisions
 

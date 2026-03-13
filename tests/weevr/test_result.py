@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
+from weevr.engine.planner import ExecutionPlan
+from weevr.engine.result import ThreadResult, WeaveResult
 from weevr.model.loom import Loom, WeaveEntry
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -180,8 +184,6 @@ class TestRunResult:
         assert "Source 'raw' not found" in s
 
     def test_summary_plan(self) -> None:
-        from weevr.engine.planner import ExecutionPlan
-
         plan = ExecutionPlan(
             weave_name="dimensions",
             threads=["dim_product", "dim_customer"],
@@ -413,6 +415,577 @@ class TestRunResult:
         assert "Errors:" not in s
 
 
+class TestSummaryPlanEnriched:
+    """Tests for enriched plan summary with cache markers and footer counts."""
+
+    def _make_plan_result(
+        self,
+        *,
+        cache_targets: list[str] | None = None,
+        lookup_schedule: dict[int, list[str]] | None = None,
+    ) -> RunResult:
+        plan = ExecutionPlan(
+            weave_name="dimensions",
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            dependents={"a": ["b"], "b": ["c"], "c": []},
+            execution_order=[["a"], ["b"], ["c"]],
+            cache_targets=cache_targets or [],
+            inferred_dependencies={"a": [], "b": ["a"], "c": ["b"]},
+            explicit_dependencies={"a": [], "b": [], "c": []},
+            lookup_schedule=lookup_schedule,
+        )
+        return RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dimensions",
+            execution_plan=[plan],
+        )
+
+    def test_summary_plan_cache_markers(self) -> None:
+        result = self._make_plan_result(cache_targets=["a"])
+        s = result.summary()
+        assert "a*" in s
+        assert "b*" not in s
+
+    def test_summary_plan_no_cache(self) -> None:
+        result = self._make_plan_result()
+        s = result.summary()
+        assert "*" not in s
+
+    def test_summary_plan_footer_counts(self) -> None:
+        result = self._make_plan_result(
+            cache_targets=["a"],
+            lookup_schedule={0: ["ext"]},
+        )
+        s = result.summary()
+        assert "3 threads" in s
+        assert "1 cached" in s
+        assert "1 lookups" in s
+
+    def test_summary_plan_footer_no_lookups(self) -> None:
+        result = self._make_plan_result(cache_targets=["a"])
+        s = result.summary()
+        assert "3 threads" in s
+        assert "1 cached" in s
+        assert "lookups" not in s
+
+    def test_summary_plan_footer_with_lookups(self) -> None:
+        result = self._make_plan_result(
+            lookup_schedule={0: ["ext1", "ext2"]},
+        )
+        s = result.summary()
+        assert "2 lookups" in s
+
+
+class TestExplain:
+    """Tests for the explain() method on RunResult."""
+
+    def _make_plan(
+        self,
+        *,
+        threads: list[str] | None = None,
+        dependencies: dict[str, list[str]] | None = None,
+        execution_order: list[list[str]] | None = None,
+        cache_targets: list[str] | None = None,
+        lookup_schedule: dict[int, list[str]] | None = None,
+        inferred_dependencies: dict[str, list[str]] | None = None,
+        explicit_dependencies: dict[str, list[str]] | None = None,
+        weave_name: str = "dimensions",
+    ) -> ExecutionPlan:
+        t = threads or ["a", "b", "c"]
+        deps = dependencies or {"a": [], "b": ["a"], "c": ["b"]}
+        dependents: dict[str, list[str]] = {n: [] for n in t}
+        for name, upstream in deps.items():
+            for u in upstream:
+                if name not in dependents.get(u, []):
+                    dependents.setdefault(u, []).append(name)
+        return ExecutionPlan(
+            weave_name=weave_name,
+            threads=t,
+            dependencies=deps,
+            dependents=dependents,
+            execution_order=execution_order or [["a"], ["b"], ["c"]],
+            cache_targets=cache_targets or [],
+            inferred_dependencies=inferred_dependencies or {n: deps.get(n, []) for n in t},
+            explicit_dependencies=explicit_dependencies or {n: [] for n in t},
+            lookup_schedule=lookup_schedule,
+        )
+
+    def _make_result(
+        self,
+        plans: list[ExecutionPlan],
+        *,
+        config_type: str = "weave",
+        config_name: str = "dimensions",
+    ) -> RunResult:
+        return RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type=config_type,
+            config_name=config_name,
+            execution_plan=plans,
+        )
+
+    def test_explain_non_plan_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="test",
+        )
+        assert result.explain() == ""
+
+    def test_explain_execution_order(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Execution order:" in text
+        assert "1. [a]" in text
+        assert "2. [b]" in text
+        assert "3. [c]" in text
+
+    def test_explain_dependencies_inferred(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "b \u2190 a (inferred)" in text
+
+    def test_explain_dependencies_explicit(self) -> None:
+        plan = self._make_plan(
+            inferred_dependencies={"a": [], "b": [], "c": []},
+            explicit_dependencies={"a": [], "b": ["a"], "c": ["b"]},
+        )
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "b \u2190 a (explicit)" in text
+
+    def test_explain_dependencies_mixed(self) -> None:
+        plan = self._make_plan(
+            threads=["a", "b", "c"],
+            dependencies={"a": [], "b": [], "c": ["a", "b"]},
+            execution_order=[["a", "b"], ["c"]],
+            inferred_dependencies={"a": [], "b": [], "c": ["a"]},
+            explicit_dependencies={"a": [], "b": [], "c": ["b"]},
+        )
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "a (inferred)" in text
+        assert "b (explicit)" in text
+
+    def test_explain_dependencies_none(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "a  (none)" in text
+
+    def test_explain_cache_targets(self) -> None:
+        plan = self._make_plan(cache_targets=["a"])
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Cache targets:" in text
+        assert "a  1 consumer: b" in text
+
+    def test_explain_cache_targets_omitted(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Cache targets:" not in text
+
+    def test_explain_lookup_schedule(self) -> None:
+        plan = self._make_plan(lookup_schedule={0: ["ext_ref"]})
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Lookup schedule:" in text
+        assert "before group 0: ext_ref" in text
+
+    def test_explain_lookup_schedule_omitted(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Lookup schedule:" not in text
+
+    def test_explain_thread_detail(self) -> None:
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/customers"
+            path = None
+
+        class _FakeTarget:
+            alias = None
+            path = "/data/curated/customers"
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps: list[Any] = []
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "Thread detail:" in text
+        assert "delta:raw/customers" in text
+        assert "/data/curated/customers" in text
+        assert "0 steps" in text
+
+    def test_explain_thread_detail_with_joins(self) -> None:
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeJoinStep:
+            join = True
+
+        class _FakeOtherStep:
+            rename = True
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/data"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/data"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps = [_FakeJoinStep(), _FakeOtherStep(), _FakeJoinStep()]
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "3 steps" in text
+        assert "2 joins" in text
+
+    def test_explain_thread_detail_singular(self) -> None:
+        """Verify singular 'step' and 'join' when count is 1."""
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeJoinStep:
+            join = True
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/data"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/data"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps = [_FakeJoinStep()]
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "1 step," in text
+        assert "1 join" in text
+        assert "1 steps" not in text
+        assert "1 joins" not in text
+
+    def test_explain_thread_detail_missing(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan])
+        text = result.explain()
+        assert "Thread detail:" not in text
+
+    def test_explain_loom_header(self) -> None:
+        plan = self._make_plan()
+        result = self._make_result([plan], config_type="loom", config_name="nightly")
+        text = result.explain()
+        assert "Loom: nightly" in text
+        assert "1 weaves" in text
+
+    def test_explain_multi_weave(self) -> None:
+        plan1 = self._make_plan(weave_name="dims")
+        plan2 = self._make_plan(weave_name="facts")
+        result = self._make_result([plan1, plan2], config_type="loom", config_name="nightly")
+        text = result.explain()
+        assert "Plan: dims" in text
+        assert "Plan: facts" in text
+        assert "2 weaves" in text
+
+
+class TestReprHtml:
+    """Tests for _repr_html_() on RunResult."""
+
+    def test_repr_html_execute_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="test",
+            duration_ms=1200,
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Execution Summary" in html_out
+        assert "success" in html_out
+        assert "weave" in html_out
+        assert "test" in html_out
+
+    def test_repr_html_validate_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.VALIDATE,
+            config_type="weave",
+            config_name="test",
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Validation Summary" in html_out
+        assert "\u2713" in html_out  # checkmarks for passed
+
+    def test_repr_html_validate_with_errors(self) -> None:
+        result = RunResult(
+            status="failure",
+            mode=ExecutionMode.VALIDATE,
+            config_type="weave",
+            config_name="test",
+            validation_errors=["Missing source: raw_customers"],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "failure" in html_out
+        assert "Missing source: raw_customers" in html_out
+
+    def test_repr_html_preview_mode(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="weave",
+            config_name="test",
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Preview Summary" in html_out
+
+    def test_repr_html_execute_with_thread_results(self) -> None:
+        tr1 = ThreadResult(
+            status="success",
+            thread_name="dim_customer",
+            rows_written=1500,
+            write_mode="overwrite",
+            target_path="Tables/dim_customer",
+        )
+        tr2 = ThreadResult(
+            status="failure",
+            thread_name="fact_orders",
+            rows_written=0,
+            write_mode="append",
+            target_path="Tables/fact_orders",
+            error="Column 'order_id' not found in source",
+        )
+        detail = WeaveResult(
+            status="partial",
+            weave_name="pipeline",
+            thread_results=[tr1, tr2],
+            threads_skipped=[],
+            duration_ms=3200,
+        )
+        result = RunResult(
+            status="partial",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="pipeline",
+            duration_ms=3200,
+            detail=detail,
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "Threads" in html_out
+        assert "dim_customer" in html_out
+        assert "fact_orders" in html_out
+        assert "1,500" in html_out
+        assert "overwrite" in html_out
+        assert "Column &#x27;order_id&#x27; not found in source" in html_out
+        assert "Errors" in html_out
+
+    def test_repr_html_execute_escapes_html(self) -> None:
+        tr = ThreadResult(
+            status="failure",
+            thread_name="<script>x</script>",
+            rows_written=0,
+            write_mode="overwrite",
+            target_path="Tables/<b>bad</b>",
+            error="<img onerror=alert(1)>",
+        )
+        result = RunResult(
+            status="failure",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="test",
+            duration_ms=100,
+            detail=tr,
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<script>" not in html_out
+        assert "<b>bad</b>" not in html_out
+        assert "<img" not in html_out
+
+    def test_repr_html_plan_mode(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<svg" in html_out
+        assert "Plan Summary" in html_out
+
+    def test_repr_html_plan_mode_summary_table(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["a"],
+            dependencies={"a": []},
+            dependents={"a": []},
+            execution_order=[["a"]],
+            cache_targets=[],
+            inferred_dependencies={"a": []},
+            explicit_dependencies={"a": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "PLANNED" not in html_out  # status is "success"
+        assert "success" in html_out
+        assert "1 threads" in html_out
+
+    def test_repr_html_escapes_user_strings(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="<script>alert(1)</script>",
+            threads=["<b>bold</b>"],
+            dependencies={"<b>bold</b>": []},
+            dependents={"<b>bold</b>": []},
+            execution_order=[["<b>bold</b>"]],
+            cache_targets=[],
+            inferred_dependencies={"<b>bold</b>": []},
+            explicit_dependencies={"<b>bold</b>": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="test",
+            execution_plan=[plan],
+        )
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "<script>" not in html_out
+        assert "<b>bold</b>" not in html_out
+
+
+class TestRunResultDag:
+    """Tests for the RunResult.dag() method."""
+
+    def test_dag_returns_none_for_non_plan(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="test",
+        )
+        assert result.dag() is None
+
+    def test_dag_returns_none_without_plans(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="test",
+            execution_plan=None,
+        )
+        assert result.dag() is None
+
+    def test_dag_single_plan(self) -> None:
+        from weevr.engine.display import DAGDiagram
+
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        diagram = result.dag()
+        assert isinstance(diagram, DAGDiagram)
+        assert "<svg" in diagram.svg
+        # Single plan — no swimlane rects
+        assert 'class="dag-swimlane"' not in diagram.svg
+
+    def test_dag_multi_plan_loom(self) -> None:
+        from weevr.engine.display import DAGDiagram
+
+        plan1 = ExecutionPlan(
+            weave_name="dims",
+            threads=["a"],
+            dependencies={"a": []},
+            dependents={"a": []},
+            execution_order=[["a"]],
+            cache_targets=[],
+            inferred_dependencies={"a": []},
+            explicit_dependencies={"a": []},
+        )
+        plan2 = ExecutionPlan(
+            weave_name="facts",
+            threads=["x"],
+            dependencies={"x": []},
+            dependents={"x": []},
+            execution_order=[["x"]],
+            cache_targets=[],
+            inferred_dependencies={"x": []},
+            explicit_dependencies={"x": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="loom",
+            config_name="nightly",
+            execution_plan=[plan1, plan2],
+        )
+        diagram = result.dag()
+        assert isinstance(diagram, DAGDiagram)
+        assert "dag-swimlane" in diagram.svg
+        assert "Weave: dims" in diagram.svg
+        assert "Weave: facts" in diagram.svg
+
+
 class TestLoadedConfig:
     @pytest.fixture()
     def sample_thread(self) -> Thread:
@@ -494,3 +1067,141 @@ class TestLoadedConfig:
         # Access it — no threads provided so plan won't build
         _ = loaded.execution_plan
         assert loaded._plan_built  # noqa: SLF001
+
+
+class TestPlanDisplayIntegration:
+    """Integration tests verifying the full plan mode display workflow."""
+
+    def _build_plan_result(self) -> RunResult:
+        plan = ExecutionPlan(
+            weave_name="dims",
+            threads=["raw", "staging", "curated"],
+            dependencies={"raw": [], "staging": ["raw"], "curated": ["staging"]},
+            dependents={"raw": ["staging"], "staging": ["curated"], "curated": []},
+            execution_order=[["raw"], ["staging"], ["curated"]],
+            cache_targets=["raw"],
+            inferred_dependencies={
+                "raw": [],
+                "staging": ["raw"],
+                "curated": ["staging"],
+            },
+            explicit_dependencies={"raw": [], "staging": [], "curated": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dims",
+            execution_plan=[plan],
+        )
+        return result
+
+    def test_plan_result_full_workflow(self) -> None:
+        result = self._build_plan_result()
+        # summary has cache markers and footer
+        s = result.summary()
+        assert "raw*" in s
+        assert "3 threads" in s
+        assert "1 cached" in s
+
+        # explain has key sections
+        e = result.explain()
+        assert "Execution order:" in e
+        assert "Dependencies:" in e
+        assert "Cache targets:" in e
+        assert "raw  1 consumer: staging" in e
+
+        # _repr_html_ returns valid HTML with SVG
+        h = result._repr_html_()
+        assert h is not None
+        assert "<svg" in h
+        assert "Plan Summary" in h
+
+    def test_plan_result_with_lookups(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="facts",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+            lookup_schedule={0: ["customer_dim"]},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="facts",
+            execution_plan=[plan],
+        )
+        e = result.explain()
+        assert "Lookup schedule:" in e
+        assert "customer_dim" in e
+
+    def test_loom_plan_result(self) -> None:
+        plan1 = ExecutionPlan(
+            weave_name="dims",
+            threads=["a"],
+            dependencies={"a": []},
+            dependents={"a": []},
+            execution_order=[["a"]],
+            cache_targets=[],
+            inferred_dependencies={"a": []},
+            explicit_dependencies={"a": []},
+        )
+        plan2 = ExecutionPlan(
+            weave_name="facts",
+            threads=["x"],
+            dependencies={"x": []},
+            dependents={"x": []},
+            execution_order=[["x"]],
+            cache_targets=[],
+            inferred_dependencies={"x": []},
+            explicit_dependencies={"x": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="loom",
+            config_name="nightly",
+            execution_plan=[plan1, plan2],
+        )
+        e = result.explain()
+        assert "Loom: nightly" in e
+        assert "2 weaves" in e
+        assert "Plan: dims" in e
+        assert "Plan: facts" in e
+
+        h = result._repr_html_()
+        assert h is not None
+        # Loom DAG + 2 per-weave SVGs = 3 total
+        assert h.count("<svg") == 3
+
+    def test_plan_result_no_resolved_threads(self) -> None:
+        result = self._build_plan_result()
+        e = result.explain()
+        assert "Thread detail:" not in e
+
+    def test_dag_export_roundtrip(self, tmp_path: Any) -> None:
+        plan = ExecutionPlan(
+            weave_name="test",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        diagram = plan.dag()
+        out_path = str(tmp_path / "test.svg")
+        diagram.save(out_path)
+
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+
+        content = Path(out_path).read_text(encoding="utf-8")
+        assert "<svg" in content
+        ET.fromstring(content)

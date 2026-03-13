@@ -1,8 +1,64 @@
 # Execution Modes
 
+weevr has two distinct concepts that share the word "mode":
+
+- **Run modes** — the `mode` argument to `ctx.run()`, which controls *what
+  the engine does* (execute, validate, plan, preview).
+- **Data modes** — the `load` and `write` blocks on a thread, which control
+  *how data is read* and *how data is written*.
+
+This page covers both.
+
+## Run modes
+
+The `mode` argument to `Context.run()` controls how far the engine
+progresses through the plan → execute → aggregate pipeline.
+
+| Mode | What happens | Result contains |
+|------|-------------|-----------------|
+| `execute` | Full execution: read, transform, write (default) | Status, row counts, telemetry |
+| `validate` | Parse config, resolve references, check DAG — no data touched | `validation_errors` list |
+| `plan` | Build the execution plan and return it without running | `execution_plan` list, `summary()` with cache markers, `explain()` for detailed breakdown |
+| `preview` | Run transforms against sampled data, skip writes | `preview_data` DataFrames |
+
+```python
+# Validate config without touching data
+result = ctx.run("nightly.loom", mode="validate")
+print(result.validation_errors)
+
+# Inspect the execution plan
+result = ctx.run("nightly.loom", mode="plan")
+print(result.summary())     # compact: execution groups with cache markers
+print(result.explain())     # detailed: dependencies, cache targets, thread detail
+
+# Preview transforms without writing
+result = ctx.run("nightly.loom", mode="preview")
+```
+
+In notebooks, results render automatically as styled HTML when you
+evaluate the result in a cell. Each mode gets a tailored report:
+
+- **execute** — thread results table with status badges, row counts,
+  write modes, and target paths
+- **validate** — check/error report with color-coded status
+- **plan** — summary table with embedded DAG diagram
+- **preview** — output shape table (columns × rows per thread)
+
+For plan mode, you can also retrieve the DAG diagram directly:
+
+```python
+result = ctx.run("nightly.loom", mode="plan")
+dag = result.dag()           # single-weave DAG or loom-level swimlane
+dag.save("plan.svg")         # export to file
+dag                          # renders inline in a notebook
+```
+
+For per-weave access in a loom, use `result.execution_plan[0].dag()`.
+
+## Data modes
+
 weevr separates *how data is read* from *how data is written*. The load
-mode controls source reading. The write mode controls target writing. This
-page covers both.
+mode controls source reading. The write mode controls target writing.
 
 ## Write modes
 
