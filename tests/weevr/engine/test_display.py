@@ -184,6 +184,16 @@ class TestRenderDagSvg:
         svg = render_dag_svg(plan)
         assert "prefers-color-scheme:dark" in svg
 
+    def test_forced_dark(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        svg = render_dag_svg(plan, dark=True)
+        assert "prefers-color-scheme:dark" not in svg
+
+    def test_forced_light(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        svg = render_dag_svg(plan, dark=False)
+        assert "prefers-color-scheme:dark" not in svg
+
     def test_tooltips_with_resolved_threads(self) -> None:
         plan = _make_plan(threads=["a"], execution_order=[["a"]])
 
@@ -933,6 +943,16 @@ class TestRenderFlowSvg:
         svg = render_flow_svg(thread)
         assert "prefers-color-scheme:dark" in svg
 
+    def test_forced_dark(self) -> None:
+        thread = _fake_thread()
+        svg = render_flow_svg(thread, dark=True)
+        assert "prefers-color-scheme:dark" not in svg
+
+    def test_forced_light(self) -> None:
+        thread = _fake_thread()
+        svg = render_flow_svg(thread, dark=False)
+        assert "prefers-color-scheme:dark" not in svg
+
     def test_xml_escaping(self) -> None:
         thread = _fake_thread(
             sources={"<script>": _fake_source(alias="src")},
@@ -1014,6 +1034,16 @@ class TestRenderTimelineSvg:
         svg = render_timeline_svg(wr, None, None)
         assert "prefers-color-scheme:dark" in svg
 
+    def test_forced_dark(self) -> None:
+        wr = self._make_weave_result(["a"])
+        svg = render_timeline_svg(wr, None, None, dark=True)
+        assert "prefers-color-scheme:dark" not in svg
+
+    def test_forced_light(self) -> None:
+        wr = self._make_weave_result(["a"])
+        svg = render_timeline_svg(wr, None, None, dark=False)
+        assert "prefers-color-scheme:dark" not in svg
+
 
 class TestRenderWaterfallSvg:
     def test_execute_mode_full(self) -> None:
@@ -1058,6 +1088,24 @@ class TestRenderWaterfallSvg:
         svg = render_waterfall_svg(tr, tt, mode="execute")
         assert "2,000,000" in svg
         assert "1,500,000" in svg
+
+    def test_dark_mode_css(self) -> None:
+        tr = _fake_thread_result(rows_written=90)
+        tt = _fake_thread_telemetry()
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        assert "prefers-color-scheme:dark" in svg
+
+    def test_forced_dark(self) -> None:
+        tr = _fake_thread_result(rows_written=90)
+        tt = _fake_thread_telemetry()
+        svg = render_waterfall_svg(tr, tt, mode="execute", dark=True)
+        assert "prefers-color-scheme:dark" not in svg
+
+    def test_forced_light(self) -> None:
+        tr = _fake_thread_result(rows_written=90)
+        tt = _fake_thread_telemetry()
+        svg = render_waterfall_svg(tr, tt, mode="execute", dark=False)
+        assert "prefers-color-scheme:dark" not in svg
 
 
 class TestRenderAnnotatedDagSvg:
@@ -1108,6 +1156,24 @@ class TestRenderAnnotatedDagSvg:
         plan = _make_plan(threads=[], execution_order=[])
         svg = render_annotated_dag_svg(plan, {})
         assert "<svg" in svg
+
+    def test_dark_mode_css(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        trs = {"a": _fake_thread_result(thread_name="a", telemetry=_fake_thread_telemetry())}
+        svg = render_annotated_dag_svg(plan, trs)
+        assert "prefers-color-scheme:dark" in svg
+
+    def test_forced_dark(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        trs = {"a": _fake_thread_result(thread_name="a", telemetry=_fake_thread_telemetry())}
+        svg = render_annotated_dag_svg(plan, trs, dark=True)
+        assert "prefers-color-scheme:dark" not in svg
+
+    def test_forced_light(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        trs = {"a": _fake_thread_result(thread_name="a", telemetry=_fake_thread_telemetry())}
+        svg = render_annotated_dag_svg(plan, trs, dark=False)
+        assert "prefers-color-scheme:dark" not in svg
 
 
 # ---------------------------------------------------------------------------

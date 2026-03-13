@@ -173,7 +173,7 @@ without the cache optimization.
 | `engine/hooks.py` | Pre/post hook step execution: quality gates, SQL statements, log messages |
 | `engine/lookups.py` | Lookup materialization: pre-read, narrow projection, caching/broadcast |
 | `engine/variables.py` | Weave-scoped variable binding and resolution |
-| `engine/display.py` | SVG DAG visualization, HTML plan rendering for notebook display |
+| `engine/display.py` | SVG visualization (DAG, flow, timeline, waterfall) and HTML result rendering for notebooks |
 
 ## Design decisions
 

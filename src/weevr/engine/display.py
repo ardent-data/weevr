@@ -385,9 +385,14 @@ def _find_group_index(name: str, execution_order: list[list[str]]) -> int:
     return 0
 
 
-def _build_svg_style() -> str:
-    """Build the CSS style block with prefers-color-scheme media query."""
-    lt = _LIGHT
+def _build_svg_style(dark: bool | None = None) -> str:
+    """Build the CSS style block with prefers-color-scheme media query.
+
+    Args:
+        dark: Force dark (True) or light (False) palette. None uses
+            ``prefers-color-scheme`` media query for automatic switching.
+    """
+    lt = _DARK if dark is True else _LIGHT
     dk = _DARK
     font = _FONT_FAMILY
     fs = _FONT_SIZE_LABEL
@@ -425,24 +430,29 @@ def _build_svg_style() -> str:
         f"  .dag-swimlane{{fill:none;stroke:{lt['node_stroke']};stroke-width:1;rx:8}}",
         f"  .dag-swimlane-header{{{lbl};{ta};font-weight:600}}",
         f"  .dag-bg{{fill:{lt['bg']}}}",
-        "  @media(prefers-color-scheme:dark){",
-        f"    .dag-node{{fill:{dk['node_fill']};stroke:{dk['node_stroke']}}}",
-        f"    .dag-node-cached{{fill:{dk['cached_fill']};stroke:{dk['cached_stroke']}}}",
-        f"    .dag-label{{fill:{dk['node_text']}}}",
-        f"    .dag-label-cached{{fill:{dk['cached_text']}}}",
-        f"    .dag-edge{{stroke:{dk['edge_stroke']}}}",
-        f"    .dag-arrow{{fill:{dk['edge_stroke']}}}",
-        (f"    .dag-lookup-node{{fill:{dk['lookup_fill']};stroke:{dk['lookup_stroke']}}}"),
-        f"    .dag-lookup-node-label{{fill:{dk['lookup_text']}}}",
-        f"    .dag-lookup-edge{{stroke:{dk['lookup_stroke']}}}",
-        f"    .dag-lookup-line{{stroke:{dk['lookup_stroke']}}}",
-        f"    .dag-lookup-label{{fill:{dk['lookup_text']}}}",
-        f"    .dag-swimlane{{stroke:{dk['node_stroke']}}}",
-        f"    .dag-swimlane-header{{fill:{dk['node_text']}}}",
-        f"    .dag-bg{{fill:{dk['bg']}}}",
-        "  }",
-        "</style>",
     ]
+    if dark is None:
+        lines.extend(
+            [
+                "  @media(prefers-color-scheme:dark){",
+                f"    .dag-node{{fill:{dk['node_fill']};stroke:{dk['node_stroke']}}}",
+                f"    .dag-node-cached{{fill:{dk['cached_fill']};stroke:{dk['cached_stroke']}}}",
+                f"    .dag-label{{fill:{dk['node_text']}}}",
+                f"    .dag-label-cached{{fill:{dk['cached_text']}}}",
+                f"    .dag-edge{{stroke:{dk['edge_stroke']}}}",
+                f"    .dag-arrow{{fill:{dk['edge_stroke']}}}",
+                f"    .dag-lookup-node{{fill:{dk['lookup_fill']};stroke:{dk['lookup_stroke']}}}",
+                f"    .dag-lookup-node-label{{fill:{dk['lookup_text']}}}",
+                f"    .dag-lookup-edge{{stroke:{dk['lookup_stroke']}}}",
+                f"    .dag-lookup-line{{stroke:{dk['lookup_stroke']}}}",
+                f"    .dag-lookup-label{{fill:{dk['lookup_text']}}}",
+                f"    .dag-swimlane{{stroke:{dk['node_stroke']}}}",
+                f"    .dag-swimlane-header{{fill:{dk['node_text']}}}",
+                f"    .dag-bg{{fill:{dk['bg']}}}",
+                "  }",
+            ]
+        )
+    lines.append("</style>")
     return "\n".join(lines)
 
 
@@ -454,12 +464,16 @@ def _build_svg_style() -> str:
 def render_dag_svg(
     plan: ExecutionPlan,
     resolved_threads: dict[str, Any] | None = None,
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate inline SVG markup for an execution plan DAG.
 
     Args:
         plan: The execution plan to visualize.
         resolved_threads: Optional thread models for tooltip content.
+        dark: Force dark (``True``) or light (``False``) palette.
+            ``None`` (default) uses the browser's color scheme preference.
 
     Returns:
         Complete SVG markup as a string.
@@ -472,7 +486,7 @@ def render_dag_svg(
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" '
             'viewBox="0 0 200 40" width="200" height="40">'
-            f"{_build_svg_style()}"
+            f"{_build_svg_style(dark)}"
             '<text x="100" y="20" class="dag-label">Empty plan</text>'
             "</svg>"
         )
@@ -485,7 +499,7 @@ def render_dag_svg(
     )
 
     # Style block
-    parts.append(_build_svg_style())
+    parts.append(_build_svg_style(dark))
 
     # Arrowhead markers
     lt = _LIGHT
@@ -629,6 +643,8 @@ def render_dag_svg(
 def render_loom_dag_svg(
     plans: list[ExecutionPlan],
     resolved_threads: dict[str, Any] | None = None,
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate a loom-level DAG SVG with swimlanes for each weave.
 
@@ -639,12 +655,14 @@ def render_loom_dag_svg(
     Args:
         plans: Execution plans for each weave in execution order.
         resolved_threads: Optional thread models for tooltip content.
+        dark: Force dark (``True``) or light (``False``) palette.
+            ``None`` (default) uses the browser's color scheme preference.
 
     Returns:
         Complete SVG markup as a string.
     """
     if len(plans) <= 1:
-        return render_dag_svg(plans[0], resolved_threads) if plans else ""
+        return render_dag_svg(plans[0], resolved_threads, dark=dark) if plans else ""
 
     # Compute internal layouts for each weave
     weave_layouts: list[
@@ -891,9 +909,14 @@ def _group_transforms(
     return nodes
 
 
-def _build_flow_svg_style() -> str:
-    """Build CSS style block for thread flow diagrams."""
-    lt = _FLOW_LIGHT
+def _build_flow_svg_style(dark: bool | None = None) -> str:
+    """Build CSS style block for thread flow diagrams.
+
+    Args:
+        dark: Force dark (True) or light (False) palette. None uses
+            ``prefers-color-scheme`` media query for automatic switching.
+    """
+    lt = _FLOW_DARK if dark is True else _FLOW_LIGHT
     dk = _FLOW_DARK
     font = _FONT_FAMILY
     fs = _FONT_SIZE_LABEL
@@ -916,24 +939,30 @@ def _build_flow_svg_style() -> str:
         f"  .flow-badge{{fill:{lt['badge_bg']};rx:8}}",
         f"  .flow-edge{{stroke:{lt['edge']};stroke-width:1.5;fill:none}}",
         f"  .flow-arrow{{fill:{lt['edge']}}}",
-        "  @media(prefers-color-scheme:dark){",
-        f"    .flow-bg{{fill:{dk['bg']}}}",
-        f"    .flow-source{{fill:{dk['source_fill']};stroke:{dk['source_stroke']}}}",
-        f"    .flow-join{{fill:{dk['join_fill']};stroke:{dk['join_stroke']}}}",
-        f"    .flow-transform{{fill:{dk['transform_fill']};stroke:{dk['transform_stroke']}}}",
-        f"    .flow-target{{fill:{dk['target_fill']};stroke:{dk['target_stroke']}}}",
-        f"    .flow-label{{fill:{dk['text']}}}",
-        f"    .flow-sublabel{{fill:{dk['text']}}}",
-        f"    .flow-badge{{fill:{dk['badge_bg']}}}",
-        f"    .flow-edge{{stroke:{dk['edge']}}}",
-        f"    .flow-arrow{{fill:{dk['edge']}}}",
-        "  }",
-        "</style>",
     ]
+    if dark is None:
+        lines.extend(
+            [
+                "  @media(prefers-color-scheme:dark){",
+                f"    .flow-bg{{fill:{dk['bg']}}}",
+                f"    .flow-source{{fill:{dk['source_fill']};stroke:{dk['source_stroke']}}}",
+                f"    .flow-join{{fill:{dk['join_fill']};stroke:{dk['join_stroke']}}}",
+                f"    .flow-transform{{fill:{dk['transform_fill']};"
+                f"stroke:{dk['transform_stroke']}}}",
+                f"    .flow-target{{fill:{dk['target_fill']};stroke:{dk['target_stroke']}}}",
+                f"    .flow-label{{fill:{dk['text']}}}",
+                f"    .flow-sublabel{{fill:{dk['text']}}}",
+                f"    .flow-badge{{fill:{dk['badge_bg']}}}",
+                f"    .flow-edge{{stroke:{dk['edge']}}}",
+                f"    .flow-arrow{{fill:{dk['edge']}}}",
+                "  }",
+            ]
+        )
+    lines.append("</style>")
     return "\n".join(lines)
 
 
-def render_flow_svg(thread: Thread) -> str:
+def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
     """Generate an inline SVG showing a thread's processing pipeline.
 
     Renders a horizontal flow diagram: sources on the left, transforms in
@@ -942,6 +971,8 @@ def render_flow_svg(thread: Thread) -> str:
 
     Args:
         thread: Thread configuration model.
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
 
     Returns:
         Complete SVG markup as a string.
@@ -1083,7 +1114,7 @@ def render_flow_svg(thread: Thread) -> str:
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
         f'width="{canvas_w:.0f}" height="{canvas_h:.0f}">'
     )
-    parts.append(_build_flow_svg_style())
+    parts.append(_build_flow_svg_style(dark))
 
     # Arrowhead marker
     asz = _FLOW_ARROW_SIZE
@@ -1222,6 +1253,8 @@ def render_timeline_svg(
     weave_result: Any,
     hook_results: list[Any] | None = None,
     lookup_results: list[Any] | None = None,
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate a phased execution timeline Gantt SVG.
 
@@ -1232,11 +1265,13 @@ def render_timeline_svg(
         weave_result: A WeaveResult with thread_results and telemetry.
         hook_results: Hook execution results (from WeaveTelemetry).
         lookup_results: Lookup materialization results (from WeaveTelemetry).
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
 
     Returns:
         Complete SVG markup as a string.
     """
-    lt = _FLOW_LIGHT
+    lt = _FLOW_DARK if dark is True else _FLOW_LIGHT
     dk = _FLOW_DARK
     font = _FONT_FAMILY
     pad = _SVG_PADDING
@@ -1338,12 +1373,13 @@ def render_timeline_svg(
         f"  .tl-phase{{fill:{lt['text']};font-family:{font};font-size:13px;font-weight:600}}"
     )
     parts.append(f"  .tl-dur{{fill:{lt['text']};font-family:{font};font-size:11px;opacity:0.7}}")
-    parts.append("  @media(prefers-color-scheme:dark){")
-    parts.append(f"    .tl-bg{{fill:{dk['bg']}}}")
-    parts.append(f"    .tl-label{{fill:{dk['text']}}}")
-    parts.append(f"    .tl-phase{{fill:{dk['text']}}}")
-    parts.append(f"    .tl-dur{{fill:{dk['text']}}}")
-    parts.append("  }")
+    if dark is None:
+        parts.append("  @media(prefers-color-scheme:dark){")
+        parts.append(f"    .tl-bg{{fill:{dk['bg']}}}")
+        parts.append(f"    .tl-label{{fill:{dk['text']}}}")
+        parts.append(f"    .tl-phase{{fill:{dk['text']}}}")
+        parts.append(f"    .tl-dur{{fill:{dk['text']}}}")
+        parts.append("  }")
     parts.append("</style>")
 
     # Background
@@ -1399,6 +1435,8 @@ def render_waterfall_svg(
     thread_result: Any,
     thread_telemetry: Any | None,
     mode: str = "execute",
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate a data flow waterfall SVG showing row counts at each stage.
 
@@ -1409,11 +1447,13 @@ def render_waterfall_svg(
         thread_result: A ThreadResult (used for rows_written).
         thread_telemetry: ThreadTelemetry with row counts.
         mode: ``"execute"`` or ``"preview"``.
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
 
     Returns:
         Complete SVG markup as a string.
     """
-    lt = _FLOW_LIGHT
+    lt = _FLOW_DARK if dark is True else _FLOW_LIGHT
     dk = _FLOW_DARK
     font = _FONT_FAMILY
     pad = _SVG_PADDING
@@ -1455,11 +1495,12 @@ def render_waterfall_svg(
     parts.append(f"  .wf-bg{{fill:{lt['bg']}}}")
     parts.append(f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:13px}}")
     parts.append(f"  .wf-count{{fill:{lt['text']};font-family:{font};font-size:12px;opacity:0.7}}")
-    parts.append("  @media(prefers-color-scheme:dark){")
-    parts.append(f"    .wf-bg{{fill:{dk['bg']}}}")
-    parts.append(f"    .wf-label{{fill:{dk['text']}}}")
-    parts.append(f"    .wf-count{{fill:{dk['text']}}}")
-    parts.append("  }")
+    if dark is None:
+        parts.append("  @media(prefers-color-scheme:dark){")
+        parts.append(f"    .wf-bg{{fill:{dk['bg']}}}")
+        parts.append(f"    .wf-label{{fill:{dk['text']}}}")
+        parts.append(f"    .wf-count{{fill:{dk['text']}}}")
+        parts.append("  }")
     parts.append("</style>")
 
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
@@ -1500,6 +1541,8 @@ def render_annotated_dag_svg(
     plan: ExecutionPlan,
     thread_results: dict[str, Any] | None = None,
     resolved_threads: dict[str, Any] | None = None,
+    *,
+    dark: bool | None = None,
 ) -> str:
     """Generate a DAG SVG with status badges and duration annotations.
 
@@ -1510,6 +1553,8 @@ def render_annotated_dag_svg(
         plan: The execution plan to visualize.
         thread_results: Mapping of thread name to ThreadResult.
         resolved_threads: Optional thread models for tooltip content.
+        dark: Force dark (``True``) or light (``False``) palette. ``None``
+            uses ``prefers-color-scheme`` media query (default).
 
     Returns:
         Complete SVG markup as a string.
@@ -1518,7 +1563,7 @@ def render_annotated_dag_svg(
         plan, resolved_threads
     )
     if not nodes:
-        return render_dag_svg(plan, resolved_threads)
+        return render_dag_svg(plan, resolved_threads, dark=dark)
 
     # Extend height for duration annotations below nodes
     annotation_space = 18
@@ -1530,17 +1575,18 @@ def render_annotated_dag_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
         f'width="{width:.0f}" height="{height:.0f}">'
     )
-    parts.append(_build_svg_style())
+    parts.append(_build_svg_style(dark))
 
     # Additional styles for annotations
-    lt = _LIGHT
+    lt = _DARK if dark is True else _LIGHT
     dk = _DARK
     parts.append("<style>")
     parts.append(
         f"  .dag-dur{{fill:{lt['node_text']};font-family:{_FONT_FAMILY};"
         f"font-size:{_FONT_SIZE_ANNOTATION}px;text-anchor:middle;opacity:0.7}}"
     )
-    parts.append(f"  @media(prefers-color-scheme:dark){{.dag-dur{{fill:{dk['node_text']}}}}}")
+    if dark is None:
+        parts.append(f"  @media(prefers-color-scheme:dark){{.dag-dur{{fill:{dk['node_text']}}}}}")
     parts.append("</style>")
 
     # Arrowhead markers
