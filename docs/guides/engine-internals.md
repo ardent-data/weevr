@@ -14,8 +14,9 @@ conditional execution, and structured result collection.
 ## Key concepts
 
 - **ExecutionPlan** — An immutable snapshot of thread ordering, dependency
-  edges, parallel execution groups, cache targets, and lookup dependency
-  mappings (`lookup_producers`, `lookup_consumers`). Produced by the planner
+  edges, parallel execution groups, cache targets, lookup dependency
+  mappings (`lookup_producers`, `lookup_consumers`), and a
+  `lookup_schedule` that assigns each lookup to its materialization point. Produced by the planner
   before any data is read. In notebooks, an `ExecutionPlan` renders
   automatically via `_repr_html_()`. Call `plan.dag()` to get a `DAGDiagram`
   SVG that can be saved with `dag.save("plan.svg")`. For plan mode results,

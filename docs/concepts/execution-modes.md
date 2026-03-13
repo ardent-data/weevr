@@ -54,6 +54,8 @@ dag                          # renders inline in a notebook
 ```
 
 For per-weave access in a loom, use `result.execution_plan[0].dag()`.
+Note that `result.dag()` includes full resolved-thread context (sources,
+targets, step counts) while the per-plan accessor does not.
 
 ## Data modes
 
