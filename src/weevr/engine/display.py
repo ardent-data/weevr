@@ -1362,19 +1362,18 @@ def render_timeline_svg(
         for bar_label, dur, status in bars:
             colors = status_colors.get(status, status_colors["success"])
             fill_lt = colors[0]
-            text_lt = colors[1]
             bar_w = max((dur / max_dur) * bar_area_w, 4)
 
             bx = pad + label_w
+            # Name label left of bar
+            parts.append(
+                f'<text x="{bx - 6:.1f}" y="{y + bar_h / 2:.1f}" '
+                f'dominant-baseline="central" text-anchor="end" class="tl-label">'
+                f"{_xml_escape(bar_label)}</text>"
+            )
             parts.append(
                 f'<rect x="{bx:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
                 f'height="{bar_h}" rx="4" fill="{fill_lt}"/>'
-            )
-            parts.append(
-                f'<text x="{bx + 6:.1f}" y="{y + bar_h / 2:.1f}" '
-                f'dominant-baseline="central" font-family="{font}" font-size="12" '
-                f'fill="{text_lt}">'
-                f"{_xml_escape(bar_label)}</text>"
             )
             # Duration text after bar
             dur_text = _format_duration(dur)
