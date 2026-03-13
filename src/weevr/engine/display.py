@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import html
+import types
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1269,7 +1271,7 @@ def render_timeline_svg(
     parts.append(f"  .tl-bg{{fill:{lt['bg']}}}")
     parts.append(f"  .tl-label{{fill:{lt['text']};font-family:{font};font-size:12px}}")
     parts.append(
-        f"  .tl-phase{{fill:{lt['text']};font-family:{font};font-size:13px;font-weight:600}}}}"
+        f"  .tl-phase{{fill:{lt['text']};font-family:{font};font-size:13px;font-weight:600}}"
     )
     parts.append(f"  .tl-dur{{fill:{lt['text']};font-family:{font};font-size:11px;opacity:0.7}}")
     parts.append("  @media(prefers-color-scheme:dark){")
@@ -1595,6 +1597,12 @@ _S_CHECK_BOX = (
     "background:#f0fff4;border:1px solid #c6f6d5;border-radius:4px;"
     "padding:8px 12px;color:#276749;font-size:13px;margin:8px 0"
 )
+_S_DETAILS = "margin:8px 0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden"
+_S_SUMMARY = (
+    "padding:8px 12px;cursor:pointer;font-weight:600;font-size:14px;"
+    "color:#2d3748;background:#f7fafc;list-style:none"
+)
+_S_DETAIL_BODY = "padding:8px 12px"
 
 
 def _html_dep_badges(
@@ -1717,6 +1725,11 @@ def render_plan_html(
     )
     parts.append("</table>")
 
+    # Resolved parameters
+    telemetry = getattr(result, "telemetry", None)
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
     # Loom header and combined DAG for multiple plans
     if len(plans) > 1:
         parts.append(f'<h3 style="{_S_H3}">Loom: {config_name} &mdash; {len(plans)} weaves</h3>')
@@ -1726,6 +1739,21 @@ def render_plan_html(
     # Per-plan sections
     for plan in plans:
         parts.append(render_execution_plan_html(plan, resolved))
+
+    # Per-thread flow diagrams
+    if resolved:
+        parts.append(f'<h3 style="{_S_H3}">Thread Pipelines</h3>')
+        for tname, thread_model in resolved.items():
+            tname_esc = html.escape(tname)
+            parts.append(f'<details style="{_S_DETAILS}">')
+            parts.append(f'<summary style="{_S_SUMMARY}">{tname_esc}</summary>')
+            parts.append(f'<div style="{_S_DETAIL_BODY}">')
+            try:
+                flow_svg = render_flow_svg(thread_model)
+                parts.append(f"<div>{flow_svg}</div>")
+            except Exception:
+                parts.append(f'<span style="{_S_NONE}">(flow diagram unavailable)</span>')
+            parts.append("</div></details>")
 
     parts.append("</div>")
     return "\n".join(parts)
@@ -1752,6 +1780,320 @@ def _status_badge(status: str) -> str:
     """Return an inline-styled badge for a status value."""
     style = _STATUS_BADGE_MAP.get(status, _S_BADGE)
     return f'<span style="{style}">{html.escape(status)}</span>'
+
+
+# ---------------------------------------------------------------------------
+# Shared HTML section renderers
+# ---------------------------------------------------------------------------
+
+
+def _render_params_table(params: dict[str, Any] | None) -> str:
+    """Render resolved parameters as an HTML table. Empty if no params."""
+    if not params:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Resolved Parameters</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Parameter</th><th style="{_S_TH}">Value</th></tr>')
+    for name, value in params.items():
+        parts.append(
+            f'<tr><td style="{_S_TD}">{html.escape(str(name))}</td>'
+            f'<td style="{_S_TD}">{html.escape(str(value))}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_variables_table(variables: dict[str, Any] | None) -> str:
+    """Render weave-scoped variable values as an HTML table."""
+    if not variables:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Variables</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Variable</th><th style="{_S_TH}">Value</th></tr>')
+    for name, value in variables.items():
+        parts.append(
+            f'<tr><td style="{_S_TD}">{html.escape(str(name))}</td>'
+            f'<td style="{_S_TD}">{html.escape(str(value))}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_hook_results_table(hook_results: list[Any] | None) -> str:
+    """Render hook execution results as an HTML table."""
+    if not hook_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Hook Results</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Phase</th>'
+        f'<th style="{_S_TH}">Type</th>'
+        f'<th style="{_S_TH}">Name</th>'
+        f'<th style="{_S_TH}">Status</th>'
+        f'<th style="{_S_TH}">Duration</th></tr>'
+    )
+    for hr in hook_results:
+        phase = html.escape(str(getattr(hr, "phase", "")))
+        step_type = html.escape(str(getattr(hr, "step_type", "")))
+        step_name = html.escape(str(getattr(hr, "step_name", "") or ""))
+        status = str(getattr(hr, "status", "passed"))
+        dur = _format_duration(int(getattr(hr, "duration_ms", 0)))
+        gate = getattr(hr, "gate_result", None)
+        status_html = _status_badge(status)
+        if gate and not getattr(gate, "passed", True):
+            msg = html.escape(str(getattr(gate, "message", "")))
+            status_html += f' <span style="font-size:12px;color:#9b2c2c">{msg}</span>'
+        parts.append(
+            f'<tr><td style="{_S_TD}">{phase}</td>'
+            f'<td style="{_S_TD}">{step_type}</td>'
+            f'<td style="{_S_TD}">{step_name}</td>'
+            f'<td style="{_S_TD}">{status_html}</td>'
+            f'<td style="{_S_TD}">{dur}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_lookup_results_table(lookup_results: list[Any] | None) -> str:
+    """Render lookup materialization results as an HTML table."""
+    if not lookup_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Lookup Results</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Lookup</th>'
+        f'<th style="{_S_TH}">Strategy</th>'
+        f'<th style="{_S_TH}">Rows</th>'
+        f'<th style="{_S_TH}">Duration</th>'
+        f'<th style="{_S_TH}">Key Check</th></tr>'
+    )
+    for lk in lookup_results:
+        name = html.escape(str(getattr(lk, "name", "")))
+        strategy = html.escape(str(getattr(lk, "strategy", "cache")))
+        rows = getattr(lk, "row_count", 0)
+        dur = _format_duration(int(getattr(lk, "duration_ms", 0)))
+        uk_checked = getattr(lk, "unique_key_checked", False)
+        if uk_checked:
+            uk_passed = getattr(lk, "unique_key_passed", None)
+            key_check = _status_badge("success" if uk_passed else "failure")
+        else:
+            key_check = f'<span style="{_S_NONE}">—</span>'
+        parts.append(
+            f'<tr><td style="{_S_TD}">{name}</td>'
+            f'<td style="{_S_TD}">{strategy}</td>'
+            f'<td style="{_S_TD}">{rows:,}</td>'
+            f'<td style="{_S_TD}">{dur}</td>'
+            f'<td style="{_S_TD}">{key_check}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_validation_table(validation_results: list[Any] | None) -> str:
+    """Render validation rule results as an HTML table."""
+    if not validation_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Validation Rules</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Rule</th>'
+        f'<th style="{_S_TH}">Expression</th>'
+        f'<th style="{_S_TH}">Severity</th>'
+        f'<th style="{_S_TH}">Passed</th>'
+        f'<th style="{_S_TH}">Failed</th></tr>'
+    )
+    for vr in validation_results:
+        rule_name = html.escape(str(getattr(vr, "rule_name", "")))
+        expr = html.escape(str(getattr(vr, "expression", "")))
+        severity = html.escape(str(getattr(vr, "severity", "")))
+        passed = getattr(vr, "rows_passed", 0)
+        failed = getattr(vr, "rows_failed", 0)
+        failed_style = _S_TD
+        if failed > 0:
+            failed_style = f"{_S_TD};color:#9b2c2c;font-weight:600"
+        parts.append(
+            f'<tr><td style="{_S_TD}">{rule_name}</td>'
+            f'<td style="{_S_TD}"><code>{expr}</code></td>'
+            f'<td style="{_S_TD}">{severity}</td>'
+            f'<td style="{_S_TD}">{passed:,}</td>'
+            f'<td style="{failed_style}">{failed:,}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_assertion_table(assertion_results: list[Any] | None) -> str:
+    """Render post-execution assertion results as an HTML table."""
+    if not assertion_results:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Assertions</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(
+        f'<tr><th style="{_S_TH}">Type</th>'
+        f'<th style="{_S_TH}">Severity</th>'
+        f'<th style="{_S_TH}">Result</th>'
+        f'<th style="{_S_TH}">Details</th></tr>'
+    )
+    for ar in assertion_results:
+        atype = html.escape(str(getattr(ar, "assertion_type", "")))
+        severity = html.escape(str(getattr(ar, "severity", "")))
+        passed = getattr(ar, "passed", False)
+        details = html.escape(str(getattr(ar, "details", "")))
+        result_badge = _status_badge("success" if passed else "failure")
+        parts.append(
+            f'<tr><td style="{_S_TD}">{atype}</td>'
+            f'<td style="{_S_TD}">{severity}</td>'
+            f'<td style="{_S_TD}">{result_badge}</td>'
+            f'<td style="{_S_TD}">{details}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_schema_table(output_schema: list[tuple[str, str]] | None) -> str:
+    """Render output schema as an HTML table."""
+    if not output_schema:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Output Schema</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Column</th><th style="{_S_TH}">Type</th></tr>')
+    for col_name, col_type in output_schema:
+        parts.append(
+            f'<tr><td style="{_S_TD}">{html.escape(str(col_name))}</td>'
+            f'<td style="{_S_TD}"><code>{html.escape(str(col_type))}</code></td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_sample_table(
+    samples: dict[str, list[dict[str, Any]]] | None,
+    key: str,
+    title: str | None = None,
+) -> str:
+    """Render a data sample as an HTML table.
+
+    Args:
+        samples: Combined samples dict from ThreadResult.
+        key: Sample category key (``"output"`` or ``"quarantine"``).
+        title: Optional section title override.
+    """
+    if not samples or key not in samples:
+        return ""
+    rows = samples[key]
+    if not rows:
+        return ""
+    heading = title or f"Data Sample ({key.title()})"
+    parts = [f'<h4 style="{_S_H4}">{html.escape(heading)}</h4>']
+    # Build table from list of dicts
+    columns = list(rows[0].keys())
+    parts.append(f'<table style="{_S_TABLE}">')
+    header = "".join(f'<th style="{_S_TH}">{html.escape(str(c))}</th>' for c in columns)
+    parts.append(f"<tr>{header}</tr>")
+    for row in rows:
+        cells = ""
+        for col in columns:
+            val = str(row.get(col, ""))
+            # Truncate long values for display
+            if len(val) > 80:
+                val = val[:77] + "\u2026"
+            cells += f'<td style="{_S_TD}">{html.escape(val)}</td>'
+        parts.append(f"<tr>{cells}</tr>")
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_watermark_section(telemetry: Any) -> str:
+    """Render watermark state for incremental threads."""
+    wm_col = getattr(telemetry, "watermark_column", None)
+    if not wm_col:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Watermark State</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Property</th><th style="{_S_TH}">Value</th></tr>')
+    parts.append(
+        f'<tr><td style="{_S_TD}">Column</td>'
+        f'<td style="{_S_TD}">{html.escape(str(wm_col))}</td></tr>'
+    )
+    prev = getattr(telemetry, "watermark_previous_value", None)
+    new = getattr(telemetry, "watermark_new_value", None)
+    first = getattr(telemetry, "watermark_first_run", False)
+    if first:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Previous</td><td style="{_S_TD}"><em>first run</em></td></tr>'
+        )
+    elif prev is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Previous</td>'
+            f'<td style="{_S_TD}">{html.escape(str(prev))}</td></tr>'
+        )
+    if new is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">New</td><td style="{_S_TD}">{html.escape(str(new))}</td></tr>'
+        )
+    persisted = getattr(telemetry, "watermark_persisted", False)
+    parts.append(
+        f'<tr><td style="{_S_TD}">Persisted</td>'
+        f'<td style="{_S_TD}">{"yes" if persisted else "no"}</td></tr>'
+    )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_cdc_section(telemetry: Any) -> str:
+    """Render CDC breakdown for merge writes."""
+    inserts = getattr(telemetry, "cdc_inserts", None)
+    updates = getattr(telemetry, "cdc_updates", None)
+    deletes = getattr(telemetry, "cdc_deletes", None)
+    if inserts is None and updates is None and deletes is None:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">CDC Breakdown</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Operation</th><th style="{_S_TH}">Rows</th></tr>')
+    if inserts is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Inserts</td><td style="{_S_TD}">{inserts:,}</td></tr>'
+        )
+    if updates is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Updates</td><td style="{_S_TD}">{updates:,}</td></tr>'
+        )
+    if deletes is not None:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Deletes</td><td style="{_S_TD}">{deletes:,}</td></tr>'
+        )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_row_counts(telemetry: Any, rows_written: int = 0) -> str:
+    """Render rows read vs written summary."""
+    rows_read = getattr(telemetry, "rows_read", 0)
+    rows_quarantined = getattr(telemetry, "rows_quarantined", 0)
+    if rows_read == 0 and rows_written == 0:
+        return ""
+    parts = [f'<h4 style="{_S_H4}">Row Counts</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Metric</th><th style="{_S_TH}">Count</th></tr>')
+    parts.append(
+        f'<tr><td style="{_S_TD}">Rows read</td><td style="{_S_TD}">{rows_read:,}</td></tr>'
+    )
+    rows_after = getattr(telemetry, "rows_after_transforms", 0)
+    if rows_after > 0:
+        parts.append(
+            f'<tr><td style="{_S_TD}">After transforms</td>'
+            f'<td style="{_S_TD}">{rows_after:,}</td></tr>'
+        )
+    if rows_quarantined > 0:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Quarantined</td>'
+            f'<td style="{_S_TD}">{rows_quarantined:,}</td></tr>'
+        )
+    parts.append(
+        f'<tr><td style="{_S_TD}">Rows written</td><td style="{_S_TD}">{rows_written:,}</td></tr>'
+    )
+    parts.append("</table>")
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -1785,19 +2127,112 @@ def render_result_html(result: Any) -> str:
     return f'<pre style="font-family:monospace;padding:12px;border-radius:4px">{escaped}</pre>'
 
 
+def _render_execute_thread_detail(
+    tr: Any,
+    telemetry: Any | None,
+    thread_model: Any | None,
+) -> str:
+    """Render a single thread's collapsible detail section for execute mode."""
+    name = html.escape(getattr(tr, "thread_name", ""))
+    tr_status = str(getattr(tr, "status", ""))
+    rows = getattr(tr, "rows_written", 0)
+    dur_text = ""
+    if telemetry:
+        span = getattr(telemetry, "span", None)
+        if span:
+            start = getattr(span, "start_time", None)
+            end = getattr(span, "end_time", None)
+            if start and end:
+                dur_text = _format_duration(int((end - start).total_seconds() * 1000))
+
+    # Auto-expand failed threads (DEC-001)
+    open_attr = " open" if tr_status == "failure" else ""
+    parts = [f'<details style="{_S_DETAILS}"{open_attr}>']
+    summary_detail = f"{rows:,} rows"
+    if dur_text:
+        summary_detail += f", {dur_text}"
+    parts.append(
+        f'<summary style="{_S_SUMMARY}">'
+        f"{_status_badge(tr_status)} {name} &mdash; {summary_detail}"
+        "</summary>"
+    )
+    parts.append(f'<div style="{_S_DETAIL_BODY}">')
+
+    # Error banner for failed threads (DEC-014)
+    error = getattr(tr, "error", None)
+    if error:
+        parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(str(error))}</div>')
+
+    # Thread flow SVG
+    if thread_model is not None:
+        try:
+            flow_svg = render_flow_svg(thread_model)
+            parts.append(f"<div>{flow_svg}</div>")
+        except Exception:
+            pass
+
+    # Data flow waterfall SVG
+    if telemetry:
+        try:
+            wf_svg = render_waterfall_svg(tr, telemetry, mode="execute")
+            parts.append(f"<div>{wf_svg}</div>")
+        except Exception:
+            pass
+
+    # Validation rules
+    if telemetry:
+        parts.append(_render_validation_table(getattr(telemetry, "validation_results", None)))
+
+    # Assertions
+    if telemetry:
+        parts.append(_render_assertion_table(getattr(telemetry, "assertion_results", None)))
+
+    # Output schema
+    parts.append(_render_schema_table(getattr(tr, "output_schema", None)))
+
+    # Data sample (output)
+    parts.append(_render_sample_table(getattr(tr, "samples", None), "output"))
+
+    # Quarantine sample
+    parts.append(
+        _render_sample_table(getattr(tr, "samples", None), "quarantine", "Quarantine Sample")
+    )
+
+    # Watermark state
+    if telemetry:
+        parts.append(_render_watermark_section(telemetry))
+
+    # CDC breakdown
+    if telemetry:
+        parts.append(_render_cdc_section(telemetry))
+
+    # Row counts
+    if telemetry:
+        parts.append(_render_row_counts(telemetry, rows_written=rows))
+
+    parts.append("</div></details>")
+    return "\n".join(parts)
+
+
 def _render_execute_html(result: Any) -> str:
     """Render a styled HTML report for execute mode results."""
     parts: list[str] = [f'<div style="{_S_CONTAINER}">']
 
     status = str(getattr(result, "status", ""))
-    config_type = html.escape(str(getattr(result, "config_type", "")))
+    config_type = str(getattr(result, "config_type", ""))
+    config_type_esc = html.escape(config_type)
     config_name = html.escape(str(getattr(result, "config_name", "")))
     duration_ms = getattr(result, "duration_ms", 0) or 0
     warnings: list[str] = getattr(result, "warnings", []) or []
+    detail = getattr(result, "detail", None)
+    telemetry = getattr(result, "telemetry", None)
+    resolved = getattr(result, "_resolved_threads", None) or {}
 
     parts.append(f'<h3 style="{_S_H3}">Execution Summary</h3>')
 
     # Summary table
+    thread_results = _collect_thread_results(result)
+    total_rows = _count_total_rows(result)
     parts.append(f'<table style="{_S_TABLE}">')
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Status</strong></td>'
@@ -1805,47 +2240,148 @@ def _render_execute_html(result: Any) -> str:
     )
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
-        f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
+        f'<td style="{_S_TD}">{config_type_esc}: {config_name}</td></tr>'
     )
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Duration</strong></td>'
         f'<td style="{_S_TD}">{_format_duration(duration_ms)}</td></tr>'
     )
-
-    # Total rows
-    total_rows = _count_total_rows(result)
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Rows Written</strong></td>'
         f'<td style="{_S_TD}">{total_rows:,}</td></tr>'
     )
+    if len(thread_results) > 1:
+        parts.append(
+            f'<tr><td style="{_S_TD}"><strong>Threads</strong></td>'
+            f'<td style="{_S_TD}">{len(thread_results)}</td></tr>'
+        )
     parts.append("</table>")
 
-    # Thread results table
-    thread_results = _collect_thread_results(result)
+    # Resolved parameters (from outermost telemetry)
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
+    # Annotated DAG (weave/loom — requires execution plan)
+    plans: list[Any] = getattr(result, "execution_plan", None) or []
+    if plans and thread_results:
+        try:
+            tr_map = {getattr(t, "thread_name", ""): t for t in thread_results}
+            dag_svg = render_annotated_dag_svg(plans[0], tr_map, resolved)
+            parts.append(f'<h4 style="{_S_H4}">Execution DAG</h4>')
+            parts.append(f"<div>{dag_svg}</div>")
+        except Exception:
+            pass
+
+    # Execution timeline (weave/loom)
+    if config_type == "weave" and detail:
+        weave_telem = telemetry
+        hook_results = getattr(weave_telem, "hook_results", None)
+        lookup_results = getattr(weave_telem, "lookup_results", None)
+        try:
+            tl_svg = render_timeline_svg(detail, hook_results, lookup_results)
+            parts.append(f'<h4 style="{_S_H4}">Execution Timeline</h4>')
+            parts.append(f"<div>{tl_svg}</div>")
+        except Exception:
+            pass
+    elif config_type == "loom" and detail:
+        # Render timeline for each weave in the loom
+        weave_results = getattr(detail, "weave_results", []) or []
+        loom_telem = telemetry
+        weave_telem_map = getattr(loom_telem, "weave_telemetry", {}) or {}
+        for wr in weave_results:
+            wname = getattr(wr, "weave_name", "")
+            wt = weave_telem_map.get(wname)
+            hook_results = getattr(wt, "hook_results", None) if wt else None
+            lookup_results = getattr(wt, "lookup_results", None) if wt else None
+            try:
+                tl_svg = render_timeline_svg(wr, hook_results, lookup_results)
+                wname_esc = html.escape(wname)
+                parts.append(f'<h4 style="{_S_H4}">Timeline: {wname_esc}</h4>')
+                parts.append(f"<div>{tl_svg}</div>")
+            except Exception:
+                pass
+
+    # Thread results summary table
     if thread_results:
-        parts.append(f'<h4 style="{_S_H4}">Threads</h4>')
+        parts.append(f'<h4 style="{_S_H4}">Thread Results</h4>')
         parts.append(f'<table style="{_S_TABLE}">')
         parts.append(
-            f'<tr><th style="{_S_TH}">Thread</th><th style="{_S_TH}">Status</th>'
-            f'<th style="{_S_TH}">Rows</th><th style="{_S_TH}">Mode</th>'
-            f'<th style="{_S_TH}">Target</th></tr>'
+            f'<tr><th style="{_S_TH}">Thread</th>'
+            f'<th style="{_S_TH}">Status</th>'
+            f'<th style="{_S_TH}">Rows</th>'
+            f'<th style="{_S_TH}">Duration</th>'
+            f'<th style="{_S_TH}">Write Mode</th>'
+            f'<th style="{_S_TH}">Load Mode</th></tr>'
         )
         for tr in thread_results:
             name = html.escape(getattr(tr, "thread_name", ""))
             tr_status = str(getattr(tr, "status", ""))
             rows = getattr(tr, "rows_written", 0)
-            write_mode = html.escape(getattr(tr, "write_mode", ""))
-            target = html.escape(getattr(tr, "target_path", ""))
-            # Truncate long paths
-            target_display = target if len(target) <= 60 else "\u2026" + target[-57:]
+            write_mode = html.escape(str(getattr(tr, "write_mode", "") or ""))
+            telem = getattr(tr, "telemetry", None)
+            load_mode = html.escape(str(getattr(telem, "load_mode", "") or ""))
+            dur_text = ""
+            if telem:
+                span = getattr(telem, "span", None)
+                if span:
+                    start = getattr(span, "start_time", None)
+                    end = getattr(span, "end_time", None)
+                    if start and end:
+                        dur_text = _format_duration(int((end - start).total_seconds() * 1000))
             parts.append(
                 f'<tr><td style="{_S_TD}">{name}</td>'
                 f'<td style="{_S_TD}">{_status_badge(tr_status)}</td>'
                 f'<td style="{_S_TD}">{rows:,}</td>'
+                f'<td style="{_S_TD}">{dur_text}</td>'
                 f'<td style="{_S_TD}">{write_mode}</td>'
-                f'<td style="{_S_TD}" title="{target}">{target_display}</td></tr>'
+                f'<td style="{_S_TD}">{load_mode}</td></tr>'
             )
         parts.append("</table>")
+
+    # Weave-level context: variables, hooks, lookups
+    if config_type == "weave" and telemetry:
+        parts.append(_render_variables_table(getattr(telemetry, "variables", None)))
+        parts.append(_render_hook_results_table(getattr(telemetry, "hook_results", None)))
+        parts.append(_render_lookup_results_table(getattr(telemetry, "lookup_results", None)))
+
+    # Per-thread detail sections (collapsible)
+    if config_type == "loom" and detail:
+        # Two-level collapse for loom: weave → thread (DEC-010)
+        weave_results = getattr(detail, "weave_results", []) or []
+        loom_telem = telemetry
+        weave_telem_map = getattr(loom_telem, "weave_telemetry", {}) or {}
+        for wr in weave_results:
+            wname = getattr(wr, "weave_name", "")
+            wr_status = str(getattr(wr, "status", ""))
+            open_attr = " open" if wr_status == "failure" else ""
+            wname_esc = html.escape(wname)
+            parts.append(f'<details style="{_S_DETAILS}"{open_attr}>')
+            parts.append(
+                f'<summary style="{_S_SUMMARY}">'
+                f"{_status_badge(wr_status)} Weave: {wname_esc}</summary>"
+            )
+            parts.append(f'<div style="{_S_DETAIL_BODY}">')
+            # Weave-level sections
+            wt = weave_telem_map.get(wname)
+            if wt:
+                parts.append(_render_variables_table(getattr(wt, "variables", None)))
+                parts.append(_render_hook_results_table(getattr(wt, "hook_results", None)))
+                parts.append(_render_lookup_results_table(getattr(wt, "lookup_results", None)))
+            # Per-thread details within weave
+            wt_thread_telem = getattr(wt, "thread_telemetry", {}) or {} if wt else {}
+            for wtr in getattr(wr, "thread_results", []):
+                tname = getattr(wtr, "thread_name", "")
+                t_telem = wt_thread_telem.get(tname) or getattr(wtr, "telemetry", None)
+                t_model = resolved.get(tname)
+                parts.append(_render_execute_thread_detail(wtr, t_telem, t_model))
+            parts.append("</div></details>")
+    else:
+        # Weave or thread: flat per-thread details
+        for tr in thread_results:
+            tname = getattr(tr, "thread_name", "")
+            t_telem = getattr(tr, "telemetry", None)
+            t_model = resolved.get(tname)
+            parts.append(_render_execute_thread_detail(tr, t_telem, t_model))
 
     # Errors
     errors = _collect_errors(result)
@@ -1873,6 +2409,8 @@ def _render_validate_html(result: Any) -> str:
     config_name = html.escape(str(getattr(result, "config_name", "")))
     validation_errors: list[str] = getattr(result, "validation_errors", []) or []
     warnings: list[str] = getattr(result, "warnings", []) or []
+    telemetry = getattr(result, "telemetry", None)
+    resolved = getattr(result, "_resolved_threads", None) or {}
 
     parts.append(f'<h3 style="{_S_H3}">Validation Summary</h3>')
 
@@ -1888,6 +2426,10 @@ def _render_validate_html(result: Any) -> str:
     )
     parts.append("</table>")
 
+    # Resolved parameters
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
     if not validation_errors:
         # Checks passed
         parts.append(
@@ -1899,6 +2441,62 @@ def _render_validate_html(result: Any) -> str:
         parts.append(f'<h4 style="{_S_H4}">Errors</h4>')
         for err in validation_errors:
             parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(err)}</div>')
+
+    # Per-thread validation rules and assertions from config (DEC-012)
+    for tname, thread_model in resolved.items():
+        tname_esc = html.escape(tname)
+        validations = getattr(thread_model, "validations", None) or []
+        assertions = getattr(thread_model, "assertions", None) or []
+        if not validations and not assertions:
+            continue
+        parts.append(f'<details style="{_S_DETAILS}">')
+        parts.append(f'<summary style="{_S_SUMMARY}">{tname_esc}</summary>')
+        parts.append(f'<div style="{_S_DETAIL_BODY}">')
+        # Validation rules defined in config
+        if validations:
+            parts.append(f'<h4 style="{_S_H4}">Validation Rules</h4>')
+            parts.append(f'<table style="{_S_TABLE}">')
+            parts.append(
+                f'<tr><th style="{_S_TH}">Rule</th>'
+                f'<th style="{_S_TH}">Expression</th>'
+                f'<th style="{_S_TH}">Severity</th></tr>'
+            )
+            for v in validations:
+                rule_name = html.escape(str(getattr(v, "name", "")))
+                expr = html.escape(str(getattr(v, "expression", "")))
+                severity = html.escape(str(getattr(v, "severity", "")))
+                parts.append(
+                    f'<tr><td style="{_S_TD}">{rule_name}</td>'
+                    f'<td style="{_S_TD}"><code>{expr}</code></td>'
+                    f'<td style="{_S_TD}">{severity}</td></tr>'
+                )
+            parts.append("</table>")
+        # Assertion definitions from config
+        if assertions:
+            parts.append(f'<h4 style="{_S_H4}">Assertions</h4>')
+            parts.append(f'<table style="{_S_TABLE}">')
+            parts.append(
+                f'<tr><th style="{_S_TH}">Type</th>'
+                f'<th style="{_S_TH}">Severity</th>'
+                f'<th style="{_S_TH}">Details</th></tr>'
+            )
+            for a in assertions:
+                atype = html.escape(str(getattr(a, "type", "")))
+                severity = html.escape(str(getattr(a, "severity", "")))
+                # Build detail string from assertion config
+                detail_parts = []
+                for attr in ("columns", "expression", "min", "max"):
+                    val = getattr(a, attr, None)
+                    if val is not None:
+                        detail_parts.append(f"{attr}={val}")
+                details = html.escape(", ".join(detail_parts)) if detail_parts else ""
+                parts.append(
+                    f'<tr><td style="{_S_TD}">{atype}</td>'
+                    f'<td style="{_S_TD}">{severity}</td>'
+                    f'<td style="{_S_TD}">{details}</td></tr>'
+                )
+            parts.append("</table>")
+        parts.append("</div></details>")
 
     if warnings:
         parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')
@@ -1916,7 +2514,11 @@ def _render_preview_html(result: Any) -> str:
     status = str(getattr(result, "status", ""))
     config_type = html.escape(str(getattr(result, "config_type", "")))
     config_name = html.escape(str(getattr(result, "config_name", "")))
+    duration_ms = getattr(result, "duration_ms", 0) or 0
     preview_data: dict[str, Any] = getattr(result, "preview_data", None) or {}
+    preview_meta: dict[str, dict[str, Any]] = getattr(result, "_preview_metadata", None) or {}
+    telemetry = getattr(result, "telemetry", None)
+    resolved = getattr(result, "_resolved_threads", None) or {}
     warnings: list[str] = getattr(result, "warnings", []) or []
 
     parts.append(f'<h3 style="{_S_H3}">Preview Summary</h3>')
@@ -1931,6 +2533,10 @@ def _render_preview_html(result: Any) -> str:
         f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
         f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
     )
+    parts.append(
+        f'<tr><td style="{_S_TD}"><strong>Duration</strong></td>'
+        f'<td style="{_S_TD}">{_format_duration(duration_ms)}</td></tr>'
+    )
     if preview_data:
         parts.append(
             f'<tr><td style="{_S_TD}"><strong>Threads</strong></td>'
@@ -1938,7 +2544,11 @@ def _render_preview_html(result: Any) -> str:
         )
     parts.append("</table>")
 
-    # Preview data table
+    # Resolved parameters
+    if telemetry:
+        parts.append(_render_params_table(getattr(telemetry, "resolved_params", None)))
+
+    # Output shape table
     if preview_data:
         parts.append(f'<h4 style="{_S_H4}">Output Shape</h4>')
         parts.append(f'<table style="{_S_TABLE}">')
@@ -1964,6 +2574,57 @@ def _render_preview_html(result: Any) -> str:
                     f'<span style="{_S_NONE}">(unavailable)</span></td></tr>'
                 )
         parts.append("</table>")
+
+    # Per-thread detail sections
+    for name in preview_data:
+        name_esc = html.escape(name)
+        meta = preview_meta.get(name, {})
+        thread_model = resolved.get(name)
+
+        parts.append(f'<details style="{_S_DETAILS}">')
+        parts.append(f'<summary style="{_S_SUMMARY}">{name_esc}</summary>')
+        parts.append(f'<div style="{_S_DETAIL_BODY}">')
+
+        # Thread flow SVG
+        if thread_model is not None:
+            try:
+                flow_svg = render_flow_svg(thread_model)
+                parts.append(f"<div>{flow_svg}</div>")
+            except Exception:
+                pass
+
+        # Data flow waterfall SVG (partial: preview mode)
+        if meta:
+            try:
+                row_count = 0
+                df = preview_data.get(name)
+                if df is not None:
+                    with contextlib.suppress(Exception):
+                        row_count = df.count()
+                pt = types.SimpleNamespace(
+                    rows_read=row_count,
+                    rows_after_transforms=row_count,
+                    rows_quarantined=0,
+                )
+                pr = types.SimpleNamespace(rows_written=0)
+                wf_svg = render_waterfall_svg(pr, pt, mode="preview")
+                parts.append(f"<div>{wf_svg}</div>")
+            except Exception:
+                pass
+
+        # Variables (weave-level, from telemetry)
+        if telemetry:
+            parts.append(_render_variables_table(getattr(telemetry, "variables", None)))
+
+        # Output schema (from preview metadata per AMD-001)
+        output_schema = meta.get("output_schema")
+        parts.append(_render_schema_table(output_schema))
+
+        # Data sample (from preview metadata per AMD-001, DEC-017: no annotation)
+        samples = meta.get("samples")
+        parts.append(_render_sample_table(samples, "output", "Data Sample"))
+
+        parts.append("</div></details>")
 
     if warnings:
         parts.append(f'<h4 style="{_S_H4}">Warnings</h4>')
