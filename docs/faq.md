@@ -326,7 +326,8 @@ The `summary()` output marks cache targets with an asterisk and includes
 footer counts (threads, cached, lookups). `explain()` provides a
 section-by-section breakdown including dependency provenance (inferred vs
 explicit), cache consumers, lookup schedule, and per-thread source/target
-detail. In notebooks, all result modes render automatically as styled
+detail. For loom-scoped results, `explain()` opens with a loom summary
+line showing the loom name and weave count. In notebooks, all result modes render automatically as styled
 HTML. Plan mode includes an embedded DAG diagram; execute mode shows a
 thread results table with status badges and row counts.
 
