@@ -868,23 +868,26 @@ def _get_join_detail(step: Any) -> str:
 
 def _group_transforms(
     steps: list[Any],
-) -> list[tuple[str, str, int]]:
+) -> list[tuple[str, str, int, str | None]]:
     """Walk pipeline steps and group consecutive same-type transforms.
 
-    Returns a list of ``(node_type, label, count)`` tuples.
+    Returns a list of ``(node_type, label, count, join_source)`` tuples.
     ``node_type`` is ``"join"`` or ``"transform"``.
+    ``join_source`` is the source name for join steps, ``None`` otherwise.
     """
-    nodes: list[tuple[str, str, int]] = []
+    nodes: list[tuple[str, str, int, str | None]] = []
     for step in steps:
         stype = _get_step_type(step)
         if stype == "join":
-            nodes.append(("join", _get_join_detail(step), 1))
+            params = getattr(step, "join", None)
+            join_src = getattr(params, "source", None) if params else None
+            nodes.append(("join", _get_join_detail(step), 1, join_src))
         elif nodes and nodes[-1][0] == "transform" and nodes[-1][1] == stype:
             # Merge with previous same-type transform
-            prev_type, prev_label, prev_count = nodes[-1]
-            nodes[-1] = (prev_type, prev_label, prev_count + 1)
+            prev_type, prev_label, prev_count, prev_src = nodes[-1]
+            nodes[-1] = (prev_type, prev_label, prev_count + 1, prev_src)
         else:
-            nodes.append(("transform", stype, 1))
+            nodes.append(("transform", stype, 1, None))
     return nodes
 
 
@@ -976,11 +979,10 @@ def render_flow_svg(thread: Thread) -> str:
     def _est_w(text: str) -> float:
         return max(len(text) * cw + np * 2, 80.0)
 
-    source_widths = [_est_w(label) for label, _ in source_nodes]
-    max_source_w = max(source_widths) if source_widths else 80.0
+    source_widths = {label: _est_w(label) for label, _ in source_nodes}
 
     pipe_widths: list[float] = []
-    for ntype, label, count in pipeline_nodes:
+    for ntype, label, count, _jsrc in pipeline_nodes:
         if ntype == "join":
             pipe_widths.append(_est_w(label))
         elif count > 1:
@@ -990,36 +992,89 @@ def render_flow_svg(thread: Thread) -> str:
 
     target_w = _est_w(tgt_label)
 
+    # --- Classify sources: primary (left-stacked) vs join (above their join node) ---
+    join_source_names: set[str] = set()
+    join_source_to_pipe_idx: dict[str, int] = {}
+    for pidx, (_ntype, _label, _count, jsrc) in enumerate(pipeline_nodes):
+        if _ntype == "join" and jsrc:
+            for slabel, _stype in source_nodes:
+                if slabel == jsrc:
+                    join_source_names.add(slabel)
+                    join_source_to_pipe_idx[slabel] = pidx
+                    break
+
+    primary_sources = [(sn, st) for sn, st in source_nodes if sn not in join_source_names]
+    join_sources = [(sn, st) for sn, st in source_nodes if sn in join_source_names]
+
     # --- Compute positions ---
-    # Sources: stacked vertically at x=pad
-    src_total_h = len(source_nodes) * nh + max(len(source_nodes) - 1, 0) * vgap
-    src_positions: list[tuple[float, float, float]] = []  # (x, y, w)
-    sy = pad
-    for _label, _ in source_nodes:
-        src_positions.append((pad, sy, max_source_w))
+    # Primary sources: stacked vertically at x=pad
+    max_primary_w = max((source_widths[sn] for sn, _ in primary_sources), default=80.0)
+    primary_count = len(primary_sources)
+    primary_total_h = primary_count * nh + max(primary_count - 1, 0) * vgap
+
+    # Join sources sit above the pipeline, so the pipeline row needs vertical room
+    has_join_sources = len(join_sources) > 0
+    join_row_h = (nh + vgap) if has_join_sources else 0
+
+    # Pipeline center Y
+    center_y = pad + join_row_h
+    if primary_sources:
+        center_y = max(center_y, pad + join_row_h + primary_total_h / 2 - nh / 2)
+        # If primary stack is taller, it determines center_y
+        if primary_total_h > nh:
+            center_y = pad + join_row_h
+
+    primary_positions: dict[str, tuple[float, float, float]] = {}
+    sy = center_y + nh / 2 - primary_total_h / 2 if primary_count > 0 else center_y
+    for slabel, _stype in primary_sources:
+        primary_positions[slabel] = (pad, sy, max_primary_w)
         sy += nh + vgap
 
-    # Pipeline center Y (vertically centered with source stack)
-    center_y = pad + src_total_h / 2 - nh / 2
-    if not source_nodes:
-        center_y = pad
-
-    # Pipeline nodes: left to right after sources
-    px = pad + max_source_w + hgap
-    pipe_positions: list[tuple[float, float, float]] = []  # (x, y, w)
-    for idx, (_ntype, _label, _count) in enumerate(pipeline_nodes):
+    # Pipeline nodes: left to right after primary sources
+    px = pad + (max_primary_w + hgap if primary_sources else 0.0)
+    pipe_positions: list[tuple[float, float, float]] = []
+    for idx, (_ntype, _label, _count, _jsrc) in enumerate(pipeline_nodes):
         w = pipe_widths[idx]
         pipe_positions.append((px, center_y, w))
         px += w + hgap
 
+    # Join source positions: centered above their join node
+    join_positions: dict[str, tuple[float, float, float]] = {}
+    for slabel in join_source_names:
+        pidx = join_source_to_pipe_idx[slabel]
+        jpx, _jpy, jpw = pipe_positions[pidx]
+        sw = source_widths[slabel]
+        # Center the source above the join node
+        jx = jpx + jpw / 2 - sw / 2
+        jy = center_y - nh - vgap
+        join_positions[slabel] = (jx, jy, sw)
+
+    # Build combined source position list (in original order, for node rendering)
+    src_positions: list[tuple[float, float, float]] = []
+    for slabel, _stype in source_nodes:
+        if slabel in primary_positions:
+            src_positions.append(primary_positions[slabel])
+        else:
+            src_positions.append(join_positions[slabel])
+
     # Target: after pipeline
     if not pipeline_nodes:
-        px = pad + max_source_w + hgap
+        px = pad + (max_primary_w + hgap if primary_sources else 0.0)
     target_pos = (px, center_y, target_w)
 
     # Canvas dimensions
+    top_edge = min(y for _, y, _ in src_positions) if src_positions else pad
+    bot_edge = max(y + nh for _, y, _ in src_positions) if src_positions else center_y + nh
+    bot_edge = max(bot_edge, center_y + nh)
     canvas_w = px + target_w + pad
-    canvas_h = max(src_total_h, nh) + pad * 2
+    canvas_h = bot_edge - top_edge + pad * 2
+
+    # Shift everything so top_edge aligns with pad
+    y_offset = pad - top_edge
+    src_positions = [(x, y + y_offset, w) for x, y, w in src_positions]
+    pipe_positions = [(x, y + y_offset, w) for x, y, w in pipe_positions]
+    target_pos = (target_pos[0], target_pos[1] + y_offset, target_pos[2])
+    center_y += y_offset
 
     # --- Render SVG ---
     parts: list[str] = []
@@ -1046,14 +1101,20 @@ def render_flow_svg(thread: Thread) -> str:
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="flow-bg"/>')
 
     # --- Edges (draw first, behind nodes) ---
-    # Source → first pipeline node (or target if no pipeline)
+    # Primary sources → first pipeline node or target
     first_target_x = pipe_positions[0][0] if pipe_positions else target_pos[0]
     first_target_y = pipe_positions[0][1] if pipe_positions else target_pos[1]
-    for sx, sy, sw in src_positions:
-        x1 = sx + sw
-        y1 = sy + nh / 2
-        x2 = first_target_x
-        y2 = first_target_y + nh / 2
+    for (slabel, _stype), (sx, sy, sw) in zip(source_nodes, src_positions, strict=True):
+        if slabel in join_source_names:
+            # Join source → its join node (vertical arrow down)
+            pidx = join_source_to_pipe_idx[slabel]
+            tx, ty, tw = pipe_positions[pidx]
+            x1, y1 = sx + sw / 2, sy + nh
+            x2, y2 = tx + tw / 2, ty
+        else:
+            # Primary source → first pipeline node (or target)
+            x1, y1 = sx + sw, sy + nh / 2
+            x2, y2 = first_target_x, first_target_y + nh / 2
         parts.append(
             f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
             f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
@@ -1099,7 +1160,9 @@ def render_flow_svg(thread: Thread) -> str:
         )
 
     # --- Pipeline nodes ---
-    for (ntype, label, count), (px, py, pw) in zip(pipeline_nodes, pipe_positions, strict=True):
+    for (ntype, label, count, _jsrc), (px, py, pw) in zip(
+        pipeline_nodes, pipe_positions, strict=True
+    ):
         css_class = "flow-join" if ntype == "join" else "flow-transform"
         display_label = label if count <= 1 else f"{label} ({count})"
 
