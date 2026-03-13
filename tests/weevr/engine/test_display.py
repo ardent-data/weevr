@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from datetime import UTC
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from weevr.engine.display import (
     DAGDiagram,
+    FlowDiagram,
+    render_annotated_dag_svg,
     render_dag_svg,
     render_execution_plan_html,
+    render_flow_svg,
     render_loom_dag_svg,
     render_plan_html,
     render_result_html,
+    render_timeline_svg,
+    render_waterfall_svg,
 )
 from weevr.engine.planner import ExecutionPlan
 
@@ -709,3 +716,1084 @@ class TestRenderResultHtml:
         html_out = render_result_html(result)
         assert "<script>" not in html_out
         assert "<img" not in html_out
+
+
+# ---------------------------------------------------------------------------
+# Helpers for M103 Phase 5 tests
+# ---------------------------------------------------------------------------
+
+
+def _fake_source(*, type_: str = "delta", alias: str = "src") -> object:
+    """Build a duck-typed Source for flow diagram tests."""
+    return type("S", (), {"type": type_, "alias": alias, "path": None, "lookup": None})()
+
+
+def _fake_target(*, alias: str = "tgt", write_mode: str = "overwrite") -> object:
+    """Build a duck-typed Target for flow diagram tests."""
+    return type("T", (), {"alias": alias, "path": None})()
+
+
+def _fake_step(step_type: str, detail: object | None = None) -> object:
+    """Build a duck-typed pipeline Step of given type."""
+    attrs: dict[str, object] = {st: None for st in ("filter", "rename", "cast", "join", "derive")}
+    attrs[step_type] = detail or type("P", (), {})()
+    return type("Step", (), attrs)()
+
+
+def _fake_join_step(jtype: str = "inner", keys: list[str] | None = None) -> object:
+    """Build a duck-typed JoinStep with join params."""
+    key_objs = [type("K", (), {"left": k})() for k in (keys or ["id"])]
+    params = type("JP", (), {"type": jtype, "on": key_objs, "source": "right"})()
+    return _fake_step("join", params)
+
+
+def _fake_thread(
+    *,
+    name: str = "test_thread",
+    sources: dict[str, object] | None = None,
+    steps: list[object] | None = None,
+    target: object | None = None,
+    write: object | None = None,
+) -> Any:
+    """Build a duck-typed Thread model for flow diagram tests."""
+    return type(
+        "Thread",
+        (),
+        {
+            "name": name,
+            "sources": sources or {"main": _fake_source()},
+            "steps": steps or [],
+            "target": target or _fake_target(),
+            "write": write or type("W", (), {"mode": "overwrite"})(),
+        },
+    )()
+
+
+def _fake_span(*, start_ms: int = 0, end_ms: int = 1000) -> object:
+    """Build a duck-typed ExecutionSpan."""
+    from datetime import datetime, timedelta
+
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    return type(
+        "Span",
+        (),
+        {
+            "start_time": base + timedelta(milliseconds=start_ms),
+            "end_time": base + timedelta(milliseconds=end_ms),
+        },
+    )()
+
+
+def _fake_thread_telemetry(
+    *,
+    rows_read: int = 100,
+    rows_written: int = 90,
+    rows_quarantined: int = 0,
+    rows_after_transforms: int = 95,
+    load_mode: str = "full",
+    span: object | None = None,
+    validation_results: list[object] | None = None,
+    assertion_results: list[object] | None = None,
+    resolved_params: dict[str, object] | None = None,
+) -> object:
+    """Build a duck-typed ThreadTelemetry."""
+    return type(
+        "TT",
+        (),
+        {
+            "span": span or _fake_span(),
+            "rows_read": rows_read,
+            "rows_written": rows_written,
+            "rows_quarantined": rows_quarantined,
+            "rows_after_transforms": rows_after_transforms,
+            "load_mode": load_mode,
+            "validation_results": validation_results or [],
+            "assertion_results": assertion_results or [],
+            "resolved_params": resolved_params,
+            "watermark_column": None,
+            "cdc_inserts": None,
+            "cdc_updates": None,
+            "cdc_deletes": None,
+        },
+    )()
+
+
+def _fake_thread_result(
+    *,
+    thread_name: str = "dim_cust",
+    status: str = "success",
+    rows_written: int = 500,
+    write_mode: str = "overwrite",
+    telemetry: object | None = None,
+    error: str | None = None,
+    output_schema: list[tuple[str, str]] | None = None,
+    samples: dict[str, list[dict[str, object]]] | None = None,
+) -> object:
+    """Build a duck-typed ThreadResult."""
+    return type(
+        "TR",
+        (),
+        {
+            "thread_name": thread_name,
+            "status": status,
+            "rows_written": rows_written,
+            "write_mode": write_mode,
+            "target_path": f"Tables/{thread_name}",
+            "telemetry": telemetry,
+            "error": error,
+            "output_schema": output_schema,
+            "samples": samples,
+        },
+    )()
+
+
+# ---------------------------------------------------------------------------
+# Task 16 — FlowDiagram class tests
+# ---------------------------------------------------------------------------
+
+
+class TestFlowDiagram:
+    def test_svg_property(self) -> None:
+        diagram = FlowDiagram(_SAMPLE_SVG)
+        assert diagram.svg == _SAMPLE_SVG
+
+    def test_repr_svg(self) -> None:
+        diagram = FlowDiagram(_SAMPLE_SVG)
+        assert diagram._repr_svg_() == _SAMPLE_SVG
+
+    def test_repr_html(self) -> None:
+        diagram = FlowDiagram(_SAMPLE_SVG)
+        html_out = diagram._repr_html_()
+        assert _SAMPLE_SVG in html_out
+        assert "<div" in html_out
+
+    def test_str(self) -> None:
+        diagram = FlowDiagram(_SAMPLE_SVG)
+        assert str(diagram) == _SAMPLE_SVG
+
+    def test_save(self, tmp_path: pytest.TempPathFactory) -> None:
+        diagram = FlowDiagram(_SAMPLE_SVG)
+        out = str(tmp_path / "flow.svg")  # type: ignore[operator]
+        diagram.save(out)
+        assert Path(out).read_text(encoding="utf-8") == _SAMPLE_SVG
+
+
+# ---------------------------------------------------------------------------
+# Task 17 — render_flow_svg() tests
+# ---------------------------------------------------------------------------
+
+
+class TestRenderFlowSvg:
+    def test_single_source_no_transforms(self) -> None:
+        thread = _fake_thread()
+        svg = render_flow_svg(thread)
+        assert "<svg" in svg
+        assert 'class="flow-source"' in svg
+        assert 'class="flow-target"' in svg
+
+    def test_single_source_with_transforms(self) -> None:
+        thread = _fake_thread(steps=[_fake_step("filter"), _fake_step("rename")])
+        svg = render_flow_svg(thread)
+        assert 'class="flow-transform"' in svg
+
+    def test_multiple_sources_with_join(self) -> None:
+        sources = {"main": _fake_source(alias="src_a"), "right": _fake_source(alias="src_b")}
+        steps = [_fake_join_step("inner", ["id"]), _fake_step("filter")]
+        thread = _fake_thread(sources=sources, steps=steps)
+        svg = render_flow_svg(thread)
+        assert "main" in svg
+        assert "right" in svg
+        assert 'class="flow-join"' in svg
+
+    def test_consecutive_same_type_grouped(self) -> None:
+        steps = [_fake_step("rename"), _fake_step("rename"), _fake_step("rename")]
+        thread = _fake_thread(steps=steps)
+        svg = render_flow_svg(thread)
+        # Grouped with count badge — "(3)" in the SVG
+        assert "(3)" in svg
+
+    def test_mixed_transforms_not_grouped(self) -> None:
+        steps = [_fake_step("rename"), _fake_step("filter"), _fake_step("rename")]
+        thread = _fake_thread(steps=steps)
+        svg = render_flow_svg(thread)
+        # 3 separate transform nodes, no grouping badge
+        assert svg.count('class="flow-transform"') == 3
+        assert "(2)" not in svg
+        assert "(3)" not in svg
+
+    def test_valid_xml(self) -> None:
+        steps = [_fake_join_step(), _fake_step("filter"), _fake_step("rename")]
+        sources = {"main": _fake_source(), "right": _fake_source(alias="lookup")}
+        thread = _fake_thread(sources=sources, steps=steps)
+        svg = render_flow_svg(thread)
+        ET.fromstring(svg)
+
+    def test_dark_mode_css(self) -> None:
+        thread = _fake_thread()
+        svg = render_flow_svg(thread)
+        assert "prefers-color-scheme:dark" in svg
+
+    def test_xml_escaping(self) -> None:
+        thread = _fake_thread(
+            sources={"<script>": _fake_source(alias="src")},
+            target=_fake_target(alias="target&name"),
+        )
+        svg = render_flow_svg(thread)
+        assert "<script>" not in svg
+        assert "&lt;script&gt;" in svg
+
+
+# ---------------------------------------------------------------------------
+# Task 18 — Timeline, waterfall, and annotated DAG SVG tests
+# ---------------------------------------------------------------------------
+
+
+class TestRenderTimelineSvg:
+    def _make_weave_result(
+        self,
+        thread_names: list[str],
+        *,
+        statuses: list[str] | None = None,
+    ) -> object:
+        """Build a duck-typed WeaveResult with thread_results."""
+        statuses = statuses or ["success"] * len(thread_names)
+        trs = []
+        for i, name in enumerate(thread_names):
+            tr = _fake_thread_result(
+                thread_name=name,
+                status=statuses[i],
+                telemetry=_fake_thread_telemetry(
+                    span=_fake_span(start_ms=i * 100, end_ms=(i + 1) * 200)
+                ),
+            )
+            trs.append(tr)
+        return type("WR", (), {"thread_results": trs, "weave_name": "test_weave"})()
+
+    def test_basic_timeline(self) -> None:
+        wr = self._make_weave_result(["a", "b"])
+        svg = render_timeline_svg(wr, None, None)
+        assert "<svg" in svg
+        assert "a" in svg
+        assert "b" in svg
+
+    def test_with_hooks_and_lookups(self) -> None:
+        wr = self._make_weave_result(["a"])
+        hooks = [
+            type(
+                "HR",
+                (),
+                {
+                    "phase": "pre",
+                    "step_name": "pre_hook",
+                    "step_type": "sql",
+                    "status": "passed",
+                    "duration_ms": 50,
+                    "gate_result": None,
+                },
+            )(),
+        ]
+        lookups = [
+            type("LR", (), {"name": "ext_ref", "duration_ms": 100})(),
+        ]
+        svg = render_timeline_svg(wr, hooks, lookups)
+        assert "Pre-hooks" in svg or "pre" in svg.lower()
+        assert "Lookups" in svg or "ext_ref" in svg
+
+    def test_empty_threads(self) -> None:
+        wr = type("WR", (), {"thread_results": [], "weave_name": "empty"})()
+        svg = render_timeline_svg(wr, None, None)
+        assert "<svg" in svg
+
+    def test_valid_xml(self) -> None:
+        wr = self._make_weave_result(["a", "b", "c"])
+        svg = render_timeline_svg(wr, None, None)
+        ET.fromstring(svg)
+
+    def test_dark_mode_css(self) -> None:
+        wr = self._make_weave_result(["a"])
+        svg = render_timeline_svg(wr, None, None)
+        assert "prefers-color-scheme:dark" in svg
+
+
+class TestRenderWaterfallSvg:
+    def test_execute_mode_full(self) -> None:
+        tr = _fake_thread_result(rows_written=90)
+        tt = _fake_thread_telemetry(rows_read=100, rows_after_transforms=95, rows_quarantined=5)
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        assert "Rows read" in svg
+        assert "After transforms" in svg
+        assert "Quarantined" in svg
+        assert "Rows written" in svg
+
+    def test_execute_mode_no_quarantine(self) -> None:
+        tr = _fake_thread_result(rows_written=100)
+        tt = _fake_thread_telemetry(rows_read=100, rows_after_transforms=100, rows_quarantined=0)
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        assert "Quarantined" not in svg
+        assert "Rows written" in svg
+
+    def test_preview_mode(self) -> None:
+        tr = _fake_thread_result(rows_written=0)
+        tt = _fake_thread_telemetry(rows_read=50, rows_after_transforms=45)
+        svg = render_waterfall_svg(tr, tt, mode="preview")
+        assert "Rows read" in svg
+        assert "After transforms" in svg
+        assert "Rows written" not in svg
+
+    def test_zero_rows(self) -> None:
+        tr = _fake_thread_result(rows_written=0)
+        tt = _fake_thread_telemetry(rows_read=0, rows_after_transforms=0)
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        assert "<svg" in svg
+
+    def test_valid_xml(self) -> None:
+        tr = _fake_thread_result(rows_written=90)
+        tt = _fake_thread_telemetry()
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        ET.fromstring(svg)
+
+    def test_thousands_separator(self) -> None:
+        tr = _fake_thread_result(rows_written=1_500_000)
+        tt = _fake_thread_telemetry(rows_read=2_000_000, rows_after_transforms=1_800_000)
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        assert "2,000,000" in svg
+        assert "1,500,000" in svg
+
+
+class TestRenderAnnotatedDagSvg:
+    def test_status_badges_present(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"], dependencies={"a": [], "b": ["a"]}, execution_order=[["a"], ["b"]]
+        )
+        trs = {
+            "a": _fake_thread_result(
+                thread_name="a", status="success", telemetry=_fake_thread_telemetry()
+            ),
+            "b": _fake_thread_result(
+                thread_name="b", status="failure", telemetry=_fake_thread_telemetry()
+            ),
+        }
+        svg = render_annotated_dag_svg(plan, trs)
+        # Green for success, red for failure
+        assert "#48bb78" in svg  # success badge color
+        assert "#fc8181" in svg  # failure badge color
+
+    def test_duration_labels(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        trs = {
+            "a": _fake_thread_result(
+                thread_name="a",
+                telemetry=_fake_thread_telemetry(span=_fake_span(start_ms=0, end_ms=2500)),
+            )
+        }
+        svg = render_annotated_dag_svg(plan, trs)
+        assert "2.5s" in svg
+
+    def test_missing_thread_results(self) -> None:
+        plan = _make_plan(
+            threads=["a", "b"], dependencies={"a": [], "b": ["a"]}, execution_order=[["a"], ["b"]]
+        )
+        trs = {"a": _fake_thread_result(thread_name="a", telemetry=_fake_thread_telemetry())}
+        svg = render_annotated_dag_svg(plan, trs)
+        # Should render without error — "b" has no badge
+        assert "<svg" in svg
+
+    def test_valid_xml(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        trs = {"a": _fake_thread_result(thread_name="a", telemetry=_fake_thread_telemetry())}
+        svg = render_annotated_dag_svg(plan, trs)
+        ET.fromstring(svg)
+
+    def test_empty_plan_fallback(self) -> None:
+        plan = _make_plan(threads=[], execution_order=[])
+        svg = render_annotated_dag_svg(plan, {})
+        assert "<svg" in svg
+
+
+# ---------------------------------------------------------------------------
+# Task 19 — HTML section renderer tests
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlSectionRenderers:
+    def test_params_table(self) -> None:
+        from weevr.engine.display import _render_params_table
+
+        html_out = _render_params_table({"env": "prod", "date": "2026-01-01"})
+        assert "Resolved Parameters" in html_out
+        assert "env" in html_out
+        assert "prod" in html_out
+
+    def test_params_table_empty(self) -> None:
+        from weevr.engine.display import _render_params_table
+
+        assert _render_params_table(None) == ""
+        assert _render_params_table({}) == ""
+
+    def test_variables_table(self) -> None:
+        from weevr.engine.display import _render_variables_table
+
+        html_out = _render_variables_table({"max_date": "2026-01-01"})
+        assert "Variables" in html_out
+        assert "max_date" in html_out
+
+    def test_hook_results_table(self) -> None:
+        from weevr.engine.display import _render_hook_results_table
+
+        hooks = [
+            type(
+                "HR",
+                (),
+                {
+                    "phase": "pre",
+                    "step_type": "sql",
+                    "step_name": "check",
+                    "status": "passed",
+                    "duration_ms": 50,
+                    "gate_result": None,
+                },
+            )(),
+        ]
+        html_out = _render_hook_results_table(hooks)
+        assert "Hook Results" in html_out
+        assert "check" in html_out
+        assert "pre" in html_out
+
+    def test_hook_results_gate_failure(self) -> None:
+        from weevr.engine.display import _render_hook_results_table
+
+        gate = type("G", (), {"passed": False, "message": "threshold exceeded"})()
+        hooks = [
+            type(
+                "HR",
+                (),
+                {
+                    "phase": "pre",
+                    "step_type": "gate",
+                    "step_name": "check",
+                    "status": "aborted",
+                    "duration_ms": 10,
+                    "gate_result": gate,
+                },
+            )(),
+        ]
+        html_out = _render_hook_results_table(hooks)
+        assert "threshold exceeded" in html_out
+
+    def test_lookup_results_table(self) -> None:
+        from weevr.engine.display import _render_lookup_results_table
+
+        lookups = [
+            type(
+                "LR",
+                (),
+                {
+                    "name": "dim_product",
+                    "strategy": "broadcast",
+                    "row_count": 500,
+                    "duration_ms": 200,
+                    "unique_key_checked": True,
+                    "unique_key_passed": True,
+                },
+            )(),
+        ]
+        html_out = _render_lookup_results_table(lookups)
+        assert "Lookup Results" in html_out
+        assert "dim_product" in html_out
+        assert "broadcast" in html_out
+
+    def test_validation_table(self) -> None:
+        from weevr.engine.display import _render_validation_table
+
+        rules = [
+            type(
+                "VR",
+                (),
+                {
+                    "rule_name": "not_null_id",
+                    "expression": "id IS NOT NULL",
+                    "severity": "error",
+                    "rows_passed": 99,
+                    "rows_failed": 1,
+                },
+            )(),
+        ]
+        html_out = _render_validation_table(rules)
+        assert "Validation Rules" in html_out
+        assert "not_null_id" in html_out
+        assert "id IS NOT NULL" in html_out
+
+    def test_validation_table_highlights_failures(self) -> None:
+        from weevr.engine.display import _render_validation_table
+
+        rules = [
+            type(
+                "VR",
+                (),
+                {
+                    "rule_name": "r",
+                    "expression": "x",
+                    "severity": "error",
+                    "rows_passed": 0,
+                    "rows_failed": 100,
+                },
+            )(),
+        ]
+        html_out = _render_validation_table(rules)
+        assert "#9b2c2c" in html_out  # red color for failures
+
+    def test_assertion_table(self) -> None:
+        from weevr.engine.display import _render_assertion_table
+
+        assertions = [
+            type(
+                "AR",
+                (),
+                {
+                    "assertion_type": "row_count",
+                    "severity": "error",
+                    "passed": True,
+                    "details": "count=500, min=1",
+                },
+            )(),
+        ]
+        html_out = _render_assertion_table(assertions)
+        assert "Assertions" in html_out
+        assert "row_count" in html_out
+
+    def test_schema_table(self) -> None:
+        from weevr.engine.display import _render_schema_table
+
+        schema = [("id", "bigint"), ("name", "string")]
+        html_out = _render_schema_table(schema)
+        assert "Output Schema" in html_out
+        assert "bigint" in html_out
+        assert "name" in html_out
+
+    def test_schema_table_empty(self) -> None:
+        from weevr.engine.display import _render_schema_table
+
+        assert _render_schema_table(None) == ""
+        assert _render_schema_table([]) == ""
+
+    def test_sample_table(self) -> None:
+        from weevr.engine.display import _render_sample_table
+
+        samples = {"output": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]}
+        html_out = _render_sample_table(samples, "output")
+        assert "Data Sample" in html_out
+        assert "Alice" in html_out
+        assert "Bob" in html_out
+
+    def test_sample_table_truncation(self) -> None:
+        from weevr.engine.display import _render_sample_table
+
+        long_val = "x" * 100
+        samples = {"output": [{"col": long_val}]}
+        html_out = _render_sample_table(samples, "output")
+        assert "\u2026" in html_out  # ellipsis for truncation
+
+    def test_sample_table_missing_key(self) -> None:
+        from weevr.engine.display import _render_sample_table
+
+        assert _render_sample_table({"output": []}, "quarantine") == ""
+        assert _render_sample_table(None, "output") == ""
+
+    def test_watermark_section(self) -> None:
+        from weevr.engine.display import _render_watermark_section
+
+        telem = type(
+            "TT",
+            (),
+            {
+                "watermark_column": "updated_at",
+                "watermark_previous_value": "2026-01-01",
+                "watermark_new_value": "2026-01-15",
+                "watermark_first_run": False,
+                "watermark_persisted": True,
+            },
+        )()
+        html_out = _render_watermark_section(telem)
+        assert "Watermark State" in html_out
+        assert "updated_at" in html_out
+        assert "2026-01-15" in html_out
+
+    def test_watermark_section_first_run(self) -> None:
+        from weevr.engine.display import _render_watermark_section
+
+        telem = type(
+            "TT",
+            (),
+            {
+                "watermark_column": "ts",
+                "watermark_previous_value": None,
+                "watermark_new_value": "2026-01-01",
+                "watermark_first_run": True,
+                "watermark_persisted": True,
+            },
+        )()
+        html_out = _render_watermark_section(telem)
+        assert "first run" in html_out
+
+    def test_watermark_section_empty(self) -> None:
+        from weevr.engine.display import _render_watermark_section
+
+        telem = type("TT", (), {"watermark_column": None})()
+        assert _render_watermark_section(telem) == ""
+
+    def test_cdc_section(self) -> None:
+        from weevr.engine.display import _render_cdc_section
+
+        telem = type("TT", (), {"cdc_inserts": 100, "cdc_updates": 50, "cdc_deletes": 5})()
+        html_out = _render_cdc_section(telem)
+        assert "CDC Breakdown" in html_out
+        assert "100" in html_out
+        assert "50" in html_out
+
+    def test_cdc_section_empty(self) -> None:
+        from weevr.engine.display import _render_cdc_section
+
+        telem = type("TT", (), {"cdc_inserts": None, "cdc_updates": None, "cdc_deletes": None})()
+        assert _render_cdc_section(telem) == ""
+
+    def test_row_counts(self) -> None:
+        from weevr.engine.display import _render_row_counts
+
+        telem = _fake_thread_telemetry(rows_read=100, rows_after_transforms=95, rows_quarantined=5)
+        html_out = _render_row_counts(telem, rows_written=90)
+        assert "Row Counts" in html_out
+        assert "100" in html_out
+        assert "90" in html_out
+
+    def test_row_counts_empty(self) -> None:
+        from weevr.engine.display import _render_row_counts
+
+        telem = type(
+            "TT", (), {"rows_read": 0, "rows_quarantined": 0, "rows_after_transforms": 0}
+        )()
+        assert _render_row_counts(telem, rows_written=0) == ""
+
+
+# ---------------------------------------------------------------------------
+# Task 19 (continued) — Collapsible layout and mode matrix tests
+# ---------------------------------------------------------------------------
+
+
+class TestCollapsibleLayout:
+    def test_details_elements_in_execute(self) -> None:
+        tr = _fake_thread_result(telemetry=_fake_thread_telemetry())
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "<details" in html_out
+        assert "<summary" in html_out
+
+    def test_failed_thread_auto_expanded(self) -> None:
+        tr = _fake_thread_result(status="failure", error="boom", telemetry=_fake_thread_telemetry())
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "failure",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "open" in html_out
+
+    def test_successful_thread_collapsed(self) -> None:
+        tr = _fake_thread_result(status="success", telemetry=_fake_thread_telemetry())
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        # <details style="..."> without open attribute
+        assert '<details style="' in html_out
+        # The details tag should NOT have " open" for successful threads
+        import re
+
+        details_tags = re.findall(r"<details[^>]*>", html_out)
+        assert all(" open" not in tag for tag in details_tags)
+
+    def test_loom_two_level_collapse(self) -> None:
+        tr = _fake_thread_result(thread_name="dim_a")
+        w1 = type("WR", (), {"thread_results": [tr], "weave_name": "dims", "status": "success"})()
+        detail = type("LR", (), {"weave_results": [w1]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "loom",
+                "config_name": "pipeline",
+                "duration_ms": 500,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        # Nested details: weave level + thread level
+        assert html_out.count("<details") >= 2
+
+
+class TestModeMatrix:
+    def test_execute_mode_sections(self) -> None:
+        telem = _fake_thread_telemetry(
+            validation_results=[
+                type(
+                    "VR",
+                    (),
+                    {
+                        "rule_name": "r1",
+                        "expression": "x",
+                        "severity": "warn",
+                        "rows_passed": 100,
+                        "rows_failed": 0,
+                    },
+                )(),
+            ],
+            assertion_results=[
+                type(
+                    "AR",
+                    (),
+                    {
+                        "assertion_type": "row_count",
+                        "severity": "error",
+                        "passed": True,
+                        "details": "ok",
+                    },
+                )(),
+            ],
+        )
+        tr = _fake_thread_result(
+            telemetry=telem,
+            output_schema=[("id", "bigint")],
+            samples={"output": [{"id": 1}]},
+        )
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Validation Rules" in html_out
+        assert "Assertions" in html_out
+        assert "Output Schema" in html_out
+        assert "Data Sample" in html_out
+        assert "Row Counts" in html_out
+
+    def test_preview_mode_sections(self) -> None:
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "preview",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "preview_data": {},
+                "_preview_metadata": {},
+                "telemetry": None,
+                "_resolved_threads": {},
+                "warnings": [],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Preview Summary" in html_out
+        # No execute-only sections
+        assert "Hook Results" not in html_out
+        assert "CDC Breakdown" not in html_out
+
+    def test_validate_mode_with_assertions(self) -> None:
+        v_rule = type(
+            "V", (), {"name": "not_null", "expression": "id IS NOT NULL", "severity": "error"}
+        )()
+        a_def = type(
+            "A",
+            (),
+            {
+                "type": "row_count",
+                "severity": "error",
+                "columns": None,
+                "expression": None,
+                "min": 1,
+                "max": None,
+            },
+        )()
+        thread_model = type("TM", (), {"validations": [v_rule], "assertions": [a_def]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "validate",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "validation_errors": [],
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {"dim_cust": thread_model},
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Validation Rules" in html_out
+        assert "not_null" in html_out
+        assert "Assertions" in html_out
+        assert "row_count" in html_out
+
+    def test_plan_mode_with_flow_diagrams(self) -> None:
+        plan = _make_plan(threads=["a"], execution_order=[["a"]])
+        thread_model = _fake_thread(name="a")
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "plan",
+                "status": "PLANNED",
+                "config_type": "weave",
+                "config_name": "test_weave",
+                "execution_plan": [plan],
+                "_resolved_threads": {"a": thread_model},
+                "telemetry": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Thread Pipelines" in html_out
+        assert 'class="flow-source"' in html_out
+
+
+# ---------------------------------------------------------------------------
+# Task 20 — Data model tests
+# ---------------------------------------------------------------------------
+
+
+class TestDataModelFields:
+    def test_thread_result_new_fields(self) -> None:
+        from weevr.engine.result import ThreadResult
+
+        tr = ThreadResult(
+            status="success",
+            thread_name="test",
+            rows_written=100,
+            write_mode="overwrite",
+            target_path="Tables/test",
+            output_schema=[("id", "bigint"), ("name", "string")],
+            samples={"output": [{"id": 1, "name": "a"}]},
+        )
+        assert tr.output_schema == [("id", "bigint"), ("name", "string")]
+        assert tr.samples is not None
+        assert len(tr.samples["output"]) == 1
+
+    def test_thread_result_defaults(self) -> None:
+        from weevr.engine.result import ThreadResult
+
+        tr = ThreadResult(
+            status="success",
+            thread_name="test",
+            rows_written=0,
+            write_mode="overwrite",
+            target_path="Tables/test",
+        )
+        assert tr.output_schema is None
+        assert tr.samples is None
+
+    def test_thread_telemetry_new_fields(self) -> None:
+        from weevr.telemetry.results import ThreadTelemetry
+        from weevr.telemetry.span import ExecutionSpan
+
+        span = ExecutionSpan(trace_id="a" * 32, span_id="b" * 16, name="test")
+        tt = ThreadTelemetry(
+            span=span,
+            rows_after_transforms=500,
+            resolved_params={"env": "prod"},
+        )
+        assert tt.rows_after_transforms == 500
+        assert tt.resolved_params == {"env": "prod"}
+
+    def test_weave_telemetry_resolved_params(self) -> None:
+        from weevr.telemetry.results import WeaveTelemetry
+        from weevr.telemetry.span import ExecutionSpan
+
+        span = ExecutionSpan(trace_id="a" * 32, span_id="b" * 16, name="test")
+        wt = WeaveTelemetry(
+            span=span,
+            resolved_params={"batch": "daily"},
+        )
+        assert wt.resolved_params == {"batch": "daily"}
+
+    def test_loom_telemetry_resolved_params(self) -> None:
+        from weevr.telemetry.results import LoomTelemetry
+        from weevr.telemetry.span import ExecutionSpan
+
+        span = ExecutionSpan(trace_id="a" * 32, span_id="b" * 16, name="test")
+        lt = LoomTelemetry(
+            span=span,
+            resolved_params={"region": "us"},
+        )
+        assert lt.resolved_params == {"region": "us"}
+
+
+# ---------------------------------------------------------------------------
+# Task 21 — Edge case tests (partial data, failures, empty states)
+# ---------------------------------------------------------------------------
+
+
+class TestPartialData:
+    def test_failed_thread_shows_error_banner(self) -> None:
+        tr = _fake_thread_result(
+            status="failure",
+            error="Connection timeout",
+            rows_written=0,
+            telemetry=_fake_thread_telemetry(rows_read=0, rows_after_transforms=0),
+        )
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "failure",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Connection timeout" in html_out
+
+    def test_missing_sections_omitted(self) -> None:
+        # Thread with no schema, no samples, no watermark, no CDC
+        tr = _fake_thread_result(telemetry=_fake_thread_telemetry())
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Output Schema" not in html_out
+        assert "Data Sample" not in html_out
+        assert "Watermark" not in html_out
+        assert "CDC" not in html_out
+
+    def test_empty_weave_result(self) -> None:
+        detail = type("WR", (), {"thread_results": []})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 0,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "Execution Summary" in html_out
+
+    def test_thread_with_partial_telemetry(self) -> None:
+        # rows_read captured but no samples or schema
+        tr = _fake_thread_result(
+            status="failure",
+            error="Write failed",
+            rows_written=0,
+            telemetry=_fake_thread_telemetry(rows_read=100, rows_after_transforms=95),
+        )
+        detail = type("WR", (), {"thread_results": [tr]})()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "failure",
+                "config_type": "weave",
+                "config_name": "test",
+                "duration_ms": 100,
+                "detail": detail,
+                "warnings": [],
+                "telemetry": None,
+                "_resolved_threads": {},
+                "execution_plan": None,
+            },
+        )()
+        html_out = render_result_html(result)
+        # Row counts should still be present
+        assert "Row Counts" in html_out
+        assert "100" in html_out
