@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../release-notes/1.5/" class="md-tabs__link">
+        <a href="../release-notes/1.6/" class="md-tabs__link">
           
   
   
@@ -2040,6 +2040,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../release-notes/1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../release-notes/1.5/" class="md-nav__link">
         
   
@@ -2612,15 +2640,16 @@ hierarchy.</p>
 <p>By default, weevr uses null-safe join semantics to prevent the common
 Spark pitfall where <code>NULL = NULL</code> evaluates to <code>NULL</code> (not <code>true</code>),
 silently dropping rows from join results.</p>
-<p>If you need to customize this behavior, configure null key handling at the
-thread level:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">keys</span><span class="p">:</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">null_safe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">null_key_replacement</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;__NULL__&quot;</span>
+<p>Null-safe behavior is configured per join step and is enabled by default:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">join</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_region</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">left</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">      </span><span class="nt">null_safe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># default — rows with null keys are preserved</span>
 </code></pre></div>
-<p>When <code>null_safe</code> is enabled, null key values are replaced with a sentinel
-before the join and restored afterward. This ensures rows with null keys
-participate in joins as expected.</p>
+<p>Set <code>null_safe: false</code> on a specific join step to use standard Spark join
+semantics where null keys do not match.</p>
 <hr />
 <h2 id="can-i-cache-lookup-tables">Can I cache lookup tables?<a class="headerlink" href="#can-i-cache-lookup-tables" title="Permanent link">&para;</a></h2>
 <p>Yes. There are two approaches:</p>
