@@ -2495,9 +2495,12 @@ files to swap environment-specific paths. See the
 <p>Configuration cascades through three levels: <strong>Loom</strong> &gt; <strong>Weave</strong> &gt;
 <strong>Thread</strong>. The rule is simple -- most specific wins.</p>
 <p>A loom can define default write modes, execution settings, and audit
-templates. A weave can override any of those. A thread can override
+columns. A weave can override any of those. A thread can override
 anything the weave set. Scalar values are replaced outright; collections
-(lists, maps) are also replaced entirely, not merged.</p>
+(lists, maps) are also replaced entirely, not merged. The exception is
+<code>audit_columns</code>, which uses <strong>additive merge</strong> -- each level extends the
+column set, and same-named columns at a lower level override the
+expression from the higher level.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Loom default:   write.mode = overwrite
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  └─ Weave:     write.mode = merge       ← overrides loom
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>       └─ Thread A: (inherits merge)

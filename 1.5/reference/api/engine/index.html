@@ -4245,7 +4245,7 @@ if the weave was conditionally skipped at loom level.</p>
 
 
 <h3 id="weevr.engine.execute_thread" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span></code>
 
 <a href="#weevr.engine.execute_thread" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4397,6 +4397,39 @@ Stored on ThreadTelemetry for thread-level runs.</p>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loom name for audit column context variables.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weave name for audit column context variables.
+Derived from <code>thread.qualified_key</code> when not provided.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
             </td>
           </tr>
       </tbody>
@@ -4785,7 +4818,7 @@ and passes it through the execution tree.</p>
 
 
 <h3 id="weevr.engine.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span></code>
 
 <a href="#weevr.engine.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5019,6 +5052,38 @@ instead of <code>plan.weave_name</code>. Typically the weave's qualified key.</p
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loom name passed to threads for audit column context.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weave name passed to threads for audit column context.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
             </td>
           </tr>
       </tbody>

@@ -1239,6 +1239,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.operations.AuditContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AuditContext
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.operations.ValidationOutcome" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1271,6 +1282,39 @@
     <span class="md-ellipsis">
       
         evaluate_assertions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.build_sources_json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_sources_json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.inject_audit_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inject_audit_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.resolve_audit_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_audit_columns
       
     </span>
   </a>
@@ -2291,6 +2335,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.operations.AuditContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AuditContext
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.operations.ValidationOutcome" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2323,6 +2378,39 @@
     <span class="md-ellipsis">
       
         evaluate_assertions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.build_sources_json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_sources_json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.inject_audit_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inject_audit_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.resolve_audit_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_audit_columns
       
     </span>
   </a>
@@ -2484,7 +2572,7 @@ step type maps to an operation function.</p>
 
 
 <h3 id="weevr.operations.__all__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;apply_target_mapping&#39;</span><span class="p">,</span> <span class="s1">&#39;compute_keys&#39;</span><span class="p">,</span> <span class="s1">&#39;evaluate_assertions&#39;</span><span class="p">,</span> <span class="s1">&#39;read_source&#39;</span><span class="p">,</span> <span class="s1">&#39;read_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;run_pipeline&#39;</span><span class="p">,</span> <span class="s1">&#39;validate_dataframe&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationOutcome&#39;</span><span class="p">,</span> <span class="s1">&#39;write_quarantine&#39;</span><span class="p">,</span> <span class="s1">&#39;write_target&#39;</span><span class="p">]</span></code>
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;AuditContext&#39;</span><span class="p">,</span> <span class="s1">&#39;apply_target_mapping&#39;</span><span class="p">,</span> <span class="s1">&#39;build_sources_json&#39;</span><span class="p">,</span> <span class="s1">&#39;compute_keys&#39;</span><span class="p">,</span> <span class="s1">&#39;evaluate_assertions&#39;</span><span class="p">,</span> <span class="s1">&#39;inject_audit_columns&#39;</span><span class="p">,</span> <span class="s1">&#39;read_source&#39;</span><span class="p">,</span> <span class="s1">&#39;read_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_audit_columns&#39;</span><span class="p">,</span> <span class="s1">&#39;run_pipeline&#39;</span><span class="p">,</span> <span class="s1">&#39;validate_dataframe&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationOutcome&#39;</span><span class="p">,</span> <span class="s1">&#39;write_quarantine&#39;</span><span class="p">,</span> <span class="s1">&#39;write_target&#39;</span><span class="p">]</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
@@ -2500,6 +2588,136 @@ step type maps to an operation function.</p>
 </div>
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.operations.AuditContext" class="doc doc-heading">
+            <code>AuditContext</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#weevr.operations.AuditContext" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Execution context for resolving audit column variables.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.thread_name">thread_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thread name (e.g. <code>stg_orders</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.thread_qualified_key">thread_qualified_key</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fully qualified key (e.g. <code>staging.stg_orders</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.thread_source">thread_source</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Primary source alias (first declared source).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.thread_sources_json">thread_sources_json</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JSON array of all sources with type metadata.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.weave_name">weave_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weave name (e.g. <code>staging</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.loom_name">loom_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loom name (e.g. <code>my-project</code>).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
@@ -2718,6 +2936,322 @@ pass/fail status, details, and the configured severity.</p>
             <td>
               <div class="doc-md-description">
                 <p>List of AssertionResult, one per input assertion.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.build_sources_json" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">build_sources_json</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.build_sources_json" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build the ${thread.sources} JSON array from thread source definitions.</p>
+<p>Each source entry includes name, alias (if available), and type
+classification (primary for the first source, lookup for lookup
+references, secondary for all others).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>sources</code>
+            </td>
+            <td>
+                  <code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="object">object</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thread source definitions keyed by alias.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JSON string array of source metadata.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.inject_audit_columns" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inject_audit_columns</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">audit_columns</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.inject_audit_columns" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve context variables, validate, and inject audit columns.</p>
+<p>Each audit column expression is first processed for context variable
+substitution, then evaluated as a Spark SQL expression via <code>F.expr()</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pyspark.sql.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input DataFrame.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>audit_columns</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Audit column definitions as <code>{name: expression}</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>context</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="AuditContext
+
+
+  
+      dataclass
+   (weevr.operations.audit.AuditContext)" href="#weevr.operations.AuditContext">AuditContext</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Execution context for variable resolution.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pyspark.sql.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with audit columns appended.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="../context/#weevr.context.ExecutionError">ExecutionError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If an audit column name conflicts with an existing
+DataFrame column.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.resolve_audit_columns" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_audit_columns</span><span class="p">(</span><span class="n">loom_audit</span><span class="p">,</span> <span class="n">weave_audit</span><span class="p">,</span> <span class="n">thread_audit</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.resolve_audit_columns" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Merge audit columns additively: loom -&gt; weave -&gt; thread.</p>
+<p>Lower levels extend the column set. Same-named columns at a lower
+level override the expression from a higher level.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_audit</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Audit columns from loom defaults.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_audit</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Audit columns from weave defaults.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_audit</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Audit columns from thread target.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Merged audit column dict. Empty dict if none defined.</p>
               </div>
             </td>
           </tr>
