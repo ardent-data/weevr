@@ -70,6 +70,8 @@ class ThreadTelemetry(FrozenBase):
         cdc_deletes: Number of CDC delete operations.
         resolved_params: Runtime parameter values that drove this execution.
             Populated on the outermost telemetry object only (thread-level runs).
+        audit_columns_applied: Names of audit columns injected into the output
+            DataFrame for this thread.
     """
 
     span: ExecutionSpan

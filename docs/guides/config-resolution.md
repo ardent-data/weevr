@@ -107,7 +107,10 @@ loaded config.
      - Thread values always win (most specific)
 
    Naming configuration cascades separately as a whole block rather than
-   per-field.
+   per-field. Audit columns (`audit_columns`) also cascade separately
+   using **additive merge** -- each level extends the column set, and
+   same-named columns at a lower level override the expression from the
+   higher level.
 
 2. **Expand macros** — `foreach` blocks in thread step lists are expanded
    into repeated sequences. This happens after variable resolution so that

@@ -265,6 +265,8 @@ depends on what was executed:
   **watermark_new_value** -- Watermark state for incremental loads
 - **cdc_inserts**, **cdc_updates**, **cdc_deletes** -- CDC operation
   counts
+- **audit_columns_applied** -- Names of audit columns injected into the
+  output
 
 ### Accessing telemetry
 

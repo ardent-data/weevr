@@ -116,7 +116,7 @@ After each thread completes:
   consumers remain.
 - Thread-level telemetry collectors are merged into the weave collector.
 
-**Thread level** (`execute_thread`) — A single thread runs through a 12-step
+**Thread level** (`execute_thread`) — A single thread runs through a 14-step
 pipeline:
 
 ```d2
@@ -134,23 +134,25 @@ transforms: Transforms {
   style.fill: "#FFF3E0"
   s4: "4. Run pipeline steps"
   s5: "5. Validate rules\n(quarantine on failure)"
-  s6: "6. Compute business keys\n+ change hashes"
-  s4 -> s5 -> s6
+  s5b: "6. Naming normalization"
+  s6: "7. Compute business keys\n+ change hashes"
+  s4 -> s5 -> s5b -> s6
 }
 
 write: Write {
   style.fill: "#E8F5E9"
-  s7: "7. Resolve target path"
-  s8: "8. Apply column mapping"
-  s9: "9. Write to Delta\n(overwrite/append/merge/CDC)"
-  s7 -> s8 -> s9
+  s7: "8. Resolve target path"
+  s8: "9. Apply column mapping"
+  s8b: "10. Inject audit columns"
+  s9: "11. Write to Delta\n(overwrite/append/merge/CDC)"
+  s7 -> s8 -> s8b -> s9
 }
 
 finalize: Finalize {
   style.fill: "#F3E5F5"
-  s10: "10. Persist watermark/CDC state"
-  s11: "11. Post-write assertions"
-  s12: "12. Build telemetry\n→ ThreadResult"
+  s10: "12. Persist watermark/CDC state"
+  s11: "13. Post-write assertions"
+  s12: "14. Build telemetry\n→ ThreadResult"
   s10 -> s11 -> s12
 }
 
@@ -164,13 +166,15 @@ write -> finalize
 3. Set the primary (first) source as the working DataFrame
 4. Run pipeline steps against the working DataFrame
 5. Evaluate validation rules; quarantine or abort on failures
-6. Compute business keys and change detection hashes
-7. Resolve the target write path
-8. Apply target column mapping
-9. Write to the Delta target (standard write or CDC merge routing)
-10. Persist watermark or CDC state
-11. Run post-write assertions
-12. Build telemetry and return `ThreadResult`
+6. Apply naming normalization (if configured)
+7. Compute business keys and change detection hashes
+8. Resolve the target write path
+9. Apply target column mapping
+10. Inject audit columns (bypasses mapping mode; applied for all write modes)
+11. Write to the Delta target (standard write or CDC merge routing)
+12. Persist watermark or CDC state
+13. Run post-write assertions
+14. Build telemetry and return `ThreadResult`
 
 ### Failure handling
 

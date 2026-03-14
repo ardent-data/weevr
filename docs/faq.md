@@ -66,9 +66,12 @@ Configuration cascades through three levels: **Loom** > **Weave** >
 **Thread**. The rule is simple -- most specific wins.
 
 A loom can define default write modes, execution settings, and audit
-templates. A weave can override any of those. A thread can override
+columns. A weave can override any of those. A thread can override
 anything the weave set. Scalar values are replaced outright; collections
-(lists, maps) are also replaced entirely, not merged.
+(lists, maps) are also replaced entirely, not merged. The exception is
+`audit_columns`, which uses **additive merge** -- each level extends the
+column set, and same-named columns at a lower level override the
+expression from the higher level.
 
 ```text
 Loom default:   write.mode = overwrite
