@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pyspark.sql import DataFrame
@@ -141,7 +142,7 @@ def inject_audit_columns(
 
 
 def build_sources_json(
-    sources: dict[str, object],
+    sources: Mapping[str, object],
 ) -> str:
     """Build the ${thread.sources} JSON array from thread source definitions.
 

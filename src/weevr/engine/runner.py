@@ -72,6 +72,8 @@ def execute_weave(
     post_steps: Sequence[HookStep] | None = None,
     lookups: dict[str, Lookup] | None = None,
     variables: dict[str, VariableSpec] | None = None,
+    loom_name: str = "",
+    weave_name: str = "",
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -105,6 +107,8 @@ def execute_weave(
         post_steps: Optional post-execution hook steps.
         lookups: Optional weave-level lookup definitions.
         variables: Optional weave-level variable specs.
+        loom_name: Loom name passed to threads for audit column context.
+        weave_name: Weave name passed to threads for audit column context.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -252,6 +256,8 @@ def execute_weave(
                                 parent_span_id=weave_span_id,
                                 cached_lookups=cached_lookup_dfs or None,
                                 weave_lookups=lookups,
+                                loom_name=loom_name,
+                                weave_name=weave_name,
                             )
                         ] = name
                     else:
@@ -262,6 +268,8 @@ def execute_weave(
                                 threads[name],
                                 cached_lookups=cached_lookup_dfs or None,
                                 weave_lookups=lookups,
+                                loom_name=loom_name,
+                                weave_name=weave_name,
                             )
                         ] = name
 
@@ -537,6 +545,8 @@ def execute_loom(
             post_steps=list(weave.post_steps) if weave.post_steps else None,
             lookups=dict(weave.lookups) if weave.lookups else None,
             variables=dict(weave.variables) if weave.variables else None,
+            loom_name=loom.name,
+            weave_name=weave_name,
         )
         weave_results.append(result)
 
