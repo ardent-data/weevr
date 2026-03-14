@@ -1,0 +1,4951 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.6/reference/yaml-schema/thread/">
+      
+      
+        <link rel="prev" href="../../../how-to/run-from-fabric-pipeline/">
+      
+      
+        <link rel="next" href="../weave/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Thread - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/mkdocs_d2_plugin.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#thread-yaml-schema" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Thread
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../release-notes/1.5/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sourcesdedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sources.dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        derive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#join" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        join
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        drop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cast
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sort
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#union" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        union
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aggregate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pivot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pivot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unpivot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unpivot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#case_when" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        case_when
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fill_null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill_null
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coalesce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        coalesce
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#string_ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        string_ops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date_ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        date_ops
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        target
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="target">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#targetcolumns-columnmapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        target.columns (ColumnMapping)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#targetnaming-namingconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        target.naming (NamingConfig)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        write
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keyssurrogate_key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        keys.surrogate_key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keyschange_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        keys.change_detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="load">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loadwatermark_store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load.watermark_store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loadcdc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load.cdc
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assertions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        assertions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        failure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        params
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/engine-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/config-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/telemetry-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sourcesdedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sources.dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        steps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        filter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        derive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#join" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        join
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        drop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cast
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sort
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#union" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        union
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aggregate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pivot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pivot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unpivot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unpivot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#case_when" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        case_when
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fill_null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill_null
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coalesce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        coalesce
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#string_ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        string_ops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date_ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        date_ops
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        target
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="target">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#targetcolumns-columnmapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        target.columns (ColumnMapping)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#targetnaming-namingconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        target.naming (NamingConfig)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        write
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keyssurrogate_key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        keys.surrogate_key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keyschange_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        keys.change_detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="load">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loadwatermark_store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load.watermark_store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loadcdc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        load.cdc
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assertions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        assertions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        failure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        params
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="thread-yaml-schema">Thread YAML Schema<a class="headerlink" href="#thread-yaml-schema" title="Permanent link">&para;</a></h1>
+<p>A thread is the smallest unit of work in weevr. It defines one or more data
+sources, an ordered sequence of transformation steps, and a single output
+target. This page documents every key accepted inside a thread YAML file.</p>
+<hr />
+<h2 id="top-level-keys">Top-level keys<a class="headerlink" href="#top-level-keys" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config_version</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Schema version identifier (e.g. <code>"1"</code>)</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>Human-readable thread name. Typically set by the weave that references this thread.</td>
+</tr>
+<tr>
+<td><code>sources</code></td>
+<td><code>dict[string, Source]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Named data sources keyed by alias</td>
+</tr>
+<tr>
+<td><code>steps</code></td>
+<td><code>list[Step]</code></td>
+<td>no</td>
+<td><code>[]</code></td>
+<td>Ordered transformation pipeline</td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td><code>Target</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Output destination</td>
+</tr>
+<tr>
+<td><code>write</code></td>
+<td><code>WriteConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Write mode and merge settings</td>
+</tr>
+<tr>
+<td><code>keys</code></td>
+<td><code>KeyConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Business key, surrogate key, and change detection</td>
+</tr>
+<tr>
+<td><code>validations</code></td>
+<td><code>list[ValidationRule]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Pre-write data quality rules</td>
+</tr>
+<tr>
+<td><code>assertions</code></td>
+<td><code>list[Assertion]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Post-execution assertions on the target</td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td><code>LoadConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Incremental load and watermark settings</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Free-form tags for filtering and organization</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td><code>dict[string, ParamSpec]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Typed parameter declarations</td>
+</tr>
+<tr>
+<td><code>defaults</code></td>
+<td><code>dict[string, any]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Default values inherited by nested structures</td>
+</tr>
+<tr>
+<td><code>failure</code></td>
+<td><code>FailureConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Per-thread failure handling policy</td>
+</tr>
+<tr>
+<td><code>execution</code></td>
+<td><code>ExecutionConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Runtime settings (logging, tracing)</td>
+</tr>
+<tr>
+<td><code>cache</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Whether to cache the final DataFrame before writing</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="sources">sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<p>Each key in <code>sources</code> is a logical alias used to reference the source in
+subsequent steps (e.g. in join, union). The value is a <code>Source</code> object.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>conditional</td>
+<td>--</td>
+<td>Source type: <code>"delta"</code>, <code>"csv"</code>, <code>"json"</code>, <code>"parquet"</code>, <code>"excel"</code>. Required when <code>lookup</code> is not set.</td>
+</tr>
+<tr>
+<td><code>lookup</code></td>
+<td><code>string</code></td>
+<td>conditional</td>
+<td><code>null</code></td>
+<td>Weave-level lookup name. Mutually exclusive with <code>type</code>. When set, the source is resolved from the weave's <code>lookups</code> map at execution time.</td>
+</tr>
+<tr>
+<td><code>alias</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Lakehouse table alias. Required when <code>type</code> is <code>"delta"</code>.</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>File path. Required for file-based types (<code>csv</code>, <code>json</code>, <code>parquet</code>, <code>excel</code>).</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>dict[string, any]</code></td>
+<td>no</td>
+<td><code>{}</code></td>
+<td>Reader options passed to Spark (e.g. <code>header</code>, <code>delimiter</code>)</td>
+</tr>
+<tr>
+<td><code>dedup</code></td>
+<td><code>DedupConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Deduplication applied immediately after reading</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sourcesdedup">sources.dedup<a class="headerlink" href="#sourcesdedup" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keys</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns used for deduplication grouping</td>
+</tr>
+<tr>
+<td><code>order_by</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Sort expression to determine which row to keep</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_orders</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">dedup</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">order_by</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at</span><span class="nv"> </span><span class="s">DESC&quot;</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">regions</span><span class="p">:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">csv</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mnt/data/regions.csv</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">options</span><span class="p">:</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">      </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,&quot;</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span><span class="w">   </span><span class="c1"># resolved from the weave&#39;s lookups map</span>
+</code></pre></div>
+<hr />
+<h2 id="steps">steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
+<p>An ordered list of transformation steps. Each step is a single-key object
+where the key identifies the step type. weevr supports 19 step types.</p>
+<h3 id="filter">filter<a class="headerlink" href="#filter" title="Permanent link">&para;</a></h3>
+<p>Filter rows using a Spark SQL expression.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>expr</code></td>
+<td><code>SparkExpr</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Boolean Spark SQL expression</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;amount</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">AND</span><span class="nv"> </span><span class="s">status</span><span class="nv"> </span><span class="s">!=</span><span class="nv"> </span><span class="s">&#39;cancelled&#39;&quot;</span>
+</code></pre></div>
+<h3 id="derive">derive<a class="headerlink" href="#derive" title="Permanent link">&para;</a></h3>
+<p>Create one or more new columns from Spark SQL expressions.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>dict[string, SparkExpr]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of output column name to expression</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">derive</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">      </span><span class="nt">total_amount</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;quantity</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">unit_price&quot;</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">order_year</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;year(order_date)&quot;</span>
+</code></pre></div>
+<h3 id="join">join<a class="headerlink" href="#join" title="Permanent link">&para;</a></h3>
+<p>Join the current DataFrame with another named source.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Name of the source to join with</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"inner"</code></td>
+<td>Join type: <code>inner</code>, <code>left</code>, <code>right</code>, <code>full</code>, <code>cross</code>, <code>semi</code>, <code>anti</code></td>
+</tr>
+<tr>
+<td><code>on</code></td>
+<td><code>list[string or JoinKeyPair]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Join keys. Strings are treated as same-name keys on both sides.</td>
+</tr>
+<tr>
+<td><code>null_safe</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>Use null-safe equality for join conditions</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>JoinKeyPair</code> has <code>left</code> and <code>right</code> fields for asymmetric key names.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">join</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regions</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">left</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">on</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region_id</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> left</span><span class="p">:</span><span class="w"> </span><span class="nv">src_code</span><span class="p p-Indicator">,</span><span class="nt"> right</span><span class="p">:</span><span class="w"> </span><span class="nv">region_code</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<h3 id="select">select<a class="headerlink" href="#select" title="Permanent link">&para;</a></h3>
+<p>Keep only the listed columns.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Column names to retain</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">select</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">total_amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">region_name</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<h3 id="drop">drop<a class="headerlink" href="#drop" title="Permanent link">&para;</a></h3>
+<p>Remove columns from the DataFrame.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Column names to drop</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">drop</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">temp_flag</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">_raw_payload</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<h3 id="rename">rename<a class="headerlink" href="#rename" title="Permanent link">&para;</a></h3>
+<p>Rename columns.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>dict[string, string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of old name to new name</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">      </span><span class="nt">cust_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">amt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">amount</span>
+</code></pre></div>
+<h3 id="cast">cast<a class="headerlink" href="#cast" title="Permanent link">&para;</a></h3>
+<p>Change column data types.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>dict[string, string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of column name to Spark data type</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">cast</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">      </span><span class="nt">amount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">decimal(18,2)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">      </span><span class="nt">order_date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
+</code></pre></div>
+<h3 id="dedup">dedup<a class="headerlink" href="#dedup" title="Permanent link">&para;</a></h3>
+<p>Deduplicate rows by key columns.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keys</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns to group by for deduplication</td>
+</tr>
+<tr>
+<td><code>order_by</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Sort expression to determine row ordering</td>
+</tr>
+<tr>
+<td><code>keep</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"last"</code></td>
+<td>Which row to keep: <code>"first"</code> or <code>"last"</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">dedup</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">order_by</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">keep</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">last</span>
+</code></pre></div>
+<h3 id="sort">sort<a class="headerlink" href="#sort" title="Permanent link">&para;</a></h3>
+<p>Sort rows.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns to sort by</td>
+</tr>
+<tr>
+<td><code>ascending</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>Sort direction</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">sort</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">order_date</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">ascending</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<h3 id="union">union<a class="headerlink" href="#union" title="Permanent link">&para;</a></h3>
+<p>Union the current DataFrame with one or more other sources.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sources</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Source aliases to union with</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"by_name"</code></td>
+<td>Union mode: <code>"by_name"</code> or <code>"by_position"</code></td>
+</tr>
+<tr>
+<td><code>allow_missing</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>Allow missing columns (filled with nulls) in <code>by_name</code> mode</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">union</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span><span class="nt">sources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">archived_orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pending_orders</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">by_name</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">allow_missing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<h3 id="aggregate">aggregate<a class="headerlink" href="#aggregate" title="Permanent link">&para;</a></h3>
+<p>Group and aggregate rows.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>group_by</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Grouping columns. Omit for whole-DataFrame aggregation.</td>
+</tr>
+<tr>
+<td><code>measures</code></td>
+<td><code>dict[string, SparkExpr]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of output alias to aggregate expression. Must not be empty.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">aggregate</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="nt">group_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">product_category</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">measures</span><span class="p">:</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">      </span><span class="nt">total_revenue</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sum(amount)&quot;</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="nt">order_count</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;count(*)&quot;</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="nt">avg_price</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;avg(unit_price)&quot;</span>
+</code></pre></div>
+<h3 id="window">window<a class="headerlink" href="#window" title="Permanent link">&para;</a></h3>
+<p>Apply window functions over a partition specification.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>functions</code></td>
+<td><code>dict[string, SparkExpr]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of output column to window expression. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>partition_by</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Partition columns. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>order_by</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Ordering within each partition</td>
+</tr>
+<tr>
+<td><code>frame</code></td>
+<td><code>WindowFrame</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Frame specification</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>WindowFrame</code> object has:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td><code>"rows"</code> or <code>"range"</code></td>
+</tr>
+<tr>
+<td><code>start</code></td>
+<td><code>int</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Frame start offset (use negative for preceding)</td>
+</tr>
+<tr>
+<td><code>end</code></td>
+<td><code>int</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Frame end offset. Must be &gt;= <code>start</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">window</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="nt">functions</span><span class="p">:</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">      </span><span class="nt">row_num</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;row_number()&quot;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">      </span><span class="nt">running_total</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sum(amount)&quot;</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nt">order_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_date</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="nt">frame</span><span class="p">:</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rows</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">      </span><span class="nt">start</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-2</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">      </span><span class="nt">end</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+</code></pre></div>
+<h3 id="pivot">pivot<a class="headerlink" href="#pivot" title="Permanent link">&para;</a></h3>
+<p>Pivot rows into columns.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>group_by</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Grouping columns</td>
+</tr>
+<tr>
+<td><code>pivot_column</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Column whose distinct values become output columns</td>
+</tr>
+<tr>
+<td><code>values</code></td>
+<td><code>list[string\|int\|float\|bool]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Explicit pivot values. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>aggregate</code></td>
+<td><code>SparkExpr</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Aggregate expression applied per cell</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pivot</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="nt">group_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">pivot_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quarter</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">values</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;Q1&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;Q2&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;Q3&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;Q4&quot;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">aggregate</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sum(revenue)&quot;</span>
+</code></pre></div>
+<h3 id="unpivot">unpivot<a class="headerlink" href="#unpivot" title="Permanent link">&para;</a></h3>
+<p>Unpivot columns into rows.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns to unpivot. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>name_column</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Name for the output column containing original column names</td>
+</tr>
+<tr>
+<td><code>value_column</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Name for the output column containing values. Must differ from <code>name_column</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">unpivot</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">jan_sales</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">feb_sales</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">mar_sales</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">name_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">month</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">value_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sales_amount</span>
+</code></pre></div>
+<h3 id="case_when">case_when<a class="headerlink" href="#case_when" title="Permanent link">&para;</a></h3>
+<p>Create a column with conditional logic (SQL CASE WHEN equivalent).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>column</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Output column name</td>
+</tr>
+<tr>
+<td><code>cases</code></td>
+<td><code>list[CaseWhenBranch]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Ordered list of when/then pairs. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>otherwise</code></td>
+<td><code>SparkExpr</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Default value when no condition matches</td>
+</tr>
+</tbody>
+</table>
+<p>Each <code>CaseWhenBranch</code> has:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>when</code></td>
+<td><code>SparkExpr</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Boolean condition</td>
+</tr>
+<tr>
+<td><code>then</code></td>
+<td><code>SparkExpr</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Value when condition is true</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">case_when</span><span class="p">:</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_tier</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">cases</span><span class="p">:</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;lifetime_value</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">10000&quot;</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">        </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;platinum&#39;&quot;</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;lifetime_value</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">5000&quot;</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">        </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;gold&#39;&quot;</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;lifetime_value</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">1000&quot;</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">        </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;silver&#39;&quot;</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">otherwise</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;bronze&#39;&quot;</span>
+</code></pre></div>
+<h3 id="fill_null">fill_null<a class="headerlink" href="#fill_null" title="Permanent link">&para;</a></h3>
+<p>Replace null values in specified columns.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>dict[string, any]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of column name to fill value. Must not be empty.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fill_null</span><span class="p">:</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">      </span><span class="nt">discount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">      </span><span class="nt">notes</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;N/A&quot;</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">      </span><span class="nt">is_active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<h3 id="coalesce">coalesce<a class="headerlink" href="#coalesce" title="Permanent link">&para;</a></h3>
+<p>Return the first non-null value from an ordered list of source columns.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>dict[string, list[string]]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Map of output column to ordered list of source columns. Both the map and each source list must not be empty.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">coalesce</span><span class="p">:</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">      </span><span class="nt">email</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">work_email</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">personal_email</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">backup_email</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">      </span><span class="nt">phone</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">mobile</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">home_phone</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<h3 id="string_ops">string_ops<a class="headerlink" href="#string_ops" title="Permanent link">&para;</a></h3>
+<p>Apply a Spark SQL expression template across selected string columns.
+The <code>{col}</code> placeholder is replaced with each column name.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns to transform</td>
+</tr>
+<tr>
+<td><code>expr</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Expression template containing <code>{col}</code> placeholder</td>
+</tr>
+<tr>
+<td><code>on_empty</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"warn"</code></td>
+<td>Behavior when column list is empty: <code>"warn"</code> or <code>"error"</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">string_ops</span><span class="p">:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">first_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">last_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">city</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;trim(upper({col}))&quot;</span>
+</code></pre></div>
+<h3 id="date_ops">date_ops<a class="headerlink" href="#date_ops" title="Permanent link">&para;</a></h3>
+<p>Apply a Spark SQL expression template across selected date or timestamp
+columns. The <code>{col}</code> placeholder is replaced with each column name.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns to transform</td>
+</tr>
+<tr>
+<td><code>expr</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Expression template containing <code>{col}</code> placeholder</td>
+</tr>
+<tr>
+<td><code>on_empty</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"warn"</code></td>
+<td>Behavior when column list is empty: <code>"warn"</code> or <code>"error"</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">date_ops</span><span class="p">:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">created_at</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">updated_at</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;to_date({col})&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="target">target<a class="headerlink" href="#target" title="Permanent link">&para;</a></h2>
+<p>Defines where the thread writes its output.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>alias</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Lakehouse table alias for Delta targets</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>File path for file-based targets</td>
+</tr>
+<tr>
+<td><code>mapping_mode</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"auto"</code></td>
+<td>Column mapping: <code>"auto"</code> (pass-through) or <code>"explicit"</code> (only mapped columns)</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>dict[string, ColumnMapping]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Per-column mapping specifications</td>
+</tr>
+<tr>
+<td><code>partition_by</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Partition columns for the output table</td>
+</tr>
+<tr>
+<td><code>audit_columns</code></td>
+<td><code>dict[string, string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Audit column definitions as name-expression pairs</td>
+</tr>
+<tr>
+<td><code>naming</code></td>
+<td><code>NamingConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Column and table naming normalization</td>
+</tr>
+</tbody>
+</table>
+<h3 id="targetcolumns-columnmapping">target.columns (ColumnMapping)<a class="headerlink" href="#targetcolumns-columnmapping" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>expr</code></td>
+<td><code>SparkExpr</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Spark SQL expression for the column value. Mutually exclusive with <code>drop</code>.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Target data type (cast applied on write)</td>
+</tr>
+<tr>
+<td><code>default</code></td>
+<td><code>any</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Default value when the source column is null</td>
+</tr>
+<tr>
+<td><code>drop</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>Drop this column from output. Mutually exclusive with <code>expr</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="targetnaming-namingconfig">target.naming (NamingConfig)<a class="headerlink" href="#targetnaming-namingconfig" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>NamingPattern</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Pattern for column names</td>
+</tr>
+<tr>
+<td><code>tables</code></td>
+<td><code>NamingPattern</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Pattern for table names</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>[]</code></td>
+<td>Column names or glob patterns to exclude from normalization</td>
+</tr>
+</tbody>
+</table>
+<p>Supported patterns: <code>snake_case</code>, <code>camelCase</code>, <code>PascalCase</code>, <code>UPPER_SNAKE_CASE</code>,
+<code>Title_Snake_Case</code>, <code>Title Case</code>, <code>lowercase</code>, <code>UPPERCASE</code>, <code>none</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span><span class="nt">mapping_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">    </span><span class="nt">total_amount</span><span class="p">:</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;decimal(18,2)&quot;</span>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="w">    </span><span class="nt">_internal_flag</span><span class="p">:</span>
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="w">      </span><span class="nt">drop</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
+</code></pre></div>
+<hr />
+<h2 id="write">write<a class="headerlink" href="#write" title="Permanent link">&para;</a></h2>
+<p>Controls how data is written to the target.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"overwrite"</code></td>
+<td>Write mode: <code>"overwrite"</code>, <code>"append"</code>, <code>"merge"</code></td>
+</tr>
+<tr>
+<td><code>match_keys</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Match keys for merge mode. Required when <code>mode</code> is <code>"merge"</code>.</td>
+</tr>
+<tr>
+<td><code>on_match</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"update"</code></td>
+<td>Merge behavior when a match is found: <code>"update"</code> or <code>"ignore"</code></td>
+</tr>
+<tr>
+<td><code>on_no_match_target</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"insert"</code></td>
+<td>Merge behavior for new source rows: <code>"insert"</code> or <code>"ignore"</code></td>
+</tr>
+<tr>
+<td><code>on_no_match_source</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"ignore"</code></td>
+<td>Merge behavior for missing source rows: <code>"delete"</code>, <code>"soft_delete"</code>, <code>"ignore"</code></td>
+</tr>
+<tr>
+<td><code>soft_delete_column</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Column to flag soft deletes. Required when <code>on_no_match_source</code> is <code>"soft_delete"</code>.</td>
+</tr>
+<tr>
+<td><code>soft_delete_value</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"true"</code></td>
+<td>Value written to the soft delete column</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nt">on_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nt">on_no_match_target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insert</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">  </span><span class="nt">on_no_match_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="w">  </span><span class="nt">soft_delete_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_deleted</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="w">  </span><span class="nt">soft_delete_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="keys">keys<a class="headerlink" href="#keys" title="Permanent link">&para;</a></h2>
+<p>Key management for business keys, surrogate keys, and change detection hashes.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>business_key</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Columns forming the natural business key</td>
+</tr>
+<tr>
+<td><code>surrogate_key</code></td>
+<td><code>SurrogateKeyConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Surrogate key generation settings</td>
+</tr>
+<tr>
+<td><code>change_detection</code></td>
+<td><code>ChangeDetectionConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Change detection hash settings</td>
+</tr>
+</tbody>
+</table>
+<h3 id="keyssurrogate_key">keys.surrogate_key<a class="headerlink" href="#keyssurrogate_key" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Output column name for the surrogate key</td>
+</tr>
+<tr>
+<td><code>algorithm</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"sha256"</code></td>
+<td>Hash algorithm: <code>"xxhash64"</code>, <code>"sha1"</code>, <code>"sha256"</code>, <code>"sha384"</code>, <code>"sha512"</code>, <code>"md5"</code>, <code>"crc32"</code>, <code>"murmur3"</code></td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"native"</code></td>
+<td>Output type for integer-returning algorithms (xxhash64, crc32, murmur3). <code>"native"</code> preserves the algorithm's return type; <code>"string"</code> casts to StringType. Has no effect on sha*/md5.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Algorithm choice</p>
+<p><code>crc32</code> has a small 32-bit output space with higher collision risk.
+<code>murmur3</code> (Spark's <code>hash()</code>) may produce different results across
+Spark major versions. Neither is recommended for high-cardinality
+surrogate key use cases.</p>
+</div>
+<h3 id="keyschange_detection">keys.change_detection<a class="headerlink" href="#keyschange_detection" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Output column name for the change hash</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Columns included in the hash</td>
+</tr>
+<tr>
+<td><code>algorithm</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"md5"</code></td>
+<td>Hash algorithm: <code>"xxhash64"</code>, <code>"sha1"</code>, <code>"sha256"</code>, <code>"sha384"</code>, <code>"sha512"</code>, <code>"md5"</code>, <code>"crc32"</code>, <code>"murmur3"</code></td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"native"</code></td>
+<td>Output type for integer-returning algorithms. <code>"native"</code> preserves the algorithm's return type; <code>"string"</code> casts to StringType.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="nt">keys</span><span class="p">:</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sk_order</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">    </span><span class="nt">algorithm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sha256</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change_hash</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">status</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">updated_at</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="w">    </span><span class="nt">algorithm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">md5</span>
+</code></pre></div>
+<hr />
+<h2 id="load">load<a class="headerlink" href="#load" title="Permanent link">&para;</a></h2>
+<p>Incremental load configuration with watermark tracking.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"full"</code></td>
+<td>Load mode: <code>"full"</code>, <code>"incremental_watermark"</code>, <code>"incremental_parameter"</code>, <code>"cdc"</code></td>
+</tr>
+<tr>
+<td><code>watermark_column</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Column for watermark comparison. Required for <code>incremental_watermark</code>. Must not be set for <code>cdc</code>.</td>
+</tr>
+<tr>
+<td><code>watermark_type</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Data type of the watermark column: <code>"timestamp"</code>, <code>"date"</code>, <code>"int"</code>, <code>"long"</code></td>
+</tr>
+<tr>
+<td><code>watermark_inclusive</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>Include rows equal to the last watermark value (use with merge/overwrite for idempotency)</td>
+</tr>
+<tr>
+<td><code>watermark_store</code></td>
+<td><code>WatermarkStoreConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Watermark persistence backend</td>
+</tr>
+<tr>
+<td><code>cdc</code></td>
+<td><code>CdcConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>CDC configuration. Required when <code>mode</code> is <code>"cdc"</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="loadwatermark_store">load.watermark_store<a class="headerlink" href="#loadwatermark_store" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"table_properties"</code></td>
+<td>Store type: <code>"table_properties"</code> (zero-config) or <code>"metadata_table"</code></td>
+</tr>
+<tr>
+<td><code>table_path</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Path to metadata table. Required for <code>"metadata_table"</code> type.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="loadcdc">load.cdc<a class="headerlink" href="#loadcdc" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>preset</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Preset name: <code>"delta_cdf"</code>. Mutually exclusive with <code>operation_column</code>.</td>
+</tr>
+<tr>
+<td><code>operation_column</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Column containing operation type. Mutually exclusive with <code>preset</code>.</td>
+</tr>
+<tr>
+<td><code>insert_value</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Value indicating an insert operation</td>
+</tr>
+<tr>
+<td><code>update_value</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Value indicating an update operation</td>
+</tr>
+<tr>
+<td><code>delete_value</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Value indicating a delete operation</td>
+</tr>
+<tr>
+<td><code>on_delete</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"hard_delete"</code></td>
+<td>Delete behavior: <code>"hard_delete"</code> or <code>"soft_delete"</code></td>
+</tr>
+</tbody>
+</table>
+<p>Either <code>preset</code> or <code>operation_column</code> must be set (but not both). When using
+explicit mapping, at least <code>insert_value</code> or <code>update_value</code> is required.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span><span class="nt">watermark_store</span><span class="p">:</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">table_properties</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cdc</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="nt">cdc</span><span class="p">:</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span><span class="nt">preset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta_cdf</span>
+</code></pre></div>
+<hr />
+<h2 id="validations">validations<a class="headerlink" href="#validations" title="Permanent link">&para;</a></h2>
+<p>Pre-write data quality rules. Each rule is evaluated as a Spark SQL boolean
+expression against the DataFrame before it is written.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Human-readable rule name</td>
+</tr>
+<tr>
+<td><code>rule</code></td>
+<td><code>SparkExpr</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Spark SQL boolean expression</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"error"</code></td>
+<td>Severity level: <code>"info"</code>, <code>"warn"</code>, <code>"error"</code>, <code>"fatal"</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">validations</span><span class="p">:</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">positive_amount</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;amount</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0&quot;</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">valid_status</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">IN</span><span class="nv"> </span><span class="s">(&#39;active&#39;,</span><span class="nv"> </span><span class="s">&#39;inactive&#39;,</span><span class="nv"> </span><span class="s">&#39;pending&#39;)&quot;</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+</code></pre></div>
+<hr />
+<h2 id="assertions">assertions<a class="headerlink" href="#assertions" title="Permanent link">&para;</a></h2>
+<p>Post-execution assertions evaluated against the target dataset after writing.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Assertion type: <code>"row_count"</code>, <code>"column_not_null"</code>, <code>"unique"</code>, <code>"expression"</code></td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"warn"</code></td>
+<td>Severity level: <code>"info"</code>, <code>"warn"</code>, <code>"error"</code>, <code>"fatal"</code></td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Columns for <code>column_not_null</code> and <code>unique</code> assertions</td>
+</tr>
+<tr>
+<td><code>min</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Minimum value for <code>row_count</code> assertions</td>
+</tr>
+<tr>
+<td><code>max</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Maximum value for <code>row_count</code> assertions</td>
+</tr>
+<tr>
+<td><code>expression</code></td>
+<td><code>SparkExpr</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Spark SQL expression for <code>expression</code> assertions</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">assertions</span><span class="p">:</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_not_null</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fatal</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">expression</span>
+<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a><span class="w">    </span><span class="nt">expression</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;count(CASE</span><span class="nv"> </span><span class="s">WHEN</span><span class="nv"> </span><span class="s">amount</span><span class="nv"> </span><span class="s">&lt;</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">THEN</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">END)</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">0&quot;</span>
+<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+</code></pre></div>
+<hr />
+<h2 id="failure">failure<a class="headerlink" href="#failure" title="Permanent link">&para;</a></h2>
+<p>Per-thread failure handling policy. Controls what happens to remaining threads
+in a weave when this thread fails.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_failure</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"abort_weave"</code></td>
+<td>Policy: <code>"abort_weave"</code>, <code>"skip_downstream"</code>, <code>"continue"</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>abort_weave</code> -- Stop all remaining threads in the weave immediately.</li>
+<li><code>skip_downstream</code> -- Skip only threads that depend on the failed thread.</li>
+<li><code>continue</code> -- Continue executing unrelated threads.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nt">failure</span><span class="p">:</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
+</code></pre></div>
+<hr />
+<h2 id="execution">execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>Runtime execution settings. These cascade from loom to weave to thread, with
+the most specific level winning.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>log_level</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"standard"</code></td>
+<td>Logging verbosity: <code>"minimal"</code>, <code>"standard"</code>, <code>"verbose"</code>, <code>"debug"</code></td>
+</tr>
+<tr>
+<td><code>trace</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>Collect execution spans for telemetry</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verbose</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<hr />
+<h2 id="params">params<a class="headerlink" href="#params" title="Permanent link">&para;</a></h2>
+<p>Typed parameter declarations. Parameters can be referenced in expressions using
+<code>${param.name}</code> syntax.</p>
+<p>Each entry maps a parameter name to a <code>ParamSpec</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Parameter name</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Data type: <code>"string"</code>, <code>"int"</code>, <code>"float"</code>, <code>"bool"</code>, <code>"date"</code>, <code>"timestamp"</code>, <code>"list[string]"</code></td>
+</tr>
+<tr>
+<td><code>required</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>Whether the parameter must be supplied at runtime</td>
+</tr>
+<tr>
+<td><code>default</code></td>
+<td><code>any</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Default value when not supplied</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>Human-readable description</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nt">params</span><span class="p">:</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">start_date</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Start</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">reporting</span><span class="nv"> </span><span class="s">window&quot;</span>
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="w">  </span><span class="nt">region_filter</span><span class="p">:</span>
+<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region_filter</span>
+<a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-29-11" name="__codelineno-29-11" href="#__codelineno-29-11"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ALL&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="complete-example">Complete example<a class="headerlink" href="#complete-example" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_orders</span>
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="w">    </span><span class="nt">dedup</span><span class="p">:</span>
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a><span class="w">      </span><span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="w">      </span><span class="nt">order_by</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at</span><span class="nv"> </span><span class="s">DESC&quot;</span>
+<a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a><span class="w">  </span><span class="nt">customers</span><span class="p">:</span>
+<a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-30-12" name="__codelineno-30-12" href="#__codelineno-30-12"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customers</span>
+<a id="__codelineno-30-13" name="__codelineno-30-13" href="#__codelineno-30-13"></a>
+<a id="__codelineno-30-14" name="__codelineno-30-14" href="#__codelineno-30-14"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-30-15" name="__codelineno-30-15" href="#__codelineno-30-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<a id="__codelineno-30-16" name="__codelineno-30-16" href="#__codelineno-30-16"></a><span class="w">      </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">!=</span><span class="nv"> </span><span class="s">&#39;cancelled&#39;&quot;</span>
+<a id="__codelineno-30-17" name="__codelineno-30-17" href="#__codelineno-30-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">join</span><span class="p">:</span>
+<a id="__codelineno-30-18" name="__codelineno-30-18" href="#__codelineno-30-18"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<a id="__codelineno-30-19" name="__codelineno-30-19" href="#__codelineno-30-19"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">left</span>
+<a id="__codelineno-30-20" name="__codelineno-30-20" href="#__codelineno-30-20"></a><span class="w">      </span><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-21" name="__codelineno-30-21" href="#__codelineno-30-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">derive</span><span class="p">:</span>
+<a id="__codelineno-30-22" name="__codelineno-30-22" href="#__codelineno-30-22"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-30-23" name="__codelineno-30-23" href="#__codelineno-30-23"></a><span class="w">        </span><span class="nt">total_amount</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;quantity</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">unit_price&quot;</span>
+<a id="__codelineno-30-24" name="__codelineno-30-24" href="#__codelineno-30-24"></a><span class="w">        </span><span class="nt">order_year</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;year(order_date)&quot;</span>
+<a id="__codelineno-30-25" name="__codelineno-30-25" href="#__codelineno-30-25"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">select</span><span class="p">:</span>
+<a id="__codelineno-30-26" name="__codelineno-30-26" href="#__codelineno-30-26"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-30-27" name="__codelineno-30-27" href="#__codelineno-30-27"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_id</span>
+<a id="__codelineno-30-28" name="__codelineno-30-28" href="#__codelineno-30-28"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<a id="__codelineno-30-29" name="__codelineno-30-29" href="#__codelineno-30-29"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_name</span>
+<a id="__codelineno-30-30" name="__codelineno-30-30" href="#__codelineno-30-30"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">total_amount</span>
+<a id="__codelineno-30-31" name="__codelineno-30-31" href="#__codelineno-30-31"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_year</span>
+<a id="__codelineno-30-32" name="__codelineno-30-32" href="#__codelineno-30-32"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
+<a id="__codelineno-30-33" name="__codelineno-30-33" href="#__codelineno-30-33"></a>
+<a id="__codelineno-30-34" name="__codelineno-30-34" href="#__codelineno-30-34"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-30-35" name="__codelineno-30-35" href="#__codelineno-30-35"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
+<a id="__codelineno-30-36" name="__codelineno-30-36" href="#__codelineno-30-36"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-37" name="__codelineno-30-37" href="#__codelineno-30-37"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
+<a id="__codelineno-30-38" name="__codelineno-30-38" href="#__codelineno-30-38"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
+<a id="__codelineno-30-39" name="__codelineno-30-39" href="#__codelineno-30-39"></a>
+<a id="__codelineno-30-40" name="__codelineno-30-40" href="#__codelineno-30-40"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-30-41" name="__codelineno-30-41" href="#__codelineno-30-41"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-30-42" name="__codelineno-30-42" href="#__codelineno-30-42"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-43" name="__codelineno-30-43" href="#__codelineno-30-43"></a><span class="w">  </span><span class="nt">on_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
+<a id="__codelineno-30-44" name="__codelineno-30-44" href="#__codelineno-30-44"></a><span class="w">  </span><span class="nt">on_no_match_target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insert</span>
+<a id="__codelineno-30-45" name="__codelineno-30-45" href="#__codelineno-30-45"></a>
+<a id="__codelineno-30-46" name="__codelineno-30-46" href="#__codelineno-30-46"></a><span class="nt">keys</span><span class="p">:</span>
+<a id="__codelineno-30-47" name="__codelineno-30-47" href="#__codelineno-30-47"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-48" name="__codelineno-30-48" href="#__codelineno-30-48"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-30-49" name="__codelineno-30-49" href="#__codelineno-30-49"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sk_order</span>
+<a id="__codelineno-30-50" name="__codelineno-30-50" href="#__codelineno-30-50"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
+<a id="__codelineno-30-51" name="__codelineno-30-51" href="#__codelineno-30-51"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change_hash</span>
+<a id="__codelineno-30-52" name="__codelineno-30-52" href="#__codelineno-30-52"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">total_amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_name</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-53" name="__codelineno-30-53" href="#__codelineno-30-53"></a>
+<a id="__codelineno-30-54" name="__codelineno-30-54" href="#__codelineno-30-54"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-30-55" name="__codelineno-30-55" href="#__codelineno-30-55"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
+<a id="__codelineno-30-56" name="__codelineno-30-56" href="#__codelineno-30-56"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
+<a id="__codelineno-30-57" name="__codelineno-30-57" href="#__codelineno-30-57"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-30-58" name="__codelineno-30-58" href="#__codelineno-30-58"></a>
+<a id="__codelineno-30-59" name="__codelineno-30-59" href="#__codelineno-30-59"></a><span class="nt">validations</span><span class="p">:</span>
+<a id="__codelineno-30-60" name="__codelineno-30-60" href="#__codelineno-30-60"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">positive_total</span>
+<a id="__codelineno-30-61" name="__codelineno-30-61" href="#__codelineno-30-61"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;total_amount</span><span class="nv"> </span><span class="s">&gt;=</span><span class="nv"> </span><span class="s">0&quot;</span>
+<a id="__codelineno-30-62" name="__codelineno-30-62" href="#__codelineno-30-62"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-30-63" name="__codelineno-30-63" href="#__codelineno-30-63"></a>
+<a id="__codelineno-30-64" name="__codelineno-30-64" href="#__codelineno-30-64"></a><span class="nt">assertions</span><span class="p">:</span>
+<a id="__codelineno-30-65" name="__codelineno-30-65" href="#__codelineno-30-65"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
+<a id="__codelineno-30-66" name="__codelineno-30-66" href="#__codelineno-30-66"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-30-67" name="__codelineno-30-67" href="#__codelineno-30-67"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-30-68" name="__codelineno-30-68" href="#__codelineno-30-68"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
+<a id="__codelineno-30-69" name="__codelineno-30-69" href="#__codelineno-30-69"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-30-70" name="__codelineno-30-70" href="#__codelineno-30-70"></a>
+<a id="__codelineno-30-71" name="__codelineno-30-71" href="#__codelineno-30-71"></a><span class="nt">failure</span><span class="p">:</span>
+<a id="__codelineno-30-72" name="__codelineno-30-72" href="#__codelineno-30-72"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
+<a id="__codelineno-30-73" name="__codelineno-30-73" href="#__codelineno-30-73"></a>
+<a id="__codelineno-30-74" name="__codelineno-30-74" href="#__codelineno-30-74"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-30-75" name="__codelineno-30-75" href="#__codelineno-30-75"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">standard</span>
+<a id="__codelineno-30-76" name="__codelineno-30-76" href="#__codelineno-30-76"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-30-77" name="__codelineno-30-77" href="#__codelineno-30-77"></a>
+<a id="__codelineno-30-78" name="__codelineno-30-78" href="#__codelineno-30-78"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">curated</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
