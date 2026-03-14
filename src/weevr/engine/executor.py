@@ -16,6 +16,7 @@ from weevr.model.lookup import Lookup
 from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
+from weevr.operations.audit import AuditContext, build_sources_json, inject_audit_columns
 from weevr.operations.hashing import compute_keys
 from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import run_pipeline
@@ -44,6 +45,8 @@ def execute_thread(
     cached_lookups: dict[str, Any] | None = None,
     weave_lookups: dict[str, Lookup] | None = None,
     resolved_params: dict[str, Any] | None = None,
+    loom_name: str = "",
+    weave_name: str = "",
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -77,6 +80,9 @@ def execute_thread(
             of non-materialized lookups.
         resolved_params: Runtime parameter values for telemetry capture.
             Stored on ThreadTelemetry for thread-level runs.
+        loom_name: Loom name for audit column context variables.
+        weave_name: Weave name for audit column context variables.
+            Derived from ``thread.qualified_key`` when not provided.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -235,6 +241,25 @@ def execute_thread(
         if thread.keys is not None:
             df = compute_keys(df, thread.keys)
 
+        # Step 6 — resolve and prepare audit columns
+        audit_columns = thread.target.audit_columns or {}
+        audit_columns_applied: list[str] = []
+        audit_ctx: AuditContext | None = None
+        if audit_columns:
+            effective_weave = weave_name or (
+                thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
+            )
+            primary_alias = next(iter(thread.sources))
+            primary_source = thread.sources[primary_alias]
+            audit_ctx = AuditContext(
+                thread_name=thread.name,
+                thread_qualified_key=thread.qualified_key,
+                thread_source=primary_source.alias,
+                thread_sources_json=build_sources_json(thread.sources),
+                weave_name=effective_weave,
+                loom_name=loom_name,
+            )
+
         # Step 7/8 — write to Delta
         write_mode = thread.write.mode if thread.write else "overwrite"
 
@@ -242,6 +267,9 @@ def execute_thread(
             # CDC merge routing — skip target column mapping because
             # execute_cdc_merge handles column selection internally
             # (it must retain the operation column for row routing).
+            if audit_columns and audit_ctx is not None:
+                df = inject_audit_columns(df, audit_columns, audit_ctx)
+                audit_columns_applied = list(audit_columns)
             output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
             with contextlib.suppress(Exception):
                 output_sample = df.limit(10).toPandas().to_dict("records")
@@ -251,6 +279,9 @@ def execute_thread(
         else:
             # Apply target column mapping for non-CDC writes
             df = apply_target_mapping(df, thread.target, spark)
+            if audit_columns and audit_ctx is not None:
+                df = inject_audit_columns(df, audit_columns, audit_ctx)
+                audit_columns_applied = list(audit_columns)
             output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
             with contextlib.suppress(Exception):
                 output_sample = df.limit(10).toPandas().to_dict("records")
@@ -319,6 +350,7 @@ def execute_thread(
             cdc_counts=cdc_counts,
             rows_after_transforms=rows_after_transforms,
             resolved_params=resolved_params,
+            audit_columns_applied=audit_columns_applied,
         )
 
         return ThreadResult(
@@ -424,6 +456,7 @@ def _build_telemetry(
     cdc_counts: dict[str, int] | None = None,
     rows_after_transforms: int = 0,
     resolved_params: dict[str, Any] | None = None,
+    audit_columns_applied: list[str] | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
@@ -458,4 +491,5 @@ def _build_telemetry(
         cdc_updates=cdc_counts["updates"] if cdc_counts else None,
         cdc_deletes=cdc_counts["deletes"] if cdc_counts else None,
         resolved_params=resolved_params,
+        audit_columns_applied=audit_columns_applied or [],
     )

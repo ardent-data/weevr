@@ -89,7 +89,10 @@ class TestThreadHydrationViaPipeline:
         assert result.target.columns is not None
         assert isinstance(result.target.columns["id"], ColumnMapping)
         assert result.target.partition_by == ["year", "month"]
-        assert result.target.audit_template == "standard_v1"
+        assert result.target.audit_columns == {
+            "_weevr_loaded_at": "current_timestamp()",
+            "_weevr_run_id": "'standard_v1'",
+        }
 
         # Write
         assert isinstance(result.write, WriteConfig)

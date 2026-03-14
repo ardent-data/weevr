@@ -151,7 +151,7 @@ Write destination with column mapping and partitioning.
 | `mapping_mode` | `"auto" \| "explicit"` | `"auto"` | Column mapping strategy |
 | `columns` | `dict[str, ColumnMapping]` | `None` | Per-column mapping |
 | `partition_by` | `list[str]` | `None` | Partition columns |
-| `audit_template` | `str` | `None` | Audit column template name |
+| `audit_columns` | `dict[str, str]` | `None` | Audit column definitions as name-expression pairs |
 | `naming` | `NamingConfig` | `None` | Naming normalization |
 
 ### ColumnMapping

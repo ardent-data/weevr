@@ -36,5 +36,5 @@ class Target(FrozenBase):
     mapping_mode: Literal["auto", "explicit"] = "auto"
     columns: dict[str, ColumnMapping] | None = None
     partition_by: list[str] | None = None
-    audit_template: str | None = None
+    audit_columns: dict[str, str] | None = None
     naming: NamingConfig | None = None

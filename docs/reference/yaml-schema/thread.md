@@ -424,7 +424,7 @@ Defines where the thread writes its output.
 | `mapping_mode` | `string` | no | `"auto"` | Column mapping: `"auto"` (pass-through) or `"explicit"` (only mapped columns) |
 | `columns` | `dict[string, ColumnMapping]` | no | `null` | Per-column mapping specifications |
 | `partition_by` | `list[string]` | no | `null` | Partition columns for the output table |
-| `audit_template` | `string` | no | `null` | Name of an audit column template to apply |
+| `audit_columns` | `dict[string, string]` | no | `null` | Audit column definitions as name-expression pairs |
 | `naming` | `NamingConfig` | no | `null` | Column and table naming normalization |
 
 ### target.columns (ColumnMapping)

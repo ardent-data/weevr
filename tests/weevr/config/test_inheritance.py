@@ -35,10 +35,10 @@ class TestCascade:
 
     def test_inheritance_from_parent(self):
         """Keys in parent but not in child should be inherited."""
-        parent = {"audit_template": "standard", "tags": ["parent"]}
+        parent = {"template": "standard", "tags": ["parent"]}
         child = {"mode": "merge"}
         result = cascade(parent, child)
-        assert result["audit_template"] == "standard"  # Inherited
+        assert result["template"] == "standard"  # Inherited
         assert result["mode"] == "merge"  # From child
         assert result["tags"] == ["parent"]  # Inherited
 
@@ -410,3 +410,116 @@ class TestHookInheritance:
         result = apply_inheritance(loom, weave, thread)
         assert len(result["pre_steps"]) == 1
         assert result["pre_steps"][0]["name"] == "weave_check"
+
+
+class TestAuditColumnsInheritance:
+    """Test additive cascade for audit_columns across loom → weave → thread."""
+
+    def test_loom_only(self):
+        """Loom audit_columns cascade into thread target."""
+        loom: dict[str, Any] = {
+            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["audit_columns"] == {
+            "_loaded_at": "current_timestamp()",
+            "_run_id": "'abc'",
+        }
+
+    def test_weave_extends_loom(self):
+        """Weave audit_columns extend loom set additively."""
+        loom: dict[str, Any] = {
+            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+        }
+        weave: dict[str, Any] = {
+            "audit_columns": {"_batch": "'batch_1'"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["target"]["audit_columns"] == {
+            "_loaded_at": "current_timestamp()",
+            "_run_id": "'abc'",
+            "_batch": "'batch_1'",
+        }
+
+    def test_weave_overrides_loom_value(self):
+        """Weave overrides a loom audit column value for the same key."""
+        loom: dict[str, Any] = {
+            "audit_columns": {"_run_id": "'loom_default'"},
+        }
+        weave: dict[str, Any] = {
+            "audit_columns": {"_run_id": "'weave_override'"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["target"]["audit_columns"]["_run_id"] == "'weave_override'"
+
+    def test_thread_extends_weave(self):
+        """Thread audit_columns extend the inherited set."""
+        loom: dict[str, Any] = {
+            "audit_columns": {"_loaded_at": "current_timestamp()"},
+        }
+        weave: dict[str, Any] = {
+            "audit_columns": {"_batch": "'b1'"},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_columns": {"_thread": "'my_thread'"},
+            }
+        }
+        result = apply_inheritance(loom, weave, thread)
+        assert result["target"]["audit_columns"] == {
+            "_loaded_at": "current_timestamp()",
+            "_batch": "'b1'",
+            "_thread": "'my_thread'",
+        }
+
+    def test_thread_overrides_weave_value(self):
+        """Thread overrides a weave audit column value for the same key."""
+        weave: dict[str, Any] = {
+            "audit_columns": {"_run_id": "'weave'"},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_columns": {"_run_id": "'thread_override'"},
+            }
+        }
+        result = apply_inheritance(None, weave, thread)
+        assert result["target"]["audit_columns"]["_run_id"] == "'thread_override'"
+
+    def test_no_audit_columns_anywhere(self):
+        """No audit_columns at any level leaves target without the key."""
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(None, None, thread)
+        assert "audit_columns" not in result.get("target", {})
+
+    def test_standard_dicts_still_replace(self):
+        """Non-audit dict keys still use standard replace semantics (regression)."""
+        loom: dict[str, Any] = {
+            "write": {"mode": "overwrite", "format": "delta"},
+            "audit_columns": {"_loaded_at": "current_timestamp()"},
+        }
+        weave: dict[str, Any] = {
+            "write": {"mode": "merge"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, weave, thread)
+        # write dict replaced entirely (standard behavior)
+        assert result["write"] == {"mode": "merge"}
+        assert "format" not in result["write"]
+        # audit_columns still present (additive)
+        assert result["target"]["audit_columns"] == {"_loaded_at": "current_timestamp()"}
+
+    def test_top_level_audit_columns_removed_from_result(self):
+        """audit_columns inherited from defaults is cleaned from the top level."""
+        loom: dict[str, Any] = {
+            "audit_columns": {"_loaded_at": "current_timestamp()"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        # Should be in target, not at top level
+        assert "audit_columns" not in result or result.get("audit_columns") is None
+        assert result["target"]["audit_columns"] == {"_loaded_at": "current_timestamp()"}
