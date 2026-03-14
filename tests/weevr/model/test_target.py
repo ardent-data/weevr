@@ -90,17 +90,19 @@ class TestTarget:
         t = Target(partition_by=["year", "month"])
         assert t.partition_by == ["year", "month"]
 
-    def test_with_audit_template(self):
-        """Target accepts audit_template string."""
-        t = Target(audit_template="standard_v1")
-        assert t.audit_template == "standard_v1"
+    def test_with_audit_columns(self):
+        """Target accepts audit_columns dict."""
+        t = Target(audit_columns={"_loaded_at": "current_timestamp()", "_run_id": "'abc'"})
+        assert t.audit_columns is not None
+        assert t.audit_columns["_loaded_at"] == "current_timestamp()"
+        assert t.audit_columns["_run_id"] == "'abc'"
 
     def test_all_none_defaults(self):
         """Target with no fields has all-None optional fields."""
         t = Target()
         assert t.columns is None
         assert t.partition_by is None
-        assert t.audit_template is None
+        assert t.audit_columns is None
         assert t.alias is None
         assert t.path is None
 
@@ -126,6 +128,6 @@ class TestTarget:
             mapping_mode="explicit",
             columns={"col_a": {"type": "string"}},  # type: ignore[arg-type]
             partition_by=["date"],
-            audit_template="standard",
+            audit_columns={"_loaded_at": "current_timestamp()"},
         )
         assert Target.model_validate(t.model_dump()) == t

@@ -35,10 +35,10 @@ class TestCascade:
 
     def test_inheritance_from_parent(self):
         """Keys in parent but not in child should be inherited."""
-        parent = {"audit_template": "standard", "tags": ["parent"]}
+        parent = {"template": "standard", "tags": ["parent"]}
         child = {"mode": "merge"}
         result = cascade(parent, child)
-        assert result["audit_template"] == "standard"  # Inherited
+        assert result["template"] == "standard"  # Inherited
         assert result["mode"] == "merge"  # From child
         assert result["tags"] == ["parent"]  # Inherited
 

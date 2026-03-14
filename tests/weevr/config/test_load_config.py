@@ -48,7 +48,7 @@ sources:
     type: delta
     alias: ${lakehouse}.customers
 target:
-  audit_template: ${env}_template
+  path: /data/${env}_output
 """
         )
 
@@ -59,7 +59,7 @@ target:
 
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"
-        assert result.target.audit_template == "dev_template"
+        assert result.target.path == "/data/dev_output"
 
     def test_load_thread_with_runtime_params(self, tmp_path):
         """load_config resolves variables from runtime params."""
@@ -72,7 +72,7 @@ sources:
     type: delta
     alias: ${lakehouse}.customers
 target:
-  audit_template: ${env}_template
+  path: /data/${env}_output
 """
         )
 
@@ -80,7 +80,7 @@ target:
 
         assert isinstance(result, Thread)
         assert result.sources["data"].alias == "bronze.customers"
-        assert result.target.audit_template == "dev_template"
+        assert result.target.path == "/data/dev_output"
 
     def test_runtime_params_override_defaults(self, tmp_path):
         """Runtime params override config default values."""
@@ -95,7 +95,7 @@ sources:
     type: delta
     alias: lakehouse
 target:
-  audit_template: output_${env}
+  path: /data/output_${env}
 """
         )
 
@@ -105,7 +105,7 @@ target:
         )
 
         assert isinstance(result, Thread)
-        assert result.target.audit_template == "output_prod"
+        assert result.target.path == "/data/output_prod"
 
     def test_variable_with_fallback_default(self, tmp_path):
         """Variables with fallback defaults use the default when unset."""
@@ -118,14 +118,14 @@ sources:
     type: delta
     alias: lakehouse
 target:
-  audit_template: ${output_table:-default_output}
+  path: ${output_table:-default_output}
 """
         )
 
         result = load_config(thread_file)
 
         assert isinstance(result, Thread)
-        assert result.target.audit_template == "default_output"
+        assert result.target.path == "default_output"
 
     def test_load_weave_returns_weave_model(self):
         """load_config returns a Weave model for a weave config."""
