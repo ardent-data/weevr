@@ -89,6 +89,7 @@ class ThreadTelemetry(FrozenBase):
     cdc_updates: int | None = None
     cdc_deletes: int | None = None
     resolved_params: dict[str, Any] | None = None
+    audit_columns_applied: list[str] = []
 
 
 class WeaveTelemetry(FrozenBase):
