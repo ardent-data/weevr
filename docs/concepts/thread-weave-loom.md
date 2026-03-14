@@ -196,7 +196,7 @@ merged.
 !!! tip "Inheritance reduces repetition"
 
     Define common patterns once at the loom level (write modes, audit
-    templates, execution settings) and override only where a thread differs.
+    columns, execution settings) and override only where a thread differs.
     Most threads need very little thread-level configuration when inheritance
     is used effectively.
 

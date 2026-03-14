@@ -210,18 +210,19 @@ By default, weevr uses null-safe join semantics to prevent the common
 Spark pitfall where `NULL = NULL` evaluates to `NULL` (not `true`),
 silently dropping rows from join results.
 
-If you need to customize this behavior, configure null key handling at the
-thread level:
+Null-safe behavior is configured per join step and is enabled by default:
 
 ```yaml
-keys:
-  null_safe: true
-  null_key_replacement: "__NULL__"
+steps:
+  - join:
+      source: dim_region
+      type: left
+      on: [region_id]
+      null_safe: true   # default — rows with null keys are preserved
 ```
 
-When `null_safe` is enabled, null key values are replaced with a sentinel
-before the join and restored afterward. This ensures rows with null keys
-participate in joins as expected.
+Set `null_safe: false` on a specific join step to use standard Spark join
+semantics where null keys do not match.
 
 ---
 
