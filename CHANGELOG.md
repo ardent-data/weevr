@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/ardent-data/weevr/compare/weevr-v1.5.0...weevr-v1.6.0) (2026-03-14)
+
+
+### Features
+
+* **engine:** add audit column injection with additive cascade ([#87](https://github.com/ardent-data/weevr/issues/87)) ([4505c15](https://github.com/ardent-data/weevr/commit/4505c1538a3716ce0222f4a9e65cd22418ff9a86))
+
 ## [1.5.0](https://github.com/ardent-data/weevr/compare/weevr-v1.4.0...weevr-v1.5.0) (2026-03-13)
 
 
