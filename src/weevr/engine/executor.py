@@ -58,14 +58,16 @@ def execute_thread(
     3. Set the primary (first) source as the working DataFrame.
     4. Run pipeline steps against the working DataFrame.
     5. Run validation rules (if configured) — quarantine or abort on failures.
-    6. Compute business keys and hashes if configured.
-    7. Resolve the target write path.
-    8. Apply target column mapping.
-    9. Write to the Delta target.
-       - For ``cdc``: use CDC merge routing instead of standard write.
-    10. Persist watermark state (if applicable).
-    11. Run post-write assertions (if configured).
-    12. Build telemetry and return ThreadResult.
+    6. Apply naming normalization (if configured).
+    7. Compute business keys and hashes if configured.
+    8. Resolve the target write path.
+    9. Apply target column mapping.
+    10. Inject audit columns (if configured; bypasses mapping mode).
+    11. Write to the Delta target.
+        - For ``cdc``: use CDC merge routing instead of standard write.
+    12. Persist watermark state (if applicable).
+    13. Run post-write assertions (if configured).
+    14. Build telemetry and return ThreadResult.
 
     Args:
         spark: Active SparkSession.
@@ -82,7 +84,8 @@ def execute_thread(
             Stored on ThreadTelemetry for thread-level runs.
         loom_name: Loom name for audit column context variables.
         weave_name: Weave name for audit column context variables.
-            Derived from ``thread.qualified_key`` when not provided.
+            Derived from the prefix of ``thread.qualified_key`` when not
+            provided. Falls back to empty string if no dot separator exists.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
