@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -11,6 +12,8 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ExecutionError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -94,9 +97,18 @@ def _resolve_context_variables(expression: str, context: AuditContext) -> str:
     def _replace(match: re.Match[str]) -> str:
         namespace = match.group(1)
         prop = match.group(2)
-        value = lookup.get(namespace, {}).get(prop)
+        ns_lookup = lookup.get(namespace, {})
+        if prop not in ns_lookup:
+            return match.group(0)  # Unknown property — leave unresolved
+        value = ns_lookup[prop]
         if value is None:
-            return match.group(0)  # Leave unresolved
+            logger.warning(
+                "Audit column context variable ${%s.%s} resolved to None, "
+                "substituting empty string",
+                namespace,
+                prop,
+            )
+            return ""
         return value
 
     return _CONTEXT_VAR_PATTERN.sub(_replace, expression)

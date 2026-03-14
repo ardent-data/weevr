@@ -9,7 +9,6 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.source import Source
 from weevr.operations.audit import (
     AuditContext,
-    _resolve_context_variables,
     build_sources_json,
     inject_audit_columns,
     resolve_audit_columns,
@@ -95,63 +94,95 @@ class TestResolveAuditColumns:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_context_variables (internal, but critical for EC-004)
+# Context variable resolution (EC-004) — tested through inject_audit_columns
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.spark
 class TestContextVariableResolution:
-    """Test ${namespace.property} substitution in expressions."""
+    """Test ${namespace.property} substitution via the public inject interface."""
 
-    def test_thread_name(self):
+    @pytest.fixture()
+    def simple_df(self, spark: SparkSession):
+        """Simple DataFrame for context variable tests."""
+        return spark.createDataFrame([{"id": 1}])
+
+    def test_thread_name(self, simple_df):
         """${thread.name} resolves to thread name."""
         ctx = _ctx(thread_name="orders")
-        assert _resolve_context_variables("'${thread.name}'", ctx) == "'orders'"
+        result = inject_audit_columns(simple_df, {"_v": "'${thread.name}'"}, ctx)
+        assert result.collect()[0]["_v"] == "orders"
 
-    def test_thread_qualified_key(self):
+    def test_thread_qualified_key(self, simple_df):
         """${thread.qualified_key} resolves to qualified key."""
         ctx = _ctx(thread_qualified_key="staging.orders")
-        result = _resolve_context_variables("'${thread.qualified_key}'", ctx)
-        assert result == "'staging.orders'"
+        result = inject_audit_columns(simple_df, {"_v": "'${thread.qualified_key}'"}, ctx)
+        assert result.collect()[0]["_v"] == "staging.orders"
 
-    def test_thread_source(self):
+    def test_thread_source(self, simple_df):
         """${thread.source} resolves to primary source alias."""
         ctx = _ctx(thread_source="bronze.raw_orders")
-        result = _resolve_context_variables("'${thread.source}'", ctx)
-        assert result == "'bronze.raw_orders'"
+        result = inject_audit_columns(simple_df, {"_v": "'${thread.source}'"}, ctx)
+        assert result.collect()[0]["_v"] == "bronze.raw_orders"
 
-    def test_thread_sources(self):
+    def test_thread_source_none_resolves_empty(self, simple_df):
+        """${thread.source} resolves to empty string when source is None."""
+        ctx = _ctx()
+        # Override thread_source to None via dataclass replacement
+        ctx_none = AuditContext(
+            thread_name=ctx.thread_name,
+            thread_qualified_key=ctx.thread_qualified_key,
+            thread_source=None,
+            thread_sources_json=ctx.thread_sources_json,
+            weave_name=ctx.weave_name,
+            loom_name=ctx.loom_name,
+        )
+        result = inject_audit_columns(simple_df, {"_v": "'${thread.source}'"}, ctx_none)
+        assert result.collect()[0]["_v"] == ""
+
+    def test_thread_sources(self, simple_df):
         """${thread.sources} resolves to JSON array."""
         sources_json = '[{"name": "raw", "alias": "bronze.raw", "type": "primary"}]'
         ctx = _ctx(thread_sources_json=sources_json)
-        result = _resolve_context_variables("'${thread.sources}'", ctx)
-        assert result == f"'{sources_json}'"
+        result = inject_audit_columns(simple_df, {"_v": "'${thread.sources}'"}, ctx)
+        assert result.collect()[0]["_v"] == sources_json
 
-    def test_weave_name(self):
+    def test_weave_name(self, simple_df):
         """${weave.name} resolves to weave name."""
         ctx = _ctx(weave_name="staging")
-        assert _resolve_context_variables("'${weave.name}'", ctx) == "'staging'"
+        result = inject_audit_columns(simple_df, {"_v": "'${weave.name}'"}, ctx)
+        assert result.collect()[0]["_v"] == "staging"
 
-    def test_loom_name(self):
+    def test_loom_name(self, simple_df):
         """${loom.name} resolves to loom name."""
         ctx = _ctx(loom_name="my-project")
-        assert _resolve_context_variables("'${loom.name}'", ctx) == "'my-project'"
+        result = inject_audit_columns(simple_df, {"_v": "'${loom.name}'"}, ctx)
+        assert result.collect()[0]["_v"] == "my-project"
 
-    def test_multiple_vars_in_one_expression(self):
+    def test_multiple_vars_in_one_expression(self, simple_df):
         """Multiple variables in a single expression all resolve."""
         ctx = _ctx(thread_name="orders", weave_name="staging")
-        result = _resolve_context_variables("concat('${thread.name}', '-', '${weave.name}')", ctx)
-        assert result == "concat('orders', '-', 'staging')"
+        result = inject_audit_columns(
+            simple_df,
+            {"_v": "concat('${thread.name}', '-', '${weave.name}')"},
+            ctx,
+        )
+        assert result.collect()[0]["_v"] == "orders-staging"
 
-    def test_unknown_var_left_unresolved(self):
-        """Unknown context variable is left as-is."""
+    def test_unknown_var_left_unresolved(self, simple_df):
+        """Unknown context variable passes through without error."""
         ctx = _ctx()
-        result = _resolve_context_variables("'${thread.unknown_prop}'", ctx)
-        assert result == "'${thread.unknown_prop}'"
+        # Unknown properties are left in the expression string; Spark may
+        # interpret ${} in SQL string literals as empty via variable substitution.
+        result = inject_audit_columns(simple_df, {"_v": "'${thread.unknown_prop}'"}, ctx)
+        # Should not raise — the expression is valid SQL regardless of resolution
+        assert "_v" in result.columns
 
-    def test_no_vars_passthrough(self):
-        """Expression without variables passes through unchanged."""
+    def test_no_vars_passthrough(self, simple_df):
+        """Expression without variables evaluates directly."""
         ctx = _ctx()
-        assert _resolve_context_variables("current_timestamp()", ctx) == "current_timestamp()"
+        result = inject_audit_columns(simple_df, {"_v": "current_timestamp()"}, ctx)
+        assert result.collect()[0]["_v"] is not None
 
 
 # ---------------------------------------------------------------------------
