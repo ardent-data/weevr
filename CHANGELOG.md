@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/ardent-data/weevr/compare/weevr-v1.7.0...weevr-v1.7.1) (2026-03-15)
+
+
+### Bug Fixes
+
+* **engine:** rewrite Sankey waterfall with proper visualization ([#93](https://github.com/ardent-data/weevr/issues/93)) ([19317e9](https://github.com/ardent-data/weevr/commit/19317e90cd9a230e872b314a887a311bea947fc9))
+
 ## [1.7.0](https://github.com/ardent-data/weevr/compare/weevr-v1.6.0...weevr-v1.7.0) (2026-03-15)
 
 
