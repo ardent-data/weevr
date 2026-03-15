@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from weevr.telemetry.results import (
     AssertionResult,
+    ExportResult,
     LoomTelemetry,
     ThreadTelemetry,
     ValidationResult,
@@ -85,6 +86,60 @@ class TestAssertionResult:
         assert ar.severity == "fatal"
 
 
+class TestExportResult:
+    def test_create_success(self) -> None:
+        er = ExportResult(
+            name="archive",
+            type="parquet",
+            target="/data/archive/2026-03-15",
+            rows_written=1000,
+            duration_ms=1234.5,
+            status="success",
+        )
+        assert er.name == "archive"
+        assert er.type == "parquet"
+        assert er.rows_written == 1000
+        assert er.status == "success"
+        assert er.error is None
+
+    def test_create_warned(self) -> None:
+        er = ExportResult(
+            name="csv_out",
+            type="csv",
+            target="/exports/csv",
+            rows_written=0,
+            duration_ms=50.0,
+            status="warned",
+            error="Complex type not supported by CSV",
+        )
+        assert er.status == "warned"
+        assert er.error is not None
+
+    def test_create_aborted(self) -> None:
+        er = ExportResult(
+            name="critical",
+            type="delta",
+            target="db.critical",
+            rows_written=0,
+            duration_ms=10.0,
+            status="aborted",
+            error="Permission denied",
+        )
+        assert er.status == "aborted"
+
+    def test_immutable(self) -> None:
+        er = ExportResult(
+            name="frozen",
+            type="parquet",
+            target="/data",
+            rows_written=100,
+            duration_ms=500.0,
+            status="success",
+        )
+        with pytest.raises(ValidationError):
+            er.rows_written = 200  # type: ignore[misc]
+
+
 class TestThreadTelemetry:
     def test_create_empty(self) -> None:
         tt = ThreadTelemetry(span=_make_span("thread:customer"))
@@ -119,6 +174,28 @@ class TestThreadTelemetry:
         assert len(tt.validation_results) == 1
         assert len(tt.assertion_results) == 1
         assert tt.rows_read == 100
+
+    def test_create_with_export_results(self) -> None:
+        er = ExportResult(
+            name="archive",
+            type="parquet",
+            target="/data/archive",
+            rows_written=500,
+            duration_ms=300.0,
+            status="success",
+        )
+        tt = ThreadTelemetry(
+            span=_make_span(),
+            rows_read=500,
+            rows_written=500,
+            export_results=[er],
+        )
+        assert len(tt.export_results) == 1
+        assert tt.export_results[0].name == "archive"
+
+    def test_export_results_default_empty(self) -> None:
+        tt = ThreadTelemetry(span=_make_span())
+        assert tt.export_results == []
 
 
 class TestWeaveTelemetry:

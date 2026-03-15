@@ -273,6 +273,50 @@ class HookError(ExecutionError):
         return base_msg
 
 
+class ExportError(ExecutionError):
+    """Raised when an export write fails with on_failure: abort.
+
+    Carries export-specific context to identify which export failed
+    and what format was being written.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        thread_name: str | None = None,
+        export_name: str | None = None,
+        export_type: str | None = None,
+    ) -> None:
+        """Initialize ExportError.
+
+        Args:
+            message: Human-readable error message.
+            cause: Optional underlying exception.
+            thread_name: Name of the thread where the error occurred.
+            export_name: Name of the export that failed.
+            export_type: Format type of the export (e.g. "parquet", "csv").
+        """
+        super().__init__(message, cause=cause, thread_name=thread_name)
+        self.export_name = export_name
+        self.export_type = export_type
+
+    def __str__(self) -> str:
+        """Return string representation with export context."""
+        parts = [self.message]
+        if self.thread_name:
+            parts.append(f"in thread '{self.thread_name}'")
+        if self.export_name:
+            label = self.export_name
+            if self.export_type:
+                label += f" ({self.export_type})"
+            parts.append(f"at export '{label}'")
+        base_msg = " ".join(parts)
+        if self.cause:
+            return f"{base_msg} (caused by: {self.cause})"
+        return base_msg
+
+
 class LookupResolutionError(ConfigError):
     """Raised when a thread references a lookup not defined in the weave.
 
