@@ -1729,39 +1729,38 @@ def render_waterfall_svg(
     canvas_w = pad * 2 + n_cols * col_w + (n_cols - 1) * col_gap
     canvas_h = pad * 2 + max_stack + 20
 
-    # --- Theme-aware colors ---
-    # Band colors keyed by role for light and dark modes.
+    # --- Theme-aware colors (aligned with flow SVG palette) ---
     band_colors_lt = {
-        "read": "#bee3f8",
-        "transform": "#c6f6d5",
-        "clean": "#c6f6d5",
-        "quarantine": "#fefcbf",
-        "target": "#bee3f8",
-        "export": "#bbf7d0",
+        "read": lt["source_fill"],
+        "transform": lt["transform_fill"],
+        "clean": lt["transform_fill"],
+        "quarantine": lt["quarantine_fill"],
+        "target": lt["target_fill"],
+        "export": lt["export_fill"],
     }
     band_stroke_lt = {
-        "read": "#90cdf4",
-        "transform": "#9ae6b4",
-        "clean": "#9ae6b4",
-        "quarantine": "#ecc94b",
-        "target": "#90cdf4",
-        "export": "#68d391",
+        "read": lt["source_stroke"],
+        "transform": lt["transform_stroke"],
+        "clean": lt["transform_stroke"],
+        "quarantine": lt["quarantine_stroke"],
+        "target": lt["target_stroke"],
+        "export": lt["export_stroke"],
     }
     band_colors_dk = {
-        "read": "#2a4365",
-        "transform": "#22543d",
-        "clean": "#22543d",
-        "quarantine": "#744210",
-        "target": "#2a4365",
-        "export": "#14532d",
+        "read": dk["source_fill"],
+        "transform": dk["transform_fill"],
+        "clean": dk["transform_fill"],
+        "quarantine": dk["quarantine_fill"],
+        "target": dk["target_fill"],
+        "export": dk["export_fill"],
     }
     band_stroke_dk = {
-        "read": "#63b3ed",
-        "transform": "#48bb78",
-        "clean": "#48bb78",
-        "quarantine": "#d69e2e",
-        "target": "#63b3ed",
-        "export": "#4ade80",
+        "read": dk["source_stroke"],
+        "transform": dk["transform_stroke"],
+        "clean": dk["transform_stroke"],
+        "quarantine": dk["quarantine_stroke"],
+        "target": dk["target_stroke"],
+        "export": dk["export_stroke"],
     }
     flow_opacity_lt = "0.3"
     flow_opacity_dk = "0.4"
