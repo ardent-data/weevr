@@ -2097,6 +2097,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/exports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4298,7 +4326,8 @@ if the weave was conditionally skipped at loom level.</p>
     - For <code>cdc</code>: use CDC merge routing instead of standard write.
 12. Persist watermark state (if applicable).
 13. Run post-write assertions (if configured).
-14. Build telemetry and return ThreadResult.</p>
+14. Write exports (secondary outputs, if configured).
+15. Build telemetry and return ThreadResult.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4526,6 +4555,16 @@ provided. Falls back to empty string if no dot separator exists.</p>
             <td>
               <div class="doc-md-description">
                 <p>If a fatal-severity validation rule fails.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExportError (weevr.errors.exceptions.ExportError)" href="../errors/#weevr.errors.ExportError">ExportError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If an export with <code>on_failure: abort</code> fails.</p>
               </div>
             </td>
           </tr>

@@ -1322,6 +1322,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.operations.resolve_export_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_export_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.resolve_exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.write_export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        write_export
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.operations.compute_keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1969,6 +2002,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/exports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2446,6 +2507,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.operations.resolve_export_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_export_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.resolve_exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.write_export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        write_export
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.operations.compute_keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2576,7 +2670,7 @@ step type maps to an operation function.</p>
 
     <div class="doc doc-contents first">
 
-        <p>weevr operations — source readers, pipeline steps, hashing, mapping, writers, and validation.</p>
+        <p>weevr operations — readers, transforms, hashing, mapping, writers, exports, validation.</p>
 
 
 
@@ -2600,7 +2694,7 @@ step type maps to an operation function.</p>
 
 
 <h3 id="weevr.operations.__all__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;AuditContext&#39;</span><span class="p">,</span> <span class="s1">&#39;apply_target_mapping&#39;</span><span class="p">,</span> <span class="s1">&#39;build_sources_json&#39;</span><span class="p">,</span> <span class="s1">&#39;compute_keys&#39;</span><span class="p">,</span> <span class="s1">&#39;evaluate_assertions&#39;</span><span class="p">,</span> <span class="s1">&#39;inject_audit_columns&#39;</span><span class="p">,</span> <span class="s1">&#39;read_source&#39;</span><span class="p">,</span> <span class="s1">&#39;read_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_audit_columns&#39;</span><span class="p">,</span> <span class="s1">&#39;run_pipeline&#39;</span><span class="p">,</span> <span class="s1">&#39;validate_dataframe&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationOutcome&#39;</span><span class="p">,</span> <span class="s1">&#39;write_quarantine&#39;</span><span class="p">,</span> <span class="s1">&#39;write_target&#39;</span><span class="p">]</span></code>
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;AuditContext&#39;</span><span class="p">,</span> <span class="s1">&#39;apply_target_mapping&#39;</span><span class="p">,</span> <span class="s1">&#39;build_sources_json&#39;</span><span class="p">,</span> <span class="s1">&#39;compute_keys&#39;</span><span class="p">,</span> <span class="s1">&#39;evaluate_assertions&#39;</span><span class="p">,</span> <span class="s1">&#39;inject_audit_columns&#39;</span><span class="p">,</span> <span class="s1">&#39;read_source&#39;</span><span class="p">,</span> <span class="s1">&#39;read_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_audit_columns&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_export_path&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_exports&#39;</span><span class="p">,</span> <span class="s1">&#39;run_pipeline&#39;</span><span class="p">,</span> <span class="s1">&#39;validate_dataframe&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationOutcome&#39;</span><span class="p">,</span> <span class="s1">&#39;write_export&#39;</span><span class="p">,</span> <span class="s1">&#39;write_quarantine&#39;</span><span class="p">,</span> <span class="s1">&#39;write_target&#39;</span><span class="p">]</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
@@ -2712,6 +2806,28 @@ step type maps to an operation function.</p>
             <td>
               <div class="doc-md-description">
                 <p>Loom name (e.g. <code>my-project</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.run_timestamp">run_timestamp</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>ISO 8601 UTC timestamp of execution start.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.operations.AuditContext.run_id">run_id</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>UUID4 identifier unique per execution.</p>
               </div>
             </td>
           </tr>
@@ -3280,6 +3396,330 @@ level override the expression from a higher level.</p>
             <td>
               <div class="doc-md-description">
                 <p>Merged audit column dict. Empty dict if none defined.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.resolve_export_path" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_export_path</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.resolve_export_path" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Substitute context variables in an export path string.</p>
+<p>Delegates to the shared <code>resolve_context_variables()</code> in the audit
+module, which handles <code>${thread.*}</code>, <code>${weave.*}</code>, <code>${loom.*}</code>,
+and <code>${run.*}</code> namespaces.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Export path with variable placeholders.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>context</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="AuditContext
+
+
+  
+      dataclass
+   (weevr.operations.audit.AuditContext)" href="#weevr.operations.AuditContext">AuditContext</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Execution context providing variable values.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path with all context variables resolved. Unknown variables</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>are left as-is.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.resolve_exports" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_exports</span><span class="p">(</span><span class="n">exports</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.resolve_exports" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve context variables in export path fields.</p>
+<p>Creates new Export instances with resolved paths. Exports using
+<code>alias</code> (no path) are returned unchanged.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>exports</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Export (weevr.model.export.Export)" href="../model/#weevr.model.Export">Export</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Export definitions with potential variable placeholders.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>context</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="AuditContext
+
+
+  
+      dataclass
+   (weevr.operations.audit.AuditContext)" href="#weevr.operations.AuditContext">AuditContext</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Execution context for variable resolution.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Export (weevr.model.export.Export)" href="../model/#weevr.model.Export">Export</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of exports with resolved paths.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.write_export" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">write_export</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">export</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">row_count</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.write_export" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Write a DataFrame to an export target.</p>
+<p>Dispatches to the appropriate Spark format writer based on the
+export type. Captures timing, row count, and any errors.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>spark</code>
+            </td>
+            <td>
+                  <code><span title="pyspark.sql.SparkSession">SparkSession</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Active SparkSession.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="pyspark.sql.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame to write (post-mapping, audit-injected).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>export</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Export (weevr.model.export.Export)" href="../model/#weevr.model.Export">Export</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Export configuration with resolved path.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>row_count</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-computed row count to avoid an extra <code>df.count()</code>
+action. When <code>None</code>, the count is computed before writing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExportResult (weevr.telemetry.results.ExportResult)" href="../telemetry/#weevr.telemetry.ExportResult">ExportResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>ExportResult with write metrics and status.</p>
               </div>
             </td>
           </tr>
