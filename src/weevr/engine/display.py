@@ -1686,55 +1686,86 @@ def render_waterfall_svg(
         export_results = getattr(thread_telemetry, "export_results", [])
 
     # Sankey layout constants
-    col_w = 100  # width of each stage column
-    col_gap = 60  # gap between columns
+    col_w = 110  # width of each stage column
+    col_gap = 80  # gap between columns (room for Bezier curves)
     max_band_h = 80  # max band height at full row count
-    label_h = 18  # height for labels below bands
-    band_min = 4  # minimum visible band height
-
-    # Build stage columns: each has (label, count, color)
-    columns: list[list[tuple[str, int, str]]] = []
-
-    # Column 0: Rows read
-    columns.append([("Rows read", rows_read, "#bee3f8")])
-
-    # Column 1: After transforms
-    columns.append([("After transforms", rows_after, "#c6f6d5")])
-
-    if mode == "execute":
-        # Column 2: Validation split (quarantine + clean rows)
-        clean_rows = rows_after - rows_quarantined
-        if rows_quarantined > 0:
-            columns.append(
-                [
-                    ("Clean rows", max(clean_rows, 0), "#c6f6d5"),
-                    ("Quarantined", rows_quarantined, "#fefcbf"),
-                ]
-            )
-        else:
-            # No quarantine — skip split column, go straight to outputs
-            columns.append([("Clean rows", rows_after, "#c6f6d5")])
-
-        # Column 3: Output destinations (target + exports)
-        outputs: list[tuple[str, int, str]] = [("Target", rows_written, "#bee3f8")]
-        for er in export_results:
-            er_name = getattr(er, "name", "export")
-            er_rows = getattr(er, "rows_written", 0)
-            outputs.append((er_name, er_rows, "#bbf7d0"))
-        columns.append(outputs)
+    band_gap = 24  # vertical gap between stacked bands (room for labels)
+    band_min = 34  # minimum band height (must fit count + label text)
 
     max_count = max(rows_read, rows_after, 1)
 
-    def _band_h(count: int) -> float:
+    def _bh(count: int) -> float:
+        """Proportional band height."""
         if count <= 0:
             return band_min
         return max((count / max_count) * max_band_h, band_min)
 
-    # Compute canvas dimensions
-    n_cols = len(columns)
-    max_bands_in_col = max(len(col) for col in columns)
+    # --- Compute band heights ---
+    clean_rows = max(rows_after - rows_quarantined, 0) if mode == "execute" else 0
+    output_dests: list[tuple[str, int]] = []
+    if mode == "execute":
+        output_dests.append(("Target", rows_written))
+        for er in export_results:
+            er_name = getattr(er, "name", "export")
+            er_rows = getattr(er, "rows_written", 0)
+            output_dests.append((er_name, er_rows))
+
+    has_quarantine = mode == "execute" and rows_quarantined > 0
+    n_cols = 2 if mode == "preview" else (4 if has_quarantine else 3)
+
+    h_read = _bh(rows_read)
+    h_after = _bh(rows_after)
+    h_clean = _bh(clean_rows) if has_quarantine else _bh(rows_after)
+    h_quar = _bh(rows_quarantined) if has_quarantine else 0.0
+    h_outputs = [_bh(c) for _, c in output_dests]
+
+    # Canvas sizing
+    max_stack = max(
+        h_read + 16,
+        h_after + 16,
+        (h_clean + band_gap + h_quar + 16) if has_quarantine else h_clean + 16,
+        (sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0) + 16 if h_outputs else 0.0),
+    )
     canvas_w = pad * 2 + n_cols * col_w + (n_cols - 1) * col_gap
-    canvas_h = pad * 2 + max_band_h + label_h + (max_bands_in_col - 1) * (band_min + 4) + 20
+    canvas_h = pad * 2 + max_stack + 20
+
+    # --- Theme-aware colors (aligned with flow SVG palette) ---
+    band_colors_lt = {
+        "read": lt["source_fill"],
+        "transform": lt["transform_fill"],
+        "clean": lt["transform_fill"],
+        "quarantine": lt["quarantine_fill"],
+        "target": lt["target_fill"],
+        "export": lt["export_fill"],
+    }
+    band_stroke_lt = {
+        "read": lt["source_stroke"],
+        "transform": lt["transform_stroke"],
+        "clean": lt["transform_stroke"],
+        "quarantine": lt["quarantine_stroke"],
+        "target": lt["target_stroke"],
+        "export": lt["export_stroke"],
+    }
+    band_colors_dk = {
+        "read": dk["source_fill"],
+        "transform": dk["transform_fill"],
+        "clean": dk["transform_fill"],
+        "quarantine": dk["quarantine_fill"],
+        "target": dk["target_fill"],
+        "export": dk["export_fill"],
+    }
+    band_stroke_dk = {
+        "read": dk["source_stroke"],
+        "transform": dk["transform_stroke"],
+        "clean": dk["transform_stroke"],
+        "quarantine": dk["quarantine_stroke"],
+        "target": dk["target_stroke"],
+        "export": dk["export_stroke"],
+    }
+    flow_opacity_lt = "0.3"
+    flow_opacity_dk = "0.4"
+    bc = band_colors_dk if dark is True else band_colors_lt
+    bs = band_stroke_dk if dark is True else band_stroke_lt
 
     parts: list[str] = []
     vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
@@ -1742,88 +1773,209 @@ def render_waterfall_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
         f'width="{canvas_w:.0f}" height="{canvas_h:.0f}">'
     )
+
+    # --- CSS ---
+    fop = flow_opacity_dk if dark is True else flow_opacity_lt
     parts.append("<style>")
     parts.append(f"  .wf-bg{{fill:{lt['bg']}}}")
     parts.append(
-        f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:11px;text-anchor:middle}}"
+        f"  .wf-label{{fill:{lt['text']};font-family:{font};"
+        "font-size:10px;text-anchor:middle;font-weight:500}}"
     )
     parts.append(
-        f"  .wf-count{{fill:{lt['text']};font-family:{font};font-size:10px;"
-        "text-anchor:middle;opacity:0.7}}"
+        f"  .wf-count{{fill:{lt['text']};font-family:{font};"
+        "font-size:11px;text-anchor:middle;font-weight:600}}"
     )
+    parts.append(f"  .wf-flow{{opacity:{fop}}}")
     if dark is None:
         parts.append("  @media(prefers-color-scheme:dark){")
         parts.append(f"    .wf-bg{{fill:{dk['bg']}}}")
         parts.append(f"    .wf-label{{fill:{dk['text']}}}")
         parts.append(f"    .wf-count{{fill:{dk['text']}}}")
+        parts.append(f"    .wf-flow{{opacity:{flow_opacity_dk}}}")
+        # Band color overrides per role (fill + stroke)
+        for role in band_colors_dk:
+            dc = band_colors_dk[role]
+            ds = band_stroke_dk[role]
+            parts.append(f"    .wf-band-{role}{{fill:{dc};stroke:{ds}}}")
         parts.append("  }")
     parts.append("</style>")
-
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
 
-    # Track band positions for drawing connecting paths
-    # Each entry: (x, y_center, height) per band per column
-    col_bands: list[list[tuple[float, float, float]]] = []
+    # --- Helpers ---
+    def _draw_band(
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        label: str,
+        count: int,
+        role: str,
+    ) -> None:
+        color = bc[role]
+        stroke = bs[role]
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w}" '
+            f'height="{h:.1f}" rx="5" fill="{color}" '
+            f'stroke="{stroke}" stroke-width="1.5" '
+            f'opacity="0.8" class="wf-band-{role}"/>'
+        )
+        # Count and label stacked inside the band
+        parts.append(
+            f'<text x="{x + w / 2:.1f}" y="{y + h / 2 - 4:.1f}" '
+            f'dominant-baseline="central" class="wf-count">'
+            f"{count:,}</text>"
+        )
+        parts.append(
+            f'<text x="{x + w / 2:.1f}" y="{y + h / 2 + 8:.1f}" '
+            f'dominant-baseline="central" '
+            f'class="wf-label">{_xml_escape(label)}</text>'
+        )
 
-    for ci, col in enumerate(columns):
-        cx = pad + ci * (col_w + col_gap)
-        # Stack bands vertically within each column
-        total_h = sum(_band_h(count) for _, count, _ in col) + max(len(col) - 1, 0) * 2
-        by = pad + (max_band_h - total_h) / 2  # vertically center
-        by = max(by, pad)
+    def _draw_flow(
+        lx: float,
+        lt_: float,
+        lb: float,
+        rx: float,
+        rt: float,
+        rb: float,
+        role: str,
+    ) -> None:
+        """Smooth Bezier Sankey band from left edge to right edge."""
+        color = bc[role]
+        mx = (lx + rx) / 2
+        parts.append(
+            f'<path d="M{lx:.1f},{lt_:.1f} '
+            f"C{mx:.1f},{lt_:.1f} {mx:.1f},{rt:.1f} "
+            f"{rx:.1f},{rt:.1f} "
+            f"L{rx:.1f},{rb:.1f} "
+            f"C{mx:.1f},{rb:.1f} {mx:.1f},{lb:.1f} "
+            f"{lx:.1f},{lb:.1f}Z"
+            f'" fill="{color}" class="wf-flow wf-band-{role}"/>'
+        )
 
-        bands: list[tuple[float, float, float]] = []
-        for label, count, color in col:
-            bh = _band_h(count)
-            parts.append(
-                f'<rect x="{cx:.1f}" y="{by:.1f}" width="{col_w}" '
-                f'height="{bh:.1f}" rx="3" fill="{color}" opacity="0.8"/>'
+    # --- Position and draw ---
+    cy = pad + max_stack / 2
+
+    # Col 0: Rows read
+    cx0 = pad
+    y_read = cy - h_read / 2
+    _draw_band(cx0, y_read, col_w, h_read, "Rows read", rows_read, "read")
+
+    # Col 1: After transforms
+    cx1 = pad + col_w + col_gap
+    y_after = cy - h_after / 2
+    _draw_band(
+        cx1,
+        y_after,
+        col_w,
+        h_after,
+        "After transforms",
+        rows_after,
+        "transform",
+    )
+    _draw_flow(
+        cx0 + col_w,
+        y_read,
+        y_read + h_read,
+        cx1,
+        y_after,
+        y_after + h_after,
+        "read",
+    )
+
+    if mode == "execute" and has_quarantine:
+        # Col 2: Split — clean rows (top) + quarantine (bottom)
+        cx2 = pad + 2 * (col_w + col_gap)
+        split_h = h_clean + band_gap + h_quar
+        y_clean = cy - split_h / 2
+        y_quar = y_clean + h_clean + band_gap
+        _draw_band(
+            cx2,
+            y_clean,
+            col_w,
+            h_clean,
+            "Clean rows",
+            clean_rows,
+            "clean",
+        )
+        _draw_band(
+            cx2,
+            y_quar,
+            col_w,
+            h_quar,
+            "Quarantined",
+            rows_quarantined,
+            "quarantine",
+        )
+
+        # Proportional split from "after transforms" band
+        ratio = clean_rows / rows_after if rows_after > 0 else 1.0
+        split_y = y_after + h_after * ratio
+        _draw_flow(
+            cx1 + col_w,
+            y_after,
+            split_y,
+            cx2,
+            y_clean,
+            y_clean + h_clean,
+            "clean",
+        )
+        _draw_flow(
+            cx1 + col_w,
+            split_y,
+            y_after + h_after,
+            cx2,
+            y_quar,
+            y_quar + h_quar,
+            "quarantine",
+        )
+        # Quarantine is terminal — no forward flow
+
+        # Col 3: Outputs (flow from clean rows only)
+        cx3 = pad + 3 * (col_w + col_gap)
+        total_out = sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0)
+        y_out = cy - total_out / 2
+        n_out = len(output_dests)
+        for oi, (olabel, ocount) in enumerate(output_dests):
+            oh = h_outputs[oi]
+            role = "target" if oi == 0 else "export"
+            _draw_band(cx3, y_out, col_w, oh, olabel, ocount, role)
+            l_top = y_clean + h_clean * oi / n_out
+            l_bot = y_clean + h_clean * (oi + 1) / n_out
+            _draw_flow(
+                cx2 + col_w,
+                l_top,
+                l_bot,
+                cx3,
+                y_out,
+                y_out + oh,
+                role,
             )
-            # Count label inside band
-            parts.append(
-                f'<text x="{cx + col_w / 2:.1f}" y="{by + bh / 2:.1f}" '
-                f'dominant-baseline="central" class="wf-count">{count:,}</text>'
+            y_out += oh + band_gap
+
+    elif mode == "execute":
+        # No quarantine — after transforms → outputs directly
+        cx2 = pad + 2 * (col_w + col_gap)
+        total_out = sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0)
+        y_out = cy - total_out / 2
+        n_out = len(output_dests)
+        for oi, (olabel, ocount) in enumerate(output_dests):
+            oh = h_outputs[oi]
+            role = "target" if oi == 0 else "export"
+            _draw_band(cx2, y_out, col_w, oh, olabel, ocount, role)
+            l_top = y_after + h_after * oi / n_out
+            l_bot = y_after + h_after * (oi + 1) / n_out
+            _draw_flow(
+                cx1 + col_w,
+                l_top,
+                l_bot,
+                cx2,
+                y_out,
+                y_out + oh,
+                role,
             )
-            # Stage label below band
-            parts.append(
-                f'<text x="{cx + col_w / 2:.1f}" y="{by + bh + 12:.1f}" '
-                f'class="wf-label">{_xml_escape(label)}</text>'
-            )
-            bands.append((cx, by + bh / 2, bh))
-            by += bh + 2
-
-        col_bands.append(bands)
-
-    # Draw connecting paths between columns (simple trapezoid fills)
-    for ci in range(len(col_bands) - 1):
-        left_bands = col_bands[ci]
-        right_bands = col_bands[ci + 1]
-        lx = pad + ci * (col_w + col_gap) + col_w
-        rx = pad + (ci + 1) * (col_w + col_gap)
-
-        # Simple case: 1 left band → N right bands (fan-out)
-        if len(left_bands) == 1:
-            ly, lh = left_bands[0][1], left_bands[0][2]
-            for ry_center, rh in [(b[1], b[2]) for b in right_bands]:
-                parts.append(
-                    f'<path d="M{lx:.1f},{ly - lh / 2:.1f} '
-                    f"L{rx:.1f},{ry_center - rh / 2:.1f} "
-                    f"L{rx:.1f},{ry_center + rh / 2:.1f} "
-                    f'L{lx:.1f},{ly + lh / 2:.1f}Z" '
-                    f'fill="{lt["edge"]}" opacity="0.15"/>'
-                )
-        else:
-            # N left bands → M right bands — draw individual connections
-            for li, (_, ly, lh) in enumerate(left_bands):
-                ri = min(li, len(right_bands) - 1)
-                _, ry, rh = right_bands[ri]
-                parts.append(
-                    f'<path d="M{lx:.1f},{ly - lh / 2:.1f} '
-                    f"L{rx:.1f},{ry - rh / 2:.1f} "
-                    f"L{rx:.1f},{ry + rh / 2:.1f} "
-                    f'L{lx:.1f},{ly + lh / 2:.1f}Z" '
-                    f'fill="{lt["edge"]}" opacity="0.15"/>'
-                )
+            y_out += oh + band_gap
 
     parts.append("</svg>")
     return "".join(parts)
