@@ -1690,7 +1690,7 @@ def render_waterfall_svg(
     col_gap = 80  # gap between columns (room for Bezier curves)
     max_band_h = 80  # max band height at full row count
     band_gap = 24  # vertical gap between stacked bands (room for labels)
-    band_min = 22  # minimum band height (must fit count text + label)
+    band_min = 34  # minimum band height (must fit count + label text)
 
     max_count = max(rows_read, rows_after, 1)
 
@@ -1777,9 +1777,9 @@ def render_waterfall_svg(
         parts.append(f"    .wf-label{{fill:{dk['text']}}}")
         parts.append(f"    .wf-count{{fill:{dk['text']}}}")
         parts.append(f"    .wf-flow{{opacity:{flow_opacity_dk}}}")
-        # Band color overrides per role
+        # Band color overrides per role (fill + stroke)
         for role, dcolor in band_colors_dk.items():
-            parts.append(f"    .wf-band-{role}{{fill:{dcolor}}}")
+            parts.append(f"    .wf-band-{role}{{fill:{dcolor};stroke:{dcolor}}}")
         parts.append("  }")
     parts.append("</style>")
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
@@ -1797,8 +1797,9 @@ def render_waterfall_svg(
         color = bc[role]
         parts.append(
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{w}" '
-            f'height="{h:.1f}" rx="4" fill="{color}" '
-            f'opacity="0.85" class="wf-band-{role}"/>'
+            f'height="{h:.1f}" rx="5" fill="{color}" '
+            f'stroke="{color}" stroke-opacity="0.6" stroke-width="1.5" '
+            f'opacity="0.8" class="wf-band-{role}"/>'
         )
         # Count and label stacked inside the band
         parts.append(
