@@ -1739,6 +1739,14 @@ def render_waterfall_svg(
         "target": "#bee3f8",
         "export": "#bbf7d0",
     }
+    band_stroke_lt = {
+        "read": "#90cdf4",
+        "transform": "#9ae6b4",
+        "clean": "#9ae6b4",
+        "quarantine": "#ecc94b",
+        "target": "#90cdf4",
+        "export": "#68d391",
+    }
     band_colors_dk = {
         "read": "#2a4365",
         "transform": "#22543d",
@@ -1747,9 +1755,18 @@ def render_waterfall_svg(
         "target": "#2a4365",
         "export": "#14532d",
     }
+    band_stroke_dk = {
+        "read": "#63b3ed",
+        "transform": "#48bb78",
+        "clean": "#48bb78",
+        "quarantine": "#d69e2e",
+        "target": "#63b3ed",
+        "export": "#4ade80",
+    }
     flow_opacity_lt = "0.3"
     flow_opacity_dk = "0.4"
     bc = band_colors_dk if dark is True else band_colors_lt
+    bs = band_stroke_dk if dark is True else band_stroke_lt
 
     parts: list[str] = []
     vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
@@ -1778,8 +1795,10 @@ def render_waterfall_svg(
         parts.append(f"    .wf-count{{fill:{dk['text']}}}")
         parts.append(f"    .wf-flow{{opacity:{flow_opacity_dk}}}")
         # Band color overrides per role (fill + stroke)
-        for role, dcolor in band_colors_dk.items():
-            parts.append(f"    .wf-band-{role}{{fill:{dcolor};stroke:{dcolor}}}")
+        for role in band_colors_dk:
+            dc = band_colors_dk[role]
+            ds = band_stroke_dk[role]
+            parts.append(f"    .wf-band-{role}{{fill:{dc};stroke:{ds}}}")
         parts.append("  }")
     parts.append("</style>")
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
@@ -1795,10 +1814,11 @@ def render_waterfall_svg(
         role: str,
     ) -> None:
         color = bc[role]
+        stroke = bs[role]
         parts.append(
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{w}" '
             f'height="{h:.1f}" rx="5" fill="{color}" '
-            f'stroke="{color}" stroke-opacity="0.6" stroke-width="1.5" '
+            f'stroke="{stroke}" stroke-width="1.5" '
             f'opacity="0.8" class="wf-band-{role}"/>'
         )
         # Count and label stacked inside the band
