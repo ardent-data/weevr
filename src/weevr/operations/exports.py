@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-import re
 import time
 from typing import TYPE_CHECKING
 
+from weevr.errors.exceptions import ExportError
 from weevr.model.export import Export
+from weevr.operations.audit import _CONTEXT_VAR_PATTERN, resolve_context_variables
 from weevr.telemetry.results import ExportResult
 
 if TYPE_CHECKING:
@@ -17,15 +18,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Same pattern as audit context variables: ${namespace.property}
-_EXPORT_VAR_PATTERN = re.compile(r"\$\{(thread|weave|loom|run)\.([a-z_]+)\}")
-
 
 def resolve_export_path(path: str, context: AuditContext) -> str:
     """Substitute context variables in an export path string.
 
-    Supports ``${thread.*}``, ``${weave.*}``, ``${loom.*}``, and
-    ``${run.*}`` namespaces using the same lookup as audit columns.
+    Delegates to the shared ``resolve_context_variables()`` in the audit
+    module, which handles ``${thread.*}``, ``${weave.*}``, ``${loom.*}``,
+    and ``${run.*}`` namespaces.
 
     Args:
         path: Export path with variable placeholders.
@@ -35,34 +34,7 @@ def resolve_export_path(path: str, context: AuditContext) -> str:
         Path with all context variables resolved. Unknown variables
         are left as-is.
     """
-    lookup: dict[str, dict[str, str | None]] = {
-        "thread": {
-            "name": context.thread_name,
-            "qualified_key": context.thread_qualified_key,
-            "source": context.thread_source,
-        },
-        "weave": {
-            "name": context.weave_name,
-        },
-        "loom": {
-            "name": context.loom_name,
-        },
-        "run": {
-            "timestamp": context.run_timestamp,
-            "id": context.run_id,
-        },
-    }
-
-    def _replace(match: re.Match[str]) -> str:
-        namespace = match.group(1)
-        prop = match.group(2)
-        ns_lookup = lookup.get(namespace, {})
-        value = ns_lookup.get(prop)
-        if value is None:
-            return match.group(0)
-        return value
-
-    return _EXPORT_VAR_PATTERN.sub(_replace, path)
+    return resolve_context_variables(path, context)
 
 
 def resolve_exports(
@@ -83,7 +55,7 @@ def resolve_exports(
     """
     resolved: list[Export] = []
     for export in exports:
-        if export.path is not None and _EXPORT_VAR_PATTERN.search(export.path):
+        if export.path is not None and _CONTEXT_VAR_PATTERN.search(export.path):
             resolved_path = resolve_export_path(export.path, context)
             resolved.append(export.model_copy(update={"path": resolved_path}))
         else:
@@ -95,6 +67,8 @@ def write_export(
     spark: SparkSession,
     df: DataFrame,
     export: Export,
+    *,
+    row_count: int | None = None,
 ) -> ExportResult:
     """Write a DataFrame to an export target.
 
@@ -105,14 +79,23 @@ def write_export(
         spark: Active SparkSession.
         df: DataFrame to write (post-mapping, audit-injected).
         export: Export configuration with resolved path.
+        row_count: Pre-computed row count to avoid an extra ``df.count()``
+            action. When ``None``, the count is computed before writing.
 
     Returns:
         ExportResult with write metrics and status.
     """
     target = export.alias or export.path or ""
+    if not target:
+        raise ExportError(
+            f"Export '{export.name}' has no path or alias",
+            export_name=export.name,
+            export_type=export.type,
+        )
+
     start = time.monotonic()
     try:
-        row_count = df.count()
+        count = row_count if row_count is not None else df.count()
 
         writer = df.write.format(export.type).mode(export.mode)
 
@@ -132,7 +115,7 @@ def write_export(
             "Export '%s' (%s) wrote %d rows to %s in %.0fms",
             export.name,
             export.type,
-            row_count,
+            count,
             target,
             duration,
         )
@@ -140,10 +123,13 @@ def write_export(
             name=export.name,
             type=export.type,
             target=target,
-            rows_written=row_count,
+            rows_written=count,
             duration_ms=duration,
             status="success",
         )
+
+    except ExportError:
+        raise
 
     except Exception as exc:
         duration = (time.monotonic() - start) * 1000

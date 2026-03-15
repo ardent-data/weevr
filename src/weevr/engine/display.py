@@ -1745,7 +1745,7 @@ def render_waterfall_svg(
     parts.append("<style>")
     parts.append(f"  .wf-bg{{fill:{lt['bg']}}}")
     parts.append(
-        f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:11px;text-anchor:middle}}}}"
+        f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:11px;text-anchor:middle}}"
     )
     parts.append(
         f"  .wf-count{{fill:{lt['text']};font-family:{font};font-size:10px;"

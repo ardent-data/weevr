@@ -73,7 +73,7 @@ def resolve_audit_columns(
     return merged
 
 
-def _resolve_context_variables(expression: str, context: AuditContext) -> str:
+def resolve_context_variables(expression: str, context: AuditContext) -> str:
     """Substitute ${namespace.property} variables in an expression string.
 
     Args:
@@ -155,7 +155,7 @@ def inject_audit_columns(
 
     result = df
     for col_name, expression in audit_columns.items():
-        resolved = _resolve_context_variables(expression, context)
+        resolved = resolve_context_variables(expression, context)
         result = result.withColumn(col_name, F.expr(resolved))
 
     return result

@@ -255,21 +255,7 @@ def execute_thread(
         audit_columns_applied: list[str] = []
         audit_ctx: AuditContext | None = None
         if audit_columns:
-            effective_weave = weave_name or (
-                thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
-            )
-            primary_alias = next(iter(thread.sources))
-            primary_source = thread.sources[primary_alias]
-            audit_ctx = AuditContext(
-                thread_name=thread.name,
-                thread_qualified_key=thread.qualified_key,
-                thread_source=primary_source.alias,
-                thread_sources_json=build_sources_json(thread.sources),
-                weave_name=effective_weave,
-                loom_name=loom_name,
-                run_timestamp=run_timestamp,
-                run_id=run_id,
-            )
+            audit_ctx = _build_audit_context(thread, weave_name, loom_name, run_timestamp, run_id)
 
         # Step 7/8 — write to Delta
         write_mode = thread.write.mode if thread.write else "overwrite"
@@ -342,25 +328,13 @@ def execute_thread(
         if thread.exports:
             # Build AuditContext for export path resolution if not already built
             if audit_ctx is None:
-                effective_weave = weave_name or (
-                    thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
-                )
-                primary_alias = next(iter(thread.sources))
-                primary_source = thread.sources[primary_alias]
-                audit_ctx = AuditContext(
-                    thread_name=thread.name,
-                    thread_qualified_key=thread.qualified_key,
-                    thread_source=primary_source.alias,
-                    thread_sources_json=build_sources_json(thread.sources),
-                    weave_name=effective_weave,
-                    loom_name=loom_name,
-                    run_timestamp=run_timestamp,
-                    run_id=run_id,
+                audit_ctx = _build_audit_context(
+                    thread, weave_name, loom_name, run_timestamp, run_id
                 )
 
             resolved = resolve_exports(thread.exports, audit_ctx)
             for export in resolved:
-                result = write_export(spark, df, export)
+                result = write_export(spark, df, export, row_count=rows_written)
                 export_results.append(result)
                 if result.status == "aborted":
                     raise ExportError(
@@ -447,6 +421,31 @@ def execute_thread(
             cause=exc,
             thread_name=thread.name,
         ) from exc
+
+
+def _build_audit_context(
+    thread: Thread,
+    weave_name: str,
+    loom_name: str,
+    run_timestamp: str,
+    run_id: str,
+) -> AuditContext:
+    """Build an AuditContext for context variable resolution."""
+    effective_weave = weave_name or (
+        thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
+    )
+    primary_alias = next(iter(thread.sources))
+    primary_source = thread.sources[primary_alias]
+    return AuditContext(
+        thread_name=thread.name,
+        thread_qualified_key=thread.qualified_key,
+        thread_source=primary_source.alias,
+        thread_sources_json=build_sources_json(thread.sources),
+        weave_name=effective_weave,
+        loom_name=loom_name,
+        run_timestamp=run_timestamp,
+        run_id=run_id,
+    )
 
 
 def _validate_incremental(thread: Thread, load_mode: str) -> None:
