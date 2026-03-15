@@ -1015,7 +1015,7 @@ class TestRenderFlowSvg:
 
     def test_all_new_nodes_together(self) -> None:
         """Thread with validations, assertions, and exports renders all nodes."""
-        exports = [type("E", (), {"name": "backup", "type": "delta"})()]
+        exports: list[object] = [type("E", (), {"name": "backup", "type": "delta"})()]
         thread = _fake_thread(
             validations=[{"rule": "test"}],
             assertions=[{"type": "row_count"}],
