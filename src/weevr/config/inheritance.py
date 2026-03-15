@@ -69,6 +69,9 @@ def apply_inheritance(
     # Audit columns cascade: loom → weave → thread.target with additive merge.
     _cascade_audit_columns(loom_defaults, weave_defaults, result)
 
+    # Exports cascade: loom → weave → thread with additive merge by name.
+    _cascade_exports(loom_defaults, weave_defaults, result)
+
     return result
 
 
@@ -134,3 +137,40 @@ def _cascade_audit_columns(
 
     # Remove top-level audit_columns inherited from defaults (not a Thread field)
     thread_config.pop("audit_columns", None)
+
+
+def _cascade_exports(
+    loom_defaults: dict[str, Any] | None,
+    weave_defaults: dict[str, Any] | None,
+    thread_config: dict[str, Any],
+) -> None:
+    """Cascade exports from loom/weave defaults into thread config.
+
+    Like audit columns, exports use additive merge: each level extends the
+    export set. Same-named exports at a lower level override the definition
+    from a higher level. Exports with ``enabled: false`` are removed from
+    the final list.
+
+    Cascade order: loom defaults → weave defaults → thread config.
+    """
+    merged: dict[str, dict[str, Any]] = {}
+
+    for level in (loom_defaults, weave_defaults):
+        if level and "exports" in level:
+            for export in level["exports"]:
+                name = export.get("name")
+                if name:
+                    merged[name] = export
+
+    # Thread-level exports
+    if "exports" in thread_config:
+        for export in thread_config["exports"]:
+            name = export.get("name")
+            if name:
+                merged[name] = export
+
+    if not merged:
+        return
+
+    # Filter out disabled exports and write the resolved list
+    thread_config["exports"] = [e for e in merged.values() if e.get("enabled", True) is not False]

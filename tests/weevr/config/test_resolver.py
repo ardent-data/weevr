@@ -394,3 +394,36 @@ class TestReferenceResolution:
         assert len(result["_resolved_weaves"]) == 1
         assert result["_resolved_weaves"][0]["name"] == "dimensions"
         assert result["_resolved_weaves"][0]["qualified_key"] == "dimensions.weave"
+
+
+class TestRunVariableSkip:
+    """Test that ${run.*} variables are preserved at config-load time."""
+
+    def test_run_timestamp_preserved(self):
+        """${run.timestamp} is not resolved at config-load time."""
+        config = {"path": "/archive/${run.timestamp}/data"}
+        result = resolve_variables(config, {})
+        assert result["path"] == "/archive/${run.timestamp}/data"
+
+    def test_run_id_preserved(self):
+        """${run.id} is not resolved at config-load time."""
+        config = {"path": "/export/${run.id}"}
+        result = resolve_variables(config, {})
+        assert result["path"] == "/export/${run.id}"
+
+    def test_run_vars_in_nested_config(self):
+        """${run.*} preserved in nested structures."""
+        config = {
+            "exports": [
+                {"name": "archive", "path": "/data/${run.timestamp}/${run.id}"},
+            ],
+        }
+        result = resolve_variables(config, {})
+        assert "${run.timestamp}" in result["exports"][0]["path"]
+        assert "${run.id}" in result["exports"][0]["path"]
+
+    def test_run_and_regular_vars_mixed(self):
+        """${run.*} preserved while regular vars are resolved."""
+        config = {"path": "/lakehouse/${env}/${run.timestamp}"}
+        result = resolve_variables(config, {"env": "prod"})
+        assert result["path"] == "/lakehouse/prod/${run.timestamp}"

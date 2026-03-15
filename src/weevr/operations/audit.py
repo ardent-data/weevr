@@ -27,6 +27,8 @@ class AuditContext:
         thread_sources_json: JSON array of all sources with type metadata.
         weave_name: Weave name (e.g. ``staging``).
         loom_name: Loom name (e.g. ``my-project``).
+        run_timestamp: ISO 8601 UTC timestamp of execution start.
+        run_id: UUID4 identifier unique per execution.
     """
 
     thread_name: str
@@ -35,10 +37,12 @@ class AuditContext:
     thread_sources_json: str
     weave_name: str
     loom_name: str
+    run_timestamp: str = ""
+    run_id: str = ""
 
 
 # Pattern matching ${namespace.property} context variables.
-_CONTEXT_VAR_PATTERN = re.compile(r"\$\{(thread|weave|loom)\.([a-z_]+)\}")
+_CONTEXT_VAR_PATTERN = re.compile(r"\$\{(thread|weave|loom|run)\.([a-z_]+)\}")
 
 
 def resolve_audit_columns(
@@ -91,6 +95,10 @@ def _resolve_context_variables(expression: str, context: AuditContext) -> str:
         },
         "loom": {
             "name": context.loom_name,
+        },
+        "run": {
+            "timestamp": context.run_timestamp,
+            "id": context.run_id,
         },
     }
 

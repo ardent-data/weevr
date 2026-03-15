@@ -327,3 +327,35 @@ class TestMappingModeBypass:
         assert "_audit" in result.columns
         # 'name' was dropped by explicit mapping — audit col still added
         assert "name" not in result.columns
+
+
+class TestRunContextVariables:
+    """Test ${run.timestamp} and ${run.id} context variable resolution."""
+
+    def test_run_timestamp_resolves(self, spark: SparkSession) -> None:
+        """${run.timestamp} resolves to the context value."""
+        ctx = _ctx(run_timestamp="2026-03-15T10:30:00+00:00")
+        df = spark.createDataFrame([(1,)], ["id"])
+        result = inject_audit_columns(df, {"_loaded_at": "'${run.timestamp}'"}, ctx)
+        rows = result.collect()
+        assert rows[0]["_loaded_at"] == "2026-03-15T10:30:00+00:00"
+
+    def test_run_id_resolves(self, spark: SparkSession) -> None:
+        """${run.id} resolves to the context value."""
+        ctx = _ctx(run_id="abc-123-def")
+        df = spark.createDataFrame([(1,)], ["id"])
+        result = inject_audit_columns(df, {"_run_id": "'${run.id}'"}, ctx)
+        rows = result.collect()
+        assert rows[0]["_run_id"] == "abc-123-def"
+
+    def test_run_vars_mixed_with_thread(self, spark: SparkSession) -> None:
+        """${run.*} and ${thread.*} resolve together."""
+        ctx = _ctx(run_timestamp="2026-03-15T00:00:00+00:00")
+        df = spark.createDataFrame([(1,)], ["id"])
+        result = inject_audit_columns(
+            df,
+            {"_meta": "concat('${thread.name}', '_', '${run.timestamp}')"},
+            ctx,
+        )
+        rows = result.collect()
+        assert rows[0]["_meta"] == "stg_orders_2026-03-15T00:00:00+00:00"

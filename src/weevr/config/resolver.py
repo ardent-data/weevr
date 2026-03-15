@@ -100,8 +100,8 @@ def resolve_variables(
             var_name = match.group(1).strip()
             default_value = match.group(2)
 
-            # Skip runtime variable namespace — resolved later by VariableContext
-            if var_name.startswith("var."):
+            # Skip runtime variable namespaces — resolved later at execution time
+            if var_name.startswith(("var.", "run.")):
                 return match.group(0)
 
             try:

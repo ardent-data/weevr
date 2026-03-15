@@ -44,6 +44,7 @@ class ThreadConfig(BaseConfig):
     assertions: list[dict[str, Any]] | None = None
     load: dict[str, Any] | None = None
     tags: list[str] | None = None
+    exports: list[dict[str, Any]] | None = None
     execution: dict[str, Any] | None = None
 
 

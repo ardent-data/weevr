@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -95,6 +96,10 @@ def execute_thread(
         ExecutionError: If any step fails, with ``thread_name`` set on the error.
         DataValidationError: If a fatal-severity validation rule fails.
     """
+    # Generate per-execution run context (shared across audit columns and exports)
+    run_timestamp = datetime.now(UTC).isoformat()
+    run_id = str(uuid.uuid4())
+
     span_builder = None
     if collector is not None:
         span_label = thread.qualified_key or thread.name
@@ -261,6 +266,8 @@ def execute_thread(
                 thread_sources_json=build_sources_json(thread.sources),
                 weave_name=effective_weave,
                 loom_name=loom_name,
+                run_timestamp=run_timestamp,
+                run_id=run_id,
             )
 
         # Step 7/8 — write to Delta
