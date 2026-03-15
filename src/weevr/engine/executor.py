@@ -69,7 +69,8 @@ def execute_thread(
         - For ``cdc``: use CDC merge routing instead of standard write.
     12. Persist watermark state (if applicable).
     13. Run post-write assertions (if configured).
-    14. Build telemetry and return ThreadResult.
+    14. Write exports (secondary outputs, if configured).
+    15. Build telemetry and return ThreadResult.
 
     Args:
         spark: Active SparkSession.
@@ -96,6 +97,7 @@ def execute_thread(
     Raises:
         ExecutionError: If any step fails, with ``thread_name`` set on the error.
         DataValidationError: If a fatal-severity validation rule fails.
+        ExportError: If an export with ``on_failure: abort`` fails.
     """
     # Generate per-execution run context (shared across audit columns and exports)
     run_timestamp = datetime.now(UTC).isoformat()

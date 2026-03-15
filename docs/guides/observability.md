@@ -267,6 +267,8 @@ depends on what was executed:
   counts
 - **audit_columns_applied** -- Names of audit columns injected into the
   output
+- **export_results** -- Per-export write results (`ExportResult` list with
+  name, type, target, rows_written, duration_ms, status, error)
 
 ### Accessing telemetry
 

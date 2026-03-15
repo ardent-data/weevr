@@ -5,6 +5,7 @@ from weevr.telemetry.events import LogEvent, create_log_event
 from weevr.telemetry.logging import LogLevel, StructuredJsonFormatter, configure_logging
 from weevr.telemetry.results import (
     AssertionResult,
+    ExportResult,
     LoomTelemetry,
     ThreadTelemetry,
     ValidationResult,
@@ -38,6 +39,7 @@ __all__ = [
     # Telemetry results
     "ValidationResult",
     "AssertionResult",
+    "ExportResult",
     "ThreadTelemetry",
     "WeaveTelemetry",
     "LoomTelemetry",

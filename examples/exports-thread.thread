@@ -15,7 +15,7 @@ sources:
 
 steps:
   - filter:
-      condition: "status != 'cancelled'"
+      expr: "status != 'cancelled'"
   - derive:
       columns:
         order_year: "year(order_date)"

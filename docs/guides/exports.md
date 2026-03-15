@@ -31,7 +31,7 @@ exports:
 |-------|----------|---------|-------------|
 | `name` | Yes | — | Unique identifier (valid Python identifier). |
 | `type` | Yes | — | Output format: `delta`, `parquet`, `csv`, `json`, `orc`. |
-| `path` | Conditional | — | OneLake path. Required for non-delta types. Supports context variables. |
+| `path` | Conditional | — | OneLake path. Required when `alias` is not set and the export is enabled. Supports context variables. |
 | `alias` | Conditional | — | Metastore alias. Delta type only, mutually exclusive with `path`. |
 | `description` | No | — | Human-readable label shown in `explain()` output. |
 | `mode` | No | `overwrite` | Write mode. Only `overwrite` in v1. |
@@ -42,7 +42,7 @@ exports:
 
 ## Format Notes
 
-- **Delta**: supports both `path` and `alias`. Auto-creates tables on first write.
+- **Delta**: use `alias` for a metastore-registered table or `path` for a direct OneLake path. Exactly one must be set. Auto-creates tables on first write.
 - **Parquet**: use `options.compression` for compression codec (snappy, gzip, etc.).
 - **CSV**: common options include `header`, `delimiter`, `quote`, `escape`.
 - **JSON**: writes one JSON object per line by default.

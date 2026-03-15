@@ -26,6 +26,7 @@ target. This page documents every key accepted inside a thread YAML file.
 | `failure` | `FailureConfig` | no | `null` | Per-thread failure handling policy |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) |
 | `cache` | `bool` | no | `null` | Whether to cache the final DataFrame before writing |
+| `exports` | `list[Export]` | no | `null` | Secondary output destinations. See [Exports guide](../../guides/exports.md). |
 
 ---
 
