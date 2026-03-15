@@ -95,6 +95,8 @@ class ThreadTelemetry(FrozenBase):
             Populated on the outermost telemetry object only (thread-level runs).
         audit_columns_applied: Names of audit columns injected into the output
             DataFrame for this thread.
+        export_results: Per-export write results, one per export configured
+            on the thread.
     """
 
     span: ExecutionSpan
