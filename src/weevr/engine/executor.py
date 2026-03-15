@@ -12,12 +12,13 @@ from pyspark.sql import SparkSession
 
 from weevr.engine.lookups import resolve_thread_lookups
 from weevr.engine.result import ThreadResult
-from weevr.errors.exceptions import DataValidationError, ExecutionError, StateError
+from weevr.errors.exceptions import DataValidationError, ExecutionError, ExportError, StateError
 from weevr.model.lookup import Lookup
 from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.audit import AuditContext, build_sources_json, inject_audit_columns
+from weevr.operations.exports import resolve_exports, write_export
 from weevr.operations.hashing import compute_keys
 from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import run_pipeline
@@ -32,7 +33,7 @@ from weevr.operations.validation import validate_dataframe
 from weevr.operations.writers import apply_target_mapping, execute_cdc_merge, write_target
 from weevr.state import WatermarkState, WatermarkStore, resolve_store
 from weevr.telemetry.collector import SpanBuilder, SpanCollector
-from weevr.telemetry.results import ThreadTelemetry
+from weevr.telemetry.results import ExportResult, ThreadTelemetry
 from weevr.telemetry.span import ExecutionSpan, SpanStatus, generate_span_id, generate_trace_id
 
 logger = logging.getLogger(__name__)
@@ -336,7 +337,40 @@ def execute_thread(
         if thread.assertions:
             assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
 
-        # Step 11 — build result
+        # Step 11 — write exports (secondary outputs)
+        export_results: list[ExportResult] = []
+        if thread.exports:
+            # Build AuditContext for export path resolution if not already built
+            if audit_ctx is None:
+                effective_weave = weave_name or (
+                    thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
+                )
+                primary_alias = next(iter(thread.sources))
+                primary_source = thread.sources[primary_alias]
+                audit_ctx = AuditContext(
+                    thread_name=thread.name,
+                    thread_qualified_key=thread.qualified_key,
+                    thread_source=primary_source.alias,
+                    thread_sources_json=build_sources_json(thread.sources),
+                    weave_name=effective_weave,
+                    loom_name=loom_name,
+                    run_timestamp=run_timestamp,
+                    run_id=run_id,
+                )
+
+            resolved = resolve_exports(thread.exports, audit_ctx)
+            for export in resolved:
+                result = write_export(spark, df, export)
+                export_results.append(result)
+                if result.status == "aborted":
+                    raise ExportError(
+                        f"Export '{export.name}' failed: {result.error}",
+                        thread_name=thread.name,
+                        export_name=export.name,
+                        export_type=export.type,
+                    )
+
+        # Step 12 — build result
         samples: dict[str, list[dict[str, Any]]] | None = None
         if output_sample:
             samples = {"output": output_sample}
@@ -361,6 +395,7 @@ def execute_thread(
             rows_after_transforms=rows_after_transforms,
             resolved_params=resolved_params,
             audit_columns_applied=audit_columns_applied,
+            export_results=export_results,
         )
 
         return ThreadResult(
@@ -467,6 +502,7 @@ def _build_telemetry(
     rows_after_transforms: int = 0,
     resolved_params: dict[str, Any] | None = None,
     audit_columns_applied: list[str] | None = None,
+    export_results: list[ExportResult] | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
@@ -502,4 +538,5 @@ def _build_telemetry(
         cdc_deletes=cdc_counts["deletes"] if cdc_counts else None,
         resolved_params=resolved_params,
         audit_columns_applied=audit_columns_applied or [],
+        export_results=export_results or [],
     )
