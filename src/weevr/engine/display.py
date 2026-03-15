@@ -1702,13 +1702,13 @@ def render_waterfall_svg(
 
     # --- Compute band heights ---
     clean_rows = max(rows_after - rows_quarantined, 0) if mode == "execute" else 0
-    output_dests: list[tuple[str, int, str]] = []
+    output_dests: list[tuple[str, int]] = []
     if mode == "execute":
-        output_dests.append(("Target", rows_written, "#bee3f8"))
+        output_dests.append(("Target", rows_written))
         for er in export_results:
             er_name = getattr(er, "name", "export")
             er_rows = getattr(er, "rows_written", 0)
-            output_dests.append((er_name, er_rows, "#bbf7d0"))
+            output_dests.append((er_name, er_rows))
 
     has_quarantine = mode == "execute" and rows_quarantined > 0
     n_cols = 2 if mode == "preview" else (4 if has_quarantine else 3)
@@ -1717,7 +1717,7 @@ def render_waterfall_svg(
     h_after = _bh(rows_after)
     h_clean = _bh(clean_rows) if has_quarantine else _bh(rows_after)
     h_quar = _bh(rows_quarantined) if has_quarantine else 0.0
-    h_outputs = [_bh(c) for _, c, _ in output_dests]
+    h_outputs = [_bh(c) for _, c in output_dests]
 
     # Canvas sizing
     max_stack = max(
@@ -1937,7 +1937,7 @@ def render_waterfall_svg(
         total_out = sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0)
         y_out = cy - total_out / 2
         n_out = len(output_dests)
-        for oi, (olabel, ocount, _ocolor) in enumerate(output_dests):
+        for oi, (olabel, ocount) in enumerate(output_dests):
             oh = h_outputs[oi]
             role = "target" if oi == 0 else "export"
             _draw_band(cx3, y_out, col_w, oh, olabel, ocount, role)
@@ -1960,7 +1960,7 @@ def render_waterfall_svg(
         total_out = sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0)
         y_out = cy - total_out / 2
         n_out = len(output_dests)
-        for oi, (olabel, ocount, _ocolor) in enumerate(output_dests):
+        for oi, (olabel, ocount) in enumerate(output_dests):
             oh = h_outputs[oi]
             role = "target" if oi == 0 else "export"
             _draw_band(cx2, y_out, col_w, oh, olabel, ocount, role)
