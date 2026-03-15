@@ -1686,11 +1686,11 @@ def render_waterfall_svg(
         export_results = getattr(thread_telemetry, "export_results", [])
 
     # Sankey layout constants
-    col_w = 100  # width of each stage column
+    col_w = 110  # width of each stage column
     col_gap = 80  # gap between columns (room for Bezier curves)
     max_band_h = 80  # max band height at full row count
-    band_gap = 8  # vertical gap between stacked bands
-    band_min = 6  # minimum visible band height
+    band_gap = 24  # vertical gap between stacked bands (room for labels)
+    band_min = 22  # minimum band height (must fit count text + label)
 
     max_count = max(rows_read, rows_after, 1)
 
@@ -1721,13 +1721,35 @@ def render_waterfall_svg(
 
     # Canvas sizing
     max_stack = max(
-        h_read,
-        h_after,
-        (h_clean + band_gap + h_quar) if has_quarantine else h_clean,
-        (sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0) if h_outputs else 0.0),
+        h_read + 16,
+        h_after + 16,
+        (h_clean + band_gap + h_quar + 16) if has_quarantine else h_clean + 16,
+        (sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0) + 16 if h_outputs else 0.0),
     )
     canvas_w = pad * 2 + n_cols * col_w + (n_cols - 1) * col_gap
-    canvas_h = pad * 2 + max_stack + 30
+    canvas_h = pad * 2 + max_stack + 20
+
+    # --- Theme-aware colors ---
+    # Band colors keyed by role for light and dark modes.
+    band_colors_lt = {
+        "read": "#bee3f8",
+        "transform": "#c6f6d5",
+        "clean": "#c6f6d5",
+        "quarantine": "#fefcbf",
+        "target": "#bee3f8",
+        "export": "#bbf7d0",
+    }
+    band_colors_dk = {
+        "read": "#2a4365",
+        "transform": "#22543d",
+        "clean": "#22543d",
+        "quarantine": "#744210",
+        "target": "#2a4365",
+        "export": "#14532d",
+    }
+    flow_opacity_lt = "0.3"
+    flow_opacity_dk = "0.4"
+    bc = band_colors_dk if dark is True else band_colors_lt
 
     parts: list[str] = []
     vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
@@ -1735,20 +1757,29 @@ def render_waterfall_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}" '
         f'width="{canvas_w:.0f}" height="{canvas_h:.0f}">'
     )
+
+    # --- CSS ---
+    fop = flow_opacity_dk if dark is True else flow_opacity_lt
     parts.append("<style>")
     parts.append(f"  .wf-bg{{fill:{lt['bg']}}}")
     parts.append(
-        f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:11px;text-anchor:middle}}"
+        f"  .wf-label{{fill:{lt['text']};font-family:{font};"
+        "font-size:10px;text-anchor:middle;font-weight:500}}"
     )
     parts.append(
         f"  .wf-count{{fill:{lt['text']};font-family:{font};"
-        "font-size:10px;text-anchor:middle;opacity:0.7}}"
+        "font-size:11px;text-anchor:middle;font-weight:600}}"
     )
+    parts.append(f"  .wf-flow{{opacity:{fop}}}")
     if dark is None:
         parts.append("  @media(prefers-color-scheme:dark){")
         parts.append(f"    .wf-bg{{fill:{dk['bg']}}}")
         parts.append(f"    .wf-label{{fill:{dk['text']}}}")
         parts.append(f"    .wf-count{{fill:{dk['text']}}}")
+        parts.append(f"    .wf-flow{{opacity:{flow_opacity_dk}}}")
+        # Band color overrides per role
+        for role, dcolor in band_colors_dk.items():
+            parts.append(f"    .wf-band-{role}{{fill:{dcolor}}}")
         parts.append("  }")
     parts.append("</style>")
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
@@ -1761,19 +1792,23 @@ def render_waterfall_svg(
         h: float,
         label: str,
         count: int,
-        color: str,
+        role: str,
     ) -> None:
+        color = bc[role]
         parts.append(
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{w}" '
-            f'height="{h:.1f}" rx="3" fill="{color}" opacity="0.8"/>'
+            f'height="{h:.1f}" rx="4" fill="{color}" '
+            f'opacity="0.85" class="wf-band-{role}"/>'
         )
+        # Count and label stacked inside the band
         parts.append(
-            f'<text x="{x + w / 2:.1f}" y="{y + h / 2:.1f}" '
+            f'<text x="{x + w / 2:.1f}" y="{y + h / 2 - 4:.1f}" '
             f'dominant-baseline="central" class="wf-count">'
             f"{count:,}</text>"
         )
         parts.append(
-            f'<text x="{x + w / 2:.1f}" y="{y + h + 12:.1f}" '
+            f'<text x="{x + w / 2:.1f}" y="{y + h / 2 + 8:.1f}" '
+            f'dominant-baseline="central" '
             f'class="wf-label">{_xml_escape(label)}</text>'
         )
 
@@ -1784,10 +1819,10 @@ def render_waterfall_svg(
         rx: float,
         rt: float,
         rb: float,
-        color: str,
-        opacity: float = 0.15,
+        role: str,
     ) -> None:
         """Smooth Bezier Sankey band from left edge to right edge."""
+        color = bc[role]
         mx = (lx + rx) / 2
         parts.append(
             f'<path d="M{lx:.1f},{lt_:.1f} '
@@ -1796,16 +1831,16 @@ def render_waterfall_svg(
             f"L{rx:.1f},{rb:.1f} "
             f"C{mx:.1f},{rb:.1f} {mx:.1f},{lb:.1f} "
             f"{lx:.1f},{lb:.1f}Z"
-            f'" fill="{color}" opacity="{opacity}"/>'
+            f'" fill="{color}" class="wf-flow wf-band-{role}"/>'
         )
 
     # --- Position and draw ---
-    cy = pad + max_stack / 2  # vertical center
+    cy = pad + max_stack / 2
 
     # Col 0: Rows read
     cx0 = pad
     y_read = cy - h_read / 2
-    _draw_band(cx0, y_read, col_w, h_read, "Rows read", rows_read, "#bee3f8")
+    _draw_band(cx0, y_read, col_w, h_read, "Rows read", rows_read, "read")
 
     # Col 1: After transforms
     cx1 = pad + col_w + col_gap
@@ -1817,7 +1852,7 @@ def render_waterfall_svg(
         h_after,
         "After transforms",
         rows_after,
-        "#c6f6d5",
+        "transform",
     )
     _draw_flow(
         cx0 + col_w,
@@ -1826,7 +1861,7 @@ def render_waterfall_svg(
         cx1,
         y_after,
         y_after + h_after,
-        "#bee3f8",
+        "read",
     )
 
     if mode == "execute" and has_quarantine:
@@ -1842,7 +1877,7 @@ def render_waterfall_svg(
             h_clean,
             "Clean rows",
             clean_rows,
-            "#c6f6d5",
+            "clean",
         )
         _draw_band(
             cx2,
@@ -1851,7 +1886,7 @@ def render_waterfall_svg(
             h_quar,
             "Quarantined",
             rows_quarantined,
-            "#fefcbf",
+            "quarantine",
         )
 
         # Proportional split from "after transforms" band
@@ -1864,7 +1899,7 @@ def render_waterfall_svg(
             cx2,
             y_clean,
             y_clean + h_clean,
-            "#c6f6d5",
+            "clean",
         )
         _draw_flow(
             cx1 + col_w,
@@ -1873,7 +1908,7 @@ def render_waterfall_svg(
             cx2,
             y_quar,
             y_quar + h_quar,
-            "#fefcbf",
+            "quarantine",
         )
         # Quarantine is terminal — no forward flow
 
@@ -1882,13 +1917,21 @@ def render_waterfall_svg(
         total_out = sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0)
         y_out = cy - total_out / 2
         n_out = len(output_dests)
-        for oi, (olabel, ocount, ocolor) in enumerate(output_dests):
+        for oi, (olabel, ocount, _ocolor) in enumerate(output_dests):
             oh = h_outputs[oi]
-            _draw_band(cx3, y_out, col_w, oh, olabel, ocount, ocolor)
-            # Proportional slice of clean band
+            role = "target" if oi == 0 else "export"
+            _draw_band(cx3, y_out, col_w, oh, olabel, ocount, role)
             l_top = y_clean + h_clean * oi / n_out
             l_bot = y_clean + h_clean * (oi + 1) / n_out
-            _draw_flow(cx2 + col_w, l_top, l_bot, cx3, y_out, y_out + oh, ocolor)
+            _draw_flow(
+                cx2 + col_w,
+                l_top,
+                l_bot,
+                cx3,
+                y_out,
+                y_out + oh,
+                role,
+            )
             y_out += oh + band_gap
 
     elif mode == "execute":
@@ -1897,12 +1940,21 @@ def render_waterfall_svg(
         total_out = sum(h_outputs) + band_gap * max(len(h_outputs) - 1, 0)
         y_out = cy - total_out / 2
         n_out = len(output_dests)
-        for oi, (olabel, ocount, ocolor) in enumerate(output_dests):
+        for oi, (olabel, ocount, _ocolor) in enumerate(output_dests):
             oh = h_outputs[oi]
-            _draw_band(cx2, y_out, col_w, oh, olabel, ocount, ocolor)
+            role = "target" if oi == 0 else "export"
+            _draw_band(cx2, y_out, col_w, oh, olabel, ocount, role)
             l_top = y_after + h_after * oi / n_out
             l_bot = y_after + h_after * (oi + 1) / n_out
-            _draw_flow(cx1 + col_w, l_top, l_bot, cx2, y_out, y_out + oh, ocolor)
+            _draw_flow(
+                cx1 + col_w,
+                l_top,
+                l_bot,
+                cx2,
+                y_out,
+                y_out + oh,
+                role,
+            )
             y_out += oh + band_gap
 
     parts.append("</svg>")
