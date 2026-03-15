@@ -1,10 +1,17 @@
 # Exports (Secondary Outputs)
 
-Exports let a thread write its output data to additional locations beyond the primary Delta target. This avoids duplicating thread pipelines for common patterns like Parquet archiving, CSV extracts for non-Spark systems, or compliance copies.
+Exports let a thread write its output data to additional locations beyond
+the primary Delta target. This avoids duplicating thread pipelines for
+common patterns like Parquet archiving, CSV extracts for non-Spark
+systems, or compliance copies.
 
 ## Overview
 
-Exports write the **same DataFrame** that goes to the primary target — post-mapping and with audit columns applied. They are declared in the `exports:` key at the thread, weave, or loom level and execute sequentially after the primary write, watermark persistence, and post-write assertions.
+Exports write the **same DataFrame** that goes to the primary target —
+post-mapping and with audit columns applied. They are declared in the
+`exports:` key at the thread, weave, or loom level and execute
+sequentially after the primary write, watermark persistence, and
+post-write assertions.
 
 ## Configuration
 
@@ -31,7 +38,7 @@ exports:
 |-------|----------|---------|-------------|
 | `name` | Yes | — | Unique identifier (valid Python identifier). |
 | `type` | Yes | — | Output format: `delta`, `parquet`, `csv`, `json`, `orc`. |
-| `path` | Conditional | — | OneLake path. Required when `alias` is not set and the export is enabled. Supports context variables. |
+| `path` | Conditional | — | OneLake path. Required when `alias` is not set. Supports variables. |
 | `alias` | Conditional | — | Metastore alias. Delta type only, mutually exclusive with `path`. |
 | `description` | No | — | Human-readable label shown in `explain()` output. |
 | `mode` | No | `overwrite` | Write mode. Only `overwrite` in v1. |
@@ -42,13 +49,17 @@ exports:
 
 ## Format Notes
 
-- **Delta**: use `alias` for a metastore-registered table or `path` for a direct OneLake path. Exactly one must be set. Auto-creates tables on first write.
+- **Delta**: use `alias` for a metastore-registered table or `path` for
+  a direct OneLake path. Exactly one must be set. Auto-creates tables on
+  first write.
 - **Parquet**: use `options.compression` for compression codec (snappy, gzip, etc.).
 - **CSV**: common options include `header`, `delimiter`, `quote`, `escape`.
 - **JSON**: writes one JSON object per line by default.
 - **ORC**: Hive-compatible columnar format.
 
-Complex types (arrays, maps, structs) may not be supported by flat-file formats (CSV, JSON). If a format cannot serialize the schema, the export fails and follows the `on_failure` behavior.
+Complex types (arrays, maps, structs) may not be supported by flat-file
+formats (CSV, JSON). If a format cannot serialize the schema, the export
+fails and follows the `on_failure` behavior.
 
 ## Dynamic Path Naming
 
@@ -90,7 +101,7 @@ exports:
 
 | `on_failure` | Behavior |
 |-------------|----------|
-| `warn` (default) | Log warning, record error in telemetry, continue to next export. Thread status: success. |
+| `warn` (default) | Log warning, record error in telemetry, continue. Thread succeeds. |
 | `abort` | Record error, raise `ExportError`. Thread status: failure. Remaining exports skipped. |
 
 Exports only run after a successful primary write. If the primary write fails, no exports execute.
