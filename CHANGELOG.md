@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/ardent-data/weevr/compare/weevr-v1.6.0...weevr-v1.7.0) (2026-03-15)
+
+
+### Features
+
+* **engine:** add export secondary outputs with cascade and format support ([#90](https://github.com/ardent-data/weevr/issues/90)) ([e38addc](https://github.com/ardent-data/weevr/commit/e38addc3874fdd1f8fa7dc725029f3ed6a5b7934))
+
 ## [1.6.0](https://github.com/ardent-data/weevr/compare/weevr-v1.5.0...weevr-v1.6.0) (2026-03-14)
 
 
