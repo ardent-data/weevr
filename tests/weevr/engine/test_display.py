@@ -764,6 +764,9 @@ def _fake_thread(
     steps: list[object] | None = None,
     target: object | None = None,
     write: object | None = None,
+    validations: list[object] | None = None,
+    assertions: list[object] | None = None,
+    exports: list[object] | None = None,
 ) -> Any:
     """Build a duck-typed Thread model for flow diagram tests."""
     return type(
@@ -775,6 +778,9 @@ def _fake_thread(
             "steps": steps or [],
             "target": target or _fake_target(),
             "write": write or type("W", (), {"mode": "overwrite"})(),
+            "validations": validations,
+            "assertions": assertions,
+            "exports": exports,
         },
     )()
 
@@ -824,7 +830,22 @@ def _fake_thread_telemetry(
             "cdc_inserts": None,
             "cdc_updates": None,
             "cdc_deletes": None,
+            "export_results": [],
         },
+    )()
+
+
+def _fake_export_result(
+    *,
+    name: str = "archive",
+    type_: str = "parquet",
+    rows_written: int = 100,
+) -> object:
+    """Build a duck-typed ExportResult."""
+    return type(
+        "ER",
+        (),
+        {"name": name, "type": type_, "rows_written": rows_written, "status": "success"},
     )()
 
 
@@ -962,6 +983,61 @@ class TestRenderFlowSvg:
         assert "<script>" not in svg
         assert "&lt;script&gt;" in svg
 
+    def test_validation_node_present(self) -> None:
+        """Thread with validations shows validation gate and quarantine nodes."""
+        thread = _fake_thread(validations=[{"rule": "test"}])
+        svg = render_flow_svg(thread)
+        assert 'class="flow-validation"' in svg
+        assert 'class="flow-quarantine"' in svg
+        assert ">validation<" in svg
+        assert ">quarantine<" in svg
+
+    def test_assertions_node_present(self) -> None:
+        """Thread with assertions shows assertions checkpoint node."""
+        thread = _fake_thread(assertions=[{"type": "row_count"}])
+        svg = render_flow_svg(thread)
+        assert 'class="flow-assertion"' in svg
+        assert ">assertions<" in svg
+
+    def test_export_nodes_present(self) -> None:
+        """Thread with exports shows export destination nodes."""
+        exports = [
+            type("E", (), {"name": "archive", "type": "parquet"})(),
+            type("E", (), {"name": "csv_feed", "type": "csv"})(),
+        ]
+        thread = _fake_thread(exports=exports)
+        svg = render_flow_svg(thread)
+        assert 'class="flow-export"' in svg
+        assert ">archive<" in svg
+        assert ">csv_feed<" in svg
+        assert ">parquet<" in svg
+        assert ">csv<" in svg
+
+    def test_all_new_nodes_together(self) -> None:
+        """Thread with validations, assertions, and exports renders all nodes."""
+        exports = [type("E", (), {"name": "backup", "type": "delta"})()]
+        thread = _fake_thread(
+            validations=[{"rule": "test"}],
+            assertions=[{"type": "row_count"}],
+            exports=exports,
+        )
+        svg = render_flow_svg(thread)
+        assert 'class="flow-validation"' in svg
+        assert 'class="flow-quarantine"' in svg
+        assert 'class="flow-assertion"' in svg
+        assert 'class="flow-export"' in svg
+        # Valid XML
+        ET.fromstring(svg)
+
+    def test_no_new_nodes_backward_compatible(self) -> None:
+        """Thread without validations/assertions/exports has no new node types."""
+        thread = _fake_thread()
+        svg = render_flow_svg(thread)
+        assert 'class="flow-validation"' not in svg
+        assert 'class="flow-quarantine"' not in svg
+        assert 'class="flow-assertion"' not in svg
+        assert 'class="flow-export"' not in svg
+
 
 # ---------------------------------------------------------------------------
 # Task 18 — Timeline, waterfall, and annotated DAG SVG tests
@@ -1053,14 +1129,14 @@ class TestRenderWaterfallSvg:
         assert "Rows read" in svg
         assert "After transforms" in svg
         assert "Quarantined" in svg
-        assert "Rows written" in svg
+        assert "Target" in svg
 
     def test_execute_mode_no_quarantine(self) -> None:
         tr = _fake_thread_result(rows_written=100)
         tt = _fake_thread_telemetry(rows_read=100, rows_after_transforms=100, rows_quarantined=0)
         svg = render_waterfall_svg(tr, tt, mode="execute")
         assert "Quarantined" not in svg
-        assert "Rows written" in svg
+        assert "Target" in svg
 
     def test_preview_mode(self) -> None:
         tr = _fake_thread_result(rows_written=0)
@@ -1068,7 +1144,7 @@ class TestRenderWaterfallSvg:
         svg = render_waterfall_svg(tr, tt, mode="preview")
         assert "Rows read" in svg
         assert "After transforms" in svg
-        assert "Rows written" not in svg
+        assert "Target" not in svg
 
     def test_zero_rows(self) -> None:
         tr = _fake_thread_result(rows_written=0)
@@ -1100,6 +1176,16 @@ class TestRenderWaterfallSvg:
         tt = _fake_thread_telemetry()
         svg = render_waterfall_svg(tr, tt, mode="execute", dark=True)
         assert "prefers-color-scheme:dark" not in svg
+
+    def test_with_exports(self) -> None:
+        """Sankey shows export bands alongside target."""
+        er = _fake_export_result(name="archive", rows_written=90)
+        tr = _fake_thread_result(rows_written=90)
+        tt = _fake_thread_telemetry(rows_read=100, rows_after_transforms=95)
+        tt.export_results = [er]  # type: ignore[attr-defined]
+        svg = render_waterfall_svg(tr, tt, mode="execute")
+        assert "Target" in svg
+        assert "archive" in svg
 
     def test_forced_light(self) -> None:
         tr = _fake_thread_result(rows_written=90)

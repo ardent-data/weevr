@@ -84,6 +84,14 @@ _FLOW_LIGHT = {
     "transform_stroke": "#48bb78",
     "target_fill": "#ebf8ff",
     "target_stroke": "#3182ce",
+    "validation_fill": "#fffbeb",
+    "validation_stroke": "#d97706",
+    "quarantine_fill": "#fef3c7",
+    "quarantine_stroke": "#b45309",
+    "assertion_fill": "#eff6ff",
+    "assertion_stroke": "#6366f1",
+    "export_fill": "#f0fdf4",
+    "export_stroke": "#22c55e",
     "text": "#2d3748",
     "edge": "#a0aec0",
     "bg": "#ffffff",
@@ -98,6 +106,14 @@ _FLOW_DARK = {
     "transform_stroke": "#48bb78",
     "target_fill": "#2a4365",
     "target_stroke": "#63b3ed",
+    "validation_fill": "#451a03",
+    "validation_stroke": "#d97706",
+    "quarantine_fill": "#78350f",
+    "quarantine_stroke": "#f59e0b",
+    "assertion_fill": "#312e81",
+    "assertion_stroke": "#818cf8",
+    "export_fill": "#14532d",
+    "export_stroke": "#4ade80",
     "text": "#e2e8f0",
     "edge": "#718096",
     "bg": "#1a202c",
@@ -933,6 +949,22 @@ def _build_flow_svg_style(dark: bool | None = None) -> str:
             f"stroke:{lt['transform_stroke']};stroke-width:1.5}}"
         ),
         f"  .flow-target{{fill:{lt['target_fill']};stroke:{lt['target_stroke']};stroke-width:2}}",
+        (
+            f"  .flow-validation{{fill:{lt['validation_fill']};"
+            f"stroke:{lt['validation_stroke']};stroke-width:1.5}}"
+        ),
+        (
+            f"  .flow-quarantine{{fill:{lt['quarantine_fill']};"
+            f"stroke:{lt['quarantine_stroke']};stroke-width:1.5;stroke-dasharray:4,3}}"
+        ),
+        (
+            f"  .flow-assertion{{fill:{lt['assertion_fill']};"
+            f"stroke:{lt['assertion_stroke']};stroke-width:1.5}}"
+        ),
+        (
+            f"  .flow-export{{fill:{lt['export_fill']};"
+            f"stroke:{lt['export_stroke']};stroke-width:1.5;stroke-dasharray:6,3}}"
+        ),
         f"  .flow-label{{fill:{lt['text']};font-family:{font};font-size:{fs}px;{ta}}}",
         f"  .flow-sublabel{{fill:{lt['text']};font-family:{font};font-size:{fa}px;{ta};"
         "opacity:0.7}}",
@@ -950,6 +982,13 @@ def _build_flow_svg_style(dark: bool | None = None) -> str:
                 f"    .flow-transform{{fill:{dk['transform_fill']};"
                 f"stroke:{dk['transform_stroke']}}}",
                 f"    .flow-target{{fill:{dk['target_fill']};stroke:{dk['target_stroke']}}}",
+                f"    .flow-validation{{fill:{dk['validation_fill']};"
+                f"stroke:{dk['validation_stroke']}}}",
+                f"    .flow-quarantine{{fill:{dk['quarantine_fill']};"
+                f"stroke:{dk['quarantine_stroke']}}}",
+                f"    .flow-assertion{{fill:{dk['assertion_fill']};"
+                f"stroke:{dk['assertion_stroke']}}}",
+                f"    .flow-export{{fill:{dk['export_fill']};stroke:{dk['export_stroke']}}}",
                 f"    .flow-label{{fill:{dk['text']}}}",
                 f"    .flow-sublabel{{fill:{dk['text']}}}",
                 f"    .flow-badge{{fill:{dk['badge_bg']}}}",
@@ -1088,16 +1127,60 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
         else:
             src_positions.append(join_positions[slabel])
 
-    # Target: after pipeline
-    if not pipeline_nodes:
+    # --- Validation and quarantine nodes (if thread has validations) ---
+    has_validations = getattr(thread, "validations", None) is not None
+    validation_pos: tuple[float, float, float] | None = None
+    quarantine_pos: tuple[float, float, float] | None = None
+    if has_validations:
+        val_w = _est_w("validation")
+        validation_pos = (px, center_y, val_w)
+        px += val_w + hgap
+        # Quarantine branches down from validation
+        quar_w = _est_w("quarantine")
+        quarantine_pos = (
+            validation_pos[0] + val_w / 2 - quar_w / 2,
+            center_y + nh + vgap,
+            quar_w,
+        )
+
+    # Target: after pipeline (and validation if present)
+    if not pipeline_nodes and not has_validations:
         px = pad + (max_primary_w + hgap if primary_sources else 0.0)
     target_pos = (px, center_y, target_w)
+
+    # --- Export nodes (fan out from the same fan-out point as target) ---
+    export_list = getattr(thread, "exports", None) or []
+    export_positions: list[tuple[float, float, float, str, str]] = []
+    for i, exp in enumerate(export_list):
+        exp_name = getattr(exp, "name", f"export_{i}")
+        exp_type = getattr(exp, "type", "")
+        exp_w = _est_w(exp_name)
+        exp_y = center_y + (i + 1) * (nh + vgap)
+        export_positions.append((px, exp_y, exp_w, exp_name, exp_type))
+
+    # --- Assertions node (after target) ---
+    has_assertions = getattr(thread, "assertions", None) is not None
+    assertion_pos: tuple[float, float, float] | None = None
+    if has_assertions:
+        assert_x = px + target_w + hgap
+        assert_w = _est_w("assertions")
+        assertion_pos = (assert_x, center_y, assert_w)
 
     # Canvas dimensions
     top_edge = min(y for _, y, _ in src_positions) if src_positions else pad
     bot_edge = max(y + nh for _, y, _ in src_positions) if src_positions else center_y + nh
     bot_edge = max(bot_edge, center_y + nh)
-    canvas_w = px + target_w + pad
+    # Account for quarantine branch
+    if quarantine_pos:
+        bot_edge = max(bot_edge, quarantine_pos[1] + nh)
+    # Account for export nodes
+    for _, ey, _, _, _ in export_positions:
+        bot_edge = max(bot_edge, ey + nh)
+    # Account for assertions
+    right_edge = px + target_w
+    if assertion_pos:
+        right_edge = assertion_pos[0] + assertion_pos[2]
+    canvas_w = right_edge + pad
     canvas_h = bot_edge - top_edge + pad * 2
 
     # Shift everything so top_edge aligns with pad
@@ -1105,6 +1188,13 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
     src_positions = [(x, y + y_offset, w) for x, y, w in src_positions]
     pipe_positions = [(x, y + y_offset, w) for x, y, w in pipe_positions]
     target_pos = (target_pos[0], target_pos[1] + y_offset, target_pos[2])
+    if validation_pos:
+        validation_pos = (validation_pos[0], validation_pos[1] + y_offset, validation_pos[2])
+    if quarantine_pos:
+        quarantine_pos = (quarantine_pos[0], quarantine_pos[1] + y_offset, quarantine_pos[2])
+    if assertion_pos:
+        assertion_pos = (assertion_pos[0], assertion_pos[1] + y_offset, assertion_pos[2])
+    export_positions = [(x, y + y_offset, w, n, t) for x, y, w, n, t in export_positions]
     center_y += y_offset
 
     # --- Render SVG ---
@@ -1132,9 +1222,16 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="flow-bg"/>')
 
     # --- Edges (draw first, behind nodes) ---
-    # Primary sources → first pipeline node or target
-    first_target_x = pipe_positions[0][0] if pipe_positions else target_pos[0]
-    first_target_y = pipe_positions[0][1] if pipe_positions else target_pos[1]
+    # Primary sources → first pipeline node, validation, or target
+    if pipe_positions:
+        first_target_x = pipe_positions[0][0]
+        first_target_y = pipe_positions[0][1]
+    elif validation_pos:
+        first_target_x = validation_pos[0]
+        first_target_y = validation_pos[1]
+    else:
+        first_target_x = target_pos[0]
+        first_target_y = target_pos[1]
     for (slabel, _stype), (sx, sy, sw) in zip(source_nodes, src_positions, strict=True):
         if slabel in join_source_names:
             # Join source → its join node (vertical arrow down)
@@ -1162,13 +1259,68 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
             f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
         )
 
-    # Last pipeline node → target
+    # Last pipeline node → validation (or target if no validation)
     if pipe_positions:
         last = pipe_positions[-1]
         x1 = last[0] + last[2]
         y1 = last[1] + nh / 2
+        if validation_pos:
+            x2 = validation_pos[0]
+            y2 = validation_pos[1] + nh / 2
+        else:
+            x2 = target_pos[0]
+            y2 = target_pos[1] + nh / 2
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # Validation → target (main flow continues)
+    if validation_pos:
+        x1 = validation_pos[0] + validation_pos[2]
+        y1 = validation_pos[1] + nh / 2
         x2 = target_pos[0]
         y2 = target_pos[1] + nh / 2
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # Validation → quarantine (branch down)
+    if validation_pos and quarantine_pos:
+        x1 = validation_pos[0] + validation_pos[2] / 2
+        y1 = validation_pos[1] + nh
+        x2 = quarantine_pos[0] + quarantine_pos[2] / 2
+        y2 = quarantine_pos[1]
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # Fan-out point → export nodes (same x as target, different y)
+    for ex, ey, _ew, _en, _et in export_positions:
+        # Edge from the preparation stage (left of target column) to export
+        if validation_pos:
+            fx = validation_pos[0] + validation_pos[2]
+            fy = validation_pos[1] + nh / 2
+        elif pipe_positions:
+            last = pipe_positions[-1]
+            fx = last[0] + last[2]
+            fy = last[1] + nh / 2
+        else:
+            fx = src_positions[0][0] + src_positions[0][2] if src_positions else pad
+            fy = center_y + nh / 2
+        parts.append(
+            f'<line x1="{fx:.1f}" y1="{fy:.1f}" x2="{ex:.1f}" y2="{ey + nh / 2:.1f}" '
+            f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+        )
+
+    # Target → assertions
+    if assertion_pos:
+        x1 = target_pos[0] + target_pos[2]
+        y1 = target_pos[1] + nh / 2
+        x2 = assertion_pos[0]
+        y2 = assertion_pos[1] + nh / 2
         parts.append(
             f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
             f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
@@ -1239,6 +1391,65 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
         f'<text x="{tx + tw / 2:.1f}" y="{ty + nh / 2 + 8:.1f}" '
         f'class="flow-sublabel">{_xml_escape(write_mode)}</text>'
     )
+
+    # --- Validation gate node (diamond-ish shape) ---
+    if validation_pos:
+        vx, vy, vw = validation_pos
+        parts.append(
+            f'<rect x="{vx:.1f}" y="{vy:.1f}" width="{vw:.1f}" height="{nh}" '
+            f'rx="{cr}" class="flow-validation"/>'
+        )
+        parts.append(
+            f'<text x="{vx + vw / 2:.1f}" y="{vy + nh / 2 - 5:.1f}" '
+            f'class="flow-label">validation</text>'
+        )
+        parts.append(
+            f'<text x="{vx + vw / 2:.1f}" y="{vy + nh / 2 + 8:.1f}" '
+            f'class="flow-sublabel">gate</text>'
+        )
+
+    # --- Quarantine destination node ---
+    if quarantine_pos:
+        qx, qy, qw = quarantine_pos
+        parts.append(
+            f'<rect x="{qx:.1f}" y="{qy:.1f}" width="{qw:.1f}" height="{nh}" '
+            f'rx="{cr}" class="flow-quarantine"/>'
+        )
+        parts.append(
+            f'<text x="{qx + qw / 2:.1f}" y="{qy + nh / 2:.1f}" '
+            f'class="flow-label">quarantine</text>'
+        )
+
+    # --- Export destination nodes ---
+    for ex, ey, ew, en, et in export_positions:
+        parts.append(
+            f'<rect x="{ex:.1f}" y="{ey:.1f}" width="{ew:.1f}" height="{nh}" '
+            f'rx="{cr}" class="flow-export"/>'
+        )
+        parts.append(
+            f'<text x="{ex + ew / 2:.1f}" y="{ey + nh / 2 - 5:.1f}" '
+            f'class="flow-label">{_xml_escape(en)}</text>'
+        )
+        parts.append(
+            f'<text x="{ex + ew / 2:.1f}" y="{ey + nh / 2 + 8:.1f}" '
+            f'class="flow-sublabel">{_xml_escape(et)}</text>'
+        )
+
+    # --- Assertions checkpoint node ---
+    if assertion_pos:
+        ax, ay, aw = assertion_pos
+        parts.append(
+            f'<rect x="{ax:.1f}" y="{ay:.1f}" width="{aw:.1f}" height="{nh}" '
+            f'rx="{cr}" class="flow-assertion"/>'
+        )
+        parts.append(
+            f'<text x="{ax + aw / 2:.1f}" y="{ay + nh / 2 - 5:.1f}" '
+            f'class="flow-label">assertions</text>'
+        )
+        parts.append(
+            f'<text x="{ax + aw / 2:.1f}" y="{ay + nh / 2 + 8:.1f}" '
+            f'class="flow-sublabel">post-write</text>'
+        )
 
     parts.append("</svg>")
     return "".join(parts)
@@ -1438,14 +1649,18 @@ def render_waterfall_svg(
     *,
     dark: bool | None = None,
 ) -> str:
-    """Generate a data flow waterfall SVG showing row counts at each stage.
+    """Generate a Sankey-style data flow SVG showing row counts at each stage.
 
-    Execute mode shows 4 stages: read, transforms, quarantine, written.
-    Preview mode shows 2 stages: read, transforms.
+    Renders proportional bands flowing left-to-right: rows read → after
+    transforms → validation split (quarantine branch + clean rows) →
+    target + export fan-out.
+
+    Execute mode shows the full pipeline including target and exports.
+    Preview mode shows only read → transforms.
 
     Args:
         thread_result: A ThreadResult (used for rows_written).
-        thread_telemetry: ThreadTelemetry with row counts.
+        thread_telemetry: ThreadTelemetry with row counts and export_results.
         mode: ``"execute"`` or ``"preview"``.
         dark: Force dark (``True``) or light (``False``) palette. ``None``
             uses ``prefers-color-scheme`` media query (default).
@@ -1457,33 +1672,69 @@ def render_waterfall_svg(
     dk = _FLOW_DARK
     font = _FONT_FAMILY
     pad = _SVG_PADDING
-    bar_h = 28
-    bar_gap = 8
-    label_w = 140
-    bar_area_w = 300
 
     # Extract row counts
     rows_read = 0
     rows_after = 0
     rows_quarantined = 0
     rows_written = getattr(thread_result, "rows_written", 0)
+    export_results: list[Any] = []
     if thread_telemetry:
         rows_read = getattr(thread_telemetry, "rows_read", 0)
         rows_after = getattr(thread_telemetry, "rows_after_transforms", 0)
         rows_quarantined = getattr(thread_telemetry, "rows_quarantined", 0)
+        export_results = getattr(thread_telemetry, "export_results", [])
 
-    # Build stages
-    stages: list[tuple[str, int, str]] = []  # (label, count, color)
-    stages.append(("Rows read", rows_read, "#bee3f8"))
-    stages.append(("After transforms", rows_after, "#c6f6d5"))
+    # Sankey layout constants
+    col_w = 100  # width of each stage column
+    col_gap = 60  # gap between columns
+    max_band_h = 80  # max band height at full row count
+    label_h = 18  # height for labels below bands
+    band_min = 4  # minimum visible band height
+
+    # Build stage columns: each has (label, count, color)
+    columns: list[list[tuple[str, int, str]]] = []
+
+    # Column 0: Rows read
+    columns.append([("Rows read", rows_read, "#bee3f8")])
+
+    # Column 1: After transforms
+    columns.append([("After transforms", rows_after, "#c6f6d5")])
+
     if mode == "execute":
+        # Column 2: Validation split (quarantine + clean rows)
+        clean_rows = rows_after - rows_quarantined
         if rows_quarantined > 0:
-            stages.append(("Quarantined", rows_quarantined, "#fefcbf"))
-        stages.append(("Rows written", rows_written, "#bee3f8"))
+            columns.append(
+                [
+                    ("Clean rows", max(clean_rows, 0), "#c6f6d5"),
+                    ("Quarantined", rows_quarantined, "#fefcbf"),
+                ]
+            )
+        else:
+            # No quarantine — skip split column, go straight to outputs
+            columns.append([("Clean rows", rows_after, "#c6f6d5")])
 
-    max_count = max((c for _, c, _ in stages), default=1) or 1
-    canvas_h = pad * 2 + len(stages) * (bar_h + bar_gap)
-    canvas_w = pad * 2 + label_w + bar_area_w + 80
+        # Column 3: Output destinations (target + exports)
+        outputs: list[tuple[str, int, str]] = [("Target", rows_written, "#bee3f8")]
+        for er in export_results:
+            er_name = getattr(er, "name", "export")
+            er_rows = getattr(er, "rows_written", 0)
+            outputs.append((er_name, er_rows, "#bbf7d0"))
+        columns.append(outputs)
+
+    max_count = max(rows_read, rows_after, 1)
+
+    def _band_h(count: int) -> float:
+        if count <= 0:
+            return band_min
+        return max((count / max_count) * max_band_h, band_min)
+
+    # Compute canvas dimensions
+    n_cols = len(columns)
+    max_bands_in_col = max(len(col) for col in columns)
+    canvas_w = pad * 2 + n_cols * col_w + (n_cols - 1) * col_gap
+    canvas_h = pad * 2 + max_band_h + label_h + (max_bands_in_col - 1) * (band_min + 4) + 20
 
     parts: list[str] = []
     vb = f"0 0 {canvas_w:.0f} {canvas_h:.0f}"
@@ -1493,8 +1744,13 @@ def render_waterfall_svg(
     )
     parts.append("<style>")
     parts.append(f"  .wf-bg{{fill:{lt['bg']}}}")
-    parts.append(f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:13px}}")
-    parts.append(f"  .wf-count{{fill:{lt['text']};font-family:{font};font-size:12px;opacity:0.7}}")
+    parts.append(
+        f"  .wf-label{{fill:{lt['text']};font-family:{font};font-size:11px;text-anchor:middle}}}}"
+    )
+    parts.append(
+        f"  .wf-count{{fill:{lt['text']};font-family:{font};font-size:10px;"
+        "text-anchor:middle;opacity:0.7}}"
+    )
     if dark is None:
         parts.append("  @media(prefers-color-scheme:dark){")
         parts.append(f"    .wf-bg{{fill:{dk['bg']}}}")
@@ -1505,28 +1761,69 @@ def render_waterfall_svg(
 
     parts.append(f'<rect width="{canvas_w:.0f}" height="{canvas_h:.0f}" class="wf-bg"/>')
 
-    y = float(pad)
-    for stage_label, count, color in stages:
-        bar_w = max((count / max_count) * bar_area_w, 4) if count > 0 else 4
-        bx = pad + label_w
+    # Track band positions for drawing connecting paths
+    # Each entry: (x, y_center, height) per band per column
+    col_bands: list[list[tuple[float, float, float]]] = []
 
-        # Label
-        parts.append(
-            f'<text x="{bx - 8:.1f}" y="{y + bar_h / 2:.1f}" '
-            f'text-anchor="end" dominant-baseline="central" class="wf-label">'
-            f"{_xml_escape(stage_label)}</text>"
-        )
-        # Bar
-        parts.append(
-            f'<rect x="{bx:.1f}" y="{y:.1f}" width="{bar_w:.1f}" '
-            f'height="{bar_h}" rx="4" fill="{color}" opacity="0.8"/>'
-        )
-        # Count text
-        parts.append(
-            f'<text x="{bx + bar_w + 6:.1f}" y="{y + bar_h / 2:.1f}" '
-            f'dominant-baseline="central" class="wf-count">{count:,}</text>'
-        )
-        y += bar_h + bar_gap
+    for ci, col in enumerate(columns):
+        cx = pad + ci * (col_w + col_gap)
+        # Stack bands vertically within each column
+        total_h = sum(_band_h(count) for _, count, _ in col) + max(len(col) - 1, 0) * 2
+        by = pad + (max_band_h - total_h) / 2  # vertically center
+        by = max(by, pad)
+
+        bands: list[tuple[float, float, float]] = []
+        for label, count, color in col:
+            bh = _band_h(count)
+            parts.append(
+                f'<rect x="{cx:.1f}" y="{by:.1f}" width="{col_w}" '
+                f'height="{bh:.1f}" rx="3" fill="{color}" opacity="0.8"/>'
+            )
+            # Count label inside band
+            parts.append(
+                f'<text x="{cx + col_w / 2:.1f}" y="{by + bh / 2:.1f}" '
+                f'dominant-baseline="central" class="wf-count">{count:,}</text>'
+            )
+            # Stage label below band
+            parts.append(
+                f'<text x="{cx + col_w / 2:.1f}" y="{by + bh + 12:.1f}" '
+                f'class="wf-label">{_xml_escape(label)}</text>'
+            )
+            bands.append((cx, by + bh / 2, bh))
+            by += bh + 2
+
+        col_bands.append(bands)
+
+    # Draw connecting paths between columns (simple trapezoid fills)
+    for ci in range(len(col_bands) - 1):
+        left_bands = col_bands[ci]
+        right_bands = col_bands[ci + 1]
+        lx = pad + ci * (col_w + col_gap) + col_w
+        rx = pad + (ci + 1) * (col_w + col_gap)
+
+        # Simple case: 1 left band → N right bands (fan-out)
+        if len(left_bands) == 1:
+            ly, lh = left_bands[0][1], left_bands[0][2]
+            for ry_center, rh in [(b[1], b[2]) for b in right_bands]:
+                parts.append(
+                    f'<path d="M{lx:.1f},{ly - lh / 2:.1f} '
+                    f"L{rx:.1f},{ry_center - rh / 2:.1f} "
+                    f"L{rx:.1f},{ry_center + rh / 2:.1f} "
+                    f'L{lx:.1f},{ly + lh / 2:.1f}Z" '
+                    f'fill="{lt["edge"]}" opacity="0.15"/>'
+                )
+        else:
+            # N left bands → M right bands — draw individual connections
+            for li, (_, ly, lh) in enumerate(left_bands):
+                ri = min(li, len(right_bands) - 1)
+                _, ry, rh = right_bands[ri]
+                parts.append(
+                    f'<path d="M{lx:.1f},{ly - lh / 2:.1f} '
+                    f"L{rx:.1f},{ry - rh / 2:.1f} "
+                    f"L{rx:.1f},{ry + rh / 2:.1f} "
+                    f'L{lx:.1f},{ly + lh / 2:.1f}Z" '
+                    f'fill="{lt["edge"]}" opacity="0.15"/>'
+                )
 
     parts.append("</svg>")
     return "".join(parts)
