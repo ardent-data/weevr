@@ -221,6 +221,18 @@ class RunResult:
                         join_label = "join" if join_count == 1 else "joins"
                         detail += f", {join_count} {join_label}"
                     lines.append(f"  {thread_name}: {detail}")
+                    # Show exports if configured
+                    exports = getattr(thread, "exports", None)
+                    if exports:
+                        export_parts = []
+                        for exp in exports:
+                            exp_name = getattr(exp, "name", "?")
+                            exp_type = getattr(exp, "type", "?")
+                            exp_target = (
+                                getattr(exp, "alias", None) or getattr(exp, "path", "") or ""
+                            )
+                            export_parts.append(f"{exp_name} ({exp_type} → {exp_target})")
+                        lines.append(f"    exports: {', '.join(export_parts)}")
 
         return "\n".join(lines)
 
@@ -295,6 +307,17 @@ class RunResult:
             for err in errors:
                 lines.append(f"  - {err}")
 
+        # Collect export results from telemetry
+        export_results = self._collect_export_results()
+        if export_results:
+            lines.append("")
+            lines.append("Exports:")
+            for name, fmt, rows, status, error in export_results:
+                entry = f"  {name} ({fmt})  {rows:,} rows  {status}"
+                if error:
+                    entry += f"  — {error}"
+                lines.append(entry)
+
         return lines
 
     def _collect_thread_errors(self) -> list[str]:
@@ -323,6 +346,36 @@ class RunResult:
                 errors.append(f"[{name}] {error}")
 
         return errors
+
+    def _collect_export_results(self) -> list[tuple[str, str, int, str, str | None]]:
+        """Extract export results from telemetry."""
+        results: list[tuple[str, str, int, str, str | None]] = []
+        if self.telemetry is None:
+            return results
+
+        def _extract_from_thread_telem(tt: Any) -> None:
+            for er in getattr(tt, "export_results", []):
+                results.append(
+                    (
+                        getattr(er, "name", "?"),
+                        getattr(er, "type", "?"),
+                        getattr(er, "rows_written", 0),
+                        getattr(er, "status", "?"),
+                        getattr(er, "error", None),
+                    )
+                )
+
+        if self.config_type == "thread":
+            _extract_from_thread_telem(self.telemetry)
+        elif self.config_type == "weave":
+            for tt in getattr(self.telemetry, "thread_telemetry", {}).values():
+                _extract_from_thread_telem(tt)
+        elif self.config_type == "loom":
+            for wt in getattr(self.telemetry, "weave_telemetry", {}).values():
+                for tt in getattr(wt, "thread_telemetry", {}).values():
+                    _extract_from_thread_telem(tt)
+
+        return results
 
     def _summary_validate(self) -> list[str]:
         lines: list[str] = [
