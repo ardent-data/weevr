@@ -17,7 +17,7 @@ runtime settings.
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Weave-scoped typed variables, settable by hook steps |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps executed before any thread runs |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps executed after all threads complete |
-| `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave |
+| `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) cascaded to threads |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to threads |
@@ -285,6 +285,10 @@ post_steps:
 defaults:
   write:
     mode: merge
+  exports:
+    - name: audit_archive
+      type: parquet
+      path: /archive/${thread.name}/${run.timestamp}/
 
 params:
   run_date:

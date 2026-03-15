@@ -107,10 +107,10 @@ loaded config.
      - Thread values always win (most specific)
 
    Naming configuration cascades separately as a whole block rather than
-   per-field. Audit columns (`audit_columns`) also cascade separately
-   using **additive merge** -- each level extends the column set, and
-   same-named columns at a lower level override the expression from the
-   higher level.
+   per-field. Audit columns (`audit_columns`) and **exports** also cascade
+   separately using **additive merge** — each level extends the set, and
+   same-named entries at a lower level override the definition from the
+   higher level. Exports with `enabled: false` are removed after merge.
 
 2. **Expand macros** — `foreach` blocks in thread step lists are expanded
    into repeated sequences. This happens after variable resolution so that
@@ -134,6 +134,22 @@ cross-cutting validations.
 | `config/validation.py` | Pre-resolution schema validation, post-resolution constraint checks |
 | `config/macros.py` | `foreach` block expansion in step lists |
 | `config/__init__.py` | `load_config()` — orchestrates the full pipeline |
+
+## Deferred variable namespaces
+
+Some variable namespaces are **not** resolved during config loading. They are
+preserved as literal `${...}` placeholders and resolved later at execution time:
+
+| Namespace | Resolved at | Used by |
+|-----------|-------------|---------|
+| `${var.*}` | Weave execution (VariableContext) | Thread steps, sources |
+| `${run.timestamp}` | Thread execution | Audit columns, export paths |
+| `${run.id}` | Thread execution | Audit columns, export paths |
+
+The `run.*` namespace provides per-execution context: `${run.timestamp}` is an
+ISO 8601 UTC timestamp and `${run.id}` is a UUID4, both generated once per
+`execute_thread()` call. They are available in audit column expressions and
+export path templates.
 
 ## Design decisions
 

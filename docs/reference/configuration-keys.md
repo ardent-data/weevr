@@ -80,6 +80,13 @@ behavior: Behavior {
     shape: class
     on_failure: str
   }
+  Export: Export {
+    shape: class
+    name: str
+    type: str
+    path: str
+    on_failure: str
+  }
 }
 
 data_flow.Thread -> behavior.WriteConfig: "0..1" {style.stroke: "#388E3C"}
@@ -87,6 +94,7 @@ data_flow.Thread -> behavior.LoadConfig: "0..1" {style.stroke: "#388E3C"}
 data_flow.Thread -> behavior.KeyConfig: "0..1" {style.stroke: "#388E3C"}
 data_flow.Thread -> behavior.ValidationRule: "0..*" {style.stroke: "#388E3C"}
 data_flow.Thread -> behavior.FailureConfig: "0..1" {style.stroke: "#388E3C"}
+data_flow.Thread -> behavior.Export: "0..*" {style.stroke: "#388E3C"}
 ```
 
 ---
@@ -113,6 +121,29 @@ The top-level configuration unit for a single data pipeline.
 | `failure` | `FailureConfig` | `None` | Failure handling policy |
 | `execution` | `ExecutionConfig` | `None` | Runtime settings |
 | `cache` | `bool` | `None` | Cache DataFrame before writing |
+| `exports` | `list[Export]` | `None` | Secondary output destinations |
+
+---
+
+## Export
+
+A named secondary output destination for thread data. Exports write the
+same post-mapping, audit-injected DataFrame as the primary target.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | *required* | Unique identifier (valid Python identifier) |
+| `description` | `str` | `None` | Human-readable label shown in `explain()` |
+| `type` | `str` | *required* | Output format: `delta`, `parquet`, `csv`, `json`, `orc` |
+| `path` | `str` | `None` | OneLake path. Required when `alias` is not set. Supports context variables. |
+| `alias` | `str` | `None` | Metastore alias. Delta type only, mutually exclusive with `path`. |
+| `mode` | `str` | `"overwrite"` | Write mode (only `overwrite` in v1) |
+| `partition_by` | `list[str]` | `None` | Partition columns (independent of primary target) |
+| `on_failure` | `str` | `"warn"` | `abort` fails the thread; `warn` logs and continues |
+| `enabled` | `bool` | `True` | Set to `false` to suppress an inherited export |
+| `options` | `dict[str, str]` | `None` | Format-specific Spark DataFrameWriter options |
+
+**Related:** [Exports guide](../guides/exports.md)
 
 ---
 

@@ -1,0 +1,44 @@
+# Exports Example
+#
+# Demonstrates secondary output destinations (exports). The thread reads
+# a Delta source, applies transforms, writes to the primary target, and
+# then writes the same data to two additional locations: a Parquet archive
+# with dynamic path naming and a CSV export with custom options.
+
+config_version: "1.0"
+name: stg_orders_with_exports
+
+sources:
+  orders:
+    type: delta
+    alias: bronze.orders
+
+steps:
+  - filter:
+      expr: "status != 'cancelled'"
+  - derive:
+      columns:
+        order_year: "year(order_date)"
+
+target:
+  alias: silver.stg_orders
+
+write:
+  mode: overwrite
+
+# Secondary output destinations
+exports:
+  - name: parquet_archive
+    description: "Daily Parquet archive for external consumers"
+    type: parquet
+    path: /lakehouse/archive/orders/${run.timestamp}/
+    partition_by: [order_year]
+
+  - name: csv_extract
+    description: "Pipe-delimited CSV for legacy system"
+    type: csv
+    path: /lakehouse/exports/orders_latest/
+    on_failure: warn
+    options:
+      header: "true"
+      delimiter: "|"

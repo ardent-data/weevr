@@ -368,3 +368,19 @@ class TestValidateSchema:
         with pytest.raises(ConfigSchemaError) as exc_info:
             validate_schema(data, "weave")
         assert "validation failed" in str(exc_info.value).lower()
+
+    def test_thread_with_exports(self):
+        """Thread config with exports list passes schema validation."""
+        data = {
+            "config_version": "1.0",
+            "sources": {"src": "table://data"},
+            "target": {"table": "output"},
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/archive"},
+                {"name": "csv_feed", "type": "csv", "path": "/csv"},
+            ],
+        }
+        result = validate_schema(data, "thread")
+        assert isinstance(result, ThreadConfig)
+        assert result.exports is not None
+        assert len(result.exports) == 2

@@ -9,6 +9,7 @@ from weevr.errors import (
     ConfigVersionError,
     DataValidationError,
     ExecutionError,
+    ExportError,
     HookError,
     InheritanceError,
     LookupResolutionError,
@@ -43,6 +44,7 @@ class TestExceptionHierarchy:
         """Execution error subclasses should inherit from ExecutionError."""
         assert issubclass(SparkError, ExecutionError)
         assert issubclass(HookError, ExecutionError)
+        assert issubclass(ExportError, ExecutionError)
 
     def test_lookup_resolution_error_hierarchy(self):
         """LookupResolutionError should inherit from ConfigError."""
@@ -343,6 +345,57 @@ class TestHookError:
         """HookError is catchable as WeevError."""
         with pytest.raises(WeevError):
             raise HookError("hook failed")
+
+
+class TestExportError:
+    """Test ExportError context fields."""
+
+    def test_minimal_construction(self):
+        """ExportError constructs with message only."""
+        err = ExportError("export failed")
+        assert str(err) == "export failed"
+        assert err.export_name is None
+        assert err.export_type is None
+
+    def test_with_export_name(self):
+        """Export name appears in string representation."""
+        err = ExportError("write failed", export_name="archive")
+        assert "archive" in str(err)
+
+    def test_with_export_name_and_type(self):
+        """Export name and type appear in string representation."""
+        err = ExportError("write failed", export_name="archive", export_type="parquet")
+        result = str(err)
+        assert "archive" in result
+        assert "parquet" in result
+
+    def test_with_all_context(self):
+        """All context fields appear in string representation."""
+        cause = OSError("disk full")
+        err = ExportError(
+            "export write failed",
+            cause=cause,
+            thread_name="stg_orders",
+            export_name="daily_archive",
+            export_type="csv",
+        )
+        result = str(err)
+        assert "export write failed" in result
+        assert "stg_orders" in result
+        assert "daily_archive" in result
+        assert "csv" in result
+        assert "caused by" in result
+        assert "disk full" in result
+
+    def test_catchable_as_execution_error(self):
+        """ExportError is catchable as ExecutionError."""
+        with pytest.raises(ExecutionError):
+            raise ExportError("export failed")
+
+    def test_catchable_as_weev_error(self):
+        """ExportError is catchable as WeevError."""
+        with pytest.raises(WeevError):
+            raise ExportError("export failed")
 
 
 class TestLookupResolutionError:

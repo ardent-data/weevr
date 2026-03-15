@@ -6,7 +6,13 @@ from pyspark.sql import SparkSession
 from spark_helpers import create_delta_table
 from weevr.engine.executor import execute_thread
 from weevr.engine.result import ThreadResult
-from weevr.errors.exceptions import DataValidationError, ExecutionError, LookupResolutionError
+from weevr.errors.exceptions import (
+    DataValidationError,
+    ExecutionError,
+    ExportError,
+    LookupResolutionError,
+)
+from weevr.model.export import Export
 from weevr.model.keys import KeyConfig, SurrogateKeyConfig
 from weevr.model.lookup import Lookup
 from weevr.model.pipeline import FilterParams, FilterStep, Step
@@ -30,6 +36,7 @@ def _make_thread(
     keys: KeyConfig | None = None,
     validations: list[ValidationRule] | None = None,
     assertions: list[Assertion] | None = None,
+    exports: list[Export] | None = None,
 ) -> Thread:
     """Helper to construct a minimal Thread for testing."""
     return Thread(
@@ -42,6 +49,7 @@ def _make_thread(
         keys=keys,
         validations=validations,
         assertions=assertions,
+        exports=exports,
     )
 
 
@@ -410,3 +418,106 @@ class TestExecuteThreadLookups:
 
         assert result.status == "success"
         assert result.rows_written == 1
+
+
+class TestExecuteThreadExports:
+    """Test export execution in execute_thread."""
+
+    def test_exports_write_data(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread with exports writes to secondary destinations."""
+        src = tmp_delta_path("exp_src")
+        tgt = tmp_delta_path("exp_tgt")
+        exp_path = tmp_delta_path("exp_parquet")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+
+        exports = [Export(name="archive", type="parquet", path=exp_path)]
+        thread = _make_thread("export_thread", src, tgt, exports=exports)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 2
+        assert result.telemetry is not None
+        assert len(result.telemetry.export_results) == 1
+        assert result.telemetry.export_results[0].name == "archive"
+        assert result.telemetry.export_results[0].status == "success"
+        assert result.telemetry.export_results[0].rows_written == 2
+        # Verify export data was written
+        exported = spark.read.parquet(exp_path)
+        assert exported.count() == 2
+
+    def test_export_warn_continues(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Export with on_failure=warn logs error but thread succeeds."""
+        src = tmp_delta_path("warn_src")
+        tgt = tmp_delta_path("warn_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        exports = [
+            Export(
+                name="bad_export",
+                type="parquet",
+                path="/nonexistent/\x00invalid",
+                on_failure="warn",
+            )
+        ]
+        thread = _make_thread("warn_thread", src, tgt, exports=exports)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert len(result.telemetry.export_results) == 1
+        assert result.telemetry.export_results[0].status == "warned"
+        assert result.telemetry.export_results[0].error is not None
+
+    def test_export_abort_raises(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Export with on_failure=abort raises ExportError."""
+        src = tmp_delta_path("abort_src")
+        tgt = tmp_delta_path("abort_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        exports = [
+            Export(
+                name="critical",
+                type="parquet",
+                path="/nonexistent/\x00invalid",
+                on_failure="abort",
+            )
+        ]
+        thread = _make_thread("abort_thread", src, tgt, exports=exports)
+        with pytest.raises(ExportError, match="critical"):
+            execute_thread(spark, thread)
+
+    def test_no_exports_backward_compatible(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread without exports works as before."""
+        src = tmp_delta_path("noexp_src")
+        tgt = tmp_delta_path("noexp_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        thread = _make_thread("no_export_thread", src, tgt)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.export_results == []
+
+    def test_multiple_exports(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread with multiple exports writes all of them."""
+        src = tmp_delta_path("multi_src")
+        tgt = tmp_delta_path("multi_tgt")
+        exp1 = tmp_delta_path("multi_exp1")
+        exp2 = tmp_delta_path("multi_exp2")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}, {"id": 3}])
+
+        exports = [
+            Export(name="pq_archive", type="parquet", path=exp1),
+            Export(name="json_feed", type="json", path=exp2),
+        ]
+        thread = _make_thread("multi_export_thread", src, tgt, exports=exports)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert len(result.telemetry.export_results) == 2
+        assert result.telemetry.export_results[0].name == "pq_archive"
+        assert result.telemetry.export_results[1].name == "json_feed"
+        assert spark.read.parquet(exp1).count() == 3
+        assert spark.read.json(exp2).count() == 3

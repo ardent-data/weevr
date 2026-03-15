@@ -523,3 +523,149 @@ class TestAuditColumnsInheritance:
         # Should be in target, not at top level
         assert "audit_columns" not in result or result.get("audit_columns") is None
         assert result["target"]["audit_columns"] == {"_loaded_at": "current_timestamp()"}
+
+
+class TestExportsInheritance:
+    """Test additive cascade for exports across loom → weave → thread."""
+
+    def test_loom_only(self):
+        """Loom exports cascade into thread config."""
+        loom: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/archive"},
+            ],
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        assert len(result["exports"]) == 1
+        assert result["exports"][0]["name"] == "archive"
+
+    def test_weave_extends_loom(self):
+        """Weave exports extend loom set additively when names differ."""
+        loom: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/archive"},
+            ],
+        }
+        weave: dict[str, Any] = {
+            "exports": [
+                {"name": "csv_feed", "type": "csv", "path": "/csv"},
+            ],
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, weave, thread)
+        names = [e["name"] for e in result["exports"]]
+        assert "archive" in names
+        assert "csv_feed" in names
+        assert len(result["exports"]) == 2
+
+    def test_weave_overrides_loom_by_name(self):
+        """Weave overrides a loom export definition for the same name."""
+        loom: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/loom/archive"},
+            ],
+        }
+        weave: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/weave/archive"},
+            ],
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert len(result["exports"]) == 1
+        assert result["exports"][0]["path"] == "/weave/archive"
+
+    def test_thread_extends_inherited(self):
+        """Thread exports extend the inherited set."""
+        loom: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/archive"},
+            ],
+        }
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [
+                {"name": "csv_feed", "type": "csv", "path": "/csv"},
+            ],
+        }
+        result = apply_inheritance(loom, None, thread)
+        names = [e["name"] for e in result["exports"]]
+        assert "archive" in names
+        assert "csv_feed" in names
+
+    def test_thread_overrides_by_name(self):
+        """Thread overrides an inherited export by name."""
+        weave: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/weave/archive"},
+            ],
+        }
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/thread/archive"},
+            ],
+        }
+        result = apply_inheritance(None, weave, thread)
+        assert len(result["exports"]) == 1
+        assert result["exports"][0]["path"] == "/thread/archive"
+
+    def test_enabled_false_suppresses_inherited(self):
+        """enabled: false at thread level removes an inherited export."""
+        loom: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/archive"},
+                {"name": "csv_feed", "type": "csv", "path": "/csv"},
+            ],
+        }
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [
+                {"name": "archive", "enabled": False},
+            ],
+        }
+        result = apply_inheritance(loom, None, thread)
+        names = [e["name"] for e in result["exports"]]
+        assert "archive" not in names
+        assert "csv_feed" in names
+
+    def test_no_exports_anywhere(self):
+        """No exports at any level leaves thread without exports key."""
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(None, None, thread)
+        assert "exports" not in result
+
+    def test_empty_thread_exports_inherits_parent(self):
+        """Thread with empty exports list doesn't clear inherited exports."""
+        loom: dict[str, Any] = {
+            "exports": [
+                {"name": "archive", "type": "parquet", "path": "/archive"},
+            ],
+        }
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [],
+        }
+        result = apply_inheritance(loom, None, thread)
+        assert len(result["exports"]) == 1
+        assert result["exports"][0]["name"] == "archive"
+
+    def test_three_level_additive(self):
+        """All three levels contribute unique exports additively."""
+        loom: dict[str, Any] = {
+            "exports": [{"name": "loom_exp", "type": "orc", "path": "/orc"}],
+        }
+        weave: dict[str, Any] = {
+            "exports": [{"name": "weave_exp", "type": "json", "path": "/json"}],
+        }
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [{"name": "thread_exp", "type": "csv", "path": "/csv"}],
+        }
+        result = apply_inheritance(loom, weave, thread)
+        names = [e["name"] for e in result["exports"]]
+        assert len(names) == 3
+        assert "loom_exp" in names
+        assert "weave_exp" in names
+        assert "thread_exp" in names

@@ -48,6 +48,29 @@ class AssertionResult(FrozenBase):
     columns: list[str] | None = None
 
 
+class ExportResult(FrozenBase):
+    """Result of a single export write.
+
+    Attributes:
+        name: Export name from the configuration.
+        type: Format type (delta, parquet, csv, json, orc).
+        target: Resolved path or alias that was written to.
+        rows_written: Number of rows written to the export target.
+        duration_ms: Wall-clock write time in milliseconds.
+        status: Outcome — success, warned (error + on_failure=warn),
+            or aborted (error + on_failure=abort).
+        error: Error message if the write failed.
+    """
+
+    name: str
+    type: str
+    target: str
+    rows_written: int
+    duration_ms: float
+    status: Literal["success", "warned", "aborted"]
+    error: str | None = None
+
+
 class ThreadTelemetry(FrozenBase):
     """Telemetry data composed into a ThreadResult.
 
@@ -92,6 +115,7 @@ class ThreadTelemetry(FrozenBase):
     cdc_deletes: int | None = None
     resolved_params: dict[str, Any] | None = None
     audit_columns_applied: list[str] = []
+    export_results: list[ExportResult] = []
 
 
 class WeaveTelemetry(FrozenBase):

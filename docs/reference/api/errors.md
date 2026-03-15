@@ -38,6 +38,7 @@ WeevError: WeevError {
     SparkError
     StateError
     HookError
+    ExportError
   }
   DataValidationError
 }
@@ -493,6 +494,49 @@ pre_steps:
 ```
 
 **Related:** [YAML Schema: Weave](../yaml-schema/weave.md)
+
+---
+
+### ExportError
+
+Raised when an export write fails and its `on_failure` policy is set to
+`abort`. Carries export-specific context: `export_name`, `export_type`,
+and `thread_name`.
+
+**Common causes:**
+
+- Export path is not writable or does not exist
+- Complex column types incompatible with the export format (e.g.,
+  arrays/maps in CSV)
+- Spark format writer error (invalid options, codec not available)
+
+**Resolution:**
+
+1. Check the error message for the export name and format type
+2. Verify the export path is accessible and writable
+3. For format compatibility issues, simplify the schema or use a
+   format that supports complex types (Delta, Parquet)
+4. To make the export non-blocking, set `on_failure: warn` instead of
+   `abort`
+
+**Example:**
+
+```yaml
+exports:
+  # This will raise ExportError if the write fails
+  - name: compliance_copy
+    type: delta
+    alias: compliance.orders
+    on_failure: abort    # raise ExportError on failure
+
+  # Change to warn to log the issue without aborting
+  - name: archive
+    type: parquet
+    path: /archive/orders/
+    on_failure: warn     # log warning and continue
+```
+
+**Related:** [Exports guide](../../guides/exports.md)
 
 ---
 

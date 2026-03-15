@@ -13,7 +13,7 @@ runtime settings that cascade down through weaves to threads.
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
 | `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
-| `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread |
+| `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings cascaded to weaves and threads |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to weaves and threads |

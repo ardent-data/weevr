@@ -1,4 +1,4 @@
-"""weevr operations — source readers, pipeline steps, hashing, mapping, writers, and validation."""
+"""weevr operations — readers, transforms, hashing, mapping, writers, exports, validation."""
 
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.audit import (
@@ -7,6 +7,7 @@ from weevr.operations.audit import (
     inject_audit_columns,
     resolve_audit_columns,
 )
+from weevr.operations.exports import resolve_export_path, resolve_exports, write_export
 from weevr.operations.hashing import compute_keys
 from weevr.operations.pipeline import run_pipeline
 from weevr.operations.quarantine import write_quarantine
@@ -24,9 +25,12 @@ __all__ = [
     "read_source",
     "read_sources",
     "resolve_audit_columns",
+    "resolve_export_path",
+    "resolve_exports",
     "run_pipeline",
     "validate_dataframe",
     "ValidationOutcome",
+    "write_export",
     "write_quarantine",
     "write_target",
 ]

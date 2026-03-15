@@ -1,6 +1,7 @@
 """Domain object model for weevr configuration."""
 
 from weevr.model.execution import ExecutionConfig, LogLevel
+from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
 from weevr.model.hooks import (
     HookStep,
@@ -97,6 +98,8 @@ __all__ = [
     # Params
     "ParamSpec",
     "ParamsConfig",
+    # Export
+    "Export",
     # Execution config
     "ExecutionConfig",
     "LogLevel",

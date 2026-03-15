@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -1205,3 +1206,124 @@ class TestPlanDisplayIntegration:
         content = Path(out_path).read_text(encoding="utf-8")
         assert "<svg" in content
         ET.fromstring(content)
+
+
+class TestExplainExports:
+    """Test explain() output includes export info."""
+
+    def test_explain_shows_exports(self) -> None:
+        """Exports are listed in thread detail section."""
+        from weevr.engine.planner import ExecutionPlan
+        from weevr.model.export import Export
+
+        plan = ExecutionPlan(
+            weave_name="staging",
+            threads=["stg_orders"],
+            dependencies={"stg_orders": []},
+            dependents={"stg_orders": []},
+            execution_order=[["stg_orders"]],
+            cache_targets=[],
+            inferred_dependencies={"stg_orders": []},
+            explicit_dependencies={"stg_orders": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="staging",
+            execution_plan=[plan],
+        )
+
+        # Build a duck-typed thread with exports
+        exports = [
+            Export(name="archive", type="parquet", path="/archive/data"),
+            Export(name="copy", type="delta", alias="db.copy"),
+        ]
+        thread_obj = type(
+            "T",
+            (),
+            {
+                "sources": {
+                    "src": type("S", (), {"type": "delta", "alias": "db.src", "path": None})()
+                },
+                "target": type("T", (), {"alias": "db.target", "path": None})(),
+                "steps": [],
+                "exports": exports,
+            },
+        )()
+        result._resolved_threads = {"stg_orders": thread_obj}
+
+        text = result.explain()
+        assert "exports:" in text
+        assert "archive" in text
+        assert "parquet" in text
+        assert "copy" in text
+        assert "delta" in text
+
+
+class TestSummaryExports:
+    """Test summary() output includes export results."""
+
+    def test_summary_shows_export_results(self) -> None:
+        """Export results appear in execute summary."""
+        from weevr.telemetry.results import ExportResult, ThreadTelemetry
+        from weevr.telemetry.span import ExecutionSpan, SpanStatus
+
+        span = ExecutionSpan(
+            trace_id="a" * 32,
+            span_id="b" * 16,
+            name="thread",
+            status=SpanStatus.OK,
+            start_time=datetime.now(UTC),
+            end_time=datetime.now(UTC),
+        )
+        er = ExportResult(
+            name="archive",
+            type="parquet",
+            target="/data/archive",
+            rows_written=500,
+            duration_ms=100.0,
+            status="success",
+        )
+        telem = ThreadTelemetry(
+            span=span,
+            rows_read=500,
+            rows_written=500,
+            export_results=[er],
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="stg_orders",
+            telemetry=telem,
+        )
+        text = result.summary()
+        assert "Exports:" in text
+        assert "archive" in text
+        assert "parquet" in text
+        assert "500" in text
+
+    def test_summary_no_exports(self) -> None:
+        """No exports section when no export results."""
+        from weevr.telemetry.results import ThreadTelemetry
+        from weevr.telemetry.span import ExecutionSpan, SpanStatus
+
+        span = ExecutionSpan(
+            trace_id="a" * 32,
+            span_id="b" * 16,
+            name="thread",
+            status=SpanStatus.OK,
+            start_time=datetime.now(UTC),
+            end_time=datetime.now(UTC),
+        )
+        telem = ThreadTelemetry(span=span, rows_read=10, rows_written=10)
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="test",
+            telemetry=telem,
+        )
+        text = result.summary()
+        assert "Exports:" not in text
