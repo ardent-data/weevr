@@ -14,7 +14,7 @@ data_flow: Data Flow {
     shape: class
     config_version: str
     sources: "dict[str, Source]"
-    step_list: "list[Step]"
+    "steps": "list[Step]"
     target: Target
   }
   Source: Source {
@@ -208,7 +208,7 @@ Write mode and merge behavior for the target.
 | `on_no_match_target` | `"insert" \| "ignore"` | `"insert"` | Action for new source rows |
 | `on_no_match_source` | `"delete" \| "soft_delete" \| "ignore"` | `"ignore"` | Action for missing source rows |
 | `soft_delete_column` | `str` | `None` | Column for soft delete flag (required for `soft_delete`) |
-| `soft_delete_value` | `str` | `"true"` | Value written to the soft delete column |
+| `soft_delete_value` | `bool` | `True` | Value written to the soft delete column |
 
 ---
 

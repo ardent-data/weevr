@@ -2,7 +2,8 @@
 
 The `weevr.model` package contains all Pydantic domain models that represent
 the configuration structure -- threads, weaves, looms, pipeline steps, sources,
-targets, hooks, lookups, and supporting types.
+targets, hooks, lookups, exports, variables, failure configuration, and
+supporting types.
 
 ::: weevr.model
     options:

@@ -78,6 +78,9 @@ The planner builds a DAG from thread configurations:
    concurrently.
 5. **Analyze cache targets** — Threads with two or more downstream dependents
    are flagged for caching, unless the thread explicitly sets `cache: false`.
+   Setting `cache: true` is a no-op — it only prevents `cache: false`
+   suppression but does not force caching for threads with fewer than two
+   dependents.
 
 The result is an immutable `ExecutionPlan` that the executor consumes without
 modification.
@@ -94,19 +97,22 @@ skipped.
 
 **Weave level** (`execute_weave`) — Orchestrates the full weave lifecycle:
 
-1. **Pre-steps** — If the weave defines `pre_steps`, hook steps run before
+1. **Initialize variables** — A `VariableContext` is created from the
+   weave's `variables` block. Variables are available to hook steps via
+   `${var.name}` placeholders.
+2. **Lookup materialization (external)** — External lookups (those not
+   produced by a thread in the weave) are materialized before any thread
+   or hook step runs. Internal lookups whose source is produced by a
+   thread in group N are deferred and materialized at the group N+1
+   boundary — after their producer completes.
+3. **Pre-steps** — If the weave defines `pre_steps`, hook steps run before
    any thread executes. Failures with `on_failure: abort` stop the weave.
-2. **Lookup materialization** — Named lookups are materialized according to
-   the planner's lookup schedule. External lookups (those not produced by a
-   thread in the weave) are pre-read before the first group. Internal lookups
-   whose source is produced by a thread in group N are deferred and
-   materialized at the group N+1 boundary — after their producer completes.
-   Threads reference lookups via `source.lookup` and receive the cached
-   DataFrame.
-3. **Thread execution** — Parallel groups are processed sequentially. Within
+   Pre-steps can read from lookups materialized in the previous step.
+4. **Thread execution** — Parallel groups are processed sequentially. Within
    each group, threads are submitted to a `ThreadPoolExecutor` for concurrent
-   execution.
-4. **Post-steps** — After all threads complete, `post_steps` hook steps run.
+   execution. Threads reference lookups via `source.lookup` and receive
+   the cached DataFrame.
+5. **Post-steps** — After all threads complete, `post_steps` hook steps run.
    Failures with `on_failure: abort` mark the weave as failed.
 
 After each thread completes:
@@ -116,7 +122,7 @@ After each thread completes:
   consumers remain.
 - Thread-level telemetry collectors are merged into the weave collector.
 
-**Thread level** (`execute_thread`) — A single thread runs through a 14-step
+**Thread level** (`execute_thread`) — A single thread runs through a 15-step
 pipeline:
 
 ```d2
@@ -152,8 +158,9 @@ finalize: Finalize {
   style.fill: "#F3E5F5"
   s10: "12. Persist watermark/CDC state"
   s11: "13. Post-write assertions"
-  s12: "14. Build telemetry\n→ ThreadResult"
-  s10 -> s11 -> s12
+  s11b: "14. Write exports\n(secondary outputs)"
+  s12: "15. Build telemetry\n→ ThreadResult"
+  s10 -> s11 -> s11b -> s12
 }
 
 sources -> transforms
@@ -174,7 +181,8 @@ write -> finalize
 11. Write to the Delta target (standard write or CDC merge routing)
 12. Persist watermark or CDC state
 13. Run post-write assertions
-14. Build telemetry and return `ThreadResult`
+14. Write exports (secondary outputs, if configured)
+15. Build telemetry and return `ThreadResult`
 
 ### Failure handling
 
