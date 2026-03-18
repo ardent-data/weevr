@@ -58,7 +58,7 @@ nav:
           - Weave: reference/yaml-schema/weave.md
           - Loom: reference/yaml-schema/loom.md
       - API:
-          - Context: reference/api/context.md
+          - Context & Results: reference/api/context.md
           - Config: reference/api/config.md
           - Model: reference/api/model.md
           - Engine: reference/api/engine.md

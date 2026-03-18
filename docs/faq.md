@@ -68,10 +68,10 @@ Configuration cascades through three levels: **Loom** > **Weave** >
 A loom can define default write modes, execution settings, and audit
 columns. A weave can override any of those. A thread can override
 anything the weave set. Scalar values are replaced outright; collections
-(lists, maps) are also replaced entirely, not merged. The exception is
-`audit_columns`, which uses **additive merge** -- each level extends the
-column set, and same-named columns at a lower level override the
-expression from the higher level.
+(lists, maps) are also replaced entirely, not merged. The exceptions are
+`audit_columns` and `exports`, which use **additive merge** -- each
+level extends the set, and same-named entries at a lower level override
+those from the higher level.
 
 ```text
 Loom default:   write.mode = overwrite
@@ -232,9 +232,9 @@ Yes. There are two approaches:
 
 **Thread-level auto-caching** — The `CacheManager` analyzes the thread
 dependency DAG within a weave. When it detects that a thread's output
-feeds multiple downstream consumers, it persists the output at
-`MEMORY_AND_DISK` level automatically. You can force caching on a
-specific thread with `cache: true` or disable it with `cache: false`.
+feeds two or more downstream consumers, it persists the output at
+`MEMORY_AND_DISK` level automatically. You can disable auto-caching on
+a specific thread with `cache: false`.
 
 **Weave-level lookups** — Define named lookups in the weave's `lookups`
 block. Lookups can be pre-materialized (read once, cached or broadcast

@@ -34,39 +34,15 @@ dim_product  -->  fact_orders
 Because `dim_product` feeds two consumers, weevr auto-caches its output after
 it finishes writing.
 
-## Step 2 -- Force-cache a thread
+## Step 2 -- Prevent cache suppression
 
-If the engine does not auto-detect a caching opportunity (for example, the
-thread is not part of a multi-consumer DAG but you know it will be read
-repeatedly), you can force caching with the `cache` flag on the thread:
+By default, threads with two or more downstream dependents are auto-cached.
+Setting `cache: true` on a thread is a no-op in the current engine — it
+only prevents `cache: false` suppression. It does **not** force caching for
+threads with fewer than two dependents.
 
-```yaml
-# lookups/dim_product.thread
-config_version: "1.0"
-
-sources:
-  products:
-    type: delta
-    alias: bronze.products
-
-steps:
-  - select:
-      columns:
-        - product_id
-        - product_name
-        - category
-
-target:
-  path: Tables/dim_product
-
-write:
-  mode: overwrite
-
-cache: true
-```
-
-Setting `cache: true` instructs the engine to persist this thread's output
-regardless of the DAG analysis.
+If you need a thread's output to be shared across multiple consumers, use
+[weave-level lookups](#step-4----use-weave-level-lookups) instead.
 
 ## Step 3 -- Disable caching for a thread
 
