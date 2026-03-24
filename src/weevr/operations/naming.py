@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import fnmatch
+import logging
 import re
 from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
 from weevr.model.naming import NamingConfig, NamingPattern
+from weevr.operations.reserved_words import ANSI_RESERVED_WORDS
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame
+
+    from weevr.model.column_set import ReservedWordConfig
+
+_log = logging.getLogger(__name__)
 
 
 def _tokenize(name: str) -> list[str]:
@@ -115,6 +121,50 @@ def is_excluded(column_name: str, exclude_patterns: list[str]) -> bool:
     return any(fnmatch.fnmatch(column_name, p) for p in exclude_patterns)
 
 
+def _apply_reserved_word_protection(
+    renames: dict[str, str], config: ReservedWordConfig
+) -> dict[str, str]:
+    """Apply reserved word protection to a column rename mapping.
+
+    Checks each output column name against the effective reserved word set and
+    applies the configured strategy to any conflicts.
+
+    Args:
+        renames: Mapping of original column name to normalized output name.
+        config: Reserved word configuration with strategy, prefix, extend, and exclude.
+
+    Returns:
+        Updated renames dict with reserved word conflicts resolved.
+
+    Raises:
+        ConfigError: If ``strategy="error"`` and any output names are reserved words.
+    """
+    effective_words = (ANSI_RESERVED_WORDS | {w.lower() for w in config.extend}) - {
+        w.lower() for w in config.exclude
+    }
+
+    if config.strategy == "quote":
+        return renames
+
+    conflicts: list[str] = []
+    updated: dict[str, str] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            if config.strategy == "prefix":
+                updated[original] = config.prefix + output
+            else:
+                # strategy == "error": collect for later reporting
+                conflicts.append(output)
+                updated[original] = output
+        else:
+            updated[original] = output
+
+    if conflicts:
+        raise ConfigError(f"Column names are SQL reserved words: {', '.join(sorted(conflicts))}")
+
+    return updated
+
+
 def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
     """Normalize column names in a DataFrame according to the naming config.
 
@@ -126,12 +176,14 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
         DataFrame with normalized column names.
 
     Raises:
-        ConfigError: If normalization produces duplicate column names.
+        ConfigError: If normalization produces duplicate column names and
+            ``on_collision`` is ``"error"``.
     """
     if config.columns is None or config.columns == NamingPattern.NONE:
         return df
 
-    from pyspark.sql import functions as F
+    if config.columns == NamingPattern.KEBAB_CASE:
+        _log.warning("kebab-case column names require backtick-quoting in SQL expressions")
 
     renames: dict[str, str] = {}
     for col_name in df.columns:
@@ -140,16 +192,35 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
         else:
             renames[col_name] = normalize_name(col_name, config.columns)
 
-    # Check for duplicate output names
+    # Detect collision groups (preserve source column order via dict iteration order)
     seen: dict[str, list[str]] = {}
     for old, new in renames.items():
         seen.setdefault(new, []).append(old)
     duplicates = {new: sources for new, sources in seen.items() if len(sources) > 1}
-    if duplicates:
-        details = "; ".join(f"'{new}' from {srcs}" for new, srcs in duplicates.items())
-        raise ConfigError(f"Naming normalization produces duplicate columns: {details}")
 
-    return df.select([F.col(old).alias(new) for old, new in renames.items()])
+    if duplicates:
+        if config.on_collision == "error":
+            details = "; ".join(f"'{new}' from {srcs}" for new, srcs in duplicates.items())
+            raise ConfigError(f"Naming normalization produces duplicate columns: {details}")
+
+        # on_collision == "suffix": keep first occurrence, append _2, _3, ... to the rest
+        for base_name, source_cols in duplicates.items():
+            for idx, old_col in enumerate(source_cols[1:], start=2):
+                suffixed = f"{base_name}_{idx}"
+                _log.warning(
+                    "Column '%s' normalises to '%s' (already taken); renamed to '%s'",
+                    old_col,
+                    base_name,
+                    suffixed,
+                )
+                renames[old_col] = suffixed
+
+    if config.reserved_words is not None:
+        renames = _apply_reserved_word_protection(renames, config.reserved_words)
+
+    # Rename via toDF() to avoid ambiguous column references when dedup
+    # creates output names that collide with other columns' original names.
+    return df.toDF(*renames.values())
 
 
 def normalize_table_name(name: str, config: NamingConfig) -> str:
