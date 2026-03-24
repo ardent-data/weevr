@@ -29,7 +29,12 @@ from weevr.model.thread import Thread
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, Weave
 from weevr.telemetry.collector import SpanCollector
-from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
+from weevr.telemetry.results import (
+    ColumnSetResult,
+    LoomTelemetry,
+    ThreadTelemetry,
+    WeaveTelemetry,
+)
 from weevr.telemetry.span import SpanStatus, generate_trace_id
 
 logger = logging.getLogger(__name__)
@@ -172,7 +177,7 @@ def execute_weave(
 
         # Materialize column sets — resolve all defs into name→mapping dicts
         resolved_column_sets: dict[str, dict[str, str]] | None = None
-        all_column_set_results: list[Any] = []
+        all_column_set_results: list[ColumnSetResult] = []
         if column_set_defs:
             resolved_column_sets, all_column_set_results = materialize_column_sets(
                 spark,
@@ -436,7 +441,7 @@ def _build_weave_telemetry(
     collector: SpanCollector | None,
     hook_results: list[HookResult] | None = None,
     lookup_results: list[LookupResult] | None = None,
-    column_set_results: list[Any] | None = None,
+    column_set_results: list[ColumnSetResult] | None = None,
     variables: dict[str, Any] | None = None,
     resolved_params: dict[str, Any] | None = None,
 ) -> WeaveTelemetry | None:

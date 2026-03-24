@@ -275,7 +275,7 @@ class TestApplyRename:
         # loaded = 3 (merged size), applied = 3 (id, name, amount all in df)
         # unmapped = 1 (active not in merged), extra = 0
         params = RenameParams(columns={"amount": "value"})
-        with caplog.at_level(logging.INFO, logger="weevr.operations.pipeline.transforms"):
+        with caplog.at_level(logging.DEBUG, logger="weevr.operations.pipeline.transforms"):
             apply_rename(
                 sample_df,
                 params,

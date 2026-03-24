@@ -112,7 +112,7 @@ def apply_rename(
         applied = len(mapping_keys & df_cols)
         unmapped = len(df_cols - mapping_keys)
         extra = len(mapping_keys - df_cols)
-        _log.info(
+        _log.debug(
             "Column set rename: %d loaded, %d applied, %d unmapped, %d extra",
             loaded,
             applied,
