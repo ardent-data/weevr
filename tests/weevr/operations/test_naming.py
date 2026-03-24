@@ -406,3 +406,30 @@ class TestNormalizeColumnsReservedWords:
         message = str(exc_info.value)
         assert "select" in message
         assert "from" in message
+
+
+@pytest.mark.spark
+class TestNormalizeColumnsFullPipeline:
+    """End-to-end test covering normalize → dedup → reserved stages in sequence."""
+
+    def test_full_pipeline_order(self, spark):
+        # Columns as if rename has already been applied upstream.
+        # "http_status" and "HttpStatus" both normalise to "http_status" → dedup gives _2.
+        # "select" is a reserved word → prefix strategy prepends "_".
+        from weevr.model.column_set import ReservedWordConfig
+
+        columns = ["company_code", "sales_org", "http_status", "HttpStatus", "select"]
+        df = spark.createDataFrame([(1, 2, 3, 4, 5)], columns)
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            on_collision="suffix",
+            reserved_words=ReservedWordConfig(strategy="prefix", prefix="_"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == [
+            "company_code",
+            "sales_org",
+            "http_status",
+            "http_status_2",
+            "_select",
+        ]
