@@ -4,6 +4,7 @@ import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import LongType, StringType, StructField, StructType
 
+from weevr.errors.exceptions import ConfigError
 from weevr.model.pipeline import (
     CastParams,
     DeriveParams,
@@ -192,6 +193,76 @@ class TestApplyRename:
         params = RenameParams(columns={"id": "pk"})
         result = apply_rename(sample_df, params)
         assert result.count() == sample_df.count()
+
+    def test_rename_column_set_mapping_only(self, sample_df) -> None:
+        params = RenameParams(columns={})
+        result = apply_rename(
+            sample_df,
+            params,
+            column_set_mapping={"id": "identifier", "name": "full_name"},
+        )
+        assert "identifier" in result.columns
+        assert "full_name" in result.columns
+        assert "id" not in result.columns
+        assert "name" not in result.columns
+
+    def test_rename_static_wins_over_column_set(self, sample_df) -> None:
+        params = RenameParams(columns={"id": "override"})
+        result = apply_rename(
+            sample_df,
+            params,
+            column_set_mapping={"id": "from_set"},
+        )
+        assert "override" in result.columns
+        assert "from_set" not in result.columns
+        assert "id" not in result.columns
+
+    def test_rename_on_unmapped_pass_through(self, sample_df) -> None:
+        params = RenameParams(columns={})
+        result = apply_rename(
+            sample_df,
+            params,
+            column_set_mapping={"id": "identifier"},
+            on_unmapped="pass_through",
+        )
+        # Unmapped columns preserved as-is
+        assert "name" in result.columns
+        assert "amount" in result.columns
+        assert "active" in result.columns
+        assert "identifier" in result.columns
+
+    def test_rename_on_unmapped_error(self, sample_df) -> None:
+        params = RenameParams(columns={})
+        with pytest.raises(ConfigError, match="unmapped"):
+            apply_rename(
+                sample_df,
+                params,
+                column_set_mapping={"id": "identifier"},
+                on_unmapped="error",
+            )
+
+    def test_rename_on_extra_warn(self, sample_df, caplog) -> None:
+        import logging
+
+        params = RenameParams(columns={})
+        with caplog.at_level(logging.WARNING):
+            apply_rename(
+                sample_df,
+                params,
+                column_set_mapping={"id": "identifier", "nonexistent": "ghost"},
+                on_extra="warn",
+            )
+        assert any("nonexistent" in r.message for r in caplog.records)
+
+    def test_rename_on_extra_error(self, sample_df) -> None:
+        params = RenameParams(columns={})
+        with pytest.raises(ConfigError, match="nonexistent"):
+            apply_rename(
+                sample_df,
+                params,
+                column_set_mapping={"id": "identifier", "nonexistent": "ghost"},
+                on_extra="error",
+            )
 
 
 class TestApplyCast:
