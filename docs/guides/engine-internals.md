@@ -100,20 +100,29 @@ skipped.
 1. **Initialize variables** — A `VariableContext` is created from the
    weave's `variables` block. Variables are available to hook steps via
    `${var.name}` placeholders.
-2. **Lookup materialization (external)** — External lookups (those not
-   produced by a thread in the weave) are materialized before any thread
-   or hook step runs. Internal lookups whose source is produced by a
-   thread in group N are deferred and materialized at the group N+1
-   boundary — after their producer completes.
-3. **Pre-steps** — If the weave defines `pre_steps`, hook steps run before
-   any thread executes. Failures with `on_failure: abort` stop the weave.
-   Pre-steps can read from lookups materialized in the previous step.
-4. **Thread execution** — Parallel groups are processed sequentially. Within
-   each group, threads are submitted to a `ThreadPoolExecutor` for concurrent
-   execution. Threads reference lookups via `source.lookup` and receive
-   the cached DataFrame.
-5. **Post-steps** — After all threads complete, `post_steps` hook steps run.
-   Failures with `on_failure: abort` mark the weave as failed.
+2. **Lookup materialization (external)** — External lookups
+   (those not produced by a thread in the weave) are materialized
+   before any thread or hook step runs. Internal lookups whose
+   source is produced by a thread in group N are deferred and
+   materialized at the group N+1 boundary — after their producer
+   completes.
+3. **Column set materialization** — If the weave (or loom) defines
+   `column_sets`, all sets are resolved to from→to mapping dicts.
+   Delta/YAML sources are read via `read_source()`; param sources
+   resolve from runtime parameters. Results are captured in
+   `WeaveTelemetry.column_set_results`.
+4. **Pre-steps** — If the weave defines `pre_steps`, hook steps
+   run before any thread executes. Failures with
+   `on_failure: abort` stop the weave. Pre-steps can read from
+   lookups materialized in step 2.
+5. **Thread execution** — Parallel groups are processed
+   sequentially. Within each group, threads are submitted to a
+   `ThreadPoolExecutor` for concurrent execution. Threads
+   reference lookups via `source.lookup` and receive the cached
+   DataFrame.
+6. **Post-steps** — After all threads complete, `post_steps` hook
+   steps run. Failures with `on_failure: abort` mark the weave
+   as failed.
 
 After each thread completes:
 

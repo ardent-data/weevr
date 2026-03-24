@@ -14,6 +14,7 @@ from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfi
 from weevr.model.load import LoadConfig
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom, WeaveEntry
+from weevr.model.naming import NamingConfig, NamingPattern
 from weevr.model.params import ParamsConfig, ParamSpec
 from weevr.model.pipeline import (
     AggregateStep,
@@ -117,6 +118,9 @@ __all__ = [
     "ColumnSet",
     "ColumnSetSource",
     "ReservedWordConfig",
+    # Naming
+    "NamingConfig",
+    "NamingPattern",
     # Variable
     "VariableSpec",
 ]
