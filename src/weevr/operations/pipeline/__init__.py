@@ -6,6 +6,7 @@ from typing import Any
 from pyspark.sql import DataFrame
 
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.column_set import ColumnSet
 from weevr.model.pipeline import (
     AggregateStep,
     CaseWhenStep,
@@ -58,7 +59,7 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     DeriveStep: lambda df, step, _src: apply_derive(df, step.derive),
     SelectStep: lambda df, step, _src: apply_select(df, step.select),
     DropStep: lambda df, step, _src: apply_drop(df, step.drop),
-    RenameStep: lambda df, step, _src: apply_rename(df, step.rename),
+    # RenameStep is dispatched separately in run_pipeline to support column sets
     CastStep: lambda df, step, _src: apply_cast(df, step.cast),
     DedupStep: lambda df, step, _src: apply_dedup(df, step.dedup),
     SortStep: lambda df, step, _src: apply_sort(df, step.sort),
@@ -84,6 +85,8 @@ def run_pipeline(
     df: DataFrame,
     steps: list[Step],
     sources: dict[str, DataFrame],
+    column_sets: dict[str, dict[str, str]] | None = None,
+    column_set_defs: dict[str, ColumnSet] | None = None,
 ) -> DataFrame:
     """Execute a sequence of pipeline steps against a working DataFrame.
 
@@ -97,6 +100,12 @@ def run_pipeline(
         steps: Ordered list of pipeline step configurations.
         sources: All loaded source DataFrames, keyed by alias. Required for
             join and union steps that reference secondary sources.
+        column_sets: Pre-resolved column set mappings keyed by name. When a
+            rename step references a column set, the resolved dict is looked up
+            here and passed to ``apply_rename``.
+        column_set_defs: Column set model instances keyed by name. Used to read
+            ``on_unmapped`` and ``on_extra`` behaviour settings for rename steps
+            that reference a column set.
 
     Returns:
         Final DataFrame after all steps have been applied.
@@ -104,18 +113,35 @@ def run_pipeline(
     Raises:
         ExecutionError: If any step fails, with step_index and step_type set.
     """
+
+    def _dispatch_rename(result: DataFrame, step: RenameStep) -> DataFrame:
+        cs_name = step.rename.column_set
+        if cs_name is not None and column_sets is not None and cs_name in column_sets:
+            cs_def = (column_set_defs or {}).get(cs_name)
+            return apply_rename(
+                result,
+                step.rename,
+                column_set_mapping=column_sets[cs_name],
+                on_unmapped=cs_def.on_unmapped if cs_def is not None else "pass_through",
+                on_extra=cs_def.on_extra if cs_def is not None else "ignore",
+            )
+        return apply_rename(result, step.rename)
+
     result = df
     for i, step in enumerate(steps):
         try:
-            handler = _STEP_HANDLERS.get(type(step))
-            if handler is None:
-                step_type = type(step).__name__.removesuffix("Step").lower()
-                raise ExecutionError(
-                    f"Pipeline step {i}: unrecognized step type '{step_type}'",
-                    step_index=i,
-                    step_type=step_type,
-                )
-            result = handler(result, step, sources)
+            if isinstance(step, RenameStep):
+                result = _dispatch_rename(result, step)
+            else:
+                handler = _STEP_HANDLERS.get(type(step))
+                if handler is None:
+                    step_type = type(step).__name__.removesuffix("Step").lower()
+                    raise ExecutionError(
+                        f"Pipeline step {i}: unrecognized step type '{step_type}'",
+                        step_index=i,
+                        step_type=step_type,
+                    )
+                result = handler(result, step, sources)
         except ExecutionError:
             raise
         except Exception as exc:

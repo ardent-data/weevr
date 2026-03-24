@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pyspark.sql import SparkSession
 
 from weevr.engine.cache_manager import CacheManager
+from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
 from weevr.engine.executor import execute_thread
 from weevr.engine.hooks import HookResult, run_hook_steps
@@ -20,6 +21,7 @@ from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
+from weevr.model.column_set import ColumnSet
 from weevr.model.hooks import HookStep
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
@@ -74,6 +76,7 @@ def execute_weave(
     variables: dict[str, VariableSpec] | None = None,
     loom_name: str = "",
     weave_name: str = "",
+    column_set_defs: dict[str, ColumnSet] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -109,6 +112,9 @@ def execute_weave(
         variables: Optional weave-level variable specs.
         loom_name: Loom name passed to threads for audit column context.
         weave_name: Weave name passed to threads for audit column context.
+        column_set_defs: Merged column set definitions (loom-level merged with
+            weave-level, weave wins) to be materialized and forwarded to each
+            thread for rename step resolution.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -162,6 +168,17 @@ def execute_weave(
         elif lookups:
             cached_lookup_dfs, all_lookup_results = materialize_lookups(
                 spark, lookups, collector=collector, parent_span_id=weave_span_id
+            )
+
+        # Materialize column sets — resolve all defs into name→mapping dicts
+        resolved_column_sets: dict[str, dict[str, str]] | None = None
+        if column_set_defs:
+            resolved_column_sets = materialize_column_sets(
+                spark,
+                column_set_defs,
+                params or {},
+                collector=collector,
+                parent_span_id=weave_span_id,
             )
 
         # Execute pre-steps
@@ -258,6 +275,8 @@ def execute_weave(
                                 weave_lookups=lookups,
                                 loom_name=loom_name,
                                 weave_name=weave_name,
+                                column_sets=resolved_column_sets,
+                                column_set_defs=column_set_defs,
                             )
                         ] = name
                     else:
@@ -270,6 +289,8 @@ def execute_weave(
                                 weave_lookups=lookups,
                                 loom_name=loom_name,
                                 weave_name=weave_name,
+                                column_sets=resolved_column_sets,
+                                column_set_defs=column_set_defs,
                             )
                         ] = name
 
@@ -532,6 +553,14 @@ def execute_loom(
             if te.condition is not None:
                 thread_conditions[te.name] = te.condition
 
+        # Merge loom-level and weave-level column set defs (weave wins on conflicts)
+        loom_column_sets = dict(loom.column_sets) if loom.column_sets else {}
+        weave_column_sets = dict(weave.column_sets) if weave.column_sets else {}
+        merged_column_set_defs: dict[str, ColumnSet] | None = {
+            **loom_column_sets,
+            **weave_column_sets,
+        } or None
+
         result = execute_weave(
             spark,
             plan,
@@ -547,6 +576,7 @@ def execute_loom(
             variables=dict(weave.variables) if weave.variables else None,
             loom_name=loom.name,
             weave_name=weave_name,
+            column_set_defs=merged_column_set_defs,
         )
         weave_results.append(result)
 

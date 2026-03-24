@@ -13,6 +13,7 @@ from pyspark.sql import SparkSession
 from weevr.engine.lookups import resolve_thread_lookups
 from weevr.engine.result import ThreadResult
 from weevr.errors.exceptions import DataValidationError, ExecutionError, ExportError, StateError
+from weevr.model.column_set import ColumnSet
 from weevr.model.lookup import Lookup
 from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
@@ -49,6 +50,8 @@ def execute_thread(
     resolved_params: dict[str, Any] | None = None,
     loom_name: str = "",
     weave_name: str = "",
+    column_sets: dict[str, dict[str, str]] | None = None,
+    column_set_defs: dict[str, ColumnSet] | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -89,6 +92,12 @@ def execute_thread(
         weave_name: Weave name for audit column context variables.
             Derived from the prefix of ``thread.qualified_key`` when not
             provided. Falls back to empty string if no dot separator exists.
+        column_sets: Pre-resolved column set mappings keyed by name. Passed
+            through to ``run_pipeline`` so rename steps can look up their
+            resolved dictionaries.
+        column_set_defs: Column set model instances keyed by name. Passed
+            through to ``run_pipeline`` so rename steps can read
+            ``on_unmapped`` and ``on_extra`` settings.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -218,7 +227,7 @@ def execute_thread(
         rows_read = df.count()
 
         # Step 3 — run pipeline steps
-        df = run_pipeline(df, thread.steps, sources_map)
+        df = run_pipeline(df, thread.steps, sources_map, column_sets, column_set_defs)
 
         # Capture intermediate row count for waterfall visualization
         rows_after_transforms = df.count()
