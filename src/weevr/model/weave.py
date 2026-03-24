@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
+from weevr.model.column_set import ColumnSet
 from weevr.model.execution import ExecutionConfig
 from weevr.model.hooks import HookStep
 from weevr.model.lookup import Lookup
@@ -57,6 +58,7 @@ class Weave(FrozenBase):
     execution: ExecutionConfig | None = None
     naming: NamingConfig | None = None
     lookups: dict[str, Lookup] | None = None
+    column_sets: dict[str, ColumnSet] | None = None
     variables: dict[str, VariableSpec] | None = None
     pre_steps: list[HookStep] | None = None
     post_steps: list[HookStep] | None = None

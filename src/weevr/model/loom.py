@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
+from weevr.model.column_set import ColumnSet
 from weevr.model.execution import ExecutionConfig
 from weevr.model.naming import NamingConfig
 from weevr.model.params import ParamSpec
@@ -38,6 +39,7 @@ class Loom(FrozenBase):
     params: dict[str, ParamSpec] | None = None
     execution: ExecutionConfig | None = None
     naming: NamingConfig | None = None
+    column_sets: dict[str, ColumnSet] | None = None
 
     @model_validator(mode="before")
     @classmethod

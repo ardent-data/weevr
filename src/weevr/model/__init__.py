@@ -1,5 +1,6 @@
 """Domain object model for weevr configuration."""
 
+from weevr.model.column_set import ColumnSet, ColumnSetSource, ReservedWordConfig
 from weevr.model.execution import ExecutionConfig, LogLevel
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
@@ -112,6 +113,10 @@ __all__ = [
     "LogMessageStep",
     # Lookup
     "Lookup",
+    # Column set
+    "ColumnSet",
+    "ColumnSetSource",
+    "ReservedWordConfig",
     # Variable
     "VariableSpec",
 ]
