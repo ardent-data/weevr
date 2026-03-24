@@ -27,6 +27,7 @@ from weevr.model.pipeline import (
     JoinStep,
     PivotParams,
     PivotStep,
+    RenameParams,
     RenameStep,
     SelectStep,
     SortStep,
@@ -670,3 +671,46 @@ class TestNewStepDiscriminator:
             {"date_ops": {"columns": ["ts"], "expr": "date_format({col}, 'yyyy-MM-dd')"}}
         )
         assert isinstance(step, DateOpsStep)
+
+
+# ---------------------------------------------------------------------------
+# RenameParams model
+# ---------------------------------------------------------------------------
+
+
+class TestRenameParams:
+    """Test RenameParams model validation, including column_set field."""
+
+    def test_static_columns_only(self):
+        """RenameParams with only columns dict parses correctly."""
+        p = RenameParams(columns={"old_name": "new_name"})
+        assert p.columns == {"old_name": "new_name"}
+        assert p.column_set is None
+
+    def test_column_set_populated(self):
+        """RenameParams with column_set reference parses correctly."""
+        p = RenameParams(columns={}, column_set="my_dict")
+        assert p.column_set == "my_dict"
+        assert p.columns == {}
+
+    def test_backward_compat_no_column_set(self):
+        """RenameParams without column_set defaults to None."""
+        p = RenameParams(columns={"a": "b"})
+        assert p.column_set is None
+
+    def test_column_set_only_empty_columns(self):
+        """RenameParams with only column_set and empty columns is valid."""
+        p = RenameParams(column_set="x")
+        assert p.column_set == "x"
+        assert p.columns == {}
+
+    def test_column_set_and_static_columns_together(self):
+        """RenameParams with both columns and column_set is valid."""
+        p = RenameParams(columns={"a": "b"}, column_set="extra_renames")
+        assert p.columns == {"a": "b"}
+        assert p.column_set == "extra_renames"
+
+    def test_column_set_none_explicit(self):
+        """Explicitly passing column_set=None is equivalent to the default."""
+        p = RenameParams(columns={"x": "y"}, column_set=None)
+        assert p.column_set is None
