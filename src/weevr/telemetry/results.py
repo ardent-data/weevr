@@ -120,6 +120,22 @@ class ThreadTelemetry(FrozenBase):
     export_results: list[ExportResult] = []
 
 
+class ColumnSetResult(FrozenBase):
+    """Result of a single column set resolution.
+
+    Attributes:
+        name: Column set name.
+        source_type: Resolution source — ``"delta"``, ``"yaml"``, or ``"param"``.
+        mappings_loaded: Number of from→to entries resolved from the source.
+        skipped: True when on_failure=skip and the source was empty or unreadable.
+    """
+
+    name: str
+    source_type: str
+    mappings_loaded: int = 0
+    skipped: bool = False
+
+
 class WeaveTelemetry(FrozenBase):
     """Telemetry data composed into a WeaveResult.
 
@@ -128,6 +144,7 @@ class WeaveTelemetry(FrozenBase):
         thread_telemetry: Per-thread telemetry keyed by thread name.
         hook_results: Results from pre/post hook step execution.
         lookup_results: Results from lookup materialization.
+        column_set_results: Results from column set resolution.
         variables: Final variable values at end of weave execution.
         resolved_params: Runtime parameter values that drove this execution.
             Populated on the outermost telemetry object only (weave-level runs).
@@ -137,6 +154,7 @@ class WeaveTelemetry(FrozenBase):
     thread_telemetry: dict[str, ThreadTelemetry] = {}
     hook_results: list[Any] = []  # list[engine.hooks.HookResult] at runtime
     lookup_results: list[Any] = []  # list[engine.lookups.LookupResult] at runtime
+    column_set_results: list[Any] = []  # list[ColumnSetResult] at runtime
     variables: dict[str, Any] = {}
     resolved_params: dict[str, Any] | None = None
 

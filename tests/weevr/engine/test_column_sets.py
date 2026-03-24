@@ -395,6 +395,49 @@ class TestMaterializeColumnSets:
         assert spans[0].parent_span_id == "p1"
 
     @patch("weevr.engine.column_sets.read_source")
+    def test_span_attributes_include_source_type_and_mappings_loaded(self, mock_read):
+        """Span attributes include column_set.name, source_type, and mappings_loaded."""
+        selected_df = MagicMock()
+        row_a = MagicMock()
+        row_a.__getitem__ = lambda self, key: "col_a" if key == "source_name" else "col_b"
+        row_b = MagicMock()
+        row_b.__getitem__ = lambda self, key: "col_c" if key == "source_name" else "col_d"
+        selected_df.collect.return_value = [row_a, row_b]
+
+        raw_df = MagicMock()
+        raw_df.select.return_value = selected_df
+        mock_read.return_value = raw_df
+
+        spark = MagicMock()
+        collector = SpanCollector(generate_trace_id())
+        column_sets = {"my_delta_cs": _make_column_set(cs_type="delta")}
+
+        materialize_column_sets(spark, column_sets, {}, collector=collector)
+
+        spans = collector.get_spans()
+        assert len(spans) == 1
+        attrs = spans[0].attributes
+        assert attrs.get("column_set.name") == "my_delta_cs"
+        assert attrs.get("column_set.source_type") == "delta"
+        assert attrs.get("column_set.mappings_loaded") == 2
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_span_attributes_param_source_type(self, mock_read):
+        """Param-sourced column set span has source_type='param'."""
+        spark = MagicMock()
+        collector = SpanCollector(generate_trace_id())
+        column_sets = {"param_cs": _make_column_set(param="my_map")}
+        resolved_params = {"my_map": {"a": "b", "c": "d"}}
+
+        materialize_column_sets(spark, column_sets, resolved_params, collector=collector)
+
+        spans = collector.get_spans()
+        assert len(spans) == 1
+        attrs = spans[0].attributes
+        assert attrs.get("column_set.source_type") == "param"
+        assert attrs.get("column_set.mappings_loaded") == 2
+
+    @patch("weevr.engine.column_sets.read_source")
     def test_empty_column_sets_returns_empty_dict(self, mock_read):
         """No column sets defined returns empty result."""
         result = materialize_column_sets(MagicMock(), {}, {})

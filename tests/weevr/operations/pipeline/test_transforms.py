@@ -264,6 +264,30 @@ class TestApplyRename:
                 on_extra="error",
             )
 
+    def test_rename_column_set_logs_counts(self, sample_df, caplog) -> None:
+        """apply_rename with column_set_mapping logs loaded/applied/unmapped/extra counts."""
+        import logging
+
+        # sample_df has columns: id, name, amount, active (4 cols)
+        # column_set: id->identifier, name->full_name (2 loaded)
+        # static: amount->value (1 more)
+        # merged has 3 entries; df has 4 cols
+        # loaded = 3 (merged size), applied = 3 (id, name, amount all in df)
+        # unmapped = 1 (active not in merged), extra = 0
+        params = RenameParams(columns={"amount": "value"})
+        with caplog.at_level(logging.INFO, logger="weevr.operations.pipeline.transforms"):
+            apply_rename(
+                sample_df,
+                params,
+                column_set_mapping={"id": "identifier", "name": "full_name"},
+            )
+        assert any("Column set rename" in r.message for r in caplog.records)
+        log_msg = next(r.message for r in caplog.records if "Column set rename" in r.message)
+        assert "3 loaded" in log_msg
+        assert "3 applied" in log_msg
+        assert "1 unmapped" in log_msg
+        assert "0 extra" in log_msg
+
 
 class TestApplyCast:
     """Tests for the cast step handler."""

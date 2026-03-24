@@ -64,8 +64,15 @@ def resolve_column_set(
         result = _resolve(spark, name, column_set, resolved_params)
 
         if span:
-            row_count = len(result) if result is not None else 0
-            span.set_attribute("column_set.row_count", row_count)
+            mappings_loaded = len(result) if result is not None else 0
+            source_type = (
+                "param"
+                if column_set.param is not None
+                else (column_set.source.type if column_set.source is not None else "unknown")
+            )
+            span.set_attribute("column_set.source_type", source_type)
+            span.set_attribute("column_set.mappings_loaded", mappings_loaded)
+            span.set_attribute("column_set.row_count", mappings_loaded)
             span.set_attribute("column_set.skipped", result is None)
             collector.add_span(span.finish(SpanStatus.OK))  # type: ignore[union-attr]
 

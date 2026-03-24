@@ -105,6 +105,21 @@ def apply_rename(
     """
     merged: dict[str, str] = {**(column_set_mapping or {}), **params.columns}
 
+    if column_set_mapping is not None:
+        df_cols = set(df.columns)
+        mapping_keys = set(merged.keys())
+        loaded = len(merged)
+        applied = len(mapping_keys & df_cols)
+        unmapped = len(df_cols - mapping_keys)
+        extra = len(mapping_keys - df_cols)
+        _log.info(
+            "Column set rename: %d loaded, %d applied, %d unmapped, %d extra",
+            loaded,
+            applied,
+            unmapped,
+            extra,
+        )
+
     if merged:
         df_cols = set(df.columns)
         mapping_keys = set(merged.keys())
