@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/ardent-data/weevr/compare/weevr-v1.7.1...weevr-v1.8.0) (2026-03-24)
+
+
+### Features
+
+* **engine:** add dictionary rename and naming enhancements ([#97](https://github.com/ardent-data/weevr/issues/97)) ([e22bd49](https://github.com/ardent-data/weevr/commit/e22bd49d17ddcdfc2caf3c91ca202762a455ee79))
+
 ## [1.7.1](https://github.com/ardent-data/weevr/compare/weevr-v1.7.0...weevr-v1.7.1) (2026-03-15)
 
 
