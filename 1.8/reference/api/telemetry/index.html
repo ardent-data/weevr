@@ -1,0 +1,5851 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.8/reference/api/telemetry/">
+      
+      
+        <link rel="prev" href="../operations/">
+      
+      
+        <link rel="next" href="../state/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Telemetry - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/mkdocs_d2_plugin.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#telemetry-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Telemetry
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../yaml-schema/thread/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../release-notes/1.7/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context & Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#weevr.telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        telemetry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="telemetry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __all__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanBuilder
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SpanBuilder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.span_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        span_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.trace_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        trace_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.set_attribute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_attribute
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.add_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_event
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.finish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        finish
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanCollector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SpanCollector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.trace_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        trace_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.start_span" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        start_span
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.add_span" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_span
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.get_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LogEvent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogEvent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LogLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogLevel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.StructuredJsonFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StructuredJsonFormatter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StructuredJsonFormatter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.StructuredJsonFormatter.format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.AssertionResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssertionResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ExportResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LoomTelemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoomTelemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ThreadTelemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ThreadTelemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ValidationResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidationResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.WeaveTelemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeaveTelemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ExecutionSpan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionSpan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanEvent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanEvent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanStatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanStatus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LoomTrace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoomTrace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LoomTrace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LoomTrace.to_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ThreadTrace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ThreadTrace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ThreadTrace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ThreadTrace.to_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.WeaveTrace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeaveTrace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WeaveTrace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.WeaveTrace.to_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.create_log_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create_log_event
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.configure_logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        configure_logging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.generate_span_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_span_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.generate_trace_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_trace_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/engine-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/config-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/telemetry-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/exports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#weevr.telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        telemetry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="telemetry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __all__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanBuilder
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SpanBuilder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.span_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        span_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.trace_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        trace_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.set_attribute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_attribute
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.add_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_event
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanBuilder.finish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        finish
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanCollector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SpanCollector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.trace_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        trace_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.start_span" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        start_span
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.add_span" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_span
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanCollector.get_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LogEvent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogEvent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LogLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogLevel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.StructuredJsonFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StructuredJsonFormatter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StructuredJsonFormatter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.StructuredJsonFormatter.format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.AssertionResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssertionResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ExportResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LoomTelemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoomTelemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ThreadTelemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ThreadTelemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ValidationResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValidationResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.WeaveTelemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeaveTelemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ExecutionSpan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionSpan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanEvent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanEvent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.SpanStatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpanStatus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LoomTrace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoomTrace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LoomTrace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.LoomTrace.to_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ThreadTrace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ThreadTrace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ThreadTrace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.ThreadTrace.to_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.WeaveTrace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeaveTrace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WeaveTrace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.WeaveTrace.to_spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.create_log_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create_log_event
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.configure_logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        configure_logging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.generate_span_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_span_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.telemetry.generate_trace_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_trace_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="telemetry-api">Telemetry API<a class="headerlink" href="#telemetry-api" title="Permanent link">&para;</a></h1>
+<p>The <code>weevr.telemetry</code> module provides structured logging, execution span
+tracking, and progress reporting. Telemetry settings cascade through the
+loom/weave/thread hierarchy via <code>ExecutionConfig</code>.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="weevr.telemetry" class="doc doc-heading">
+            <code>weevr.telemetry</code>
+
+
+<a href="#weevr.telemetry" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>weevr telemetry — structured observability for execution pipelines.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="weevr.telemetry.__all__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ExecutionSpan&#39;</span><span class="p">,</span> <span class="s1">&#39;SpanEvent&#39;</span><span class="p">,</span> <span class="s1">&#39;SpanStatus&#39;</span><span class="p">,</span> <span class="s1">&#39;generate_trace_id&#39;</span><span class="p">,</span> <span class="s1">&#39;generate_span_id&#39;</span><span class="p">,</span> <span class="s1">&#39;SpanCollector&#39;</span><span class="p">,</span> <span class="s1">&#39;SpanBuilder&#39;</span><span class="p">,</span> <span class="s1">&#39;LogEvent&#39;</span><span class="p">,</span> <span class="s1">&#39;create_log_event&#39;</span><span class="p">,</span> <span class="s1">&#39;LogLevel&#39;</span><span class="p">,</span> <span class="s1">&#39;StructuredJsonFormatter&#39;</span><span class="p">,</span> <span class="s1">&#39;configure_logging&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationResult&#39;</span><span class="p">,</span> <span class="s1">&#39;AssertionResult&#39;</span><span class="p">,</span> <span class="s1">&#39;ExportResult&#39;</span><span class="p">,</span> <span class="s1">&#39;ThreadTelemetry&#39;</span><span class="p">,</span> <span class="s1">&#39;WeaveTelemetry&#39;</span><span class="p">,</span> <span class="s1">&#39;LoomTelemetry&#39;</span><span class="p">,</span> <span class="s1">&#39;ThreadTrace&#39;</span><span class="p">,</span> <span class="s1">&#39;WeaveTrace&#39;</span><span class="p">,</span> <span class="s1">&#39;LoomTrace&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#weevr.telemetry.__all__" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.SpanBuilder" class="doc doc-heading">
+            <code>SpanBuilder</code>
+
+
+<a href="#weevr.telemetry.SpanBuilder" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Mutable builder for constructing an ExecutionSpan incrementally.</p>
+<p>Created by :meth:<code>SpanCollector.start_span</code>. Accumulate attributes and
+events during execution, then call :meth:<code>finish</code> to produce an immutable
+:class:<code>ExecutionSpan</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="weevr.telemetry.SpanBuilder.span_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">span_id</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.telemetry.SpanBuilder.span_id" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The pre-assigned span ID for this builder.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="weevr.telemetry.SpanBuilder.trace_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">trace_id</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.telemetry.SpanBuilder.trace_id" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The trace ID this span belongs to.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanBuilder.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">span_id</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanBuilder.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize a span builder with identity and parent linkage.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanBuilder.set_attribute" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">set_attribute</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanBuilder.set_attribute" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Set a key-value attribute on the span.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanBuilder.add_event" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">add_event</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">attributes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanBuilder.add_event" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Add a timestamped event to the span.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanBuilder.finish" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finish</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">SpanStatus</span><span class="o">.</span><span class="n">OK</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanBuilder.finish" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Finalize the span and return an immutable ExecutionSpan.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>status</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SpanStatus (weevr.telemetry.span.SpanStatus)" href="#weevr.telemetry.SpanStatus">SpanStatus</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Final status of the span.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="weevr.telemetry.span.SpanStatus.OK">OK</span></code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Immutable ExecutionSpan with all accumulated attributes and events.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="RuntimeError">RuntimeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If finish() has already been called on this builder.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.SpanCollector" class="doc doc-heading">
+            <code>SpanCollector</code>
+
+
+<a href="#weevr.telemetry.SpanCollector" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Mutable collector that accumulates finished spans during execution.</p>
+<p>Each execution scope (thread, weave, loom) gets its own collector.
+Thread-level collectors are merged into the weave-level collector after
+thread completion, ensuring no contention during concurrent execution.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="weevr.telemetry.SpanCollector.trace_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">trace_id</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.telemetry.SpanCollector.trace_id" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The trace ID this collector is bound to.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanCollector.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">trace_id</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanCollector.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize a collector bound to a trace ID.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanCollector.start_span" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">start_span</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanCollector.start_span" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Start building a new span.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable span name (e.g., "thread:customer_dim").</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>parent_span_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional parent span ID for hierarchy.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SpanBuilder (weevr.telemetry.collector.SpanBuilder)" href="#weevr.telemetry.SpanBuilder">SpanBuilder</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A mutable SpanBuilder to accumulate attributes and events.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanCollector.add_span" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">add_span</span><span class="p">(</span><span class="n">span</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanCollector.add_span" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Add a finished span to the collector.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanCollector.merge" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">merge</span><span class="p">(</span><span class="n">other</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.SpanCollector.merge" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Merge spans from another collector into this one.</p>
+<p>Used to combine thread-level collectors into the weave-level collector
+after thread completion.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.SpanCollector.get_spans" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_spans</span><span class="p">()</span></code>
+
+<a href="#weevr.telemetry.SpanCollector.get_spans" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return all collected spans.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.LogEvent" class="doc doc-heading">
+            <code>LogEvent</code>
+
+
+<a href="#weevr.telemetry.LogEvent" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Frozen Pydantic model for a structured log event.</p>
+<p>Each execution step can produce one or more LogEvents. These are
+serialized to JSON via :class:<code>StructuredJsonFormatter</code> and emitted
+through Python's logging module.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.timestamp">timestamp</span></code></td>
+            <td>
+                  <code><span title="datetime.datetime">datetime</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>UTC timestamp of the event.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.level">level</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Log level string (INFO, WARNING, ERROR, DEBUG).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.component">component</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dotted module path (e.g., "engine.executor").</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.thread_name">thread_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thread being executed, if applicable.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.weave_name">weave_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weave being executed, if applicable.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.loom_name">loom_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loom being executed, if applicable.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.trace_id">trace_id</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Trace ID correlating this event to an execution trace.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.span_id">span_id</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Span ID of the active span when this event was emitted.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.message">message</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable log message.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LogEvent.attributes">attributes</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span> | <span title="int">int</span> | <span title="float">float</span> | <span title="bool">bool</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional key-value context.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.LogLevel" class="doc doc-heading">
+            <code>LogLevel</code>
+
+
+<a href="#weevr.telemetry.LogLevel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.StrEnum">StrEnum</span></code></p>
+
+
+
+        <p>Configurable log level for weevr execution.</p>
+<p>Controls the verbosity of structured logging output during pipeline
+execution. Maps to Python logging levels internally.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.StructuredJsonFormatter" class="doc doc-heading">
+            <code>StructuredJsonFormatter</code>
+
+
+<a href="#weevr.telemetry.StructuredJsonFormatter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="logging.Formatter">Formatter</span></code></p>
+
+
+
+        <p>Formats log records as structured JSON with OTel-compatible field names.</p>
+<p>Produces one JSON object per log line with fields: timestamp, level,
+logger, message, and any extra attributes attached to the log record.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.StructuredJsonFormatter.format" class="doc doc-heading">
+            <code class="highlight language-python"><span class="nb">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.StructuredJsonFormatter.format" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Format a log record as a JSON string.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.AssertionResult" class="doc doc-heading">
+            <code>AssertionResult</code>
+
+
+<a href="#weevr.telemetry.AssertionResult" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Outcome of a single post-execution assertion.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.AssertionResult.assertion_type">assertion_type</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of assertion (row_count, column_not_null, unique, expression).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.AssertionResult.severity">severity</span></code></td>
+            <td>
+                  <code><span title="weevr.telemetry.results.Severity">Severity</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Configured severity level.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.AssertionResult.passed">passed</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the assertion passed.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.AssertionResult.details">details</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable outcome description.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.AssertionResult.columns">columns</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Columns involved, if applicable.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.ExportResult" class="doc doc-heading">
+            <code>ExportResult</code>
+
+
+<a href="#weevr.telemetry.ExportResult" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Result of a single export write.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.name">name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Export name from the configuration.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.type">type</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Format type (delta, parquet, csv, json, orc).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.target">target</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resolved path or alias that was written to.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.rows_written">rows_written</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows written to the export target.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.duration_ms">duration_ms</span></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Wall-clock write time in milliseconds.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.status">status</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;success&#39;, &#39;warned&#39;, &#39;aborted&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Outcome — success, warned (error + on_failure=warn),
+or aborted (error + on_failure=abort).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExportResult.error">error</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Error message if the write failed.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.LoomTelemetry" class="doc doc-heading">
+            <code>LoomTelemetry</code>
+
+
+<a href="#weevr.telemetry.LoomTelemetry" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Telemetry data composed into a LoomResult.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LoomTelemetry.span">span</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The execution span for this loom.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LoomTelemetry.weave_telemetry">weave_telemetry</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="WeaveTelemetry (weevr.telemetry.results.WeaveTelemetry)" href="#weevr.telemetry.WeaveTelemetry">WeaveTelemetry</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-weave telemetry keyed by weave name.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LoomTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (loom-level runs).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.ThreadTelemetry" class="doc doc-heading">
+            <code>ThreadTelemetry</code>
+
+
+<a href="#weevr.telemetry.ThreadTelemetry" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Telemetry data composed into a ThreadResult.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.span">span</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The execution span for this thread.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.validation_results">validation_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="ValidationResult (weevr.telemetry.results.ValidationResult)" href="#weevr.telemetry.ValidationResult">ValidationResult</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Results of pre-write validation rules.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.assertion_results">assertion_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="AssertionResult (weevr.telemetry.results.AssertionResult)" href="#weevr.telemetry.AssertionResult">AssertionResult</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Results of post-write assertions.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.rows_read">rows_read</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Total rows read from sources.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.rows_written">rows_written</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows written to the target.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.rows_quarantined">rows_quarantined</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rows written to the quarantine table.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.rows_after_transforms">rows_after_transforms</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Row count after transforms, before validation.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.load_mode">load_mode</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Load mode used (full, incremental_watermark, etc.).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.watermark_column">watermark_column</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Watermark column name, if applicable.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.watermark_previous_value">watermark_previous_value</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Prior HWM value before this run.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.watermark_new_value">watermark_new_value</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>New HWM value captured during this run.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.watermark_persisted">watermark_persisted</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether watermark state was successfully persisted.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.watermark_first_run">watermark_first_run</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether this was the first run (no prior state).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.cdc_inserts">cdc_inserts</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of CDC insert operations.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.cdc_updates">cdc_updates</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of CDC update operations.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.cdc_deletes">cdc_deletes</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of CDC delete operations.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (thread-level runs).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.audit_columns_applied">audit_columns_applied</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Names of audit columns injected into the output
+DataFrame for this thread.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.export_results">export_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="ExportResult (weevr.telemetry.results.ExportResult)" href="#weevr.telemetry.ExportResult">ExportResult</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-export write results, one per export configured
+on the thread.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.ValidationResult" class="doc doc-heading">
+            <code>ValidationResult</code>
+
+
+<a href="#weevr.telemetry.ValidationResult" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Outcome of a single validation rule evaluation.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ValidationResult.rule_name">rule_name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the validation rule.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ValidationResult.expression">expression</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The Spark SQL expression that was evaluated.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ValidationResult.severity">severity</span></code></td>
+            <td>
+                  <code><span title="weevr.telemetry.results.Severity">Severity</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Severity level of the rule.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ValidationResult.rows_passed">rows_passed</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows that passed the rule.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ValidationResult.rows_failed">rows_failed</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of rows that failed the rule.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ValidationResult.applied">applied</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>False if the rule expression itself errored during evaluation.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.WeaveTelemetry" class="doc doc-heading">
+            <code>WeaveTelemetry</code>
+
+
+<a href="#weevr.telemetry.WeaveTelemetry" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Telemetry data composed into a WeaveResult.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.span">span</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The execution span for this weave.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.thread_telemetry">thread_telemetry</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ThreadTelemetry (weevr.telemetry.results.ThreadTelemetry)" href="#weevr.telemetry.ThreadTelemetry">ThreadTelemetry</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-thread telemetry keyed by thread name.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.hook_results">hook_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Results from pre/post hook step execution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.lookup_results">lookup_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Results from lookup materialization.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.column_set_results">column_set_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Results from column set resolution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.variables">variables</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Final variable values at end of weave execution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTelemetry.resolved_params">resolved_params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Runtime parameter values that drove this execution.
+Populated on the outermost telemetry object only (weave-level runs).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.ExecutionSpan" class="doc doc-heading">
+            <code>ExecutionSpan</code>
+
+
+<a href="#weevr.telemetry.ExecutionSpan" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>OTel-compatible execution span for telemetry.</p>
+<p>Represents a unit of work (thread, weave, or loom execution) with timing,
+status, and key-value metric attributes. Field naming follows OTel Span
+semantic conventions for future export compatibility.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.trace_id">trace_id</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>32-character hex string identifying the execution trace.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.span_id">span_id</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>16-character hex string identifying this span.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.parent_span_id">parent_span_id</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>span_id of the parent span, or None for root spans.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.name">name</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable span name (e.g., "thread:customer_dim").</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.status">status</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SpanStatus (weevr.telemetry.span.SpanStatus)" href="#weevr.telemetry.SpanStatus">SpanStatus</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Outcome status of this span.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.start_time">start_time</span></code></td>
+            <td>
+                  <code><span title="datetime.datetime">datetime</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>UTC timestamp when the span started.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.end_time">end_time</span></code></td>
+            <td>
+                  <code><span title="datetime.datetime">datetime</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>UTC timestamp when the span ended, or None if still open.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.attributes">attributes</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span> | <span title="int">int</span> | <span title="float">float</span> | <span title="bool">bool</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Key-value metric attributes (row counts, durations, etc.).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ExecutionSpan.events">events</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="SpanEvent (weevr.telemetry.span.SpanEvent)" href="#weevr.telemetry.SpanEvent">SpanEvent</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Timestamped events that occurred within this span.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.SpanEvent" class="doc doc-heading">
+            <code>SpanEvent</code>
+
+
+<a href="#weevr.telemetry.SpanEvent" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A timestamped event within a span.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.SpanStatus" class="doc doc-heading">
+            <code>SpanStatus</code>
+
+
+<a href="#weevr.telemetry.SpanStatus" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.StrEnum">StrEnum</span></code></p>
+
+
+
+        <p>Status of an execution span, aligned with OTel conventions.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.LoomTrace" class="doc doc-heading">
+            <code>LoomTrace</code>
+
+
+<a href="#weevr.telemetry.LoomTrace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Trace node for a loom execution — the root of the trace tree.</p>
+<p>Provides both tree-shaped navigation for programmatic access and
+flat span serialization for OTel export.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LoomTrace.span">span</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The execution span for this loom.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.LoomTrace.weaves">weaves</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="WeaveTrace (weevr.telemetry.trace.WeaveTrace)" href="#weevr.telemetry.WeaveTrace">WeaveTrace</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-weave traces keyed by weave name.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.LoomTrace.to_spans" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_spans</span><span class="p">()</span></code>
+
+<a href="#weevr.telemetry.LoomTrace.to_spans" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Recursively flatten the entire trace tree into a span list.</p>
+<p>Returns spans in tree order: loom span, then each weave span followed
+by its thread spans.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.ThreadTrace" class="doc doc-heading">
+            <code>ThreadTrace</code>
+
+
+<a href="#weevr.telemetry.ThreadTrace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Trace node for a single thread execution.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTrace.span">span</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The execution span for this thread.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTrace.telemetry">telemetry</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ThreadTelemetry (weevr.telemetry.results.ThreadTelemetry)" href="#weevr.telemetry.ThreadTelemetry">ThreadTelemetry</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Full telemetry data for the thread.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.ThreadTrace.to_spans" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_spans</span><span class="p">()</span></code>
+
+<a href="#weevr.telemetry.ThreadTrace.to_spans" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return this thread's span as a flat list.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.telemetry.WeaveTrace" class="doc doc-heading">
+            <code>WeaveTrace</code>
+
+
+<a href="#weevr.telemetry.WeaveTrace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Trace node for a weave execution.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTrace.span">span</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionSpan (weevr.telemetry.span.ExecutionSpan)" href="#weevr.telemetry.ExecutionSpan">ExecutionSpan</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The execution span for this weave.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.WeaveTrace.threads">threads</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ThreadTrace (weevr.telemetry.trace.ThreadTrace)" href="#weevr.telemetry.ThreadTrace">ThreadTrace</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-thread traces keyed by thread name.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.telemetry.WeaveTrace.to_spans" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_spans</span><span class="p">()</span></code>
+
+<a href="#weevr.telemetry.WeaveTrace.to_spans" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Flatten weave span and all child thread spans into a list.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.telemetry.create_log_event" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">create_log_event</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">component</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">thread_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">trace_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attributes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.create_log_event" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Create a LogEvent with auto-generated UTC timestamp.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>level</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Log level (INFO, WARNING, ERROR, DEBUG).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>component</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Source component (e.g., "engine.executor").</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional thread context.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional weave context.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional loom context.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>trace_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional trace correlation ID.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>span_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional span correlation ID.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>attributes</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span> | <span title="int">int</span> | <span title="float">float</span> | <span title="bool">bool</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional additional key-value attributes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LogEvent (weevr.telemetry.events.LogEvent)" href="#weevr.telemetry.LogEvent">LogEvent</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Frozen LogEvent instance.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.telemetry.configure_logging" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">configure_logging</span><span class="p">(</span><span class="n">log_level</span><span class="o">=</span><span class="n">LogLevel</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span> <span class="n">logger_name</span><span class="o">=</span><span class="s1">&#39;weevr&#39;</span><span class="p">)</span></code>
+
+<a href="#weevr.telemetry.configure_logging" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Configure a weevr logger with structured JSON output.</p>
+<p>Sets up a logger with a :class:<code>StructuredJsonFormatter</code> handler at the
+appropriate Python logging level based on the weevr :class:<code>LogLevel</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>log_level</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LogLevel (weevr.model.execution.LogLevel)" href="#weevr.telemetry.LogLevel">LogLevel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>weevr log level to configure.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="weevr.model.execution.LogLevel.STANDARD">STANDARD</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>logger_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the logger to configure.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;weevr&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="logging.Logger">Logger</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Configured logger instance.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.telemetry.generate_span_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">generate_span_id</span><span class="p">()</span></code>
+
+<a href="#weevr.telemetry.generate_span_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Generate a 16-character hex span ID (OTel convention).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.telemetry.generate_trace_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">generate_trace_id</span><span class="p">()</span></code>
+
+<a href="#weevr.telemetry.generate_trace_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Generate a 32-character hex trace ID (OTel convention).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
