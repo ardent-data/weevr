@@ -42,7 +42,7 @@ only prevents `cache: false` suppression. It does **not** force caching for
 threads with fewer than two dependents.
 
 If you need a thread's output to be shared across multiple consumers, use
-[weave-level lookups](#step-4----use-weave-level-lookups) instead.
+[weave-level lookups](#weave-level-lookups) instead.
 
 ## Step 3 -- Disable caching for a thread
 
@@ -70,7 +70,7 @@ This overrides the engine's auto-cache decision for that specific thread.
 - **Scope:** Caching operates within a single weave execution. Cached
   DataFrames do not persist across weave boundaries or Spark sessions.
 
-## Step 4 -- Use weave-level lookups
+## Step 4 - Use weave-level lookups {#weave-level-lookups}
 
 ```d2
 direction: down

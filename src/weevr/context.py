@@ -345,6 +345,7 @@ class Context:
                 post_steps=list(model.post_steps) if model.post_steps else None,
                 lookups=dict(model.lookups) if model.lookups else None,
                 variables=dict(model.variables) if model.variables else None,
+                column_set_defs=dict(model.column_sets) if model.column_sets else None,
             )
             assert engine_result.status in ("success", "failure", "partial")
             result = RunResult(

@@ -55,6 +55,7 @@ class WeaveConfig(BaseConfig):
     defaults: dict[str, Any] | None = None
     execution: dict[str, Any] | None = None
     lookups: dict[str, Any] | None = None
+    column_sets: dict[str, Any] | None = None
     variables: dict[str, Any] | None = None
     pre_steps: list[dict[str, Any]] | None = None
     post_steps: list[dict[str, Any]] | None = None
@@ -66,6 +67,7 @@ class LoomConfig(BaseConfig):
     weaves: list[str | dict[str, Any]]
     defaults: dict[str, Any] | None = None
     execution: dict[str, Any] | None = None
+    column_sets: dict[str, Any] | None = None
 
 
 def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:

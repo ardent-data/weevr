@@ -1212,3 +1212,167 @@ class TestWeaveVariableIntegration:
         assert result.status == "success"
         assert result.telemetry is not None
         assert result.telemetry.variables == {"batch": "B001"}
+
+
+# ---------------------------------------------------------------------------
+# column_sets cascade tests (loom → weave inheritance)
+# ---------------------------------------------------------------------------
+
+
+class TestColumnSetsCascade:
+    """Test that column_sets defined at loom level cascade to weaves."""
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_column_sets_forwarded_when_weave_has_none(self, mock_exec):
+        """Weave with no column_sets receives loom-level definitions."""
+        from weevr.model.column_set import ColumnSet, ColumnSetSource
+
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.sap_map"),
+        )
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "column_sets": {"sap": loom_cs.model_dump()},
+            }
+        )
+        weaves = {
+            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_exec.call_args.kwargs
+        merged = call_kwargs.get("column_set_defs")
+        assert merged is not None
+        assert "sap" in merged
+        assert merged["sap"] == loom_cs
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_weave_column_sets_override_loom(self, mock_exec):
+        """Weave-level column_sets win over loom-level for the same key."""
+        from weevr.model.column_set import ColumnSet, ColumnSetSource
+
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.loom_map"),
+        )
+        weave_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.weave_map"),
+        )
+
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "column_sets": {"sap": loom_cs.model_dump()},
+            }
+        )
+        weaves = {
+            "w1": Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "name": "w1",
+                    "threads": ["t1"],
+                    "column_sets": {"sap": weave_cs.model_dump()},
+                }
+            )
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_exec.call_args.kwargs
+        merged = call_kwargs.get("column_set_defs")
+        assert merged is not None
+        assert "sap" in merged
+        # Weave definition wins
+        assert merged["sap"] == weave_cs
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_and_weave_column_sets_merged(self, mock_exec):
+        """Loom and weave column_sets with different keys are merged together."""
+        from weevr.model.column_set import ColumnSet, ColumnSetSource
+
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.sap_map"),
+        )
+        weave_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.erp_map"),
+        )
+
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "column_sets": {"sap": loom_cs.model_dump()},
+            }
+        )
+        weaves = {
+            "w1": Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "name": "w1",
+                    "threads": ["t1"],
+                    "column_sets": {"erp": weave_cs.model_dump()},
+                }
+            )
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_exec.call_args.kwargs
+        merged = call_kwargs.get("column_set_defs")
+        assert merged is not None
+        assert "sap" in merged
+        assert "erp" in merged
+        assert merged["sap"] == loom_cs
+        assert merged["erp"] == weave_cs
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_no_column_sets_passes_none(self, mock_exec):
+        """When neither loom nor weave define column_sets, None is forwarded."""
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        weaves = {
+            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_exec.call_args.kwargs
+        assert call_kwargs.get("column_set_defs") is None

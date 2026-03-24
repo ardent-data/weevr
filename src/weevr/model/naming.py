@@ -1,8 +1,10 @@
 """Naming normalization models."""
 
 from enum import StrEnum
+from typing import Literal
 
 from weevr.model.base import FrozenBase
+from weevr.model.column_set import ReservedWordConfig
 
 
 class NamingPattern(StrEnum):
@@ -17,6 +19,7 @@ class NamingPattern(StrEnum):
         TITLE_CASE: ``Http Status``
         LOWERCASE: ``httpstatus``
         UPPERCASE: ``HTTPSTATUS``
+        KEBAB_CASE: ``http-status``
         NONE: Opt-out sentinel — no normalization applied.
     """
 
@@ -28,6 +31,7 @@ class NamingPattern(StrEnum):
     TITLE_CASE = "Title Case"
     LOWERCASE = "lowercase"
     UPPERCASE = "UPPERCASE"
+    KEBAB_CASE = "kebab-case"
     NONE = "none"
 
 
@@ -38,8 +42,15 @@ class NamingConfig(FrozenBase):
         columns: Pattern to apply to column names. None means inherit from parent.
         tables: Pattern to apply to table names. None means inherit from parent.
         exclude: Glob patterns or explicit names to exclude from column normalization.
+        on_collision: Behaviour when two columns normalise to the same name.
+            ``"suffix"`` appends a numeric suffix to the later column; ``"error"``
+            aborts with a validation error.
+        reserved_words: Optional configuration for handling SQL reserved word
+            collisions in column names. None means no reserved word handling.
     """
 
     columns: NamingPattern | None = None
     tables: NamingPattern | None = None
     exclude: list[str] = []
+    on_collision: Literal["suffix", "error"] = "error"
+    reserved_words: ReservedWordConfig | None = None

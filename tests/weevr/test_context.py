@@ -622,3 +622,63 @@ class TestPreviewMode:
 
         assert result.preview_data is not None
         assert result.preview_data["prev3"].count() <= 50
+
+
+@pytest.mark.spark
+class TestColumnSetWiring:
+    """Smoke tests verifying column_sets flow through Context.run() to the engine."""
+
+    def test_param_sourced_column_set_rename(self, spark: SparkSession, tmp_path: Path) -> None:
+        """A param-backed column_set declared on a weave renames columns end-to-end."""
+        src = str(tmp_path / "src_cs")
+        tgt = str(tmp_path / "tgt_cs")
+        spark.createDataFrame([{"old_col": 1, "other": 2}]).write.format("delta").save(src)
+
+        project = _project_dir(tmp_path)
+
+        # Thread with a rename step that references a column set by name
+        thread_dir = project / "threads"
+        thread_dir.mkdir(parents=True, exist_ok=True)
+        thread_file = thread_dir / "cs_thread.thread"
+        thread_file.write_text(f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{src}"
+steps:
+  - rename:
+      column_set: my_mapping
+target:
+  path: "{tgt}"
+write:
+  mode: overwrite
+""")
+
+        # Weave with a param-sourced column_set definition
+        weave_dir = project / "weaves"
+        weave_dir.mkdir(parents=True, exist_ok=True)
+        weave_file = weave_dir / "cs_weave.weave"
+        weave_file.write_text("""\
+config_version: "1.0"
+column_sets:
+  my_mapping:
+    param: col_map
+threads:
+  - ref: "threads/cs_thread.thread"
+""")
+
+        # Runtime params supply the mapping dict
+        ctx = Context(
+            spark=spark,
+            project=project,
+            params={"col_map": {"old_col": "new_col"}},
+        )
+        result = ctx.run(weave_file)
+
+        assert result.status == "success", result.warnings
+        assert result.config_type == "weave"
+
+        output = spark.read.format("delta").load(tgt)
+        assert "new_col" in output.columns
+        assert "old_col" not in output.columns

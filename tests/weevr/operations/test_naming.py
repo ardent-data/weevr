@@ -92,6 +92,25 @@ class TestNormalizeNamePatterns:
     def test_none_passthrough(self):
         assert normalize_name("HTTPStatus", NamingPattern.NONE) == "HTTPStatus"
 
+    def test_kebab_case(self):
+        assert normalize_name("HTTPStatus", NamingPattern.KEBAB_CASE) == "http-status"
+
+
+class TestKebabCase:
+    """Test kebab-case normalization."""
+
+    def test_snake_input(self):
+        assert normalize_name("http_status", NamingPattern.KEBAB_CASE) == "http-status"
+
+    def test_pascal_acronym_input(self):
+        assert normalize_name("HTTPStatus", NamingPattern.KEBAB_CASE) == "http-status"
+
+    def test_multi_word_snake(self):
+        assert normalize_name("my_column_name", NamingPattern.KEBAB_CASE) == "my-column-name"
+
+    def test_already_kebab(self):
+        assert normalize_name("already-kebab", NamingPattern.KEBAB_CASE) == "already-kebab"
+
 
 class TestNormalizeNameEdgeCases:
     """Test edge cases across patterns."""
@@ -224,3 +243,193 @@ class TestNormalizeColumnsSpark:
         row = result.collect()[0]
         assert row["user_id"] == 1
         assert row["user_name"] == "alice"
+
+    def test_kebab_case_logs_warning(self, spark, caplog):
+        import logging
+
+        df = spark.createDataFrame([(1,)], ["myColumn"])
+        config = NamingConfig(columns=NamingPattern.KEBAB_CASE)
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.naming"):
+            normalize_columns(df, config)
+        messages = " ".join(caplog.messages)
+        assert "backtick" in messages or "kebab-case" in messages
+
+    def test_on_collision_error_raises(self, spark):
+        # httpStatus and http_status both normalise to http_status
+        df = spark.createDataFrame([(1, 2)], ["httpStatus", "http_status"])
+        config = NamingConfig(columns=NamingPattern.SNAKE_CASE, on_collision="error")
+        with pytest.raises(ConfigError, match="duplicate"):
+            normalize_columns(df, config)
+
+    def test_on_collision_suffix_two_way(self, spark):
+        # httpStatus and http_status both normalise to http_status; second gets _2
+        df = spark.createDataFrame([(1, 2)], ["httpStatus", "http_status"])
+        config = NamingConfig(columns=NamingPattern.SNAKE_CASE, on_collision="suffix")
+        result = normalize_columns(df, config)
+        assert result.columns == ["http_status", "http_status_2"]
+
+    def test_on_collision_suffix_three_way(self, spark):
+        # Three columns normalising to the same base name
+        df = spark.createDataFrame([(1, 2, 3)], ["httpStatus", "http_status", "Http_Status"])
+        config = NamingConfig(columns=NamingPattern.SNAKE_CASE, on_collision="suffix")
+        result = normalize_columns(df, config)
+        assert result.columns == ["http_status", "http_status_2", "http_status_3"]
+
+    def test_on_collision_suffix_data_preserved(self, spark):
+        df = spark.createDataFrame([(10, 20)], ["httpStatus", "http_status"])
+        config = NamingConfig(columns=NamingPattern.SNAKE_CASE, on_collision="suffix")
+        result = normalize_columns(df, config)
+        row = result.collect()[0]
+        assert row["http_status"] == 10
+        assert row["http_status_2"] == 20
+
+    def test_on_collision_excluded_columns_not_in_dedup(self, spark):
+        # Excluded column keeps its original name even if it matches a normalised name
+        df = spark.createDataFrame([(1, 2)], ["http_status", "httpStatus"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            on_collision="suffix",
+            exclude=["http_status"],
+        )
+        result = normalize_columns(df, config)
+        # http_status is excluded (identity rename), httpStatus normalises to http_status
+        # They produce a collision — the non-excluded second occurrence gets _2
+        assert result.columns == ["http_status", "http_status_2"]
+
+
+@pytest.mark.spark
+class TestNormalizeColumnsReservedWords:
+    """Test reserved word protection in normalize_columns."""
+
+    def test_prefix_strategy_default_prefix(self, spark):
+        # "select" is a reserved word; default prefix is "_"
+        df = spark.createDataFrame([(1,)], ["select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_select"]
+
+    def test_prefix_strategy_custom_prefix(self, spark):
+        # Custom prefix "col_" applied to reserved word
+        df = spark.createDataFrame([(1,)], ["select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", prefix="col_"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["col_select"]
+
+    def test_quote_strategy_passthrough(self, spark):
+        # "quote" strategy leaves the name unchanged (Spark handles quoting)
+        df = spark.createDataFrame([(1,)], ["select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="quote"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select"]
+
+    def test_error_strategy_raises(self, spark):
+        # "error" strategy raises ConfigError listing conflicting names
+        df = spark.createDataFrame([(1,)], ["from"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="error"),
+        )
+        with pytest.raises(ConfigError, match="from"):
+            normalize_columns(df, config)
+
+    def test_extend_adds_custom_word(self, spark):
+        # "custom_word" is not a standard reserved word but added via extend
+        df = spark.createDataFrame([(1,)], ["custom_word"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", extend=["custom_word"]),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_custom_word"]
+
+    def test_exclude_removes_reserved_word(self, spark):
+        # "to" is excluded from reserved word check — passes through without prefix
+        df = spark.createDataFrame([(1,)], ["to"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.NONE,
+            reserved_words=ReservedWordConfig(strategy="prefix", exclude=["to"]),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["to"]
+
+    def test_non_reserved_word_unaffected(self, spark):
+        # "amount" is not a reserved word; no transformation
+        df = spark.createDataFrame([(1,)], ["amount"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["amount"]
+
+    def test_no_reserved_words_config_no_change(self, spark):
+        # reserved_words=None means no protection applied
+        df = spark.createDataFrame([(1,)], ["select"])
+        config = NamingConfig(columns=NamingPattern.SNAKE_CASE)
+        result = normalize_columns(df, config)
+        assert result.columns == ["select"]
+
+    def test_error_strategy_collects_multiple(self, spark):
+        # Multiple reserved words trigger a single error listing all conflicts
+        df = spark.createDataFrame([(1, 2)], ["select", "from"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="error"),
+        )
+        with pytest.raises(ConfigError) as exc_info:
+            normalize_columns(df, config)
+        message = str(exc_info.value)
+        assert "select" in message
+        assert "from" in message
+
+
+@pytest.mark.spark
+class TestNormalizeColumnsFullPipeline:
+    """End-to-end test covering normalize → dedup → reserved stages in sequence."""
+
+    def test_full_pipeline_order(self, spark):
+        # Columns as if rename has already been applied upstream.
+        # "http_status" and "HttpStatus" both normalise to "http_status" → dedup gives _2.
+        # "select" is a reserved word → prefix strategy prepends "_".
+        from weevr.model.column_set import ReservedWordConfig
+
+        columns = ["company_code", "sales_org", "http_status", "HttpStatus", "select"]
+        df = spark.createDataFrame([(1, 2, 3, 4, 5)], columns)
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            on_collision="suffix",
+            reserved_words=ReservedWordConfig(strategy="prefix", prefix="_"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == [
+            "company_code",
+            "sales_org",
+            "http_status",
+            "http_status_2",
+            "_select",
+        ]

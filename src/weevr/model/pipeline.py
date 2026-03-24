@@ -135,9 +135,16 @@ class DropParams(FrozenBase):
 
 
 class RenameParams(FrozenBase):
-    """Parameters for the rename step."""
+    """Parameters for the rename step.
 
-    columns: dict[str, str]
+    ``columns`` maps old column names to new names for static renames.
+    ``column_set`` names a pre-declared column set whose entries are merged
+    at execution time, allowing shared rename dictionaries to be reused
+    across pipelines.
+    """
+
+    columns: dict[str, str] = {}
+    column_set: str | None = None
 
 
 class CastParams(FrozenBase):
