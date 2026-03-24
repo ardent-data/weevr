@@ -29,7 +29,7 @@
         "source=${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | bash && uv sync --dev",
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | bash && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && uv sync --dev",
 
     // Keep the venv current on every container start (not just first create).
     "postStartCommand": "uv sync",
