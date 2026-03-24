@@ -2438,6 +2438,13 @@ runtime settings that cascade down through weaves to threads.</p>
 <td><code>null</code></td>
 <td>Naming normalization cascaded to weaves and threads</td>
 </tr>
+<tr>
+<td><code>column_sets</code></td>
+<td><code>dict[string, ColumnSet]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. See <a href="../weave/#column_sets">Weave schema: column_sets</a> for field details.</td>
+</tr>
 </tbody>
 </table>
 <hr />

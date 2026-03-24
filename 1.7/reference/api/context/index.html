@@ -7258,7 +7258,7 @@ File paths contain slashes or URI schemes (<code>://</code>).</p>
 
 
 <h3 id="weevr.context.execute_thread" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_thread" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7447,6 +7447,42 @@ provided. Falls back to empty string if no dot separator exists.</p>
             </td>
             <td>
                   <code>&#39;&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_sets</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-resolved column set mappings keyed by name. Passed
+through to <code>run_pipeline</code> so rename steps can look up their
+resolved dictionaries.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_set_defs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ColumnSet (weevr.model.column_set.ColumnSet)" href="../model/#weevr.model.ColumnSet">ColumnSet</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column set model instances keyed by name. Passed
+through to <code>run_pipeline</code> so rename steps can read
+<code>on_unmapped</code> and <code>on_extra</code> settings.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -7845,7 +7881,7 @@ and passes it through the execution tree.</p>
 
 
 <h3 id="weevr.context.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -8111,6 +8147,24 @@ instead of <code>plan.weave_name</code>. Typically the weave's qualified key.</p
             </td>
             <td>
                   <code>&#39;&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_set_defs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ColumnSet (weevr.model.column_set.ColumnSet)" href="../model/#weevr.model.ColumnSet">ColumnSet</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Merged column set definitions (loom-level merged with
+weave-level, weave wins) to be materialized and forwarded to each
+thread for rename step resolution.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -9411,6 +9465,17 @@ on the thread.</p>
             <td>
               <div class="doc-md-description">
                 <p>Results from lookup materialization.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.WeaveTelemetry.column_set_results">column_set_results</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Results from column set resolution.</p>
               </div>
             </td>
           </tr>

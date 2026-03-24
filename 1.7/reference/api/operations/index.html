@@ -3880,7 +3880,7 @@ change detection spec.</p>
 
 
 <h3 id="weevr.operations.run_pipeline" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">run_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">sources</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">run_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.run_pipeline" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -3956,6 +3956,42 @@ join and union steps that reference secondary sources.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_sets</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-resolved column set mappings keyed by name. When a
+rename step references a column set, the resolved dict is looked up
+here and passed to <code>apply_rename</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>column_set_defs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ColumnSet (weevr.model.column_set.ColumnSet)" href="../model/#weevr.model.ColumnSet">ColumnSet</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column set model instances keyed by name. Used to read
+<code>on_unmapped</code> and <code>on_extra</code> behaviour settings for rename steps
+that reference a column set.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>

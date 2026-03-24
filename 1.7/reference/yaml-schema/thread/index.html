@@ -3533,7 +3533,9 @@ where the key identifies the step type. weevr supports 19 step types.</p>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">temp_flag</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">_raw_payload</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <h3 id="rename">rename<a class="headerlink" href="#rename" title="Permanent link">&para;</a></h3>
-<p>Rename columns.</p>
+<p>Rename columns. Supports both static mappings and named column set
+references. When both <code>column_set</code> and <code>columns</code> are specified,
+static entries in <code>columns</code> override matching column set entries.</p>
 <table>
 <thead>
 <tr>
@@ -3548,16 +3550,30 @@ where the key identifies the step type. weevr supports 19 step types.</p>
 <tr>
 <td><code>columns</code></td>
 <td><code>dict[string, string]</code></td>
-<td>yes</td>
-<td>--</td>
+<td>no</td>
+<td><code>{}</code></td>
 <td>Map of old name to new name</td>
+</tr>
+<tr>
+<td><code>column_set</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Name of a column set defined at weave or loom level</td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">      </span><span class="nt">cust_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">amt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">amount</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Static rename only</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">cust_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">amt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">amount</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Column set with static overrides</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="nt">column_set</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sap_dictionary</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">      </span><span class="nt">MANUAL_COL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manual_override</span><span class="w">  </span><span class="c1"># static wins</span>
 </code></pre></div>
 <h3 id="cast">cast<a class="headerlink" href="#cast" title="Permanent link">&para;</a></h3>
 <p>Change column data types.</p>
@@ -4268,10 +4284,25 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 <td><code>[]</code></td>
 <td>Column names or glob patterns to exclude from normalization</td>
 </tr>
+<tr>
+<td><code>on_collision</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"error"</code></td>
+<td>Behavior when normalization produces duplicate names: <code>"error"</code> or <code>"suffix"</code></td>
+</tr>
+<tr>
+<td><code>reserved_words</code></td>
+<td><code>ReservedWordConfig</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Reserved word protection. See <a href="../weave/#naming-namingconfig">Weave schema: naming</a> for details.</td>
+</tr>
 </tbody>
 </table>
-<p>Supported patterns: <code>snake_case</code>, <code>camelCase</code>, <code>PascalCase</code>, <code>UPPER_SNAKE_CASE</code>,
-<code>Title_Snake_Case</code>, <code>Title Case</code>, <code>lowercase</code>, <code>UPPERCASE</code>, <code>none</code>.</p>
+<p>Supported patterns: <code>snake_case</code>, <code>camelCase</code>, <code>PascalCase</code>,
+<code>UPPER_SNAKE_CASE</code>, <code>Title_Snake_Case</code>, <code>Title Case</code>, <code>lowercase</code>,
+<code>UPPERCASE</code>, <code>kebab-case</code>, <code>none</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">target</span><span class="p">:</span>
 <a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
 <a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
