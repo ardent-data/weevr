@@ -67,6 +67,10 @@ def _uppercase(tokens: list[str]) -> str:
     return "".join(t.upper() for t in tokens)
 
 
+def _kebab_case(tokens: list[str]) -> str:
+    return "-".join(tokens)
+
+
 _PATTERN_FUNCS = {
     NamingPattern.SNAKE_CASE: _snake_case,
     NamingPattern.CAMEL_CASE: _camel_case,
@@ -76,6 +80,7 @@ _PATTERN_FUNCS = {
     NamingPattern.TITLE_CASE: _title_case,
     NamingPattern.LOWERCASE: _lowercase,
     NamingPattern.UPPERCASE: _uppercase,
+    NamingPattern.KEBAB_CASE: _kebab_case,
 }
 
 

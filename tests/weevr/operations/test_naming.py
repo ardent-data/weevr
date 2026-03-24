@@ -92,6 +92,25 @@ class TestNormalizeNamePatterns:
     def test_none_passthrough(self):
         assert normalize_name("HTTPStatus", NamingPattern.NONE) == "HTTPStatus"
 
+    def test_kebab_case(self):
+        assert normalize_name("HTTPStatus", NamingPattern.KEBAB_CASE) == "http-status"
+
+
+class TestKebabCase:
+    """Test kebab-case normalization."""
+
+    def test_snake_input(self):
+        assert normalize_name("http_status", NamingPattern.KEBAB_CASE) == "http-status"
+
+    def test_pascal_acronym_input(self):
+        assert normalize_name("HTTPStatus", NamingPattern.KEBAB_CASE) == "http-status"
+
+    def test_multi_word_snake(self):
+        assert normalize_name("my_column_name", NamingPattern.KEBAB_CASE) == "my-column-name"
+
+    def test_already_kebab(self):
+        assert normalize_name("already-kebab", NamingPattern.KEBAB_CASE) == "already-kebab"
+
 
 class TestNormalizeNameEdgeCases:
     """Test edge cases across patterns."""
