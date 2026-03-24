@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.7/" class="md-tabs__link">
+        <a href="../../../release-notes/1.8/" class="md-tabs__link">
           
   
   
@@ -1396,6 +1396,28 @@
     <span class="md-ellipsis">
       
         WeaveEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.NamingConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NamingConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.NamingPattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NamingPattern
       
     </span>
   </a>
@@ -2529,6 +2551,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.7/" class="md-nav__link">
         
   
@@ -3051,6 +3101,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.model.NamingConfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NamingConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.NamingPattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NamingPattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.model.ParamsConfig" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3555,7 +3627,7 @@ strings.</p>
 
 
 <h3 id="weevr.model.__all__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Thread&#39;</span><span class="p">,</span> <span class="s1">&#39;Weave&#39;</span><span class="p">,</span> <span class="s1">&#39;Loom&#39;</span><span class="p">,</span> <span class="s1">&#39;FailureConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ThreadEntry&#39;</span><span class="p">,</span> <span class="s1">&#39;ConditionSpec&#39;</span><span class="p">,</span> <span class="s1">&#39;WeaveEntry&#39;</span><span class="p">,</span> <span class="s1">&#39;Source&#39;</span><span class="p">,</span> <span class="s1">&#39;DedupConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;Target&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnMapping&#39;</span><span class="p">,</span> <span class="s1">&#39;Step&#39;</span><span class="p">,</span> <span class="s1">&#39;FilterStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DeriveStep&#39;</span><span class="p">,</span> <span class="s1">&#39;JoinStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SelectStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DropStep&#39;</span><span class="p">,</span> <span class="s1">&#39;RenameStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CastStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DedupStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SortStep&#39;</span><span class="p">,</span> <span class="s1">&#39;UnionStep&#39;</span><span class="p">,</span> <span class="s1">&#39;AggregateStep&#39;</span><span class="p">,</span> <span class="s1">&#39;WindowStep&#39;</span><span class="p">,</span> <span class="s1">&#39;PivotStep&#39;</span><span class="p">,</span> <span class="s1">&#39;UnpivotStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CaseWhenStep&#39;</span><span class="p">,</span> <span class="s1">&#39;FillNullStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CoalesceStep&#39;</span><span class="p">,</span> <span class="s1">&#39;StringOpsStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DateOpsStep&#39;</span><span class="p">,</span> <span class="s1">&#39;KeyConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;SurrogateKeyConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ChangeDetectionConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;WriteConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationRule&#39;</span><span class="p">,</span> <span class="s1">&#39;Assertion&#39;</span><span class="p">,</span> <span class="s1">&#39;LoadConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ParamSpec&#39;</span><span class="p">,</span> <span class="s1">&#39;ParamsConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;Export&#39;</span><span class="p">,</span> <span class="s1">&#39;ExecutionConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;LogLevel&#39;</span><span class="p">,</span> <span class="s1">&#39;SparkExpr&#39;</span><span class="p">,</span> <span class="s1">&#39;HookStep&#39;</span><span class="p">,</span> <span class="s1">&#39;QualityGateStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SqlStatementStep&#39;</span><span class="p">,</span> <span class="s1">&#39;LogMessageStep&#39;</span><span class="p">,</span> <span class="s1">&#39;Lookup&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnSet&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnSetSource&#39;</span><span class="p">,</span> <span class="s1">&#39;ReservedWordConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;VariableSpec&#39;</span><span class="p">]</span></code>
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Thread&#39;</span><span class="p">,</span> <span class="s1">&#39;Weave&#39;</span><span class="p">,</span> <span class="s1">&#39;Loom&#39;</span><span class="p">,</span> <span class="s1">&#39;FailureConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ThreadEntry&#39;</span><span class="p">,</span> <span class="s1">&#39;ConditionSpec&#39;</span><span class="p">,</span> <span class="s1">&#39;WeaveEntry&#39;</span><span class="p">,</span> <span class="s1">&#39;Source&#39;</span><span class="p">,</span> <span class="s1">&#39;DedupConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;Target&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnMapping&#39;</span><span class="p">,</span> <span class="s1">&#39;Step&#39;</span><span class="p">,</span> <span class="s1">&#39;FilterStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DeriveStep&#39;</span><span class="p">,</span> <span class="s1">&#39;JoinStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SelectStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DropStep&#39;</span><span class="p">,</span> <span class="s1">&#39;RenameStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CastStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DedupStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SortStep&#39;</span><span class="p">,</span> <span class="s1">&#39;UnionStep&#39;</span><span class="p">,</span> <span class="s1">&#39;AggregateStep&#39;</span><span class="p">,</span> <span class="s1">&#39;WindowStep&#39;</span><span class="p">,</span> <span class="s1">&#39;PivotStep&#39;</span><span class="p">,</span> <span class="s1">&#39;UnpivotStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CaseWhenStep&#39;</span><span class="p">,</span> <span class="s1">&#39;FillNullStep&#39;</span><span class="p">,</span> <span class="s1">&#39;CoalesceStep&#39;</span><span class="p">,</span> <span class="s1">&#39;StringOpsStep&#39;</span><span class="p">,</span> <span class="s1">&#39;DateOpsStep&#39;</span><span class="p">,</span> <span class="s1">&#39;KeyConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;SurrogateKeyConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ChangeDetectionConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;WriteConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationRule&#39;</span><span class="p">,</span> <span class="s1">&#39;Assertion&#39;</span><span class="p">,</span> <span class="s1">&#39;LoadConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;ParamSpec&#39;</span><span class="p">,</span> <span class="s1">&#39;ParamsConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;Export&#39;</span><span class="p">,</span> <span class="s1">&#39;ExecutionConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;LogLevel&#39;</span><span class="p">,</span> <span class="s1">&#39;SparkExpr&#39;</span><span class="p">,</span> <span class="s1">&#39;HookStep&#39;</span><span class="p">,</span> <span class="s1">&#39;QualityGateStep&#39;</span><span class="p">,</span> <span class="s1">&#39;SqlStatementStep&#39;</span><span class="p">,</span> <span class="s1">&#39;LogMessageStep&#39;</span><span class="p">,</span> <span class="s1">&#39;Lookup&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnSet&#39;</span><span class="p">,</span> <span class="s1">&#39;ColumnSetSource&#39;</span><span class="p">,</span> <span class="s1">&#39;ReservedWordConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;NamingConfig&#39;</span><span class="p">,</span> <span class="s1">&#39;NamingPattern&#39;</span><span class="p">,</span> <span class="s1">&#39;VariableSpec&#39;</span><span class="p">]</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
@@ -5384,6 +5456,288 @@ Mutually exclusive with inline definition (name + body).</p>
             <td>
               <div class="doc-md-description">
                 <p>Optional condition for conditional execution.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.NamingConfig" class="doc doc-heading">
+            <code>NamingConfig</code>
+
+
+<a href="#weevr.model.NamingConfig" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>Configuration for naming normalization.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingConfig.columns">columns</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="NamingPattern (weevr.model.naming.NamingPattern)" href="#weevr.model.NamingPattern">NamingPattern</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pattern to apply to column names. None means inherit from parent.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingConfig.tables">tables</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="NamingPattern (weevr.model.naming.NamingPattern)" href="#weevr.model.NamingPattern">NamingPattern</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pattern to apply to table names. None means inherit from parent.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingConfig.exclude">exclude</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Glob patterns or explicit names to exclude from column normalization.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingConfig.on_collision">on_collision</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;suffix&#39;, &#39;error&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Behaviour when two columns normalise to the same name.
+<code>"suffix"</code> appends a numeric suffix to the later column; <code>"error"</code>
+aborts with a validation error.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingConfig.reserved_words">reserved_words</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ReservedWordConfig (weevr.model.column_set.ReservedWordConfig)" href="#weevr.model.ReservedWordConfig">ReservedWordConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional configuration for handling SQL reserved word
+collisions in column names. None means no reserved word handling.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.model.NamingPattern" class="doc doc-heading">
+            <code>NamingPattern</code>
+
+
+<a href="#weevr.model.NamingPattern" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.StrEnum">StrEnum</span></code></p>
+
+
+
+        <p>Column and table naming patterns.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.SNAKE_CASE">SNAKE_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>http_status</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.CAMEL_CASE">CAMEL_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>httpStatus</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.PASCAL_CASE">PASCAL_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>HttpStatus</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.UPPER_SNAKE_CASE">UPPER_SNAKE_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>HTTP_STATUS</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.TITLE_SNAKE_CASE">TITLE_SNAKE_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>Http_Status</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.TITLE_CASE">TITLE_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>Http Status</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.LOWERCASE">LOWERCASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>httpstatus</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.UPPERCASE">UPPERCASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>HTTPSTATUS</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.KEBAB_CASE">KEBAB_CASE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>http-status</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.NamingPattern.NONE">NONE</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Opt-out sentinel — no normalization applied.</p>
               </div>
             </td>
           </tr>
