@@ -265,10 +265,17 @@ depends on what was executed:
   **watermark_new_value** -- Watermark state for incremental loads
 - **cdc_inserts**, **cdc_updates**, **cdc_deletes** -- CDC operation
   counts
-- **audit_columns_applied** -- Names of audit columns injected into the
-  output
-- **export_results** -- Per-export write results (`ExportResult` list with
-  name, type, target, rows_written, duration_ms, status, error)
+- **rows_after_transforms** -- Row count after pipeline transforms,
+  before validation
+- **audit_columns_applied** -- Names of audit columns injected
+  into the output
+- **export_results** -- Per-export write results (`ExportResult`
+  list with name, type, target, rows_written, duration_ms,
+  status, error)
+- **watermark_persisted** -- Whether the watermark was
+  successfully persisted after write
+- **watermark_first_run** -- Whether this is the first run with
+  no prior watermark state
 
 ### Weave telemetry fields
 
