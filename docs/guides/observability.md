@@ -249,7 +249,7 @@ depends on what was executed:
 | Config type | Telemetry type     | Contents |
 |-------------|--------------------|----------|
 | Thread      | `ThreadTelemetry`  | Span, validation/assertion results, row counts, watermark state |
-| Weave       | `WeaveTelemetry`   | Span, per-thread telemetry keyed by thread name |
+| Weave       | `WeaveTelemetry`   | Span, per-thread telemetry, column set results, lookup results |
 | Loom        | `LoomTelemetry`    | Span, per-weave telemetry keyed by weave name |
 
 ### Thread telemetry fields
@@ -269,6 +269,20 @@ depends on what was executed:
   output
 - **export_results** -- Per-export write results (`ExportResult` list with
   name, type, target, rows_written, duration_ms, status, error)
+
+### Weave telemetry fields
+
+`WeaveTelemetry` includes:
+
+- **span** -- The weave's execution span
+- **thread_telemetry** -- Per-thread telemetry keyed by thread name
+- **hook_results** -- Pre/post hook step outcomes
+- **lookup_results** -- Lookup materialization outcomes
+- **column_set_results** -- Column set resolution outcomes
+  (`ColumnSetResult` list with name, source_type,
+  mappings_loaded, skipped)
+- **variables** -- Final variable values
+- **resolved_params** -- Runtime parameter values
 
 ### Accessing telemetry
 

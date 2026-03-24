@@ -154,17 +154,27 @@ Remove columns from the DataFrame.
 
 ### rename
 
-Rename columns.
+Rename columns. Supports both static mappings and named column set
+references. When both `column_set` and `columns` are specified,
+static entries in `columns` override matching column set entries.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `columns` | `dict[string, string]` | yes | -- | Map of old name to new name |
+| `columns` | `dict[string, string]` | no | `{}` | Map of old name to new name |
+| `column_set` | `string` | no | `null` | Name of a column set defined at weave or loom level |
 
 ```yaml
+# Static rename only
 - rename:
     columns:
       cust_id: customer_id
       amt: amount
+
+# Column set with static overrides
+- rename:
+    column_set: sap_dictionary
+    columns:
+      MANUAL_COL: manual_override  # static wins
 ```
 
 ### cast
@@ -444,9 +454,12 @@ Defines where the thread writes its output.
 | `columns` | `NamingPattern` | no | `null` | Pattern for column names |
 | `tables` | `NamingPattern` | no | `null` | Pattern for table names |
 | `exclude` | `list[string]` | no | `[]` | Column names or glob patterns to exclude from normalization |
+| `on_collision` | `string` | no | `"error"` | Behavior when normalization produces duplicate names: `"error"` or `"suffix"` |
+| `reserved_words` | `ReservedWordConfig` | no | `null` | Reserved word protection. See [Weave schema: naming](../yaml-schema/weave.md#naming-namingconfig) for details. |
 
-Supported patterns: `snake_case`, `camelCase`, `PascalCase`, `UPPER_SNAKE_CASE`,
-`Title_Snake_Case`, `Title Case`, `lowercase`, `UPPERCASE`, `none`.
+Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
+`UPPER_SNAKE_CASE`, `Title_Snake_Case`, `Title Case`, `lowercase`,
+`UPPERCASE`, `kebab-case`, `none`.
 
 ```yaml
 target:

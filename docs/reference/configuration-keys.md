@@ -43,11 +43,13 @@ orchestration: Orchestration {
     pre_steps: "list[HookStep]"
     post_steps: "list[HookStep]"
     variables: "dict[str, VariableSpec]"
+    column_sets: "dict[str, ColumnSet]"
   }
   Loom: Loom {
     shape: class
     weaves: "list[WeaveEntry]"
     defaults: dict
+    column_sets: "dict[str, ColumnSet]"
   }
   Loom -> Weave: "1..*" {style.stroke: "#7B1FA2"}
   Weave -> data_flow.Thread: "1..*" {style.stroke: "#7B1FA2"}
@@ -338,17 +340,29 @@ Typed parameter declaration.
 
 ## NamingConfig
 
-Column and table naming normalization. Cascades through loom/weave/thread/target.
+Column and table naming normalization. Cascades through
+loom/weave/thread/target.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `columns` | `NamingPattern` | `None` | Column naming pattern |
 | `tables` | `NamingPattern` | `None` | Table naming pattern |
 | `exclude` | `list[str]` | `[]` | Names or patterns excluded from normalization |
+| `on_collision` | `Literal["suffix", "error"]` | `"error"` | Duplicate name handling after normalization |
+| `reserved_words` | `ReservedWordConfig` | `None` | Reserved word protection config |
 
-Supported `NamingPattern` values: `snake_case`, `camelCase`, `PascalCase`,
-`UPPER_SNAKE_CASE`, `Title_Snake_Case`, `Title Case`, `lowercase`, `UPPERCASE`,
-`none`.
+Supported `NamingPattern` values: `snake_case`, `camelCase`,
+`PascalCase`, `UPPER_SNAKE_CASE`, `Title_Snake_Case`, `Title Case`,
+`lowercase`, `UPPERCASE`, `kebab-case`, `none`.
+
+### ReservedWordConfig
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `strategy` | `Literal["prefix", "quote", "error"]` | `"quote"` | How to handle reserved words |
+| `prefix` | `str` | `"_"` | Prefix string when `strategy` is `"prefix"` |
+| `extend` | `list[str]` | `[]` | Additional words to treat as reserved |
+| `exclude` | `list[str]` | `[]` | Words to remove from the default reserved list |
 
 ---
 
@@ -369,6 +383,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
 | `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded to threads |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
+| `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets for bulk rename |
 
 ### ThreadEntry
 
@@ -400,6 +415,7 @@ Deployment unit grouping one or more weaves.
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
 | `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded down |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded down |
+| `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets cascaded to weaves |
 
 ### WeaveEntry
 
@@ -408,6 +424,31 @@ Deployment unit grouping one or more weaves.
 | `name` | `str` | `""` | Weave name (required for inline definitions) |
 | `ref` | `str` | `None` | Path to an external `.weave` file |
 | `condition` | `ConditionSpec` | `None` | Conditional execution gate |
+
+---
+
+## ColumnSet
+
+Named column mapping sourced from Delta, YAML, or runtime parameters.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `source` | `ColumnSetSource` | `None` | External source definition |
+| `param` | `str` | `None` | Runtime parameter name (mutually exclusive with `source`) |
+| `on_unmapped` | `Literal["pass_through", "error"]` | `"pass_through"` | Behavior for unmapped DataFrame columns |
+| `on_extra` | `Literal["ignore", "warn", "error"]` | `"ignore"` | Behavior for extra mapping keys |
+| `on_failure` | `Literal["abort", "warn", "skip"]` | `"abort"` | Behavior on source read failure |
+
+### ColumnSetSource
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `Literal["delta", "yaml"]` | *required* | Source type |
+| `alias` | `str` | `None` | Lakehouse table alias (Delta) |
+| `path` | `str` | `None` | File path (Delta path or YAML file) |
+| `from_column` | `str` | `"source_name"` | Column containing raw names |
+| `to_column` | `str` | `"target_name"` | Column containing target names |
+| `filter` | `str` | `None` | SQL WHERE expression |
 
 ---
 

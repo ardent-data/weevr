@@ -14,6 +14,7 @@ runtime settings.
 | `name` | `string` | no | `""` | Human-readable weave name |
 | `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (local name references). Use `ref` for external file references. |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Named lookup sources shared across threads in this weave |
+| `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets for bulk rename from external dictionaries. Shared across threads in this weave. |
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Weave-scoped typed variables, settable by hook steps |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps executed before any thread runs |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps executed after all threads complete |
@@ -90,6 +91,69 @@ Threads reference lookups via the `lookup` field on a source:
 sources:
   products:
     lookup: dim_product   # resolved from the weave's lookups map
+```
+
+---
+
+## column_sets
+
+Named column sets define externally-sourced column mappings for bulk
+rename operations. Each key is a column set name that rename steps can
+reference via `column_set: <name>`.
+
+Column sets can be sourced from a Delta table, a YAML file, or a
+runtime parameter. A column set must have exactly one of `source` or
+`param` — not both.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `source` | `ColumnSetSource` | no | `null` | External source for the column mapping (Delta or YAML) |
+| `param` | `string` | no | `null` | Runtime parameter name containing a `dict[str, str]` mapping. Mutually exclusive with `source`. |
+| `on_unmapped` | `string` | no | `"pass_through"` | Behavior when a DataFrame column has no rename entry: `"pass_through"` or `"error"` |
+| `on_extra` | `string` | no | `"ignore"` | Behavior when a mapping key references a column not in the DataFrame: `"ignore"`, `"warn"`, or `"error"` |
+| `on_failure` | `string` | no | `"abort"` | Behavior when the source cannot be read or returns no rows: `"abort"`, `"warn"`, or `"skip"` |
+
+### column_sets.source (ColumnSetSource)
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `type` | `string` | yes | -- | Source type: `"delta"` or `"yaml"` |
+| `alias` | `string` | no | `null` | Lakehouse table alias (for Delta sources) |
+| `path` | `string` | no | `null` | File path (for Delta path or YAML sources) |
+| `from_column` | `string` | no | `"source_name"` | Column containing the original (raw) column names |
+| `to_column` | `string` | no | `"target_name"` | Column containing the target (friendly) column names |
+| `filter` | `string` | no | `null` | SQL WHERE expression applied before collecting mappings |
+
+```yaml
+column_sets:
+  sap_dictionary:
+    source:
+      type: delta
+      alias: ref.column_dictionary
+      from_column: raw_name
+      to_column: friendly_name
+      filter: "system = 'SAP'"
+    on_unmapped: pass_through
+    on_extra: ignore
+    on_failure: abort
+
+  hr_mappings:
+    source:
+      type: yaml
+      path: mappings/hr_columns.yaml
+
+  runtime_overrides:
+    param: column_overrides
+```
+
+Rename steps reference column sets by name:
+
+```yaml
+steps:
+  - rename:
+      column_set: sap_dictionary
+      columns:
+        MANUAL_COL: manual_override  # static wins
 ```
 
 ---
@@ -223,9 +287,26 @@ settings override these.
 | `columns` | `NamingPattern` | no | `null` | Column naming pattern |
 | `tables` | `NamingPattern` | no | `null` | Table naming pattern |
 | `exclude` | `list[string]` | no | `[]` | Names or glob patterns excluded from normalization |
+| `on_collision` | `string` | no | `"error"` | Behavior when normalization produces duplicate names: `"error"` or `"suffix"` (appends `_2`, `_3`, etc.) |
+| `reserved_words` | `ReservedWordConfig` | no | `null` | Reserved word protection for output column names |
 
-Supported patterns: `snake_case`, `camelCase`, `PascalCase`, `UPPER_SNAKE_CASE`,
-`Title_Snake_Case`, `Title Case`, `lowercase`, `UPPERCASE`, `none`.
+Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
+`UPPER_SNAKE_CASE`, `Title_Snake_Case`, `Title Case`, `lowercase`,
+`UPPERCASE`, `kebab-case`, `none`.
+
+!!! warning "kebab-case requires backtick-quoting"
+    Column names with hyphens must be backtick-quoted in Spark SQL
+    expressions (e.g., `` `my-column` ``). A validation warning is
+    emitted when `kebab-case` is selected.
+
+### naming.reserved_words (ReservedWordConfig)
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `strategy` | `string` | no | `"quote"` | How to handle reserved words: `"prefix"`, `"quote"` (no-op — Spark backtick-quotes automatically), or `"error"` |
+| `prefix` | `string` | no | `"_"` | Prefix prepended to reserved words when `strategy` is `"prefix"` |
+| `extend` | `list[string]` | no | `[]` | Additional words to treat as reserved |
+| `exclude` | `list[string]` | no | `[]` | Words to remove from the default reserved list |
 
 ---
 
@@ -245,6 +326,14 @@ lookups:
     key: [product_id]
     values: [product_name, category]
     unique_key: true
+
+column_sets:
+  sap_dictionary:
+    source:
+      type: delta
+      alias: ref.column_dictionary
+      from_column: raw_name
+      to_column: friendly_name
 
 variables:
   baseline_count:
@@ -303,6 +392,10 @@ execution:
 
 naming:
   columns: snake_case
+  on_collision: suffix
+  reserved_words:
+    strategy: prefix
+    prefix: "_"
 ```
 
 ### Shorthand thread syntax
