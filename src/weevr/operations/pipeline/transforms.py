@@ -119,6 +119,8 @@ def apply_rename(
             unmapped,
             extra,
         )
+        for old_name, new_name in merged.items():
+            _log.debug("  rename: '%s' -> '%s'", old_name, new_name)
 
     if merged:
         df_cols = set(df.columns)

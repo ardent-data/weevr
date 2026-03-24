@@ -333,12 +333,13 @@ class TestMaterializeColumnSets:
             "cs2": _make_column_set(alias="db.other_map"),
         }
 
-        result = materialize_column_sets(spark, column_sets, {})
+        resolved, results = materialize_column_sets(spark, column_sets, {})
 
-        assert "cs1" in result
-        assert "cs2" in result
-        assert result["cs1"] == {"a": "b"}
-        assert result["cs2"] == {"a": "b"}
+        assert "cs1" in resolved
+        assert "cs2" in resolved
+        assert resolved["cs1"] == {"a": "b"}
+        assert resolved["cs2"] == {"a": "b"}
+        assert len(results) == 2
 
     def test_param_column_sets_resolved(self):
         """Param-sourced column sets are resolved from resolved_params."""
@@ -348,9 +349,13 @@ class TestMaterializeColumnSets:
         }
         resolved_params = {"my_map": {"col_x": "col_y"}}
 
-        result = materialize_column_sets(spark, column_sets, resolved_params)
+        resolved, results = materialize_column_sets(spark, column_sets, resolved_params)
 
-        assert result == {"rename_map": {"col_x": "col_y"}}
+        assert resolved == {"rename_map": {"col_x": "col_y"}}
+        assert len(results) == 1
+        assert results[0].name == "rename_map"
+        assert results[0].source_type == "param"
+        assert results[0].mappings_loaded == 1
 
     @patch("weevr.engine.column_sets.read_source")
     def test_skip_none_results(self, mock_read):
@@ -367,9 +372,11 @@ class TestMaterializeColumnSets:
             "skip_me": _make_column_set(on_failure="skip"),
         }
 
-        result = materialize_column_sets(spark, column_sets, {})
+        resolved, results = materialize_column_sets(spark, column_sets, {})
 
-        assert "skip_me" not in result
+        assert "skip_me" not in resolved
+        assert len(results) == 1
+        assert results[0].skipped is True
 
     @patch("weevr.engine.column_sets.read_source")
     def test_telemetry_spans_created(self, mock_read):
@@ -440,6 +447,7 @@ class TestMaterializeColumnSets:
     @patch("weevr.engine.column_sets.read_source")
     def test_empty_column_sets_returns_empty_dict(self, mock_read):
         """No column sets defined returns empty result."""
-        result = materialize_column_sets(MagicMock(), {}, {})
-        assert result == {}
+        resolved, results = materialize_column_sets(MagicMock(), {}, {})
+        assert resolved == {}
+        assert results == []
         mock_read.assert_not_called()

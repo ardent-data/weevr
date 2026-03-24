@@ -151,7 +151,9 @@ def _apply_reserved_word_protection(
     for original, output in renames.items():
         if output.lower() in effective_words:
             if config.strategy == "prefix":
-                updated[original] = config.prefix + output
+                prefixed = config.prefix + output
+                _log.debug("Reserved word protection: '%s' -> '%s'", output, prefixed)
+                updated[original] = prefixed
             else:
                 # strategy == "error": collect for later reporting
                 conflicts.append(output)
@@ -217,6 +219,10 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
 
     if config.reserved_words is not None:
         renames = _apply_reserved_word_protection(renames, config.reserved_words)
+
+    for old, new in renames.items():
+        if old != new:
+            _log.debug("  normalize: '%s' -> '%s'", old, new)
 
     # Rename via toDF() to avoid ambiguous column references when dedup
     # creates output names that collide with other columns' original names.

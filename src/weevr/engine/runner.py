@@ -172,8 +172,9 @@ def execute_weave(
 
         # Materialize column sets — resolve all defs into name→mapping dicts
         resolved_column_sets: dict[str, dict[str, str]] | None = None
+        all_column_set_results: list[Any] = []
         if column_set_defs:
-            resolved_column_sets = materialize_column_sets(
+            resolved_column_sets, all_column_set_results = materialize_column_sets(
                 spark,
                 column_set_defs,
                 params or {},
@@ -407,6 +408,7 @@ def execute_weave(
         collector,
         hook_results=all_hook_results,
         lookup_results=all_lookup_results,
+        column_set_results=all_column_set_results,
         variables=variable_ctx.snapshot(),
         resolved_params=params,
     )
@@ -434,6 +436,7 @@ def _build_weave_telemetry(
     collector: SpanCollector | None,
     hook_results: list[HookResult] | None = None,
     lookup_results: list[LookupResult] | None = None,
+    column_set_results: list[Any] | None = None,
     variables: dict[str, Any] | None = None,
     resolved_params: dict[str, Any] | None = None,
 ) -> WeaveTelemetry | None:
@@ -469,6 +472,7 @@ def _build_weave_telemetry(
         thread_telemetry=thread_telemetry,
         hook_results=hook_results or [],
         lookup_results=lookup_results or [],
+        column_set_results=column_set_results or [],
         variables=variables or {},
         resolved_params=resolved_params,
     )

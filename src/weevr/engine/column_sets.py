@@ -11,6 +11,7 @@ from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.column_set import ColumnSet
 from weevr.model.source import Source
 from weevr.operations.readers import read_source
+from weevr.telemetry.results import ColumnSetResult
 from weevr.telemetry.span import SpanStatus
 
 if TYPE_CHECKING:
@@ -72,7 +73,6 @@ def resolve_column_set(
             )
             span.set_attribute("column_set.source_type", source_type)
             span.set_attribute("column_set.mappings_loaded", mappings_loaded)
-            span.set_attribute("column_set.row_count", mappings_loaded)
             span.set_attribute("column_set.skipped", result is None)
             collector.add_span(span.finish(SpanStatus.OK))  # type: ignore[union-attr]
 
@@ -210,11 +210,12 @@ def materialize_column_sets(
     resolved_params: dict[str, Any],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
-) -> dict[str, dict[str, str]]:
+) -> tuple[dict[str, dict[str, str]], list[ColumnSetResult]]:
     """Resolve all column sets and return them as a name→mapping dict.
 
     Column sets where resolution returns ``None`` (``on_failure="skip"``) are
-    excluded from the result.
+    excluded from the resolved mappings but still appear in the results list
+    with ``skipped=True``.
 
     Args:
         spark: Active SparkSession.
@@ -224,12 +225,17 @@ def materialize_column_sets(
         parent_span_id: Optional parent span ID for span hierarchy.
 
     Returns:
-        Mapping of column set name to resolved from→to dict.  Column sets
-        that were skipped are absent from the result.
+        Tuple of (resolved mappings dict, list of ColumnSetResult).
     """
-    result: dict[str, dict[str, str]] = {}
+    resolved_mappings: dict[str, dict[str, str]] = {}
+    results: list[ColumnSetResult] = []
 
     for name, column_set in column_sets.items():
+        source_type = (
+            "param"
+            if column_set.param is not None
+            else (column_set.source.type if column_set.source is not None else "unknown")
+        )
         resolved = resolve_column_set(
             spark,
             name,
@@ -238,7 +244,16 @@ def materialize_column_sets(
             collector=collector,
             parent_span_id=parent_span_id,
         )
+        skipped = resolved is None
         if resolved is not None:
-            result[name] = resolved
+            resolved_mappings[name] = resolved
+        results.append(
+            ColumnSetResult(
+                name=name,
+                source_type=source_type,
+                mappings_loaded=len(resolved) if resolved else 0,
+                skipped=skipped,
+            )
+        )
 
-    return result
+    return resolved_mappings, results
