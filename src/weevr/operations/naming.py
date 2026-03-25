@@ -230,13 +230,39 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
 def normalize_table_name(name: str, config: NamingConfig) -> str:
     """Normalize a table name according to the naming config.
 
+    Applies pattern normalization followed by reserved word protection
+    when configured.
+
     Args:
         name: The table name to normalize.
-        config: Naming configuration with table pattern.
+        config: Naming configuration with table pattern and optional
+            reserved word settings.
 
     Returns:
         The normalized table name, or original if no table pattern is set.
+
+    Raises:
+        ConfigError: If the normalized name is a reserved word and
+            ``strategy="error"``.
     """
     if config.tables is None or config.tables == NamingPattern.NONE:
-        return name
-    return normalize_name(name, config.tables)
+        result = name
+    else:
+        result = normalize_name(name, config.tables)
+
+    if config.reserved_words is not None:
+        effective_words = resolve_effective_words(config.reserved_words)
+        if result.lower() in effective_words:
+            if config.reserved_words.strategy == "prefix":
+                prefixed = config.reserved_words.prefix + result
+                _log.debug(
+                    "Reserved word protection (table): '%s' -> '%s'",
+                    result,
+                    prefixed,
+                )
+                result = prefixed
+            elif config.reserved_words.strategy == "error":
+                raise ConfigError(f"Table name is a reserved word: {result}")
+            # strategy == "quote": no-op
+
+    return result

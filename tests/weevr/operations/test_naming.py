@@ -176,6 +176,75 @@ class TestNormalizTableName:
         assert normalize_table_name("DimCustomer", config) == "DimCustomer"
 
 
+class TestNormalizeTableNameReservedWords:
+    """Test reserved word protection for table names."""
+
+    def test_prefix_strategy(self):
+        """Reserved table name is prefixed."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        assert normalize_table_name("Select", config) == "_select"
+
+    def test_quote_strategy_passthrough(self):
+        """Quote strategy leaves reserved table name unchanged."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="quote"),
+        )
+        assert normalize_table_name("Select", config) == "select"
+
+    def test_error_strategy_raises(self):
+        """Error strategy raises ConfigError for reserved table name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="error"),
+        )
+        with pytest.raises(ConfigError, match="select"):
+            normalize_table_name("Select", config)
+
+    def test_non_reserved_unaffected(self):
+        """Non-reserved table name passes through unchanged."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        assert normalize_table_name("DimCustomer", config) == "dim_customer"
+
+    def test_preset_dax(self):
+        """DAX preset catches DAX-reserved table name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="dax"),  # type: ignore[arg-type]
+        )
+        assert normalize_table_name("Measure", config) == "_measure"
+
+    def test_no_tables_pattern_still_checks_reserved(self):
+        """Reserved word check applies even without a table pattern."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        assert normalize_table_name("select", config) == "_select"
+
+    def test_no_reserved_words_config(self):
+        """No reserved_words config means no protection."""
+        config = NamingConfig(tables=NamingPattern.SNAKE_CASE)
+        assert normalize_table_name("Select", config) == "select"
+
+
 class TestNamingConfig:
     """Test NamingConfig model."""
 

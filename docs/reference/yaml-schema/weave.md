@@ -288,7 +288,7 @@ settings override these.
 | `tables` | `NamingPattern` | no | `null` | Table naming pattern |
 | `exclude` | `list[string]` | no | `[]` | Names or glob patterns excluded from normalization |
 | `on_collision` | `string` | no | `"error"` | Behavior when normalization produces duplicate names: `"error"` or `"suffix"` (appends `_2`, `_3`, etc.) |
-| `reserved_words` | `ReservedWordConfig` | no | `null` | Reserved word protection for output column names |
+| `reserved_words` | `ReservedWordConfig` | no | `null` | Reserved word protection for column and table names |
 
 Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
 `UPPER_SNAKE_CASE`, `Title_Snake_Case`, `Title Case`, `lowercase`,
@@ -303,10 +303,11 @@ Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `strategy` | `string` | no | `"quote"` | How to handle reserved words: `"prefix"`, `"quote"` (no-op — Spark backtick-quotes automatically), or `"error"` |
-| `prefix` | `string` | no | `"_"` | Prefix prepended to reserved words when `strategy` is `"prefix"` |
-| `extend` | `list[string]` | no | `[]` | Additional words to treat as reserved |
-| `exclude` | `list[string]` | no | `[]` | Words to remove from the default reserved list |
+| `strategy` | `string` | no | `"quote"` | How to handle reserved words: `"prefix"`, `"quote"`, or `"error"` |
+| `prefix` | `string` | no | `"_"` | Prefix when `strategy` is `"prefix"` |
+| `preset` | `string \| list[string]` | no | `null` | Built-in word list presets (`ansi`, `dax`, `m`, `powerbi`, `tsql`) |
+| `extend` | `list[string]` | no | `[]` | Extra words to treat as reserved |
+| `exclude` | `list[string]` | no | `[]` | Words to remove from the check |
 
 ---
 
