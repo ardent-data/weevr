@@ -409,6 +409,73 @@ class TestNormalizeColumnsReservedWords:
 
 
 @pytest.mark.spark
+class TestNormalizeColumnsPresetIntegration:
+    """Test reserved word presets with normalize_columns."""
+
+    def test_dax_preset_catches_dax_word(self, spark):
+        """DAX word is caught when using dax preset."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1,)], ["calculate"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="dax"),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_calculate"]
+
+    def test_dax_preset_ignores_ansi_only_word(self, spark):
+        """ANSI-only word is NOT caught when using only dax preset."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1,)], ["select"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="dax"),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        # "select" is ANSI but not DAX — should pass through unprefixed
+        assert result.columns == ["select"]
+
+    def test_combined_ansi_dax_catches_both(self, spark):
+        """Combined presets catch words from both sets."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1, 2)], ["select", "calculate"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset=["ansi", "dax"]),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_select", "_calculate"]
+
+    def test_no_preset_backwards_compat(self, spark):
+        """No preset specified uses ANSI default (backwards compat)."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1,)], ["select"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_select"]
+
+    def test_powerbi_preset_catches_dax_and_m(self, spark):
+        """powerbi preset catches both DAX and M words."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        # "calculate" is DAX, "each" is M
+        df = spark.createDataFrame([(1, 2)], ["calculate", "each"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="powerbi"),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_calculate", "_each"]
+
+
+@pytest.mark.spark
 class TestNormalizeColumnsFullPipeline:
     """End-to-end test covering normalize → dedup → reserved stages in sequence."""
 

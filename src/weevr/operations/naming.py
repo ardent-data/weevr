@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
 from weevr.model.naming import NamingConfig, NamingPattern
-from weevr.operations.reserved_words import ANSI_RESERVED_WORDS
+from weevr.operations.reserved_words import resolve_effective_words
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame
@@ -139,9 +139,7 @@ def _apply_reserved_word_protection(
     Raises:
         ConfigError: If ``strategy="error"`` and any output names are reserved words.
     """
-    effective_words = (ANSI_RESERVED_WORDS | {w.lower() for w in config.extend}) - {
-        w.lower() for w in config.exclude
-    }
+    effective_words = resolve_effective_words(config)
 
     if config.strategy == "quote":
         return renames
