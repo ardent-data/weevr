@@ -43,7 +43,9 @@
     "autouse",
     "conftest",
     "markdownlint",
-    "cspell"
+    "cspell",
+    "powerbi",
+    "tsql"
   ],
   "ignorePaths": [
     "**/*.py",

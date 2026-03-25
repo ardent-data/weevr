@@ -394,6 +394,7 @@ naming:
   columns: snake_case
   on_collision: suffix
   reserved_words:
+    preset: [ansi, dax]
     strategy: prefix
     prefix: "_"
 ```
