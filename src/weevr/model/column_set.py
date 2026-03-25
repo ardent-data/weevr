@@ -1,10 +1,33 @@
 """Column set models for named external column mappings."""
 
+from enum import StrEnum
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 
 from weevr.model.base import FrozenBase
+
+
+class ReservedWordPreset(StrEnum):
+    """Built-in reserved word list presets.
+
+    Each preset represents a self-contained set of reserved words for a
+    specific query language or engine context. Presets can be combined
+    via list composition; the effective word set is the union.
+
+    Attributes:
+        ANSI: ANSI SQL reserved keywords (~80 words).
+        DAX: DAX reserved words for Power BI semantic models.
+        M: M language (Power Query) reserved words.
+        POWERBI: Convenience alias expanding to DAX + M union.
+        TSQL: T-SQL reserved keywords for Fabric SQL endpoints.
+    """
+
+    ANSI = "ansi"
+    DAX = "dax"
+    M = "m"
+    POWERBI = "powerbi"
+    TSQL = "tsql"
 
 
 class ColumnSetSource(FrozenBase):
@@ -73,24 +96,43 @@ class ColumnSet(FrozenBase):
 
 
 class ReservedWordConfig(FrozenBase):
-    """Configuration for handling SQL reserved word collisions in column names.
+    """Configuration for handling reserved word collisions in column names.
 
-    When a column name matches a SQL reserved word, the engine can handle the
-    collision in one of three ways: quote the name, prefix it, or raise an
-    error.  The ``extend`` and ``exclude`` lists let callers augment or narrow
-    the built-in reserved word list.
+    When a column or table name matches a reserved word, the engine can
+    handle the collision in one of three ways: quote the name, prefix it,
+    or raise an error.
+
+    The ``preset`` field selects one or more built-in word lists. When
+    omitted, the ANSI SQL list is used as the default. Specifying any
+    preset replaces that default — to include ANSI words alongside other
+    presets, list ``"ansi"`` explicitly. A single string is accepted as
+    shorthand for a one-element list.
+
+    The ``extend`` and ``exclude`` lists compose on top of the resolved
+    preset union, adding or removing individual words.
 
     Attributes:
-        strategy: How to handle reserved word collisions. ``"quote"`` wraps the
-            name in back-ticks; ``"prefix"`` prepends ``prefix``; ``"error"``
-            raises a validation error.
+        strategy: How to handle reserved word collisions. ``"quote"`` wraps
+            the name in back-ticks; ``"prefix"`` prepends ``prefix``;
+            ``"error"`` raises a validation error.
         prefix: String prepended to colliding column names when
             ``strategy="prefix"``.
-        extend: Additional words to treat as reserved beyond the built-in list.
+        preset: Built-in word list presets to activate. ``None`` (default)
+            uses the ANSI SQL list. Accepts a single string or a list.
+        extend: Additional words to treat as reserved beyond the preset.
         exclude: Words to remove from the reserved word check.
     """
 
     strategy: Literal["prefix", "quote", "error"] = "quote"
     prefix: str = "_"
+    preset: list[ReservedWordPreset] | None = None
     extend: list[str] = []
     exclude: list[str] = []
+
+    @field_validator("preset", mode="before")
+    @classmethod
+    def _normalize_preset(cls, v: object) -> object:
+        """Accept a single string as sugar for a one-element list."""
+        if isinstance(v, str):
+            return [v]
+        return v

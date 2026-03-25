@@ -1,6 +1,11 @@
 """Domain object model for weevr configuration."""
 
-from weevr.model.column_set import ColumnSet, ColumnSetSource, ReservedWordConfig
+from weevr.model.column_set import (
+    ColumnSet,
+    ColumnSetSource,
+    ReservedWordConfig,
+    ReservedWordPreset,
+)
 from weevr.model.execution import ExecutionConfig, LogLevel
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
@@ -118,6 +123,7 @@ __all__ = [
     "ColumnSet",
     "ColumnSetSource",
     "ReservedWordConfig",
+    "ReservedWordPreset",
     # Naming
     "NamingConfig",
     "NamingPattern",
