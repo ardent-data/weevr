@@ -259,3 +259,111 @@ class TestThreadCacheField:
         """Thread with cache=True stores the value."""
         t = Thread.model_validate({**_MINIMAL, "cache": True})
         assert t.cache is True
+
+
+class TestThreadSharedResourceFields:
+    """Tests for Thread shared resource fields."""
+
+    def test_all_shared_resource_fields_default_to_none(self):
+        """All five shared resource fields default to None when omitted."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.lookups is None
+        assert t.column_sets is None
+        assert t.variables is None
+        assert t.pre_steps is None
+        assert t.post_steps is None
+
+    def test_lookups_accepted(self):
+        """Thread accepts lookups as a dict of Lookup models."""
+        data = {
+            **_MINIMAL,
+            "lookups": {
+                "customer_lookup": {
+                    "source": {"type": "delta", "alias": "ref.customers"},
+                    "key": ["customer_id"],
+                }
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.lookups is not None
+        assert "customer_lookup" in t.lookups
+
+    def test_column_sets_accepted(self):
+        """Thread accepts column_sets as a dict of ColumnSet models."""
+        data = {
+            **_MINIMAL,
+            "column_sets": {
+                "sap_rename": {
+                    "source": {"type": "delta", "alias": "ref.mappings"},
+                    "key_column": "source_name",
+                    "value_column": "target_name",
+                }
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.column_sets is not None
+        assert "sap_rename" in t.column_sets
+
+    def test_variables_accepted(self):
+        """Thread accepts variables as a dict of VariableSpec models."""
+        data = {
+            **_MINIMAL,
+            "variables": {"record_count": {"type": "int"}},
+        }
+        t = Thread.model_validate(data)
+        assert t.variables is not None
+        assert "record_count" in t.variables
+
+    def test_pre_steps_accepted(self):
+        """Thread accepts pre_steps as a list of HookStep models."""
+        data = {
+            **_MINIMAL,
+            "pre_steps": [
+                {"type": "quality_gate", "check": "table_exists", "source": "raw.customers"}
+            ],
+        }
+        t = Thread.model_validate(data)
+        assert t.pre_steps is not None
+        assert len(t.pre_steps) == 1
+
+    def test_post_steps_accepted(self):
+        """Thread accepts post_steps as a list of HookStep models."""
+        data = {
+            **_MINIMAL,
+            "post_steps": [
+                {
+                    "type": "quality_gate",
+                    "check": "row_count",
+                    "target": "dim.customers",
+                    "min_count": 1,
+                }
+            ],
+        }
+        t = Thread.model_validate(data)
+        assert t.post_steps is not None
+        assert len(t.post_steps) == 1
+
+    def test_lookups_must_be_dict(self):
+        """Thread rejects lookups that are not a dict."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate({**_MINIMAL, "lookups": ["not", "a", "dict"]})
+
+    def test_column_sets_must_be_dict(self):
+        """Thread rejects column_sets that are not a dict."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate({**_MINIMAL, "column_sets": "not_a_dict"})
+
+    def test_variables_must_be_dict(self):
+        """Thread rejects variables that are not a dict."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate({**_MINIMAL, "variables": [{"type": "int"}]})
+
+    def test_pre_steps_must_be_list(self):
+        """Thread rejects pre_steps that are not a list."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate({**_MINIMAL, "pre_steps": {"type": "quality_gate"}})
+
+    def test_post_steps_must_be_list(self):
+        """Thread rejects post_steps that are not a list."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate({**_MINIMAL, "post_steps": {"type": "quality_gate"}})

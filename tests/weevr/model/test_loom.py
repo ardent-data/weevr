@@ -73,6 +73,76 @@ class TestLoom:
         loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"], "name": "nightly"})
         assert loom.name == "nightly"
 
+    def test_shared_resource_fields_default_to_none(self):
+        """lookups, variables, pre_steps, post_steps all default to None."""
+        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        assert loom.lookups is None
+        assert loom.variables is None
+        assert loom.pre_steps is None
+        assert loom.post_steps is None
+
+    def test_with_lookups(self):
+        """Loom accepts optional lookups dict."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "lookups": {
+                    "customer_lookup": {
+                        "source": {"type": "delta", "alias": "ref.customers"},
+                        "key": ["customer_id"],
+                    }
+                },
+            }
+        )
+        assert loom.lookups is not None
+        assert "customer_lookup" in loom.lookups
+
+    def test_with_variables(self):
+        """Loom accepts optional variables dict."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "variables": {"record_count": {"type": "int"}},
+            }
+        )
+        assert loom.variables is not None
+        assert "record_count" in loom.variables
+
+    def test_with_pre_steps(self):
+        """Loom accepts optional pre_steps list."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "pre_steps": [
+                    {"type": "quality_gate", "check": "table_exists", "source": "raw.customers"}
+                ],
+            }
+        )
+        assert loom.pre_steps is not None
+        assert len(loom.pre_steps) == 1
+
+    def test_with_post_steps(self):
+        """Loom accepts optional post_steps list."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "post_steps": [
+                    {
+                        "type": "quality_gate",
+                        "check": "row_count",
+                        "target": "dim.customers",
+                        "min_count": 1,
+                    }
+                ],
+            }
+        )
+        assert loom.post_steps is not None
+        assert len(loom.post_steps) == 1
+
 
 class TestWeaveEntry:
     """Tests for WeaveEntry model and Loom normalization."""

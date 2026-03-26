@@ -18,6 +18,10 @@ runtime settings that cascade down through weaves to threads.
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings cascaded to weaves and threads |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to weaves and threads |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. See [Weave schema: column_sets](weave.md#column_sets) for field details. |
+| `lookups` | `dict[string, Lookup]` | no | `null` | Loom-level lookup definitions. Merged with weave-level lookups (weave wins on name collision). See [Weave schema: lookups](weave.md#lookups) for field details. |
+| `variables` | `dict[string, VariableSpec]` | no | `null` | Loom-level variable declarations. Resolved before `pre_steps` execution. |
+| `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before any weave executes. See [Weave schema: pre_steps / post_steps](weave.md#pre_steps-post_steps-hookstep) for field details. |
+| `post_steps` | `list[HookStep]` | no | `null` | Hook steps to run after all weaves complete. |
 
 ---
 
@@ -38,6 +42,72 @@ Each entry in the `weaves` list is either a plain string (shorthand) or a
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `when` | `string` | yes | -- | Condition expression. Supports `${param.x}` references, `table_exists()`, `table_empty()`, `row_count()`, and boolean operators. |
+
+---
+
+## lookups
+
+Loom-level lookup definitions shared across all weaves. The structure is
+identical to [weave-level lookups](weave.md#lookups). When a weave defines
+a lookup with the same name, the weave-level definition wins.
+
+```yaml
+lookups:
+  dim_calendar:
+    source:
+      type: delta
+      alias: ref.dim_calendar
+    key: [date_key]
+    values: [fiscal_year, fiscal_quarter]
+    materialize: true
+    strategy: broadcast
+```
+
+---
+
+## variables
+
+Loom-level typed variable declarations. Variables can be set by
+`sql_statement` hook steps via `set_var` and referenced in downstream config
+as `${var.name}`. The structure is identical to
+[weave-level variables](weave.md#variables-variablespec).
+
+```yaml
+variables:
+  pipeline_start:
+    type: timestamp
+    default: null
+```
+
+---
+
+## pre_steps / post_steps
+
+Hook steps that run before any weave executes (`pre_steps`) or after
+all weaves complete (`post_steps`). The structure is identical to
+[weave-level hooks](weave.md#pre_steps-post_steps-hookstep).
+
+`post_steps` run after all weaves complete, including when a weave
+fails and stops the loom. They do not run if an earlier lifecycle
+phase (such as `pre_steps` or lookup materialization) raises an
+unhandled exception.
+
+These lists are not cascaded to child weaves. Each level runs its
+own list.
+
+```yaml
+pre_steps:
+  - type: quality_gate
+    name: check_upstream_freshness
+    check: source_freshness
+    source: raw.events
+    max_age: "1h"
+
+post_steps:
+  - type: log_message
+    message: "Loom complete."
+    level: info
+```
 
 ---
 

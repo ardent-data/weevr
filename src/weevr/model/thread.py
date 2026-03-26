@@ -3,16 +3,20 @@
 from typing import Any
 
 from weevr.model.base import FrozenBase
+from weevr.model.column_set import ColumnSet
 from weevr.model.execution import ExecutionConfig
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
+from weevr.model.hooks import HookStep
 from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
+from weevr.model.lookup import Lookup
 from weevr.model.params import ParamSpec
 from weevr.model.pipeline import Step
 from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.validation import Assertion, ValidationRule
+from weevr.model.variable import VariableSpec
 from weevr.model.write import WriteConfig
 
 
@@ -41,3 +45,8 @@ class Thread(FrozenBase):
     execution: ExecutionConfig | None = None
     cache: bool | None = None
     exports: list[Export] | None = None
+    lookups: dict[str, Lookup] | None = None
+    column_sets: dict[str, ColumnSet] | None = None
+    variables: dict[str, VariableSpec] | None = None
+    pre_steps: list[HookStep] | None = None
+    post_steps: list[HookStep] | None = None

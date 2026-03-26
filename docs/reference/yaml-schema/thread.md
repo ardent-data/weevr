@@ -27,6 +27,11 @@ target. This page documents every key accepted inside a thread YAML file.
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) |
 | `cache` | `bool` | no | `null` | Whether to cache the final DataFrame before writing |
 | `exports` | `list[Export]` | no | `null` | Secondary output destinations. See [Exports guide](../../guides/exports.md). |
+| `lookups` | `dict[string, Lookup]` | no | `null` | Thread-level lookup definitions. Merged with weave-level lookups (thread wins on name collision). |
+| `column_sets` | `dict[string, ColumnSet]` | no | `null` | Thread-level column set definitions for rename steps. Merged with weave-level column sets (thread wins). |
+| `variables` | `dict[string, VariableSpec]` | no | `null` | Thread-level variable declarations. Resolved before `pre_steps` execution. |
+| `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before thread core execution. Not cascaded from weave — each level runs its own list. |
+| `post_steps` | `list[HookStep]` | no | `null` | Hook steps to run after thread core execution. Not cascaded from weave. |
 
 ---
 
@@ -721,6 +726,86 @@ params:
     type: string
     required: false
     default: "ALL"
+```
+
+---
+
+## lookups
+
+Thread-level lookup definitions. The structure is identical to
+[weave-level lookups](weave.md#lookups). When a thread and its parent weave
+define a lookup with the same name, the thread-level definition wins.
+
+```yaml
+lookups:
+  dim_region:
+    source:
+      type: delta
+      alias: ref.dim_region
+    key: [region_id]
+    values: [region_name, country_code]
+    materialize: true
+    strategy: broadcast
+```
+
+---
+
+## column_sets
+
+Thread-level column set definitions for rename steps. The structure is
+identical to [weave-level column_sets](weave.md#column_sets). When the same
+name is defined at both thread and weave level, the thread-level definition
+wins.
+
+```yaml
+column_sets:
+  local_overrides:
+    source:
+      type: yaml
+      path: mappings/thread_overrides.yaml
+    on_unmapped: pass_through
+```
+
+---
+
+## variables
+
+Thread-level typed variable declarations. Variables can be set by
+`sql_statement` hook steps via `set_var` and referenced in downstream config
+as `${var.name}`. The structure is identical to
+[weave-level variables](weave.md#variables-variablespec).
+
+```yaml
+variables:
+  row_count:
+    type: int
+    default: 0
+```
+
+---
+
+## pre_steps / post_steps
+
+Hook steps that run before or after the thread's core execution. The
+structure is identical to
+[weave-level pre_steps / post_steps](weave.md#pre_steps-post_steps-hookstep).
+
+Thread-level hook lists are **not** cascaded from the parent weave. Each
+level runs its own list independently. `pre_steps` run before any source is
+read; `post_steps` run after write, assertions, and exports.
+
+```yaml
+pre_steps:
+  - type: quality_gate
+    name: check_source_freshness
+    check: source_freshness
+    source: raw.orders
+    max_age: "4h"
+
+post_steps:
+  - type: log_message
+    message: "Thread complete. Rows written: ${var.row_count}."
+    level: info
 ```
 
 ---

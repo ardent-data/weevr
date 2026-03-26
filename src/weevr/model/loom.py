@@ -7,8 +7,11 @@ from pydantic import model_validator
 from weevr.model.base import FrozenBase
 from weevr.model.column_set import ColumnSet
 from weevr.model.execution import ExecutionConfig
+from weevr.model.hooks import HookStep
+from weevr.model.lookup import Lookup
 from weevr.model.naming import NamingConfig
 from weevr.model.params import ParamSpec
+from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec
 
 
@@ -40,6 +43,10 @@ class Loom(FrozenBase):
     execution: ExecutionConfig | None = None
     naming: NamingConfig | None = None
     column_sets: dict[str, ColumnSet] | None = None
+    lookups: dict[str, Lookup] | None = None
+    variables: dict[str, VariableSpec] | None = None
+    pre_steps: list[HookStep] | None = None
+    post_steps: list[HookStep] | None = None
 
     @model_validator(mode="before")
     @classmethod
