@@ -521,3 +521,234 @@ class TestExecuteThreadExports:
         assert result.telemetry.export_results[1].name == "json_feed"
         assert spark.read.parquet(exp1).count() == 3
         assert spark.read.json(exp2).count() == 3
+
+
+class TestThreadResourceLifecycle:
+    """Thread-level resource lifecycle in execute_thread."""
+
+    def test_thread_pre_steps_run_before_execution(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Thread pre_steps execute before the core read/transform/write pipeline."""
+        src = tmp_delta_path("pre_src")
+        tgt = tmp_delta_path("pre_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        # Use a log_message pre_step; verify via mock logging
+        from unittest.mock import patch
+
+        from weevr.model.hooks import HookStep, LogMessageStep
+
+        pre_steps: list[HookStep] = [
+            LogMessageStep(type="log_message", message="thread-pre-fired", level="info"),
+        ]
+        thread = Thread(
+            name="pre_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt),
+            pre_steps=pre_steps,
+        )
+
+        with patch("weevr.engine.hooks.logger") as mock_logger:
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        # Verify the log message was emitted by the pre_step
+        log_messages = [str(call) for call in mock_logger.log.call_args_list]
+        assert any("thread-pre-fired" in msg for msg in log_messages)
+
+    def test_thread_post_steps_run_after_execution(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Thread post_steps execute after the core pipeline completes."""
+        src = tmp_delta_path("post_src")
+        tgt = tmp_delta_path("post_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        from unittest.mock import patch
+
+        from weevr.model.hooks import HookStep, LogMessageStep
+
+        post_steps: list[HookStep] = [
+            LogMessageStep(type="log_message", message="thread-post-fired", level="info"),
+        ]
+        thread = Thread(
+            name="post_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt),
+            post_steps=post_steps,
+        )
+
+        with patch("weevr.engine.hooks.logger") as mock_logger:
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        log_messages = [str(call) for call in mock_logger.log.call_args_list]
+        assert any("thread-post-fired" in msg for msg in log_messages)
+
+    def test_thread_lookups_materialize_and_merge(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Thread-level lookups are materialized and merged with weave-level cached lookups."""
+        src = tmp_delta_path("tlkp_src")
+        tgt = tmp_delta_path("tlkp_tgt")
+        thread_lookup_src = tmp_delta_path("tlkp_ref")
+        create_delta_table(spark, src, [{"id": 1}])
+        create_delta_table(spark, thread_lookup_src, [{"ref_id": 10, "val": "x"}])
+
+        # Thread with a source that references a thread-level lookup
+        thread = Thread(
+            name="tlkp_thread",
+            config_version="1",
+            sources={
+                "main": Source(type="delta", alias=src),
+                "ref": Source(lookup="thread_ref"),
+            },
+            steps=[],
+            target=Target(path=tgt),
+            lookups={
+                "thread_ref": Lookup(
+                    source=Source(type="delta", alias=thread_lookup_src),
+                    materialize=True,
+                ),
+            },
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 1
+
+    def test_thread_lookups_cleanup_on_failure(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread-level lookup cleanup runs even when execution fails."""
+        from unittest.mock import patch
+
+        thread_lookup_src = tmp_delta_path("tlkp_fail_ref")
+        create_delta_table(spark, thread_lookup_src, [{"ref_id": 1}])
+
+        # Thread with invalid source path but valid thread-level lookup
+        thread = Thread(
+            name="tlkp_fail_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias="/nonexistent/path")},
+            steps=[],
+            target=Target(path="/tmp/fail_tgt"),
+            lookups={
+                "fail_ref": Lookup(
+                    source=Source(type="delta", alias=thread_lookup_src),
+                    materialize=True,
+                ),
+            },
+        )
+
+        with patch("weevr.engine.executor.cleanup_lookups") as mock_cleanup:
+            with pytest.raises(ExecutionError):
+                execute_thread(spark, thread)
+            # cleanup_lookups should have been called with the thread-level lookups
+            mock_cleanup.assert_called_once()
+            cleanup_arg = mock_cleanup.call_args[0][0]
+            assert "fail_ref" in cleanup_arg
+
+    def test_thread_column_sets_merged_with_weave(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Thread-level column_sets merge with weave-level, thread wins on conflict."""
+        from weevr.model.column_set import ColumnSet
+        from weevr.model.pipeline import RenameParams, RenameStep
+
+        src = tmp_delta_path("tcs_src")
+        tgt = tmp_delta_path("tcs_tgt")
+        create_delta_table(spark, src, [{"old_name": 1, "other": 2}])
+
+        # Thread-level column_set overrides weave-level
+        thread = Thread(
+            name="tcs_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[
+                RenameStep(rename=RenameParams(column_set="my_cs")),
+            ],
+            target=Target(path=tgt),
+            column_sets={
+                "my_cs": ColumnSet(
+                    param="cs_param",
+                ),
+            },
+        )
+
+        # Weave-level column_sets passed to execute_thread (different mapping)
+        weave_column_sets = {"old_name": "weave_renamed"}
+        weave_column_set_defs = {
+            "my_cs": ColumnSet(param="cs_param"),
+        }
+
+        # Thread-level should win — pass thread_cs via the thread model
+        # The resolved_params provide the mapping for the param-based column set
+        result = execute_thread(
+            spark,
+            thread,
+            resolved_params={"cs_param": {"old_name": "new_name"}},
+            column_sets={"my_cs": weave_column_sets},
+            column_set_defs=weave_column_set_defs,
+        )
+
+        assert result.status == "success"
+        written = spark.read.format("delta").load(tgt)
+        # Thread-level column_set should be used (new_name, not weave_renamed)
+        assert "new_name" in written.columns
+
+    def test_thread_variables_merged_with_weave(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread-level variables create a VariableContext for hook step resolution."""
+        src = tmp_delta_path("tvar_src")
+        tgt = tmp_delta_path("tvar_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        from unittest.mock import patch
+
+        from weevr.model.hooks import LogMessageStep
+        from weevr.model.variable import VariableSpec
+
+        # Thread has a variable with a default, used in a pre_step log message
+        thread = Thread(
+            name="tvar_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt),
+            variables={
+                "my_var": VariableSpec(type="string", default="hello-from-thread"),
+            },
+            pre_steps=[
+                LogMessageStep(
+                    type="log_message",
+                    message="var=${var.my_var}",
+                    level="info",
+                ),
+            ],
+        )
+
+        with patch("weevr.engine.hooks.logger") as mock_logger:
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        # Check that the variable was resolved in the log message
+        log_messages = [str(call) for call in mock_logger.log.call_args_list]
+        assert any("var=hello-from-thread" in msg for msg in log_messages)
+
+    def test_thread_without_resources_backward_compatible(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Threads without any resource fields still work as before."""
+        src = tmp_delta_path("norc_src")
+        tgt = tmp_delta_path("norc_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+
+        thread = _make_thread("norc_thread", src, tgt)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 2

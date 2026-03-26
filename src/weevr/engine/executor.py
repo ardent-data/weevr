@@ -10,8 +10,12 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
-from weevr.engine.lookups import resolve_thread_lookups
+from weevr.engine.column_sets import materialize_column_sets
+from weevr.engine.hooks import run_hook_steps
+from weevr.engine.lookups import cleanup_lookups, materialize_lookups, resolve_thread_lookups
+from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
+from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import DataValidationError, ExecutionError, ExportError, StateError
 from weevr.model.column_set import ColumnSet
 from weevr.model.lookup import Lookup
@@ -56,6 +60,8 @@ def execute_thread(
     """Execute a single thread from sources through transforms to a Delta target.
 
     Execution order:
+    0. Initialize thread-level resources (variables, lookups, column_sets).
+    0a. Run thread-level pre_steps.
     1. Resolve lookup-based sources from cached or on-demand DataFrames.
     2. Read all remaining declared sources into DataFrames.
        - For ``incremental_watermark``: load prior HWM, apply filter, capture new HWM.
@@ -73,6 +79,7 @@ def execute_thread(
     12. Persist watermark state (if applicable).
     13. Run post-write assertions (if configured).
     14. Write exports (secondary outputs, if configured).
+    14a. Run thread-level post_steps.
     15. Build telemetry and return ThreadResult.
 
     Args:
@@ -140,298 +147,387 @@ def execute_thread(
     if load_mode != "full":
         _validate_incremental(thread, load_mode)
 
-    try:
-        # Resolve target path early (needed for watermark store resolution)
-        target_path = thread.target.alias or thread.target.path
-        if target_path is None:
-            raise ExecutionError(
-                "Target has no 'alias' or 'path' — cannot resolve write location",
-                thread_name=thread.name,
+    # --- Thread-level resource lifecycle ---
+    thread_variable_ctx = _build_thread_variable_context(thread)
+    thread_cached_lookups: dict[str, Any] = {}
+
+    # Compute effective resources by merging weave-level with thread-level
+    effective_cached_lookups = cached_lookups
+    effective_weave_lookups = weave_lookups
+    effective_column_sets = column_sets
+    effective_column_set_defs = column_set_defs
+
+    try:  # noqa: PLR0912 — outer try/finally for thread-level lookup cleanup
+        # Materialize thread-level lookups and merge with weave-level
+        if thread.lookups:
+            thread_cached_lookups, _ = materialize_lookups(spark, thread.lookups)
+            all_cached: dict[str, Any] = {}
+            if cached_lookups:
+                all_cached.update(cached_lookups)
+            all_cached.update(thread_cached_lookups)  # thread wins
+            effective_cached_lookups = all_cached or None
+            # Merge lookup definitions so resolve_thread_lookups sees both
+            effective_weave_lookups = merge_resource_dicts(
+                weave_lookups, thread.lookups, "lookup", "weave", "thread"
             )
 
-        # --- Watermark/CDC state loading ---
-        if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
-            watermark_store = resolve_store(thread.load, target_path)
-            prior_state = watermark_store.read(spark, thread.name)
-            watermark_first_run = prior_state is None
-            logger.debug(
-                "Thread '%s': load_mode=%s, first_run=%s, prior_value=%s",
-                thread.name,
-                load_mode,
-                watermark_first_run,
-                prior_state.last_value if prior_state else None,
+        # Merge thread-level column_sets with weave-level (thread wins)
+        if thread.column_sets:
+            merged_cs_defs = merge_resource_dicts(
+                column_set_defs, thread.column_sets, "column_set", "weave", "thread"
             )
-
-        # --- Step 0: Resolve lookup-based sources ---
-        lookup_dfs: dict[str, Any] = {}
-        if cached_lookups is not None or weave_lookups is not None:
-            lookup_dfs = resolve_thread_lookups(
-                thread.sources,
-                weave_lookups or {},
-                cached_lookups or {},
-                spark,
-            )
-
-        # --- Step 1: Read sources ---
-        if load_mode == "incremental_watermark" and thread.load is not None:
-            # Read primary source with watermark filter
-            primary_alias = next(iter(thread.sources))
-            primary_source = thread.sources[primary_alias]
-            primary_df, new_hwm = read_source_incremental(
-                spark, primary_alias, primary_source, thread.load, prior_state
-            )
-
-            # Read secondary sources normally (skip lookup-resolved ones)
-            sources_map = {primary_alias: primary_df}
-            for alias, source in thread.sources.items():
-                if alias != primary_alias and alias not in lookup_dfs:
-                    sources_map[alias] = read_source(spark, alias, source)
-            sources_map.update(lookup_dfs)
-
-        elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-            # Read CDC source
-            primary_alias = next(iter(thread.sources))
-            primary_source = thread.sources[primary_alias]
-
-            last_version: int | None = None
-            if prior_state is not None:
-                try:
-                    last_version = int(prior_state.last_value)
-                except (ValueError, TypeError):
-                    last_version = None
-
-            primary_df = read_cdc_source(spark, primary_source, thread.load.cdc, last_version)
-
-            # Capture new CDF version if Delta CDF
-            if thread.load.cdc.preset == "delta_cdf" and "_commit_version" in primary_df.columns:
-                from pyspark.sql import functions as F
-
-                max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
-                if max_row and max_row[0]["mv"] is not None:
-                    new_hwm = str(max_row[0]["mv"])
-
-            # Read secondary sources normally (skip lookup-resolved ones)
-            sources_map = {primary_alias: primary_df}
-            for alias, source in thread.sources.items():
-                if alias != primary_alias and alias not in lookup_dfs:
-                    sources_map[alias] = read_source(spark, alias, source)
-            sources_map.update(lookup_dfs)
-        else:
-            # Full mode or incremental_parameter — read non-lookup sources normally
-            normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
-            sources_map = read_sources(spark, normal_sources)
-            sources_map.update(lookup_dfs)
-
-        # Step 2 — primary DataFrame is the first declared source
-        df = next(iter(sources_map.values()))
-        rows_read = df.count()
-
-        # Step 3 — run pipeline steps
-        df = run_pipeline(df, thread.steps, sources_map, column_sets, column_set_defs)
-
-        # Capture intermediate row count for waterfall visualization
-        rows_after_transforms = df.count()
-
-        # Step 4 — run validation rules
-        if thread.validations:
-            outcome = validate_dataframe(df, thread.validations)
-            validation_results = outcome.validation_results
-
-            if outcome.has_fatal:
-                raise DataValidationError(
-                    f"Fatal validation failure in thread '{thread.name}'",
+            if merged_cs_defs:
+                effective_column_set_defs = merged_cs_defs
+                effective_column_sets, _ = materialize_column_sets(
+                    spark, merged_cs_defs, resolved_params or {}
                 )
 
-            # Write quarantine rows if present
-            if outcome.quarantine_df is not None:
-                rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
-                with contextlib.suppress(Exception):
-                    quarantine_sample = (
-                        outcome.quarantine_df.limit(10).toPandas().to_dict("records")
+        # Run thread-level pre_steps
+        if thread.pre_steps:
+            run_hook_steps(
+                spark,
+                thread.pre_steps,
+                "pre",
+                thread_variable_ctx,
+                params=resolved_params,
+            )
+
+        # --- Core execution pipeline ---
+        try:
+            # Resolve target path early (needed for watermark store resolution)
+            target_path = thread.target.alias or thread.target.path
+            if target_path is None:
+                raise ExecutionError(
+                    "Target has no 'alias' or 'path' — cannot resolve write location",
+                    thread_name=thread.name,
+                )
+
+            # --- Watermark/CDC state loading ---
+            if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
+                watermark_store = resolve_store(thread.load, target_path)
+                prior_state = watermark_store.read(spark, thread.name)
+                watermark_first_run = prior_state is None
+                logger.debug(
+                    "Thread '%s': load_mode=%s, first_run=%s, prior_value=%s",
+                    thread.name,
+                    load_mode,
+                    watermark_first_run,
+                    prior_state.last_value if prior_state else None,
+                )
+
+            # --- Step 0: Resolve lookup-based sources ---
+            lookup_dfs: dict[str, Any] = {}
+            if effective_cached_lookups is not None or effective_weave_lookups is not None:
+                lookup_dfs = resolve_thread_lookups(
+                    thread.sources,
+                    effective_weave_lookups or {},
+                    effective_cached_lookups or {},
+                    spark,
+                )
+
+            # --- Step 1: Read sources ---
+            if load_mode == "incremental_watermark" and thread.load is not None:
+                # Read primary source with watermark filter
+                primary_alias = next(iter(thread.sources))
+                primary_source = thread.sources[primary_alias]
+                primary_df, new_hwm = read_source_incremental(
+                    spark, primary_alias, primary_source, thread.load, prior_state
+                )
+
+                # Read secondary sources normally (skip lookup-resolved ones)
+                sources_map = {primary_alias: primary_df}
+                for alias, source in thread.sources.items():
+                    if alias != primary_alias and alias not in lookup_dfs:
+                        sources_map[alias] = read_source(spark, alias, source)
+                sources_map.update(lookup_dfs)
+
+            elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
+                # Read CDC source
+                primary_alias = next(iter(thread.sources))
+                primary_source = thread.sources[primary_alias]
+
+                last_version: int | None = None
+                if prior_state is not None:
+                    try:
+                        last_version = int(prior_state.last_value)
+                    except (ValueError, TypeError):
+                        last_version = None
+
+                primary_df = read_cdc_source(spark, primary_source, thread.load.cdc, last_version)
+
+                # Capture new CDF version if Delta CDF
+                if (
+                    thread.load.cdc.preset == "delta_cdf"
+                    and "_commit_version" in primary_df.columns
+                ):
+                    from pyspark.sql import functions as F
+
+                    max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
+                    if max_row and max_row[0]["mv"] is not None:
+                        new_hwm = str(max_row[0]["mv"])
+
+                # Read secondary sources normally (skip lookup-resolved ones)
+                sources_map = {primary_alias: primary_df}
+                for alias, source in thread.sources.items():
+                    if alias != primary_alias and alias not in lookup_dfs:
+                        sources_map[alias] = read_source(spark, alias, source)
+                sources_map.update(lookup_dfs)
+            else:
+                # Full mode or incremental_parameter — read non-lookup sources normally
+                normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
+                sources_map = read_sources(spark, normal_sources)
+                sources_map.update(lookup_dfs)
+
+            # Step 2 — primary DataFrame is the first declared source
+            df = next(iter(sources_map.values()))
+            rows_read = df.count()
+
+            # Step 3 — run pipeline steps
+            df = run_pipeline(
+                df,
+                thread.steps,
+                sources_map,
+                effective_column_sets,
+                effective_column_set_defs,
+            )
+
+            # Capture intermediate row count for waterfall visualization
+            rows_after_transforms = df.count()
+
+            # Step 4 — run validation rules
+            if thread.validations:
+                outcome = validate_dataframe(df, thread.validations)
+                validation_results = outcome.validation_results
+
+                if outcome.has_fatal:
+                    raise DataValidationError(
+                        f"Fatal validation failure in thread '{thread.name}'",
                     )
 
-            # Continue with clean_df
-            df = outcome.clean_df
+                # Write quarantine rows if present
+                if outcome.quarantine_df is not None:
+                    rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
+                    with contextlib.suppress(Exception):
+                        quarantine_sample = (
+                            outcome.quarantine_df.limit(10).toPandas().to_dict("records")
+                        )
 
-        # Step 4b — apply naming normalization (before target mapping)
-        if thread.target.naming is not None:
-            df = normalize_columns(df, thread.target.naming)
+                # Continue with clean_df
+                df = outcome.clean_df
 
-        # Step 5 — compute keys and hashes
-        if thread.keys is not None:
-            df = compute_keys(df, thread.keys)
+            # Step 4b — apply naming normalization (before target mapping)
+            if thread.target.naming is not None:
+                df = normalize_columns(df, thread.target.naming)
 
-        # Step 6 — resolve and prepare audit columns
-        audit_columns = thread.target.audit_columns or {}
-        audit_columns_applied: list[str] = []
-        audit_ctx: AuditContext | None = None
-        if audit_columns:
-            audit_ctx = _build_audit_context(thread, weave_name, loom_name, run_timestamp, run_id)
+            # Step 5 — compute keys and hashes
+            if thread.keys is not None:
+                df = compute_keys(df, thread.keys)
 
-        # Step 7/8 — write to Delta
-        write_mode = thread.write.mode if thread.write else "overwrite"
-
-        if load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-            # CDC merge routing — skip target column mapping because
-            # execute_cdc_merge handles column selection internally
-            # (it must retain the operation column for row routing).
-            if audit_columns and audit_ctx is not None:
-                df = inject_audit_columns(df, audit_columns, audit_ctx)
-                audit_columns_applied = list(audit_columns)
-            output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-            with contextlib.suppress(Exception):
-                output_sample = df.limit(10).toPandas().to_dict("records")
-            cdc_write = _validate_cdc_write_config(thread)
-            cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
-            rows_written = sum(cdc_counts.values())
-        else:
-            # Apply target column mapping for non-CDC writes
-            df = apply_target_mapping(df, thread.target, spark)
-            if audit_columns and audit_ctx is not None:
-                df = inject_audit_columns(df, audit_columns, audit_ctx)
-                audit_columns_applied = list(audit_columns)
-            output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-            with contextlib.suppress(Exception):
-                output_sample = df.limit(10).toPandas().to_dict("records")
-            rows_written = write_target(spark, df, thread.target, thread.write, target_path)
-
-        # Step 9 — persist watermark state
-        if (
-            watermark_store is not None
-            and load_mode in ("incremental_watermark", "cdc")
-            and thread.load is not None
-            and new_hwm is not None
-        ):
-            try:
-                wm_type = thread.load.watermark_type or "timestamp"
-                wm_col = thread.load.watermark_column or "_commit_version"
-
-                new_state = WatermarkState(
-                    thread_name=thread.name,
-                    watermark_column=wm_col,
-                    watermark_type=wm_type,
-                    last_value=new_hwm,
-                    last_updated=datetime.now(UTC),
-                )
-                watermark_store.write(spark, new_state)
-                watermark_persisted = True
-                logger.debug(
-                    "Thread '%s': persisted HWM %s=%s",
-                    thread.name,
-                    wm_col,
-                    new_hwm,
-                )
-            except StateError:
-                raise
-            except Exception as e:
-                raise StateError(
-                    f"Failed to persist watermark for thread '{thread.name}'",
-                    cause=e,
-                    thread_name=thread.name,
-                ) from e
-
-        # Step 10 — run post-write assertions
-        if thread.assertions:
-            assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
-
-        # Step 11 — write exports (secondary outputs)
-        export_results: list[ExportResult] = []
-        if thread.exports:
-            # Build AuditContext for export path resolution if not already built
-            if audit_ctx is None:
+            # Step 6 — resolve and prepare audit columns
+            audit_columns = thread.target.audit_columns or {}
+            audit_columns_applied: list[str] = []
+            audit_ctx: AuditContext | None = None
+            if audit_columns:
                 audit_ctx = _build_audit_context(
                     thread, weave_name, loom_name, run_timestamp, run_id
                 )
 
-            resolved = resolve_exports(thread.exports, audit_ctx)
-            for export in resolved:
-                result = write_export(spark, df, export, row_count=rows_written)
-                export_results.append(result)
-                if result.status == "aborted":
-                    raise ExportError(
-                        f"Export '{export.name}' failed: {result.error}",
+            # Step 7/8 — write to Delta
+            write_mode = thread.write.mode if thread.write else "overwrite"
+
+            if load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
+                # CDC merge routing — skip target column mapping because
+                # execute_cdc_merge handles column selection internally
+                # (it must retain the operation column for row routing).
+                if audit_columns and audit_ctx is not None:
+                    df = inject_audit_columns(df, audit_columns, audit_ctx)
+                    audit_columns_applied = list(audit_columns)
+                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+                with contextlib.suppress(Exception):
+                    output_sample = df.limit(10).toPandas().to_dict("records")
+                cdc_write = _validate_cdc_write_config(thread)
+                cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
+                rows_written = sum(cdc_counts.values())
+            else:
+                # Apply target column mapping for non-CDC writes
+                df = apply_target_mapping(df, thread.target, spark)
+                if audit_columns and audit_ctx is not None:
+                    df = inject_audit_columns(df, audit_columns, audit_ctx)
+                    audit_columns_applied = list(audit_columns)
+                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+                with contextlib.suppress(Exception):
+                    output_sample = df.limit(10).toPandas().to_dict("records")
+                rows_written = write_target(spark, df, thread.target, thread.write, target_path)
+
+            # Step 9 — persist watermark state
+            if (
+                watermark_store is not None
+                and load_mode in ("incremental_watermark", "cdc")
+                and thread.load is not None
+                and new_hwm is not None
+            ):
+                try:
+                    wm_type = thread.load.watermark_type or "timestamp"
+                    wm_col = thread.load.watermark_column or "_commit_version"
+
+                    new_state = WatermarkState(
                         thread_name=thread.name,
-                        export_name=export.name,
-                        export_type=export.type,
+                        watermark_column=wm_col,
+                        watermark_type=wm_type,
+                        last_value=new_hwm,
+                        last_updated=datetime.now(UTC),
+                    )
+                    watermark_store.write(spark, new_state)
+                    watermark_persisted = True
+                    logger.debug(
+                        "Thread '%s': persisted HWM %s=%s",
+                        thread.name,
+                        wm_col,
+                        new_hwm,
+                    )
+                except StateError:
+                    raise
+                except Exception as e:
+                    raise StateError(
+                        f"Failed to persist watermark for thread '{thread.name}'",
+                        cause=e,
+                        thread_name=thread.name,
+                    ) from e
+
+            # Step 10 — run post-write assertions
+            if thread.assertions:
+                assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
+
+            # Step 11 — write exports (secondary outputs)
+            export_results: list[ExportResult] = []
+            if thread.exports:
+                # Build AuditContext for export path resolution if not already built
+                if audit_ctx is None:
+                    audit_ctx = _build_audit_context(
+                        thread, weave_name, loom_name, run_timestamp, run_id
                     )
 
-        # Step 12 — build result
-        samples: dict[str, list[dict[str, Any]]] | None = None
-        if output_sample:
-            samples = {"output": output_sample}
-            if quarantine_sample:
-                samples["quarantine"] = quarantine_sample
+                resolved = resolve_exports(thread.exports, audit_ctx)
+                for export in resolved:
+                    result = write_export(spark, df, export, row_count=rows_written)
+                    export_results.append(result)
+                    if result.status == "aborted":
+                        raise ExportError(
+                            f"Export '{export.name}' failed: {result.error}",
+                            thread_name=thread.name,
+                            export_name=export.name,
+                            export_type=export.type,
+                        )
 
-        telemetry = _build_telemetry(
-            span_builder,
-            validation_results,
-            assertion_results,
-            rows_read,
-            rows_written,
-            rows_quarantined,
-            collector=collector,
-            load_mode=load_mode,
-            watermark_column=thread.load.watermark_column if thread.load else None,
-            watermark_previous_value=prior_state.last_value if prior_state else None,
-            watermark_new_value=new_hwm,
-            watermark_persisted=watermark_persisted,
-            watermark_first_run=watermark_first_run,
-            cdc_counts=cdc_counts,
-            rows_after_transforms=rows_after_transforms,
-            resolved_params=resolved_params,
-            audit_columns_applied=audit_columns_applied,
-            export_results=export_results,
-        )
+            # Run thread-level post_steps (after core execution, before result)
+            if thread.post_steps:
+                run_hook_steps(
+                    spark,
+                    thread.post_steps,
+                    "post",
+                    thread_variable_ctx,
+                    params=resolved_params,
+                )
 
-        return ThreadResult(
-            status="success",
-            thread_name=thread.name,
-            rows_written=rows_written,
-            write_mode=write_mode,
-            target_path=target_path,
-            telemetry=telemetry,
-            output_schema=output_schema,
-            samples=samples,
-        )
+            # Step 12 — build result
+            samples: dict[str, list[dict[str, Any]]] | None = None
+            if output_sample:
+                samples = {"output": output_sample}
+                if quarantine_sample:
+                    samples["quarantine"] = quarantine_sample
 
-    except DataValidationError:
-        _build_telemetry(
-            span_builder,
-            validation_results,
-            assertion_results,
-            rows_read,
-            rows_written,
-            rows_quarantined,
-            status=SpanStatus.ERROR,
-            collector=collector,
-        )
-        raise
+            telemetry = _build_telemetry(
+                span_builder,
+                validation_results,
+                assertion_results,
+                rows_read,
+                rows_written,
+                rows_quarantined,
+                collector=collector,
+                load_mode=load_mode,
+                watermark_column=thread.load.watermark_column if thread.load else None,
+                watermark_previous_value=prior_state.last_value if prior_state else None,
+                watermark_new_value=new_hwm,
+                watermark_persisted=watermark_persisted,
+                watermark_first_run=watermark_first_run,
+                cdc_counts=cdc_counts,
+                rows_after_transforms=rows_after_transforms,
+                resolved_params=resolved_params,
+                audit_columns_applied=audit_columns_applied,
+                export_results=export_results,
+            )
 
-    except ExecutionError as exc:
-        if span_builder is not None:
-            span = span_builder.finish(status=SpanStatus.ERROR)
-            if collector is not None:
-                collector.add_span(span)
-        if exc.thread_name is None:
-            raise ExecutionError(
-                exc.message,
-                cause=exc.cause,
+            return ThreadResult(
+                status="success",
                 thread_name=thread.name,
-                step_index=exc.step_index,
-                step_type=exc.step_type,
-                source_name=exc.source_name,
+                rows_written=rows_written,
+                write_mode=write_mode,
+                target_path=target_path,
+                telemetry=telemetry,
+                output_schema=output_schema,
+                samples=samples,
+            )
+
+        except DataValidationError:
+            _build_telemetry(
+                span_builder,
+                validation_results,
+                assertion_results,
+                rows_read,
+                rows_written,
+                rows_quarantined,
+                status=SpanStatus.ERROR,
+                collector=collector,
+            )
+            raise
+
+        except ExecutionError as exc:
+            if span_builder is not None:
+                span = span_builder.finish(status=SpanStatus.ERROR)
+                if collector is not None:
+                    collector.add_span(span)
+            if exc.thread_name is None:
+                raise ExecutionError(
+                    exc.message,
+                    cause=exc.cause,
+                    thread_name=thread.name,
+                    step_index=exc.step_index,
+                    step_type=exc.step_type,
+                    source_name=exc.source_name,
+                ) from exc
+            raise
+        except Exception as exc:
+            if span_builder is not None:
+                span = span_builder.finish(status=SpanStatus.ERROR)
+                if collector is not None:
+                    collector.add_span(span)
+            raise ExecutionError(
+                f"Thread '{thread.name}' failed unexpectedly",
+                cause=exc,
+                thread_name=thread.name,
             ) from exc
-        raise
-    except Exception as exc:
-        if span_builder is not None:
-            span = span_builder.finish(status=SpanStatus.ERROR)
-            if collector is not None:
-                collector.add_span(span)
-        raise ExecutionError(
-            f"Thread '{thread.name}' failed unexpectedly",
-            cause=exc,
-            thread_name=thread.name,
-        ) from exc
+
+    finally:
+        # Cleanup thread-level lookups only; weave-level cleanup is the caller's job
+        if thread_cached_lookups:
+            cleanup_lookups(thread_cached_lookups)
+
+
+def _build_thread_variable_context(thread: Thread) -> VariableContext:
+    """Build a VariableContext from thread-level variable definitions.
+
+    If the thread declares variables, those are used. Otherwise an empty
+    context is returned so that hook steps have a valid context to work with.
+
+    Args:
+        thread: Thread configuration with optional variables.
+
+    Returns:
+        VariableContext initialized from thread variables.
+    """
+    if thread.variables:
+        return VariableContext(dict(thread.variables))
+    return VariableContext(None)
 
 
 def _build_audit_context(
