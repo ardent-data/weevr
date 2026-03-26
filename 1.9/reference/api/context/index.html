@@ -7323,24 +7323,27 @@ File paths contain slashes or URI schemes (<code>://</code>).</p>
 
         <p>Execute a single thread from sources through transforms to a Delta target.</p>
 <p>Execution order:
-1. Resolve lookup-based sources from cached or on-demand DataFrames.
-2. Read all remaining declared sources into DataFrames.
+1. Initialize thread-level resources (variables, lookups, column_sets).
+2. Run thread-level pre_steps.
+3. Resolve lookup-based sources from cached or on-demand DataFrames.
+4. Read all remaining declared sources into DataFrames.
    - For <code>incremental_watermark</code>: load prior HWM, apply filter, capture new HWM.
    - For <code>cdc</code>: read via CDF or generic CDC source.
-3. Set the primary (first) source as the working DataFrame.
-4. Run pipeline steps against the working DataFrame.
-5. Run validation rules (if configured) — quarantine or abort on failures.
-6. Apply naming normalization (if configured).
-7. Compute business keys and hashes if configured.
-8. Resolve the target write path.
-9. Apply target column mapping.
-10. Inject audit columns (if configured; bypasses mapping mode).
-11. Write to the Delta target.
+5. Set the primary (first) source as the working DataFrame.
+6. Run pipeline steps against the working DataFrame.
+7. Run validation rules (if configured) — quarantine or abort on failures.
+8. Apply naming normalization (if configured).
+9. Compute business keys and hashes if configured.
+10. Resolve the target write path.
+11. Apply target column mapping.
+12. Inject audit columns (if configured; bypasses mapping mode).
+13. Write to the Delta target.
     - For <code>cdc</code>: use CDC merge routing instead of standard write.
-12. Persist watermark state (if applicable).
-13. Run post-write assertions (if configured).
-14. Write exports (secondary outputs, if configured).
-15. Build telemetry and return ThreadResult.</p>
+14. Persist watermark state (if applicable).
+15. Run post-write assertions (if configured).
+16. Write exports (secondary outputs, if configured).
+17. Run thread-level post_steps.
+18. Build telemetry and return ThreadResult.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7937,7 +7940,7 @@ and passes it through the execution tree.</p>
 
 
 <h3 id="weevr.context.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7951,11 +7954,12 @@ execution. Respects <code>on_failure</code> config on each thread and manages th
 cache lifecycle via :class:<code>~weevr.engine.cache_manager.CacheManager</code>.</p>
 <p>When hooks are provided, the lifecycle is:
 1. Initialize <code>VariableContext</code> from <code>variables</code>.
-2. Materialize lookups (<code>materialize=True</code>).
-3. Execute <code>pre_steps</code>.
-4. Execute threads (with cached lookup DataFrames).
-5. Execute <code>post_steps</code>.
-6. Cleanup lookups.</p>
+2. Execute <code>pre_steps</code>.
+3. Materialize lookups (<code>materialize=True</code>).
+4. Materialize column sets.
+5. Execute threads (with cached lookup DataFrames).
+6. Execute <code>post_steps</code>.
+7. Cleanup lookups.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -8217,6 +8221,24 @@ instead of <code>plan.weave_name</code>. Typically the weave's qualified key.</p
                 <p>Merged column set definitions (loom-level merged with
 weave-level, weave wins) to be materialized and forwarded to each
 thread for rename step resolution.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>pre_cached_lookups</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Already-materialized lookup DataFrames from a
+parent scope (e.g. loom level). Seeded into the weave's cached
+lookup dict so threads can reference them without re-materializing.</p>
               </div>
             </td>
             <td>
