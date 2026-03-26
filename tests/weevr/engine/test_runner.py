@@ -1471,6 +1471,25 @@ class TestWeaveLifecycleOrder:
         )
         assert exec_idx < post_idx, f"threads ({exec_idx}) must run before post_steps ({post_idx})"
 
+    @patch("weevr.engine.runner.execute_thread")
+    def test_params_forwarded_to_execute_thread(self, mock_exec):
+        """Weave-level params are forwarded as resolved_params to execute_thread."""
+        mock_exec.side_effect = lambda spark, thread, **kw: _make_result(thread.name)
+
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+        runtime_params = {"env": "prod", "pk_columns": ["id", "ts"]}
+
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            params=runtime_params,
+        )
+
+        call_kwargs = mock_exec.call_args[1]
+        assert call_kwargs["resolved_params"] == runtime_params
+
 
 # ---------------------------------------------------------------------------
 # Loom resource lifecycle tests
@@ -1730,3 +1749,38 @@ class TestLoomResourceLifecycle:
         assert merged["shared"] == weave_cs
         # Weave-only key present
         assert "extra" in merged
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.run_hook_steps", return_value=[])
+    def test_loom_post_steps_run_after_weave_failure(self, mock_hooks, mock_weave_exec):
+        """Loom post_steps execute even when a weave fails."""
+        from weevr.model.hooks import LogMessageStep
+
+        call_order: list[str] = []
+        mock_hooks.side_effect = lambda spark, steps, phase, *a, **kw: (
+            call_order.append(f"hooks:{phase}"),
+            [],
+        )[1]
+        mock_weave_exec.side_effect = lambda *a, **kw: (
+            call_order.append("execute_weave"),
+            WeaveResult(
+                status="failure",
+                weave_name="w1",
+                thread_results=[],
+                threads_skipped=[],
+                duration_ms=0,
+            ),
+        )[1]
+
+        post = [LogMessageStep(type="log_message", message="loom done")]
+        loom = self._make_loom(post_steps=[s.model_dump() for s in post])
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "failure"
+        assert "hooks:post" in call_order, "post_steps must run even after weave failure"
+        weave_idx = call_order.index("execute_weave")
+        post_idx = call_order.index("hooks:post")
+        assert weave_idx < post_idx

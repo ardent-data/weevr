@@ -60,27 +60,27 @@ def execute_thread(
     """Execute a single thread from sources through transforms to a Delta target.
 
     Execution order:
-    0. Initialize thread-level resources (variables, lookups, column_sets).
-    0a. Run thread-level pre_steps.
-    1. Resolve lookup-based sources from cached or on-demand DataFrames.
-    2. Read all remaining declared sources into DataFrames.
+    1. Initialize thread-level resources (variables, lookups, column_sets).
+    2. Run thread-level pre_steps.
+    3. Resolve lookup-based sources from cached or on-demand DataFrames.
+    4. Read all remaining declared sources into DataFrames.
        - For ``incremental_watermark``: load prior HWM, apply filter, capture new HWM.
        - For ``cdc``: read via CDF or generic CDC source.
-    3. Set the primary (first) source as the working DataFrame.
-    4. Run pipeline steps against the working DataFrame.
-    5. Run validation rules (if configured) — quarantine or abort on failures.
-    6. Apply naming normalization (if configured).
-    7. Compute business keys and hashes if configured.
-    8. Resolve the target write path.
-    9. Apply target column mapping.
-    10. Inject audit columns (if configured; bypasses mapping mode).
-    11. Write to the Delta target.
+    5. Set the primary (first) source as the working DataFrame.
+    6. Run pipeline steps against the working DataFrame.
+    7. Run validation rules (if configured) — quarantine or abort on failures.
+    8. Apply naming normalization (if configured).
+    9. Compute business keys and hashes if configured.
+    10. Resolve the target write path.
+    11. Apply target column mapping.
+    12. Inject audit columns (if configured; bypasses mapping mode).
+    13. Write to the Delta target.
         - For ``cdc``: use CDC merge routing instead of standard write.
-    12. Persist watermark state (if applicable).
-    13. Run post-write assertions (if configured).
-    14. Write exports (secondary outputs, if configured).
-    14a. Run thread-level post_steps.
-    15. Build telemetry and return ThreadResult.
+    14. Persist watermark state (if applicable).
+    15. Run post-write assertions (if configured).
+    16. Write exports (secondary outputs, if configured).
+    17. Run thread-level post_steps.
+    18. Build telemetry and return ThreadResult.
 
     Args:
         spark: Active SparkSession.
