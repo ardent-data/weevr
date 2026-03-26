@@ -83,9 +83,12 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 1. **Build parameter context** — Merge runtime parameters (highest priority)
    over config-declared defaults (lowest priority) into a flat context
    dictionary. Dotted keys like `env.lakehouse` support nested access.
-2. **Resolve variables** — Recursively walk all strings in the config and
-   replace `${var}` references with values from the parameter context.
-   Unresolved variables without defaults raise `VariableResolutionError`.
+2. **Resolve variables** — Recursively walk all values in the config and
+   resolve `${var}` references from the parameter context. Whole-value
+   references return the native type; embedded references coerce to
+   string (see [Parameter resolution](#parameter-resolution) below).
+   Unresolved variables without defaults raise
+   `VariableResolutionError`.
 
 ### Stage 7: Load child configs
 
@@ -113,16 +116,21 @@ loaded config.
    higher level. Exports with `enabled: false` are removed after merge.
 
 2. **Expand macros** — `foreach` blocks in thread step lists are expanded
-   into repeated sequences. This happens after variable resolution so that
-   `foreach.values` can reference parameters.
+   into repeated sequences. This only applies when loading a thread
+   config directly; for weave and loom configs, child thread steps
+   are already concrete after reference resolution. Expansion happens
+   after variable resolution so that `foreach.values` can reference
+   parameters.
 
 ### Stage 10: Hydrate
 
-**Hydrate model** — The fully resolved dictionary is validated through
-the typed Pydantic model (`Thread`, `Weave`, or `Loom`). Semantic errors
-at this stage raise `ModelValidationError`. Incremental-mode constraints
-(e.g., CDC requires merge write mode) are checked as post-resolution
-cross-cutting validations.
+**Validate name and hydrate model** — The config `name` field is
+validated against the filename stem (mismatch raises `ConfigError`;
+missing name is injected from the stem). The fully resolved dictionary
+is then validated through the typed Pydantic model (`Thread`, `Weave`,
+or `Loom`). Semantic errors at this stage raise `ModelValidationError`.
+Incremental-mode constraints (e.g., CDC requires merge write mode) are
+checked as post-resolution cross-cutting validations.
 
 ## Module map
 
@@ -208,6 +216,15 @@ path: "/mnt/${env}/data/${table_name}"
 
 Embedded references that resolve to `None` produce the string `"None"`.
 Use whole-value references when you need null pass-through.
+
+### Inline defaults
+
+The `${param:-default}` fallback syntax always returns the default as
+a **string**, even in a whole-value position. For example,
+`limit: ${max_rows:-100}` returns the string `"100"` when `max_rows`
+is missing — not the integer `100`. To use a typed default, supply
+the parameter value explicitly at runtime rather than relying on the
+inline `:-` fallback.
 
 ---
 

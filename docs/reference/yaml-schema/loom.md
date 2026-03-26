@@ -87,8 +87,10 @@ Hook steps that run before any weave executes (`pre_steps`) or after
 all weaves complete (`post_steps`). The structure is identical to
 [weave-level hooks](weave.md#pre_steps-post_steps-hookstep).
 
-`post_steps` always run, even when a weave fails. This makes them
-suitable for unconditional teardown or notification steps.
+`post_steps` run after all weaves complete, including when a weave
+fails and stops the loom. They do not run if an earlier lifecycle
+phase (such as `pre_steps` or lookup materialization) raises an
+unhandled exception.
 
 These lists are not cascaded to child weaves. Each level runs its
 own list.

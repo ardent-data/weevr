@@ -792,7 +792,7 @@ structure is identical to
 
 Thread-level hook lists are **not** cascaded from the parent weave. Each
 level runs its own list independently. `pre_steps` run before any source is
-read; `post_steps` run after the target write completes.
+read; `post_steps` run after write, assertions, and exports.
 
 ```yaml
 pre_steps:
