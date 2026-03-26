@@ -477,6 +477,236 @@ class TestWholeValueResolution:
         assert "Unresolved variable" in str(exc_info.value)
         assert "undefined_param" in str(exc_info.value)
 
+
+_MINIMAL_THREAD = {
+    "config_version": "1.0",
+    "sources": {"data": {"type": "delta", "alias": "raw.data"}},
+    "target": {},
+}
+
+
+class TestStandaloneThreadResources:
+    """Test that standalone .thread files with inline resources parse correctly."""
+
+    def test_standalone_thread_with_inline_lookups(self):
+        """Standalone thread with inline lookups field parses correctly."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "lookups": {
+                "country_ref": {
+                    "source": {"type": "delta", "alias": "dim.country"},
+                    "materialize": True,
+                    "key": ["country_code"],
+                }
+            },
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.lookups is not None
+        assert "country_ref" in thread.lookups
+        lookup = thread.lookups["country_ref"]
+        assert lookup.materialize is True
+        assert lookup.key == ["country_code"]
+        assert lookup.source.alias == "dim.country"
+
+    def test_standalone_thread_with_inline_column_sets(self):
+        """Standalone thread with inline column_sets field parses correctly."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "column_sets": {
+                "rename_map": {
+                    "source": {
+                        "type": "delta",
+                        "alias": "config.column_mapping",
+                    }
+                }
+            },
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.column_sets is not None
+        assert "rename_map" in thread.column_sets
+        cs = thread.column_sets["rename_map"]
+        assert cs.source is not None
+        assert cs.source.alias == "config.column_mapping"
+
+    def test_standalone_thread_with_inline_params(self):
+        """Standalone thread with inline params field parses correctly."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "params": {
+                "env": {"name": "env", "type": "string", "required": True},
+                "batch_size": {
+                    "name": "batch_size",
+                    "type": "int",
+                    "required": False,
+                    "default": 1000,
+                },
+            },
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.params is not None
+        assert "env" in thread.params
+        assert "batch_size" in thread.params
+        assert thread.params["env"].type == "string"
+        assert thread.params["env"].required is True
+        assert thread.params["batch_size"].default == 1000
+
+    def test_standalone_thread_with_inline_variables(self):
+        """Standalone thread with inline variables field parses correctly."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "variables": {
+                "row_count": {"type": "int"},
+                "run_date": {"type": "date", "default": "2024-01-01"},
+            },
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.variables is not None
+        assert "row_count" in thread.variables
+        assert "run_date" in thread.variables
+        assert thread.variables["row_count"].type == "int"
+        assert thread.variables["run_date"].default == "2024-01-01"
+
+    def test_standalone_thread_with_inline_pre_and_post_steps(self):
+        """Standalone thread with inline pre_steps and post_steps parses correctly."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "pre_steps": [{"type": "log_message", "message": "Starting thread execution"}],
+            "post_steps": [{"type": "sql_statement", "sql": "OPTIMIZE silver.data"}],
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.pre_steps is not None
+        assert len(thread.pre_steps) == 1
+        pre = thread.pre_steps[0]
+        assert pre.type == "log_message"
+        assert pre.message == "Starting thread execution"
+
+        assert thread.post_steps is not None
+        assert len(thread.post_steps) == 1
+        post = thread.post_steps[0]
+        assert post.type == "sql_statement"
+        assert post.sql == "OPTIMIZE silver.data"
+
+    def test_standalone_thread_with_all_resources(self):
+        """Standalone thread can carry all inline resource types simultaneously."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "params": {"env": {"name": "env", "type": "string", "required": True}},
+            "lookups": {
+                "ref_data": {
+                    "source": {"type": "delta", "alias": "dim.ref"},
+                    "materialize": False,
+                }
+            },
+            "column_sets": {"col_map": {"source": {"type": "delta", "alias": "cfg.cols"}}},
+            "variables": {"status": {"type": "string"}},
+            "pre_steps": [{"type": "log_message", "message": "pre"}],
+            "post_steps": [{"type": "log_message", "message": "post"}],
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.params is not None and "env" in thread.params
+        assert thread.lookups is not None and "ref_data" in thread.lookups
+        assert thread.column_sets is not None and "col_map" in thread.column_sets
+        assert thread.variables is not None and "status" in thread.variables
+        assert thread.pre_steps is not None and len(thread.pre_steps) == 1
+        assert thread.post_steps is not None and len(thread.post_steps) == 1
+
+    def test_param_validation_required_param_missing_raises(self):
+        """validate_params raises ConfigSchemaError when a required thread param is absent."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "params": {"env": {"name": "env", "type": "string", "required": True}},
+        }
+        thread = Thread.model_validate(data)
+
+        # Build param specs dict from thread.params (as validate_params expects)
+        assert thread.params is not None
+        param_specs = {k: v for k, v in thread.params.items()}
+        context: dict = {}
+
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            validate_params(param_specs, context)
+        assert "Required parameter" in str(exc_info.value)
+        assert "env" in str(exc_info.value)
+
+    def test_param_validation_type_mismatch_raises(self):
+        """validate_params raises ConfigSchemaError when a thread param has wrong type."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "params": {"count": {"name": "count", "type": "int", "required": True}},
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.params is not None
+        param_specs = {k: v for k, v in thread.params.items()}
+        context = {"count": "not_an_int"}
+
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            validate_params(param_specs, context)
+        assert "expected int" in str(exc_info.value).lower()
+
+    def test_param_validation_with_defaults_passes(self):
+        """validate_params uses default when required param is absent but has a default."""
+        from weevr.model.thread import Thread
+
+        data = {
+            **_MINIMAL_THREAD,
+            "params": {
+                "mode": {
+                    "name": "mode",
+                    "type": "string",
+                    "required": True,
+                    "default": "batch",
+                }
+            },
+        }
+        thread = Thread.model_validate(data)
+
+        assert thread.params is not None
+        param_specs = {k: v for k, v in thread.params.items()}
+        context: dict = {}
+
+        validate_params(param_specs, context)  # Should not raise
+        assert context["mode"] == "batch"
+
+    def test_variable_resolution_within_standalone_thread(self):
+        """${param} references inside a standalone thread config resolve correctly."""
+        config = {
+            "sources": {
+                "data": {
+                    "type": "delta",
+                    "alias": "${lakehouse}.customers",
+                }
+            },
+            "target": {"alias": "${lakehouse}.output"},
+        }
+        context = {"lakehouse": "silver"}
+        resolved = resolve_variables(config, context)
+
+        assert resolved["sources"]["data"]["alias"] == "silver.customers"
+        assert resolved["target"]["alias"] == "silver.output"
+
     def test_whole_value_whitespace_stripped(self):
         """Whole-value match works even when value has surrounding whitespace."""
         config = {"keys": "  ${pk_columns}  "}
