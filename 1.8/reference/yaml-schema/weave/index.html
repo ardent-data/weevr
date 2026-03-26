@@ -3429,7 +3429,7 @@ settings override these.</p>
 <td><code>ReservedWordConfig</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Reserved word protection for output column names</td>
+<td>Reserved word protection for column and table names</td>
 </tr>
 </tbody>
 </table>
@@ -3459,28 +3459,35 @@ emitted when <code>kebab-case</code> is selected.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"quote"</code></td>
-<td>How to handle reserved words: <code>"prefix"</code>, <code>"quote"</code> (no-op — Spark backtick-quotes automatically), or <code>"error"</code></td>
+<td>How to handle reserved words: <code>"prefix"</code>, <code>"quote"</code>, or <code>"error"</code></td>
 </tr>
 <tr>
 <td><code>prefix</code></td>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"_"</code></td>
-<td>Prefix prepended to reserved words when <code>strategy</code> is <code>"prefix"</code></td>
+<td>Prefix when <code>strategy</code> is <code>"prefix"</code></td>
+</tr>
+<tr>
+<td><code>preset</code></td>
+<td><code>string \| list[string] \| null</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Built-in word list presets (<code>ansi</code>, <code>dax</code>, <code>m</code>, <code>powerbi</code>, <code>tsql</code>)</td>
 </tr>
 <tr>
 <td><code>extend</code></td>
 <td><code>list[string]</code></td>
 <td>no</td>
 <td><code>[]</code></td>
-<td>Additional words to treat as reserved</td>
+<td>Extra words to treat as reserved</td>
 </tr>
 <tr>
 <td><code>exclude</code></td>
 <td><code>list[string]</code></td>
 <td>no</td>
 <td><code>[]</code></td>
-<td>Words to remove from the default reserved list</td>
+<td>Words to remove from the check</td>
 </tr>
 </tbody>
 </table>
@@ -3567,8 +3574,9 @@ emitted when <code>kebab-case</code> is selected.</p>
 <a id="__codelineno-6-79" name="__codelineno-6-79" href="#__codelineno-6-79"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
 <a id="__codelineno-6-80" name="__codelineno-6-80" href="#__codelineno-6-80"></a><span class="w">  </span><span class="nt">on_collision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">suffix</span>
 <a id="__codelineno-6-81" name="__codelineno-6-81" href="#__codelineno-6-81"></a><span class="w">  </span><span class="nt">reserved_words</span><span class="p">:</span>
-<a id="__codelineno-6-82" name="__codelineno-6-82" href="#__codelineno-6-82"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
-<a id="__codelineno-6-83" name="__codelineno-6-83" href="#__codelineno-6-83"></a><span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;_&quot;</span>
+<a id="__codelineno-6-82" name="__codelineno-6-82" href="#__codelineno-6-82"></a><span class="w">    </span><span class="nt">preset</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ansi</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">dax</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-6-83" name="__codelineno-6-83" href="#__codelineno-6-83"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
+<a id="__codelineno-6-84" name="__codelineno-6-84" href="#__codelineno-6-84"></a><span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;_&quot;</span>
 </code></pre></div>
 <h3 id="shorthand-thread-syntax">Shorthand thread syntax<a class="headerlink" href="#shorthand-thread-syntax" title="Permanent link">&para;</a></h3>
 <p>Thread entries can be plain strings for inline definitions that need no
