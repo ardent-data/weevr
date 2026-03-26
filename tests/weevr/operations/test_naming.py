@@ -176,6 +176,75 @@ class TestNormalizTableName:
         assert normalize_table_name("DimCustomer", config) == "DimCustomer"
 
 
+class TestNormalizeTableNameReservedWords:
+    """Test reserved word protection for table names."""
+
+    def test_prefix_strategy(self):
+        """Reserved table name is prefixed."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        assert normalize_table_name("Select", config) == "_select"
+
+    def test_quote_strategy_passthrough(self):
+        """Quote strategy leaves reserved table name unchanged."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="quote"),
+        )
+        assert normalize_table_name("Select", config) == "select"
+
+    def test_error_strategy_raises(self):
+        """Error strategy raises ConfigError for reserved table name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="error"),
+        )
+        with pytest.raises(ConfigError, match="select"):
+            normalize_table_name("Select", config)
+
+    def test_non_reserved_unaffected(self):
+        """Non-reserved table name passes through unchanged."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        assert normalize_table_name("DimCustomer", config) == "dim_customer"
+
+    def test_preset_dax(self):
+        """DAX preset catches DAX-reserved table name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="dax"),  # type: ignore[arg-type]
+        )
+        assert normalize_table_name("Measure", config) == "_measure"
+
+    def test_no_tables_pattern_still_checks_reserved(self):
+        """Reserved word check applies even without a table pattern."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        assert normalize_table_name("select", config) == "_select"
+
+    def test_no_reserved_words_config(self):
+        """No reserved_words config means no protection."""
+        config = NamingConfig(tables=NamingPattern.SNAKE_CASE)
+        assert normalize_table_name("Select", config) == "select"
+
+
 class TestNamingConfig:
     """Test NamingConfig model."""
 
@@ -406,6 +475,73 @@ class TestNormalizeColumnsReservedWords:
         message = str(exc_info.value)
         assert "select" in message
         assert "from" in message
+
+
+@pytest.mark.spark
+class TestNormalizeColumnsPresetIntegration:
+    """Test reserved word presets with normalize_columns."""
+
+    def test_dax_preset_catches_dax_word(self, spark):
+        """DAX word is caught when using dax preset."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1,)], ["calculate"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="dax"),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_calculate"]
+
+    def test_dax_preset_ignores_ansi_only_word(self, spark):
+        """ANSI-only word is NOT caught when using only dax preset."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1,)], ["select"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="dax"),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        # "select" is ANSI but not DAX — should pass through unprefixed
+        assert result.columns == ["select"]
+
+    def test_combined_ansi_dax_catches_both(self, spark):
+        """Combined presets catch words from both sets."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1, 2)], ["select", "calculate"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset=["ansi", "dax"]),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_select", "_calculate"]
+
+    def test_no_preset_backwards_compat(self, spark):
+        """No preset specified uses ANSI default (backwards compat)."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        df = spark.createDataFrame([(1,)], ["select"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_select"]
+
+    def test_powerbi_preset_catches_dax_and_m(self, spark):
+        """powerbi preset catches both DAX and M words."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        # "calculate" is DAX, "each" is M
+        df = spark.createDataFrame([(1, 2)], ["calculate", "each"])
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="prefix", preset="powerbi"),  # type: ignore[arg-type]
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["_calculate", "_each"]
 
 
 @pytest.mark.spark

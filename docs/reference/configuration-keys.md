@@ -360,9 +360,51 @@ Supported `NamingPattern` values: `snake_case`, `camelCase`,
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `strategy` | `Literal["prefix", "quote", "error"]` | `"quote"` | How to handle reserved words |
-| `prefix` | `str` | `"_"` | Prefix string when `strategy` is `"prefix"` |
-| `extend` | `list[str]` | `[]` | Additional words to treat as reserved |
-| `exclude` | `list[str]` | `[]` | Words to remove from the default reserved list |
+| `prefix` | `str` | `"_"` | Prefix when `strategy` is `"prefix"` |
+| `preset` | `str \| list[str] \| None` | `None` | Built-in word list presets |
+| `extend` | `list[str]` | `[]` | Extra words to treat as reserved |
+| `exclude` | `list[str]` | `[]` | Words to remove from check |
+
+#### Presets
+
+The `preset` field selects one or more built-in reserved word
+lists. When omitted, the ANSI SQL list is used as the default.
+Specifying any preset replaces that default — to include ANSI
+words alongside other presets, list `ansi` explicitly.
+
+A single string is accepted as shorthand for a one-element list.
+
+| Preset | Description |
+|--------|-------------|
+| `ansi` | ANSI SQL reserved keywords (~80 words) |
+| `dax` | DAX reserved words for Power BI semantic models |
+| `m` | M language (Power Query) reserved words |
+| `powerbi` | Convenience alias — expands to `dax` + `m` |
+| `tsql` | T-SQL reserved keywords for SQL endpoints |
+
+Each preset is self-contained: `preset: [tsql]` alone gives
+full T-SQL protection without needing to add `ansi`.
+
+```yaml
+# Default (no preset = ANSI):
+reserved_words:
+  strategy: prefix
+
+# Power BI convenience alias (= dax + m):
+reserved_words:
+  preset: powerbi
+  strategy: prefix
+
+# Multi-engine (ANSI + DAX + T-SQL):
+reserved_words:
+  preset: [ansi, dax, tsql]
+  strategy: prefix
+  extend: [fiscal_year]
+  exclude: [by]
+```
+
+`extend` and `exclude` compose on top of the resolved preset
+union, adding or removing individual words.
 
 ---
 

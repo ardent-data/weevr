@@ -3,7 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from weevr.model.column_set import ColumnSet, ColumnSetSource, ReservedWordConfig
+from weevr.model.column_set import (
+    ColumnSet,
+    ColumnSetSource,
+    ReservedWordConfig,
+    ReservedWordPreset,
+)
 
 
 class TestColumnSetSource:
@@ -278,8 +283,59 @@ class TestReservedWordConfig:
         assert cfg.extend == ["TIMESTAMP", "VALUE"]
         assert cfg.exclude == ["id"]
 
+    def test_preset_defaults_to_none(self):
+        """preset defaults to None when not specified."""
+        cfg = ReservedWordConfig()
+        assert cfg.preset is None
+
+    def test_preset_accepts_list(self):
+        """preset accepts a list of valid preset names."""
+        cfg = ReservedWordConfig(preset=["ansi", "dax"])  # type: ignore[arg-type]
+        assert cfg.preset == [ReservedWordPreset.ANSI, ReservedWordPreset.DAX]
+
+    def test_preset_string_sugar(self):
+        """Single string is normalised to a one-element list."""
+        cfg = ReservedWordConfig(preset="dax")  # type: ignore[arg-type]
+        assert cfg.preset == [ReservedWordPreset.DAX]
+
+    def test_preset_unknown_raises(self):
+        """Unknown preset name raises ValidationError."""
+        with pytest.raises(ValidationError):
+            ReservedWordConfig(preset=["nonexistent"])  # type: ignore[arg-type]
+
+    def test_preset_empty_list(self):
+        """Empty preset list is accepted."""
+        cfg = ReservedWordConfig(preset=[])
+        assert cfg.preset == []
+
+    def test_preset_all_values(self):
+        """All five preset values are accepted."""
+        cfg = ReservedWordConfig(preset=["ansi", "dax", "m", "powerbi", "tsql"])  # type: ignore[arg-type]
+        assert cfg.preset is not None and len(cfg.preset) == 5
+
     def test_frozen(self):
         """ReservedWordConfig is immutable."""
         cfg = ReservedWordConfig()
         with pytest.raises(ValidationError):
             cfg.strategy = "prefix"  # type: ignore[misc]
+
+
+class TestReservedWordPreset:
+    """Test ReservedWordPreset enum."""
+
+    def test_has_five_members(self):
+        """Enum has exactly 5 members."""
+        assert len(ReservedWordPreset) == 5
+
+    def test_values_are_lowercase(self):
+        """All enum values are lowercase strings."""
+        for preset in ReservedWordPreset:
+            assert preset.value == preset.value.lower()
+
+    def test_string_comparison(self):
+        """StrEnum members compare equal to their string values."""
+        assert ReservedWordPreset.ANSI == "ansi"
+        assert ReservedWordPreset.DAX == "dax"
+        assert ReservedWordPreset.M == "m"
+        assert ReservedWordPreset.POWERBI == "powerbi"
+        assert ReservedWordPreset.TSQL == "tsql"
