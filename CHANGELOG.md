@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/ardent-data/weevr/compare/weevr-v1.8.0...weevr-v1.9.0) (2026-03-26)
+
+
+### Features
+
+* **engine:** add reserved word presets for Power BI, DAX, M, and T-SQL ([#101](https://github.com/ardent-data/weevr/issues/101)) ([bd16bf4](https://github.com/ardent-data/weevr/commit/bd16bf4949cb1cfd6014e32022c69cded51f4dc8))
+
 ## [1.8.0](https://github.com/ardent-data/weevr/compare/weevr-v1.7.1...weevr-v1.8.0) (2026-03-24)
 
 
