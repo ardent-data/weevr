@@ -361,7 +361,7 @@ Supported `NamingPattern` values: `snake_case`, `camelCase`,
 |-------|------|---------|-------------|
 | `strategy` | `Literal["prefix", "quote", "error"]` | `"quote"` | How to handle reserved words |
 | `prefix` | `str` | `"_"` | Prefix when `strategy` is `"prefix"` |
-| `preset` | `str \| list[str]` | `None` | Built-in word list presets |
+| `preset` | `str \| list[str] \| None` | `None` | Built-in word list presets |
 | `extend` | `list[str]` | `[]` | Extra words to treat as reserved |
 | `exclude` | `list[str]` | `[]` | Words to remove from check |
 

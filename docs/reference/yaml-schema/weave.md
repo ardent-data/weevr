@@ -305,7 +305,7 @@ Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
 |-----|------|----------|---------|-------------|
 | `strategy` | `string` | no | `"quote"` | How to handle reserved words: `"prefix"`, `"quote"`, or `"error"` |
 | `prefix` | `string` | no | `"_"` | Prefix when `strategy` is `"prefix"` |
-| `preset` | `string \| list[string]` | no | `null` | Built-in word list presets (`ansi`, `dax`, `m`, `powerbi`, `tsql`) |
+| `preset` | `string \| list[string] \| null` | no | `null` | Built-in word list presets (`ansi`, `dax`, `m`, `powerbi`, `tsql`) |
 | `extend` | `list[string]` | no | `[]` | Extra words to treat as reserved |
 | `exclude` | `list[string]` | no | `[]` | Words to remove from the check |
 
