@@ -215,7 +215,7 @@ def execute_thread(
                     prior_state.last_value if prior_state else None,
                 )
 
-            # --- Step 0: Resolve lookup-based sources ---
+            # --- Step 3: Resolve lookup-based sources ---
             lookup_dfs: dict[str, Any] = {}
             if effective_cached_lookups is not None or effective_weave_lookups is not None:
                 lookup_dfs = resolve_thread_lookups(
@@ -225,7 +225,7 @@ def execute_thread(
                     spark,
                 )
 
-            # --- Step 1: Read sources ---
+            # --- Step 4: Read sources ---
             if load_mode == "incremental_watermark" and thread.load is not None:
                 # Read primary source with watermark filter
                 primary_alias = next(iter(thread.sources))
@@ -278,11 +278,11 @@ def execute_thread(
                 sources_map = read_sources(spark, normal_sources)
                 sources_map.update(lookup_dfs)
 
-            # Step 2 — primary DataFrame is the first declared source
+            # Step 5 — primary DataFrame is the first declared source
             df = next(iter(sources_map.values()))
             rows_read = df.count()
 
-            # Step 3 — run pipeline steps
+            # Step 6 — run pipeline steps
             df = run_pipeline(
                 df,
                 thread.steps,
@@ -294,7 +294,7 @@ def execute_thread(
             # Capture intermediate row count for waterfall visualization
             rows_after_transforms = df.count()
 
-            # Step 4 — run validation rules
+            # Step 7 — run validation rules
             if thread.validations:
                 outcome = validate_dataframe(df, thread.validations)
                 validation_results = outcome.validation_results
@@ -315,15 +315,15 @@ def execute_thread(
                 # Continue with clean_df
                 df = outcome.clean_df
 
-            # Step 4b — apply naming normalization (before target mapping)
+            # Step 8 — apply naming normalization (before target mapping)
             if thread.target.naming is not None:
                 df = normalize_columns(df, thread.target.naming)
 
-            # Step 5 — compute keys and hashes
+            # Step 9 — compute keys and hashes
             if thread.keys is not None:
                 df = compute_keys(df, thread.keys)
 
-            # Step 6 — resolve and prepare audit columns
+            # Step 10 — resolve and prepare audit columns
             audit_columns = thread.target.audit_columns or {}
             audit_columns_applied: list[str] = []
             audit_ctx: AuditContext | None = None
@@ -332,7 +332,7 @@ def execute_thread(
                     thread, weave_name, loom_name, run_timestamp, run_id
                 )
 
-            # Step 7/8 — write to Delta
+            # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
 
             if load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
@@ -359,7 +359,7 @@ def execute_thread(
                     output_sample = df.limit(10).toPandas().to_dict("records")
                 rows_written = write_target(spark, df, thread.target, thread.write, target_path)
 
-            # Step 9 — persist watermark state
+            # Step 14 — persist watermark state
             if (
                 watermark_store is not None
                 and load_mode in ("incremental_watermark", "cdc")
@@ -394,11 +394,11 @@ def execute_thread(
                         thread_name=thread.name,
                     ) from e
 
-            # Step 10 — run post-write assertions
+            # Step 15 — run post-write assertions
             if thread.assertions:
                 assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
 
-            # Step 11 — write exports (secondary outputs)
+            # Step 16 — write exports (secondary outputs)
             export_results: list[ExportResult] = []
             if thread.exports:
                 # Build AuditContext for export path resolution if not already built
@@ -429,7 +429,7 @@ def execute_thread(
                     params=resolved_params,
                 )
 
-            # Step 12 — build result
+            # Step 18 — build result
             samples: dict[str, list[dict[str, Any]]] | None = None
             if output_sample:
                 samples = {"output": output_sample}
