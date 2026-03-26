@@ -788,7 +788,7 @@ variables:
 
 Hook steps that run before or after the thread's core execution. The
 structure is identical to
-[weave-level pre_steps / post_steps](weave.md#pre_steps--post_steps-hookstep).
+[weave-level pre_steps / post_steps](weave.md#pre_steps-post_steps-hookstep).
 
 Thread-level hook lists are **not** cascaded from the parent weave. Each
 level runs its own list independently. `pre_steps` run before any source is
