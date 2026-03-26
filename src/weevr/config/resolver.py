@@ -67,6 +67,9 @@ def _get_dotted_value(context: dict[str, Any], key: str) -> Any:
 # Regex pattern for ${var} and ${var:-default}
 VARIABLE_PATTERN = re.compile(r"\$\{([^}:]+?)(?::-(.*?))?\}")
 
+# Matches a string that is entirely a single ${var} or ${var:-default} reference
+WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-(.*?))?\}$")
+
 
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
@@ -95,6 +98,26 @@ def resolve_variables(
         return [resolve_variables(item, context) for item in config]
 
     elif isinstance(config, str):
+        # Whole-value check: if the entire string is a single ${param} reference,
+        # return the native Python type rather than stringifying it.
+        whole_match = WHOLE_VALUE_PATTERN.match(config.strip())
+        if whole_match:
+            var_name = whole_match.group(1).strip()
+            default_value = whole_match.group(2)
+
+            if not var_name.startswith(("var.", "run.")):
+                try:
+                    return _get_dotted_value(context, var_name)
+                except KeyError as exc:
+                    if default_value is not None:
+                        return default_value
+                    else:
+                        raise VariableResolutionError(
+                            f"Unresolved variable '${{{var_name}}}' with no default value",
+                            config_key=var_name,
+                        ) from exc
+            # var.* / run.* fall through to the existing sub() path below
+
         # Find all variable references in the string
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1).strip()

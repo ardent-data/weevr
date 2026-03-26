@@ -396,6 +396,96 @@ class TestReferenceResolution:
         assert result["_resolved_weaves"][0]["qualified_key"] == "dimensions.weave"
 
 
+class TestWholeValueResolution:
+    """Test that whole-value ${param} references return native Python types."""
+
+    def test_whole_value_list(self):
+        """${param} resolving to list returns list, not string."""
+        config = {"match_keys": "${pk_columns}"}
+        context = {"pk_columns": ["mandt", "color"]}
+        result = resolve_variables(config, context)
+        assert result["match_keys"] == ["mandt", "color"]
+        assert isinstance(result["match_keys"], list)
+
+    def test_whole_value_int(self):
+        """${param} resolving to int returns int."""
+        config = {"page_size": "${batch_size}"}
+        context = {"batch_size": 1000}
+        result = resolve_variables(config, context)
+        assert result["page_size"] == 1000
+        assert isinstance(result["page_size"], int)
+
+    def test_whole_value_bool_true(self):
+        """${param} resolving to bool True returns bool."""
+        config = {"enabled": "${flag_enabled}"}
+        context = {"flag_enabled": True}
+        result = resolve_variables(config, context)
+        assert result["enabled"] is True
+        assert isinstance(result["enabled"], bool)
+
+    def test_whole_value_bool_false(self):
+        """${param} resolving to bool False returns bool."""
+        config = {"debug": "${flag_debug}"}
+        context = {"flag_debug": False}
+        result = resolve_variables(config, context)
+        assert result["debug"] is False
+        assert isinstance(result["debug"], bool)
+
+    def test_whole_value_none(self):
+        """${param} resolving to None returns None, not string 'None'."""
+        config = {"filter": "${optional_filter}"}
+        context = {"optional_filter": None}
+        result = resolve_variables(config, context)
+        assert result["filter"] is None
+
+    def test_whole_value_with_default_returns_string(self):
+        """${param:-default} where param missing returns default as string."""
+        config = {"mode": "${missing_param:-batch}"}
+        context = {}
+        result = resolve_variables(config, context)
+        assert result["mode"] == "batch"
+        assert isinstance(result["mode"], str)
+
+    def test_embedded_ref_still_returns_string(self):
+        """Embedded ${param} in a longer string always returns string."""
+        config = {"alias": "SAP.${table_name}"}
+        context = {"table_name": "MARA"}
+        result = resolve_variables(config, context)
+        assert result["alias"] == "SAP.MARA"
+        assert isinstance(result["alias"], str)
+
+    def test_whole_value_var_namespace_passthrough(self):
+        """${var.x} whole-value reference still passes through unchanged."""
+        config = {"schema": "${var.target_schema}"}
+        context = {}
+        result = resolve_variables(config, context)
+        assert result["schema"] == "${var.target_schema}"
+
+    def test_whole_value_run_namespace_passthrough(self):
+        """${run.x} whole-value reference still passes through unchanged."""
+        config = {"ts": "${run.timestamp}"}
+        context = {}
+        result = resolve_variables(config, context)
+        assert result["ts"] == "${run.timestamp}"
+
+    def test_whole_value_missing_no_default_raises(self):
+        """${param} where param missing and no default raises VariableResolutionError."""
+        config = {"keys": "${undefined_param}"}
+        context = {}
+        with pytest.raises(VariableResolutionError) as exc_info:
+            resolve_variables(config, context)
+        assert "Unresolved variable" in str(exc_info.value)
+        assert "undefined_param" in str(exc_info.value)
+
+    def test_whole_value_whitespace_stripped(self):
+        """Whole-value match works even when value has surrounding whitespace."""
+        config = {"keys": "  ${pk_columns}  "}
+        context = {"pk_columns": ["id", "code"]}
+        result = resolve_variables(config, context)
+        assert result["keys"] == ["id", "code"]
+        assert isinstance(result["keys"], list)
+
+
 class TestRunVariableSkip:
     """Test that ${run.*} variables are preserved at config-load time."""
 
