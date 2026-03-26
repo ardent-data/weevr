@@ -45,7 +45,8 @@
     "markdownlint",
     "cspell",
     "powerbi",
-    "tsql"
+    "tsql",
+    "dataflows"
   ],
   "ignorePaths": [
     "**/*.py",
