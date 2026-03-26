@@ -1470,3 +1470,263 @@ class TestWeaveLifecycleOrder:
             f"column_sets ({cs_idx}) must be materialized before thread execution ({exec_idx})"
         )
         assert exec_idx < post_idx, f"threads ({exec_idx}) must run before post_steps ({post_idx})"
+
+
+# ---------------------------------------------------------------------------
+# Loom resource lifecycle tests
+# ---------------------------------------------------------------------------
+
+
+class TestLoomResourceLifecycle:
+    """Test loom-level resource lifecycle: variables, pre/post_steps, lookups.
+
+    These tests mock execute_weave (and supporting functions) at the runner
+    module level, verifying that execute_loom orchestrates the lifecycle in
+    the correct order and passes merged resources to each weave.
+    """
+
+    def _make_loom(self, **overrides):
+        """Build a minimal Loom with optional resource overrides."""
+        data = {"config_version": "1.0", "weaves": ["w1"], **overrides}
+        return Loom.model_validate(data)
+
+    def _make_weave(self, name="w1", **overrides):
+        data = {"config_version": "1.0", "name": name, "threads": ["t1"], **overrides}
+        return Weave.model_validate(data)
+
+    def _weave_result(self, name="w1"):
+        return WeaveResult(
+            status="success",
+            weave_name=name,
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.run_hook_steps", return_value=[])
+    def test_loom_pre_steps_run_before_weaves(self, mock_hooks, mock_weave_exec):
+        """Loom pre_steps execute before any weave runs."""
+        from weevr.model.hooks import LogMessageStep
+
+        mock_weave_exec.return_value = self._weave_result()
+
+        call_order: list[str] = []
+        mock_hooks.side_effect = lambda spark, steps, phase, *a, **kw: (
+            call_order.append(f"hooks:{phase}"),
+            [],
+        )[1]
+        mock_weave_exec.side_effect = lambda *a, **kw: (
+            call_order.append("execute_weave"),
+            self._weave_result(),
+        )[1]
+
+        pre = [LogMessageStep(type="log_message", message="loom start")]
+        loom = self._make_loom(pre_steps=[s.model_dump() for s in pre])
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert "hooks:pre" in call_order
+        assert "execute_weave" in call_order
+        pre_idx = call_order.index("hooks:pre")
+        weave_idx = call_order.index("execute_weave")
+        assert pre_idx < weave_idx, "pre_steps must run before weave execution"
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.run_hook_steps", return_value=[])
+    def test_loom_post_steps_run_after_weaves(self, mock_hooks, mock_weave_exec):
+        """Loom post_steps execute after all weaves complete."""
+        from weevr.model.hooks import LogMessageStep
+
+        call_order: list[str] = []
+        mock_hooks.side_effect = lambda spark, steps, phase, *a, **kw: (
+            call_order.append(f"hooks:{phase}"),
+            [],
+        )[1]
+        mock_weave_exec.side_effect = lambda *a, **kw: (
+            call_order.append("execute_weave"),
+            self._weave_result(),
+        )[1]
+
+        post = [LogMessageStep(type="log_message", message="loom done")]
+        loom = self._make_loom(post_steps=[s.model_dump() for s in post])
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        weave_idx = call_order.index("execute_weave")
+        post_idx = call_order.index("hooks:post")
+        assert weave_idx < post_idx, "post_steps must run after weave execution"
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_loom_lookups_materialize_and_cleanup(self, mock_mat, mock_cleanup, mock_weave_exec):
+        """Loom lookups are materialized before weaves and cleaned up after."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=10)],
+        )
+        mock_weave_exec.return_value = self._weave_result()
+
+        loom_lookup = Lookup(
+            source=Source(type="delta", alias="gold.ref"),
+            materialize=True,
+        )
+        loom = self._make_loom(lookups={"ref": loom_lookup.model_dump()})
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        # Loom lookups materialized
+        mock_mat.assert_called_once()
+        mat_lookups = mock_mat.call_args[0][1]
+        assert "ref" in mat_lookups
+
+        # Cleanup called with the cached DFs
+        mock_cleanup.assert_called_once()
+        cleaned = mock_cleanup.call_args[0][0]
+        assert "ref" in cleaned
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_loom_lookups_passed_as_pre_cached(self, mock_mat, mock_weave_exec):
+        """Loom cached lookup DFs are passed to execute_weave as pre_cached_lookups."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_weave_exec.return_value = self._weave_result()
+
+        loom_lookup = Lookup(
+            source=Source(type="delta", alias="gold.ref"),
+            materialize=True,
+        )
+        loom = self._make_loom(lookups={"ref": loom_lookup.model_dump()})
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_weave_exec.call_args.kwargs
+        pre_cached = call_kwargs.get("pre_cached_lookups")
+        assert pre_cached is not None
+        assert "ref" in pre_cached
+        assert pre_cached["ref"] is mock_df
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_variables_cascade_into_weave(self, mock_weave_exec):
+        """Loom variables merge with weave variables; weave wins on conflict."""
+        mock_weave_exec.return_value = self._weave_result()
+
+        loom = self._make_loom(
+            variables={
+                "batch": {"type": "string", "default": "L001"},
+                "env": {"type": "string", "default": "prod"},
+            }
+        )
+        weaves = {
+            "w1": self._make_weave(
+                variables={
+                    "batch": {"type": "string", "default": "W001"},
+                }
+            ),
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_weave_exec.call_args.kwargs
+        merged_vars = call_kwargs.get("variables")
+        assert merged_vars is not None
+        # Weave wins on "batch"
+        assert merged_vars["batch"].default == "W001"
+        # Loom "env" is inherited
+        assert "env" in merged_vars
+        assert merged_vars["env"].default == "prod"
+
+    @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_loom_cleanup_runs_on_failure(self, mock_mat, mock_cleanup, mock_weave_exec):
+        """Loom lookup cleanup runs even when a weave fails."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_weave_exec.return_value = WeaveResult(
+            status="failure",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom_lookup = Lookup(
+            source=Source(type="delta", alias="gold.ref"),
+            materialize=True,
+        )
+        loom = self._make_loom(lookups={"ref": loom_lookup.model_dump()})
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "failure"
+        # Cleanup must still be called
+        mock_cleanup.assert_called_once()
+        cleaned = mock_cleanup.call_args[0][0]
+        assert "ref" in cleaned
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_column_sets_use_merge_helper(self, mock_weave_exec):
+        """Column sets now use merge_resource_dicts helper for loom/weave merge."""
+        from weevr.model.column_set import ColumnSet, ColumnSetSource
+
+        mock_weave_exec.return_value = self._weave_result()
+
+        loom_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.loom_map"),
+        )
+        weave_cs = ColumnSet(
+            source=ColumnSetSource(type="delta", alias="gold.weave_map"),
+        )
+
+        loom = self._make_loom(column_sets={"shared": loom_cs.model_dump()})
+        weaves = {
+            "w1": self._make_weave(
+                column_sets={"shared": weave_cs.model_dump(), "extra": weave_cs.model_dump()}
+            ),
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_weave_exec.call_args.kwargs
+        merged = call_kwargs.get("column_set_defs")
+        assert merged is not None
+        # Weave wins on conflict
+        assert merged["shared"] == weave_cs
+        # Weave-only key present
+        assert "extra" in merged

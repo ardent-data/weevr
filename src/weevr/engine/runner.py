@@ -18,6 +18,7 @@ from weevr.engine.executor import execute_thread
 from weevr.engine.hooks import HookResult, run_hook_steps
 from weevr.engine.lookups import LookupResult, cleanup_lookups, materialize_lookups
 from weevr.engine.planner import ExecutionPlan, build_plan
+from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
@@ -82,6 +83,7 @@ def execute_weave(
     loom_name: str = "",
     weave_name: str = "",
     column_set_defs: dict[str, ColumnSet] | None = None,
+    pre_cached_lookups: dict[str, Any] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -121,6 +123,9 @@ def execute_weave(
         column_set_defs: Merged column set definitions (loom-level merged with
             weave-level, weave wins) to be materialized and forwarded to each
             thread for rename step resolution.
+        pre_cached_lookups: Already-materialized lookup DataFrames from a
+            parent scope (e.g. loom level). Seeded into the weave's cached
+            lookup dict so threads can reference them without re-materializing.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -147,7 +152,7 @@ def execute_weave(
 
     # Initialize hook lifecycle components
     variable_ctx = VariableContext(variables)
-    cached_lookup_dfs: dict[str, Any] = {}
+    cached_lookup_dfs: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
     all_hook_results: list[HookResult] = []
     all_lookup_results: list[LookupResult] = []
 
@@ -521,82 +526,129 @@ def execute_loom(
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
-    for weave_entry in loom.weaves:
-        weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
+    # Loom-level resource lifecycle
+    loom_variable_ctx = VariableContext(dict(loom.variables) if loom.variables else None)
+    loom_cached_lookup_dfs: dict[str, Any] = {}
 
-        # Evaluate weave-level condition
-        if weave_entry.condition is not None and not evaluate_condition(
-            weave_entry.condition, spark=spark, params=params
-        ):
-            logger.debug(
-                "Loom '%s' — weave '%s' skipped (condition: '%s')",
-                loom.name,
-                weave_name,
-                weave_entry.condition.when,
+    try:
+        # Loom pre_steps
+        if loom.pre_steps:
+            run_hook_steps(
+                spark,
+                list(loom.pre_steps),
+                "pre",
+                loom_variable_ctx,
+                params=params,
+                collector=collector,
+                parent_span_id=loom_span_id,
             )
-            weave_results.append(
-                WeaveResult(
-                    status="skipped",
-                    weave_name=weave_name,
-                    thread_results=[],
-                    threads_skipped=[],
-                    duration_ms=0,
-                    skip_reason=weave_entry.condition.when,
+
+        # Materialize loom-level lookups (shared across all weaves)
+        if loom.lookups:
+            loom_cached_lookup_dfs, _ = materialize_lookups(
+                spark,
+                dict(loom.lookups),
+                collector=collector,
+                parent_span_id=loom_span_id,
+            )
+
+        for weave_entry in loom.weaves:
+            weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
+
+            # Evaluate weave-level condition
+            if weave_entry.condition is not None and not evaluate_condition(
+                weave_entry.condition, spark=spark, params=params
+            ):
+                logger.debug(
+                    "Loom '%s' — weave '%s' skipped (condition: '%s')",
+                    loom.name,
+                    weave_name,
+                    weave_entry.condition.when,
                 )
+                weave_results.append(
+                    WeaveResult(
+                        status="skipped",
+                        weave_name=weave_name,
+                        thread_results=[],
+                        threads_skipped=[],
+                        duration_ms=0,
+                        skip_reason=weave_entry.condition.when,
+                    )
+                )
+                continue
+
+            weave = weaves[weave_name]
+            weave_threads = threads[weave_name]
+
+            weave_lookups = dict(weave.lookups) if weave.lookups else None
+            plan = build_plan(
+                weave_name=weave_name,
+                threads=weave_threads,
+                thread_entries=list(weave.threads),
+                lookups=weave_lookups,
             )
-            continue
 
-        weave = weaves[weave_name]
-        weave_threads = threads[weave_name]
+            # Build thread condition map from ThreadEntry conditions
+            thread_conditions: dict[str, ConditionSpec] = {}
+            for te in weave.threads:
+                if te.condition is not None:
+                    thread_conditions[te.name] = te.condition
 
-        weave_lookups = dict(weave.lookups) if weave.lookups else None
-        plan = build_plan(
-            weave_name=weave_name,
-            threads=weave_threads,
-            thread_entries=list(weave.threads),
-            lookups=weave_lookups,
-        )
-
-        # Build thread condition map from ThreadEntry conditions
-        thread_conditions: dict[str, ConditionSpec] = {}
-        for te in weave.threads:
-            if te.condition is not None:
-                thread_conditions[te.name] = te.condition
-
-        # Merge loom-level and weave-level column set defs (weave wins on conflicts)
-        loom_column_sets = dict(loom.column_sets) if loom.column_sets else {}
-        weave_column_sets = dict(weave.column_sets) if weave.column_sets else {}
-        merged_column_set_defs: dict[str, ColumnSet] | None = {
-            **loom_column_sets,
-            **weave_column_sets,
-        } or None
-
-        result = execute_weave(
-            spark,
-            plan,
-            weave_threads,
-            collector=collector,
-            parent_span_id=loom_span_id,
-            thread_conditions=thread_conditions if thread_conditions else None,
-            params=params,
-            weave_span_label=weave.qualified_key or weave_name,
-            pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
-            post_steps=list(weave.post_steps) if weave.post_steps else None,
-            lookups=dict(weave.lookups) if weave.lookups else None,
-            variables=dict(weave.variables) if weave.variables else None,
-            loom_name=loom.name,
-            weave_name=weave_name,
-            column_set_defs=merged_column_set_defs,
-        )
-        weave_results.append(result)
-
-        if result.status == "failure":
-            logger.debug(
-                "Loom '%s' — weave '%s' failed, stopping loom execution",
-                loom.name,
-                weave_name,
+            # Merge loom and weave resources using cascade helpers (weave wins)
+            loom_cs = dict(loom.column_sets) if loom.column_sets else None
+            weave_cs = dict(weave.column_sets) if weave.column_sets else None
+            merged_column_set_defs = merge_resource_dicts(
+                loom_cs, weave_cs, "column_set", "loom", "weave"
             )
-            break
+
+            loom_vars_dict = dict(loom.variables) if loom.variables else None
+            weave_vars_dict = dict(weave.variables) if weave.variables else None
+            merged_variables = merge_resource_dicts(
+                loom_vars_dict, weave_vars_dict, "variable", "loom", "weave"
+            )
+
+            result = execute_weave(
+                spark,
+                plan,
+                weave_threads,
+                collector=collector,
+                parent_span_id=loom_span_id,
+                thread_conditions=thread_conditions if thread_conditions else None,
+                params=params,
+                weave_span_label=weave.qualified_key or weave_name,
+                pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
+                post_steps=list(weave.post_steps) if weave.post_steps else None,
+                lookups=weave_lookups,
+                variables=merged_variables,
+                loom_name=loom.name,
+                weave_name=weave_name,
+                column_set_defs=merged_column_set_defs,
+                pre_cached_lookups=loom_cached_lookup_dfs or None,
+            )
+            weave_results.append(result)
+
+            if result.status == "failure":
+                logger.debug(
+                    "Loom '%s' — weave '%s' failed, stopping loom execution",
+                    loom.name,
+                    weave_name,
+                )
+                break
+
+        # Loom post_steps
+        if loom.post_steps:
+            run_hook_steps(
+                spark,
+                list(loom.post_steps),
+                "post",
+                loom_variable_ctx,
+                params=params,
+                collector=collector,
+                parent_span_id=loom_span_id,
+            )
+
+    finally:
+        cleanup_lookups(loom_cached_lookup_dfs)
 
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
