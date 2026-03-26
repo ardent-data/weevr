@@ -84,6 +84,7 @@ nav:
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:
+      - "1.9": release-notes/1.9.md
       - "1.8": release-notes/1.8.md
       - "1.7": release-notes/1.7.md
       - "1.6": release-notes/1.6.md
