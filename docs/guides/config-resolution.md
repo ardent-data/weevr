@@ -166,6 +166,51 @@ export path templates.
   resolution so that the `values` list can come from parameters, but before
   model hydration so that expanded steps are fully validated.
 
+## Parameter resolution
+
+### Whole-value resolution
+
+When an entire YAML value is a single `${param}` reference (no surrounding
+text), the resolver returns the native Python type of the referenced value.
+The result is not cast to string.
+
+```yaml
+match_keys: ${pk_columns}
+# pk_columns: ["mandt", "color"] → list[str]
+
+enabled: ${flag}
+# flag: true → bool
+
+limit: ${max_rows}
+# max_rows: 1000 → int
+```
+
+A whole-value reference that resolves to `None` returns `null` rather than
+the string `"None"`:
+
+```yaml
+optional_param: ${value}
+# value: null → None
+```
+
+### Embedded resolution
+
+When `${param}` appears inside a larger string, standard string interpolation
+applies. The resolved value is coerced to string and substituted in place.
+
+```yaml
+alias: "SAP.${table_name}"
+# table_name: "MARA" → "SAP.MARA"
+
+path: "/mnt/${env}/data/${table_name}"
+# env: "prod", table_name: "MARA" → "/mnt/prod/data/MARA"
+```
+
+Embedded references that resolve to `None` produce the string `"None"`.
+Use whole-value references when you need null pass-through.
+
+---
+
 ## Further reading
 
 - [Configuration Keys](../reference/configuration-keys.md) — Complete field
