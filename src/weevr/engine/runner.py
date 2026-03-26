@@ -92,11 +92,12 @@ def execute_weave(
 
     When hooks are provided, the lifecycle is:
     1. Initialize ``VariableContext`` from ``variables``.
-    2. Materialize lookups (``materialize=True``).
-    3. Execute ``pre_steps``.
-    4. Execute threads (with cached lookup DataFrames).
-    5. Execute ``post_steps``.
-    6. Cleanup lookups.
+    2. Execute ``pre_steps``.
+    3. Materialize lookups (``materialize=True``).
+    4. Materialize column sets.
+    5. Execute threads (with cached lookup DataFrames).
+    6. Execute ``post_steps``.
+    7. Cleanup lookups.
 
     Args:
         spark: Active SparkSession.
@@ -164,6 +165,23 @@ def execute_weave(
         all_lookup_results.extend(new_results)
 
     try:
+        # Execute pre-steps before any materialization
+        if pre_steps:
+            try:
+                pre_results = run_hook_steps(
+                    spark,
+                    pre_steps,
+                    "pre",
+                    variable_ctx,
+                    params=params,
+                    collector=collector,
+                    parent_span_id=weave_span_id,
+                )
+                all_hook_results.extend(pre_results)
+            except HookError:
+                cleanup_lookups(cached_lookup_dfs)
+                raise
+
         # Materialize lookups: when a lookup schedule is available, defer
         # internal lookups to the correct group boundary. Otherwise (backward
         # compat) materialize everything upfront.
@@ -186,23 +204,6 @@ def execute_weave(
                 collector=collector,
                 parent_span_id=weave_span_id,
             )
-
-        # Execute pre-steps
-        if pre_steps:
-            try:
-                pre_results = run_hook_steps(
-                    spark,
-                    pre_steps,
-                    "pre",
-                    variable_ctx,
-                    params=params,
-                    collector=collector,
-                    parent_span_id=weave_span_id,
-                )
-                all_hook_results.extend(pre_results)
-            except HookError:
-                cleanup_lookups(cached_lookup_dfs)
-                raise
 
         for group_idx, group in enumerate(plan.execution_order):
             # Materialize lookups whose producers completed in prior groups.

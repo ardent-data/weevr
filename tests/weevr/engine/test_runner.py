@@ -1358,6 +1358,7 @@ class TestColumnSetsCascade:
     @patch("weevr.engine.runner.execute_weave")
     def test_no_column_sets_passes_none(self, mock_exec):
         """When neither loom nor weave define column_sets, None is forwarded."""
+
         mock_exec.return_value = WeaveResult(
             status="success",
             weave_name="w1",
@@ -1376,3 +1377,96 @@ class TestColumnSetsCascade:
 
         call_kwargs = mock_exec.call_args.kwargs
         assert call_kwargs.get("column_set_defs") is None
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle order tests
+# ---------------------------------------------------------------------------
+
+
+class TestWeaveLifecycleOrder:
+    """Verify that execute_weave runs lifecycle phases in the correct order.
+
+    DEC-013 specifies: variables → pre_steps → lookups → column_sets →
+    threads → post_steps → cleanup.
+    """
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_column_sets")
+    @patch("weevr.engine.runner.materialize_lookups")
+    @patch("weevr.engine.runner.run_hook_steps")
+    def test_pre_steps_run_before_lookups_and_column_sets(
+        self, mock_hooks, mock_mat_lookups, mock_mat_cs, mock_exec
+    ):
+        """Pre-steps must execute before lookups and column sets are materialized."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.column_set import ColumnSet, ColumnSetSource
+        from weevr.model.hooks import LogMessageStep
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        call_order: list[str] = []
+
+        mock_hooks.side_effect = lambda spark, steps, phase, *a, **kw: (
+            call_order.append(f"hooks:{phase}"),
+            [],
+        )[1]
+
+        mock_df = MagicMock()
+        mock_mat_lookups.side_effect = lambda spark, lk_dict, **kw: (
+            call_order.append("materialize_lookups"),
+            (
+                {n: mock_df for n in lk_dict},
+                [LookupResult(name=n, materialized=True, row_count=1) for n in lk_dict],
+            ),
+        )[1]
+
+        mock_mat_cs.side_effect = lambda spark, cs_defs, params, **kw: (
+            call_order.append("materialize_column_sets"),
+            ({}, []),
+        )[1]
+
+        mock_exec.side_effect = lambda spark, thread, **kw: (
+            call_order.append(f"execute:{thread.name}"),
+            _make_result(thread.name),
+        )[1]
+
+        pre = [LogMessageStep(type="log_message", message="pre")]
+        post = [LogMessageStep(type="log_message", message="post")]
+        lookups = {"ref": Lookup(source=Source(type="delta", alias="db.ref"), materialize=True)}
+        col_set = ColumnSet(source=ColumnSetSource(type="delta", alias="gold.map"))
+        column_set_defs = {"cs": col_set}
+
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            pre_steps=pre,
+            post_steps=post,
+            lookups=lookups,
+            column_set_defs=column_set_defs,
+        )
+
+        assert result.status == "success"
+
+        # pre_steps must come before lookups and column_sets
+        pre_idx = call_order.index("hooks:pre")
+        lookups_idx = call_order.index("materialize_lookups")
+        cs_idx = call_order.index("materialize_column_sets")
+        exec_idx = call_order.index("execute:A")
+        post_idx = call_order.index("hooks:post")
+
+        assert pre_idx < lookups_idx, (
+            f"pre_steps ({pre_idx}) must run before lookups ({lookups_idx})"
+        )
+        assert pre_idx < cs_idx, f"pre_steps ({pre_idx}) must run before column_sets ({cs_idx})"
+        assert lookups_idx < exec_idx, (
+            f"lookups ({lookups_idx}) must be materialized before thread execution ({exec_idx})"
+        )
+        assert cs_idx < exec_idx, (
+            f"column_sets ({cs_idx}) must be materialized before thread execution ({exec_idx})"
+        )
+        assert exec_idx < post_idx, f"threads ({exec_idx}) must run before post_steps ({post_idx})"
