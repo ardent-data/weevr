@@ -139,6 +139,17 @@ def _extract_audit_templates(
     return result or None
 
 
+def _to_template_refs(val: Any) -> list[str] | None:
+    """Normalize a raw audit_template value to a list of names.
+
+    Handles both the string sugar form (``"fabric"``) and the list form
+    (``["fabric", "custom"]``).  Returns ``None`` for falsy input.
+    """
+    if not val:
+        return None
+    return val if isinstance(val, list) else [val]
+
+
 def _cascade_audit(
     loom_defaults: dict[str, Any] | None,
     weave_defaults: dict[str, Any] | None,
@@ -167,8 +178,8 @@ def _cascade_audit(
     thread_templates = _extract_audit_templates(thread_config.get("audit_templates"))
 
     # --- template refs ---
-    loom_target = (loom_defaults or {}).get("target", {}) if loom_defaults else {}
-    weave_target = (weave_defaults or {}).get("target", {}) if weave_defaults else {}
+    loom_target = (loom_defaults or {}).get("target", {})
+    weave_target = (weave_defaults or {}).get("target", {})
     thread_target = thread_config.get("target") or {}
 
     loom_template_ref = loom_target.get("audit_template")
@@ -177,9 +188,9 @@ def _cascade_audit(
         thread_target.get("audit_template") if isinstance(thread_target, dict) else None
     )
 
-    loom_template_refs = [loom_template_ref] if loom_template_ref else None
-    weave_template_refs = [weave_template_ref] if weave_template_ref else None
-    thread_template_refs = [thread_template_ref] if thread_template_ref else None
+    loom_template_refs = _to_template_refs(loom_template_ref)
+    weave_template_refs = _to_template_refs(weave_template_ref)
+    thread_template_refs = _to_template_refs(thread_template_ref)
 
     # --- inherit flag ---
     thread_inherit = True

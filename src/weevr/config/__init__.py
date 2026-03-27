@@ -105,17 +105,31 @@ def load_config(
     # Step 8: Apply inheritance for child configs
     if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
         loom_defaults = resolved_with_refs.get("defaults")
+        loom_audit_templates = resolved_with_refs.get("audit_templates")
         for weave in resolved_with_refs["_resolved_weaves"]:
             if "_resolved_threads" in weave:
                 weave_defaults = weave.get("defaults")
+                weave_audit_templates = weave.get("audit_templates")
                 for i, thread in enumerate(weave["_resolved_threads"]):
-                    merged = apply_inheritance(loom_defaults, weave_defaults, thread)
+                    merged = apply_inheritance(
+                        loom_defaults,
+                        weave_defaults,
+                        thread,
+                        loom_audit_templates=loom_audit_templates,
+                        weave_audit_templates=weave_audit_templates,
+                    )
                     weave["_resolved_threads"][i] = merged
 
     elif config_type == "weave" and "_resolved_threads" in resolved_with_refs:
         weave_defaults = resolved_with_refs.get("defaults")
+        weave_audit_templates = resolved_with_refs.get("audit_templates")
         for i, thread in enumerate(resolved_with_refs["_resolved_threads"]):
-            merged = apply_inheritance(None, weave_defaults, thread)
+            merged = apply_inheritance(
+                None,
+                weave_defaults,
+                thread,
+                weave_audit_templates=weave_audit_templates,
+            )
             resolved_with_refs["_resolved_threads"][i] = merged
 
     # Step 8b: Expand foreach macros in thread steps
