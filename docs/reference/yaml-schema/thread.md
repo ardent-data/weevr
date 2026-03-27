@@ -80,7 +80,7 @@ sources:
 ## steps
 
 An ordered list of transformation steps. Each step is a single-key object
-where the key identifies the step type. weevr supports 19 step types.
+where the key identifies the step type. weevr supports 22 step types.
 
 ### filter
 
@@ -365,11 +365,24 @@ Each `CaseWhenBranch` has:
 
 ### fill_null
 
-Replace null values in specified columns.
+Replace null values in specified columns. Supports explicit
+column-to-value mapping and schema-driven type defaults.
+Both modes may appear in the same step — type defaults apply
+first, then explicit columns override.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `columns` | `dict[string, any]` | yes | -- | Map of column name to fill value. Must not be empty. |
+| `columns` | `dict[string, any]` | cond. | -- | Map of column name to fill value |
+| `mode` | `string` | cond. | -- | Set to `"type_defaults"` for schema-driven fills |
+| `code` | `string` | cond. | -- | Semantic code: `"unknown"`, `"not_applicable"`, or `"invalid"`. Required when `mode` is set. |
+| `include` | `list[string]` | no | all | Glob patterns restricting which columns are filled |
+| `exclude` | `list[string]` | no | none | Glob patterns excluding columns from fill |
+| `overrides` | `dict[string, any]` | no | -- | Per-column overrides for type-based defaults |
+| `where` | `string` | no | -- | Spark SQL predicate for conditional fill |
+
+At least one of `columns` or `mode` must be set.
+
+**Explicit columns:**
 
 ```yaml
 - fill_null:
@@ -377,6 +390,49 @@ Replace null values in specified columns.
       discount: 0
       notes: "N/A"
       is_active: true
+```
+
+**Type-aware mode:**
+
+```yaml
+- fill_null:
+    mode: type_defaults
+    code: unknown
+    exclude: [id, "*_id"]
+    overrides:
+      region: "Unspecified"
+```
+
+**Type-default mappings:**
+
+| Spark type | unknown | not_applicable | invalid |
+|-----------|---------|----------------|---------|
+| String | `"Unknown"` | `"Not Applicable"` | `"Invalid"` |
+| Boolean | `false` | `false` | `false` |
+| Integer/Long | `0` | `0` | `0` |
+| Float/Double | `0.0` | `0.0` | `0.0` |
+| Decimal | `0` | `0` | `0` |
+| Date | `1970-01-01` | `1970-01-01` | `1970-01-01` |
+| Timestamp | epoch | epoch | epoch |
+
+**Composable (both modes):**
+
+```yaml
+- fill_null:
+    mode: type_defaults
+    code: unknown
+    exclude: [id]
+    columns:
+      special_flag: -1
+```
+
+**Conditional fill:**
+
+```yaml
+- fill_null:
+    mode: type_defaults
+    code: unknown
+    where: "status = 'UNKNOWN'"
 ```
 
 ### coalesce
@@ -426,6 +482,93 @@ columns. The `{col}` placeholder is replaced with each column name.
 - date_ops:
     columns: [created_at, updated_at]
     expr: "to_date({col})"
+```
+
+### concat
+
+Concatenate multiple columns into a single string column.
+Null handling, separator, and trimming are configurable.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `target` | `string` | yes | -- | Output column name |
+| `columns` | `list[string]` | yes | -- | Ordered source columns. Must not be empty. |
+| `separator` | `string` | no | `""` | String inserted between column values |
+| `null_mode` | `string` | no | `"skip"` | How nulls are handled: `"skip"`, `"empty"`, or `"literal"` |
+| `null_literal` | `string` | no | `"<NULL>"` | Replacement text when `null_mode` is `"literal"` |
+| `trim` | `boolean` | no | `false` | Trim whitespace from inputs and result |
+| `collapse_separators` | `boolean` | no | `true` | Collapse adjacent separators from skipped values |
+
+Non-string columns are auto-cast to string before concatenation.
+When all input columns are null or blank, the result is `NULL`.
+
+```yaml
+- concat:
+    target: full_address
+    columns: [street, city, state, zip]
+    separator: ", "
+    null_mode: skip
+    trim: true
+```
+
+### map
+
+Map discrete values in a column using a lookup dictionary.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `column` | `string` | yes | -- | Source column to map |
+| `target` | `string` | no | source column | Output column name |
+| `values` | `dict[string, any]` | yes | -- | Value mapping dictionary. Must not be empty. |
+| `default` | `any` | no | `null` | Value for unmapped inputs. Mutually exclusive with `unmapped: null\|validate`. |
+| `on_null` | `any` | no | `null` | Value when source is null. Falls back to `default` if not set. |
+| `unmapped` | `string` | no | `"keep"` | Behavior for unmapped values: `"keep"`, `"null"`, or `"validate"` |
+| `case_sensitive` | `boolean` | no | `true` | Whether value matching is case-sensitive |
+
+Null handling cascade: `on_null` (if set) then `default`
+(if set) then null passthrough.
+
+```yaml
+- map:
+    column: status_code
+    target: status_label
+    values:
+      A: Active
+      I: Inactive
+      C: Closed
+    default: Unknown
+```
+
+### format
+
+Format columns using pattern, number, or date rules.
+Multiple columns can be formatted in a single step.
+Each key is a target column name with a format specification.
+
+**Format spec keys:**
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `source` | `string` | no | target name | Source column (in-place when omitted) |
+| `pattern` | `string` | cond. | -- | String pattern with `{pos:len}` placeholders (1-indexed) |
+| `number` | `string` | cond. | -- | Java DecimalFormat pattern |
+| `date` | `string` | cond. | -- | Java SimpleDateFormat pattern |
+| `on_short` | `string` | no | `"null"` | Behavior when source is shorter than pattern: `"null"` or `"partial"` |
+| `strict_types` | `boolean` | no | `false` | Reject type mismatches instead of auto-casting |
+
+Exactly one of `pattern`, `number`, or `date` must be set
+per column.
+
+```yaml
+- format:
+    phone:
+      pattern: "({1:3}){4:3}-{7:4}"
+      source: raw_phone
+    amount_display:
+      number: "#,##0.00"
+      source: amount
+    event_date:
+      date: "yyyy-MM-dd"
 ```
 
 ---
