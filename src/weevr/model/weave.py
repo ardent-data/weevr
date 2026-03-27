@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import model_validator
 
+from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
 from weevr.model.column_set import ColumnSet
 from weevr.model.execution import ExecutionConfig
@@ -62,6 +63,7 @@ class Weave(FrozenBase):
     variables: dict[str, VariableSpec] | None = None
     pre_steps: list[HookStep] | None = None
     post_steps: list[HookStep] | None = None
+    audit_templates: dict[str, AuditTemplate] | None = None
 
     @model_validator(mode="before")
     @classmethod
