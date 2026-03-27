@@ -22,6 +22,7 @@ runtime settings that cascade down through weaves to threads.
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Loom-level variable declarations. Resolved before `pre_steps` execution. |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before any weave executes. See [Weave schema: pre_steps / post_steps](weave.md#pre_steps-post_steps-hookstep) for field details. |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps to run after all weaves complete. |
+| `audit_templates` | `dict[string, dict[string, string]]` | no | `null` | Named audit column templates cascaded to all weaves and threads. Weave and thread definitions override loom-level definitions with the same name. See [Audit Templates guide](../../guides/audit-templates.md). |
 
 ---
 
