@@ -887,3 +887,37 @@ class TestAuditTemplateInheritance:
             apply_inheritance(None, None, thread, loom_audit_templates=loom_templates)
         assert "fabric" in str(exc_info.value)
         assert "minimal" in str(exc_info.value)
+
+    def test_list_valued_audit_template_in_defaults(self):
+        """Multi-template list in defaults.target.audit_template resolves."""
+        loom_templates: dict[str, Any] = {
+            "tpl_a": {"columns": {"_a": "1"}},
+            "tpl_b": {"columns": {"_b": "2"}},
+        }
+        loom: dict[str, Any] = {
+            "target": {"audit_template": ["tpl_a", "tpl_b"]},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(
+            loom,
+            None,
+            thread,
+            loom_audit_templates=loom_templates,
+        )
+        ac = result["target"]["audit_columns"]
+        assert ac["_a"] == "1"
+        assert ac["_b"] == "2"
+
+    def test_exclusion_applies_to_inline_columns(self):
+        """audit_columns_exclude removes inline columns too."""
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_columns": {"_keep": "1", "_drop_me": "2"},
+                "audit_columns_exclude": ["_drop_*"],
+            }
+        }
+        result = apply_inheritance(None, None, thread)
+        ac = result["target"]["audit_columns"]
+        assert "_keep" in ac
+        assert "_drop_me" not in ac

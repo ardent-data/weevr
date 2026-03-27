@@ -162,14 +162,10 @@ target:
     - _pipeline_*
 ```
 
-The `_pipeline_*` pattern matches `_pipeline_id`, `_pipeline_name`, and any
-other columns matching the glob. Exclusions are applied after the full merge
-of templates and inline `audit_columns`.
-
-Inline `audit_columns` entries are not excluded by this list. If you define
-a column both inline and in a template, the inline definition survives even
-if its name matches an exclusion pattern. To remove an inline column,
-delete it from the `audit_columns` block instead.
+The `_pipeline_*` pattern matches `_pipeline_id`, `_pipeline_name`,
+and any other columns matching the glob. Exclusions are applied after
+the full merge of templates and inline `audit_columns` — all columns
+are subject to exclusion regardless of origin.
 
 ## Shadow warnings
 
