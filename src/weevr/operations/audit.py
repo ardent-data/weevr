@@ -12,9 +12,36 @@ from dataclasses import dataclass
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from weevr.errors.exceptions import ExecutionError
+from weevr.errors.exceptions import ConfigError, ExecutionError
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Built-in audit presets
+# ---------------------------------------------------------------------------
+
+#: Built-in audit column presets keyed by name.
+#:
+#: ``fabric`` — nine columns aligned with Microsoft Fabric pipeline parameters.
+#: ``minimal`` — three lightweight columns for simple run tracking.
+BUILTIN_AUDIT_PRESETS: dict[str, dict[str, str]] = {
+    "fabric": {
+        "_batch_id": "${param.batch_id}",
+        "_batch_version": "${param.batch_version}",
+        "_batch_source": "${param.batch_source}",
+        "_batch_process_ts": "current_timestamp()",
+        "_pipeline_id": "${param.pipeline_id}",
+        "_pipeline_name": "${param.pipeline_name}",
+        "_workspace_id": "${param.workspace_id}",
+        "_spark_app_id": "spark_context().applicationId",
+        "_task_ts": "current_timestamp()",
+    },
+    "minimal": {
+        "_weevr_loaded_at": "current_timestamp()",
+        "_weevr_run_id": "${param.run_id}",
+        "_weevr_thread": "${thread.name}",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -103,6 +130,49 @@ def apply_audit_exclusions(
             result[name] = expression
 
     return result
+
+
+def resolve_template_columns(
+    template_names: list[str],
+    user_templates: dict[str, dict[str, str]] | None = None,
+) -> dict[str, str]:
+    """Resolve template names to merged column definitions.
+
+    Looks up each name in user-defined templates first, then built-in
+    presets. Logs a warning when a user-defined template shadows a
+    built-in preset. Raises ConfigError if a name is not found.
+
+    Args:
+        template_names: Ordered list of template names to resolve.
+        user_templates: User-defined templates keyed by name.
+
+    Returns:
+        Merged column dict. Later names override earlier on collision.
+
+    Raises:
+        ConfigError: If a template name is not found in user-defined
+            or built-in presets.
+    """
+    resolved_user = user_templates or {}
+    merged: dict[str, str] = {}
+
+    for name in template_names:
+        if name in resolved_user:
+            if name in BUILTIN_AUDIT_PRESETS:
+                logger.warning(
+                    "User-defined template %r shadows built-in preset with the same name",
+                    name,
+                )
+            merged.update(resolved_user[name])
+        elif name in BUILTIN_AUDIT_PRESETS:
+            merged.update(BUILTIN_AUDIT_PRESETS[name])
+        else:
+            available = sorted(set(resolved_user) | set(BUILTIN_AUDIT_PRESETS))
+            raise ConfigError(
+                f"Audit template {name!r} not found. Available templates: {', '.join(available)}"
+            )
+
+    return merged
 
 
 def resolve_context_variables(expression: str, context: AuditContext) -> str:

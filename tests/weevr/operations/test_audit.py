@@ -5,14 +5,16 @@ import json
 import pytest
 from pyspark.sql import SparkSession
 
-from weevr.errors.exceptions import ExecutionError
+from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.operations.audit import (
+    BUILTIN_AUDIT_PRESETS,
     AuditContext,
     apply_audit_exclusions,
     build_sources_json,
     inject_audit_columns,
     resolve_audit_columns,
+    resolve_template_columns,
 )
 
 
@@ -420,3 +422,99 @@ class TestRunContextVariables:
         )
         rows = result.collect()
         assert rows[0]["_meta"] == "stg_orders_2026-03-15T00:00:00+00:00"
+
+
+# ---------------------------------------------------------------------------
+# BUILTIN_AUDIT_PRESETS
+# ---------------------------------------------------------------------------
+
+
+class TestBuiltinAuditPresets:
+    """Test the built-in preset constants."""
+
+    def test_fabric_preset_has_9_columns(self):
+        """fabric preset contains exactly the 9 specified columns with correct expressions."""
+        preset = BUILTIN_AUDIT_PRESETS["fabric"]
+        assert len(preset) == 9
+        assert preset["_batch_id"] == "${param.batch_id}"
+        assert preset["_batch_version"] == "${param.batch_version}"
+        assert preset["_batch_source"] == "${param.batch_source}"
+        assert preset["_batch_process_ts"] == "current_timestamp()"
+        assert preset["_pipeline_id"] == "${param.pipeline_id}"
+        assert preset["_pipeline_name"] == "${param.pipeline_name}"
+        assert preset["_workspace_id"] == "${param.workspace_id}"
+        assert preset["_spark_app_id"] == "spark_context().applicationId"
+        assert preset["_task_ts"] == "current_timestamp()"
+
+    def test_minimal_preset_has_3_columns(self):
+        """minimal preset contains exactly the 3 specified columns with correct expressions."""
+        preset = BUILTIN_AUDIT_PRESETS["minimal"]
+        assert len(preset) == 3
+        assert preset["_weevr_loaded_at"] == "current_timestamp()"
+        assert preset["_weevr_run_id"] == "${param.run_id}"
+        assert preset["_weevr_thread"] == "${thread.name}"
+
+
+# ---------------------------------------------------------------------------
+# resolve_template_columns
+# ---------------------------------------------------------------------------
+
+
+class TestResolveTemplateColumns:
+    """Test template name resolution to merged column dicts."""
+
+    def test_resolve_user_defined_template(self):
+        """User-defined template is found by name."""
+        user_templates = {"my_audit": {"_col": "expr()"}}
+        result = resolve_template_columns(["my_audit"], user_templates)
+        assert result == {"_col": "expr()"}
+
+    def test_resolve_builtin_fallback(self):
+        """Name not in user-defined is found in built-in presets."""
+        result = resolve_template_columns(["minimal"], user_templates=None)
+        assert "_weevr_loaded_at" in result
+        assert "_weevr_run_id" in result
+        assert "_weevr_thread" in result
+
+    def test_resolve_unknown_raises_config_error(self):
+        """Unknown template name raises ConfigError listing available templates."""
+        with pytest.raises(ConfigError, match="unknown_tpl"):
+            resolve_template_columns(["unknown_tpl"], user_templates=None)
+
+    def test_resolve_unknown_error_lists_available(self):
+        """ConfigError message includes available template names."""
+        user_templates = {"my_tpl": {"_col": "1"}}
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_template_columns(["unknown_tpl"], user_templates=user_templates)
+        msg = str(exc_info.value)
+        # Should mention built-in names and user-defined names
+        assert "fabric" in msg or "minimal" in msg or "my_tpl" in msg
+
+    def test_resolve_shadow_warning(self, caplog):
+        """User-defined template with a built-in name logs a WARNING."""
+        import logging
+
+        user_templates = {"fabric": {"_col": "override()"}}
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.audit"):
+            resolve_template_columns(["fabric"], user_templates)
+        assert any("fabric" in record.message for record in caplog.records)
+        assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+    def test_resolve_template_list_merges_in_order(self):
+        """List of names merges columns; later names override earlier on collision."""
+        user_templates = {
+            "base": {"_a": "base_a", "_b": "base_b"},
+            "override": {"_b": "override_b", "_c": "override_c"},
+        }
+        result = resolve_template_columns(["base", "override"], user_templates)
+        assert result["_a"] == "base_a"
+        assert result["_b"] == "override_b"
+        assert result["_c"] == "override_c"
+
+    def test_resolve_template_list_builtin_then_user(self):
+        """Built-in followed by user-defined: user overrides built-in on collision."""
+        user_templates = {"my_ext": {"_weevr_loaded_at": "custom_ts()", "_extra": "1"}}
+        result = resolve_template_columns(["minimal", "my_ext"], user_templates)
+        assert result["_weevr_loaded_at"] == "custom_ts()"
+        assert result["_extra"] == "1"
+        assert result["_weevr_run_id"] == "${param.run_id}"
