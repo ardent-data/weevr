@@ -124,6 +124,11 @@ The top-level configuration unit for a single data pipeline.
 | `execution` | `ExecutionConfig` | `None` | Runtime settings |
 | `cache` | `bool` | `None` | Cache DataFrame before writing |
 | `exports` | `list[Export]` | `None` | Secondary output destinations |
+| `lookups` | `dict[str, Lookup]` | `None` | Thread-level lookup definitions |
+| `column_sets` | `dict[str, ColumnSet]` | `None` | Thread-level column set definitions |
+| `variables` | `dict[str, VariableSpec]` | `None` | Thread-level variable declarations |
+| `pre_steps` | `list[HookStep]` | `None` | Hook steps run before thread execution |
+| `post_steps` | `list[HookStep]` | `None` | Hook steps run after thread execution |
 | `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates available to all targets |
 
 ---
@@ -484,6 +489,10 @@ Deployment unit grouping one or more weaves.
 | `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded down |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded down |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets cascaded to weaves |
+| `lookups` | `dict[str, Lookup]` | `None` | Loom-level lookup definitions cascaded to weaves |
+| `variables` | `dict[str, VariableSpec]` | `None` | Loom-level variable declarations |
+| `pre_steps` | `list[HookStep]` | `None` | Hook steps run before any weave executes |
+| `post_steps` | `list[HookStep]` | `None` | Hook steps run after all weaves complete |
 | `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to weaves and threads |
 
 ### WeaveEntry

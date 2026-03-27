@@ -128,24 +128,29 @@ target:
 
 ## Inheritance: cascade behavior
 
-`audit_templates` cascades additively through loom → weave → thread, matching
-the behavior of other additive keys. Child levels can add new template
-definitions and override existing ones by name.
+Template *definitions* (`audit_templates` blocks) from all levels are
+always collected into a single namespace. A thread can reference any
+template defined at loom, weave, or its own level regardless of
+inheritance settings.
 
-To prevent a thread from inheriting any parent-level `audit_template`
-assignment, set `audit_template_inherit: false` on the target:
+Template *references* (`audit_template` on the target) and inline
+`audit_columns` cascade additively from loom → weave → thread. To
+suppress inherited references and inline columns from parent levels,
+set `audit_template_inherit: false` on the target:
 
 ```yaml
 target:
   alias: curated.reference_data
   audit_template_inherit: false
+  audit_template: custom_local
   audit_columns:
     _loaded_at: "current_timestamp()"
 ```
 
-This suppresses all inherited template references. Any `audit_template` set
-directly on this target still applies — only the inherited assignment is
-dropped.
+This suppresses inherited template references and inline columns
+from loom and weave. The thread's own `audit_template` and
+`audit_columns` still apply. Template definitions from parent
+levels remain available for resolution.
 
 ## Exclusion: `audit_columns_exclude`
 
@@ -169,16 +174,17 @@ are subject to exclusion regardless of origin.
 
 ## Shadow warnings
 
-weevr logs a warning at configuration load time when a user-defined column
-name matches a built-in preset column name. This catches accidental shadowing
-of preset defaults:
+weevr logs a warning at configuration load time when a user-defined
+template name matches a built-in preset name. This catches accidental
+shadowing of shipped defaults:
 
-```
-WARN [config] audit_columns defines '_batch_id' which shadows the 'fabric'
-     preset. The user-defined expression will be used.
+```text
+WARN User-defined template 'fabric' shadows built-in preset
+     with the same name
 ```
 
-The user-defined value always takes effect. The warning is informational.
+The user-defined template always takes precedence. The warning is
+informational — it confirms that the built-in preset is not in use.
 
 ## Migration: `defaults.audit_columns`
 
