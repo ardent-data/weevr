@@ -81,6 +81,7 @@ nav:
       - Config Resolution: guides/config-resolution.md
       - Telemetry Architecture: guides/telemetry-architecture.md
       - Exports: guides/exports.md
+      - Audit Templates: guides/audit-templates.md
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:
