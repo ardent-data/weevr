@@ -16,6 +16,8 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> DataFrame:
     Returns:
         DataFrame with nulls replaced by specified defaults.
     """
+    if params.columns is None:
+        return df
     return df.fillna(params.columns)
 
 
