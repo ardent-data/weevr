@@ -20,6 +20,7 @@ serve as reference templates and are validated by CI to ensure structural correc
 | `hooks-quality-gates.weave` | Weave with pre/post quality gates, SQL variables, and log messages. |
 | `hooks-lookups.weave` | Weave with materialized (broadcast) and on-demand lookup definitions. |
 | `exports-thread.thread` | Thread with secondary exports: Parquet archive and CSV extract. |
+| `transform-extensions.thread` | concat, map, fill_null type_defaults, and format in a single pipeline. |
 
 ## Fabcon 2026 Demos
 
