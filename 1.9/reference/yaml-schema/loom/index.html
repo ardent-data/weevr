@@ -1909,6 +1909,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/audit-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2594,6 +2622,13 @@ runtime settings that cascade down through weaves to threads.</p>
 <td>no</td>
 <td><code>null</code></td>
 <td>Hook steps to run after all weaves complete.</td>
+</tr>
+<tr>
+<td><code>audit_templates</code></td>
+<td><code>dict[string, dict[string, string]]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Named audit column templates cascaded to all weaves and threads. Weave and thread definitions override loom-level definitions with the same name. See <a href="../../../guides/audit-templates/">Audit Templates guide</a>.</td>
 </tr>
 </tbody>
 </table>

@@ -2301,6 +2301,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/audit-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3436,6 +3464,13 @@ target. This page documents every key accepted inside a thread YAML file.</p>
 <td>Thread-level variable declarations. Resolved before <code>pre_steps</code> execution.</td>
 </tr>
 <tr>
+<td><code>audit_templates</code></td>
+<td><code>dict[string, dict[string, string]]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Named audit column templates available to targets in this thread. Merged with parent-level definitions (thread wins on name collision).</td>
+</tr>
+<tr>
 <td><code>pre_steps</code></td>
 <td><code>list[HookStep]</code></td>
 <td>no</td>
@@ -4378,6 +4413,27 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 <td>no</td>
 <td><code>null</code></td>
 <td>Audit column definitions as name-expression pairs</td>
+</tr>
+<tr>
+<td><code>audit_template</code></td>
+<td><code>string or list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Named template(s) to apply. Resolved from <code>audit_templates</code> at any level or from built-in presets (<code>fabric</code>, <code>minimal</code>). See <a href="../../../guides/audit-templates/">Audit Templates guide</a>.</td>
+</tr>
+<tr>
+<td><code>audit_template_inherit</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>When <code>false</code>, suppresses any <code>audit_template</code> inherited from parent levels. Direct <code>audit_template</code> on this target still applies.</td>
+</tr>
+<tr>
+<td><code>audit_columns_exclude</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Column names or glob patterns to exclude from the resolved template set.</td>
 </tr>
 <tr>
 <td><code>naming</code></td>

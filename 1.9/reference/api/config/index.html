@@ -2041,6 +2041,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/audit-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3161,7 +3189,7 @@ of transformation steps, and a single target.</p>
 
 
 <h3 id="weevr.config.apply_inheritance" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">apply_inheritance</span><span class="p">(</span><span class="n">loom_defaults</span><span class="p">,</span> <span class="n">weave_defaults</span><span class="p">,</span> <span class="n">thread_config</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">apply_inheritance</span><span class="p">(</span><span class="n">loom_defaults</span><span class="p">,</span> <span class="n">weave_defaults</span><span class="p">,</span> <span class="n">thread_config</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">loom_audit_templates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_audit_templates</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.config.apply_inheritance" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -3232,6 +3260,38 @@ of transformation steps, and a single target.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_audit_templates</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>User-defined audit template definitions from loom</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_audit_templates</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>User-defined audit template definitions from weave</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
