@@ -175,6 +175,83 @@ def resolve_template_columns(
     return merged
 
 
+def merge_audit_columns_with_templates(
+    *,
+    loom_templates: dict[str, dict[str, str]] | None = None,
+    loom_template_refs: list[str] | None = None,
+    loom_inline: dict[str, str] | None = None,
+    weave_templates: dict[str, dict[str, str]] | None = None,
+    weave_template_refs: list[str] | None = None,
+    weave_inline: dict[str, str] | None = None,
+    thread_templates: dict[str, dict[str, str]] | None = None,
+    thread_template_refs: list[str] | None = None,
+    thread_inline: dict[str, str] | None = None,
+    thread_inherit: bool = True,
+    thread_exclude: list[str] | None = None,
+) -> dict[str, str]:
+    """Merge audit columns from templates, inline definitions, and inheritance.
+
+    Resolution order:
+    1. Collect user-defined templates from all levels.
+    2. If thread_inherit is False, skip loom and weave template refs and inline.
+    3. Resolve template refs at each level via resolve_template_columns().
+    4. Merge: loom template cols → loom inline → weave template cols
+       → weave inline → thread template cols → thread inline.
+    5. Apply apply_audit_exclusions() with thread_exclude.
+
+    User-defined template definitions from all levels are always available for
+    name resolution, even when thread_inherit is False. Inheritance only controls
+    whether loom and weave template refs and inline columns contribute to the
+    merged output.
+
+    Args:
+        loom_templates: User-defined templates declared at the loom level.
+        loom_template_refs: Template names to resolve at the loom level.
+        loom_inline: Explicit audit columns defined inline at the loom level.
+        weave_templates: User-defined templates declared at the weave level.
+        weave_template_refs: Template names to resolve at the weave level.
+        weave_inline: Explicit audit columns defined inline at the weave level.
+        thread_templates: User-defined templates declared at the thread level.
+        thread_template_refs: Template names to resolve at the thread level.
+        thread_inline: Explicit audit columns defined inline at the thread level.
+        thread_inherit: When False, loom and weave template refs and inline
+            columns are excluded from the merged result. Defaults to True.
+        thread_exclude: Glob patterns applied after all merging. Matching
+            column names are removed from the final result.
+
+    Returns:
+        Merged audit column dict. Empty dict if nothing is defined.
+    """
+    # Merge all user-defined templates across levels so they are available for
+    # any level's template refs regardless of inheritance setting.
+    all_user_templates: dict[str, dict[str, str]] = {}
+    if loom_templates:
+        all_user_templates.update(loom_templates)
+    if weave_templates:
+        all_user_templates.update(weave_templates)
+    if thread_templates:
+        all_user_templates.update(thread_templates)
+
+    merged: dict[str, str] = {}
+
+    if thread_inherit:
+        if loom_template_refs:
+            merged.update(resolve_template_columns(loom_template_refs, all_user_templates))
+        if loom_inline:
+            merged.update(loom_inline)
+        if weave_template_refs:
+            merged.update(resolve_template_columns(weave_template_refs, all_user_templates))
+        if weave_inline:
+            merged.update(weave_inline)
+
+    if thread_template_refs:
+        merged.update(resolve_template_columns(thread_template_refs, all_user_templates))
+    if thread_inline:
+        merged.update(thread_inline)
+
+    return apply_audit_exclusions(merged, thread_exclude)
+
+
 def resolve_context_variables(expression: str, context: AuditContext) -> str:
     """Substitute ${namespace.property} variables in an expression string.
 
