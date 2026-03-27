@@ -13,6 +13,7 @@ from weevr.operations.audit import (
     apply_audit_exclusions,
     build_sources_json,
     inject_audit_columns,
+    merge_audit_columns_with_templates,
     resolve_audit_columns,
     resolve_template_columns,
 )
@@ -518,3 +519,162 @@ class TestResolveTemplateColumns:
         assert result["_weevr_loaded_at"] == "custom_ts()"
         assert result["_extra"] == "1"
         assert result["_weevr_run_id"] == "${param.run_id}"
+
+
+# ---------------------------------------------------------------------------
+# merge_audit_columns_with_templates
+# ---------------------------------------------------------------------------
+
+
+class TestMergeAuditColumnsWithTemplates:
+    """Test template-aware audit column merge across loom, weave, and thread levels."""
+
+    def test_merge_template_only(self):
+        """Thread template ref resolves to columns with no inline or parent data."""
+        thread_templates = {"base": {"_a": "expr_a", "_b": "expr_b"}}
+        result = merge_audit_columns_with_templates(
+            thread_templates=thread_templates,
+            thread_template_refs=["base"],
+        )
+        assert result == {"_a": "expr_a", "_b": "expr_b"}
+
+    def test_merge_template_plus_inline(self):
+        """Inline columns override template columns when keys collide."""
+        thread_templates = {"base": {"_a": "from_template", "_b": "from_template"}}
+        result = merge_audit_columns_with_templates(
+            thread_templates=thread_templates,
+            thread_template_refs=["base"],
+            thread_inline={"_a": "from_inline", "_c": "inline_only"},
+        )
+        assert result["_a"] == "from_inline"
+        assert result["_b"] == "from_template"
+        assert result["_c"] == "inline_only"
+
+    def test_merge_inherit_true_cascades(self):
+        """With inherit=True (default), parent template refs and inline are merged in."""
+        loom_templates = {"loom_tpl": {"_loom_col": "loom_expr"}}
+        weave_templates = {"weave_tpl": {"_weave_col": "weave_expr"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["loom_tpl"],
+            weave_templates=weave_templates,
+            weave_template_refs=["weave_tpl"],
+            thread_inherit=True,
+        )
+        assert result["_loom_col"] == "loom_expr"
+        assert result["_weave_col"] == "weave_expr"
+
+    def test_merge_inherit_false_blocks_upstream(self):
+        """With inherit=False, loom and weave template refs are suppressed.
+
+        User-defined template definitions from loom/weave are still available
+        for resolution if the thread explicitly references them.
+        """
+        loom_templates = {"loom_tpl": {"_loom_col": "loom_expr"}}
+        weave_templates = {"weave_tpl": {"_weave_col": "weave_expr"}}
+        thread_templates = {"thread_tpl": {"_thread_col": "thread_expr"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["loom_tpl"],
+            loom_inline={"_loom_inline": "loom_inline_expr"},
+            weave_templates=weave_templates,
+            weave_template_refs=["weave_tpl"],
+            weave_inline={"_weave_inline": "weave_inline_expr"},
+            thread_templates=thread_templates,
+            thread_template_refs=["thread_tpl"],
+            thread_inherit=False,
+        )
+        assert "_loom_col" not in result
+        assert "_loom_inline" not in result
+        assert "_weave_col" not in result
+        assert "_weave_inline" not in result
+        assert result["_thread_col"] == "thread_expr"
+
+    def test_merge_inherit_false_can_use_parent_template_defs(self):
+        """With inherit=False, thread can still reference loom/weave template definitions."""
+        loom_templates = {"shared_tpl": {"_shared_col": "shared_expr"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["shared_tpl"],
+            thread_template_refs=["shared_tpl"],
+            thread_inherit=False,
+        )
+        # loom_template_refs suppressed, but thread_template_refs referencing the
+        # loom-defined template should still work
+        assert result["_shared_col"] == "shared_expr"
+
+    def test_merge_exclude_after_merge(self):
+        """Exclusion patterns apply after all merging is complete."""
+        loom_templates = {"base": {"_batch_id": "uuid()", "_batch_ts": "current_timestamp()"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["base"],
+            thread_inline={"_run_id": "uuid()"},
+            thread_exclude=["_batch_*"],
+        )
+        assert "_batch_id" not in result
+        assert "_batch_ts" not in result
+        assert result["_run_id"] == "uuid()"
+
+    def test_merge_full_cascade(self):
+        """Full cascade: loom template + weave template + thread template + inline + exclude."""
+        loom_templates = {"loom_base": {"_a": "loom_a", "_b": "loom_b"}}
+        weave_templates = {"weave_ext": {"_b": "weave_b", "_c": "weave_c"}}
+        thread_templates = {"thread_ext": {"_c": "thread_c", "_d": "thread_d"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["loom_base"],
+            weave_templates=weave_templates,
+            weave_template_refs=["weave_ext"],
+            thread_templates=thread_templates,
+            thread_template_refs=["thread_ext"],
+            thread_inline={"_d": "inline_d", "_e": "inline_e"},
+            thread_exclude=["_a"],
+        )
+        # _a excluded
+        assert "_a" not in result
+        # _b: loom_b overridden by weave_b
+        assert result["_b"] == "weave_b"
+        # _c: weave_c overridden by thread_c
+        assert result["_c"] == "thread_c"
+        # _d: thread_d overridden by inline
+        assert result["_d"] == "inline_d"
+        # _e: inline only
+        assert result["_e"] == "inline_e"
+
+    def test_merge_all_none_returns_empty(self):
+        """All None inputs returns empty dict."""
+        result = merge_audit_columns_with_templates()
+        assert result == {}
+
+    def test_merge_builtin_preset_via_thread_ref(self):
+        """Thread can reference a built-in preset by name."""
+        result = merge_audit_columns_with_templates(
+            thread_template_refs=["minimal"],
+        )
+        assert "_weevr_loaded_at" in result
+        assert "_weevr_run_id" in result
+        assert "_weevr_thread" in result
+
+    def test_merge_loom_inline_only(self):
+        """Loom inline without templates still merges with inherit=True."""
+        result = merge_audit_columns_with_templates(
+            loom_inline={"_loom_col": "loom_expr"},
+        )
+        assert result["_loom_col"] == "loom_expr"
+
+    def test_merge_weave_overrides_loom_inline(self):
+        """Weave inline overrides loom inline on key collision."""
+        result = merge_audit_columns_with_templates(
+            loom_inline={"_col": "from_loom"},
+            weave_inline={"_col": "from_weave"},
+        )
+        assert result["_col"] == "from_weave"
+
+    def test_merge_thread_inline_overrides_weave_inline(self):
+        """Thread inline overrides weave inline on key collision."""
+        result = merge_audit_columns_with_templates(
+            weave_inline={"_col": "from_weave"},
+            thread_inline={"_col": "from_thread"},
+        )
+        assert result["_col"] == "from_thread"
