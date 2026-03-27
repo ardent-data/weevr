@@ -2,7 +2,10 @@
 
 from typing import Any
 
+import pytest
+
 from weevr.config.inheritance import apply_inheritance, cascade
+from weevr.errors.exceptions import ConfigError
 
 
 class TestCascade:
@@ -857,3 +860,30 @@ class TestAuditTemplateInheritance:
         # because thread's audit_template: minimal takes precedence
         # (loom's template ref columns are superseded by thread's template cols)
         # exclude was for _source_file which minimal doesn't have, so it's a no-op
+
+    def test_unknown_template_ref_raises_config_error(self):
+        """Unknown audit_template name raises ConfigError during cascade."""
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "nonexistent",
+            }
+        }
+        with pytest.raises(ConfigError, match="nonexistent"):
+            apply_inheritance(None, None, thread)
+
+    def test_config_error_lists_available_templates(self):
+        """ConfigError for unknown template includes available names."""
+        loom_templates: dict[str, Any] = {
+            "custom_template": {"columns": {"_col": "expr"}},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "bad_name",
+            }
+        }
+        with pytest.raises(ConfigError, match="custom_template") as exc_info:
+            apply_inheritance(None, None, thread, loom_audit_templates=loom_templates)
+        assert "fabric" in str(exc_info.value)
+        assert "minimal" in str(exc_info.value)
