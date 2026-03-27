@@ -1216,6 +1216,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#concat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        concat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        format
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3043,6 +3076,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#concat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        concat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        format
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3592,7 +3658,7 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <hr />
 <h2 id="steps">steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <p>An ordered list of transformation steps. Each step is a single-key object
-where the key identifies the step type. weevr supports 19 step types.</p>
+where the key identifies the step type. weevr supports 22 step types.</p>
 <h3 id="filter">filter<a class="headerlink" href="#filter" title="Permanent link">&para;</a></h3>
 <p>Filter rows using a Spark SQL expression.</p>
 <table>
@@ -4222,7 +4288,10 @@ static entries in <code>columns</code> override matching column set entries.</p>
 <a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">otherwise</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;bronze&#39;&quot;</span>
 </code></pre></div>
 <h3 id="fill_null">fill_null<a class="headerlink" href="#fill_null" title="Permanent link">&para;</a></h3>
-<p>Replace null values in specified columns.</p>
+<p>Replace null values in specified columns. Supports explicit
+column-to-value mapping and schema-driven type defaults.
+Both modes may appear in the same step — type defaults apply
+first, then explicit columns override.</p>
 <table>
 <thead>
 <tr>
@@ -4237,17 +4306,138 @@ static entries in <code>columns</code> override matching column set entries.</p>
 <tr>
 <td><code>columns</code></td>
 <td><code>dict[string, any]</code></td>
-<td>yes</td>
+<td>cond.</td>
 <td>--</td>
-<td>Map of column name to fill value. Must not be empty.</td>
+<td>Map of column name to fill value</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td>--</td>
+<td>Set to <code>"type_defaults"</code> for schema-driven fills</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td>--</td>
+<td>Semantic code: <code>"unknown"</code>, <code>"not_applicable"</code>, or <code>"invalid"</code>. Required when <code>mode</code> is set.</td>
+</tr>
+<tr>
+<td><code>include</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td>all</td>
+<td>Glob patterns restricting which columns are filled</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td><code>list[string]</code></td>
+<td>no</td>
+<td>none</td>
+<td>Glob patterns excluding columns from fill</td>
+</tr>
+<tr>
+<td><code>overrides</code></td>
+<td><code>dict[string, any]</code></td>
+<td>no</td>
+<td>--</td>
+<td>Per-column overrides for type-based defaults</td>
+</tr>
+<tr>
+<td><code>where</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td>--</td>
+<td>Spark SQL predicate for conditional fill</td>
 </tr>
 </tbody>
 </table>
+<p>At least one of <code>columns</code> or <code>mode</code> must be set.</p>
+<p><strong>Explicit columns:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fill_null</span><span class="p">:</span>
 <a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
 <a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">      </span><span class="nt">discount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">      </span><span class="nt">notes</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;N/A&quot;</span>
 <a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">      </span><span class="nt">is_active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p><strong>Type-aware mode:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fill_null</span><span class="p">:</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type_defaults</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unknown</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;*_id&quot;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span><span class="nt">overrides</span><span class="p">:</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">      </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Unspecified&quot;</span>
+</code></pre></div>
+<p><strong>Type-default mappings:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Spark type</th>
+<th>unknown</th>
+<th>not_applicable</th>
+<th>invalid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>String</td>
+<td><code>"Unknown"</code></td>
+<td><code>"Not Applicable"</code></td>
+<td><code>"Invalid"</code></td>
+</tr>
+<tr>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td><code>false</code></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td>Integer/Long</td>
+<td><code>0</code></td>
+<td><code>0</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>Float/Double</td>
+<td><code>0.0</code></td>
+<td><code>0.0</code></td>
+<td><code>0.0</code></td>
+</tr>
+<tr>
+<td>Decimal</td>
+<td><code>0</code></td>
+<td><code>0</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>Date</td>
+<td><code>1970-01-01</code></td>
+<td><code>1970-01-01</code></td>
+<td><code>1970-01-01</code></td>
+</tr>
+<tr>
+<td>Timestamp</td>
+<td>epoch</td>
+<td>epoch</td>
+<td>epoch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Composable (both modes):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fill_null</span><span class="p">:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type_defaults</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unknown</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">      </span><span class="nt">special_flag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+</code></pre></div>
+<p><strong>Conditional fill:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fill_null</span><span class="p">:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type_defaults</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unknown</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nt">where</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;UNKNOWN&#39;&quot;</span>
 </code></pre></div>
 <h3 id="coalesce">coalesce<a class="headerlink" href="#coalesce" title="Permanent link">&para;</a></h3>
 <p>Return the first non-null value from an ordered list of source columns.</p>
@@ -4271,10 +4461,10 @@ static entries in <code>columns</code> override matching column set entries.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">coalesce</span><span class="p">:</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">      </span><span class="nt">email</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">work_email</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">personal_email</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">backup_email</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">      </span><span class="nt">phone</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">mobile</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">home_phone</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">coalesce</span><span class="p">:</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">      </span><span class="nt">email</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">work_email</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">personal_email</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">backup_email</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">      </span><span class="nt">phone</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">mobile</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">home_phone</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <h3 id="string_ops">string_ops<a class="headerlink" href="#string_ops" title="Permanent link">&para;</a></h3>
 <p>Apply a Spark SQL expression template across selected string columns.
@@ -4313,9 +4503,9 @@ The <code>{col}</code> placeholder is replaced with each column name.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">string_ops</span><span class="p">:</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">first_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">last_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">city</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;trim(upper({col}))&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">string_ops</span><span class="p">:</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">first_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">last_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">city</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;trim(upper({col}))&quot;</span>
 </code></pre></div>
 <h3 id="date_ops">date_ops<a class="headerlink" href="#date_ops" title="Permanent link">&para;</a></h3>
 <p>Apply a Spark SQL expression template across selected date or timestamp
@@ -4354,9 +4544,230 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">date_ops</span><span class="p">:</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">created_at</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">updated_at</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;to_date({col})&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">date_ops</span><span class="p">:</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">created_at</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">updated_at</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;to_date({col})&quot;</span>
+</code></pre></div>
+<h3 id="concat">concat<a class="headerlink" href="#concat" title="Permanent link">&para;</a></h3>
+<p>Concatenate multiple columns into a single string column.
+Null handling, separator, and trimming are configurable.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>target</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Output column name</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Ordered source columns. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>separator</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>String inserted between column values</td>
+</tr>
+<tr>
+<td><code>null_mode</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"skip"</code></td>
+<td>How nulls are handled: <code>"skip"</code>, <code>"empty"</code>, or <code>"literal"</code></td>
+</tr>
+<tr>
+<td><code>null_literal</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"&lt;NULL&gt;"</code></td>
+<td>Replacement text when <code>null_mode</code> is <code>"literal"</code></td>
+</tr>
+<tr>
+<td><code>trim</code></td>
+<td><code>boolean</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>Trim whitespace from inputs and result</td>
+</tr>
+<tr>
+<td><code>collapse_separators</code></td>
+<td><code>boolean</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>Collapse adjacent separators. Only applies when <code>null_mode</code> is <code>"skip"</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Non-string columns are auto-cast to string before concatenation.
+When all input columns are null or blank, the result is <code>NULL</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">concat</span><span class="p">:</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">    </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_address</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">street</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">city</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">state</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">zip</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">    </span><span class="nt">separator</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,</span><span class="nv"> </span><span class="s">&quot;</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="nt">null_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="nt">trim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<h3 id="map">map<a class="headerlink" href="#map" title="Permanent link">&para;</a></h3>
+<p>Map discrete values in a column using a lookup dictionary.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>column</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Source column to map</td>
+</tr>
+<tr>
+<td><code>target</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td>source column</td>
+<td>Output column name</td>
+</tr>
+<tr>
+<td><code>values</code></td>
+<td><code>dict[string, any]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Value mapping dictionary. Must not be empty.</td>
+</tr>
+<tr>
+<td><code>default</code></td>
+<td><code>any</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Value for unmapped inputs. Mutually exclusive with <code>unmapped: null\|validate</code>.</td>
+</tr>
+<tr>
+<td><code>on_null</code></td>
+<td><code>any</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Value when source is null. Falls back to <code>default</code> if not set.</td>
+</tr>
+<tr>
+<td><code>unmapped</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"keep"</code></td>
+<td>Behavior for unmapped values: <code>"keep"</code>, <code>"null"</code>, or <code>"validate"</code></td>
+</tr>
+<tr>
+<td><code>case_sensitive</code></td>
+<td><code>boolean</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>Whether value matching is case-sensitive</td>
+</tr>
+</tbody>
+</table>
+<p>Null handling cascade: <code>on_null</code> (if set) then <code>default</code>
+(if set) then null passthrough.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">map</span><span class="p">:</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">status_code</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">status_label</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span><span class="nt">values</span><span class="p">:</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">      </span><span class="nt">A</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Active</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">      </span><span class="nt">I</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Inactive</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">      </span><span class="nt">C</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Closed</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Unknown</span>
+</code></pre></div>
+<h3 id="format">format<a class="headerlink" href="#format" title="Permanent link">&para;</a></h3>
+<p>Format columns using pattern, number, or date rules.
+Multiple columns can be formatted in a single step.
+Each key is a target column name with a format specification.</p>
+<p><strong>Format spec keys:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td>target name</td>
+<td>Source column (in-place when omitted)</td>
+</tr>
+<tr>
+<td><code>pattern</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td>--</td>
+<td>String pattern with <code>{pos:len}</code> placeholders (1-indexed)</td>
+</tr>
+<tr>
+<td><code>number</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td>--</td>
+<td>Java DecimalFormat pattern</td>
+</tr>
+<tr>
+<td><code>date</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td>--</td>
+<td>Java SimpleDateFormat pattern</td>
+</tr>
+<tr>
+<td><code>on_short</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"null"</code></td>
+<td>Behavior when source is shorter than pattern: <code>"null"</code> or <code>"partial"</code></td>
+</tr>
+<tr>
+<td><code>strict_types</code></td>
+<td><code>boolean</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>Reject type mismatches instead of auto-casting</td>
+</tr>
+</tbody>
+</table>
+<p>Exactly one of <code>pattern</code>, <code>number</code>, or <code>date</code> must be set
+per column.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">format</span><span class="p">:</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">    </span><span class="nt">phone</span><span class="p">:</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">      </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;({1:3}){4:3}-{7:4}&quot;</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_phone</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="nt">amount_display</span><span class="p">:</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">      </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#,##0.00&quot;</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">amount</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="w">    </span><span class="nt">event_date</span><span class="p">:</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="w">      </span><span class="nt">date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;yyyy-MM-dd&quot;</span>
 </code></pre></div>
 <hr />
 <h2 id="target">target<a class="headerlink" href="#target" title="Permanent link">&para;</a></h2>
@@ -4538,17 +4949,17 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 <p>Supported patterns: <code>snake_case</code>, <code>camelCase</code>, <code>PascalCase</code>,
 <code>UPPER_SNAKE_CASE</code>, <code>Title_Snake_Case</code>, <code>Title Case</code>, <code>lowercase</code>,
 <code>UPPERCASE</code>, <code>kebab-case</code>, <code>none</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span><span class="nt">mapping_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">    </span><span class="nt">total_amount</span><span class="p">:</span>
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;decimal(18,2)&quot;</span>
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="w">    </span><span class="nt">_internal_flag</span><span class="p">:</span>
-<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="w">      </span><span class="nt">drop</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">  </span><span class="nt">mapping_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">    </span><span class="nt">total_amount</span><span class="p">:</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;decimal(18,2)&quot;</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="w">    </span><span class="nt">_internal_flag</span><span class="p">:</span>
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a><span class="w">      </span><span class="nt">drop</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
+<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
 </code></pre></div>
 <hr />
 <h2 id="write">write<a class="headerlink" href="#write" title="Permanent link">&para;</a></h2>
@@ -4615,14 +5026,14 @@ columns. The <code>{col}</code> placeholder is replaced with each column name.</
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">write</span><span class="p">:</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nt">on_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nt">on_no_match_target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insert</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">  </span><span class="nt">on_no_match_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="w">  </span><span class="nt">soft_delete_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_deleted</span>
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="w">  </span><span class="nt">soft_delete_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">  </span><span class="nt">on_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="w">  </span><span class="nt">on_no_match_target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insert</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="w">  </span><span class="nt">on_no_match_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
+<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="w">  </span><span class="nt">soft_delete_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_deleted</span>
+<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a><span class="w">  </span><span class="nt">soft_delete_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <hr />
 <h2 id="keys">keys<a class="headerlink" href="#keys" title="Permanent link">&para;</a></h2>
@@ -4745,15 +5156,15 @@ surrogate key use cases.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="nt">keys</span><span class="p">:</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sk_order</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">    </span><span class="nt">algorithm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sha256</span>
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
-<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change_hash</span>
-<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">status</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">updated_at</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="w">    </span><span class="nt">algorithm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">md5</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nt">keys</span><span class="p">:</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sk_order</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="w">    </span><span class="nt">algorithm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sha256</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change_hash</span>
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">status</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">updated_at</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a><span class="w">    </span><span class="nt">algorithm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">md5</span>
 </code></pre></div>
 <hr />
 <h2 id="load">load<a class="headerlink" href="#load" title="Permanent link">&para;</a></h2>
@@ -4899,17 +5310,17 @@ surrogate key use cases.</p>
 </table>
 <p>Either <code>preset</code> or <code>operation_column</code> must be set (but not both). When using
 explicit mapping, at least <code>insert_value</code> or <code>update_value</code> is required.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nt">load</span><span class="p">:</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span><span class="nt">watermark_store</span><span class="p">:</span>
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">table_properties</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">  </span><span class="nt">watermark_store</span><span class="p">:</span>
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">table_properties</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nt">load</span><span class="p">:</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cdc</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="nt">cdc</span><span class="p">:</span>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span><span class="nt">preset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta_cdf</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cdc</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">  </span><span class="nt">cdc</span><span class="p">:</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">    </span><span class="nt">preset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta_cdf</span>
 </code></pre></div>
 <hr />
 <h2 id="validations">validations<a class="headerlink" href="#validations" title="Permanent link">&para;</a></h2>
@@ -4949,13 +5360,13 @@ expression against the DataFrame before it is written.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">validations</span><span class="p">:</span>
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">positive_amount</span>
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;amount</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0&quot;</span>
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">valid_status</span>
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">IN</span><span class="nv"> </span><span class="s">(&#39;active&#39;,</span><span class="nv"> </span><span class="s">&#39;inactive&#39;,</span><span class="nv"> </span><span class="s">&#39;pending&#39;)&quot;</span>
-<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nt">validations</span><span class="p">:</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">positive_amount</span>
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;amount</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0&quot;</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">valid_status</span>
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">IN</span><span class="nv"> </span><span class="s">(&#39;active&#39;,</span><span class="nv"> </span><span class="s">&#39;inactive&#39;,</span><span class="nv"> </span><span class="s">&#39;pending&#39;)&quot;</span>
+<a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
 </code></pre></div>
 <hr />
 <h2 id="assertions">assertions<a class="headerlink" href="#assertions" title="Permanent link">&para;</a></h2>
@@ -5015,18 +5426,18 @@ expression against the DataFrame before it is written.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">assertions</span><span class="p">:</span>
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_not_null</span>
-<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fatal</span>
-<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
-<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">expression</span>
-<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a><span class="w">    </span><span class="nt">expression</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;count(CASE</span><span class="nv"> </span><span class="s">WHEN</span><span class="nv"> </span><span class="s">amount</span><span class="nv"> </span><span class="s">&lt;</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">THEN</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">END)</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">0&quot;</span>
-<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="nt">assertions</span><span class="p">:</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_not_null</span>
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fatal</span>
+<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
+<a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">expression</span>
+<a id="__codelineno-32-11" name="__codelineno-32-11" href="#__codelineno-32-11"></a><span class="w">    </span><span class="nt">expression</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;count(CASE</span><span class="nv"> </span><span class="s">WHEN</span><span class="nv"> </span><span class="s">amount</span><span class="nv"> </span><span class="s">&lt;</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">THEN</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">END)</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">0&quot;</span>
+<a id="__codelineno-32-12" name="__codelineno-32-12" href="#__codelineno-32-12"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
 </code></pre></div>
 <hr />
 <h2 id="failure">failure<a class="headerlink" href="#failure" title="Permanent link">&para;</a></h2>
@@ -5057,8 +5468,8 @@ in a weave when this thread fails.</p>
 <li><code>skip_downstream</code> -- Skip only threads that depend on the failed thread.</li>
 <li><code>continue</code> -- Continue executing unrelated threads.</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nt">failure</span><span class="p">:</span>
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="nt">failure</span><span class="p">:</span>
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
 </code></pre></div>
 <hr />
 <h2 id="execution">execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
@@ -5091,9 +5502,9 @@ the most specific level winning.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nt">execution</span><span class="p">:</span>
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verbose</span>
-<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verbose</span>
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <hr />
 <h2 id="params">params<a class="headerlink" href="#params" title="Permanent link">&para;</a></h2>
@@ -5148,32 +5559,32 @@ the most specific level winning.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nt">params</span><span class="p">:</span>
-<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span>
-<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">start_date</span>
-<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Start</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">reporting</span><span class="nv"> </span><span class="s">window&quot;</span>
-<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="w">  </span><span class="nt">region_filter</span><span class="p">:</span>
-<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region_filter</span>
-<a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
-<a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-<a id="__codelineno-29-11" name="__codelineno-29-11" href="#__codelineno-29-11"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ALL&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nt">params</span><span class="p">:</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="nt">start_date</span><span class="p">:</span>
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">start_date</span>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Start</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">reporting</span><span class="nv"> </span><span class="s">window&quot;</span>
+<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="w">  </span><span class="nt">region_filter</span><span class="p">:</span>
+<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region_filter</span>
+<a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-35-11" name="__codelineno-35-11" href="#__codelineno-35-11"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ALL&quot;</span>
 </code></pre></div>
 <hr />
 <h2 id="lookups">lookups<a class="headerlink" href="#lookups" title="Permanent link">&para;</a></h2>
 <p>Thread-level lookup definitions. The structure is identical to
 <a href="../weave/#lookups">weave-level lookups</a>. When a thread and its parent weave
 define a lookup with the same name, the thread-level definition wins.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nt">lookups</span><span class="p">:</span>
-<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">  </span><span class="nt">dim_region</span><span class="p">:</span>
-<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref.dim_region</span>
-<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="w">    </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="w">    </span><span class="nt">values</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">country_code</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a><span class="w">    </span><span class="nt">materialize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">broadcast</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="nt">lookups</span><span class="p">:</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span><span class="nt">dim_region</span><span class="p">:</span>
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref.dim_region</span>
+<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a><span class="w">    </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="w">    </span><span class="nt">values</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">region_name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">country_code</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="w">    </span><span class="nt">materialize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">broadcast</span>
 </code></pre></div>
 <hr />
 <h2 id="column_sets">column_sets<a class="headerlink" href="#column_sets" title="Permanent link">&para;</a></h2>
@@ -5181,12 +5592,12 @@ define a lookup with the same name, the thread-level definition wins.</p>
 identical to <a href="../weave/#column_sets">weave-level column_sets</a>. When the same
 name is defined at both thread and weave level, the thread-level definition
 wins.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="nt">column_sets</span><span class="p">:</span>
-<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">  </span><span class="nt">local_overrides</span><span class="p">:</span>
-<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml</span>
-<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mappings/thread_overrides.yaml</span>
-<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a><span class="w">    </span><span class="nt">on_unmapped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass_through</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nt">column_sets</span><span class="p">:</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">  </span><span class="nt">local_overrides</span><span class="p">:</span>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mappings/thread_overrides.yaml</span>
+<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a><span class="w">    </span><span class="nt">on_unmapped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass_through</span>
 </code></pre></div>
 <hr />
 <h2 id="variables">variables<a class="headerlink" href="#variables" title="Permanent link">&para;</a></h2>
@@ -5194,10 +5605,10 @@ wins.</p>
 <code>sql_statement</code> hook steps via <code>set_var</code> and referenced in downstream config
 as <code>${var.name}</code>. The structure is identical to
 <a href="../weave/#variables-variablespec">weave-level variables</a>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="nt">variables</span><span class="p">:</span>
-<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="w">  </span><span class="nt">row_count</span><span class="p">:</span>
-<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
-<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="nt">variables</span><span class="p">:</span>
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="w">  </span><span class="nt">row_count</span><span class="p">:</span>
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 </code></pre></div>
 <hr />
 <h2 id="pre_steps-post_steps">pre_steps / post_steps<a class="headerlink" href="#pre_steps-post_steps" title="Permanent link">&para;</a></h2>
@@ -5207,98 +5618,98 @@ structure is identical to
 <p>Thread-level hook lists are <strong>not</strong> cascaded from the parent weave. Each
 level runs its own list independently. <code>pre_steps</code> run before any source is
 read; <code>post_steps</code> run after write, assertions, and exports.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="nt">pre_steps</span><span class="p">:</span>
-<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
-<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_source_freshness</span>
-<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
-<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
-<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4h&quot;</span>
-<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a>
-<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="nt">post_steps</span><span class="p">:</span>
-<a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log_message</span>
-<a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Thread</span><span class="nv"> </span><span class="s">complete.</span><span class="nv"> </span><span class="s">Rows</span><span class="nv"> </span><span class="s">written:</span><span class="nv"> </span><span class="s">${var.row_count}.&quot;</span>
-<a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a><span class="w">    </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">info</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="nt">pre_steps</span><span class="p">:</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_source_freshness</span>
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4h&quot;</span>
+<a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a>
+<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="nt">post_steps</span><span class="p">:</span>
+<a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log_message</span>
+<a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Thread</span><span class="nv"> </span><span class="s">complete.</span><span class="nv"> </span><span class="s">Rows</span><span class="nv"> </span><span class="s">written:</span><span class="nv"> </span><span class="s">${var.row_count}.&quot;</span>
+<a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a><span class="w">    </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">info</span>
 </code></pre></div>
 <hr />
 <h2 id="complete-example">Complete example<a class="headerlink" href="#complete-example" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
-<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>
-<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="nt">sources</span><span class="p">:</span>
-<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
-<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_orders</span>
-<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="w">    </span><span class="nt">dedup</span><span class="p">:</span>
-<a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a><span class="w">      </span><span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-9" name="__codelineno-34-9" href="#__codelineno-34-9"></a><span class="w">      </span><span class="nt">order_by</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at</span><span class="nv"> </span><span class="s">DESC&quot;</span>
-<a id="__codelineno-34-10" name="__codelineno-34-10" href="#__codelineno-34-10"></a><span class="w">  </span><span class="nt">customers</span><span class="p">:</span>
-<a id="__codelineno-34-11" name="__codelineno-34-11" href="#__codelineno-34-11"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-34-12" name="__codelineno-34-12" href="#__codelineno-34-12"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customers</span>
-<a id="__codelineno-34-13" name="__codelineno-34-13" href="#__codelineno-34-13"></a>
-<a id="__codelineno-34-14" name="__codelineno-34-14" href="#__codelineno-34-14"></a><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-34-15" name="__codelineno-34-15" href="#__codelineno-34-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
-<a id="__codelineno-34-16" name="__codelineno-34-16" href="#__codelineno-34-16"></a><span class="w">      </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">!=</span><span class="nv"> </span><span class="s">&#39;cancelled&#39;&quot;</span>
-<a id="__codelineno-34-17" name="__codelineno-34-17" href="#__codelineno-34-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">join</span><span class="p">:</span>
-<a id="__codelineno-34-18" name="__codelineno-34-18" href="#__codelineno-34-18"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
-<a id="__codelineno-34-19" name="__codelineno-34-19" href="#__codelineno-34-19"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">left</span>
-<a id="__codelineno-34-20" name="__codelineno-34-20" href="#__codelineno-34-20"></a><span class="w">      </span><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-21" name="__codelineno-34-21" href="#__codelineno-34-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">derive</span><span class="p">:</span>
-<a id="__codelineno-34-22" name="__codelineno-34-22" href="#__codelineno-34-22"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-34-23" name="__codelineno-34-23" href="#__codelineno-34-23"></a><span class="w">        </span><span class="nt">total_amount</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;quantity</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">unit_price&quot;</span>
-<a id="__codelineno-34-24" name="__codelineno-34-24" href="#__codelineno-34-24"></a><span class="w">        </span><span class="nt">order_year</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;year(order_date)&quot;</span>
-<a id="__codelineno-34-25" name="__codelineno-34-25" href="#__codelineno-34-25"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">select</span><span class="p">:</span>
-<a id="__codelineno-34-26" name="__codelineno-34-26" href="#__codelineno-34-26"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-34-27" name="__codelineno-34-27" href="#__codelineno-34-27"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_id</span>
-<a id="__codelineno-34-28" name="__codelineno-34-28" href="#__codelineno-34-28"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
-<a id="__codelineno-34-29" name="__codelineno-34-29" href="#__codelineno-34-29"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_name</span>
-<a id="__codelineno-34-30" name="__codelineno-34-30" href="#__codelineno-34-30"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">total_amount</span>
-<a id="__codelineno-34-31" name="__codelineno-34-31" href="#__codelineno-34-31"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_year</span>
-<a id="__codelineno-34-32" name="__codelineno-34-32" href="#__codelineno-34-32"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
-<a id="__codelineno-34-33" name="__codelineno-34-33" href="#__codelineno-34-33"></a>
-<a id="__codelineno-34-34" name="__codelineno-34-34" href="#__codelineno-34-34"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-34-35" name="__codelineno-34-35" href="#__codelineno-34-35"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
-<a id="__codelineno-34-36" name="__codelineno-34-36" href="#__codelineno-34-36"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-37" name="__codelineno-34-37" href="#__codelineno-34-37"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-34-38" name="__codelineno-34-38" href="#__codelineno-34-38"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
-<a id="__codelineno-34-39" name="__codelineno-34-39" href="#__codelineno-34-39"></a>
-<a id="__codelineno-34-40" name="__codelineno-34-40" href="#__codelineno-34-40"></a><span class="nt">write</span><span class="p">:</span>
-<a id="__codelineno-34-41" name="__codelineno-34-41" href="#__codelineno-34-41"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
-<a id="__codelineno-34-42" name="__codelineno-34-42" href="#__codelineno-34-42"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-43" name="__codelineno-34-43" href="#__codelineno-34-43"></a><span class="w">  </span><span class="nt">on_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
-<a id="__codelineno-34-44" name="__codelineno-34-44" href="#__codelineno-34-44"></a><span class="w">  </span><span class="nt">on_no_match_target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insert</span>
-<a id="__codelineno-34-45" name="__codelineno-34-45" href="#__codelineno-34-45"></a>
-<a id="__codelineno-34-46" name="__codelineno-34-46" href="#__codelineno-34-46"></a><span class="nt">keys</span><span class="p">:</span>
-<a id="__codelineno-34-47" name="__codelineno-34-47" href="#__codelineno-34-47"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-48" name="__codelineno-34-48" href="#__codelineno-34-48"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
-<a id="__codelineno-34-49" name="__codelineno-34-49" href="#__codelineno-34-49"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sk_order</span>
-<a id="__codelineno-34-50" name="__codelineno-34-50" href="#__codelineno-34-50"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
-<a id="__codelineno-34-51" name="__codelineno-34-51" href="#__codelineno-34-51"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change_hash</span>
-<a id="__codelineno-34-52" name="__codelineno-34-52" href="#__codelineno-34-52"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">total_amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_name</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-53" name="__codelineno-34-53" href="#__codelineno-34-53"></a>
-<a id="__codelineno-34-54" name="__codelineno-34-54" href="#__codelineno-34-54"></a><span class="nt">load</span><span class="p">:</span>
-<a id="__codelineno-34-55" name="__codelineno-34-55" href="#__codelineno-34-55"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
-<a id="__codelineno-34-56" name="__codelineno-34-56" href="#__codelineno-34-56"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
-<a id="__codelineno-34-57" name="__codelineno-34-57" href="#__codelineno-34-57"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
-<a id="__codelineno-34-58" name="__codelineno-34-58" href="#__codelineno-34-58"></a>
-<a id="__codelineno-34-59" name="__codelineno-34-59" href="#__codelineno-34-59"></a><span class="nt">validations</span><span class="p">:</span>
-<a id="__codelineno-34-60" name="__codelineno-34-60" href="#__codelineno-34-60"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">positive_total</span>
-<a id="__codelineno-34-61" name="__codelineno-34-61" href="#__codelineno-34-61"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;total_amount</span><span class="nv"> </span><span class="s">&gt;=</span><span class="nv"> </span><span class="s">0&quot;</span>
-<a id="__codelineno-34-62" name="__codelineno-34-62" href="#__codelineno-34-62"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
-<a id="__codelineno-34-63" name="__codelineno-34-63" href="#__codelineno-34-63"></a>
-<a id="__codelineno-34-64" name="__codelineno-34-64" href="#__codelineno-34-64"></a><span class="nt">assertions</span><span class="p">:</span>
-<a id="__codelineno-34-65" name="__codelineno-34-65" href="#__codelineno-34-65"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
-<a id="__codelineno-34-66" name="__codelineno-34-66" href="#__codelineno-34-66"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-34-67" name="__codelineno-34-67" href="#__codelineno-34-67"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
-<a id="__codelineno-34-68" name="__codelineno-34-68" href="#__codelineno-34-68"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
-<a id="__codelineno-34-69" name="__codelineno-34-69" href="#__codelineno-34-69"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-34-70" name="__codelineno-34-70" href="#__codelineno-34-70"></a>
-<a id="__codelineno-34-71" name="__codelineno-34-71" href="#__codelineno-34-71"></a><span class="nt">failure</span><span class="p">:</span>
-<a id="__codelineno-34-72" name="__codelineno-34-72" href="#__codelineno-34-72"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
-<a id="__codelineno-34-73" name="__codelineno-34-73" href="#__codelineno-34-73"></a>
-<a id="__codelineno-34-74" name="__codelineno-34-74" href="#__codelineno-34-74"></a><span class="nt">execution</span><span class="p">:</span>
-<a id="__codelineno-34-75" name="__codelineno-34-75" href="#__codelineno-34-75"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">standard</span>
-<a id="__codelineno-34-76" name="__codelineno-34-76" href="#__codelineno-34-76"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-34-77" name="__codelineno-34-77" href="#__codelineno-34-77"></a>
-<a id="__codelineno-34-78" name="__codelineno-34-78" href="#__codelineno-34-78"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">curated</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_orders</span>
+<a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a><span class="w">    </span><span class="nt">dedup</span><span class="p">:</span>
+<a id="__codelineno-40-8" name="__codelineno-40-8" href="#__codelineno-40-8"></a><span class="w">      </span><span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-9" name="__codelineno-40-9" href="#__codelineno-40-9"></a><span class="w">      </span><span class="nt">order_by</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at</span><span class="nv"> </span><span class="s">DESC&quot;</span>
+<a id="__codelineno-40-10" name="__codelineno-40-10" href="#__codelineno-40-10"></a><span class="w">  </span><span class="nt">customers</span><span class="p">:</span>
+<a id="__codelineno-40-11" name="__codelineno-40-11" href="#__codelineno-40-11"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-40-12" name="__codelineno-40-12" href="#__codelineno-40-12"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customers</span>
+<a id="__codelineno-40-13" name="__codelineno-40-13" href="#__codelineno-40-13"></a>
+<a id="__codelineno-40-14" name="__codelineno-40-14" href="#__codelineno-40-14"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-40-15" name="__codelineno-40-15" href="#__codelineno-40-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<a id="__codelineno-40-16" name="__codelineno-40-16" href="#__codelineno-40-16"></a><span class="w">      </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">!=</span><span class="nv"> </span><span class="s">&#39;cancelled&#39;&quot;</span>
+<a id="__codelineno-40-17" name="__codelineno-40-17" href="#__codelineno-40-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">join</span><span class="p">:</span>
+<a id="__codelineno-40-18" name="__codelineno-40-18" href="#__codelineno-40-18"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<a id="__codelineno-40-19" name="__codelineno-40-19" href="#__codelineno-40-19"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">left</span>
+<a id="__codelineno-40-20" name="__codelineno-40-20" href="#__codelineno-40-20"></a><span class="w">      </span><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-21" name="__codelineno-40-21" href="#__codelineno-40-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">derive</span><span class="p">:</span>
+<a id="__codelineno-40-22" name="__codelineno-40-22" href="#__codelineno-40-22"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-40-23" name="__codelineno-40-23" href="#__codelineno-40-23"></a><span class="w">        </span><span class="nt">total_amount</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;quantity</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">unit_price&quot;</span>
+<a id="__codelineno-40-24" name="__codelineno-40-24" href="#__codelineno-40-24"></a><span class="w">        </span><span class="nt">order_year</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;year(order_date)&quot;</span>
+<a id="__codelineno-40-25" name="__codelineno-40-25" href="#__codelineno-40-25"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">select</span><span class="p">:</span>
+<a id="__codelineno-40-26" name="__codelineno-40-26" href="#__codelineno-40-26"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-40-27" name="__codelineno-40-27" href="#__codelineno-40-27"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_id</span>
+<a id="__codelineno-40-28" name="__codelineno-40-28" href="#__codelineno-40-28"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<a id="__codelineno-40-29" name="__codelineno-40-29" href="#__codelineno-40-29"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_name</span>
+<a id="__codelineno-40-30" name="__codelineno-40-30" href="#__codelineno-40-30"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">total_amount</span>
+<a id="__codelineno-40-31" name="__codelineno-40-31" href="#__codelineno-40-31"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_year</span>
+<a id="__codelineno-40-32" name="__codelineno-40-32" href="#__codelineno-40-32"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
+<a id="__codelineno-40-33" name="__codelineno-40-33" href="#__codelineno-40-33"></a>
+<a id="__codelineno-40-34" name="__codelineno-40-34" href="#__codelineno-40-34"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-40-35" name="__codelineno-40-35" href="#__codelineno-40-35"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_orders</span>
+<a id="__codelineno-40-36" name="__codelineno-40-36" href="#__codelineno-40-36"></a><span class="w">  </span><span class="nt">partition_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_year</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-37" name="__codelineno-40-37" href="#__codelineno-40-37"></a><span class="w">  </span><span class="nt">naming</span><span class="p">:</span>
+<a id="__codelineno-40-38" name="__codelineno-40-38" href="#__codelineno-40-38"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
+<a id="__codelineno-40-39" name="__codelineno-40-39" href="#__codelineno-40-39"></a>
+<a id="__codelineno-40-40" name="__codelineno-40-40" href="#__codelineno-40-40"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-40-41" name="__codelineno-40-41" href="#__codelineno-40-41"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-40-42" name="__codelineno-40-42" href="#__codelineno-40-42"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-43" name="__codelineno-40-43" href="#__codelineno-40-43"></a><span class="w">  </span><span class="nt">on_match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">update</span>
+<a id="__codelineno-40-44" name="__codelineno-40-44" href="#__codelineno-40-44"></a><span class="w">  </span><span class="nt">on_no_match_target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">insert</span>
+<a id="__codelineno-40-45" name="__codelineno-40-45" href="#__codelineno-40-45"></a>
+<a id="__codelineno-40-46" name="__codelineno-40-46" href="#__codelineno-40-46"></a><span class="nt">keys</span><span class="p">:</span>
+<a id="__codelineno-40-47" name="__codelineno-40-47" href="#__codelineno-40-47"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-48" name="__codelineno-40-48" href="#__codelineno-40-48"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-40-49" name="__codelineno-40-49" href="#__codelineno-40-49"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sk_order</span>
+<a id="__codelineno-40-50" name="__codelineno-40-50" href="#__codelineno-40-50"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
+<a id="__codelineno-40-51" name="__codelineno-40-51" href="#__codelineno-40-51"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change_hash</span>
+<a id="__codelineno-40-52" name="__codelineno-40-52" href="#__codelineno-40-52"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">total_amount</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_name</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-53" name="__codelineno-40-53" href="#__codelineno-40-53"></a>
+<a id="__codelineno-40-54" name="__codelineno-40-54" href="#__codelineno-40-54"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-40-55" name="__codelineno-40-55" href="#__codelineno-40-55"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
+<a id="__codelineno-40-56" name="__codelineno-40-56" href="#__codelineno-40-56"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">updated_at</span>
+<a id="__codelineno-40-57" name="__codelineno-40-57" href="#__codelineno-40-57"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-40-58" name="__codelineno-40-58" href="#__codelineno-40-58"></a>
+<a id="__codelineno-40-59" name="__codelineno-40-59" href="#__codelineno-40-59"></a><span class="nt">validations</span><span class="p">:</span>
+<a id="__codelineno-40-60" name="__codelineno-40-60" href="#__codelineno-40-60"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">positive_total</span>
+<a id="__codelineno-40-61" name="__codelineno-40-61" href="#__codelineno-40-61"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;total_amount</span><span class="nv"> </span><span class="s">&gt;=</span><span class="nv"> </span><span class="s">0&quot;</span>
+<a id="__codelineno-40-62" name="__codelineno-40-62" href="#__codelineno-40-62"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-40-63" name="__codelineno-40-63" href="#__codelineno-40-63"></a>
+<a id="__codelineno-40-64" name="__codelineno-40-64" href="#__codelineno-40-64"></a><span class="nt">assertions</span><span class="p">:</span>
+<a id="__codelineno-40-65" name="__codelineno-40-65" href="#__codelineno-40-65"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
+<a id="__codelineno-40-66" name="__codelineno-40-66" href="#__codelineno-40-66"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-40-67" name="__codelineno-40-67" href="#__codelineno-40-67"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-40-68" name="__codelineno-40-68" href="#__codelineno-40-68"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
+<a id="__codelineno-40-69" name="__codelineno-40-69" href="#__codelineno-40-69"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-40-70" name="__codelineno-40-70" href="#__codelineno-40-70"></a>
+<a id="__codelineno-40-71" name="__codelineno-40-71" href="#__codelineno-40-71"></a><span class="nt">failure</span><span class="p">:</span>
+<a id="__codelineno-40-72" name="__codelineno-40-72" href="#__codelineno-40-72"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
+<a id="__codelineno-40-73" name="__codelineno-40-73" href="#__codelineno-40-73"></a>
+<a id="__codelineno-40-74" name="__codelineno-40-74" href="#__codelineno-40-74"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-40-75" name="__codelineno-40-75" href="#__codelineno-40-75"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">standard</span>
+<a id="__codelineno-40-76" name="__codelineno-40-76" href="#__codelineno-40-76"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-40-77" name="__codelineno-40-77" href="#__codelineno-40-77"></a>
+<a id="__codelineno-40-78" name="__codelineno-40-78" href="#__codelineno-40-78"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">curated</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 
 
