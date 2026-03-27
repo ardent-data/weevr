@@ -876,6 +876,9 @@ _STEP_TYPES = frozenset(
         "coalesce",
         "string_ops",
         "date_ops",
+        "concat",
+        "map",
+        "format",
     }
 )
 
