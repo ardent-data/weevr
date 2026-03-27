@@ -1,5 +1,6 @@
 """Domain object model for weevr configuration."""
 
+from weevr.model.audit import AuditTemplate
 from weevr.model.column_set import (
     ColumnSet,
     ColumnSetSource,
@@ -70,6 +71,8 @@ __all__ = [
     # Target
     "Target",
     "ColumnMapping",
+    # Audit
+    "AuditTemplate",
     # Pipeline steps
     "Step",
     "FilterStep",

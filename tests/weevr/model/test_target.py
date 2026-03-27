@@ -134,7 +134,7 @@ class TestTarget:
 
     def test_audit_template_string_sugar(self):
         """audit_template accepts a string and normalizes it to a list."""
-        t = Target(audit_template="fabric")
+        t = Target(audit_template="fabric")  # type: ignore[arg-type]
         assert t.audit_template == ["fabric"]
 
     def test_audit_template_list(self):
