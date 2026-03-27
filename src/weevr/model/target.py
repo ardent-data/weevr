@@ -37,4 +37,23 @@ class Target(FrozenBase):
     columns: dict[str, ColumnMapping] | None = None
     partition_by: list[str] | None = None
     audit_columns: dict[str, str] | None = None
+    audit_template: list[str] | None = None
+    audit_template_inherit: bool = True
+    audit_columns_exclude: list[str] | None = None
     naming: NamingConfig | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_audit_template(cls, data: Any) -> Any:
+        if isinstance(data, dict) and isinstance(data.get("audit_template"), str):
+            data = {**data, "audit_template": [data["audit_template"]]}
+        return data
+
+    @model_validator(mode="after")
+    def _validate_exclude_patterns(self) -> "Target":
+        """Validate audit_columns_exclude patterns are non-empty strings."""
+        if self.audit_columns_exclude:
+            for pattern in self.audit_columns_exclude:
+                if not pattern:
+                    raise ValueError("audit_columns_exclude patterns must be non-empty strings")
+        return self

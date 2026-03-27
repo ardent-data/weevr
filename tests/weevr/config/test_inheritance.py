@@ -2,7 +2,10 @@
 
 from typing import Any
 
+import pytest
+
 from weevr.config.inheritance import apply_inheritance, cascade
+from weevr.errors.exceptions import ConfigError
 
 
 class TestCascade:
@@ -669,3 +672,252 @@ class TestExportsInheritance:
         assert "loom_exp" in names
         assert "weave_exp" in names
         assert "thread_exp" in names
+
+
+class TestAuditTemplateInheritance:
+    """Test audit template, inherit flag, exclusion, and legacy path handling."""
+
+    def test_audit_template_cascades_from_loom(self):
+        """Loom defaults.target.audit_template flows down to thread."""
+        loom: dict[str, Any] = {
+            "target": {"audit_template": "minimal"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["audit_columns"] == {
+            "_weevr_loaded_at": "current_timestamp()",
+            "_weevr_run_id": "${param.run_id}",
+            "_weevr_thread": "${thread.name}",
+        }
+
+    def test_audit_template_cascades_from_weave(self):
+        """Weave defaults.target.audit_template flows down to thread."""
+        weave: dict[str, Any] = {
+            "target": {"audit_template": "minimal"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(None, weave, thread)
+        assert result["target"]["audit_columns"] == {
+            "_weevr_loaded_at": "current_timestamp()",
+            "_weevr_run_id": "${param.run_id}",
+            "_weevr_thread": "${thread.name}",
+        }
+
+    def test_audit_template_thread_overrides(self):
+        """Thread's own audit_template columns take precedence on key collision."""
+        loom_audit_templates: dict[str, Any] = {
+            "base": {"columns": {"_ts": "loom_ts()", "_env": "'loom'"}},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "override_tpl",
+            }
+        }
+        weave_audit_templates: dict[str, Any] = {
+            "override_tpl": {"columns": {"_ts": "thread_ts()", "_extra": "'extra'"}},
+        }
+        result = apply_inheritance(
+            None,
+            None,
+            thread,
+            loom_audit_templates=loom_audit_templates,
+            weave_audit_templates=weave_audit_templates,
+        )
+        ac = result["target"]["audit_columns"]
+        # Thread-level template ref resolves using available template defs
+        assert ac["_ts"] == "thread_ts()"
+        assert ac["_extra"] == "'extra'"
+
+    def test_audit_template_inherit_false_blocks_loom(self):
+        """Weave with audit_template_inherit: false blocks loom's template."""
+        loom: dict[str, Any] = {
+            "target": {"audit_template": "minimal"},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template_inherit": False,
+            }
+        }
+        result = apply_inheritance(loom, None, thread)
+        assert "audit_columns" not in result.get("target", {})
+
+    def test_audit_columns_exclude_applied(self):
+        """Thread audit_columns_exclude removes columns after merge."""
+        loom: dict[str, Any] = {
+            "audit_columns": {
+                "_loaded_at": "current_timestamp()",
+                "_run_id": "'abc'",
+                "_batch": "'b1'",
+            },
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_columns_exclude": ["_batch"],
+            }
+        }
+        result = apply_inheritance(loom, None, thread)
+        assert "_loaded_at" in result["target"]["audit_columns"]
+        assert "_run_id" in result["target"]["audit_columns"]
+        assert "_batch" not in result["target"]["audit_columns"]
+
+    def test_legacy_audit_columns_path_merged(self):
+        """defaults.audit_columns (legacy path) is still resolved into target."""
+        loom: dict[str, Any] = {
+            "audit_columns": {"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["audit_columns"] == {
+            "_loaded_at": "current_timestamp()",
+            "_run_id": "'abc'",
+        }
+
+    def test_legacy_audit_columns_path_warns(self, caplog):
+        """defaults.audit_columns triggers a deprecation warning."""
+        import logging
+
+        loom: dict[str, Any] = {
+            "audit_columns": {"_loaded_at": "current_timestamp()"},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        with caplog.at_level(logging.WARNING, logger="weevr.config.inheritance"):
+            apply_inheritance(loom, None, thread)
+        assert any("deprecated" in record.message.lower() for record in caplog.records)
+
+    def test_legacy_and_new_path_coexist(self):
+        """Both legacy and new paths present; new path wins on key collision."""
+        loom: dict[str, Any] = {
+            "audit_columns": {
+                "_loaded_at": "legacy_value()",
+                "_legacy_only": "'yes'",
+            },
+            "target": {
+                "audit_columns": {
+                    "_loaded_at": "new_value()",
+                    "_new_only": "'yes'",
+                }
+            },
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["audit_columns"]["_loaded_at"] == "new_value()"
+        assert result["target"]["audit_columns"]["_legacy_only"] == "'yes'"
+        assert result["target"]["audit_columns"]["_new_only"] == "'yes'"
+
+    def test_audit_templates_definitions_cascade(self):
+        """User-defined templates from loom are available for thread resolution."""
+        loom_audit_templates: dict[str, Any] = {
+            "my_standard": {"columns": {"_ts": "current_timestamp()", "_id": "'x'"}},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "my_standard",
+            }
+        }
+        result = apply_inheritance(
+            None,
+            None,
+            thread,
+            loom_audit_templates=loom_audit_templates,
+        )
+        assert result["target"]["audit_columns"] == {"_ts": "current_timestamp()", "_id": "'x'"}
+
+    def test_cascade_full_scenario(self):
+        """Full scenario: loom template + weave inline + thread template + thread exclude."""
+        loom_audit_templates: dict[str, Any] = {
+            "base": {"columns": {"_loaded_at": "current_timestamp()", "_env": "'prod'"}},
+        }
+        loom: dict[str, Any] = {
+            "target": {"audit_template": "base"},
+        }
+        weave: dict[str, Any] = {
+            "audit_columns": {"_run_id": "'run_42'"},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "minimal",
+                "audit_columns_exclude": ["_source_file"],
+            }
+        }
+        result = apply_inheritance(
+            loom,
+            weave,
+            thread,
+            loom_audit_templates=loom_audit_templates,
+        )
+        ac = result["target"]["audit_columns"]
+        # thread template minimal cols present
+        assert "_weevr_loaded_at" in ac
+        assert "_weevr_run_id" in ac
+        # thread_inherit is True so weave inline flows through
+        assert "_run_id" in ac
+        # loom's base template was overridden at thread level — _env not present
+        # because thread's audit_template: minimal takes precedence
+        # (loom's template ref columns are superseded by thread's template cols)
+        # exclude was for _source_file which minimal doesn't have, so it's a no-op
+
+    def test_unknown_template_ref_raises_config_error(self):
+        """Unknown audit_template name raises ConfigError during cascade."""
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "nonexistent",
+            }
+        }
+        with pytest.raises(ConfigError, match="nonexistent"):
+            apply_inheritance(None, None, thread)
+
+    def test_config_error_lists_available_templates(self):
+        """ConfigError for unknown template includes available names."""
+        loom_templates: dict[str, Any] = {
+            "custom_template": {"columns": {"_col": "expr"}},
+        }
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_template": "bad_name",
+            }
+        }
+        with pytest.raises(ConfigError, match="custom_template") as exc_info:
+            apply_inheritance(None, None, thread, loom_audit_templates=loom_templates)
+        assert "fabric" in str(exc_info.value)
+        assert "minimal" in str(exc_info.value)
+
+    def test_list_valued_audit_template_in_defaults(self):
+        """Multi-template list in defaults.target.audit_template resolves."""
+        loom_templates: dict[str, Any] = {
+            "tpl_a": {"columns": {"_a": "1"}},
+            "tpl_b": {"columns": {"_b": "2"}},
+        }
+        loom: dict[str, Any] = {
+            "target": {"audit_template": ["tpl_a", "tpl_b"]},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(
+            loom,
+            None,
+            thread,
+            loom_audit_templates=loom_templates,
+        )
+        ac = result["target"]["audit_columns"]
+        assert ac["_a"] == "1"
+        assert ac["_b"] == "2"
+
+    def test_exclusion_applies_to_inline_columns(self):
+        """audit_columns_exclude removes inline columns too."""
+        thread: dict[str, Any] = {
+            "target": {
+                "alias": "data.out",
+                "audit_columns": {"_keep": "1", "_drop_me": "2"},
+                "audit_columns_exclude": ["_drop_*"],
+            }
+        }
+        result = apply_inheritance(None, None, thread)
+        ac = result["target"]["audit_columns"]
+        assert "_keep" in ac
+        assert "_drop_me" not in ac

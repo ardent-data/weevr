@@ -1,6 +1,11 @@
 """Config inheritance cascade logic."""
 
+import logging
 from typing import Any
+
+from weevr.operations.audit import merge_audit_columns_with_templates
+
+logger = logging.getLogger(__name__)
 
 
 def cascade(parent: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:
@@ -33,6 +38,9 @@ def apply_inheritance(
     loom_defaults: dict[str, Any] | None,
     weave_defaults: dict[str, Any] | None,
     thread_config: dict[str, Any],
+    *,
+    loom_audit_templates: dict[str, Any] | None = None,
+    weave_audit_templates: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Apply multi-level inheritance cascade.
 
@@ -45,6 +53,8 @@ def apply_inheritance(
         loom_defaults: Defaults from loom level
         weave_defaults: Defaults from weave level
         thread_config: Thread-specific config
+        loom_audit_templates: User-defined audit template definitions from loom
+        weave_audit_templates: User-defined audit template definitions from weave
 
     Returns:
         Fully merged config with thread values taking precedence
@@ -66,8 +76,10 @@ def apply_inheritance(
     # The most specific (thread-level) wins entirely.
     _cascade_naming(loom_defaults, weave_defaults, result)
 
-    # Audit columns cascade: loom → weave → thread.target with additive merge.
-    _cascade_audit_columns(loom_defaults, weave_defaults, result)
+    # Audit cascade: templates, inline columns, inherit flag, and exclusions.
+    _cascade_audit(
+        loom_defaults, weave_defaults, result, loom_audit_templates, weave_audit_templates
+    )
 
     # Exports cascade: loom → weave → thread with additive merge by name.
     _cascade_exports(loom_defaults, weave_defaults, result)
@@ -101,42 +113,173 @@ def _cascade_naming(
         target["naming"] = parent_naming
 
 
-def _cascade_audit_columns(
+def _extract_audit_templates(
+    raw: dict[str, Any] | None,
+) -> dict[str, dict[str, str]] | None:
+    """Extract and flatten user-defined audit templates into name→columns mapping.
+
+    The raw audit_templates structure at each level is expected to be a dict of
+    ``{name: {"columns": {col: expr, ...}}}`` or already ``{name: {col: expr}}``.
+    Both forms are supported.
+
+    Args:
+        raw: Raw audit_templates dict from a config level, or None.
+
+    Returns:
+        Flattened ``{name: {col: expr}}`` dict, or None if input is empty/None.
+    """
+    if not raw:
+        return None
+    result: dict[str, dict[str, str]] = {}
+    for name, value in raw.items():
+        if isinstance(value, dict) and "columns" in value:
+            result[name] = value["columns"]
+        elif isinstance(value, dict):
+            result[name] = value
+    return result or None
+
+
+def _to_template_refs(val: Any) -> list[str] | None:
+    """Normalize a raw audit_template value to a list of names.
+
+    Handles both the string sugar form (``"fabric"``) and the list form
+    (``["fabric", "custom"]``).  Returns ``None`` for falsy input.
+    """
+    if not val:
+        return None
+    return val if isinstance(val, list) else [val]
+
+
+def _cascade_audit(
     loom_defaults: dict[str, Any] | None,
     weave_defaults: dict[str, Any] | None,
     thread_config: dict[str, Any],
+    loom_audit_templates: dict[str, Any] | None = None,
+    weave_audit_templates: dict[str, Any] | None = None,
 ) -> None:
-    """Cascade audit columns from loom/weave defaults into thread target.
+    """Cascade audit columns with template resolution, inheritance, and exclusion.
 
-    Unlike standard cascade (child replaces parent), audit columns use
-    additive merge: each level extends the column set. Same-named columns
-    at a lower level override the value from a higher level.
+    Handles both the new path (``defaults.target.audit_columns``,
+    ``defaults.target.audit_template``) and the legacy path
+    (``defaults.audit_columns``). The legacy path is still supported but
+    triggers a deprecation warning. When both are present, the new path wins
+    on key collision.
 
-    Cascade order: loom defaults → weave defaults → thread target.
+    Args:
+        loom_defaults: Defaults dict from loom level.
+        weave_defaults: Defaults dict from weave level.
+        thread_config: Fully cascaded thread config (mutated in place).
+        loom_audit_templates: User-defined template definitions from loom top-level.
+        weave_audit_templates: User-defined template definitions from weave top-level.
     """
-    merged: dict[str, str] = {}
+    # --- template definitions ---
+    loom_templates = _extract_audit_templates(loom_audit_templates)
+    weave_templates = _extract_audit_templates(weave_audit_templates)
+    thread_templates = _extract_audit_templates(thread_config.get("audit_templates"))
 
-    if loom_defaults and "audit_columns" in loom_defaults:
-        merged.update(loom_defaults["audit_columns"])
-    if weave_defaults and "audit_columns" in weave_defaults:
-        merged.update(weave_defaults["audit_columns"])
+    # --- template refs ---
+    loom_target = (loom_defaults or {}).get("target", {})
+    weave_target = (weave_defaults or {}).get("target", {})
+    thread_target = thread_config.get("target") or {}
 
-    # Thread-level audit_columns live under target.audit_columns
-    target = thread_config.get("target")
-    if isinstance(target, dict) and "audit_columns" in target:
-        merged.update(target["audit_columns"])
+    loom_template_ref = loom_target.get("audit_template")
+    weave_template_ref = weave_target.get("audit_template")
+    thread_template_ref = (
+        thread_target.get("audit_template") if isinstance(thread_target, dict) else None
+    )
 
-    if not merged:
+    loom_template_refs = _to_template_refs(loom_template_ref)
+    weave_template_refs = _to_template_refs(weave_template_ref)
+    thread_template_refs = _to_template_refs(thread_template_ref)
+
+    # --- inherit flag ---
+    thread_inherit = True
+    if isinstance(thread_target, dict):
+        thread_inherit = thread_target.get("audit_template_inherit", True)
+
+    # --- inline audit_columns: legacy and new paths ---
+    loom_inline: dict[str, str] = {}
+    if loom_defaults:
+        legacy = loom_defaults.get("audit_columns")
+        if legacy:
+            logger.warning(
+                "defaults.audit_columns is deprecated; use defaults.target.audit_columns instead"
+            )
+            loom_inline.update(legacy)
+        new_path = loom_target.get("audit_columns")
+        if new_path:
+            loom_inline.update(new_path)
+
+    weave_inline: dict[str, str] = {}
+    if weave_defaults:
+        legacy = weave_defaults.get("audit_columns")
+        if legacy:
+            logger.warning(
+                "defaults.audit_columns is deprecated; use defaults.target.audit_columns instead"
+            )
+            weave_inline.update(legacy)
+        new_path = weave_target.get("audit_columns")
+        if new_path:
+            weave_inline.update(new_path)
+
+    thread_inline: dict[str, str] | None = None
+    if isinstance(thread_target, dict):
+        thread_inline = thread_target.get("audit_columns")
+
+    # --- exclude ---
+    thread_exclude: list[str] | None = None
+    if isinstance(thread_target, dict):
+        thread_exclude = thread_target.get("audit_columns_exclude")
+
+    # Skip entirely if nothing is defined at any level
+    has_anything = any(
+        [
+            loom_templates,
+            weave_templates,
+            thread_templates,
+            loom_template_refs,
+            weave_template_refs,
+            thread_template_refs,
+            loom_inline,
+            weave_inline,
+            thread_inline,
+        ]
+    )
+    if not has_anything:
+        thread_config.pop("audit_columns", None)
         return
 
-    # Write the merged set into thread's target block
-    if not isinstance(target, dict):
-        thread_config.setdefault("target", {})
-        target = thread_config["target"]
-    target["audit_columns"] = merged
+    merged = merge_audit_columns_with_templates(
+        loom_templates=loom_templates,
+        loom_template_refs=loom_template_refs,
+        loom_inline=loom_inline or None,
+        weave_templates=weave_templates,
+        weave_template_refs=weave_template_refs,
+        weave_inline=weave_inline or None,
+        thread_templates=thread_templates,
+        thread_template_refs=thread_template_refs,
+        thread_inline=thread_inline,
+        thread_inherit=thread_inherit,
+        thread_exclude=thread_exclude,
+    )
 
-    # Remove top-level audit_columns inherited from defaults (not a Thread field)
+    # Write result into thread's target block
+    if not isinstance(thread_config.get("target"), dict):
+        thread_config["target"] = {}
+
+    if merged:
+        thread_config["target"]["audit_columns"] = merged
+    else:
+        thread_config["target"].pop("audit_columns", None)
+
+    # Clean up intermediate keys from the cascaded thread_config
     thread_config.pop("audit_columns", None)
+    thread_config.pop("audit_templates", None)
+
+    target = thread_config["target"]
+    target.pop("audit_template", None)
+    target.pop("audit_template_inherit", None)
+    target.pop("audit_columns_exclude", None)
 
 
 def _cascade_exports(

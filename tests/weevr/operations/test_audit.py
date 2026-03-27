@@ -5,13 +5,17 @@ import json
 import pytest
 from pyspark.sql import SparkSession
 
-from weevr.errors.exceptions import ExecutionError
+from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.operations.audit import (
+    BUILTIN_AUDIT_PRESETS,
     AuditContext,
+    apply_audit_exclusions,
     build_sources_json,
     inject_audit_columns,
+    merge_audit_columns_with_templates,
     resolve_audit_columns,
+    resolve_template_columns,
 )
 
 
@@ -91,6 +95,66 @@ class TestResolveAuditColumns:
             {"_t1": "e"},
         )
         assert len(result) == 5
+
+
+# ---------------------------------------------------------------------------
+# apply_audit_exclusions
+# ---------------------------------------------------------------------------
+
+
+class TestApplyAuditExclusions:
+    """Test glob-pattern exclusion of inherited audit columns."""
+
+    def test_exclude_exact_match(self):
+        """Exact column name is removed from the result."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, ["_loaded_at"])
+        assert "_loaded_at" not in result
+        assert "_run_id" in result
+
+    def test_exclude_glob_pattern(self):
+        """Glob pattern removes all matching columns."""
+        columns = {
+            "_batch_id": "uuid()",
+            "_batch_ts": "current_timestamp()",
+            "_run_id": "uuid()",
+        }
+        result = apply_audit_exclusions(columns, ["_batch_*"])
+        assert "_batch_id" not in result
+        assert "_batch_ts" not in result
+        assert "_run_id" in result
+
+    def test_exclude_no_match_is_noop(self):
+        """Pattern that matches nothing returns all columns unchanged."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, ["_nonexistent_*"])
+        assert result == columns
+
+    def test_exclude_multiple_patterns(self):
+        """Multiple patterns are each applied; union of matches is removed."""
+        columns = {
+            "_batch_id": "uuid()",
+            "_loaded_at": "current_timestamp()",
+            "_run_id": "uuid()",
+            "_source": "'bronze'",
+        }
+        result = apply_audit_exclusions(columns, ["_batch_*", "_loaded_at"])
+        assert "_batch_id" not in result
+        assert "_loaded_at" not in result
+        assert "_run_id" in result
+        assert "_source" in result
+
+    def test_exclude_empty_list(self):
+        """Empty exclude list returns all columns unchanged."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, [])
+        assert result == columns
+
+    def test_exclude_none(self):
+        """None exclude returns all columns unchanged."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, None)
+        assert result == columns
 
 
 # ---------------------------------------------------------------------------
@@ -359,3 +423,258 @@ class TestRunContextVariables:
         )
         rows = result.collect()
         assert rows[0]["_meta"] == "stg_orders_2026-03-15T00:00:00+00:00"
+
+
+# ---------------------------------------------------------------------------
+# BUILTIN_AUDIT_PRESETS
+# ---------------------------------------------------------------------------
+
+
+class TestBuiltinAuditPresets:
+    """Test the built-in preset constants."""
+
+    def test_fabric_preset_has_9_columns(self):
+        """fabric preset contains exactly the 9 specified columns with correct expressions."""
+        preset = BUILTIN_AUDIT_PRESETS["fabric"]
+        assert len(preset) == 9
+        assert preset["_batch_id"] == "${param.batch_id}"
+        assert preset["_batch_version"] == "${param.batch_version}"
+        assert preset["_batch_source"] == "${param.batch_source}"
+        assert preset["_batch_process_ts"] == "current_timestamp()"
+        assert preset["_pipeline_id"] == "${param.pipeline_id}"
+        assert preset["_pipeline_name"] == "${param.pipeline_name}"
+        assert preset["_workspace_id"] == "${param.workspace_id}"
+        assert preset["_spark_app_id"] == "spark_context().applicationId"
+        assert preset["_task_ts"] == "current_timestamp()"
+
+    def test_minimal_preset_has_3_columns(self):
+        """minimal preset contains exactly the 3 specified columns with correct expressions."""
+        preset = BUILTIN_AUDIT_PRESETS["minimal"]
+        assert len(preset) == 3
+        assert preset["_weevr_loaded_at"] == "current_timestamp()"
+        assert preset["_weevr_run_id"] == "${param.run_id}"
+        assert preset["_weevr_thread"] == "${thread.name}"
+
+
+# ---------------------------------------------------------------------------
+# resolve_template_columns
+# ---------------------------------------------------------------------------
+
+
+class TestResolveTemplateColumns:
+    """Test template name resolution to merged column dicts."""
+
+    def test_resolve_user_defined_template(self):
+        """User-defined template is found by name."""
+        user_templates = {"my_audit": {"_col": "expr()"}}
+        result = resolve_template_columns(["my_audit"], user_templates)
+        assert result == {"_col": "expr()"}
+
+    def test_resolve_builtin_fallback(self):
+        """Name not in user-defined is found in built-in presets."""
+        result = resolve_template_columns(["minimal"], user_templates=None)
+        assert "_weevr_loaded_at" in result
+        assert "_weevr_run_id" in result
+        assert "_weevr_thread" in result
+
+    def test_resolve_unknown_raises_config_error(self):
+        """Unknown template name raises ConfigError listing available templates."""
+        with pytest.raises(ConfigError, match="unknown_tpl"):
+            resolve_template_columns(["unknown_tpl"], user_templates=None)
+
+    def test_resolve_unknown_error_lists_available(self):
+        """ConfigError message includes available template names."""
+        user_templates = {"my_tpl": {"_col": "1"}}
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_template_columns(["unknown_tpl"], user_templates=user_templates)
+        msg = str(exc_info.value)
+        # Should mention built-in names and user-defined names
+        assert "fabric" in msg or "minimal" in msg or "my_tpl" in msg
+
+    def test_resolve_shadow_warning(self, caplog):
+        """User-defined template with a built-in name logs a WARNING."""
+        import logging
+
+        user_templates = {"fabric": {"_col": "override()"}}
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.audit"):
+            resolve_template_columns(["fabric"], user_templates)
+        assert any("fabric" in record.message for record in caplog.records)
+        assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+    def test_resolve_template_list_merges_in_order(self):
+        """List of names merges columns; later names override earlier on collision."""
+        user_templates = {
+            "base": {"_a": "base_a", "_b": "base_b"},
+            "override": {"_b": "override_b", "_c": "override_c"},
+        }
+        result = resolve_template_columns(["base", "override"], user_templates)
+        assert result["_a"] == "base_a"
+        assert result["_b"] == "override_b"
+        assert result["_c"] == "override_c"
+
+    def test_resolve_template_list_builtin_then_user(self):
+        """Built-in followed by user-defined: user overrides built-in on collision."""
+        user_templates = {"my_ext": {"_weevr_loaded_at": "custom_ts()", "_extra": "1"}}
+        result = resolve_template_columns(["minimal", "my_ext"], user_templates)
+        assert result["_weevr_loaded_at"] == "custom_ts()"
+        assert result["_extra"] == "1"
+        assert result["_weevr_run_id"] == "${param.run_id}"
+
+
+# ---------------------------------------------------------------------------
+# merge_audit_columns_with_templates
+# ---------------------------------------------------------------------------
+
+
+class TestMergeAuditColumnsWithTemplates:
+    """Test template-aware audit column merge across loom, weave, and thread levels."""
+
+    def test_merge_template_only(self):
+        """Thread template ref resolves to columns with no inline or parent data."""
+        thread_templates = {"base": {"_a": "expr_a", "_b": "expr_b"}}
+        result = merge_audit_columns_with_templates(
+            thread_templates=thread_templates,
+            thread_template_refs=["base"],
+        )
+        assert result == {"_a": "expr_a", "_b": "expr_b"}
+
+    def test_merge_template_plus_inline(self):
+        """Inline columns override template columns when keys collide."""
+        thread_templates = {"base": {"_a": "from_template", "_b": "from_template"}}
+        result = merge_audit_columns_with_templates(
+            thread_templates=thread_templates,
+            thread_template_refs=["base"],
+            thread_inline={"_a": "from_inline", "_c": "inline_only"},
+        )
+        assert result["_a"] == "from_inline"
+        assert result["_b"] == "from_template"
+        assert result["_c"] == "inline_only"
+
+    def test_merge_inherit_true_cascades(self):
+        """With inherit=True (default), parent template refs and inline are merged in."""
+        loom_templates = {"loom_tpl": {"_loom_col": "loom_expr"}}
+        weave_templates = {"weave_tpl": {"_weave_col": "weave_expr"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["loom_tpl"],
+            weave_templates=weave_templates,
+            weave_template_refs=["weave_tpl"],
+            thread_inherit=True,
+        )
+        assert result["_loom_col"] == "loom_expr"
+        assert result["_weave_col"] == "weave_expr"
+
+    def test_merge_inherit_false_blocks_upstream(self):
+        """With inherit=False, loom and weave template refs are suppressed.
+
+        User-defined template definitions from loom/weave are still available
+        for resolution if the thread explicitly references them.
+        """
+        loom_templates = {"loom_tpl": {"_loom_col": "loom_expr"}}
+        weave_templates = {"weave_tpl": {"_weave_col": "weave_expr"}}
+        thread_templates = {"thread_tpl": {"_thread_col": "thread_expr"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["loom_tpl"],
+            loom_inline={"_loom_inline": "loom_inline_expr"},
+            weave_templates=weave_templates,
+            weave_template_refs=["weave_tpl"],
+            weave_inline={"_weave_inline": "weave_inline_expr"},
+            thread_templates=thread_templates,
+            thread_template_refs=["thread_tpl"],
+            thread_inherit=False,
+        )
+        assert "_loom_col" not in result
+        assert "_loom_inline" not in result
+        assert "_weave_col" not in result
+        assert "_weave_inline" not in result
+        assert result["_thread_col"] == "thread_expr"
+
+    def test_merge_inherit_false_can_use_parent_template_defs(self):
+        """With inherit=False, thread can still reference loom/weave template definitions."""
+        loom_templates = {"shared_tpl": {"_shared_col": "shared_expr"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["shared_tpl"],
+            thread_template_refs=["shared_tpl"],
+            thread_inherit=False,
+        )
+        # loom_template_refs suppressed, but thread_template_refs referencing the
+        # loom-defined template should still work
+        assert result["_shared_col"] == "shared_expr"
+
+    def test_merge_exclude_after_merge(self):
+        """Exclusion patterns apply after all merging is complete."""
+        loom_templates = {"base": {"_batch_id": "uuid()", "_batch_ts": "current_timestamp()"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["base"],
+            thread_inline={"_run_id": "uuid()"},
+            thread_exclude=["_batch_*"],
+        )
+        assert "_batch_id" not in result
+        assert "_batch_ts" not in result
+        assert result["_run_id"] == "uuid()"
+
+    def test_merge_full_cascade(self):
+        """Full cascade: loom template + weave template + thread template + inline + exclude."""
+        loom_templates = {"loom_base": {"_a": "loom_a", "_b": "loom_b"}}
+        weave_templates = {"weave_ext": {"_b": "weave_b", "_c": "weave_c"}}
+        thread_templates = {"thread_ext": {"_c": "thread_c", "_d": "thread_d"}}
+        result = merge_audit_columns_with_templates(
+            loom_templates=loom_templates,
+            loom_template_refs=["loom_base"],
+            weave_templates=weave_templates,
+            weave_template_refs=["weave_ext"],
+            thread_templates=thread_templates,
+            thread_template_refs=["thread_ext"],
+            thread_inline={"_d": "inline_d", "_e": "inline_e"},
+            thread_exclude=["_a"],
+        )
+        # _a excluded
+        assert "_a" not in result
+        # _b: loom_b overridden by weave_b
+        assert result["_b"] == "weave_b"
+        # _c: weave_c overridden by thread_c
+        assert result["_c"] == "thread_c"
+        # _d: thread_d overridden by inline
+        assert result["_d"] == "inline_d"
+        # _e: inline only
+        assert result["_e"] == "inline_e"
+
+    def test_merge_all_none_returns_empty(self):
+        """All None inputs returns empty dict."""
+        result = merge_audit_columns_with_templates()
+        assert result == {}
+
+    def test_merge_builtin_preset_via_thread_ref(self):
+        """Thread can reference a built-in preset by name."""
+        result = merge_audit_columns_with_templates(
+            thread_template_refs=["minimal"],
+        )
+        assert "_weevr_loaded_at" in result
+        assert "_weevr_run_id" in result
+        assert "_weevr_thread" in result
+
+    def test_merge_loom_inline_only(self):
+        """Loom inline without templates still merges with inherit=True."""
+        result = merge_audit_columns_with_templates(
+            loom_inline={"_loom_col": "loom_expr"},
+        )
+        assert result["_loom_col"] == "loom_expr"
+
+    def test_merge_weave_overrides_loom_inline(self):
+        """Weave inline overrides loom inline on key collision."""
+        result = merge_audit_columns_with_templates(
+            loom_inline={"_col": "from_loom"},
+            weave_inline={"_col": "from_weave"},
+        )
+        assert result["_col"] == "from_weave"
+
+    def test_merge_thread_inline_overrides_weave_inline(self):
+        """Thread inline overrides weave inline on key collision."""
+        result = merge_audit_columns_with_templates(
+            weave_inline={"_col": "from_weave"},
+            thread_inline={"_col": "from_thread"},
+        )
+        assert result["_col"] == "from_thread"

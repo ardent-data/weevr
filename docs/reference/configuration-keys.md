@@ -124,6 +124,12 @@ The top-level configuration unit for a single data pipeline.
 | `execution` | `ExecutionConfig` | `None` | Runtime settings |
 | `cache` | `bool` | `None` | Cache DataFrame before writing |
 | `exports` | `list[Export]` | `None` | Secondary output destinations |
+| `lookups` | `dict[str, Lookup]` | `None` | Thread-level lookup definitions |
+| `column_sets` | `dict[str, ColumnSet]` | `None` | Thread-level column set definitions |
+| `variables` | `dict[str, VariableSpec]` | `None` | Thread-level variable declarations |
+| `pre_steps` | `list[HookStep]` | `None` | Hook steps run before thread execution |
+| `post_steps` | `list[HookStep]` | `None` | Hook steps run after thread execution |
+| `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates available to all targets |
 
 ---
 
@@ -146,6 +152,27 @@ same post-mapping, audit-injected DataFrame as the primary target.
 | `options` | `dict[str, str]` | `None` | Format-specific Spark DataFrameWriter options |
 
 **Related:** [Exports guide](../guides/exports.md)
+
+---
+
+## AuditTemplate
+
+A named set of audit columns defined under `audit_templates` at loom, weave,
+or thread level. Each template is a `dict[str, str]` mapping column names to
+Spark SQL expressions.
+
+```yaml
+audit_templates:
+  lineage:
+    _source_system: "${param.source_system}"
+    _load_ts: "current_timestamp()"
+    _run_id: "${param.run_id}"
+```
+
+Templates are referenced by name in `target.audit_template`. The built-in
+presets `fabric` and `minimal` do not require a declaration.
+
+**Related:** [Audit Templates guide](../guides/audit-templates.md)
 
 ---
 
@@ -185,6 +212,9 @@ Write destination with column mapping and partitioning.
 | `columns` | `dict[str, ColumnMapping]` | `None` | Per-column mapping |
 | `partition_by` | `list[str]` | `None` | Partition columns |
 | `audit_columns` | `dict[str, str]` | `None` | Audit column definitions as name-expression pairs |
+| `audit_template` | `str \| list[str]` | `None` | Template name(s) to apply. Accepts built-in presets (`fabric`, `minimal`) or user-defined names. |
+| `audit_template_inherit` | `bool` | `True` | When `False`, suppresses inherited `audit_template` from parent levels |
+| `audit_columns_exclude` | `list[str]` | `None` | Column names or glob patterns excluded from the resolved template set |
 | `naming` | `NamingConfig` | `None` | Naming normalization |
 
 ### ColumnMapping
@@ -426,6 +456,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded to threads |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets for bulk rename |
+| `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to threads |
 
 ### ThreadEntry
 
@@ -458,6 +489,11 @@ Deployment unit grouping one or more weaves.
 | `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded down |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded down |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets cascaded to weaves |
+| `lookups` | `dict[str, Lookup]` | `None` | Loom-level lookup definitions cascaded to weaves |
+| `variables` | `dict[str, VariableSpec]` | `None` | Loom-level variable declarations |
+| `pre_steps` | `list[HookStep]` | `None` | Hook steps run before any weave executes |
+| `post_steps` | `list[HookStep]` | `None` | Hook steps run after all weaves complete |
+| `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to weaves and threads |
 
 ### WeaveEntry
 

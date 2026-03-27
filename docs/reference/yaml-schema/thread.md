@@ -30,6 +30,7 @@ target. This page documents every key accepted inside a thread YAML file.
 | `lookups` | `dict[string, Lookup]` | no | `null` | Thread-level lookup definitions. Merged with weave-level lookups (thread wins on name collision). |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Thread-level column set definitions for rename steps. Merged with weave-level column sets (thread wins). |
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Thread-level variable declarations. Resolved before `pre_steps` execution. |
+| `audit_templates` | `dict[string, dict[string, string]]` | no | `null` | Named audit column templates available to targets in this thread. Merged with parent-level definitions (thread wins on name collision). |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before thread core execution. Not cascaded from weave — each level runs its own list. |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps to run after thread core execution. Not cascaded from weave. |
 
@@ -441,6 +442,9 @@ Defines where the thread writes its output.
 | `columns` | `dict[string, ColumnMapping]` | no | `null` | Per-column mapping specifications |
 | `partition_by` | `list[string]` | no | `null` | Partition columns for the output table |
 | `audit_columns` | `dict[string, string]` | no | `null` | Audit column definitions as name-expression pairs |
+| `audit_template` | `string or list[string]` | no | `null` | Named template(s) to apply. Resolved from `audit_templates` at any level or from built-in presets (`fabric`, `minimal`). See [Audit Templates guide](../../guides/audit-templates.md). |
+| `audit_template_inherit` | `bool` | no | `true` | When `false`, suppresses any `audit_template` inherited from parent levels. Direct `audit_template` on this target still applies. |
+| `audit_columns_exclude` | `list[string]` | no | `null` | Column names or glob patterns to exclude from the resolved template set. |
 | `naming` | `NamingConfig` | no | `null` | Column and table naming normalization |
 
 ### target.columns (ColumnMapping)

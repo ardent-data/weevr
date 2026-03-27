@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
 import re
@@ -11,9 +12,36 @@ from dataclasses import dataclass
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from weevr.errors.exceptions import ExecutionError
+from weevr.errors.exceptions import ConfigError, ExecutionError
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Built-in audit presets
+# ---------------------------------------------------------------------------
+
+#: Built-in audit column presets keyed by name.
+#:
+#: ``fabric`` — nine columns aligned with Microsoft Fabric pipeline parameters.
+#: ``minimal`` — three lightweight columns for simple run tracking.
+BUILTIN_AUDIT_PRESETS: dict[str, dict[str, str]] = {
+    "fabric": {
+        "_batch_id": "${param.batch_id}",
+        "_batch_version": "${param.batch_version}",
+        "_batch_source": "${param.batch_source}",
+        "_batch_process_ts": "current_timestamp()",
+        "_pipeline_id": "${param.pipeline_id}",
+        "_pipeline_name": "${param.pipeline_name}",
+        "_workspace_id": "${param.workspace_id}",
+        "_spark_app_id": "spark_context().applicationId",
+        "_task_ts": "current_timestamp()",
+    },
+    "minimal": {
+        "_weevr_loaded_at": "current_timestamp()",
+        "_weevr_run_id": "${param.run_id}",
+        "_weevr_thread": "${thread.name}",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -71,6 +99,157 @@ def resolve_audit_columns(
     if thread_audit:
         merged.update(thread_audit)
     return merged
+
+
+def apply_audit_exclusions(
+    columns: dict[str, str],
+    exclude_patterns: list[str] | None,
+) -> dict[str, str]:
+    """Remove audit columns whose names match any of the given glob patterns.
+
+    Args:
+        columns: Resolved audit column definitions as ``{name: expression}``.
+        exclude_patterns: List of glob patterns (``fnmatch`` syntax). ``None``
+            or an empty list is a no-op.
+
+    Returns:
+        Copy of ``columns`` with matching entries removed.
+    """
+    if not exclude_patterns:
+        return columns
+
+    result: dict[str, str] = {}
+    for name, expression in columns.items():
+        matched = False
+        for pattern in exclude_patterns:
+            if fnmatch.fnmatch(name, pattern):
+                logger.debug("Audit column %r excluded by pattern %r", name, pattern)
+                matched = True
+                break
+        if not matched:
+            result[name] = expression
+
+    return result
+
+
+def resolve_template_columns(
+    template_names: list[str],
+    user_templates: dict[str, dict[str, str]] | None = None,
+) -> dict[str, str]:
+    """Resolve template names to merged column definitions.
+
+    Looks up each name in user-defined templates first, then built-in
+    presets. Logs a warning when a user-defined template shadows a
+    built-in preset. Raises ConfigError if a name is not found.
+
+    Args:
+        template_names: Ordered list of template names to resolve.
+        user_templates: User-defined templates keyed by name.
+
+    Returns:
+        Merged column dict. Later names override earlier on collision.
+
+    Raises:
+        ConfigError: If a template name is not found in user-defined
+            or built-in presets.
+    """
+    resolved_user = user_templates or {}
+    merged: dict[str, str] = {}
+
+    for name in template_names:
+        if name in resolved_user:
+            if name in BUILTIN_AUDIT_PRESETS:
+                logger.warning(
+                    "User-defined template %r shadows built-in preset with the same name",
+                    name,
+                )
+            merged.update(resolved_user[name])
+        elif name in BUILTIN_AUDIT_PRESETS:
+            merged.update(BUILTIN_AUDIT_PRESETS[name])
+        else:
+            available = sorted(set(resolved_user) | set(BUILTIN_AUDIT_PRESETS))
+            raise ConfigError(
+                f"Audit template {name!r} not found. Available templates: {', '.join(available)}"
+            )
+
+    return merged
+
+
+def merge_audit_columns_with_templates(
+    *,
+    loom_templates: dict[str, dict[str, str]] | None = None,
+    loom_template_refs: list[str] | None = None,
+    loom_inline: dict[str, str] | None = None,
+    weave_templates: dict[str, dict[str, str]] | None = None,
+    weave_template_refs: list[str] | None = None,
+    weave_inline: dict[str, str] | None = None,
+    thread_templates: dict[str, dict[str, str]] | None = None,
+    thread_template_refs: list[str] | None = None,
+    thread_inline: dict[str, str] | None = None,
+    thread_inherit: bool = True,
+    thread_exclude: list[str] | None = None,
+) -> dict[str, str]:
+    """Merge audit columns from templates, inline definitions, and inheritance.
+
+    Resolution order:
+    1. Collect user-defined templates from all levels.
+    2. If thread_inherit is False, skip loom and weave template refs and inline.
+    3. Resolve template refs at each level via resolve_template_columns().
+    4. Merge: loom template cols → loom inline → weave template cols
+       → weave inline → thread template cols → thread inline.
+    5. Apply apply_audit_exclusions() with thread_exclude.
+
+    User-defined template definitions from all levels are always available for
+    name resolution, even when thread_inherit is False. Inheritance only controls
+    whether loom and weave template refs and inline columns contribute to the
+    merged output.
+
+    Args:
+        loom_templates: User-defined templates declared at the loom level.
+        loom_template_refs: Template names to resolve at the loom level.
+        loom_inline: Explicit audit columns defined inline at the loom level.
+        weave_templates: User-defined templates declared at the weave level.
+        weave_template_refs: Template names to resolve at the weave level.
+        weave_inline: Explicit audit columns defined inline at the weave level.
+        thread_templates: User-defined templates declared at the thread level.
+        thread_template_refs: Template names to resolve at the thread level.
+        thread_inline: Explicit audit columns defined inline at the thread level.
+        thread_inherit: When False, loom and weave template refs and inline
+            columns are excluded from the merged result. Defaults to True.
+        thread_exclude: Glob patterns applied after all merging. Matching
+            column names are removed from the final result.
+
+    Returns:
+        Merged audit column dict. Empty dict if nothing is defined.
+    """
+    # Merge all user-defined templates across levels so they are available for
+    # any level's template refs regardless of inheritance setting.
+    all_user_templates: dict[str, dict[str, str]] = {}
+    if loom_templates:
+        all_user_templates.update(loom_templates)
+    if weave_templates:
+        all_user_templates.update(weave_templates)
+    if thread_templates:
+        all_user_templates.update(thread_templates)
+
+    merged: dict[str, str] = {}
+
+    if thread_inherit:
+        if loom_template_refs:
+            merged.update(resolve_template_columns(loom_template_refs, all_user_templates))
+        if loom_inline:
+            merged.update(loom_inline)
+        if weave_template_refs:
+            merged.update(resolve_template_columns(weave_template_refs, all_user_templates))
+        if weave_inline:
+            merged.update(weave_inline)
+
+    if thread_template_refs:
+        merged.update(resolve_template_columns(thread_template_refs, all_user_templates))
+    if thread_inline:
+        merged.update(thread_inline)
+
+    return apply_audit_exclusions(merged, thread_exclude)
 
 
 def resolve_context_variables(expression: str, context: AuditContext) -> str:
