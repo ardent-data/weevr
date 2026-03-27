@@ -1,7 +1,6 @@
 """Pipeline step dispatcher — routes each step to the appropriate handler."""
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from typing import Any
 
 from pyspark.sql import DataFrame
@@ -13,13 +12,16 @@ from weevr.model.pipeline import (
     CaseWhenStep,
     CastStep,
     CoalesceStep,
+    ConcatStep,
     DateOpsStep,
     DedupStep,
     DeriveStep,
     DropStep,
     FillNullStep,
     FilterStep,
+    FormatStep,
     JoinStep,
+    MapStep,
     PivotStep,
     RenameStep,
     SelectStep,
@@ -30,6 +32,7 @@ from weevr.model.pipeline import (
     UnpivotStep,
     WindowStep,
 )
+from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.analytical import (
     apply_aggregate,
     apply_pivot,
@@ -37,7 +40,9 @@ from weevr.operations.pipeline.analytical import (
     apply_window,
 )
 from weevr.operations.pipeline.column_ops import apply_date_ops, apply_string_ops
+from weevr.operations.pipeline.concat import apply_concat
 from weevr.operations.pipeline.conditional import apply_case_when
+from weevr.operations.pipeline.formatting import apply_format
 from weevr.operations.pipeline.joins import apply_join, apply_union
 from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
 from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
@@ -49,20 +54,9 @@ from weevr.operations.pipeline.transforms import (
     apply_rename,
     apply_select,
 )
+from weevr.operations.pipeline.value_mapping import apply_map
 
-
-@dataclass(frozen=True)
-class StepResult:
-    """Return type for pipeline step handlers.
-
-    Wraps the transformed DataFrame with optional metadata for
-    observability. Existing handlers return empty metadata; new M115
-    handlers populate step-specific metrics.
-    """
-
-    df: DataFrame
-    metadata: dict[str, Any] = field(default_factory=dict)
-
+__all__ = ["StepResult", "run_pipeline"]
 
 # Handler signature: (df, step, sources) -> StepResult
 # All handlers receive the full step object and source dict for a uniform interface.
@@ -93,6 +87,10 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     # Column-ops steps (M08a)
     StringOpsStep: lambda df, step, _src: StepResult(apply_string_ops(df, step.string_ops)),
     DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
+    # Transform step extensions (M115)
+    ConcatStep: lambda df, step, _src: apply_concat(df, step.concat),
+    MapStep: lambda df, step, _src: apply_map(df, step.map),
+    FormatStep: lambda df, step, _src: apply_format(df, step.format),
 }
 
 
@@ -171,4 +169,12 @@ def run_pipeline(
                 step_index=i,
                 step_type=step_type,
             ) from exc
+
+    # Strip internal flag columns added by steps (e.g. __map_unmapped).
+    # These are used within the pipeline for downstream step coordination
+    # but must not surface in the output DataFrame.
+    flag_cols = [c for c in result.columns if c.startswith("__map_")]
+    if flag_cols:
+        result = result.drop(*flag_cols)
+
     return result

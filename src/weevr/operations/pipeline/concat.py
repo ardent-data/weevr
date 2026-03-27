@@ -9,7 +9,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType
 
 from weevr.model.pipeline import ConcatParams
-from weevr.operations.pipeline import StepResult
+from weevr.operations.pipeline._result import StepResult
 
 
 def apply_concat(df: DataFrame, params: ConcatParams) -> StepResult:

@@ -18,7 +18,7 @@ from pyspark.sql.types import (
 )
 
 from weevr.model.pipeline import FormatParams
-from weevr.operations.pipeline import StepResult
+from weevr.operations.pipeline._result import StepResult
 
 _PLACEHOLDER_RE = re.compile(r"\{(\d+):(\d+)\}")
 

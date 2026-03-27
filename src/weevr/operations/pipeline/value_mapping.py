@@ -8,7 +8,7 @@ import pyspark.sql.functions as F
 from pyspark.sql import Column, DataFrame
 
 from weevr.model.pipeline import MapParams
-from weevr.operations.pipeline import StepResult
+from weevr.operations.pipeline._result import StepResult
 
 
 def apply_map(df: DataFrame, params: MapParams) -> StepResult:

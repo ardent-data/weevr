@@ -82,11 +82,13 @@ class TestFillNullTypeDefaults:
         """Type defaults with unknown code fills by DataType."""
         df = spark.createDataFrame(
             [(None, None, None)],
-            schema=StructType([
-                StructField("name", StringType()),
-                StructField("age", IntegerType()),
-                StructField("active", BooleanType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("name", StringType()),
+                    StructField("age", IntegerType()),
+                    StructField("active", BooleanType()),
+                ]
+            ),
         )
         params = FillNullParams(mode="type_defaults", code="unknown")
         result = apply_fill_null(df, params)
@@ -119,11 +121,13 @@ class TestFillNullTypeDefaults:
         """Include glob restricts which columns receive type defaults."""
         df = spark.createDataFrame(
             [(None, None, None)],
-            schema=StructType([
-                StructField("addr_line1", StringType()),
-                StructField("addr_line2", StringType()),
-                StructField("city", StringType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("addr_line1", StringType()),
+                    StructField("addr_line2", StringType()),
+                    StructField("city", StringType()),
+                ]
+            ),
         )
         params = FillNullParams(mode="type_defaults", code="unknown", include=["addr_*"])
         result = apply_fill_null(df, params)
@@ -136,10 +140,12 @@ class TestFillNullTypeDefaults:
         """Exclude glob prevents specific columns from receiving type defaults."""
         df = spark.createDataFrame(
             [(None, None)],
-            schema=StructType([
-                StructField("id", IntegerType()),
-                StructField("amount", IntegerType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("id", IntegerType()),
+                    StructField("amount", IntegerType()),
+                ]
+            ),
         )
         params = FillNullParams(mode="type_defaults", code="unknown", exclude=["id"])
         result = apply_fill_null(df, params)
@@ -151,10 +157,12 @@ class TestFillNullTypeDefaults:
         """Per-column overrides replace type-based defaults for named columns."""
         df = spark.createDataFrame(
             [(None, None)],
-            schema=StructType([
-                StructField("region", StringType()),
-                StructField("city", StringType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("region", StringType()),
+                    StructField("city", StringType()),
+                ]
+            ),
         )
         params = FillNullParams(
             mode="type_defaults",
@@ -170,10 +178,12 @@ class TestFillNullTypeDefaults:
         """Where predicate applies fills only to rows matching the condition."""
         df = spark.createDataFrame(
             [("UNKNOWN", None), ("VALID", None)],
-            schema=StructType([
-                StructField("status", StringType()),
-                StructField("name", StringType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("status", StringType()),
+                    StructField("name", StringType()),
+                ]
+            ),
         )
         params = FillNullParams(
             mode="type_defaults",
@@ -191,10 +201,12 @@ class TestFillNullTypeDefaults:
         """type_defaults and explicit columns apply in a single step."""
         df = spark.createDataFrame(
             [(None, None)],
-            schema=StructType([
-                StructField("name", StringType()),
-                StructField("special", IntegerType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("name", StringType()),
+                    StructField("special", IntegerType()),
+                ]
+            ),
         )
         params = FillNullParams(
             mode="type_defaults",
@@ -204,16 +216,18 @@ class TestFillNullTypeDefaults:
         result = apply_fill_null(df, params)
         row = result.collect()[0]
         assert row.name == "Unknown"  # From type_defaults
-        assert row.special == -1      # From explicit columns override
+        assert row.special == -1  # From explicit columns override
 
     def test_backward_compat_columns_only(self, spark: SparkSession):
         """Existing columns-only fill behavior is unchanged."""
         df = spark.createDataFrame(
             [(None, None)],
-            schema=StructType([
-                StructField("discount", IntegerType()),
-                StructField("region", StringType()),
-            ]),
+            schema=StructType(
+                [
+                    StructField("discount", IntegerType()),
+                    StructField("region", StringType()),
+                ]
+            ),
         )
         params = FillNullParams(columns={"discount": 0, "region": "Unknown"})
         result = apply_fill_null(df, params)
