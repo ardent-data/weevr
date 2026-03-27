@@ -134,7 +134,7 @@ class TestTarget:
 
     def test_audit_template_string_sugar(self):
         """audit_template accepts a string and normalizes it to a list."""
-        t = Target(audit_template="fabric")
+        t = Target(audit_template="fabric")  # type: ignore[arg-type]
         assert t.audit_template == ["fabric"]
 
     def test_audit_template_list(self):
@@ -175,3 +175,13 @@ class TestTarget:
             audit_columns_exclude=["_loaded_at"],
         )
         assert Target.model_validate(t.model_dump()) == t
+
+    def test_exclude_valid_patterns(self):
+        """audit_columns_exclude accepts valid non-empty glob patterns."""
+        t = Target(audit_columns_exclude=["_batch_*", "_custom"])
+        assert t.audit_columns_exclude == ["_batch_*", "_custom"]
+
+    def test_exclude_empty_string_rejected(self):
+        """audit_columns_exclude rejects empty string entries."""
+        with pytest.raises(ValidationError, match="non-empty"):
+            Target(audit_columns_exclude=[""])
