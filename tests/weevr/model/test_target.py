@@ -131,3 +131,47 @@ class TestTarget:
             audit_columns={"_loaded_at": "current_timestamp()"},
         )
         assert Target.model_validate(t.model_dump()) == t
+
+    def test_audit_template_string_sugar(self):
+        """audit_template accepts a string and normalizes it to a list."""
+        t = Target(audit_template="fabric")
+        assert t.audit_template == ["fabric"]
+
+    def test_audit_template_list(self):
+        """audit_template accepts a list of strings."""
+        t = Target(audit_template=["fabric", "custom"])
+        assert t.audit_template == ["fabric", "custom"]
+
+    def test_audit_template_default_none(self):
+        """audit_template defaults to None."""
+        t = Target()
+        assert t.audit_template is None
+
+    def test_audit_template_inherit_default_true(self):
+        """audit_template_inherit defaults to True."""
+        t = Target()
+        assert t.audit_template_inherit is True
+
+    def test_audit_template_inherit_false(self):
+        """audit_template_inherit accepts False."""
+        t = Target(audit_template_inherit=False)
+        assert t.audit_template_inherit is False
+
+    def test_audit_columns_exclude_list(self):
+        """audit_columns_exclude accepts a list of strings."""
+        t = Target(audit_columns_exclude=["_loaded_at", "_run_*"])
+        assert t.audit_columns_exclude == ["_loaded_at", "_run_*"]
+
+    def test_audit_columns_exclude_default_none(self):
+        """audit_columns_exclude defaults to None."""
+        t = Target()
+        assert t.audit_columns_exclude is None
+
+    def test_round_trip_with_new_fields(self):
+        """Target round-trips with all new audit template fields."""
+        t = Target(
+            audit_template=["fabric", "custom"],
+            audit_template_inherit=False,
+            audit_columns_exclude=["_loaded_at"],
+        )
+        assert Target.model_validate(t.model_dump()) == t
