@@ -8,10 +8,11 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from weevr.model.pipeline import CoalesceParams, FillNullParams
+from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.type_defaults import resolve_type_defaults
 
 
-def apply_fill_null(df: DataFrame, params: FillNullParams) -> DataFrame:
+def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
     """Fill null values with specified defaults per column.
 
     Supports two composable modes:
@@ -30,9 +31,11 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> DataFrame:
         params: Fill-null parameters.
 
     Returns:
-        DataFrame with nulls replaced.
+        StepResult with nulls replaced and metadata listing filled
+        columns when using type_defaults mode.
     """
     result = df
+    metadata: dict[str, Any] = {}
 
     # Phase 1: type_defaults mode
     if params.mode == "type_defaults":
@@ -62,15 +65,16 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> DataFrame:
                     )
             else:
                 result = result.fillna(fill_dict)
+            metadata["columns_filled"] = list(fill_dict.keys())
 
     # Phase 2: explicit columns (applied on top of type_defaults)
     if params.columns is not None and params.columns:
         result = result.fillna(params.columns)
 
-    return result
+    return StepResult(result, metadata)
 
 
-def apply_coalesce(df: DataFrame, params: CoalesceParams) -> DataFrame:
+def apply_coalesce(df: DataFrame, params: CoalesceParams) -> StepResult:
     """Coalesce multiple source columns into output columns.
 
     For each output column, selects the first non-null value from the
@@ -81,9 +85,9 @@ def apply_coalesce(df: DataFrame, params: CoalesceParams) -> DataFrame:
         params: Coalesce parameters — output column to source columns map.
 
     Returns:
-        DataFrame with coalesced output columns.
+        StepResult with coalesced output columns.
     """
     result = df
     for output_col, source_cols in params.columns.items():
         result = result.withColumn(output_col, F.coalesce(*[F.col(c) for c in source_cols]))
-    return result
+    return StepResult(result)

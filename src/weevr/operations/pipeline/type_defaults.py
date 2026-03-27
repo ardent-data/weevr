@@ -91,7 +91,9 @@ def resolve_type_defaults(
         exclude: Optional glob patterns to remove columns from the result.
             Applied after include filtering.
         overrides: Per-column fill values that replace the type-based
-            default for specific columns.
+            default for specific columns. May also include columns not
+            present in the type-resolved result (e.g., complex types
+            that are normally skipped).
 
     Returns:
         Dict mapping column names to their type-appropriate fill values.

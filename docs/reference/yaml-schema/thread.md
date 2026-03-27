@@ -497,7 +497,7 @@ Null handling, separator, and trimming are configurable.
 | `null_mode` | `string` | no | `"skip"` | How nulls are handled: `"skip"`, `"empty"`, or `"literal"` |
 | `null_literal` | `string` | no | `"<NULL>"` | Replacement text when `null_mode` is `"literal"` |
 | `trim` | `boolean` | no | `false` | Trim whitespace from inputs and result |
-| `collapse_separators` | `boolean` | no | `true` | Collapse adjacent separators from skipped values |
+| `collapse_separators` | `boolean` | no | `true` | Collapse adjacent separators. Only applies when `null_mode` is `"skip"`. |
 
 Non-string columns are auto-cast to string before concatenation.
 When all input columns are null or blank, the result is `NULL`.

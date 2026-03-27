@@ -82,8 +82,8 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     # Conditional step (M08a)
     CaseWhenStep: lambda df, step, _src: StepResult(apply_case_when(df, step.case_when)),
     # Null-handling steps (M08a)
-    FillNullStep: lambda df, step, _src: StepResult(apply_fill_null(df, step.fill_null)),
-    CoalesceStep: lambda df, step, _src: StepResult(apply_coalesce(df, step.coalesce)),
+    FillNullStep: lambda df, step, _src: apply_fill_null(df, step.fill_null),
+    CoalesceStep: lambda df, step, _src: apply_coalesce(df, step.coalesce),
     # Column-ops steps (M08a)
     StringOpsStep: lambda df, step, _src: StepResult(apply_string_ops(df, step.string_ops)),
     DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),

@@ -115,10 +115,10 @@ def apply_format(df: DataFrame, params: FormatParams) -> StepResult:
                         f"strict_types=True but source column '{source_name}' is "
                         f"{source_type}, expected numeric"
                     )
-                cast_col_name = f"_fmt_cast_{target_name}"
+                cast_col_name = f"__fmt_cast_{target_name}"
                 cast_cols[cast_col_name] = source_col.cast("double")
             else:
-                cast_col_name = f"_fmt_cast_{target_name}"
+                cast_col_name = f"__fmt_cast_{target_name}"
                 cast_cols[cast_col_name] = source_col
 
             col_exprs[target_name] = F.when(

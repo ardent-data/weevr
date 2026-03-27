@@ -80,9 +80,9 @@ class TestApplyMap:
         assert rows[0].status == "Active"
         # Unmapped value retained
         assert rows[1].status == "X"
-        # Flag column added for unmapped rows
-        assert rows[0]["__map_unmapped"] is False
-        assert rows[1]["__map_unmapped"] is True
+        # Flag column added for unmapped rows (named per target column)
+        assert rows[0]["__map_unmapped_status"] is False
+        assert rows[1]["__map_unmapped_status"] is True
 
     def test_case_sensitive_default(self, spark):
         df = spark.createDataFrame([("A",), ("a",)], ["code"])

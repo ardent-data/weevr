@@ -238,7 +238,8 @@ class TestRunPipelineM115Handlers:
         ]
         result = run_pipeline(df, steps, {})
         # Flag column must never appear in the output
-        assert "__map_unmapped" not in result.columns
+        assert "__map_unmapped_status" not in result.columns
+        assert not any(c.startswith("__map_") for c in result.columns)
         # Mapped values are present
         mapped_vals = {r["status"] for r in result.collect()}
         assert "A" in mapped_vals

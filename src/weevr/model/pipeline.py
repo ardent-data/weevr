@@ -538,6 +538,19 @@ class FormatSpec(FrozenBase):
                     raise ValueError(f"pattern length must be >= 1, got {length}")
         return v
 
+    @field_validator("number")
+    @classmethod
+    def _validate_number_pattern(cls, v: str | None) -> str | None:
+        if v is not None:
+            allowed = set("0#.,%-E+();' ")
+            invalid = set(v) - allowed
+            if invalid:
+                raise ValueError(
+                    f"number pattern contains invalid characters: "
+                    f"{', '.join(sorted(repr(c) for c in invalid))}"
+                )
+        return v
+
 
 class FormatParams(FrozenBase):
     """Parameters for the format step.

@@ -62,7 +62,10 @@ def apply_map(df: DataFrame, params: MapParams) -> StepResult:
     expr = otherwise if expr is None else expr.otherwise(otherwise)
 
     # validate mode: compute the unmapped flag against the original column
-    # before the mapping overwrites it (when target_col == source_col)
+    # before the mapping overwrites it (when target_col == source_col).
+    # Flag column is named per-target so multiple validate-mode map steps
+    # in the same pipeline don't clobber each other's flags.
+    flag_col_name = f"__map_unmapped_{target_col}"
     if params.unmapped == "validate":
         mapped_keys = list(params.values.keys())
         if params.case_sensitive:
@@ -71,12 +74,12 @@ def apply_map(df: DataFrame, params: MapParams) -> StepResult:
             is_mapped = F.lower(col_ref).isin([k.lower() for k in mapped_keys])
 
         flag_expr = F.when(col_ref.isNull(), F.lit(False)).otherwise(~is_mapped)
-        df = df.withColumn("__map_unmapped", flag_expr)
+        df = df.withColumn(flag_col_name, flag_expr)
 
     result = df.withColumn(target_col, expr)
 
     if params.unmapped == "validate":
-        unmapped_count = result.filter(F.col("__map_unmapped")).count()
+        unmapped_count = result.filter(F.col(flag_col_name)).count()
         metadata["unmapped_count"] = unmapped_count
 
     return StepResult(result, metadata)
