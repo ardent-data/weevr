@@ -16,7 +16,7 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> DataFrame:
     Returns:
         DataFrame with nulls replaced by specified defaults.
     """
-    return df.fillna(params.columns)
+    return df.fillna(params.columns)  # type: ignore[arg-type]
 
 
 def apply_coalesce(df: DataFrame, params: CoalesceParams) -> DataFrame:
