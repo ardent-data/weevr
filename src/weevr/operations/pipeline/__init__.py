@@ -12,13 +12,16 @@ from weevr.model.pipeline import (
     CaseWhenStep,
     CastStep,
     CoalesceStep,
+    ConcatStep,
     DateOpsStep,
     DedupStep,
     DeriveStep,
     DropStep,
     FillNullStep,
     FilterStep,
+    FormatStep,
     JoinStep,
+    MapStep,
     PivotStep,
     RenameStep,
     SelectStep,
@@ -29,6 +32,7 @@ from weevr.model.pipeline import (
     UnpivotStep,
     WindowStep,
 )
+from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.analytical import (
     apply_aggregate,
     apply_pivot,
@@ -36,7 +40,9 @@ from weevr.operations.pipeline.analytical import (
     apply_window,
 )
 from weevr.operations.pipeline.column_ops import apply_date_ops, apply_string_ops
+from weevr.operations.pipeline.concat import apply_concat
 from weevr.operations.pipeline.conditional import apply_case_when
+from weevr.operations.pipeline.formatting import apply_format
 from weevr.operations.pipeline.joins import apply_join, apply_union
 from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
 from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
@@ -48,36 +54,43 @@ from weevr.operations.pipeline.transforms import (
     apply_rename,
     apply_select,
 )
+from weevr.operations.pipeline.value_mapping import apply_map
 
-# Handler signature: (df, step, sources) -> DataFrame
+__all__ = ["StepResult", "run_pipeline"]
+
+# Handler signature: (df, step, sources) -> StepResult
 # All handlers receive the full step object and source dict for a uniform interface.
-StepHandler = Callable[[DataFrame, Any, dict[str, DataFrame]], DataFrame]
+StepHandler = Callable[[DataFrame, Any, dict[str, DataFrame]], StepResult]
 
 _STEP_HANDLERS: dict[type, StepHandler] = {
     # Original steps
-    FilterStep: lambda df, step, _src: apply_filter(df, step.filter),
-    DeriveStep: lambda df, step, _src: apply_derive(df, step.derive),
-    SelectStep: lambda df, step, _src: apply_select(df, step.select),
-    DropStep: lambda df, step, _src: apply_drop(df, step.drop),
+    FilterStep: lambda df, step, _src: StepResult(apply_filter(df, step.filter)),
+    DeriveStep: lambda df, step, _src: StepResult(apply_derive(df, step.derive)),
+    SelectStep: lambda df, step, _src: StepResult(apply_select(df, step.select)),
+    DropStep: lambda df, step, _src: StepResult(apply_drop(df, step.drop)),
     # RenameStep is dispatched separately in run_pipeline to support column sets
-    CastStep: lambda df, step, _src: apply_cast(df, step.cast),
-    DedupStep: lambda df, step, _src: apply_dedup(df, step.dedup),
-    SortStep: lambda df, step, _src: apply_sort(df, step.sort),
-    JoinStep: lambda df, step, src: apply_join(df, step.join, src),
-    UnionStep: lambda df, step, src: apply_union(df, step.union, src),
+    CastStep: lambda df, step, _src: StepResult(apply_cast(df, step.cast)),
+    DedupStep: lambda df, step, _src: StepResult(apply_dedup(df, step.dedup)),
+    SortStep: lambda df, step, _src: StepResult(apply_sort(df, step.sort)),
+    JoinStep: lambda df, step, src: StepResult(apply_join(df, step.join, src)),
+    UnionStep: lambda df, step, src: StepResult(apply_union(df, step.union, src)),
     # Analytical steps (M08a)
-    AggregateStep: lambda df, step, _src: apply_aggregate(df, step.aggregate),
-    WindowStep: lambda df, step, _src: apply_window(df, step.window),
-    PivotStep: lambda df, step, _src: apply_pivot(df, step.pivot),
-    UnpivotStep: lambda df, step, _src: apply_unpivot(df, step.unpivot),
+    AggregateStep: lambda df, step, _src: StepResult(apply_aggregate(df, step.aggregate)),
+    WindowStep: lambda df, step, _src: StepResult(apply_window(df, step.window)),
+    PivotStep: lambda df, step, _src: StepResult(apply_pivot(df, step.pivot)),
+    UnpivotStep: lambda df, step, _src: StepResult(apply_unpivot(df, step.unpivot)),
     # Conditional step (M08a)
-    CaseWhenStep: lambda df, step, _src: apply_case_when(df, step.case_when),
+    CaseWhenStep: lambda df, step, _src: StepResult(apply_case_when(df, step.case_when)),
     # Null-handling steps (M08a)
     FillNullStep: lambda df, step, _src: apply_fill_null(df, step.fill_null),
     CoalesceStep: lambda df, step, _src: apply_coalesce(df, step.coalesce),
     # Column-ops steps (M08a)
-    StringOpsStep: lambda df, step, _src: apply_string_ops(df, step.string_ops),
-    DateOpsStep: lambda df, step, _src: apply_date_ops(df, step.date_ops),
+    StringOpsStep: lambda df, step, _src: StepResult(apply_string_ops(df, step.string_ops)),
+    DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
+    # Transform step extensions (M115)
+    ConcatStep: lambda df, step, _src: apply_concat(df, step.concat),
+    MapStep: lambda df, step, _src: apply_map(df, step.map),
+    FormatStep: lambda df, step, _src: apply_format(df, step.format),
 }
 
 
@@ -114,24 +127,27 @@ def run_pipeline(
         ExecutionError: If any step fails, with step_index and step_type set.
     """
 
-    def _dispatch_rename(result: DataFrame, step: RenameStep) -> DataFrame:
+    def _dispatch_rename(result: DataFrame, step: RenameStep) -> StepResult:
         cs_name = step.rename.column_set
         if cs_name is not None and column_sets is not None and cs_name in column_sets:
             cs_def = (column_set_defs or {}).get(cs_name)
-            return apply_rename(
-                result,
-                step.rename,
-                column_set_mapping=column_sets[cs_name],
-                on_unmapped=cs_def.on_unmapped if cs_def is not None else "pass_through",
-                on_extra=cs_def.on_extra if cs_def is not None else "ignore",
+            return StepResult(
+                apply_rename(
+                    result,
+                    step.rename,
+                    column_set_mapping=column_sets[cs_name],
+                    on_unmapped=cs_def.on_unmapped if cs_def is not None else "pass_through",
+                    on_extra=cs_def.on_extra if cs_def is not None else "ignore",
+                )
             )
-        return apply_rename(result, step.rename)
+        return StepResult(apply_rename(result, step.rename))
 
     result = df
     for i, step in enumerate(steps):
         try:
             if isinstance(step, RenameStep):
-                result = _dispatch_rename(result, step)
+                step_result = _dispatch_rename(result, step)
+                result = step_result.df
             else:
                 handler = _STEP_HANDLERS.get(type(step))
                 if handler is None:
@@ -141,7 +157,8 @@ def run_pipeline(
                         step_index=i,
                         step_type=step_type,
                     )
-                result = handler(result, step, sources)
+                step_result = handler(result, step, sources)
+                result = step_result.df
         except ExecutionError:
             raise
         except Exception as exc:
@@ -152,4 +169,12 @@ def run_pipeline(
                 step_index=i,
                 step_type=step_type,
             ) from exc
+
+    # Strip internal flag columns added by steps (e.g. __map_unmapped).
+    # These are used within the pipeline for downstream step coordination
+    # but must not surface in the output DataFrame.
+    flag_cols = [c for c in result.columns if c.startswith("__map_")]
+    if flag_cols:
+        result = result.drop(*flag_cols)
+
     return result

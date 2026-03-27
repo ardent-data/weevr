@@ -7,6 +7,8 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import (
     CastParams,
     CastStep,
+    ConcatParams,
+    ConcatStep,
     DedupParams,
     DedupStep,
     DeriveParams,
@@ -15,9 +17,14 @@ from weevr.model.pipeline import (
     DropStep,
     FilterParams,
     FilterStep,
+    FormatParams,
+    FormatSpec,
+    FormatStep,
     JoinKeyPair,
     JoinParams,
     JoinStep,
+    MapParams,
+    MapStep,
     RenameParams,
     RenameStep,
     SelectParams,
@@ -180,3 +187,60 @@ class TestRunPipelineErrorHandling:
 
         err = exc_info.value
         assert err.step_index == 1
+
+
+class TestRunPipelineM115Handlers:
+    """Dispatcher routes M115 step types to the correct handlers."""
+
+    def test_concat_step_dispatched(self, base_df) -> None:
+        steps: list[Step] = [
+            ConcatStep(concat=ConcatParams(target="full", columns=["id", "name"], separator="-"))
+        ]
+        result = run_pipeline(base_df, steps, {})
+        assert "full" in result.columns
+        assert result.count() == 3
+
+    def test_map_step_dispatched(self, base_df) -> None:
+        steps: list[Step] = [
+            MapStep(map=MapParams(column="name", values={"alice": "ALICE", "bob": "BOB"}))
+        ]
+        result = run_pipeline(base_df, steps, {})
+        names = {r["name"] for r in result.collect()}
+        assert "ALICE" in names
+        assert "BOB" in names
+
+    def test_format_step_dispatched(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame([{"code": "12345"}, {"code": "67890"}])
+        steps: list[Step] = [
+            FormatStep(format=FormatParams(columns={"code": FormatSpec(pattern="{1:3}-{4:2}")}))
+        ]
+        result = run_pipeline(df, steps, {})
+        codes = {r["code"] for r in result.collect()}
+        assert "123-45" in codes
+        assert "678-90" in codes
+
+    def test_map_validate_flag_col_stripped_from_output(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame(
+            [
+                {"status": "active"},
+                {"status": "pending"},
+                {"status": "unknown"},
+            ]
+        )
+        steps: list[Step] = [
+            MapStep(
+                map=MapParams(
+                    column="status",
+                    values={"active": "A", "pending": "P"},
+                    unmapped="validate",
+                )
+            )
+        ]
+        result = run_pipeline(df, steps, {})
+        # Flag column must never appear in the output
+        assert "__map_unmapped_status" not in result.columns
+        assert not any(c.startswith("__map_") for c in result.columns)
+        # Mapped values are present
+        mapped_vals = {r["status"] for r in result.collect()}
+        assert "A" in mapped_vals
+        assert "P" in mapped_vals

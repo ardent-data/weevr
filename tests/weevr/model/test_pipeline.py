@@ -529,7 +529,7 @@ class TestFillNullParams:
     def test_valid(self):
         """Valid fill_null construction."""
         p = FillNullParams(columns={"amount": 0, "name": "unknown"})
-        assert len(p.columns) == 2
+        assert p.columns is not None and len(p.columns) == 2
 
     def test_empty_columns_raises(self):
         """Empty columns raises ValidationError."""

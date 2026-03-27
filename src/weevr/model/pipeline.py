@@ -1,5 +1,6 @@
 """Pipeline step models with discriminated union dispatch."""
 
+import re
 from typing import Annotated, Any, Literal
 
 from pydantic import Discriminator, Tag, field_validator, model_validator
@@ -29,6 +30,9 @@ _STEP_TYPES = frozenset(
         "coalesce",
         "string_ops",
         "date_ops",
+        "concat",
+        "map",
+        "format",
     }
 )
 
@@ -380,16 +384,35 @@ class CaseWhenParams(FrozenBase):
 
 
 class FillNullParams(FrozenBase):
-    """Parameters for the fill_null step."""
+    """Parameters for the fill_null step.
 
-    columns: dict[str, Any]
+    Supports two composable modes: explicit column-to-value mapping
+    (``columns``) and schema-driven type defaults (``mode:
+    type_defaults``). Both may appear in the same step — type defaults
+    apply first, then explicit columns override.
+    """
 
-    @field_validator("columns")
-    @classmethod
-    def _columns_non_empty(cls, v: dict[str, Any]) -> dict[str, Any]:
-        if not v:
-            raise ValueError("columns must not be empty")
-        return v
+    columns: dict[str, Any] | None = None
+    mode: Literal["type_defaults"] | None = None
+    code: Literal["unknown", "not_applicable", "invalid"] | None = None
+    include: list[str] | None = None
+    exclude: list[str] | None = None
+    overrides: dict[str, Any] | None = None
+    where: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_fill_null_config(self) -> "FillNullParams":
+        if self.columns is None and self.mode is None:
+            raise ValueError("at least one of 'columns' or 'mode' must be set")
+        if self.columns is not None and not self.columns and self.mode is None:
+            raise ValueError("columns must not be empty when mode is not set")
+        if self.mode == "type_defaults" and self.code is None:
+            raise ValueError("'code' is required when mode is 'type_defaults'")
+        if self.mode is None:
+            for field_name in ("code", "include", "exclude", "overrides", "where"):
+                if getattr(self, field_name) is not None:
+                    raise ValueError(f"'{field_name}' is only valid when mode is 'type_defaults'")
+        return self
 
 
 class CoalesceParams(FrozenBase):
@@ -409,6 +432,156 @@ class CoalesceParams(FrozenBase):
             if not sources:
                 raise ValueError(f"source list for '{key}' must not be empty")
         return v
+
+
+class ConcatParams(FrozenBase):
+    """Parameters for the concat step.
+
+    Concatenates multiple columns into a single string column with
+    configurable null handling, separator, and trimming.
+    """
+
+    target: str
+    columns: list[str]
+    separator: str = ""
+    null_mode: Literal["skip", "empty", "literal"] = "skip"
+    null_literal: str = "<NULL>"
+    trim: bool = False
+    collapse_separators: bool = True
+
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
+
+class ConcatStep(FrozenBase):
+    """Pipeline step: concatenate columns into a string."""
+
+    concat: ConcatParams
+
+
+class MapParams(FrozenBase):
+    """Parameters for the map step.
+
+    Maps discrete values in a column to new values using a lookup dict.
+    Null handling and unmapped value behavior are independently
+    configurable.
+    """
+
+    column: str
+    target: str | None = None
+    values: dict[str, Any]
+    default: Any = None
+    on_null: Any = None
+    unmapped: Literal["keep", "null", "validate"] = "keep"
+    case_sensitive: bool = True
+
+    @field_validator("values")
+    @classmethod
+    def _values_non_empty(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if not v:
+            raise ValueError("values must not be empty")
+        return v
+
+    @model_validator(mode="after")
+    def _default_unmapped_exclusive(self) -> "MapParams":
+        if self.default is not None and self.unmapped in ("null", "validate"):
+            raise ValueError(
+                "default and unmapped modes 'null'/'validate' are mutually "
+                "exclusive — default already handles unmapped values"
+            )
+        return self
+
+
+class MapStep(FrozenBase):
+    """Pipeline step: map discrete values."""
+
+    map: MapParams
+
+
+_FORMAT_PLACEHOLDER_RE = re.compile(r"\{(\d+):(\d+)\}")
+
+
+class FormatSpec(FrozenBase):
+    """Per-column format specification.
+
+    Exactly one of ``pattern``, ``number``, or ``date`` must be set.
+    ``source`` defaults to the target column name when omitted.
+    """
+
+    source: str | None = None
+    pattern: str | None = None
+    number: str | None = None
+    date: str | None = None
+    on_short: Literal["null", "partial"] = "null"
+    strict_types: bool = False
+
+    @model_validator(mode="after")
+    def _exactly_one_format_type(self) -> "FormatSpec":
+        set_count = sum(v is not None for v in (self.pattern, self.number, self.date))
+        if set_count != 1:
+            raise ValueError("exactly one of 'pattern', 'number', or 'date' must be set")
+        return self
+
+    @field_validator("pattern")
+    @classmethod
+    def _validate_pattern_syntax(cls, v: str | None) -> str | None:
+        if v is not None and "{" in v:
+            for match in _FORMAT_PLACEHOLDER_RE.finditer(v):
+                pos, length = int(match.group(1)), int(match.group(2))
+                if pos < 1:
+                    raise ValueError(f"pattern position must be >= 1, got {pos}")
+                if length < 1:
+                    raise ValueError(f"pattern length must be >= 1, got {length}")
+        return v
+
+    @field_validator("number")
+    @classmethod
+    def _validate_number_pattern(cls, v: str | None) -> str | None:
+        if v is not None:
+            allowed = set("0#.,%-E+();' ")
+            invalid = set(v) - allowed
+            if invalid:
+                raise ValueError(
+                    f"number pattern contains invalid characters: "
+                    f"{', '.join(sorted(repr(c) for c in invalid))}"
+                )
+        return v
+
+
+class FormatParams(FrozenBase):
+    """Parameters for the format step.
+
+    Maps target column names to format specifications. Multiple columns
+    can be formatted in a single step.
+    """
+
+    columns: dict[str, FormatSpec]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_root_dict(cls, data: Any) -> Any:
+        # If data is a plain dict of column specs (no 'columns' key),
+        # wrap it so Pydantic can parse it
+        if isinstance(data, dict) and "columns" not in data:
+            return {"columns": data}
+        return data
+
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: dict[str, FormatSpec]) -> dict[str, FormatSpec]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
+
+class FormatStep(FrozenBase):
+    """Pipeline step: format columns using pattern, number, or date rules."""
+
+    format: FormatParams
 
 
 class StringOpsParams(FrozenBase):
@@ -531,7 +704,10 @@ Step = Annotated[
     | Annotated[FillNullStep, Tag("fill_null")]
     | Annotated[CoalesceStep, Tag("coalesce")]
     | Annotated[StringOpsStep, Tag("string_ops")]
-    | Annotated[DateOpsStep, Tag("date_ops")],
+    | Annotated[DateOpsStep, Tag("date_ops")]
+    | Annotated[ConcatStep, Tag("concat")]
+    | Annotated[MapStep, Tag("map")]
+    | Annotated[FormatStep, Tag("format")],
     Discriminator(_step_discriminator),
 ]
 """Discriminated union of all pipeline step types.

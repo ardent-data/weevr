@@ -1,0 +1,48 @@
+# Transform extensions — concat, map, fill_null type_defaults,
+# and format in a single pipeline.
+
+config_version: "1.0"
+name: dim_contacts
+
+sources:
+  raw_contacts:
+    alias: raw_contacts
+
+steps:
+  # Build full name from parts
+  - concat:
+      target: full_name
+      columns: [first_name, middle_name, last_name]
+      separator: " "
+      null_mode: skip
+      trim: true
+
+  # Map status codes to labels
+  - map:
+      column: status_code
+      target: status_label
+      values:
+        A: Active
+        I: Inactive
+        P: Pending
+      default: Unknown
+
+  # Fill nulls by type with semantic defaults
+  - fill_null:
+      mode: type_defaults
+      code: unknown
+      exclude: [id, "*_id"]
+      overrides:
+        region: "Unspecified"
+
+  # Format phone and dates
+  - format:
+      phone_display:
+        pattern: "({1:3}) {4:3}-{7:4}"
+        source: phone_raw
+      hire_date:
+        date: "yyyy-MM-dd"
+
+target:
+  alias: dim_contacts
+  mode: overwrite

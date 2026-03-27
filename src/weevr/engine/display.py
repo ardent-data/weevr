@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from weevr.engine.formatting import format_duration as _format_duration
+from weevr.model.pipeline import _STEP_TYPES
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
@@ -854,30 +855,7 @@ def render_loom_dag_svg(
 # Thread flow SVG renderer
 # ---------------------------------------------------------------------------
 
-# Step types recognized as the key attribute on discriminated-union step models.
-_STEP_TYPES = frozenset(
-    {
-        "filter",
-        "derive",
-        "join",
-        "select",
-        "drop",
-        "rename",
-        "cast",
-        "dedup",
-        "sort",
-        "union",
-        "aggregate",
-        "window",
-        "pivot",
-        "unpivot",
-        "case_when",
-        "fill_null",
-        "coalesce",
-        "string_ops",
-        "date_ops",
-    }
-)
+# Step types imported from weevr.model.pipeline — single source of truth.
 
 
 def _get_step_type(step: Any) -> str:
