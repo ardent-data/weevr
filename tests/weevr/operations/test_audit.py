@@ -9,6 +9,7 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.source import Source
 from weevr.operations.audit import (
     AuditContext,
+    apply_audit_exclusions,
     build_sources_json,
     inject_audit_columns,
     resolve_audit_columns,
@@ -91,6 +92,66 @@ class TestResolveAuditColumns:
             {"_t1": "e"},
         )
         assert len(result) == 5
+
+
+# ---------------------------------------------------------------------------
+# apply_audit_exclusions
+# ---------------------------------------------------------------------------
+
+
+class TestApplyAuditExclusions:
+    """Test glob-pattern exclusion of inherited audit columns."""
+
+    def test_exclude_exact_match(self):
+        """Exact column name is removed from the result."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, ["_loaded_at"])
+        assert "_loaded_at" not in result
+        assert "_run_id" in result
+
+    def test_exclude_glob_pattern(self):
+        """Glob pattern removes all matching columns."""
+        columns = {
+            "_batch_id": "uuid()",
+            "_batch_ts": "current_timestamp()",
+            "_run_id": "uuid()",
+        }
+        result = apply_audit_exclusions(columns, ["_batch_*"])
+        assert "_batch_id" not in result
+        assert "_batch_ts" not in result
+        assert "_run_id" in result
+
+    def test_exclude_no_match_is_noop(self):
+        """Pattern that matches nothing returns all columns unchanged."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, ["_nonexistent_*"])
+        assert result == columns
+
+    def test_exclude_multiple_patterns(self):
+        """Multiple patterns are each applied; union of matches is removed."""
+        columns = {
+            "_batch_id": "uuid()",
+            "_loaded_at": "current_timestamp()",
+            "_run_id": "uuid()",
+            "_source": "'bronze'",
+        }
+        result = apply_audit_exclusions(columns, ["_batch_*", "_loaded_at"])
+        assert "_batch_id" not in result
+        assert "_loaded_at" not in result
+        assert "_run_id" in result
+        assert "_source" in result
+
+    def test_exclude_empty_list(self):
+        """Empty exclude list returns all columns unchanged."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, [])
+        assert result == columns
+
+    def test_exclude_none(self):
+        """None exclude returns all columns unchanged."""
+        columns = {"_loaded_at": "current_timestamp()", "_run_id": "uuid()"}
+        result = apply_audit_exclusions(columns, None)
+        assert result == columns
 
 
 # ---------------------------------------------------------------------------

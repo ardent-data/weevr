@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
 import re
@@ -71,6 +72,37 @@ def resolve_audit_columns(
     if thread_audit:
         merged.update(thread_audit)
     return merged
+
+
+def apply_audit_exclusions(
+    columns: dict[str, str],
+    exclude_patterns: list[str] | None,
+) -> dict[str, str]:
+    """Remove audit columns whose names match any of the given glob patterns.
+
+    Args:
+        columns: Resolved audit column definitions as ``{name: expression}``.
+        exclude_patterns: List of glob patterns (``fnmatch`` syntax). ``None``
+            or an empty list is a no-op.
+
+    Returns:
+        Copy of ``columns`` with matching entries removed.
+    """
+    if not exclude_patterns:
+        return columns
+
+    result: dict[str, str] = {}
+    for name, expression in columns.items():
+        matched = False
+        for pattern in exclude_patterns:
+            if fnmatch.fnmatch(name, pattern):
+                logger.debug("Audit column %r excluded by pattern %r", name, pattern)
+                matched = True
+                break
+        if not matched:
+            result[name] = expression
+
+    return result
 
 
 def resolve_context_variables(expression: str, context: AuditContext) -> str:
