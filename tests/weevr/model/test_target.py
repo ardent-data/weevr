@@ -175,3 +175,13 @@ class TestTarget:
             audit_columns_exclude=["_loaded_at"],
         )
         assert Target.model_validate(t.model_dump()) == t
+
+    def test_exclude_valid_patterns(self):
+        """audit_columns_exclude accepts valid non-empty glob patterns."""
+        t = Target(audit_columns_exclude=["_batch_*", "_custom"])
+        assert t.audit_columns_exclude == ["_batch_*", "_custom"]
+
+    def test_exclude_empty_string_rejected(self):
+        """audit_columns_exclude rejects empty string entries."""
+        with pytest.raises(ValidationError, match="non-empty"):
+            Target(audit_columns_exclude=[""])

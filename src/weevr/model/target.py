@@ -48,3 +48,12 @@ class Target(FrozenBase):
         if isinstance(data, dict) and isinstance(data.get("audit_template"), str):
             data = {**data, "audit_template": [data["audit_template"]]}
         return data
+
+    @model_validator(mode="after")
+    def _validate_exclude_patterns(self) -> "Target":
+        """Validate audit_columns_exclude patterns are non-empty strings."""
+        if self.audit_columns_exclude:
+            for pattern in self.audit_columns_exclude:
+                if not pattern:
+                    raise ValueError("audit_columns_exclude patterns must be non-empty strings")
+        return self
