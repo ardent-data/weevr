@@ -1,6 +1,7 @@
 """Pipeline step dispatcher — routes each step to the appropriate handler."""
 
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 from pyspark.sql import DataFrame
@@ -49,35 +50,49 @@ from weevr.operations.pipeline.transforms import (
     apply_select,
 )
 
-# Handler signature: (df, step, sources) -> DataFrame
+
+@dataclass(frozen=True)
+class StepResult:
+    """Return type for pipeline step handlers.
+
+    Wraps the transformed DataFrame with optional metadata for
+    observability. Existing handlers return empty metadata; new M115
+    handlers populate step-specific metrics.
+    """
+
+    df: DataFrame
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+# Handler signature: (df, step, sources) -> StepResult
 # All handlers receive the full step object and source dict for a uniform interface.
-StepHandler = Callable[[DataFrame, Any, dict[str, DataFrame]], DataFrame]
+StepHandler = Callable[[DataFrame, Any, dict[str, DataFrame]], StepResult]
 
 _STEP_HANDLERS: dict[type, StepHandler] = {
     # Original steps
-    FilterStep: lambda df, step, _src: apply_filter(df, step.filter),
-    DeriveStep: lambda df, step, _src: apply_derive(df, step.derive),
-    SelectStep: lambda df, step, _src: apply_select(df, step.select),
-    DropStep: lambda df, step, _src: apply_drop(df, step.drop),
+    FilterStep: lambda df, step, _src: StepResult(apply_filter(df, step.filter)),
+    DeriveStep: lambda df, step, _src: StepResult(apply_derive(df, step.derive)),
+    SelectStep: lambda df, step, _src: StepResult(apply_select(df, step.select)),
+    DropStep: lambda df, step, _src: StepResult(apply_drop(df, step.drop)),
     # RenameStep is dispatched separately in run_pipeline to support column sets
-    CastStep: lambda df, step, _src: apply_cast(df, step.cast),
-    DedupStep: lambda df, step, _src: apply_dedup(df, step.dedup),
-    SortStep: lambda df, step, _src: apply_sort(df, step.sort),
-    JoinStep: lambda df, step, src: apply_join(df, step.join, src),
-    UnionStep: lambda df, step, src: apply_union(df, step.union, src),
+    CastStep: lambda df, step, _src: StepResult(apply_cast(df, step.cast)),
+    DedupStep: lambda df, step, _src: StepResult(apply_dedup(df, step.dedup)),
+    SortStep: lambda df, step, _src: StepResult(apply_sort(df, step.sort)),
+    JoinStep: lambda df, step, src: StepResult(apply_join(df, step.join, src)),
+    UnionStep: lambda df, step, src: StepResult(apply_union(df, step.union, src)),
     # Analytical steps (M08a)
-    AggregateStep: lambda df, step, _src: apply_aggregate(df, step.aggregate),
-    WindowStep: lambda df, step, _src: apply_window(df, step.window),
-    PivotStep: lambda df, step, _src: apply_pivot(df, step.pivot),
-    UnpivotStep: lambda df, step, _src: apply_unpivot(df, step.unpivot),
+    AggregateStep: lambda df, step, _src: StepResult(apply_aggregate(df, step.aggregate)),
+    WindowStep: lambda df, step, _src: StepResult(apply_window(df, step.window)),
+    PivotStep: lambda df, step, _src: StepResult(apply_pivot(df, step.pivot)),
+    UnpivotStep: lambda df, step, _src: StepResult(apply_unpivot(df, step.unpivot)),
     # Conditional step (M08a)
-    CaseWhenStep: lambda df, step, _src: apply_case_when(df, step.case_when),
+    CaseWhenStep: lambda df, step, _src: StepResult(apply_case_when(df, step.case_when)),
     # Null-handling steps (M08a)
-    FillNullStep: lambda df, step, _src: apply_fill_null(df, step.fill_null),
-    CoalesceStep: lambda df, step, _src: apply_coalesce(df, step.coalesce),
+    FillNullStep: lambda df, step, _src: StepResult(apply_fill_null(df, step.fill_null)),
+    CoalesceStep: lambda df, step, _src: StepResult(apply_coalesce(df, step.coalesce)),
     # Column-ops steps (M08a)
-    StringOpsStep: lambda df, step, _src: apply_string_ops(df, step.string_ops),
-    DateOpsStep: lambda df, step, _src: apply_date_ops(df, step.date_ops),
+    StringOpsStep: lambda df, step, _src: StepResult(apply_string_ops(df, step.string_ops)),
+    DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
 }
 
 
@@ -114,24 +129,27 @@ def run_pipeline(
         ExecutionError: If any step fails, with step_index and step_type set.
     """
 
-    def _dispatch_rename(result: DataFrame, step: RenameStep) -> DataFrame:
+    def _dispatch_rename(result: DataFrame, step: RenameStep) -> StepResult:
         cs_name = step.rename.column_set
         if cs_name is not None and column_sets is not None and cs_name in column_sets:
             cs_def = (column_set_defs or {}).get(cs_name)
-            return apply_rename(
-                result,
-                step.rename,
-                column_set_mapping=column_sets[cs_name],
-                on_unmapped=cs_def.on_unmapped if cs_def is not None else "pass_through",
-                on_extra=cs_def.on_extra if cs_def is not None else "ignore",
+            return StepResult(
+                apply_rename(
+                    result,
+                    step.rename,
+                    column_set_mapping=column_sets[cs_name],
+                    on_unmapped=cs_def.on_unmapped if cs_def is not None else "pass_through",
+                    on_extra=cs_def.on_extra if cs_def is not None else "ignore",
+                )
             )
-        return apply_rename(result, step.rename)
+        return StepResult(apply_rename(result, step.rename))
 
     result = df
     for i, step in enumerate(steps):
         try:
             if isinstance(step, RenameStep):
-                result = _dispatch_rename(result, step)
+                step_result = _dispatch_rename(result, step)
+                result = step_result.df
             else:
                 handler = _STEP_HANDLERS.get(type(step))
                 if handler is None:
@@ -141,7 +159,8 @@ def run_pipeline(
                         step_index=i,
                         step_type=step_type,
                     )
-                result = handler(result, step, sources)
+                step_result = handler(result, step, sources)
+                result = step_result.df
         except ExecutionError:
             raise
         except Exception as exc:
