@@ -265,3 +265,74 @@ def apply_resolve(
         result_df,
         metadata={"resolve_stats": {params.name: stats}},
     )
+
+
+def apply_resolve_batch(
+    df: DataFrame,
+    params: ResolveParams,
+    lookups: dict[str, DataFrame],
+) -> StepResult:
+    """Resolve multiple FKs in batch mode.
+
+    Iterates through merged batch items, applying single FK resolution
+    per item without dropping source columns until all FKs are
+    complete. Aggregates per-item stats in metadata.
+
+    Args:
+        df: Fact DataFrame.
+        params: Resolve parameters with batch items.
+        lookups: Dict mapping lookup names to DataFrames.
+
+    Returns:
+        StepResult with all FK columns added and aggregated metadata.
+    """
+    items = params.resolve_batch_items()
+    all_stats: dict[str, Any] = {}
+    all_source_cols: set[str] = set()
+    should_drop = params.drop_source_columns
+    result_df = df
+
+    for item in items:
+        lookup_name = item.lookup
+        lookup_df = lookups.get(lookup_name)
+        if lookup_df is None:
+            raise ValueError(f"Lookup '{lookup_name}' not found for batch item '{item.name}'")
+
+        # Track source columns for deferred drop
+        assert item.match is not None
+        item_source_cols = set(item.match.keys())
+        if item.drop_source_columns or should_drop:
+            all_source_cols.update(item_source_cols)
+
+        # Build a temporary ResolveParams for single FK resolution
+        item_params = ResolveParams(
+            name=item.name,
+            lookup=item.lookup,
+            match=item.match,
+            pk=item.pk,  # type: ignore[arg-type]
+            on_invalid=item.on_invalid if item.on_invalid is not None else params.on_invalid,
+            on_unknown=item.on_unknown if item.on_unknown is not None else params.on_unknown,
+            on_duplicate=(
+                item.on_duplicate if item.on_duplicate is not None else params.on_duplicate
+            ),
+            on_failure=item.on_failure if item.on_failure is not None else params.on_failure,
+            normalize=item.normalize if item.normalize is not None else params.normalize,
+            drop_source_columns=False,  # Defer drop
+            include=item.include,
+            include_prefix=item.include_prefix,
+            effective=item.effective,
+            where=item.where,
+        )
+
+        step_result = apply_resolve(result_df, item_params, lookup_df, _drop_source_columns=False)
+        result_df = step_result.df
+
+        # Collect per-item stats
+        item_stats = step_result.metadata.get("resolve_stats", {})
+        all_stats.update(item_stats)
+
+    # Deferred source column drop
+    if all_source_cols:
+        result_df = result_df.drop(*all_source_cols)
+
+    return StepResult(result_df, metadata={"resolve_stats": all_stats})

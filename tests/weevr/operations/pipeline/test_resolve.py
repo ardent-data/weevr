@@ -549,3 +549,112 @@ class TestApplyResolveEffective:
         result = apply_resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Batch resolve mode (Task 7)
+# ---------------------------------------------------------------------------
+
+
+class TestApplyResolveBatch:
+    """Test batch FK resolution."""
+
+    def test_two_fks_shared_defaults(self, spark: SparkSession):
+        """Two FKs with shared pk resolve correctly."""
+        from weevr.operations.pipeline.resolve import apply_resolve_batch
+
+        fact = spark.createDataFrame(
+            [("A", "X")],
+            StructType(
+                [
+                    StructField("bk1", StringType(), True),
+                    StructField("bk2", StringType(), True),
+                ]
+            ),
+        )
+        dim1 = spark.createDataFrame(
+            [(10, "A")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                ]
+            ),
+        )
+        dim2 = spark.createDataFrame(
+            [(20, "X")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("code", StringType(), False),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            pk="id",
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": {"bk1": "natural_id"}},
+                {"name": "fk2", "lookup": "dim2", "match": {"bk2": "code"}},
+            ],
+        )
+        lookups = {"dim1": dim1, "dim2": dim2}
+        result = apply_resolve_batch(fact, params, lookups)
+        row = result.df.collect()[0]
+        assert row["fk1"] == 10
+        assert row["fk2"] == 20
+
+    def test_batch_source_columns_not_dropped_mid_batch(self, spark: SparkSession):
+        """Source columns shared across FKs survive until batch completes."""
+        from weevr.operations.pipeline.resolve import apply_resolve_batch
+
+        fact = spark.createDataFrame([("A",)], _fact_schema("shared_bk"))
+        dim1 = spark.createDataFrame(
+            [(10, "A")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                ]
+            ),
+        )
+        dim2 = spark.createDataFrame(
+            [(20, "A")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("bk", StringType(), False),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            pk="id",
+            drop_source_columns=True,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": {"shared_bk": "natural_id"}},
+                {"name": "fk2", "lookup": "dim2", "match": {"shared_bk": "bk"}},
+            ],
+        )
+        lookups = {"dim1": dim1, "dim2": dim2}
+        result = apply_resolve_batch(fact, params, lookups)
+        row = result.df.collect()[0]
+        assert row["fk1"] == 10
+        assert row["fk2"] == 20
+        assert "shared_bk" not in result.df.columns
+
+    def test_batch_per_item_stats(self, spark: SparkSession):
+        """Batch metadata contains per-item stats."""
+        from weevr.operations.pipeline.resolve import apply_resolve_batch
+
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        dim = _dim_df(spark)
+        params = ResolveParams(
+            pk="id",
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim", "match": {"bk": "natural_id"}},
+            ],
+        )
+        lookups = {"dim": dim}
+        result = apply_resolve_batch(fact, params, lookups)
+        stats = result.metadata.get("resolve_stats", {})
+        assert "fk1" in stats
+        assert stats["fk1"]["total"] == 1
