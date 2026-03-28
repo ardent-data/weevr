@@ -615,7 +615,7 @@ class TestConditionalThreadExecution:
         plan = build_plan("test_weave", threads, entries)
         conditions = {"A": ConditionSpec(when="false")}
         result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
-        assert result.status == "failure"  # all threads skipped → failure
+        assert result.status == "success"  # all threads skipped → success
         assert "A" in result.threads_skipped
         mock_exec.assert_not_called()
         # Check the skipped result

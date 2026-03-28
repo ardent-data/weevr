@@ -62,6 +62,8 @@ def _compute_weave_status(
     states = set(thread_states.values())
     if states <= {"succeeded"}:
         return "success"
+    if states <= {"skipped"}:
+        return "success"
     if states <= {"failed", "skipped"}:
         return "failure"
     return "partial"
@@ -137,6 +139,7 @@ def execute_weave(
     threads_skipped: list[str] = []
     cache = CacheManager(plan.cache_targets, plan.dependents)
     aborted = False
+    _weave_raised = False
 
     # Create weave span if collector is active
     weave_span_builder = None
@@ -184,7 +187,6 @@ def execute_weave(
                 )
                 all_hook_results.extend(pre_results)
             except HookError:
-                cleanup_lookups(cached_lookup_dfs)
                 raise
 
         # Materialize lookups: when a lookup schedule is available, defer
@@ -396,9 +398,20 @@ def execute_weave(
             )
             all_hook_results.extend(post_results)
 
+    except BaseException:
+        _weave_raised = True
+        raise
     finally:
         cache.cleanup()
         cleanup_lookups(cached_lookup_dfs)
+        if weave_span_builder is not None and collector is not None:
+            if _weave_raised:
+                _span_status = SpanStatus.ERROR
+            else:
+                _weave_status = _compute_weave_status(thread_states)
+                _span_status = SpanStatus.OK if _weave_status == "success" else SpanStatus.ERROR
+            weave_span = weave_span_builder.finish(status=_span_status)
+            collector.add_span(weave_span)
 
     # Collect any pending threads that weren't processed (shouldn't happen, but be safe)
     for name, state in thread_states.items():
@@ -407,12 +420,6 @@ def execute_weave(
 
     status = _compute_weave_status(thread_states)
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
-
-    # Finalize weave span and add to collector
-    if weave_span_builder is not None and collector is not None:
-        weave_span_status = SpanStatus.OK if status == "success" else SpanStatus.ERROR
-        weave_span = weave_span_builder.finish(status=weave_span_status)
-        collector.add_span(weave_span)
 
     # Build weave telemetry from thread results
     weave_telemetry = _build_weave_telemetry(
@@ -531,6 +538,7 @@ def execute_loom(
     # Loom-level resource lifecycle
     loom_variable_ctx = VariableContext(dict(loom.variables) if loom.variables else None)
     loom_cached_lookup_dfs: dict[str, Any] = {}
+    _loom_raised = False
 
     try:
         # Loom pre_steps
@@ -649,8 +657,21 @@ def execute_loom(
                 parent_span_id=loom_span_id,
             )
 
+    except BaseException:
+        _loom_raised = True
+        raise
     finally:
         cleanup_lookups(loom_cached_lookup_dfs)
+        if _loom_raised:
+            _loom_span_status = SpanStatus.ERROR
+        else:
+            _loom_statuses = {r.status for r in weave_results}
+            if _loom_statuses <= {"success", "skipped"}:
+                _loom_span_status = SpanStatus.OK
+            else:
+                _loom_span_status = SpanStatus.ERROR
+        loom_span = loom_span_builder.finish(status=_loom_span_status)
+        collector.add_span(loom_span)
 
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
@@ -662,11 +683,6 @@ def execute_loom(
         loom_status = "partial"
     else:
         loom_status = "failure"
-
-    # Finalize loom span and add to collector
-    loom_span_status = SpanStatus.OK if loom_status == "success" else SpanStatus.ERROR
-    loom_span = loom_span_builder.finish(status=loom_span_status)
-    collector.add_span(loom_span)
 
     # Build loom telemetry
     loom_telemetry = _build_loom_telemetry(
