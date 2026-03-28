@@ -6,8 +6,9 @@ They intentionally use ``dict[str, Any]`` and ``extra="allow"`` so that
 validation happens as the final step of ``load_config()`` via
 ``model_validate()``.
 
-Post-resolution cross-cutting validators (``validate_incremental_config``)
-run after variable substitution on the resolved thread config dict.
+Post-resolution cross-cutting validators (``validate_incremental_config``,
+``validate_dimension_overrides``) run after variable substitution on the
+resolved thread config dict.
 """
 
 from __future__ import annotations
@@ -177,5 +178,65 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
             "WARN: watermark_inclusive=True with write.mode='append' "
             "may cause duplicate rows on re-reads; prefer merge or overwrite"
         )
+
+    return diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Post-resolution cross-cutting validators for dimension mode
+# ---------------------------------------------------------------------------
+
+#: write fields that the engine derives automatically from the dimension block
+_DIMENSION_FORBIDDEN_WRITE_FIELDS = ("match_keys", "on_match")
+
+#: keys fields declared inside the dimension block; forbidden at top level
+_DIMENSION_FORBIDDEN_KEYS_FIELDS = ("business_key", "surrogate_key", "change_detection")
+
+
+def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
+    """Validate write/keys override constraints when a dimension block is present.
+
+    Called after variable resolution on the full thread config dict.
+
+    Returns a list of diagnostic messages. Messages starting with
+    ``"ERROR:"`` are fatal; ``"WARN:"`` are advisory.
+
+    Rules (only applied when ``target.dimension`` is present):
+
+    - ``write.match_keys`` → ERROR (engine derives from business_key)
+    - ``write.on_match`` → ERROR (engine derives from on_change behaviour)
+    - ``write.mode`` not ``"merge"`` → ERROR (dimension requires merge)
+    - ``keys.business_key`` → ERROR (declared in dimension block)
+    - ``keys.surrogate_key`` → ERROR (declared in dimension block)
+    - ``keys.change_detection`` → ERROR (declared in dimension block)
+    """
+    diagnostics: list[str] = []
+
+    target = thread_config.get("target") or {}
+    if "dimension" not in target:
+        return diagnostics
+
+    write = thread_config.get("write") or {}
+    keys = thread_config.get("keys") or {}
+
+    for field in _DIMENSION_FORBIDDEN_WRITE_FIELDS:
+        if field in write:
+            diagnostics.append(
+                f"ERROR: write.{field} cannot be set when target.dimension is present "
+                f"(the engine derives it from the dimension block)"
+            )
+
+    if "mode" in write and write["mode"] != "merge":
+        diagnostics.append(
+            f"ERROR: write.mode must be 'merge' when target.dimension is present, "
+            f"got '{write['mode']}'"
+        )
+
+    for field in _DIMENSION_FORBIDDEN_KEYS_FIELDS:
+        if field in keys:
+            diagnostics.append(
+                f"ERROR: keys.{field} cannot be set when target.dimension is present "
+                f"(declare it inside the dimension block instead)"
+            )
 
     return diagnostics
