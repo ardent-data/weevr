@@ -21,6 +21,7 @@ serve as reference templates and are validated by CI to ensure structural correc
 | `hooks-lookups.weave` | Weave with materialized (broadcast) and on-demand lookup definitions. |
 | `exports-thread.thread` | Thread with secondary exports: Parquet archive and CSV extract. |
 | `transform-extensions.thread` | concat, map, fill_null type_defaults, and format in a single pipeline. |
+| `resolve-fk.thread` | FK resolution: single, compound BK, SCD2 current flag, batch mode, sentinel assertions. |
 
 ## Fabcon 2026 Demos
 
