@@ -80,7 +80,7 @@ sources:
 ## steps
 
 An ordered list of transformation steps. Each step is a single-key object
-where the key identifies the step type. weevr supports 22 step types.
+where the key identifies the step type. weevr supports 23 step types.
 
 ### filter
 
@@ -571,6 +571,46 @@ per column.
       date: "yyyy-MM-dd"
 ```
 
+### resolve
+
+Resolve foreign keys by joining to a named lookup dimension.
+Assigns sentinel values for invalid (null/blank) and unknown
+(no match) business keys. Supports single FK, compound BK,
+SCD2 narrowing, batch mode, and include columns.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | `string` | yes* | -- | Output FK column name |
+| `lookup` | `string` | yes* | -- | Named lookup reference |
+| `match` | `string`, `list`, or `dict` | yes* | -- | BK column mapping (sugar: string/list/dict) |
+| `pk` | `string` | yes | -- | Surrogate key column in lookup |
+| `on_invalid` | `int` | no | `-4` | Sentinel for incomplete BK |
+| `on_unknown` | `int` | no | `-1` | Sentinel for no match |
+| `on_duplicate` | `string` | no | `"warn"` | `"error"`, `"warn"`, `"first"` |
+| `on_failure` | `string` | no | `"abort"` | `"abort"`, `"warn"` |
+| `normalize` | `string` | no | `null` | `"trim_lower"`, `"trim_upper"`, `"trim"`, `"none"` |
+| `drop_source_columns` | `bool` | no | `false` | Drop source columns after resolve |
+| `include` | `list` or `dict` | no | `null` | Extra columns from lookup |
+| `include_prefix` | `string` | no | `null` | Prefix for included columns |
+| `effective` | `EffectiveConfig` | no | `null` | SCD2 narrowing (date range or current flag) |
+| `where` | `string` | no | `null` | SQL predicate filter on lookup |
+| `batch` | `list[ResolveBatchItem]` | no | `null` | Batch FK specs (mutually exclusive with name/lookup/match) |
+
+*Required in single mode; omitted in batch mode.
+
+See the [Resolve Step guide](../../guides/resolve.md) for
+detailed examples of all modes and features.
+
+```yaml
+- resolve:
+    name: plant_id
+    lookup: dim_plant
+    match: plant_code
+    pk: id
+    on_invalid: -4
+    on_unknown: -1
+```
+
 ---
 
 ## target
@@ -895,12 +935,17 @@ Post-execution assertions evaluated against the target dataset after writing.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `type` | `string` | yes | -- | Assertion type: `"row_count"`, `"column_not_null"`, `"unique"`, `"expression"` |
+| `type` | `string` | yes | -- | Assertion type: `"row_count"`, `"column_not_null"`, `"unique"`, `"expression"`, `"fk_sentinel_rate"` |
 | `severity` | `string` | no | `"warn"` | Severity level: `"info"`, `"warn"`, `"error"`, `"fatal"` |
-| `columns` | `list[string]` | no | `null` | Columns for `column_not_null` and `unique` assertions |
+| `columns` | `list[string]` | no | `null` | Columns for `column_not_null`, `unique`, and `fk_sentinel_rate` assertions |
 | `min` | `int` | no | `null` | Minimum value for `row_count` assertions |
 | `max` | `int` | no | `null` | Maximum value for `row_count` assertions |
 | `expression` | `SparkExpr` | no | `null` | Spark SQL expression for `expression` assertions |
+| `column` | `string` | no | `null` | Single column for `fk_sentinel_rate` (mutually exclusive with `columns`) |
+| `sentinel` | `int` or `string` | no | `null` | Single sentinel value for `fk_sentinel_rate` (mutually exclusive with `sentinels`) |
+| `sentinels` | `dict` | no | `null` | Named sentinel groups for `fk_sentinel_rate` (dict-of-int or dict-of-dict) |
+| `max_rate` | `float` | no | `null` | Maximum sentinel rate threshold for `fk_sentinel_rate` |
+| `message` | `string` | no | `null` | Custom failure message for `fk_sentinel_rate` |
 
 ```yaml
 assertions:
@@ -915,6 +960,11 @@ assertions:
   - type: expression
     expression: "count(CASE WHEN amount < 0 THEN 1 END) = 0"
     severity: warn
+  - type: fk_sentinel_rate
+    column: plant_id
+    sentinel: -4
+    max_rate: 0.05
+    message: "plant FK invalid rate exceeded"
 ```
 
 ---

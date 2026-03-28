@@ -45,9 +45,9 @@ Defaults:
 | `invalid` | -4 | Business key was incomplete |
 | `missing` | -1 | No lookup match found |
 
-These values document the FK contract. The `resolve` step
-(M114, future) will use them to assign sentinel SKs when
-FK lookups fail.
+These values align with the sentinel defaults used by the
+[`resolve` step](resolve.md). The resolve step assigns these
+sentinel SKs when FK lookups fail or BKs are incomplete.
 
 ## Relationship to Dimension Targets
 

@@ -171,6 +171,23 @@ Normalize both source and lookup BK columns before joining:
 
 Available presets: `trim_lower`, `trim_upper`, `trim`, `none`.
 
+## Dropping source columns
+
+After resolution, the original BK source columns can be dropped:
+
+```yaml
+- resolve:
+    name: plant_id
+    lookup: dim_plant
+    match: plant_code
+    pk: id
+    drop_source_columns: true
+```
+
+Defaults to `false`. In batch mode, source columns are dropped
+only after all FKs complete — preventing mid-batch failures
+when the same source column is used by multiple resolutions.
+
 ## Duplicate handling
 
 When multiple lookup rows match a single fact row:
@@ -207,17 +224,21 @@ Resolve multiple FKs in one step with shared defaults:
 ```
 
 Shared defaults (`pk`, `on_invalid`, etc.) apply to all items.
-Item-level values override the shared default. Source columns
-are dropped only after all FKs complete.
+Item-level values override the shared default. When
+`drop_source_columns: true`, source columns are dropped only
+after all FKs complete.
 
 ## on_failure handling
 
-Control behavior when a lookup cannot be read:
+Control behavior when a lookup cannot be found (single mode):
 
 ```yaml
 on_failure: abort   # default — fail the thread
 on_failure: warn    # assign on_unknown to all rows, continue
 ```
+
+In batch mode, a missing lookup always aborts regardless of
+`on_failure`.
 
 ## fk_sentinel_rate assertion
 
