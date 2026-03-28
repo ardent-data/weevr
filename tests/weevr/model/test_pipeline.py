@@ -322,7 +322,7 @@ class TestStepFreezeAndRoundTrip:
 
 
 # ---------------------------------------------------------------------------
-# New M08a supporting models
+# Additional supporting models
 # ---------------------------------------------------------------------------
 
 
@@ -374,7 +374,7 @@ class TestCaseWhenBranch:
 
 
 # ---------------------------------------------------------------------------
-# New M08a param models
+# Additional param models
 # ---------------------------------------------------------------------------
 
 
@@ -600,7 +600,7 @@ class TestDateOpsParams:
 
 
 class TestNewStepDiscriminator:
-    """Test Step discriminated union dispatch for new M08a step types."""
+    """Test Step discriminated union dispatch for additional step types."""
 
     def _validate(self, d: dict) -> Step:  # type: ignore[type-arg]
         return _step_adapter.validate_python(d)

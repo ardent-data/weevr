@@ -80,20 +80,20 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     SortStep: lambda df, step, _src: StepResult(apply_sort(df, step.sort)),
     JoinStep: lambda df, step, src: StepResult(apply_join(df, step.join, src)),
     UnionStep: lambda df, step, src: StepResult(apply_union(df, step.union, src)),
-    # Analytical steps (M08a)
+    # Analytical steps
     AggregateStep: lambda df, step, _src: StepResult(apply_aggregate(df, step.aggregate)),
     WindowStep: lambda df, step, _src: StepResult(apply_window(df, step.window)),
     PivotStep: lambda df, step, _src: StepResult(apply_pivot(df, step.pivot)),
     UnpivotStep: lambda df, step, _src: StepResult(apply_unpivot(df, step.unpivot)),
-    # Conditional step (M08a)
+    # Conditional step
     CaseWhenStep: lambda df, step, _src: StepResult(apply_case_when(df, step.case_when)),
-    # Null-handling steps (M08a)
+    # Null-handling steps
     FillNullStep: lambda df, step, _src: apply_fill_null(df, step.fill_null),
     CoalesceStep: lambda df, step, _src: apply_coalesce(df, step.coalesce),
-    # Column-ops steps (M08a)
+    # Column-ops steps
     StringOpsStep: lambda df, step, _src: StepResult(apply_string_ops(df, step.string_ops)),
     DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
-    # Transform step extensions (M115)
+    # Transform step extensions
     ConcatStep: lambda df, step, _src: apply_concat(df, step.concat),
     MapStep: lambda df, step, _src: apply_map(df, step.map),
     FormatStep: lambda df, step, _src: apply_format(df, step.format),

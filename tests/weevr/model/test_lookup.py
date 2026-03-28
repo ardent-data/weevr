@@ -62,7 +62,7 @@ class TestLookup:
         with pytest.raises(ValidationError):
             lookup.materialize = True  # type: ignore[misc]
 
-    # -- Narrow lookup field tests (M101a) --
+    # -- Narrow lookup field tests --
 
     def test_narrow_defaults(self):
         """New narrow fields default to None/False without affecting existing configs."""

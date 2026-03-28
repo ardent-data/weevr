@@ -82,7 +82,7 @@ class ExecutionPlan(FrozenBase):
 def _normalize_path(path: str) -> str:
     """Normalize a path for DAG matching.
 
-    Strips trailing slashes and preserves case (DEC-003).
+    Strips trailing slashes and preserves case.
     """
     return path.rstrip("/")
 
@@ -308,7 +308,7 @@ def _analyze_cache_targets(
     targets: list[str] = []
     for name in thread_names:
         thread = threads[name]
-        # Explicit cache=False suppresses auto-caching (EC-008)
+        # Explicit cache=False suppresses auto-caching
         if thread.cache is False:
             continue
         if len(dependents.get(name, [])) >= 2:

@@ -13,7 +13,7 @@ class StepResult:
     """Return type for pipeline step handlers.
 
     Wraps the transformed DataFrame with optional metadata for
-    observability. Existing handlers return empty metadata; new M115
+    observability. Existing handlers return empty metadata; newer
     handlers populate step-specific metrics.
     """
 

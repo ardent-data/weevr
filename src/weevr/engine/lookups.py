@@ -313,7 +313,7 @@ def resolve_thread_lookups(
         else:
             lookup_def = weave_lookups[lookup_name]
             df = read_source(spark, lookup_name, lookup_def.source)
-            # Apply narrow pipeline for on-demand reads (DEC-001)
+            # Apply narrow pipeline for on-demand reads
             df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
             resolved[alias] = df
 

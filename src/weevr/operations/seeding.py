@@ -170,7 +170,7 @@ def execute_seeds(
 
 
 # ---------------------------------------------------------------------------
-# Default system members (DEC-003)
+# Default system members
 # ---------------------------------------------------------------------------
 
 _DEFAULT_SYSTEM_MEMBERS: list[SystemMemberConfig] = [

@@ -198,7 +198,7 @@ class TestWeaveRunnerFailureHandling:
 
     @patch("weevr.engine.runner.execute_thread")
     def test_continue_same_as_skip_downstream(self, mock_exec):
-        """on_failure=continue: dependents skipped, independents continue (DEC-007)."""
+        """on_failure=continue: dependents skipped, independents continue."""
 
         def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
@@ -1387,7 +1387,7 @@ class TestColumnSetsCascade:
 class TestWeaveLifecycleOrder:
     """Verify that execute_weave runs lifecycle phases in the correct order.
 
-    DEC-013 specifies: variables → pre_steps → lookups → column_sets →
+    Lifecycle phases in order: variables → pre_steps → lookups → column_sets →
     threads → post_steps → cleanup.
     """
 

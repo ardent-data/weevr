@@ -1,6 +1,6 @@
 """Integration tests for DAG orchestration — weave and loom execution with real Spark/Delta.
 
-Covers exit criteria EC-001 through EC-010 per M04 design.
+Covers exit criteria for DAG orchestration design.
 """
 
 import pytest
@@ -70,7 +70,7 @@ def _run_weave_directly(
 
 
 # ---------------------------------------------------------------------------
-# EC-001: 3-thread weave with dependency chain and independent thread
+# 3-thread weave with dependency chain and independent thread
 # ---------------------------------------------------------------------------
 
 
@@ -78,7 +78,7 @@ class TestEC001DependencyChain:
     def test_three_thread_weave_dependency_chain_and_parallel(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-001: A writes table_x; B reads table_x (depends on A); C is independent.
+        """A writes table_x; B reads table_x (depends on A); C is independent.
         B must run after A; A and C can run in parallel.
         All three should succeed.
         """
@@ -116,7 +116,7 @@ class TestEC001DependencyChain:
 
 
 # ---------------------------------------------------------------------------
-# EC-002: Circular dependency detection
+# Circular dependency detection
 # ---------------------------------------------------------------------------
 
 
@@ -124,7 +124,7 @@ class TestEC002CircularDependency:
     def test_circular_dependency_raises_at_plan_time(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-002: Circular dependency detected and reported at plan construction time."""
+        """Circular dependency detected and reported at plan construction time."""
         tgt_a = tmp_delta_path("ec002_tgt_a")
         tgt_b = tmp_delta_path("ec002_tgt_b")
 
@@ -138,13 +138,13 @@ class TestEC002CircularDependency:
 
 
 # ---------------------------------------------------------------------------
-# EC-003: Loom with 2+ weaves executes sequentially
+# Loom with 2+ weaves executes sequentially
 # ---------------------------------------------------------------------------
 
 
 class TestEC003LoomSequential:
     def test_loom_two_weaves_run_sequentially(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-003: Loom executes weave1 then weave2; LoomResult contains both WeaveResults."""
+        """Loom executes weave1 then weave2; LoomResult contains both WeaveResults."""
         src1 = tmp_delta_path("ec003_src1")
         tgt1 = tmp_delta_path("ec003_tgt1")
         src2 = tmp_delta_path("ec003_src2")
@@ -181,13 +181,13 @@ class TestEC003LoomSequential:
 
 
 # ---------------------------------------------------------------------------
-# EC-004: on_failure=abort_weave
+# on_failure=abort_weave
 # ---------------------------------------------------------------------------
 
 
 class TestEC004AbortWeave:
     def test_abort_weave_stops_remaining_threads(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-004: Thread A fails with abort_weave → B and C (both depend on A) are aborted."""
+        """Thread A fails with abort_weave → B and C (both depend on A) are aborted."""
         tgt_a = tmp_delta_path("ec004_tgt_a")
         tgt_b = tmp_delta_path("ec004_tgt_b")
         tgt_c = tmp_delta_path("ec004_tgt_c")
@@ -208,7 +208,7 @@ class TestEC004AbortWeave:
 
 
 # ---------------------------------------------------------------------------
-# EC-005: on_failure=skip_downstream
+# on_failure=skip_downstream
 # ---------------------------------------------------------------------------
 
 
@@ -216,7 +216,7 @@ class TestEC005SkipDownstream:
     def test_skip_downstream_skips_only_dependents(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-005: Thread A fails; B (depends on A) is skipped; C (independent) succeeds."""
+        """Thread A fails; B (depends on A) is skipped; C (independent) succeeds."""
         src_c = tmp_delta_path("ec005_src_c")
         tgt_a = tmp_delta_path("ec005_tgt_a")
         tgt_b = tmp_delta_path("ec005_tgt_b")
@@ -239,7 +239,7 @@ class TestEC005SkipDownstream:
 
 
 # ---------------------------------------------------------------------------
-# EC-006: on_failure=continue (same observable behaviour as skip_downstream)
+# on_failure=continue (same observable behaviour as skip_downstream)
 # ---------------------------------------------------------------------------
 
 
@@ -247,7 +247,7 @@ class TestEC006Continue:
     def test_continue_skips_dependents_continues_independents(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-006: on_failure=continue — B (dependent) skipped, C (independent) continues."""
+        """on_failure=continue — B (dependent) skipped, C (independent) continues."""
         src_c = tmp_delta_path("ec006_src_c")
         tgt_a = tmp_delta_path("ec006_tgt_a")
         tgt_b = tmp_delta_path("ec006_tgt_b")
@@ -269,7 +269,7 @@ class TestEC006Continue:
 
 
 # ---------------------------------------------------------------------------
-# EC-007: Auto-cache — DataFrame consumed by 2+ threads is cached
+# Auto-cache — DataFrame consumed by 2+ threads is cached
 # ---------------------------------------------------------------------------
 
 
@@ -277,7 +277,7 @@ class TestEC007AutoCache:
     def test_multi_consumer_thread_marked_as_cache_target(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-007: Thread A's output is read by both B and C → A is in cache_targets.
+        """Thread A's output is read by both B and C → A is in cache_targets.
         Correctness is verified by successful row counts in B and C's targets.
         """
         src_a = tmp_delta_path("ec007_src_a")
@@ -304,7 +304,7 @@ class TestEC007AutoCache:
 
 
 # ---------------------------------------------------------------------------
-# EC-008: Thread with cache=False suppresses auto-caching
+# Thread with cache=False suppresses auto-caching
 # ---------------------------------------------------------------------------
 
 
@@ -312,7 +312,7 @@ class TestEC008CacheOverride:
     def test_cache_false_excludes_thread_from_cache_targets(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-008: Thread A with cache=False is not in cache_targets even with 2 consumers."""
+        """Thread A with cache=False is not in cache_targets even with 2 consumers."""
         src_a = tmp_delta_path("ec008_src_a")
         tgt_a = tmp_delta_path("ec008_tgt_a")
         tgt_b = tmp_delta_path("ec008_tgt_b")
@@ -334,7 +334,7 @@ class TestEC008CacheOverride:
 
 
 # ---------------------------------------------------------------------------
-# EC-009: ExecutionPlan is inspectable
+# ExecutionPlan is inspectable
 # ---------------------------------------------------------------------------
 
 
@@ -342,7 +342,7 @@ class TestEC009PlanInspectability:
     def test_execution_plan_exposes_full_metadata(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-009: ExecutionPlan exposes dependency graph, parallel groups, and cache decisions."""
+        """ExecutionPlan exposes dependency graph, parallel groups, and cache decisions."""
         src_a = tmp_delta_path("ec009_src_a")
         tgt_a = tmp_delta_path("ec009_tgt_a")
         tgt_b = tmp_delta_path("ec009_tgt_b")
@@ -379,7 +379,7 @@ class TestEC009PlanInspectability:
 
 
 # ---------------------------------------------------------------------------
-# EC-010: WeaveResult.status="partial" on mixed success/failure
+# WeaveResult.status="partial" on mixed success/failure
 # ---------------------------------------------------------------------------
 
 
@@ -387,7 +387,7 @@ class TestEC010PartialStatus:
     def test_partial_status_when_some_succeed_some_fail(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-010: A fails (skip_downstream), B skipped, C succeeds → status='partial'."""
+        """A fails (skip_downstream), B skipped, C succeeds → status='partial'."""
         src_c = tmp_delta_path("ec010_src_c")
         tgt_a = tmp_delta_path("ec010_tgt_a")
         tgt_b = tmp_delta_path("ec010_tgt_b")

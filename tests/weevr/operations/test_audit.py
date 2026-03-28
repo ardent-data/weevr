@@ -88,7 +88,7 @@ class TestResolveAuditColumns:
         assert resolve_audit_columns(None, None, None) == {}
 
     def test_multiple_columns_per_level(self):
-        """Multiple columns at each level merge correctly (EC-002)."""
+        """Multiple columns at each level merge correctly."""
         result = resolve_audit_columns(
             {"_l1": "a", "_l2": "b"},
             {"_w1": "c", "_w2": "d"},
@@ -158,7 +158,7 @@ class TestApplyAuditExclusions:
 
 
 # ---------------------------------------------------------------------------
-# Context variable resolution (EC-004) — tested through inject_audit_columns
+# Context variable resolution — tested through inject_audit_columns
 # ---------------------------------------------------------------------------
 
 
@@ -300,7 +300,7 @@ class TestInjectAuditColumns:
         assert result.columns == simple_df.columns
 
     def test_conflict_raises_error(self, simple_df):
-        """Column name conflict raises ExecutionError (EC-006)."""
+        """Column name conflict raises ExecutionError."""
         with pytest.raises(ExecutionError, match="Audit column name conflict"):
             inject_audit_columns(simple_df, {"id": "0"}, _ctx())
 
@@ -360,7 +360,7 @@ class TestBuildSourcesJson:
 
 
 # ---------------------------------------------------------------------------
-# Mapping mode bypass (DEC-007) — audit columns survive target mapping
+# Mapping mode bypass — audit columns survive target mapping
 # ---------------------------------------------------------------------------
 
 

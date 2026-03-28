@@ -372,7 +372,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
 
-                # Seed phase (before merge, DEC-009)
+                # Seed phase (before merge)
                 if seed_config is not None or dim_config.seed_system_members:
                     target_schema = df.schema
                     all_seed_rows: list[dict[str, Any]] = []
@@ -414,7 +414,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
 
-                # General seed phase (non-dimension, DEC-009)
+                # General seed phase (non-dimension)
                 if seed_config is not None:
                     execute_seeds(spark, seed_config, target_path, df.schema)
 

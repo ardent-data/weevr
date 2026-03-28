@@ -128,18 +128,18 @@ class TestThreadHydrationViaPipeline:
         assert result.tags == ["nightly", "critical"]
 
     def test_invalid_step_raises_model_validation_error(self):
-        """Unknown step type raises ModelValidationError (EC-004)."""
+        """Unknown step type raises ModelValidationError."""
         with pytest.raises(ModelValidationError) as exc_info:
             load_config(FIXTURES / "thread_invalid_step.thread")
         assert "thread" in str(exc_info.value).lower()
 
     def test_merge_write_without_keys_raises_model_validation_error(self):
-        """Merge mode without match_keys raises ModelValidationError (EC-004)."""
+        """Merge mode without match_keys raises ModelValidationError."""
         with pytest.raises(ModelValidationError):
             load_config(FIXTURES / "thread_merge_no_keys.thread")
 
     def test_join_explicit_key_pairs(self):
-        """Thread with explicit join key pairs hydrates correctly (DEC-005)."""
+        """Thread with explicit join key pairs hydrates correctly."""
         result = load_config(FIXTURES / "thread_join_explicit_keys.thread")
 
         assert isinstance(result, Thread)
@@ -159,7 +159,7 @@ class TestThreadHydrationViaPipeline:
 
 
 class TestThreadFrozenAfterHydration:
-    """Verify all hydrated models are frozen (EC-006)."""
+    """Verify all hydrated models are frozen."""
 
     def test_thread_is_frozen(self):
         """Thread model is immutable after hydration."""

@@ -300,7 +300,7 @@ def _hook_step(check: str, name: str | None = None) -> dict[str, Any]:
 
 
 class TestHookInheritance:
-    """Verify hooks, lookups, and variables cascade correctly (DEC-010)."""
+    """Verify hooks, lookups, and variables cascade correctly."""
 
     def test_weave_pre_steps_replace_loom_defaults(self):
         """Weave pre_steps entirely replaces loom defaults pre_steps."""

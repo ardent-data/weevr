@@ -466,7 +466,7 @@ class TestComputeNamedGroupHashes:
             "_static": ChangeDetectionGroupConfig(
                 columns=["b"],
                 on_change="static",
-                # name=None, algorithm=None — DEC-012: skip hash computation
+                # name=None, algorithm=None — skip hash computation
             )
         }
         result = compute_named_group_hashes(df, groups, exclude_columns=set())

@@ -144,7 +144,7 @@ def read_source_incremental(
     If ``prior_state`` is ``None`` (first run), reads all data.
     Otherwise applies a watermark filter for predicate pushdown.
     HWM is captured as ``MAX(watermark_column)`` from the source read
-    (before transforms, per DEC-003).
+    (before transforms).
 
     Args:
         spark: Active SparkSession.

@@ -216,7 +216,7 @@ class TestTargetAnalyticalModes:
         assert t.seed.rows == [{"id": 1, "name": "test"}]
 
     def test_dimension_and_fact_mutually_exclusive(self):
-        """dimension and fact together raise ValidationError (DEC-016)."""
+        """dimension and fact together raise ValidationError."""
         with pytest.raises(ValidationError, match="mutually exclusive"):
             Target(
                 dimension=self._dimension_data,  # type: ignore[arg-type]

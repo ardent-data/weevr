@@ -161,7 +161,7 @@ class TestApplyConcat:
         assert row["result"] is None
 
     def test_single_column(self, spark: SparkSession):
-        """Single column passthrough with trim applied (DEC-025)."""
+        """Single column passthrough with trim applied."""
         df = spark.createDataFrame([("  hello  ",)], ["a"])
         params = ConcatParams(target="result", columns=["a"], separator="", trim=True)
         step_result = apply_concat(df, params)
@@ -169,7 +169,7 @@ class TestApplyConcat:
         assert row["result"] == "hello"
 
     def test_auto_cast_non_string(self, spark: SparkSession):
-        """Integer column is auto-cast to string before concat (DEC-005)."""
+        """Integer column is auto-cast to string before concat."""
         schema = StructType(
             [
                 StructField("name", StringType(), True),

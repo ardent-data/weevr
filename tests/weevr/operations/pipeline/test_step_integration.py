@@ -1,4 +1,4 @@
-"""Integration tests — YAML-to-execution round-trips for M115 step types."""
+"""Integration tests — YAML-to-execution round-trips for extended step types."""
 
 from datetime import date
 

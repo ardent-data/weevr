@@ -133,7 +133,7 @@ class DimensionMergeBuilder:
         """Return the set of SK values used by system members.
 
         Used for auto-exclusion during delete/soft_delete operations
-        (DEC-003). Only negative integers are returned.
+        Only negative integers are returned.
 
         Returns:
             Set of negative SK values.

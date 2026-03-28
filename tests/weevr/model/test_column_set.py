@@ -38,12 +38,12 @@ class TestColumnSetSource:
         assert source.alias is None
 
     def test_default_from_column(self):
-        """from_column defaults to 'source_name' (DEC-013)."""
+        """from_column defaults to 'source_name'."""
         source = ColumnSetSource(type="delta", alias="ref_t")
         assert source.from_column == "source_name"
 
     def test_default_to_column(self):
-        """to_column defaults to 'target_name' (DEC-013)."""
+        """to_column defaults to 'target_name'."""
         source = ColumnSetSource(type="delta", alias="ref_t")
         assert source.to_column == "target_name"
 
@@ -99,17 +99,17 @@ class TestColumnSet:
             ColumnSet()
 
     def test_default_on_unmapped(self):
-        """on_unmapped defaults to 'pass_through' (DEC-003)."""
+        """on_unmapped defaults to 'pass_through'."""
         cs = ColumnSet(param="p")
         assert cs.on_unmapped == "pass_through"
 
     def test_default_on_extra(self):
-        """on_extra defaults to 'ignore' (DEC-004)."""
+        """on_extra defaults to 'ignore'."""
         cs = ColumnSet(param="p")
         assert cs.on_extra == "ignore"
 
     def test_default_on_failure(self):
-        """on_failure defaults to 'abort' (DEC-008)."""
+        """on_failure defaults to 'abort'."""
         cs = ColumnSet(param="p")
         assert cs.on_failure == "abort"
 

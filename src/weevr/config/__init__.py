@@ -84,7 +84,7 @@ def load_config(
     validated = validate_schema(raw, config_type)
     config_dict = validated.model_dump(exclude_unset=True)
 
-    # Step 5: Build parameter context (no more param_file; DEC-009)
+    # Step 5: Build parameter context (no more param_file)
     context = build_param_context(
         runtime_params,
         config_dict.get("defaults") or config_dict.get("params"),

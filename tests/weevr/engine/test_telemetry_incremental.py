@@ -65,7 +65,7 @@ class TestCdcTelemetry:
 
 
 class TestIncrementalParameterTelemetry:
-    """incremental_parameter mode telemetry — semantic marker (DEC-008)."""
+    """incremental_parameter mode telemetry — semantic marker."""
 
     def test_parameter_mode_records_load_mode(self, spark: SparkSession, tmp_delta_path) -> None:
         """Thread with incremental_parameter records load_mode in telemetry."""

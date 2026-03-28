@@ -189,8 +189,8 @@ class TestRunPipelineErrorHandling:
         assert err.step_index == 1
 
 
-class TestRunPipelineM115Handlers:
-    """Dispatcher routes M115 step types to the correct handlers."""
+class TestRunPipelineExtendedHandlers:
+    """Dispatcher routes extended step types to the correct handlers."""
 
     def test_concat_step_dispatched(self, base_df) -> None:
         steps: list[Step] = [
