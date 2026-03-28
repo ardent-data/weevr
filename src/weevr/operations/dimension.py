@@ -17,7 +17,7 @@ from pyspark.sql import functions as F
 from weevr.delta import delta_table_exists, resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
-from weevr.operations.writers import _quote_identifier
+from weevr.operations.writers import quote_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -314,9 +314,9 @@ def _execute_versioned_merge(
     # Build merge condition: match on BK AND marker=False
     # (so new-version rows never match existing target rows)
     merge_parts = [
-        f"target.{_quote_identifier(c)} <=> source.{_quote_identifier(c)}" for c in bk_cols
+        f"target.{quote_identifier(c)} <=> source.{quote_identifier(c)}" for c in bk_cols
     ]
-    merge_parts.append(f"source.{_quote_identifier(marker)} = false")
+    merge_parts.append(f"source.{quote_identifier(marker)} = false")
     merge_cond = " AND ".join(merge_parts)
 
     delta_table = resolve_delta_table(spark, target_path)
@@ -325,7 +325,7 @@ def _execute_versioned_merge(
     # Matched + version hash changed → close old row
     if version_hash_cols:
         version_change_sql = " OR ".join(
-            f"source.{_quote_identifier(c)} != target.{_quote_identifier(c)}"
+            f"source.{quote_identifier(c)} != target.{quote_identifier(c)}"
             for c in version_hash_cols
         )
         close_set: dict[str, Column] = {
@@ -334,18 +334,18 @@ def _execute_versioned_merge(
         }
         # Apply overwrite columns during close
         for col_name in builder.get_overwrite_columns():
-            close_set[col_name] = F.col(f"source.{_quote_identifier(col_name)}")
+            close_set[col_name] = F.col(f"source.{quote_identifier(col_name)}")
         # Apply previous_columns
         if config.previous_columns:
             for prev_col, src_col in config.previous_columns.items():
-                close_set[prev_col] = F.col(f"target.{_quote_identifier(src_col)}")
+                close_set[prev_col] = F.col(f"target.{quote_identifier(src_col)}")
         merger = merger.whenMatchedUpdate(condition=version_change_sql, set=close_set)
 
     # Not matched → insert (includes new entities AND new version rows).
     # IMPORTANT: use source_df.columns (not merged_source.columns) to
     # exclude the __dim_new_version__ marker from the insert values.
     # The marker must never be written to the target schema.
-    insert_cols = {c: F.col(f"source.{_quote_identifier(c)}") for c in source_df.columns}
+    insert_cols = {c: F.col(f"source.{quote_identifier(c)}") for c in source_df.columns}
     merger = merger.whenNotMatchedInsert(values=insert_cols)
 
     # Handle on_no_match_source
@@ -368,7 +368,7 @@ def _execute_standard_merge(
     bk_cols = config.business_key
 
     merge_cond = " AND ".join(
-        f"target.{_quote_identifier(c)} <=> source.{_quote_identifier(c)}" for c in bk_cols
+        f"target.{quote_identifier(c)} <=> source.{quote_identifier(c)}" for c in bk_cols
     )
 
     delta_table = resolve_delta_table(spark, target_path)
@@ -383,7 +383,7 @@ def _execute_standard_merge(
 
     if change_hash_cols:
         change_cond = " OR ".join(
-            f"source.{_quote_identifier(c)} != target.{_quote_identifier(c)}"
+            f"source.{quote_identifier(c)} != target.{quote_identifier(c)}"
             for c in change_hash_cols
         )
     else:
@@ -400,12 +400,12 @@ def _execute_standard_merge(
             continue
         if col in scd_col_names or col == sk_col:
             continue
-        update_set[col] = F.col(f"source.{_quote_identifier(col)}")
+        update_set[col] = F.col(f"source.{quote_identifier(col)}")
 
     # Handle previous_columns
     if config.previous_columns:
         for prev_col, src_col in config.previous_columns.items():
-            update_set[prev_col] = F.col(f"target.{_quote_identifier(src_col)}")
+            update_set[prev_col] = F.col(f"target.{quote_identifier(src_col)}")
 
     merger = delta_table.alias("target").merge(source_df.alias("source"), merge_cond)
 
@@ -431,7 +431,7 @@ def _apply_not_matched_by_source(
     if write_config.on_no_match_source == "delete":
         if system_member_sks:
             exclusion = " AND ".join(
-                f"target.{_quote_identifier(sk_col)} != {v}" for v in system_member_sks
+                f"target.{quote_identifier(sk_col)} != {v}" for v in system_member_sks
             )
             merger.whenNotMatchedBySourceDelete(condition=exclusion)  # type: ignore[union-attr]
         else:
@@ -443,7 +443,7 @@ def _apply_not_matched_by_source(
             condition = None
             if system_member_sks:
                 condition = " AND ".join(
-                    f"target.{_quote_identifier(sk_col)} != {v}" for v in system_member_sks
+                    f"target.{quote_identifier(sk_col)} != {v}" for v in system_member_sks
                 )
             merger.whenNotMatchedBySourceUpdate(  # type: ignore[union-attr]
                 condition=condition, set={sd_col: F.lit(sd_val)}

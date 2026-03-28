@@ -154,7 +154,7 @@ class WeaveTelemetry(FrozenBase):
     thread_telemetry: dict[str, ThreadTelemetry] = {}
     hook_results: list[Any] = []  # list[engine.hooks.HookResult] at runtime
     lookup_results: list[Any] = []  # list[engine.lookups.LookupResult] at runtime
-    column_set_results: list[Any] = []  # list[ColumnSetResult] at runtime
+    column_set_results: list[ColumnSetResult] = []
     variables: dict[str, Any] = {}
     resolved_params: dict[str, Any] | None = None
 

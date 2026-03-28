@@ -8,23 +8,23 @@ from spark_helpers import create_delta_table
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
-from weevr.operations.writers import _quote_identifier, apply_target_mapping, write_target
+from weevr.operations.writers import apply_target_mapping, quote_identifier, write_target
 
 
 class TestQuoteIdentifier:
-    """Unit tests for _quote_identifier SQL escaping (no Spark needed)."""
+    """Unit tests for quote_identifier SQL escaping (no Spark needed)."""
 
     def test_plain_name(self) -> None:
-        assert _quote_identifier("column_name") == "`column_name`"
+        assert quote_identifier("column_name") == "`column_name`"
 
     def test_name_with_backtick(self) -> None:
-        assert _quote_identifier("col`umn") == "`col``umn`"
+        assert quote_identifier("col`umn") == "`col``umn`"
 
     def test_name_with_spaces(self) -> None:
-        assert _quote_identifier("my column") == "`my column`"
+        assert quote_identifier("my column") == "`my column`"
 
     def test_empty_string(self) -> None:
-        assert _quote_identifier("") == "``"
+        assert quote_identifier("") == "``"
 
 
 @pytest.fixture()

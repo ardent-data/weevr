@@ -58,8 +58,8 @@ class Export(FrozenBase):
             )
 
         if self.enabled:
-            has_path = self.path is not None
-            has_alias = self.alias is not None
+            has_path = bool(self.path)
+            has_alias = bool(self.alias)
             if has_path == has_alias:
                 raise ValueError(
                     f"Export '{self.name}': exactly one of 'path' or 'alias' "

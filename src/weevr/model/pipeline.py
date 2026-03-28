@@ -509,6 +509,12 @@ class ConcatParams(FrozenBase):
             raise ValueError("columns must not be empty")
         return v
 
+    @model_validator(mode="after")
+    def _validate_null_literal(self) -> "ConcatParams":
+        if self.null_mode == "literal" and not self.null_literal:
+            raise ValueError("null_literal must not be empty when null_mode is 'literal'")
+        return self
+
 
 class ConcatStep(FrozenBase):
     """Pipeline step: concatenate columns into a string."""
@@ -582,6 +588,8 @@ class FormatSpec(FrozenBase):
     @field_validator("pattern")
     @classmethod
     def _validate_pattern_syntax(cls, v: str | None) -> str | None:
+        if v is not None and not v:
+            raise ValueError("pattern must not be empty")
         if v is not None and "{" in v:
             for match in _FORMAT_PLACEHOLDER_RE.finditer(v):
                 pos, length = int(match.group(1)), int(match.group(2))

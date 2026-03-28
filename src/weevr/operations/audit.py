@@ -70,7 +70,7 @@ class AuditContext:
 
 
 # Pattern matching ${namespace.property} context variables.
-_CONTEXT_VAR_PATTERN = re.compile(r"\$\{(thread|weave|loom|run)\.([a-z_]+)\}")
+CONTEXT_VAR_PATTERN = re.compile(r"\$\{(thread|weave|loom|run)\.([a-z_]+)\}")
 
 
 def resolve_audit_columns(
@@ -298,7 +298,7 @@ def resolve_context_variables(expression: str, context: AuditContext) -> str:
             return ""
         return value
 
-    return _CONTEXT_VAR_PATTERN.sub(_replace, expression)
+    return CONTEXT_VAR_PATTERN.sub(_replace, expression)
 
 
 def inject_audit_columns(

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ExportError
 from weevr.model.export import Export
-from weevr.operations.audit import _CONTEXT_VAR_PATTERN, resolve_context_variables
+from weevr.operations.audit import CONTEXT_VAR_PATTERN, resolve_context_variables
 from weevr.telemetry.results import ExportResult
 
 if TYPE_CHECKING:
@@ -55,7 +55,7 @@ def resolve_exports(
     """
     resolved: list[Export] = []
     for export in exports:
-        if export.path is not None and _CONTEXT_VAR_PATTERN.search(export.path):
+        if export.path is not None and CONTEXT_VAR_PATTERN.search(export.path):
             resolved_path = resolve_export_path(export.path, context)
             resolved.append(export.model_copy(update={"path": resolved_path}))
         else:
