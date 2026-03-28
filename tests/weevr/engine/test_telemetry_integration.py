@@ -281,7 +281,7 @@ class TestFatalValidationIntegration:
     ) -> None:
         """ExecutionError path adds the error span to the collector."""
         src = tmp_delta_path("exec_err_src")
-        # Source exists but target path is None — triggers ExecutionError
+        # Source exists but target path is non-writable — triggers ExecutionError
         create_delta_table(spark, src, [{"id": 1}])
 
         thread = Thread(
@@ -289,7 +289,8 @@ class TestFatalValidationIntegration:
             config_version="1",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
-            target=Target(),  # no path or alias → ExecutionError
+            # Write to an unresolvable path to trigger ExecutionError
+            target=Target(path="/nonexistent_path/bad_target"),
         )
 
         collector = SpanCollector(generate_trace_id())

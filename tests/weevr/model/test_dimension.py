@@ -7,11 +7,14 @@ from weevr.model.dimension import (
     AdditionalKeyConfig,
     ChangeDetectionGroupConfig,
     DimensionConfig,
+    DimensionSurrogateKeyConfig,
     ScdColumnConfig,
     ScdDateConfig,
-    SurrogateKeyConfig,
     SystemMemberConfig,
 )
+
+# Backward-compatible alias for test readability
+SurrogateKeyConfig = DimensionSurrogateKeyConfig
 
 
 class TestSurrogateKeyConfig:

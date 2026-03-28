@@ -3,7 +3,8 @@ sources:
   events:
     type: delta
     alias: raw.events
-target: {}
+target:
+  alias: test
 load:
   mode: incremental_watermark
   watermark_column: event_ts

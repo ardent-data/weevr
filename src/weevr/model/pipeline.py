@@ -9,7 +9,7 @@ from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
 
 # All valid step type keys — used by the discriminator
-_STEP_TYPES = frozenset(
+STEP_TYPES = frozenset(
     {
         "filter",
         "derive",
@@ -38,6 +38,14 @@ _STEP_TYPES = frozenset(
 )
 
 
+_MULTI_WORD_STEP_NAMES: dict[str, str] = {
+    "CaseWhenStep": "case_when",
+    "FillNullStep": "fill_null",
+    "StringOpsStep": "string_ops",
+    "DateOpsStep": "date_ops",
+}
+
+
 def _step_discriminator(v: Any) -> str:
     """Return the step type key for discriminated union dispatch.
 
@@ -48,12 +56,14 @@ def _step_discriminator(v: Any) -> str:
     Pydantic emits a ``ValidationError`` rather than a bare ``ValueError``.
     """
     if isinstance(v, dict):
-        matched = set(v.keys()) & _STEP_TYPES
+        matched = set(v.keys()) & STEP_TYPES
         if len(matched) == 1:
             return matched.pop()
         # Return unrecognised tag — Pydantic will raise ValidationError
         return f"<invalid:{','.join(sorted(v.keys()))}>"
     cls_name = type(v).__name__
+    if cls_name in _MULTI_WORD_STEP_NAMES:
+        return _MULTI_WORD_STEP_NAMES[cls_name]
     if cls_name.endswith("Step"):
         return cls_name.removesuffix("Step").lower()
     return f"<unknown:{cls_name}>"
@@ -90,6 +100,13 @@ class DeriveParams(FrozenBase):
     """
 
     columns: dict[str, SparkExpr]
+
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: dict[str, SparkExpr]) -> dict[str, SparkExpr]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
 
 
 class JoinParams(FrozenBase):
@@ -132,11 +149,25 @@ class SelectParams(FrozenBase):
 
     columns: list[str]
 
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
 
 class DropParams(FrozenBase):
     """Parameters for the drop step."""
 
     columns: list[str]
+
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
 
 
 class RenameParams(FrozenBase):
@@ -157,6 +188,13 @@ class CastParams(FrozenBase):
 
     columns: dict[str, str]
 
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: dict[str, str]) -> dict[str, str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
 
 class DedupParams(FrozenBase):
     """Parameters for the dedup step."""
@@ -172,6 +210,13 @@ class SortParams(FrozenBase):
     columns: list[str]
     ascending: bool = True
 
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
 
 class UnionParams(FrozenBase):
     """Parameters for the union step."""
@@ -179,6 +224,13 @@ class UnionParams(FrozenBase):
     sources: list[str]
     mode: Literal["by_name", "by_position"] = "by_name"
     allow_missing: bool = False
+
+    @field_validator("sources")
+    @classmethod
+    def _sources_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("sources must not be empty")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -745,6 +797,9 @@ class ResolveParams(FrozenBase):
                 "are mutually exclusive — use batch items or "
                 "single-mode fields, not both"
             )
+
+        if self.batch is not None and len(self.batch) == 0:
+            raise ValueError("batch must contain at least one item")
 
         if self.batch is None:
             for field_name in ("name", "lookup", "match", "pk"):

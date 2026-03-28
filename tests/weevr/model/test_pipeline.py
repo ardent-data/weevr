@@ -9,6 +9,7 @@ from weevr.model.pipeline import (
     CaseWhenBranch,
     CaseWhenParams,
     CaseWhenStep,
+    CastParams,
     CastStep,
     CoalesceParams,
     CoalesceStep,
@@ -17,6 +18,7 @@ from weevr.model.pipeline import (
     DedupStep,
     DeriveParams,
     DeriveStep,
+    DropParams,
     DropStep,
     FillNullParams,
     FillNullStep,
@@ -29,11 +31,14 @@ from weevr.model.pipeline import (
     PivotStep,
     RenameParams,
     RenameStep,
+    SelectParams,
     SelectStep,
+    SortParams,
     SortStep,
     Step,
     StringOpsParams,
     StringOpsStep,
+    UnionParams,
     UnionStep,
     UnpivotParams,
     UnpivotStep,
@@ -319,6 +324,56 @@ class TestStepFreezeAndRoundTrip:
             step = _step_adapter.validate_python(data)
             dumped = step.model_dump()  # type: ignore[union-attr]
             assert isinstance(dumped, dict)
+
+
+# ---------------------------------------------------------------------------
+# Instance-based round-trip for multi-word step discriminator
+# ---------------------------------------------------------------------------
+
+
+class TestMultiWordStepInstanceRoundTrip:
+    """Verify that already-constructed multi-word step instances survive a
+    second pass through the Step TypeAdapter (instance-branch of discriminator).
+    """
+
+    def test_case_when_step_instance_round_trip(self):
+        """CaseWhenStep instance dispatches correctly via the instance branch."""
+        step = CaseWhenStep(
+            case_when=CaseWhenParams(
+                column="tier",
+                cases=[CaseWhenBranch(when=SparkExpr("amount > 100"), then=SparkExpr("'high'"))],
+                otherwise=SparkExpr("'low'"),
+            )
+        )
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, CaseWhenStep)
+        assert result.case_when.column == "tier"
+
+    def test_fill_null_step_instance_round_trip(self):
+        """FillNullStep instance dispatches correctly via the instance branch."""
+        step = FillNullStep(fill_null=FillNullParams(columns={"amount": 0}))
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, FillNullStep)
+        assert result.fill_null.columns == {"amount": 0}
+
+    def test_string_ops_step_instance_round_trip(self):
+        """StringOpsStep instance dispatches correctly via the instance branch."""
+        step = StringOpsStep(string_ops=StringOpsParams(columns=["name"], expr="trim({col})"))
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, StringOpsStep)
+        assert result.string_ops.columns == ["name"]
+
+    def test_date_ops_step_instance_round_trip(self):
+        """DateOpsStep instance dispatches correctly via the instance branch."""
+        step = DateOpsStep(
+            date_ops=DateOpsParams(
+                columns=["created_at"],
+                expr="date_format({col}, 'yyyy-MM-dd')",
+            )
+        )
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, DateOpsStep)
+        assert result.date_ops.columns == ["created_at"]
 
 
 # ---------------------------------------------------------------------------
@@ -1165,3 +1220,103 @@ class TestBatchDefaultMerging:
         )
         with pytest.raises(ValueError, match="pk"):
             p.resolve_batch_items()
+
+
+# ---------------------------------------------------------------------------
+# Empty collection validators
+# ---------------------------------------------------------------------------
+
+
+class TestSelectParamsNonEmpty:
+    """Test SelectParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """SelectParams with at least one column is accepted."""
+        p = SelectParams(columns=["id", "name"])
+        assert p.columns == ["id", "name"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns list raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            SelectParams(columns=[])
+
+
+class TestDropParamsNonEmpty:
+    """Test DropParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """DropParams with at least one column is accepted."""
+        p = DropParams(columns=["_tmp"])
+        assert p.columns == ["_tmp"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns list raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            DropParams(columns=[])
+
+
+class TestCastParamsNonEmpty:
+    """Test CastParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """CastParams with at least one mapping is accepted."""
+        p = CastParams(columns={"amount": "double"})
+        assert p.columns == {"amount": "double"}
+
+    def test_empty_columns_raises(self):
+        """Empty columns dict raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            CastParams(columns={})
+
+
+class TestDeriveParamsNonEmpty:
+    """Test DeriveParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """DeriveParams with at least one expression is accepted."""
+        p = DeriveParams(columns={"full_name": SparkExpr("first_name || ' ' || last_name")})
+        assert len(p.columns) == 1
+
+    def test_empty_columns_raises(self):
+        """Empty columns dict raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            DeriveParams(columns={})
+
+
+class TestSortParamsNonEmpty:
+    """Test SortParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """SortParams with at least one column is accepted."""
+        p = SortParams(columns=["date"])
+        assert p.columns == ["date"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns list raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            SortParams(columns=[])
+
+
+class TestUnionParamsNonEmpty:
+    """Test UnionParams.sources non-empty validation."""
+
+    def test_valid_sources(self):
+        """UnionParams with at least one source is accepted."""
+        p = UnionParams(sources=["table_a", "table_b"])
+        assert p.sources == ["table_a", "table_b"]
+
+    def test_empty_sources_raises(self):
+        """Empty sources list raises ValidationError."""
+        with pytest.raises(ValidationError, match="sources must not be empty"):
+            UnionParams(sources=[])
+
+
+class TestResolveParamsBatchNonEmpty:
+    """Test ResolveParams.batch non-empty validation."""
+
+    def test_empty_batch_raises(self):
+        """Empty batch list raises ValidationError."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="batch must contain at least one item"):
+            ResolveParams(batch=[])

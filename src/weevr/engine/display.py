@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from weevr.engine.formatting import format_duration as _format_duration
-from weevr.model.pipeline import _STEP_TYPES
+from weevr.model.pipeline import STEP_TYPES
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
@@ -860,7 +860,7 @@ def render_loom_dag_svg(
 
 def _get_step_type(step: Any) -> str:
     """Determine the step type key from a discriminated-union step model."""
-    for attr in _STEP_TYPES:
+    for attr in STEP_TYPES:
         if hasattr(step, attr) and getattr(step, attr) is not None:
             return attr
     return "unknown"

@@ -72,6 +72,11 @@ class Assertion(FrozenBase):
         if self.type != "fk_sentinel_rate":
             return self
 
+        if self.column is None and self.columns is None:
+            raise ValueError("fk_sentinel_rate requires 'column' or 'columns'")
+        if self.sentinel is None and self.sentinels is None:
+            raise ValueError("fk_sentinel_rate requires 'sentinel' or 'sentinels'")
+
         if self.column is not None and self.columns is not None:
             raise ValueError("column and columns are mutually exclusive")
         if self.sentinel is not None and self.sentinels is not None:

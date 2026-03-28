@@ -13,4 +13,5 @@ steps:
       "on":
         - left: customer_id
           right: cust_id
-target: {}
+target:
+  alias: test

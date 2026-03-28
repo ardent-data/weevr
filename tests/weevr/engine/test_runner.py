@@ -38,9 +38,7 @@ def _make_thread(
     else:
         sources["_src"] = {"type": "delta", "alias": "_src"}
 
-    target: dict[str, Any] = {}
-    if target_alias:
-        target["alias"] = target_alias
+    target: dict[str, Any] = {"alias": target_alias or f"test.{name}"}
 
     data: dict[str, Any] = {
         "name": name,
@@ -1002,7 +1000,7 @@ class TestDeferredLookupMaterialization:
                     "name": "B",
                     "config_version": "1.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             ),
         }
@@ -1079,7 +1077,7 @@ class TestDeferredLookupMaterialization:
                     "name": "A",
                     "config_version": "1.0",
                     "sources": {"lk_ext": {"lookup": "ext"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             )
         }
@@ -1120,7 +1118,7 @@ class TestDeferredLookupMaterialization:
                     "name": "B",
                     "config_version": "1.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             ),
         }
@@ -1168,7 +1166,7 @@ class TestDeferredLookupMaterialization:
                     "name": "B",
                     "config_version": "1.0",
                     "sources": {"lk_cust": {"lookup": "cust"}, "lk_ext": {"lookup": "ext_codes"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             ),
         }

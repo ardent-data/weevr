@@ -481,7 +481,7 @@ class TestWholeValueResolution:
 _MINIMAL_THREAD = {
     "config_version": "1.0",
     "sources": {"data": {"type": "delta", "alias": "raw.data"}},
-    "target": {},
+    "target": {"alias": "test"},
 }
 
 

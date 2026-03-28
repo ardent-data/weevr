@@ -339,3 +339,37 @@ class TestReservedWordPreset:
         assert ReservedWordPreset.M == "m"
         assert ReservedWordPreset.POWERBI == "powerbi"
         assert ReservedWordPreset.TSQL == "tsql"
+
+
+class TestColumnSetSourceTypeSpecificValidation:
+    """Test ColumnSetSource type-specific field requirements."""
+
+    def test_delta_without_alias_raises(self):
+        """delta type without alias raises ValidationError."""
+        with pytest.raises(ValidationError, match="alias.*required"):
+            ColumnSetSource(type="delta")
+
+    def test_delta_with_alias_valid(self):
+        """delta type with alias is accepted."""
+        src = ColumnSetSource(type="delta", alias="silver.col_map")
+        assert src.alias == "silver.col_map"
+
+    def test_yaml_without_path_raises(self):
+        """yaml type without path raises ValidationError."""
+        with pytest.raises(ValidationError, match="path.*required"):
+            ColumnSetSource(type="yaml")
+
+    def test_yaml_with_path_valid(self):
+        """yaml type with path is accepted."""
+        src = ColumnSetSource(type="yaml", path="mappings/cols.yaml")
+        assert src.path == "mappings/cols.yaml"
+
+    def test_delta_path_ignored_without_alias(self):
+        """delta type with only path (no alias) raises ValidationError."""
+        with pytest.raises(ValidationError, match="alias.*required"):
+            ColumnSetSource(type="delta", path="some/path.yaml")
+
+    def test_yaml_alias_ignored_without_path(self):
+        """yaml type with only alias (no path) raises ValidationError."""
+        with pytest.raises(ValidationError, match="path.*required"):
+            ColumnSetSource(type="yaml", alias="some.table")

@@ -44,7 +44,7 @@ def _make_thread_model(name: str) -> Thread:
             "name": name,
             "config_version": "1.0",
             "sources": {"_src": {"type": "delta", "alias": "_src"}},
-            "target": {},
+            "target": {"alias": "test"},
         }
     )
 

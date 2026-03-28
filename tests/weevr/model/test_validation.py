@@ -254,3 +254,21 @@ class TestFkSentinelRateAssertion:
         restored = Assertion.model_validate(a.model_dump())
         assert restored.type == "fk_sentinel_rate"
         assert restored.sentinel == -4
+
+    def test_fk_sentinel_rate_missing_column_raises(self):
+        """fk_sentinel_rate without column or columns raises ValidationError."""
+        with pytest.raises(ValidationError, match="requires 'column' or 'columns'"):
+            Assertion(
+                type="fk_sentinel_rate",
+                sentinel=-4,
+                max_rate=0.05,
+            )
+
+    def test_fk_sentinel_rate_missing_sentinel_raises(self):
+        """fk_sentinel_rate without sentinel or sentinels raises ValidationError."""
+        with pytest.raises(ValidationError, match="requires 'sentinel' or 'sentinels'"):
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                max_rate=0.05,
+            )

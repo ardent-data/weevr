@@ -55,6 +55,14 @@ class ColumnSetSource(FrozenBase):
     to_column: str = "target_name"
     filter: str | None = None
 
+    @model_validator(mode="after")
+    def _validate_type_specific_fields(self) -> "ColumnSetSource":
+        if self.type == "delta" and self.alias is None:
+            raise ValueError("'alias' is required when type is 'delta'")
+        if self.type == "yaml" and self.path is None:
+            raise ValueError("'path' is required when type is 'yaml'")
+        return self
+
 
 class ColumnSet(FrozenBase):
     """A named column set that defines an external column mapping.
