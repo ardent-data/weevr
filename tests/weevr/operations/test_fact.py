@@ -76,3 +76,35 @@ class TestValidateFactTarget:
         assert len(diagnostics) == 2
         assert "ERROR: FK column 'dim_date_id' not found in output DataFrame" in diagnostics
         assert "ERROR: FK column 'dim_product_id' not found in output DataFrame" in diagnostics
+
+    def test_fk_column_no_sentinel_values_warns(self, spark: SparkSession):
+        """FK column with no sentinel values produces WARN diagnostic."""
+        schema = StructType(
+            [
+                StructField("sk_customer", IntegerType(), True),
+                StructField("amount", IntegerType(), True),
+            ]
+        )
+        # All positive values — no sentinel (-1 or -4)
+        df = spark.createDataFrame([(1, 100), (2, 200)], schema)
+        fact_config = FactConfig(foreign_keys=["sk_customer"])
+        diagnostics = validate_fact_target(df, fact_config)
+        warns = [d for d in diagnostics if d.startswith("WARN:")]
+        assert len(warns) == 1
+        assert "sk_customer" in warns[0]
+        assert "sentinel" in warns[0]
+
+    def test_fk_column_with_sentinel_no_warn(self, spark: SparkSession):
+        """FK column containing sentinel values produces no WARN."""
+        schema = StructType(
+            [
+                StructField("sk_customer", IntegerType(), True),
+                StructField("amount", IntegerType(), True),
+            ]
+        )
+        # Contains -1 (missing sentinel)
+        df = spark.createDataFrame([(-1, 0), (1, 100)], schema)
+        fact_config = FactConfig(foreign_keys=["sk_customer"])
+        diagnostics = validate_fact_target(df, fact_config)
+        warns = [d for d in diagnostics if d.startswith("WARN:")]
+        assert len(warns) == 0

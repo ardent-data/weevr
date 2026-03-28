@@ -644,6 +644,32 @@ class TestComputeDimensionKeys:
         with pytest.raises(ExecutionError, match="missing_col"):
             compute_dimension_keys(df, config)
 
+    def test_audit_columns_excluded_from_auto_hash(self, spark: SparkSession) -> None:
+        """Audit columns are excluded from auto group hash when passed."""
+        df = spark.createDataFrame(
+            [{"id": 1, "name": "alice", "_loaded_at": "2026-01-01", "_run_id": "abc"}]
+        )
+        config = self._minimal_config()
+        # With audit columns: auto should resolve to 'name' only
+        result_with = compute_dimension_keys(df, config, audit_columns={"_loaded_at", "_run_id"})
+        # Without audit columns: auto resolves to 'name', '_loaded_at', '_run_id'
+        result_without = compute_dimension_keys(df, config, audit_columns=None)
+        # The hash values should differ because different columns are hashed
+        hash_with = result_with.select("_row_hash").collect()[0][0]
+        hash_without = result_without.select("_row_hash").collect()[0][0]
+        assert hash_with != hash_without
+
+    def test_empty_auto_raises_execution_error(self, spark: SparkSession) -> None:
+        """auto resolves to empty set when all columns are engine-managed."""
+        # DataFrame with only BK + SK source columns — nothing left for auto
+        df = spark.createDataFrame([{"id": 1}])
+        config = DimensionConfig(
+            business_key=["id"],
+            surrogate_key=DimensionSurrogateKeyConfig(name="sk", columns=["id"]),
+        )
+        with pytest.raises(ExecutionError, match="no data columns remain"):
+            compute_dimension_keys(df, config)
+
     def test_existing_compute_keys_still_works(self, spark: SparkSession) -> None:
         df = spark.createDataFrame([{"first": "alice", "last": "smith", "dept": "eng"}])
         keys = KeyConfig(
