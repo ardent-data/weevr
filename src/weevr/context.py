@@ -436,9 +436,9 @@ class Context:
             requested = set(thread_names)
             filtered = {n: t for n, t in all_threads.items() if n in requested}
         else:
-            if tags is None:
-                raise ValueError("Either 'tags' or 'thread_names' must be provided")
-            requested_tags = set(tags)
+            # tags is guaranteed non-None here — the (None, None) case
+            # returns early at line 432-433.
+            requested_tags = set(tags)  # type: ignore[arg-type]
             filtered = {
                 n: t
                 for n, t in all_threads.items()

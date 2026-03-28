@@ -358,17 +358,6 @@ class TestApplyResolveEffective:
         fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
         dim = spark.createDataFrame(
             [(1, "A", True), (2, "A", False)],
-            StructType(
-                [
-                    StructField("id", IntegerType(), False),
-                    StructField("natural_id", StringType(), False),
-                    StructField("is_current", StringType(), True),
-                ]
-            ),
-        )
-        # Spark reads boolean YAML as string, so use "true"/"false"
-        dim = spark.createDataFrame(
-            [(1, "A", True), (2, "A", False)],
             ["id", "natural_id", "is_current"],
         )
         params = ResolveParams(
