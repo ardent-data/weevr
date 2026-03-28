@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.10.0](https://github.com/ardent-data/weevr/compare/weevr-v1.9.0...weevr-v1.10.0) (2026-03-28)
+
+
+### Features
+
+* add concat, map, format steps and type-aware fill_null ([#108](https://github.com/ardent-data/weevr/issues/108)) ([fae398c](https://github.com/ardent-data/weevr/commit/fae398c5d645a32e7bb5469b16bbd1b471c63090))
+* **engine:** add analytical target modes with dimension and fact blocks ([#109](https://github.com/ardent-data/weevr/issues/109)) ([0046cc2](https://github.com/ardent-data/weevr/commit/0046cc2a972516456982561285aa91b26d27602e))
+* **engine:** add audit column templates with built-in presets ([#107](https://github.com/ardent-data/weevr/issues/107)) ([ae729fe](https://github.com/ardent-data/weevr/commit/ae729fe8922cb6bede35f48a2abaf555481b4e18))
+* **engine:** add resolve step for FK resolution with batch mode and fk_sentinel_rate assertion ([#110](https://github.com/ardent-data/weevr/issues/110)) ([860ca34](https://github.com/ardent-data/weevr/commit/860ca342a3992f8edb4a130b8962ea21b3bde5d7))
+* **engine:** add shared resource universality across loom, weave, and thread levels ([#105](https://github.com/ardent-data/weevr/issues/105)) ([1715b71](https://github.com/ardent-data/weevr/commit/1715b7198581d1aed31958b583baa6ba0af01a30))
+
 ## [1.9.0](https://github.com/ardent-data/weevr/compare/weevr-v1.8.0...weevr-v1.9.0) (2026-03-26)
 
 
