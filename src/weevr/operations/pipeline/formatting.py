@@ -17,6 +17,7 @@ from pyspark.sql.types import (
     TimestampType,
 )
 
+from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import FormatParams
 from weevr.operations.pipeline._result import StepResult
 
@@ -69,7 +70,7 @@ def _build_date_expr(col: Column, pattern: str, source_type: Any, strict_types: 
     """
     if not isinstance(source_type, (DateType, TimestampType)):
         if strict_types:
-            raise ValueError(
+            raise ExecutionError(
                 f"strict_types=True but source column is {source_type}, expected date/timestamp"
             )
         col = col.cast("timestamp")
@@ -111,7 +112,7 @@ def apply_format(df: DataFrame, params: FormatParams) -> StepResult:
             numeric_types = (IntegerType, LongType, FloatType, DoubleType)
             if not isinstance(source_type, numeric_types):
                 if spec.strict_types:
-                    raise ValueError(
+                    raise ExecutionError(
                         f"strict_types=True but source column '{source_name}' is "
                         f"{source_type}, expected numeric"
                     )

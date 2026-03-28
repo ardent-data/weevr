@@ -12,7 +12,7 @@ _ALGORITHM_LITERAL = Literal[
 ]
 
 
-class SurrogateKeyConfig(FrozenBase):
+class DimensionSurrogateKeyConfig(FrozenBase):
     """Surrogate key generation configuration for a dimension target.
 
     Unlike the keys.py SurrogateKeyConfig, this variant includes a ``columns``
@@ -170,7 +170,7 @@ class DimensionConfig(FrozenBase):
     """
 
     business_key: list[str]
-    surrogate_key: SurrogateKeyConfig
+    surrogate_key: DimensionSurrogateKeyConfig
     track_history: bool = False
     previous_columns: dict[str, str] | None = None
     change_detection: dict[str, ChangeDetectionGroupConfig] | None = None

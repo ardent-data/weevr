@@ -71,7 +71,7 @@ class Weave(FrozenBase):
         """Normalize thread list to ThreadEntry objects.
 
         Accepts both plain string entries and dict entries, ensuring backward
-        compatibility with existing ``list[str]`` configs (DEC-006).
+        compatibility with existing ``list[str]`` configs.
         """
         if not isinstance(data, dict):
             return data

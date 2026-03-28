@@ -34,9 +34,7 @@ def _make_thread(
         # Every thread needs at least one source
         sources["_default"] = {"type": "delta", "alias": "_default_src"}
 
-    target: dict = {}
-    if target_alias:
-        target["alias"] = target_alias
+    target: dict = {"alias": target_alias or f"test.{name}"}
     if target_path:
         target["path"] = target_path
 
@@ -414,9 +412,7 @@ def _make_thread_with_lookup(
             sources[alias] = {"type": "delta", "alias": alias}
     sources[f"lk_{lookup_name}"] = {"lookup": lookup_name}
 
-    target: dict = {}
-    if target_alias:
-        target["alias"] = target_alias
+    target: dict = {"alias": target_alias or f"test.{name}"}
 
     return Thread.model_validate(
         {

@@ -257,7 +257,7 @@ def compute_named_group_hashes(
     - The hash algorithm defaults to ``sha256`` when ``group.algorithm`` is
       ``None``.
     - A static group (``on_change: "static"``) with neither a name nor an
-      algorithm is skipped — no hash column is produced (DEC-012).
+      algorithm is skipped — no hash column is produced.
 
     Args:
         df: Input DataFrame.
@@ -270,7 +270,7 @@ def compute_named_group_hashes(
     result = df
 
     for group_key, group in groups.items():
-        # DEC-012: skip static groups that carry no name and no algorithm.
+        # Skip static groups that carry no name and no algorithm.
         if group.on_change == "static" and group.name is None and group.algorithm is None:
             continue
 
@@ -334,7 +334,7 @@ def _build_auto_exclusion_set(
     - SCD tracking column names (valid_from, valid_to, is_current).
     - Columns explicitly listed in non-auto change detection groups.
     - Output column names of change detection groups (group.name or dict key).
-    - previous_columns source column names (the dict values, per DEC-014).
+    - previous_columns source column names (the dict values).
     - previous_columns output column names (the dict keys).
     - Audit columns from the resolved audit config.
 

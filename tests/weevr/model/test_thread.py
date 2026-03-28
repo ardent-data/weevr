@@ -16,7 +16,7 @@ from weevr.model.write import WriteConfig
 _MINIMAL = {
     "config_version": "1.0",
     "sources": {"customers": {"type": "delta", "alias": "raw.customers"}},
-    "target": {},
+    "target": {"alias": "test"},
 }
 
 
@@ -33,7 +33,7 @@ class TestThreadConstruction:
     def test_missing_sources_raises(self):
         """Thread without sources raises ValidationError."""
         with pytest.raises(ValidationError):
-            Thread.model_validate({"config_version": "1.0", "target": {}})
+            Thread.model_validate({"config_version": "1.0", "target": {"alias": "test"}})
 
     def test_missing_target_raises(self):
         """Thread without target raises ValidationError."""
@@ -127,7 +127,11 @@ class TestThreadConstruction:
                 {"filter": {"expr": "active = true"}},
                 {"select": {"columns": ["id", "name", "amount"]}},
             ],
-            "target": {"mapping_mode": "explicit", "partition_by": ["year"]},
+            "target": {
+                "alias": "curated.customers",
+                "mapping_mode": "explicit",
+                "partition_by": ["year"],
+            },
             "write": {"mode": "merge", "match_keys": ["id"]},
             "keys": {"business_key": ["id"]},
             "load": {"mode": "incremental_watermark", "watermark_column": "ts"},
@@ -367,3 +371,14 @@ class TestThreadSharedResourceFields:
         """Thread rejects post_steps that are not a list."""
         with pytest.raises(ValidationError):
             Thread.model_validate({**_MINIMAL, "post_steps": {"type": "quality_gate"}})
+
+    def test_empty_sources_raises(self):
+        """Thread with empty sources dict raises ValidationError."""
+        with pytest.raises(ValidationError, match="at least one entry"):
+            Thread.model_validate(
+                {
+                    "config_version": "1.0",
+                    "sources": {},
+                    "target": {"alias": "test"},
+                }
+            )

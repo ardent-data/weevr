@@ -60,12 +60,12 @@ class TestTarget:
 
     def test_default_mapping_mode(self):
         """Default mapping mode is 'auto'."""
-        t = Target()
+        t = Target(alias="test")
         assert t.mapping_mode == "auto"
 
     def test_explicit_mapping_mode(self):
         """explicit mapping mode is valid."""
-        t = Target(mapping_mode="explicit")
+        t = Target(alias="test", mapping_mode="explicit")
         assert t.mapping_mode == "explicit"
 
     def test_invalid_mapping_mode_raises(self):
@@ -76,10 +76,11 @@ class TestTarget:
     def test_with_columns(self):
         """Target accepts columns dict with ColumnMapping values."""
         t = Target(
+            alias="test",
             columns={  # type: ignore[arg-type]
                 "amount_usd": {"expr": "amount * rate", "type": "double"},
                 "is_active": {"default": True},
-            }
+            },
         )
         assert t.columns is not None
         assert isinstance(t.columns["amount_usd"], ColumnMapping)
@@ -87,23 +88,30 @@ class TestTarget:
 
     def test_with_partition_by(self):
         """Target accepts partition_by list."""
-        t = Target(partition_by=["year", "month"])
+        t = Target(alias="test", partition_by=["year", "month"])
         assert t.partition_by == ["year", "month"]
 
     def test_with_audit_columns(self):
         """Target accepts audit_columns dict."""
-        t = Target(audit_columns={"_loaded_at": "current_timestamp()", "_run_id": "'abc'"})
+        t = Target(
+            alias="test",
+            audit_columns={"_loaded_at": "current_timestamp()", "_run_id": "'abc'"},
+        )
         assert t.audit_columns is not None
         assert t.audit_columns["_loaded_at"] == "current_timestamp()"
         assert t.audit_columns["_run_id"] == "'abc'"
 
-    def test_all_none_defaults(self):
-        """Target with no fields has all-None optional fields."""
-        t = Target()
+    def test_neither_alias_nor_path_raises(self):
+        """Target with neither alias nor path raises ValidationError."""
+        with pytest.raises(ValidationError, match="alias.*path"):
+            Target()
+
+    def test_all_none_optional_defaults(self):
+        """Target with only alias has all-None optional fields."""
+        t = Target(alias="test")
         assert t.columns is None
         assert t.partition_by is None
         assert t.audit_columns is None
-        assert t.alias is None
         assert t.path is None
 
     def test_with_alias(self):
@@ -118,13 +126,14 @@ class TestTarget:
 
     def test_frozen(self):
         """Target is immutable."""
-        t = Target(mapping_mode="auto")
+        t = Target(alias="test", mapping_mode="auto")
         with pytest.raises(ValidationError):
             t.mapping_mode = "explicit"  # type: ignore[misc]
 
     def test_round_trip(self):
         """Target round-trips."""
         t = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={"col_a": {"type": "string"}},  # type: ignore[arg-type]
             partition_by=["date"],
@@ -134,42 +143,43 @@ class TestTarget:
 
     def test_audit_template_string_sugar(self):
         """audit_template accepts a string and normalizes it to a list."""
-        t = Target(audit_template="fabric")  # type: ignore[arg-type]
+        t = Target(alias="test", audit_template="fabric")  # type: ignore[arg-type]
         assert t.audit_template == ["fabric"]
 
     def test_audit_template_list(self):
         """audit_template accepts a list of strings."""
-        t = Target(audit_template=["fabric", "custom"])
+        t = Target(alias="test", audit_template=["fabric", "custom"])
         assert t.audit_template == ["fabric", "custom"]
 
     def test_audit_template_default_none(self):
         """audit_template defaults to None."""
-        t = Target()
+        t = Target(alias="test")
         assert t.audit_template is None
 
     def test_audit_template_inherit_default_true(self):
         """audit_template_inherit defaults to True."""
-        t = Target()
+        t = Target(alias="test")
         assert t.audit_template_inherit is True
 
     def test_audit_template_inherit_false(self):
         """audit_template_inherit accepts False."""
-        t = Target(audit_template_inherit=False)
+        t = Target(alias="test", audit_template_inherit=False)
         assert t.audit_template_inherit is False
 
     def test_audit_columns_exclude_list(self):
         """audit_columns_exclude accepts a list of strings."""
-        t = Target(audit_columns_exclude=["_loaded_at", "_run_*"])
+        t = Target(alias="test", audit_columns_exclude=["_loaded_at", "_run_*"])
         assert t.audit_columns_exclude == ["_loaded_at", "_run_*"]
 
     def test_audit_columns_exclude_default_none(self):
         """audit_columns_exclude defaults to None."""
-        t = Target()
+        t = Target(alias="test")
         assert t.audit_columns_exclude is None
 
     def test_round_trip_with_new_fields(self):
         """Target round-trips with all new audit template fields."""
         t = Target(
+            alias="test",
             audit_template=["fabric", "custom"],
             audit_template_inherit=False,
             audit_columns_exclude=["_loaded_at"],
@@ -178,13 +188,13 @@ class TestTarget:
 
     def test_exclude_valid_patterns(self):
         """audit_columns_exclude accepts valid non-empty glob patterns."""
-        t = Target(audit_columns_exclude=["_batch_*", "_custom"])
+        t = Target(alias="test", audit_columns_exclude=["_batch_*", "_custom"])
         assert t.audit_columns_exclude == ["_batch_*", "_custom"]
 
     def test_exclude_empty_string_rejected(self):
         """audit_columns_exclude rejects empty string entries."""
         with pytest.raises(ValidationError, match="non-empty"):
-            Target(audit_columns_exclude=[""])
+            Target(alias="test", audit_columns_exclude=[""])
 
 
 class TestTargetAnalyticalModes:
@@ -199,26 +209,27 @@ class TestTargetAnalyticalModes:
 
     def test_with_dimension(self):
         """Target accepts a dimension config."""
-        t = Target(dimension=self._dimension_data)  # type: ignore[arg-type]
+        t = Target(alias="test", dimension=self._dimension_data)  # type: ignore[arg-type]
         assert t.dimension is not None
         assert t.dimension.business_key == ["customer_id"]
 
     def test_with_fact(self):
         """Target accepts a fact config."""
-        t = Target(fact=self._fact_data)  # type: ignore[arg-type]
+        t = Target(alias="test", fact=self._fact_data)  # type: ignore[arg-type]
         assert t.fact is not None
         assert t.fact.foreign_keys == ["customer_sk"]
 
     def test_with_seed(self):
         """Target accepts a seed config."""
-        t = Target(seed=self._seed_data)  # type: ignore[arg-type]
+        t = Target(alias="test", seed=self._seed_data)  # type: ignore[arg-type]
         assert t.seed is not None
         assert t.seed.rows == [{"id": 1, "name": "test"}]
 
     def test_dimension_and_fact_mutually_exclusive(self):
-        """dimension and fact together raise ValidationError (DEC-016)."""
+        """dimension and fact together raise ValidationError."""
         with pytest.raises(ValidationError, match="mutually exclusive"):
             Target(
+                alias="test",
                 dimension=self._dimension_data,  # type: ignore[arg-type]
                 fact=self._fact_data,  # type: ignore[arg-type]
             )
@@ -226,6 +237,7 @@ class TestTargetAnalyticalModes:
     def test_dimension_and_seed_compatible(self):
         """dimension and seed together are valid."""
         t = Target(
+            alias="test",
             dimension=self._dimension_data,  # type: ignore[arg-type]
             seed=self._seed_data,  # type: ignore[arg-type]
         )
@@ -235,6 +247,7 @@ class TestTargetAnalyticalModes:
     def test_fact_and_seed_compatible(self):
         """fact and seed together are valid."""
         t = Target(
+            alias="test",
             fact=self._fact_data,  # type: ignore[arg-type]
             seed=self._seed_data,  # type: ignore[arg-type]
         )
@@ -243,15 +256,15 @@ class TestTargetAnalyticalModes:
 
     def test_round_trip_with_dimension(self):
         """Target with dimension round-trips."""
-        t = Target(dimension=self._dimension_data)  # type: ignore[arg-type]
+        t = Target(alias="test", dimension=self._dimension_data)  # type: ignore[arg-type]
         assert Target.model_validate(t.model_dump()) == t
 
     def test_round_trip_with_fact(self):
         """Target with fact round-trips."""
-        t = Target(fact=self._fact_data)  # type: ignore[arg-type]
+        t = Target(alias="test", fact=self._fact_data)  # type: ignore[arg-type]
         assert Target.model_validate(t.model_dump()) == t
 
     def test_round_trip_with_seed(self):
         """Target with seed round-trips."""
-        t = Target(seed=self._seed_data)  # type: ignore[arg-type]
+        t = Target(alias="test", seed=self._seed_data)  # type: ignore[arg-type]
         assert Target.model_validate(t.model_dump()) == t

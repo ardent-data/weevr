@@ -5,8 +5,12 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import IntegerType, LongType, StringType, StructField, StructType
 
 from weevr.errors.exceptions import ExecutionError
-from weevr.model.dimension import AdditionalKeyConfig, ChangeDetectionGroupConfig, DimensionConfig
-from weevr.model.dimension import SurrogateKeyConfig as DimensionSurrogateKeyConfig
+from weevr.model.dimension import (
+    AdditionalKeyConfig,
+    ChangeDetectionGroupConfig,
+    DimensionConfig,
+    DimensionSurrogateKeyConfig,
+)
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
 from weevr.operations.hashing import (
     compute_additional_keys,
@@ -466,7 +470,7 @@ class TestComputeNamedGroupHashes:
             "_static": ChangeDetectionGroupConfig(
                 columns=["b"],
                 on_change="static",
-                # name=None, algorithm=None — DEC-012: skip hash computation
+                # name=None, algorithm=None — skip hash computation
             )
         }
         result = compute_named_group_hashes(df, groups, exclude_columns=set())

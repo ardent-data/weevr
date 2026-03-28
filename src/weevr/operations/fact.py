@@ -53,7 +53,6 @@ def validate_fact_target(df: DataFrame, fact_config: FactConfig) -> list[str]:
                     diagnostics.append(msg)
                     logger.warning(msg)
             except Exception:
-                # Sentinel check is advisory — don't fail on errors
-                pass
+                logger.debug("FK sentinel advisory check failed", exc_info=True)
 
     return diagnostics

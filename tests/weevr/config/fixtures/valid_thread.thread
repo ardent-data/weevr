@@ -3,4 +3,5 @@ sources:
   customers:
     type: delta
     alias: lakehouse.dim_customer
-target: {}
+target:
+  alias: test

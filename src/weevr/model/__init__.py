@@ -7,6 +7,7 @@ from weevr.model.column_set import (
     ReservedWordConfig,
     ReservedWordPreset,
 )
+from weevr.model.dimension import DimensionSurrogateKeyConfig
 from weevr.model.execution import ExecutionConfig, LogLevel
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
@@ -27,15 +28,27 @@ from weevr.model.pipeline import (
     CaseWhenStep,
     CastStep,
     CoalesceStep,
+    ConcatParams,
+    ConcatStep,
+    CurrentConfig,
     DateOpsStep,
     DedupStep,
     DeriveStep,
     DropStep,
+    EffectiveConfig,
     FillNullStep,
     FilterStep,
+    FormatParams,
+    FormatSpec,
+    FormatStep,
     JoinStep,
+    MapParams,
+    MapStep,
     PivotStep,
     RenameStep,
+    ResolveBatchItem,
+    ResolveParams,
+    ResolveStep,
     SelectStep,
     SortStep,
     Step,
@@ -94,6 +107,18 @@ __all__ = [
     "CoalesceStep",
     "StringOpsStep",
     "DateOpsStep",
+    "ConcatStep",
+    "ConcatParams",
+    "MapStep",
+    "MapParams",
+    "FormatStep",
+    "FormatSpec",
+    "FormatParams",
+    "ResolveStep",
+    "ResolveParams",
+    "ResolveBatchItem",
+    "EffectiveConfig",
+    "CurrentConfig",
     # Keys
     "KeyConfig",
     "SurrogateKeyConfig",
@@ -132,4 +157,6 @@ __all__ = [
     "NamingPattern",
     # Variable
     "VariableSpec",
+    # Dimension
+    "DimensionSurrogateKeyConfig",
 ]

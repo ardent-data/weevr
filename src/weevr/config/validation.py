@@ -240,3 +240,63 @@ def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
             )
 
     return diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Post-resolution cross-cutting validators for resolve step lookups
+# ---------------------------------------------------------------------------
+
+
+def validate_resolve_lookups(
+    thread_config: dict[str, Any],
+    *,
+    available_lookups: set[str],
+) -> list[str]:
+    """Validate that resolve steps reference defined lookup names.
+
+    Called after variable resolution on the full thread config dict.
+
+    Args:
+        thread_config: Resolved thread configuration dictionary.
+        available_lookups: Set of lookup names available from
+            weave, loom, and thread levels.
+
+    Returns:
+        List of diagnostic messages. ``"ERROR:"`` prefixed entries
+        are fatal.
+    """
+    diagnostics: list[str] = []
+    steps = thread_config.get("steps") or []
+
+    for step in steps:
+        if not isinstance(step, dict) or "resolve" not in step:
+            continue
+
+        resolve = step["resolve"]
+        if not isinstance(resolve, dict):
+            continue
+
+        # Collect all lookup names referenced by this resolve step
+        lookup_names: list[str] = []
+
+        # Single-mode lookup
+        if "lookup" in resolve and isinstance(resolve["lookup"], str):
+            lookup_names.append(resolve["lookup"])
+
+        # Batch-mode lookups
+        batch = resolve.get("batch")
+        if isinstance(batch, list):
+            for item in batch:
+                if isinstance(item, dict) and "lookup" in item:
+                    lookup_names.append(item["lookup"])
+
+        # Validate each referenced lookup
+        for name in lookup_names:
+            if name not in available_lookups:
+                diagnostics.append(
+                    f"ERROR: resolve step references undefined lookup "
+                    f"'{name}'; available lookups: "
+                    f"{sorted(available_lookups) or '(none)'}"
+                )
+
+    return diagnostics

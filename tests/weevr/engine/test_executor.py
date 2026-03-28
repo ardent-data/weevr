@@ -196,24 +196,14 @@ class TestExecuteThreadErrors:
 
         assert exc_info.value.thread_name == "err_thread"
 
-    def test_missing_target_path_raises_execution_error(
+    def test_missing_target_path_raises_validation_error(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        src = tmp_delta_path("no_tgt_src")
-        create_delta_table(spark, src, [{"id": 1}])
+        from pydantic import ValidationError
 
-        # Thread with target that has neither alias nor path
-        thread = Thread(
-            name="no_path_thread",
-            config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
-            steps=[],
-            target=Target(),  # no alias, no path
-        )
-        with pytest.raises(ExecutionError) as exc_info:
-            execute_thread(spark, thread)
-
-        assert "no_path_thread" in str(exc_info.value)
+        # Target with neither alias nor path is rejected at model construction
+        with pytest.raises(ValidationError, match="alias.*path"):
+            Target()  # no alias, no path
 
     def test_execution_error_carries_thread_name(self, spark: SparkSession, tmp_delta_path) -> None:
         tgt = tmp_delta_path("carry_tgt")

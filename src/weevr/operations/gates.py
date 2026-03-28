@@ -12,6 +12,11 @@ if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
 
+def _quote_table_ref(alias: str) -> str:
+    """Backtick-escape a table reference for SQL injection safety."""
+    return f"`{alias.replace('`', '``')}`"
+
+
 class GateResult(FrozenBase):
     """Result of a quality gate check.
 
@@ -45,7 +50,7 @@ def check_source_freshness(spark: SparkSession, source_alias: str, max_age_str: 
         GateResult with pass/fail and measured age.
     """
     max_age = parse_duration(max_age_str)
-    history = spark.sql(f"DESCRIBE HISTORY {source_alias} LIMIT 1")  # noqa: S608
+    history = spark.sql(f"DESCRIBE HISTORY {_quote_table_ref(source_alias)} LIMIT 1")  # noqa: S608
     rows = history.collect()
     if not rows:
         return GateResult(
@@ -96,7 +101,7 @@ def check_row_count_delta(
     Returns:
         GateResult with pass/fail and delta details.
     """
-    after_row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {target_alias}").collect()  # noqa: S608
+    after_row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
     after_count = after_row[0]["cnt"] if after_row else 0
     delta = after_count - before_count
     if before_count != 0:
@@ -150,7 +155,7 @@ def check_row_count(
     Returns:
         GateResult with pass/fail and count.
     """
-    row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {target_alias}").collect()  # noqa: S608
+    row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
     count = row[0]["cnt"] if row else 0
     failures: list[str] = []
 

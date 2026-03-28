@@ -59,10 +59,10 @@ def _thread(
 
 
 class TestYamlLoadToExecute:
-    """EC-001, EC-004, EC-010, EC-013, EC-014 — YAML config loaded via load_config()."""
+    """YAML config loaded via load_config() — overwrite, transforms, name, result fields, merge."""
 
     def test_simple_thread_content_correct(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-001: Delta source → overwrite → verify target content."""
+        """Delta source — overwrite — verify target content."""
         src = tmp_delta_path("ec001_src")
         tgt = tmp_delta_path("ec001_tgt")
         create_delta_table(spark, src, [{"id": 1, "val": "a"}, {"id": 2, "val": "b"}])
@@ -79,7 +79,7 @@ class TestYamlLoadToExecute:
         assert written.count() == 2
 
     def test_transforms_thread_applies_all_steps(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-004: All declared transform steps execute in sequence (filter, derive,
+        """All declared transform steps execute in sequence (filter, derive,
         select, drop, rename, cast)."""
         src = tmp_delta_path("ec004_src")
         tgt = tmp_delta_path("ec004_tgt")
@@ -107,7 +107,7 @@ class TestYamlLoadToExecute:
         assert "doubled" not in written.columns
 
     def test_name_derived_from_file_path(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-014: Thread.name is derived from the YAML file path."""
+        """Thread.name is derived from the YAML file path."""
         src = tmp_delta_path("ec014_src")
         tgt = tmp_delta_path("ec014_tgt")
         create_delta_table(spark, src, [{"id": 1}])
@@ -123,7 +123,7 @@ class TestYamlLoadToExecute:
     def test_result_fields_populated_from_yaml_execution(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-013: ThreadResult carries correct status, name, rows, mode, and path."""
+        """ThreadResult carries correct status, name, rows, mode, and path."""
         src = tmp_delta_path("ec013_src")
         tgt = tmp_delta_path("ec013_tgt")
         create_delta_table(spark, src, [{"id": i} for i in range(3)])
@@ -143,7 +143,7 @@ class TestYamlLoadToExecute:
         assert result.target_path == tgt
 
     def test_merge_thread_via_yaml(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-010: Merge write mode — update matched, insert new, ignore unmatched source."""
+        """Merge write mode — update matched, insert new, ignore unmatched source."""
         src = tmp_delta_path("ec010_src")
         tgt = tmp_delta_path("ec010_tgt")
         # Pre-populate target
@@ -167,7 +167,7 @@ class TestYamlLoadToExecute:
 
 
 class TestFileSourceReaders:
-    """EC-002: File-format sources (CSV, JSON, Parquet) are read correctly."""
+    """File-format sources (CSV, JSON, Parquet) are read correctly."""
 
     def test_csv_source_read(self, spark: SparkSession, tmp_path) -> None:
         csv_path = str(tmp_path / "data.csv")
@@ -228,7 +228,7 @@ class TestFileSourceReaders:
 
 
 class TestSourceDedup:
-    """EC-003: Source-level deduplication removes duplicates before pipeline steps."""
+    """Source-level deduplication removes duplicates before pipeline steps."""
 
     def test_source_dedup_removes_duplicates(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("ec003_src")
@@ -273,7 +273,7 @@ class TestSourceDedup:
 
 
 class TestPipelineStepTypes:
-    """EC-004 (remainder): dedup, sort, join, union pipeline steps via execute_thread."""
+    """Dedup, sort, join, union pipeline steps via execute_thread."""
 
     def test_pipeline_dedup_step(self, spark: SparkSession, tmp_delta_path) -> None:
         src = tmp_delta_path("dedup_src")
@@ -328,7 +328,7 @@ class TestPipelineStepTypes:
 
 
 class TestJoins:
-    """EC-005: Join steps with null-safe and standard join modes.
+    """Join steps with null-safe and standard join modes.
 
     Uses semi joins so that only left-side columns appear in the result,
     avoiding the duplicate-column issue that arises from inner joins when
@@ -441,10 +441,10 @@ class TestJoins:
 
 
 class TestKeyGeneration:
-    """EC-006, EC-007: Surrogate key and change detection hash via YAML config."""
+    """Surrogate key and change detection hash via YAML config."""
 
     def test_surrogate_key_generated_via_yaml(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-006: Surrogate key column present with null-safe business key hashing."""
+        """Surrogate key column present with null-safe business key hashing."""
         src = tmp_delta_path("ec006_src")
         tgt = tmp_delta_path("ec006_tgt")
         create_delta_table(spark, src, [{"id": 1, "name": "alice"}, {"id": 2, "name": None}])
@@ -464,7 +464,7 @@ class TestKeyGeneration:
     def test_change_detection_hash_generated_via_yaml(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-007: Change detection hash column is present and differs when data differs."""
+        """Change detection hash column is present and differs when data differs."""
         src = tmp_delta_path("ec007_src")
         tgt = tmp_delta_path("ec007_tgt")
         create_delta_table(spark, src, [{"id": 1, "name": "alice"}, {"id": 2, "name": "bob"}])
@@ -484,12 +484,12 @@ class TestKeyGeneration:
 
 
 class TestTargetMapping:
-    """EC-008, EC-009: Auto and explicit target mapping modes."""
+    """Auto and explicit target mapping modes."""
 
     def test_auto_mapping_new_target_passes_all_columns(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-008a: Auto mapping with no existing target — all columns pass through."""
+        """Auto mapping with no existing target — all columns pass through."""
         src = tmp_delta_path("auto_new_src")
         tgt = tmp_delta_path("auto_new_tgt")
         create_delta_table(spark, src, [{"id": 1, "extra": "keep"}])
@@ -504,7 +504,7 @@ class TestTargetMapping:
     def test_auto_mapping_existing_target_narrows_columns(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-008b: Auto mapping with existing target — selects only matching columns."""
+        """Auto mapping with existing target — selects only matching columns."""
         src = tmp_delta_path("auto_exist_src")
         tgt = tmp_delta_path("auto_exist_tgt")
         # Existing target only has 'id'
@@ -522,7 +522,7 @@ class TestTargetMapping:
     def test_explicit_mapping_keeps_only_declared_columns(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """EC-009: Explicit mapping — only declared columns written."""
+        """Explicit mapping — only declared columns written."""
         src = tmp_delta_path("explicit_src")
         tgt = tmp_delta_path("explicit_tgt")
         create_delta_table(spark, src, [{"id": 1, "keep": "yes", "discard": "no"}])
@@ -546,10 +546,10 @@ class TestTargetMapping:
 
 
 class TestWriteModes:
-    """EC-010, EC-011: Write mode integration (merge covered in YAML tests, append here)."""
+    """Write mode integration (merge covered in YAML tests, append here)."""
 
     def test_append_accumulates_rows(self, spark: SparkSession, tmp_delta_path) -> None:
-        """EC-011: Append mode adds rows to existing table."""
+        """Append mode adds rows to existing table."""
         src = tmp_delta_path("append_src")
         tgt = tmp_delta_path("append_tgt")
         create_delta_table(spark, tgt, [{"id": 0}])
@@ -577,7 +577,7 @@ class TestWriteModes:
 
 
 class TestErrorWrapping:
-    """EC-012: Errors are wrapped as ExecutionError with thread context."""
+    """Errors are wrapped as ExecutionError with thread context."""
 
     def test_invalid_filter_expression_raises_execution_error(
         self, spark: SparkSession, tmp_delta_path

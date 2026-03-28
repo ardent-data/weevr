@@ -3,6 +3,7 @@ sources:
   data:
     type: delta
     alias: raw.data
-target: {}
+target:
+  alias: test
 write:
   mode: merge

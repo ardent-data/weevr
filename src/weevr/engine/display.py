@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from weevr.engine.formatting import format_duration as _format_duration
-from weevr.model.pipeline import _STEP_TYPES
+from weevr.model.pipeline import STEP_TYPES
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
@@ -860,7 +860,7 @@ def render_loom_dag_svg(
 
 def _get_step_type(step: Any) -> str:
     """Determine the step type key from a discriminated-union step model."""
-    for attr in _STEP_TYPES:
+    for attr in STEP_TYPES:
         if hasattr(step, attr) and getattr(step, attr) is not None:
             return attr
     return "unknown"
@@ -2685,7 +2685,7 @@ def _render_execute_thread_detail(
             if start and end:
                 dur_text = _format_duration(int((end - start).total_seconds() * 1000))
 
-    # Auto-expand failed threads (DEC-001)
+    # Auto-expand failed threads
     open_attr = " open" if tr_status == "failure" else ""
     parts = [f'<details style="{_S_DETAILS}"{open_attr}>']
     summary_detail = f"{rows:,} rows"
@@ -2698,7 +2698,7 @@ def _render_execute_thread_detail(
     )
     parts.append(f'<div style="{_S_DETAIL_BODY}">')
 
-    # Error banner for failed threads (DEC-014)
+    # Error banner for failed threads
     error = getattr(tr, "error", None)
     if error:
         parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(str(error))}</div>')
@@ -2886,7 +2886,7 @@ def _render_execute_html(result: Any) -> str:
 
     # Per-thread detail sections (collapsible)
     if config_type == "loom" and detail:
-        # Two-level collapse for loom: weave → thread (DEC-010)
+        # Two-level collapse for loom: weave → thread
         weave_results = getattr(detail, "weave_results", []) or []
         loom_telem = telemetry
         weave_telem_map = getattr(loom_telem, "weave_telemetry", {}) or {}
@@ -2982,7 +2982,7 @@ def _render_validate_html(result: Any) -> str:
         for err in validation_errors:
             parts.append(f'<div style="{_S_ERROR_BOX}">{html.escape(err)}</div>')
 
-    # Per-thread validation rules and assertions from config (DEC-012)
+    # Per-thread validation rules and assertions from config
     for tname, thread_model in resolved.items():
         tname_esc = html.escape(tname)
         validations = getattr(thread_model, "validations", None) or []
@@ -3156,11 +3156,11 @@ def _render_preview_html(result: Any) -> str:
         if telemetry:
             parts.append(_render_variables_table(getattr(telemetry, "variables", None)))
 
-        # Output schema (from preview metadata per AMD-001)
+        # Output schema (from preview metadata)
         output_schema = meta.get("output_schema")
         parts.append(_render_schema_table(output_schema))
 
-        # Data sample (from preview metadata per AMD-001, DEC-017: no annotation)
+        # Data sample (from preview metadata, no annotation)
         samples = meta.get("samples")
         parts.append(_render_sample_table(samples, "output", "Data Sample"))
 

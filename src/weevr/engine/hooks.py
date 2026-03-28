@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from weevr.engine.variables import VariableContext
-from weevr.errors.exceptions import HookError
+from weevr.errors.exceptions import ExecutionError, HookError
 from weevr.model.base import FrozenBase
 from weevr.model.hooks import LogMessageStep, QualityGateStep, SqlStatementStep
 from weevr.operations.gates import (
@@ -118,12 +118,15 @@ def _execute_quality_gate(
     check = step.check
 
     if check == "source_freshness":
-        assert step.source is not None  # validated by model  # noqa: S101
-        assert step.max_age is not None  # noqa: S101
+        if step.source is None:
+            raise ExecutionError("source_freshness hook step requires 'source'")
+        if step.max_age is None:
+            raise ExecutionError("source_freshness hook step requires 'max_age'")
         return check_source_freshness(spark, step.source, step.max_age)
 
     if check == "row_count_delta":
-        assert step.target is not None  # noqa: S101
+        if step.target is None:
+            raise ExecutionError("row_count_delta hook step requires 'target'")
         before_count = row_counts.get(step.target, 0)
         return check_row_count_delta(
             spark,
@@ -136,7 +139,8 @@ def _execute_quality_gate(
         )
 
     if check == "row_count":
-        assert step.target is not None  # noqa: S101
+        if step.target is None:
+            raise ExecutionError("row_count hook step requires 'target'")
         return check_row_count(
             spark,
             step.target,
@@ -145,11 +149,13 @@ def _execute_quality_gate(
         )
 
     if check == "table_exists":
-        assert step.source is not None  # noqa: S101
+        if step.source is None:
+            raise ExecutionError("table_exists hook step requires 'source'")
         return check_table_exists(spark, step.source)
 
     if check == "expression":
-        assert step.sql is not None  # noqa: S101
+        if step.sql is None:
+            raise ExecutionError("expression hook step requires 'sql'")
         return check_expression(spark, step.sql, step.message)
 
     msg = f"Unknown quality gate check type: {check}"

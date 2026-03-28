@@ -42,6 +42,7 @@ steps:
       sources: [customers]
       mode: by_name
 target:
+  alias: gold.customers
   mapping_mode: explicit
   columns:
     id:

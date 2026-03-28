@@ -9,6 +9,7 @@ from weevr.model.pipeline import (
     CaseWhenBranch,
     CaseWhenParams,
     CaseWhenStep,
+    CastParams,
     CastStep,
     CoalesceParams,
     CoalesceStep,
@@ -17,6 +18,7 @@ from weevr.model.pipeline import (
     DedupStep,
     DeriveParams,
     DeriveStep,
+    DropParams,
     DropStep,
     FillNullParams,
     FillNullStep,
@@ -29,11 +31,14 @@ from weevr.model.pipeline import (
     PivotStep,
     RenameParams,
     RenameStep,
+    SelectParams,
     SelectStep,
+    SortParams,
     SortStep,
     Step,
     StringOpsParams,
     StringOpsStep,
+    UnionParams,
     UnionStep,
     UnpivotParams,
     UnpivotStep,
@@ -322,7 +327,57 @@ class TestStepFreezeAndRoundTrip:
 
 
 # ---------------------------------------------------------------------------
-# New M08a supporting models
+# Instance-based round-trip for multi-word step discriminator
+# ---------------------------------------------------------------------------
+
+
+class TestMultiWordStepInstanceRoundTrip:
+    """Verify that already-constructed multi-word step instances survive a
+    second pass through the Step TypeAdapter (instance-branch of discriminator).
+    """
+
+    def test_case_when_step_instance_round_trip(self):
+        """CaseWhenStep instance dispatches correctly via the instance branch."""
+        step = CaseWhenStep(
+            case_when=CaseWhenParams(
+                column="tier",
+                cases=[CaseWhenBranch(when=SparkExpr("amount > 100"), then=SparkExpr("'high'"))],
+                otherwise=SparkExpr("'low'"),
+            )
+        )
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, CaseWhenStep)
+        assert result.case_when.column == "tier"
+
+    def test_fill_null_step_instance_round_trip(self):
+        """FillNullStep instance dispatches correctly via the instance branch."""
+        step = FillNullStep(fill_null=FillNullParams(columns={"amount": 0}))
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, FillNullStep)
+        assert result.fill_null.columns == {"amount": 0}
+
+    def test_string_ops_step_instance_round_trip(self):
+        """StringOpsStep instance dispatches correctly via the instance branch."""
+        step = StringOpsStep(string_ops=StringOpsParams(columns=["name"], expr="trim({col})"))
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, StringOpsStep)
+        assert result.string_ops.columns == ["name"]
+
+    def test_date_ops_step_instance_round_trip(self):
+        """DateOpsStep instance dispatches correctly via the instance branch."""
+        step = DateOpsStep(
+            date_ops=DateOpsParams(
+                columns=["created_at"],
+                expr="date_format({col}, 'yyyy-MM-dd')",
+            )
+        )
+        result = _step_adapter.validate_python(step)
+        assert isinstance(result, DateOpsStep)
+        assert result.date_ops.columns == ["created_at"]
+
+
+# ---------------------------------------------------------------------------
+# Additional supporting models
 # ---------------------------------------------------------------------------
 
 
@@ -374,7 +429,7 @@ class TestCaseWhenBranch:
 
 
 # ---------------------------------------------------------------------------
-# New M08a param models
+# Additional param models
 # ---------------------------------------------------------------------------
 
 
@@ -600,7 +655,7 @@ class TestDateOpsParams:
 
 
 class TestNewStepDiscriminator:
-    """Test Step discriminated union dispatch for new M08a step types."""
+    """Test Step discriminated union dispatch for additional step types."""
 
     def _validate(self, d: dict) -> Step:  # type: ignore[type-arg]
         return _step_adapter.validate_python(d)
@@ -714,3 +769,583 @@ class TestRenameParams:
         """Explicitly passing column_set=None is equivalent to the default."""
         p = RenameParams(columns={"x": "y"}, column_set=None)
         assert p.column_set is None
+
+
+class TestFormatSpecValidation:
+    """Test FormatSpec edge case validators."""
+
+    def test_empty_pattern_raises(self):
+        """Empty pattern string raises ValidationError."""
+        from weevr.model.pipeline import FormatSpec
+
+        with pytest.raises(ValidationError, match="must not be empty"):
+            FormatSpec(pattern="")
+
+
+class TestConcatParamsValidation:
+    """Test ConcatParams null_literal validator."""
+
+    def test_empty_null_literal_with_literal_mode_raises(self):
+        """Empty null_literal when null_mode='literal' raises."""
+        from weevr.model.pipeline import ConcatParams
+
+        with pytest.raises(ValidationError, match="null_literal"):
+            ConcatParams(target="out", columns=["a", "b"], null_mode="literal", null_literal="")
+
+    def test_null_literal_with_skip_mode_ok(self):
+        """Empty null_literal with skip mode is fine (not used)."""
+        from weevr.model.pipeline import ConcatParams
+
+        p = ConcatParams(target="out", columns=["a", "b"], null_mode="skip", null_literal="")
+        assert p.null_literal == ""
+
+
+# ---------------------------------------------------------------------------
+# Resolve step models
+# ---------------------------------------------------------------------------
+
+
+class TestCurrentConfig:
+    """Test CurrentConfig model."""
+
+    def test_basic(self):
+        """CurrentConfig with column and default value."""
+        from weevr.model.pipeline import CurrentConfig
+
+        c = CurrentConfig(column="is_current")
+        assert c.column == "is_current"
+        assert c.value is True
+
+    def test_custom_value(self):
+        """CurrentConfig with custom value."""
+        from weevr.model.pipeline import CurrentConfig
+
+        c = CurrentConfig(column="is_current", value="Y")
+        assert c.value == "Y"
+
+
+class TestEffectiveConfig:
+    """Test EffectiveConfig model validation."""
+
+    def test_date_range_mode(self):
+        """Date range with all three fields."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        e = EffectiveConfig.model_validate(
+            {"date_column": "order_date", "from": "eff_from", "to": "eff_to"}
+        )
+        assert e.date_column == "order_date"
+        assert e.from_ == "eff_from"
+        assert e.to == "eff_to"
+        assert e.current is None
+
+    def test_current_string_sugar(self):
+        """Current flag as plain string (column name, value=True)."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        e = EffectiveConfig(current="is_current")  # type: ignore[arg-type]
+        assert e.current is not None
+        assert e.current.column == "is_current"  # type: ignore[union-attr]
+        assert e.current.value is True  # type: ignore[union-attr]
+
+    def test_current_dict_form(self):
+        """Current flag with custom value via dict."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        e = EffectiveConfig(current={"column": "is_current", "value": "Y"})  # type: ignore[arg-type]
+        assert e.current.column == "is_current"  # type: ignore[union-attr]
+        assert e.current.value == "Y"  # type: ignore[union-attr]
+
+    def test_date_range_partial_raises(self):
+        """Partial date range fields raise ValidationError."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        with pytest.raises(ValidationError, match="all-or-nothing"):
+            EffectiveConfig.model_validate({"date_column": "order_date"})
+
+    def test_date_range_and_current_exclusive(self):
+        """Date range and current are mutually exclusive."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            EffectiveConfig.model_validate(
+                {
+                    "date_column": "order_date",
+                    "from": "eff_from",
+                    "to": "eff_to",
+                    "current": "is_current",
+                }
+            )
+
+    def test_empty_raises(self):
+        """EffectiveConfig with no fields raises ValidationError."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        with pytest.raises(ValidationError):
+            EffectiveConfig()
+
+
+class TestResolveParams:
+    """Test ResolveParams model validation and match sugar."""
+
+    def test_required_fields(self):
+        """ResolveParams requires name, lookup, match, pk."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id", lookup="dim_plant", match={"plant_code": "natural_id"}, pk="id"
+        )
+        assert p.name == "plant_id"
+        assert p.lookup == "dim_plant"
+        assert p.match == {"plant_code": "natural_id"}
+        assert p.pk == "id"
+
+    def test_match_sugar_string(self):
+        """String match sugar: 'col' -> {'col': 'col'}."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id",
+            lookup="dim_plant",
+            match="natural_id",  # type: ignore[arg-type]
+            pk="id",
+        )
+        assert p.match == {"natural_id": "natural_id"}
+
+    def test_match_sugar_list(self):
+        """List match sugar: ['a', 'b'] -> {'a': 'a', 'b': 'b'}."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id",
+            lookup="dim_plant",
+            match=["mandt", "plant"],  # type: ignore[arg-type]
+            pk="id",
+        )
+        assert p.match == {"mandt": "mandt", "plant": "plant"}
+
+    def test_match_dict_passthrough(self):
+        """Dict match passes through unchanged."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id",
+            lookup="dim_plant",
+            match={"plant": "natural_id", "region": "region_code"},
+            pk="id",
+        )
+        assert p.match == {"plant": "natural_id", "region": "region_code"}
+
+    def test_defaults(self):
+        """Default sentinel and behavior values."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(name="fk", lookup="dim", match="bk", pk="id")  # type: ignore[arg-type]
+        assert p.on_invalid == -4
+        assert p.on_unknown == -1
+        assert p.on_duplicate == "warn"
+        assert p.on_failure == "abort"
+        assert p.normalize is None
+        assert p.drop_source_columns is False
+        assert p.include is None
+        assert p.include_prefix is None
+        assert p.effective is None
+        assert p.where is None
+        assert p.batch is None
+
+    def test_include_string_sugar(self):
+        """String include sugar: 'col' -> ['col']."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include="description",  # type: ignore[arg-type]
+        )
+        assert p.include == ["description"]
+
+    def test_include_list(self):
+        """List include passes through."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=["description", "category"],
+        )
+        assert p.include == ["description", "category"]
+
+    def test_include_dict(self):
+        """Dict include for rename passes through."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include={"description": "plant_desc"},
+        )
+        assert p.include == {"description": "plant_desc"}
+
+    def test_include_prefix_without_include_raises(self):
+        """include_prefix without include raises ValidationError."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="include_prefix"):
+            ResolveParams(
+                name="fk",
+                lookup="dim",
+                match="bk",  # type: ignore[arg-type]
+                pk="id",
+                include_prefix="dim_",
+            )
+
+    def test_effective_composable_with_where(self):
+        """Effective and where can coexist."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            effective={"current": "is_current"},  # type: ignore[arg-type]
+            where="region = ${region_code}",
+        )
+        assert p.effective is not None
+        assert p.where is not None
+
+    def test_batch_and_single_exclusive(self):
+        """Batch mode and single-mode required fields are mutually exclusive."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            ResolveParams(
+                name="fk",
+                lookup="dim",
+                match="bk",  # type: ignore[arg-type]
+                pk="id",
+                batch=[{"name": "fk2", "lookup": "d2", "match": "b2"}],  # type: ignore[list-item]
+            )
+
+    def test_batch_mode_no_required_single_fields(self):
+        """Batch mode does not require name/lookup/match/pk at outer level."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_invalid=-4,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+                {"name": "fk2", "lookup": "dim2", "match": "bk2"},
+            ],
+        )
+        assert p.batch is not None
+        assert len(p.batch) == 2
+
+    def test_on_invalid_equals_on_unknown_raises(self):
+        """Equal sentinel values for on_invalid and on_unknown raise."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="must be different"):
+            ResolveParams(
+                name="fk",
+                lookup="dim",
+                match={"bk": "bk"},
+                pk="id",
+                on_invalid=-1,
+                on_unknown=-1,
+            )
+
+
+class TestResolveBatchItem:
+    """Test ResolveBatchItem model."""
+
+    def test_required_fields(self):
+        """ResolveBatchItem requires name, lookup, match."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(name="fk", lookup="dim", match="bk")  # type: ignore[arg-type]
+        assert item.name == "fk"
+        assert item.match == {"bk": "bk"}
+
+    def test_match_sugar(self):
+        """ResolveBatchItem supports match sugar."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(name="fk", lookup="dim", match=["a", "b"])  # type: ignore[arg-type]
+        assert item.match == {"a": "a", "b": "b"}
+
+    def test_override_fields(self):
+        """ResolveBatchItem accepts optional override fields."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="sk",
+            on_invalid=-9,
+            effective={"current": "is_active"},  # type: ignore[arg-type]
+        )
+        assert item.pk == "sk"
+        assert item.on_invalid == -9
+        assert item.effective is not None
+
+
+class TestResolveStepDiscriminator:
+    """Test resolve step in the Step discriminated union."""
+
+    def _validate(self, d: dict) -> Step:  # type: ignore[type-arg]
+        return _step_adapter.validate_python(d)
+
+    def test_resolve_step_dispatches(self):
+        """Dict with 'resolve' key dispatches to ResolveStep."""
+        from weevr.model.pipeline import ResolveStep
+
+        step = self._validate(
+            {"resolve": {"name": "plant_id", "lookup": "dim_plant", "match": "bk", "pk": "id"}}
+        )
+        assert isinstance(step, ResolveStep)
+        assert step.resolve.name == "plant_id"
+
+    def test_resolve_step_round_trip(self):
+        """ResolveStep round-trips via Step union adapter."""
+        from weevr.model.pipeline import ResolveStep
+
+        step = self._validate(
+            {"resolve": {"name": "plant_id", "lookup": "dim_plant", "match": "bk", "pk": "id"}}
+        )
+        assert isinstance(step, ResolveStep)
+        dumped = step.model_dump()
+        restored = _step_adapter.validate_python(dumped)
+        assert isinstance(restored, ResolveStep)
+        assert restored.resolve.match == {"bk": "bk"}
+
+
+class TestBatchDefaultMerging:
+    """Test batch default merging on ResolveParams."""
+
+    def test_shared_pk_applied_to_items(self):
+        """Shared pk is applied to items that lack it."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_invalid=-4,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+                {"name": "fk2", "lookup": "dim2", "match": "bk2"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert len(items) == 2
+        assert items[0].pk == "id"
+        assert items[1].pk == "id"
+
+    def test_item_pk_overrides_shared(self):
+        """Item-level pk overrides the shared default."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1", "pk": "sk"},
+                {"name": "fk2", "lookup": "dim2", "match": "bk2"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].pk == "sk"
+        assert items[1].pk == "id"
+
+    def test_shared_on_invalid_applied(self):
+        """Shared on_invalid applied to items without it."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_invalid=-9,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].on_invalid == -9
+
+    def test_item_effective_overrides_shared(self):
+        """Item-level effective overrides shared effective."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            effective={"current": "is_current"},  # type: ignore[arg-type]
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+                {
+                    "name": "fk2",
+                    "lookup": "dim2",
+                    "match": "bk2",
+                    "effective": {"current": {"column": "active", "value": "Y"}},
+                },
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].effective is not None
+        assert items[0].effective.current.column == "is_current"  # type: ignore[union-attr]
+        assert items[1].effective is not None
+        assert items[1].effective.current.column == "active"  # type: ignore[union-attr]
+
+    def test_item_with_all_fields_ignores_shared(self):
+        """Item with all fields set ignores shared defaults."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="shared_pk",
+            on_invalid=-99,
+            on_unknown=-88,
+            batch=[  # type: ignore[list-item]
+                {
+                    "name": "fk1",
+                    "lookup": "dim1",
+                    "match": "bk1",
+                    "pk": "item_pk",
+                    "on_invalid": -1,
+                    "on_unknown": -2,
+                },
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].pk == "item_pk"
+        assert items[0].on_invalid == -1
+        assert items[0].on_unknown == -2
+
+    def test_items_inherit_on_duplicate(self):
+        """Items inherit shared on_duplicate when not set."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_duplicate="error",
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].on_duplicate == "error"
+
+    def test_missing_pk_on_item_and_shared_raises(self):
+        """Item without pk and no shared pk raises ValueError."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+            ],
+        )
+        with pytest.raises(ValueError, match="pk"):
+            p.resolve_batch_items()
+
+
+# ---------------------------------------------------------------------------
+# Empty collection validators
+# ---------------------------------------------------------------------------
+
+
+class TestSelectParamsNonEmpty:
+    """Test SelectParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """SelectParams with at least one column is accepted."""
+        p = SelectParams(columns=["id", "name"])
+        assert p.columns == ["id", "name"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns list raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            SelectParams(columns=[])
+
+
+class TestDropParamsNonEmpty:
+    """Test DropParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """DropParams with at least one column is accepted."""
+        p = DropParams(columns=["_tmp"])
+        assert p.columns == ["_tmp"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns list raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            DropParams(columns=[])
+
+
+class TestCastParamsNonEmpty:
+    """Test CastParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """CastParams with at least one mapping is accepted."""
+        p = CastParams(columns={"amount": "double"})
+        assert p.columns == {"amount": "double"}
+
+    def test_empty_columns_raises(self):
+        """Empty columns dict raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            CastParams(columns={})
+
+
+class TestDeriveParamsNonEmpty:
+    """Test DeriveParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """DeriveParams with at least one expression is accepted."""
+        p = DeriveParams(columns={"full_name": SparkExpr("first_name || ' ' || last_name")})
+        assert len(p.columns) == 1
+
+    def test_empty_columns_raises(self):
+        """Empty columns dict raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            DeriveParams(columns={})
+
+
+class TestSortParamsNonEmpty:
+    """Test SortParams.columns non-empty validation."""
+
+    def test_valid_columns(self):
+        """SortParams with at least one column is accepted."""
+        p = SortParams(columns=["date"])
+        assert p.columns == ["date"]
+
+    def test_empty_columns_raises(self):
+        """Empty columns list raises ValidationError."""
+        with pytest.raises(ValidationError, match="columns must not be empty"):
+            SortParams(columns=[])
+
+
+class TestUnionParamsNonEmpty:
+    """Test UnionParams.sources non-empty validation."""
+
+    def test_valid_sources(self):
+        """UnionParams with at least one source is accepted."""
+        p = UnionParams(sources=["table_a", "table_b"])
+        assert p.sources == ["table_a", "table_b"]
+
+    def test_empty_sources_raises(self):
+        """Empty sources list raises ValidationError."""
+        with pytest.raises(ValidationError, match="sources must not be empty"):
+            UnionParams(sources=[])
+
+
+class TestResolveParamsBatchNonEmpty:
+    """Test ResolveParams.batch non-empty validation."""
+
+    def test_empty_batch_raises(self):
+        """Empty batch list raises ValidationError."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="batch must contain at least one item"):
+            ResolveParams(batch=[])

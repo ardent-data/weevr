@@ -12,7 +12,7 @@ from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 
 
-def _quote_identifier(name: str) -> str:
+def quote_identifier(name: str) -> str:
     """Backtick-escape a SQL identifier to prevent injection.
 
     Escapes any existing backticks by doubling them, then wraps the name
@@ -175,7 +175,7 @@ def _execute_merge(
     if write_config.match_keys is None:
         raise ExecutionError("merge mode requires 'match_keys' to be set")
     merge_condition = " AND ".join(
-        f"target.{_quote_identifier(k)} = source.{_quote_identifier(k)}"
+        f"target.{quote_identifier(k)} = source.{quote_identifier(k)}"
         for k in write_config.match_keys
     )
     delta_table = resolve_delta_table(spark, target_path)
@@ -278,7 +278,7 @@ def execute_cdc_merge(
     delete_val = cols["delete_value"]
 
     merge_condition = " AND ".join(
-        f"target.{_quote_identifier(k)} = source.{_quote_identifier(k)}"
+        f"target.{quote_identifier(k)} = source.{quote_identifier(k)}"
         for k in write_config.match_keys
     )
 
@@ -331,12 +331,12 @@ def execute_cdc_merge(
         )
 
         # Route by operation type
-        quoted_op = _quote_identifier(op_col)
+        quoted_op = quote_identifier(op_col)
 
         if update_val:
             escaped_val = update_val.replace("'", "''")
             update_set: dict[str, str | Column] = {
-                c: F.col(f"source.{_quote_identifier(c)}")
+                c: F.col(f"source.{quote_identifier(c)}")
                 for c in data_cols
                 if c not in write_config.match_keys
             }
@@ -362,7 +362,7 @@ def execute_cdc_merge(
         if insert_val:
             escaped_ins = insert_val.replace("'", "''")
             insert_set: dict[str, str | Column] = {
-                c: F.col(f"source.{_quote_identifier(c)}") for c in data_cols
+                c: F.col(f"source.{quote_identifier(c)}") for c in data_cols
             }
             merger = merger.whenNotMatchedInsert(
                 condition=f"source.{quoted_op} = '{escaped_ins}'",

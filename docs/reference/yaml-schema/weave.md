@@ -119,8 +119,8 @@ runtime parameter. A column set must have exactly one of `source` or
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | yes | -- | Source type: `"delta"` or `"yaml"` |
-| `alias` | `string` | no | `null` | Lakehouse table alias (for Delta sources) |
-| `path` | `string` | no | `null` | File path (for Delta path or YAML sources) |
+| `alias` | `string` | cond. | `null` | Lakehouse table alias. Required when `type="delta"`. |
+| `path` | `string` | cond. | `null` | File path. Required when `type="yaml"`. |
 | `from_column` | `string` | no | `"source_name"` | Column containing the original (raw) column names |
 | `to_column` | `string` | no | `"target_name"` | Column containing the target (friendly) column names |
 | `filter` | `string` | no | `null` | SQL WHERE expression applied before collecting mappings |

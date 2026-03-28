@@ -9,7 +9,7 @@ from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
 
 # All valid step type keys — used by the discriminator
-_STEP_TYPES = frozenset(
+STEP_TYPES = frozenset(
     {
         "filter",
         "derive",
@@ -33,8 +33,17 @@ _STEP_TYPES = frozenset(
         "concat",
         "map",
         "format",
+        "resolve",
     }
 )
+
+
+_MULTI_WORD_STEP_NAMES: dict[str, str] = {
+    "CaseWhenStep": "case_when",
+    "FillNullStep": "fill_null",
+    "StringOpsStep": "string_ops",
+    "DateOpsStep": "date_ops",
+}
 
 
 def _step_discriminator(v: Any) -> str:
@@ -47,12 +56,14 @@ def _step_discriminator(v: Any) -> str:
     Pydantic emits a ``ValidationError`` rather than a bare ``ValueError``.
     """
     if isinstance(v, dict):
-        matched = set(v.keys()) & _STEP_TYPES
+        matched = set(v.keys()) & STEP_TYPES
         if len(matched) == 1:
             return matched.pop()
         # Return unrecognised tag — Pydantic will raise ValidationError
         return f"<invalid:{','.join(sorted(v.keys()))}>"
     cls_name = type(v).__name__
+    if cls_name in _MULTI_WORD_STEP_NAMES:
+        return _MULTI_WORD_STEP_NAMES[cls_name]
     if cls_name.endswith("Step"):
         return cls_name.removesuffix("Step").lower()
     return f"<unknown:{cls_name}>"
@@ -89,6 +100,13 @@ class DeriveParams(FrozenBase):
     """
 
     columns: dict[str, SparkExpr]
+
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: dict[str, SparkExpr]) -> dict[str, SparkExpr]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
 
 
 class JoinParams(FrozenBase):
@@ -131,11 +149,25 @@ class SelectParams(FrozenBase):
 
     columns: list[str]
 
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
 
 class DropParams(FrozenBase):
     """Parameters for the drop step."""
 
     columns: list[str]
+
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
 
 
 class RenameParams(FrozenBase):
@@ -156,6 +188,13 @@ class CastParams(FrozenBase):
 
     columns: dict[str, str]
 
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: dict[str, str]) -> dict[str, str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
 
 class DedupParams(FrozenBase):
     """Parameters for the dedup step."""
@@ -171,6 +210,13 @@ class SortParams(FrozenBase):
     columns: list[str]
     ascending: bool = True
 
+    @field_validator("columns")
+    @classmethod
+    def _columns_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("columns must not be empty")
+        return v
+
 
 class UnionParams(FrozenBase):
     """Parameters for the union step."""
@@ -178,6 +224,13 @@ class UnionParams(FrozenBase):
     sources: list[str]
     mode: Literal["by_name", "by_position"] = "by_name"
     allow_missing: bool = False
+
+    @field_validator("sources")
+    @classmethod
+    def _sources_non_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("sources must not be empty")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +327,7 @@ class CaseWhenBranch(FrozenBase):
 
 
 # ---------------------------------------------------------------------------
-# New param models (M08a)
+# Additional param models
 # ---------------------------------------------------------------------------
 
 
@@ -456,6 +509,12 @@ class ConcatParams(FrozenBase):
             raise ValueError("columns must not be empty")
         return v
 
+    @model_validator(mode="after")
+    def _validate_null_literal(self) -> "ConcatParams":
+        if self.null_mode == "literal" and not self.null_literal:
+            raise ValueError("null_literal must not be empty when null_mode is 'literal'")
+        return self
+
 
 class ConcatStep(FrozenBase):
     """Pipeline step: concatenate columns into a string."""
@@ -529,6 +588,8 @@ class FormatSpec(FrozenBase):
     @field_validator("pattern")
     @classmethod
     def _validate_pattern_syntax(cls, v: str | None) -> str | None:
+        if v is not None and not v:
+            raise ValueError("pattern must not be empty")
         if v is not None and "{" in v:
             for match in _FORMAT_PLACEHOLDER_RE.finditer(v):
                 pos, length = int(match.group(1)), int(match.group(2))
@@ -584,6 +645,239 @@ class FormatStep(FrozenBase):
     format: FormatParams
 
 
+# ---------------------------------------------------------------------------
+# Resolve step models
+# ---------------------------------------------------------------------------
+
+
+class CurrentConfig(FrozenBase):
+    """Current-flag sub-mode for SCD2 narrowing.
+
+    When the lookup dimension uses a boolean or coded column to mark the
+    active record, ``column`` identifies that column and ``value`` is the
+    active marker (defaults to ``True``).
+    """
+
+    column: str
+    value: Any = True
+
+
+class EffectiveConfig(FrozenBase):
+    """SCD2 narrowing configuration for resolve step.
+
+    Supports two mutually exclusive sub-modes:
+
+    * **Date range** — half-open interval ``[from, to)`` checked against
+      a fact ``date_column``.
+    * **Current flag** — filter lookup rows where a column equals a
+      specific value (string sugar or dict form with custom value).
+    """
+
+    date_column: str | None = None
+    from_: str | None = None
+    to: str | None = None
+    current: str | CurrentConfig | None = None
+
+    model_config = {"populate_by_name": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap_from_key(cls, data: Any) -> Any:
+        """Remap YAML ``from`` to Python ``from_``."""
+        if isinstance(data, dict) and "from" in data and "from_" not in data:
+            data = {**data, "from_": data.pop("from")}
+        return data
+
+    @field_validator("current", mode="before")
+    @classmethod
+    def _current_string_sugar(cls, v: Any) -> Any:
+        """Convert string sugar to CurrentConfig."""
+        if isinstance(v, str):
+            return CurrentConfig(column=v)
+        return v
+
+    @model_validator(mode="after")
+    def _validate_effective_modes(self) -> "EffectiveConfig":
+        date_fields = (self.date_column, self.from_, self.to)
+        date_set = sum(f is not None for f in date_fields)
+        has_current = self.current is not None
+
+        if date_set > 0 and date_set < 3:
+            raise ValueError(
+                "date range fields (date_column, from, to) are "
+                "all-or-nothing — set all three or none"
+            )
+        if date_set == 3 and has_current:
+            raise ValueError("date range and current flag are mutually exclusive")
+        if date_set == 0 and not has_current:
+            raise ValueError("effective block requires either date range fields or current flag")
+        return self
+
+
+def _normalize_match(v: Any) -> dict[str, str]:
+    """Normalize match sugar: string -> dict, list -> dict, dict passthrough."""
+    if isinstance(v, str):
+        return {v: v}
+    if isinstance(v, list):
+        return {item: item for item in v}
+    return v
+
+
+class ResolveBatchItem(FrozenBase):
+    """Per-FK configuration within a batch resolve step.
+
+    Every item requires ``name``, ``lookup``, and ``match``.  All other
+    fields are optional overrides merged with shared defaults at runtime.
+    """
+
+    name: str
+    lookup: str
+    match: dict[str, str]
+    pk: str | None = None
+    on_invalid: int | None = None
+    on_unknown: int | None = None
+    on_duplicate: Literal["error", "warn", "first"] | None = None
+    on_failure: Literal["abort", "warn"] | None = None
+    normalize: Literal["trim_lower", "trim_upper", "trim", "none"] | None = None
+    drop_source_columns: bool | None = None
+    include: list[str] | dict[str, str] | None = None
+    include_prefix: str | None = None
+    effective: EffectiveConfig | None = None
+    where: str | None = None
+
+    @field_validator("match", mode="before")
+    @classmethod
+    def _normalize_match(cls, v: Any) -> dict[str, str]:
+        return _normalize_match(v)
+
+
+class ResolveParams(FrozenBase):
+    """Parameters for the resolve step.
+
+    Encapsulates FK resolution: BK completeness check, multi-column
+    equi-join against a named lookup, sentinel assignment for invalid
+    and unknown BKs, optional SCD2 narrowing, include columns, and
+    batch mode for multi-FK fact tables.
+
+    In single mode, ``name``, ``lookup``, ``match``, and ``pk`` are
+    required.  In batch mode, ``batch`` contains the per-FK specs and
+    the outer-level fields serve as shared defaults.
+    """
+
+    name: str | None = None
+    lookup: str | None = None
+    match: dict[str, str] | None = None
+    pk: str | None = None
+    on_invalid: int = -4
+    on_unknown: int = -1
+    on_duplicate: Literal["error", "warn", "first"] = "warn"
+    on_failure: Literal["abort", "warn"] = "abort"
+    normalize: Literal["trim_lower", "trim_upper", "trim", "none"] | None = None
+    drop_source_columns: bool = False
+    include: list[str] | dict[str, str] | None = None
+    include_prefix: str | None = None
+    effective: EffectiveConfig | None = None
+    where: str | None = None
+    batch: list[ResolveBatchItem] | None = None
+
+    @field_validator("match", mode="before")
+    @classmethod
+    def _normalize_match(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        return _normalize_match(v)
+
+    @field_validator("include", mode="before")
+    @classmethod
+    def _include_sugar(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @model_validator(mode="after")
+    def _validate_resolve_mode(self) -> "ResolveParams":
+        single_fields = (self.name, self.lookup, self.match)
+        has_single = any(f is not None for f in single_fields)
+
+        if self.batch is not None and has_single:
+            raise ValueError(
+                "batch and single-mode fields (name, lookup, match) "
+                "are mutually exclusive — use batch items or "
+                "single-mode fields, not both"
+            )
+
+        if self.batch is not None and len(self.batch) == 0:
+            raise ValueError("batch must contain at least one item")
+
+        if self.batch is None:
+            for field_name in ("name", "lookup", "match", "pk"):
+                if getattr(self, field_name) is None:
+                    raise ValueError(f"'{field_name}' is required in single-mode resolve")
+
+        if self.include_prefix is not None and self.include is None:
+            raise ValueError("include_prefix requires include to be set")
+
+        if self.on_invalid == self.on_unknown:
+            raise ValueError(
+                f"on_invalid ({self.on_invalid}) and on_unknown "
+                f"({self.on_unknown}) must be different values — "
+                f"equal sentinels prevent accurate resolution stats"
+            )
+
+        return self
+
+    def resolve_batch_items(self) -> list[ResolveBatchItem]:
+        """Merge shared defaults into each batch item.
+
+        Returns a list of fully-resolved ``ResolveBatchItem`` objects
+        where item-level values override the shared defaults from
+        this ``ResolveParams`` instance.  Raises ``ValueError`` if a
+        required field (``pk``) is missing after merge.
+        """
+        if self.batch is None:
+            raise ValueError("resolve_batch_items() requires batch mode")
+
+        shared_defaults: dict[str, Any] = {}
+        for field_name in (
+            "pk",
+            "on_invalid",
+            "on_unknown",
+            "on_duplicate",
+            "on_failure",
+            "normalize",
+            "drop_source_columns",
+            "include",
+            "include_prefix",
+            "effective",
+            "where",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                shared_defaults[field_name] = value
+
+        items: list[ResolveBatchItem] = []
+        for batch_item in self.batch:
+            merged = dict(shared_defaults)
+            for field_name in ResolveBatchItem.model_fields:
+                val = getattr(batch_item, field_name)
+                if val is not None:
+                    merged[field_name] = val
+            item = ResolveBatchItem.model_validate(merged)
+            if item.pk is None:
+                raise ValueError(
+                    f"batch item '{item.name}' has no pk — set pk "
+                    f"at item level or as a shared default"
+                )
+            items.append(item)
+        return items
+
+
+class ResolveStep(FrozenBase):
+    """Pipeline step: resolve foreign keys via lookup join."""
+
+    resolve: ResolveParams
+
+
 class StringOpsParams(FrozenBase):
     """Parameters for the string_ops step.
 
@@ -623,7 +917,7 @@ class DateOpsParams(FrozenBase):
 
 
 # ---------------------------------------------------------------------------
-# New step wrapper models (M08a)
+# Additional step wrapper models
 # ---------------------------------------------------------------------------
 
 
@@ -707,7 +1001,8 @@ Step = Annotated[
     | Annotated[DateOpsStep, Tag("date_ops")]
     | Annotated[ConcatStep, Tag("concat")]
     | Annotated[MapStep, Tag("map")]
-    | Annotated[FormatStep, Tag("format")],
+    | Annotated[FormatStep, Tag("format")]
+    | Annotated[ResolveStep, Tag("resolve")],
     Discriminator(_step_discriminator),
 ]
 """Discriminated union of all pipeline step types.

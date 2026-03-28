@@ -1,8 +1,10 @@
 """Pipeline step dispatcher — routes each step to the appropriate handler."""
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
+import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 
 from weevr.errors.exceptions import ExecutionError
@@ -24,6 +26,7 @@ from weevr.model.pipeline import (
     MapStep,
     PivotStep,
     RenameStep,
+    ResolveStep,
     SelectStep,
     SortStep,
     Step,
@@ -46,6 +49,7 @@ from weevr.operations.pipeline.formatting import apply_format
 from weevr.operations.pipeline.joins import apply_join, apply_union
 from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
 from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
+from weevr.operations.pipeline.resolve import apply_resolve, apply_resolve_batch
 from weevr.operations.pipeline.transforms import (
     apply_cast,
     apply_derive,
@@ -57,6 +61,8 @@ from weevr.operations.pipeline.transforms import (
 from weevr.operations.pipeline.value_mapping import apply_map
 
 __all__ = ["StepResult", "run_pipeline"]
+
+_logger = logging.getLogger(__name__)
 
 # Handler signature: (df, step, sources) -> StepResult
 # All handlers receive the full step object and source dict for a uniform interface.
@@ -74,20 +80,20 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     SortStep: lambda df, step, _src: StepResult(apply_sort(df, step.sort)),
     JoinStep: lambda df, step, src: StepResult(apply_join(df, step.join, src)),
     UnionStep: lambda df, step, src: StepResult(apply_union(df, step.union, src)),
-    # Analytical steps (M08a)
+    # Analytical steps
     AggregateStep: lambda df, step, _src: StepResult(apply_aggregate(df, step.aggregate)),
     WindowStep: lambda df, step, _src: StepResult(apply_window(df, step.window)),
     PivotStep: lambda df, step, _src: StepResult(apply_pivot(df, step.pivot)),
     UnpivotStep: lambda df, step, _src: StepResult(apply_unpivot(df, step.unpivot)),
-    # Conditional step (M08a)
+    # Conditional step
     CaseWhenStep: lambda df, step, _src: StepResult(apply_case_when(df, step.case_when)),
-    # Null-handling steps (M08a)
+    # Null-handling steps
     FillNullStep: lambda df, step, _src: apply_fill_null(df, step.fill_null),
     CoalesceStep: lambda df, step, _src: apply_coalesce(df, step.coalesce),
-    # Column-ops steps (M08a)
+    # Column-ops steps
     StringOpsStep: lambda df, step, _src: StepResult(apply_string_ops(df, step.string_ops)),
     DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
-    # Transform step extensions (M115)
+    # Transform step extensions
     ConcatStep: lambda df, step, _src: apply_concat(df, step.concat),
     MapStep: lambda df, step, _src: apply_map(df, step.map),
     FormatStep: lambda df, step, _src: apply_format(df, step.format),
@@ -100,6 +106,7 @@ def run_pipeline(
     sources: dict[str, DataFrame],
     column_sets: dict[str, dict[str, str]] | None = None,
     column_set_defs: dict[str, ColumnSet] | None = None,
+    lookups: dict[str, DataFrame] | None = None,
 ) -> DataFrame:
     """Execute a sequence of pipeline steps against a working DataFrame.
 
@@ -119,6 +126,8 @@ def run_pipeline(
         column_set_defs: Column set model instances keyed by name. Used to read
             ``on_unmapped`` and ``on_extra`` behaviour settings for rename steps
             that reference a column set.
+        lookups: Cached lookup DataFrames keyed by name. Required for
+            resolve steps that reference named lookups.
 
     Returns:
         Final DataFrame after all steps have been applied.
@@ -142,11 +151,57 @@ def run_pipeline(
             )
         return StepResult(apply_rename(result, step.rename))
 
+    def _dispatch_resolve(result: DataFrame, step: ResolveStep) -> StepResult:
+        resolve_lookups = lookups or {}
+        params = step.resolve
+        if params.batch is not None:
+            return apply_resolve_batch(result, params, resolve_lookups)
+        # Single mode — look up the named lookup DataFrame
+        lookup_name = params.lookup
+        if lookup_name is None:
+            raise ExecutionError("resolve step requires 'lookup'")
+        if params.name is None:
+            raise ExecutionError("resolve step requires 'name'")
+        lookup_df = resolve_lookups.get(lookup_name)
+        if lookup_df is None:
+            if params.on_failure == "warn":
+                _logger.warning(
+                    "Resolve '%s': lookup '%s' not found; "
+                    "assigning on_unknown sentinel (%d) to all rows.",
+                    params.name,
+                    lookup_name,
+                    params.on_unknown,
+                )
+                fallback_df = result.withColumn(params.name, F.lit(params.on_unknown))
+                total = fallback_df.count()
+                return StepResult(
+                    fallback_df,
+                    metadata={
+                        "resolve_stats": {
+                            params.name: {
+                                "total": total,
+                                "matched": 0,
+                                "unknown": total,
+                                "invalid": 0,
+                                "duplicates": 0,
+                                "match_rate": 0.0,
+                            }
+                        }
+                    },
+                )
+            raise ExecutionError(
+                f"Lookup '{lookup_name}' not found for resolve step '{params.name}'",
+            )
+        return apply_resolve(result, params, lookup_df)
+
     result = df
     for i, step in enumerate(steps):
         try:
             if isinstance(step, RenameStep):
                 step_result = _dispatch_rename(result, step)
+                result = step_result.df
+            elif isinstance(step, ResolveStep):
+                step_result = _dispatch_resolve(result, step)
                 result = step_result.df
             else:
                 handler = _STEP_HANDLERS.get(type(step))

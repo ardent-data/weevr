@@ -1,0 +1,99 @@
+# Resolve FK Example
+#
+# Demonstrates FK resolution: single FK, compound BK, SCD2 current
+# flag, batch mode with shared defaults, and fk_sentinel_rate
+# assertion.
+
+config_version: "1.0"
+name: fact_sales
+
+sources:
+  sales:
+    type: delta
+    alias: raw.sales
+
+# Lookups referenced by resolve steps (defined at weave level)
+# lookups:
+#   dim_plant:
+#     source: curated.dim_plant
+#   dim_customer:
+#     source: curated.dim_customer
+#   dim_product:
+#     source: curated.dim_product
+
+steps:
+  # --- Single FK resolve (simple match) ---
+  - resolve:
+      name: plant_id
+      lookup: dim_plant
+      match: plant_code           # string sugar: {plant_code: plant_code}
+      pk: id
+      on_invalid: -4
+      on_unknown: -1
+
+  # --- Compound BK resolve (multi-column match) ---
+  - resolve:
+      name: customer_id
+      lookup: dim_customer
+      match:
+        customer_code: natural_id
+        region: region_code
+      pk: id
+      normalize: trim_lower
+
+  # --- SCD2 resolve with current flag ---
+  - resolve:
+      name: product_id
+      lookup: dim_product
+      match: product_code
+      pk: id
+      effective:
+        current: is_current
+      include:
+        - product_name
+        - category
+      include_prefix: "product_"
+
+  # --- Batch resolve with shared defaults ---
+  # - resolve:
+  #     pk: id
+  #     on_invalid: -4
+  #     on_unknown: -1
+  #     batch:
+  #       - name: plant_id
+  #         lookup: dim_plant
+  #         match: plant_code
+  #       - name: customer_id
+  #         lookup: dim_customer
+  #         match:
+  #           customer_code: natural_id
+  #           region: region_code
+  #         normalize: trim_lower
+  #       - name: product_id
+  #         lookup: dim_product
+  #         match: product_code
+  #         effective:
+  #           current: is_current
+
+target:
+  alias: curated.fact_sales
+
+write:
+  mode: overwrite
+
+assertions:
+  # Single column, single sentinel
+  - type: fk_sentinel_rate
+    column: plant_id
+    sentinel: -4
+    max_rate: 0.05
+    message: "plant FK invalid rate exceeded"
+
+  # Multiple columns, named sentinel groups
+  - type: fk_sentinel_rate
+    columns: [plant_id, customer_id, product_id]
+    sentinels:
+      invalid: -4
+      unknown: -1
+    max_rate: 0.10
+    message: "FK unresolved rate exceeded"

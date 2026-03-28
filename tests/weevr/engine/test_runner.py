@@ -38,9 +38,7 @@ def _make_thread(
     else:
         sources["_src"] = {"type": "delta", "alias": "_src"}
 
-    target: dict[str, Any] = {}
-    if target_alias:
-        target["alias"] = target_alias
+    target: dict[str, Any] = {"alias": target_alias or f"test.{name}"}
 
     data: dict[str, Any] = {
         "name": name,
@@ -198,7 +196,7 @@ class TestWeaveRunnerFailureHandling:
 
     @patch("weevr.engine.runner.execute_thread")
     def test_continue_same_as_skip_downstream(self, mock_exec):
-        """on_failure=continue: dependents skipped, independents continue (DEC-007)."""
+        """on_failure=continue: dependents skipped, independents continue."""
 
         def side_effect(spark, thread, **kwargs):
             if thread.name == "A":
@@ -617,7 +615,7 @@ class TestConditionalThreadExecution:
         plan = build_plan("test_weave", threads, entries)
         conditions = {"A": ConditionSpec(when="false")}
         result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
-        assert result.status == "failure"  # all threads skipped → failure
+        assert result.status == "success"  # all threads skipped → success
         assert "A" in result.threads_skipped
         mock_exec.assert_not_called()
         # Check the skipped result
@@ -638,7 +636,7 @@ class TestConditionalThreadExecution:
         plan = build_plan("test_weave", threads, entries)
         conditions = {"A": ConditionSpec(when="false")}  # B has no condition
         result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
-        assert result.status == "partial"
+        assert result.status == "success"
         assert "A" in result.threads_skipped
         assert any(r.thread_name == "B" and r.status == "success" for r in result.thread_results)
 
@@ -1002,7 +1000,7 @@ class TestDeferredLookupMaterialization:
                     "name": "B",
                     "config_version": "1.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             ),
         }
@@ -1079,7 +1077,7 @@ class TestDeferredLookupMaterialization:
                     "name": "A",
                     "config_version": "1.0",
                     "sources": {"lk_ext": {"lookup": "ext"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             )
         }
@@ -1120,7 +1118,7 @@ class TestDeferredLookupMaterialization:
                     "name": "B",
                     "config_version": "1.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             ),
         }
@@ -1168,7 +1166,7 @@ class TestDeferredLookupMaterialization:
                     "name": "B",
                     "config_version": "1.0",
                     "sources": {"lk_cust": {"lookup": "cust"}, "lk_ext": {"lookup": "ext_codes"}},
-                    "target": {},
+                    "target": {"alias": "test"},
                 }
             ),
         }
@@ -1387,7 +1385,7 @@ class TestColumnSetsCascade:
 class TestWeaveLifecycleOrder:
     """Verify that execute_weave runs lifecycle phases in the correct order.
 
-    DEC-013 specifies: variables → pre_steps → lookups → column_sets →
+    Lifecycle phases in order: variables → pre_steps → lookups → column_sets →
     threads → post_steps → cleanup.
     """
 

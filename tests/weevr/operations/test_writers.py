@@ -8,23 +8,23 @@ from spark_helpers import create_delta_table
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
-from weevr.operations.writers import _quote_identifier, apply_target_mapping, write_target
+from weevr.operations.writers import apply_target_mapping, quote_identifier, write_target
 
 
 class TestQuoteIdentifier:
-    """Unit tests for _quote_identifier SQL escaping (no Spark needed)."""
+    """Unit tests for quote_identifier SQL escaping (no Spark needed)."""
 
     def test_plain_name(self) -> None:
-        assert _quote_identifier("column_name") == "`column_name`"
+        assert quote_identifier("column_name") == "`column_name`"
 
     def test_name_with_backtick(self) -> None:
-        assert _quote_identifier("col`umn") == "`col``umn`"
+        assert quote_identifier("col`umn") == "`col``umn`"
 
     def test_name_with_spaces(self) -> None:
-        assert _quote_identifier("my column") == "`my column`"
+        assert quote_identifier("my column") == "`my column`"
 
     def test_empty_string(self) -> None:
-        assert _quote_identifier("") == "``"
+        assert quote_identifier("") == "``"
 
 
 @pytest.fixture()
@@ -169,6 +169,7 @@ class TestExplicitMode:
 
     def test_explicit_selects_only_declared_columns(self, source_df, spark: SparkSession) -> None:
         target = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={
                 "id": ColumnMapping(),
@@ -181,6 +182,7 @@ class TestExplicitMode:
 
     def test_explicit_with_expr_applies_expression(self, source_df, spark: SparkSession) -> None:
         target = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={
                 "id": ColumnMapping(),
@@ -194,6 +196,7 @@ class TestExplicitMode:
 
     def test_explicit_with_type_cast(self, source_df, spark: SparkSession) -> None:
         target = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={"amount": ColumnMapping(type="string")},
         )
@@ -203,6 +206,7 @@ class TestExplicitMode:
 
     def test_explicit_excludes_dropped_columns(self, source_df, spark: SparkSession) -> None:
         target = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={
                 "id": ColumnMapping(),
@@ -215,7 +219,7 @@ class TestExplicitMode:
         assert {"id", "name"} <= set(result.columns)
 
     def test_explicit_no_columns_returns_as_is(self, source_df, spark: SparkSession) -> None:
-        target = Target(mapping_mode="explicit")
+        target = Target(alias="test", mapping_mode="explicit")
         result = apply_target_mapping(source_df, target, spark)
         assert set(result.columns) == set(source_df.columns)
 
@@ -228,6 +232,7 @@ class TestExplicitMode:
         )
         df = spark.createDataFrame([(1, None), (2, 99)], schema=schema)
         target = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={"score": ColumnMapping(default=0)},
         )
@@ -239,6 +244,7 @@ class TestExplicitMode:
 
     def test_explicit_preserves_row_count(self, source_df, spark: SparkSession) -> None:
         target = Target(
+            alias="test",
             mapping_mode="explicit",
             columns={"id": ColumnMapping()},
         )

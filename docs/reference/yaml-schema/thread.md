@@ -12,7 +12,7 @@ target. This page documents every key accepted inside a thread YAML file.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable thread name. Typically set by the weave that references this thread. |
-| `sources` | `dict[string, Source]` | yes | -- | Named data sources keyed by alias |
+| `sources` | `dict[string, Source]` | yes | -- | Named data sources keyed by alias. Must contain at least one entry. |
 | `steps` | `list[Step]` | no | `[]` | Ordered transformation pipeline |
 | `target` | `Target` | yes | -- | Output destination |
 | `write` | `WriteConfig` | no | `null` | Write mode and merge settings |
@@ -80,7 +80,7 @@ sources:
 ## steps
 
 An ordered list of transformation steps. Each step is a single-key object
-where the key identifies the step type. weevr supports 22 step types.
+where the key identifies the step type. weevr supports 23 step types.
 
 ### filter
 
@@ -571,6 +571,48 @@ per column.
       date: "yyyy-MM-dd"
 ```
 
+### resolve
+
+Resolve foreign keys by joining to a named lookup dimension.
+Assigns sentinel values for invalid (null/blank) and unknown
+(no match) business keys. Supports single FK, compound BK,
+SCD2 narrowing, batch mode, and include columns.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | `string` | yes* | -- | Output FK column name |
+| `lookup` | `string` | yes* | -- | Named lookup reference |
+| `match` | `string`, `list`, or `dict` | yes* | -- | BK column mapping (sugar: string/list/dict) |
+| `pk` | `string` | yes* | -- | Surrogate key column in lookup |
+| `on_invalid` | `int` | no | `-4` | Sentinel for incomplete BK |
+| `on_unknown` | `int` | no | `-1` | Sentinel for no match |
+| `on_duplicate` | `string` | no | `"warn"` | `"error"`, `"warn"`, `"first"` |
+| `on_failure` | `string` | no | `"abort"` | `"abort"`, `"warn"` |
+| `normalize` | `string` | no | `null` | `"trim_lower"`, `"trim_upper"`, `"trim"`, `"none"` |
+| `drop_source_columns` | `bool` | no | `false` | Drop source columns after resolve |
+| `include` | `list` or `dict` | no | `null` | Extra columns from lookup |
+| `include_prefix` | `string` | no | `null` | Prefix for included columns |
+| `effective` | `EffectiveConfig` | no | `null` | SCD2 narrowing (date range or current flag) |
+| `where` | `string` | no | `null` | SQL predicate filter on lookup |
+| `batch` | `list[ResolveBatchItem]` | no | `null` | Batch FK specs (mutually exclusive with name/lookup/match) |
+
+*Required in single mode. In batch mode, these fields are optional
+at the top level and serve as shared defaults merged into each batch
+item.
+
+See the [Resolve Step guide](../../guides/resolve.md) for
+detailed examples of all modes and features.
+
+```yaml
+- resolve:
+    name: plant_id
+    lookup: dim_plant
+    match: plant_code
+    pk: id
+    on_invalid: -4
+    on_unknown: -1
+```
+
 ---
 
 ## target
@@ -579,9 +621,9 @@ Defines where the thread writes its output.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `alias` | `string` | no | `null` | Lakehouse table alias for Delta targets |
-| `path` | `string` | no | `null` | File path for file-based targets |
-| `mapping_mode` | `string` | no | `"auto"` | Column mapping: `"auto"` (pass-through) or `"explicit"` (only mapped columns) |
+| `alias` | `string` | cond. | `null` | Lakehouse table alias for Delta targets |
+| `path` | `string` | cond. | `null` | File path for file-based targets |
+| `mapping_mode` | `string` | no | `"auto"` | Column mapping: `"auto"` or `"explicit"` |
 | `columns` | `dict[string, ColumnMapping]` | no | `null` | Per-column mapping specifications |
 | `partition_by` | `list[string]` | no | `null` | Partition columns for the output table |
 | `audit_columns` | `dict[string, string]` | no | `null` | Audit column definitions as name-expression pairs |
@@ -591,7 +633,9 @@ Defines where the thread writes its output.
 | `naming` | `NamingConfig` | no | `null` | Column and table naming normalization |
 | `dimension` | `DimensionConfig` | no | `null` | Dimension target mode with composable SCD flags. Mutually exclusive with `fact`. See [Dimension Modeling guide](../../guides/dimension-modeling.md). |
 | `fact` | `FactConfig` | no | `null` | Fact target mode with FK validation. Mutually exclusive with `dimension`. See [Fact Tables guide](../../guides/fact-tables.md). |
-| `seed` | `SeedConfig` | no | `null` | Seed rows inserted on first write or when table is empty. Compatible with both `dimension` and `fact`. |
+| `seed` | `SeedConfig` | no | `null` | Seed rows inserted on first write or when table is empty. |
+
+At least one of `alias` or `path` is required.
 
 ### target.columns (ColumnMapping)
 
@@ -640,7 +684,7 @@ for detailed examples.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `business_key` | `list[string]` | yes | -- | Natural key columns |
-| `surrogate_key` | `SurrogateKeyConfig` | yes | -- | SK generation (see below) |
+| `surrogate_key` | `DimensionSurrogateKeyConfig` | yes | -- | SK generation (see below) |
 | `track_history` | `bool` | no | `false` | Enable SCD versioning (close-and-insert) |
 | `change_detection` | `dict[string, GroupConfig]` | no | auto | Named change detection groups. Defaults to a single auto group (`on_change: version` if `track_history`, else `overwrite`). |
 | `previous_columns` | `dict[string, string]` | no | `null` | Map of output → source for prior-value tracking |
@@ -791,6 +835,13 @@ Key management for business keys, surrogate keys, and change detection hashes.
     Spark major versions. Neither is recommended for high-cardinality
     surrogate key use cases.
 
+!!! info "keys vs dimension surrogate key"
+    `keys.surrogate_key` uses `SurrogateKeyConfig` (hash-based, no
+    `columns` field). `target.dimension.surrogate_key` uses
+    `DimensionSurrogateKeyConfig` (requires `columns` for SK
+    generation from business key columns). These are separate
+    types with different fields.
+
 ### keys.change_detection
 
 | Key | Type | Required | Default | Description |
@@ -895,12 +946,20 @@ Post-execution assertions evaluated against the target dataset after writing.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `type` | `string` | yes | -- | Assertion type: `"row_count"`, `"column_not_null"`, `"unique"`, `"expression"` |
+| `type` | `string` | yes | -- | Assertion type: `"row_count"`, `"column_not_null"`, `"unique"`, `"expression"`, `"fk_sentinel_rate"` |
 | `severity` | `string` | no | `"warn"` | Severity level: `"info"`, `"warn"`, `"error"`, `"fatal"` |
-| `columns` | `list[string]` | no | `null` | Columns for `column_not_null` and `unique` assertions |
+| `columns` | `list[string]` | no | `null` | Columns for `column_not_null`, `unique`, and `fk_sentinel_rate` assertions |
 | `min` | `int` | no | `null` | Minimum value for `row_count` assertions |
 | `max` | `int` | no | `null` | Maximum value for `row_count` assertions |
 | `expression` | `SparkExpr` | no | `null` | Spark SQL expression for `expression` assertions |
+| `column` | `string` | cond. | `null` | Single column for `fk_sentinel_rate` (mutually exclusive with `columns`) |
+| `sentinel` | `int` or `string` | cond. | `null` | Single sentinel value for `fk_sentinel_rate` (mutually exclusive with `sentinels`) |
+| `sentinels` | `dict` | cond. | `null` | Named sentinel groups for `fk_sentinel_rate` (dict-of-int or dict-of-dict) |
+| `max_rate` | `float` | no | `null` | Maximum sentinel rate threshold for `fk_sentinel_rate` |
+| `message` | `string` | no | `null` | Custom failure message for `fk_sentinel_rate` |
+
+For `fk_sentinel_rate`: at least one of `column` or `columns` is
+required, and at least one of `sentinel` or `sentinels` is required.
 
 ```yaml
 assertions:
@@ -915,6 +974,11 @@ assertions:
   - type: expression
     expression: "count(CASE WHEN amount < 0 THEN 1 END) = 0"
     severity: warn
+  - type: fk_sentinel_rate
+    column: plant_id
+    sentinel: -4
+    max_rate: 0.05
+    message: "plant FK invalid rate exceeded"
 ```
 
 ---

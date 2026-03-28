@@ -233,8 +233,9 @@ class TestApplyUnion:
         with pytest.raises(ExecutionError, match="missing"):
             apply_union(df, params, {})
 
-    def test_union_empty_sources_list_returns_original(self, spark: SparkSession) -> None:
-        df = spark.createDataFrame([{"id": 1}, {"id": 2}])
-        params = UnionParams(sources=[], mode="by_name")
-        result = apply_union(df, params, {})
-        assert result.count() == 2
+    def test_union_empty_sources_list_rejected_by_model(self, spark: SparkSession) -> None:
+        """Empty sources list is rejected at model validation time."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="sources must not be empty"):
+            UnionParams(sources=[], mode="by_name")

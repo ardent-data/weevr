@@ -29,7 +29,11 @@ def apply_dedup(df: DataFrame, params: DedupParams) -> DataFrame:
     base_col = F.expr(params.order_by)
     order_col = base_col.asc() if params.keep == "first" else base_col.desc()
     window = Window.partitionBy(params.keys).orderBy(order_col)
-    return df.withColumn("_rn", F.row_number().over(window)).filter(F.col("_rn") == 1).drop("_rn")
+    return (
+        df.withColumn("__dedup_rn__", F.row_number().over(window))
+        .filter(F.col("__dedup_rn__") == 1)
+        .drop("__dedup_rn__")
+    )
 
 
 def apply_sort(df: DataFrame, params: SortParams) -> DataFrame:

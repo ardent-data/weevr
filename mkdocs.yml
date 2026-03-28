@@ -84,6 +84,7 @@ nav:
       - Audit Templates: guides/audit-templates.md
       - Dimension Modeling: guides/dimension-modeling.md
       - Fact Tables: guides/fact-tables.md
+      - Resolve Step: guides/resolve.md
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:

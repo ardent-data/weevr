@@ -200,7 +200,7 @@ class TestWatermarkInclusive:
 
 
 class TestWatermarkHwmFromSource:
-    """HWM is captured from source data, not from transformed output (DEC-003)."""
+    """HWM is captured from source data, not from transformed output."""
 
     def test_hwm_reflects_source_max_even_when_filtered(
         self, spark: SparkSession, tmp_delta_path
@@ -255,7 +255,7 @@ class TestWatermarkHwmFromSource:
 
 
 class TestWatermarkPersistenceFailure:
-    """Watermark persistence failure fails the thread (DEC-007)."""
+    """Watermark persistence failure fails the thread."""
 
     def test_persistence_failure_raises_state_error(
         self, spark: SparkSession, tmp_delta_path

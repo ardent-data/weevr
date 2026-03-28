@@ -186,7 +186,8 @@ sources:
   data:
     type: delta
     alias: lakehouse
-target: {}
+target:
+  alias: test
 """
         )
         result = load_config(thread_file)
@@ -246,7 +247,8 @@ sources:
   data:
     type: delta
     alias: ${missing_var}.customers
-target: {}
+target:
+  alias: test
 """
         )
 
@@ -265,7 +267,8 @@ sources:
   data:
     type: delta
     alias: lakehouse
-target: {}
+target:
+  alias: test
 steps:
   - pivot:
       columns: [x]
@@ -289,7 +292,8 @@ sources:
   data:
     type: delta
     alias: lakehouse
-target: {}
+target:
+  alias: test
 steps:
   - foreach:
       values: [name, email]
@@ -321,7 +325,8 @@ sources:
   data:
     type: delta
     alias: lakehouse
-target: {}
+target:
+  alias: test
 steps:
   - filter:
       expr: "active = true"
@@ -351,7 +356,8 @@ sources:
   data:
     type: delta
     alias: ${schema}.customers
-target: {}
+target:
+  alias: test
 steps:
   - foreach:
       values: [x, y]
@@ -377,7 +383,7 @@ class TestLoadConfigTypedExtensions:
         thread_file = tmp_path / "dim_customer.thread"
         thread_file.write_text(
             'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
-            "    alias: raw.customers\ntarget: {}\n"
+            "    alias: raw.customers\ntarget:\n  alias: test\n"
         )
         result = load_config(thread_file)
         assert isinstance(result, Thread)
@@ -388,7 +394,7 @@ class TestLoadConfigTypedExtensions:
         thread_file = tmp_path / "dim_customer.thread"
         thread_file.write_text(
             'config_version: "1.0"\nname: dim_customer\nsources:\n  data:\n'
-            "    type: delta\n    alias: raw.customers\ntarget: {}\n"
+            "    type: delta\n    alias: raw.customers\ntarget:\n  alias: test\n"
         )
         result = load_config(thread_file)
         assert isinstance(result, Thread)
@@ -399,7 +405,7 @@ class TestLoadConfigTypedExtensions:
         thread_file = tmp_path / "dim_customer.thread"
         thread_file.write_text(
             'config_version: "1.0"\nname: wrong_name\nsources:\n  data:\n'
-            "    type: delta\n    alias: raw.customers\ntarget: {}\n"
+            "    type: delta\n    alias: raw.customers\ntarget:\n  alias: test\n"
         )
         with pytest.raises(ConfigError, match="does not match filename stem"):
             load_config(thread_file)
@@ -412,7 +418,7 @@ class TestLoadConfigTypedExtensions:
         thread_file = thread_dir / "dim_customer.thread"
         thread_file.write_text(
             'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
-            "    alias: raw.customers\ntarget: {}\n"
+            "    alias: raw.customers\ntarget:\n  alias: test\n"
         )
         result = load_config(thread_file, project_root=project)
         assert isinstance(result, Thread)

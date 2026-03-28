@@ -44,7 +44,7 @@ def _make_thread_model(name: str) -> Thread:
             "name": name,
             "config_version": "1.0",
             "sources": {"_src": {"type": "delta", "alias": "_src"}},
-            "target": {},
+            "target": {"alias": "test"},
         }
     )
 
@@ -627,7 +627,7 @@ class TestNarrowLookupOnDemand:
 
 
 class TestNarrowLookupBackwardCompat:
-    """Lookups without narrow fields work identically to M101 behavior."""
+    """Lookups without narrow fields work identically to previous behavior."""
 
     def test_full_table_lookup_unchanged(self, spark: SparkSession, tmp_delta_path) -> None:
         """Lookup without narrow fields caches the full source table."""

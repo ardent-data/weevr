@@ -278,7 +278,8 @@ class Context:
         """Execute a resolved config and wrap the result."""
         if resolved.config_type == "thread":
             model = resolved.model
-            assert isinstance(model, Thread)
+            if not isinstance(model, Thread):
+                raise TypeError(f"Expected Thread, got {type(model).__name__}")
             from weevr.telemetry.collector import SpanCollector
             from weevr.telemetry.span import generate_trace_id
 
@@ -286,7 +287,10 @@ class Context:
             engine_result = execute_thread(
                 self._spark, model, collector=thread_collector, resolved_params=self._params
             )
-            assert engine_result.status in ("success", "failure")
+            if engine_result.status not in ("success", "failure"):
+                raise ExecutionError(
+                    f"Unexpected thread execution status: '{engine_result.status}'"
+                )
             result = RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
@@ -300,7 +304,8 @@ class Context:
 
         if resolved.config_type == "weave":
             model = resolved.model
-            assert isinstance(model, Weave)
+            if not isinstance(model, Weave):
+                raise TypeError(f"Expected Weave, got {type(model).__name__}")
             weave_threads = resolved.threads.get(resolved.config_name, {})
             weave_threads, warnings = self._filter_threads(
                 weave_threads, tags=tags, thread_names=thread_names
@@ -347,7 +352,8 @@ class Context:
                 variables=dict(model.variables) if model.variables else None,
                 column_set_defs=dict(model.column_sets) if model.column_sets else None,
             )
-            assert engine_result.status in ("success", "failure", "partial")
+            if engine_result.status not in ("success", "failure", "partial"):
+                raise ExecutionError(f"Unexpected weave execution status: '{engine_result.status}'")
             result = RunResult(
                 status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
@@ -362,7 +368,8 @@ class Context:
 
         # loom
         model = resolved.model
-        assert isinstance(model, Loom)
+        if not isinstance(model, Loom):
+            raise TypeError(f"Expected Loom, got {type(model).__name__}")
         all_warnings: list[str] = []
 
         filtered_weaves: dict[str, Weave] = {}
@@ -429,8 +436,9 @@ class Context:
             requested = set(thread_names)
             filtered = {n: t for n, t in all_threads.items() if n in requested}
         else:
-            assert tags is not None
-            requested_tags = set(tags)
+            # tags is guaranteed non-None here — the (None, None) case
+            # returns early at line 432-433.
+            requested_tags = set(tags)  # type: ignore[arg-type]
             filtered = {
                 n: t
                 for n, t in all_threads.items()
@@ -452,7 +460,8 @@ class Context:
 
         if resolved.config_type == "weave":
             model = resolved.model
-            assert isinstance(model, Weave)
+            if not isinstance(model, Weave):
+                raise TypeError(f"Expected Weave, got {type(model).__name__}")
             wt = resolved.threads.get(resolved.config_name, {})
             try:
                 build_plan(
@@ -466,7 +475,8 @@ class Context:
 
         elif resolved.config_type == "loom":
             model = resolved.model
-            assert isinstance(model, Loom)
+            if not isinstance(model, Loom):
+                raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
                 weave_name = weave_entry.name or (
                     Path(weave_entry.ref).stem if weave_entry.ref else ""
@@ -533,7 +543,8 @@ class Context:
         """Flatten all threads from a resolved config into a single dict."""
         if resolved.config_type == "thread":
             model = resolved.model
-            assert isinstance(model, Thread)
+            if not isinstance(model, Thread):
+                raise TypeError(f"Expected Thread, got {type(model).__name__}")
             return {resolved.config_name: model}
 
         result: dict[str, Thread] = {}
@@ -567,7 +578,8 @@ class Context:
 
         if resolved.config_type == "weave":
             model = resolved.model
-            assert isinstance(model, Weave)
+            if not isinstance(model, Weave):
+                raise TypeError(f"Expected Weave, got {type(model).__name__}")
             wt = resolved.threads.get(resolved.config_name, {})
             wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
             all_warnings.extend(warnings)
@@ -584,7 +596,8 @@ class Context:
 
         elif resolved.config_type == "loom":
             model = resolved.model
-            assert isinstance(model, Loom)
+            if not isinstance(model, Loom):
+                raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
                 weave_name = weave_entry.name or (
                     Path(weave_entry.ref).stem if weave_entry.ref else ""
@@ -727,6 +740,10 @@ class Context:
         Replicates the ``load_config`` pipeline but captures resolved child
         configs (``_resolved_threads`` / ``_resolved_weaves``) before Pydantic
         hydration strips them.
+
+        Note: This method replicates the ``load_config`` pipeline. Changes
+        to ``load_config`` must be mirrored here. A future refactor should
+        extract a shared ``_resolve_config_to_dict`` function.
         """
         file_path = self._resolve_config_path(path)
         project_root = Path(self._project_root)

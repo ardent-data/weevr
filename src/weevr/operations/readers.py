@@ -84,7 +84,11 @@ def _apply_dedup(df: DataFrame, dedup: DedupConfig) -> DataFrame:
 
     order_col = _parse_order_col(dedup.order_by)
     window = Window.partitionBy(dedup.keys).orderBy(order_col)
-    return df.withColumn("_rn", F.row_number().over(window)).filter(F.col("_rn") == 1).drop("_rn")
+    return (
+        df.withColumn("__dedup_rn__", F.row_number().over(window))
+        .filter(F.col("__dedup_rn__") == 1)
+        .drop("__dedup_rn__")
+    )
 
 
 def _parse_order_col(order_by: str):  # type: ignore[return]
@@ -144,7 +148,7 @@ def read_source_incremental(
     If ``prior_state`` is ``None`` (first run), reads all data.
     Otherwise applies a watermark filter for predicate pushdown.
     HWM is captured as ``MAX(watermark_column)`` from the source read
-    (before transforms, per DEC-003).
+    (before transforms).
 
     Args:
         spark: Active SparkSession.

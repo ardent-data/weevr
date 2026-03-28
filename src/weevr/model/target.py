@@ -65,6 +65,13 @@ class Target(FrozenBase):
         return self
 
     @model_validator(mode="after")
+    def _validate_alias_or_path(self) -> "Target":
+        """Validate that at least one of alias or path is provided."""
+        if self.alias is None and self.path is None:
+            raise ValueError("target requires at least one of 'alias' or 'path'")
+        return self
+
+    @model_validator(mode="after")
     def _validate_dimension_fact_exclusive(self) -> "Target":
         """Validate that dimension and fact are mutually exclusive."""
         if self.dimension is not None and self.fact is not None:

@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from pydantic import field_validator
+
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
 from weevr.model.column_set import ColumnSet
@@ -32,6 +34,14 @@ class Thread(FrozenBase):
     qualified_key: str = ""
     config_version: str
     sources: dict[str, Source]
+
+    @field_validator("sources")
+    @classmethod
+    def _sources_non_empty(cls, v: dict[str, Source]) -> dict[str, Source]:
+        if not v:
+            raise ValueError("sources must contain at least one entry")
+        return v
+
     steps: list[Step] = []
     target: Target
     write: WriteConfig | None = None

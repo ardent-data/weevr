@@ -103,9 +103,12 @@ steps:
         - order_year
 ```
 
-Available step types include `filter`, `derive`, `join`, `select`, `drop`,
-`rename`, `cast`, `dedup`, `sort`, `union`, `aggregate`, `window`, `pivot`,
-`unpivot`, `case_when`, `fill_null`, `coalesce`, `string_ops`, and `date_ops`.
+Available step types include `filter`, `derive`, `join`, `select`,
+`drop`, `rename`, `cast`, `dedup`, `sort`, `union`, `aggregate`,
+`window`, `pivot`, `unpivot`, `case_when`, `fill_null`, `coalesce`,
+`string_ops`, `date_ops`, `concat`, `map`, `format`, and `resolve`.
+See the [thread schema reference](../reference/yaml-schema/thread.md)
+for the full list.
 
 ## Step 3 -- Define the target
 

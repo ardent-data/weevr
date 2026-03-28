@@ -3,4 +3,5 @@ sources:
   customers:
     type: delta
     alias: raw.customers
-target: {}
+target:
+  alias: test
