@@ -82,6 +82,8 @@ nav:
       - Telemetry Architecture: guides/telemetry-architecture.md
       - Exports: guides/exports.md
       - Audit Templates: guides/audit-templates.md
+      - Dimension Modeling: guides/dimension-modeling.md
+      - Fact Tables: guides/fact-tables.md
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:

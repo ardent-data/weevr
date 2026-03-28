@@ -185,3 +185,73 @@ class TestTarget:
         """audit_columns_exclude rejects empty string entries."""
         with pytest.raises(ValidationError, match="non-empty"):
             Target(audit_columns_exclude=[""])
+
+
+class TestTargetAnalyticalModes:
+    """Test Target dimension, fact, and seed fields."""
+
+    _dimension_data = {
+        "business_key": ["customer_id"],
+        "surrogate_key": {"name": "_sk", "columns": ["customer_id"]},
+    }
+    _fact_data = {"foreign_keys": ["customer_sk"]}
+    _seed_data = {"rows": [{"id": 1, "name": "test"}]}
+
+    def test_with_dimension(self):
+        """Target accepts a dimension config."""
+        t = Target(dimension=self._dimension_data)  # type: ignore[arg-type]
+        assert t.dimension is not None
+        assert t.dimension.business_key == ["customer_id"]
+
+    def test_with_fact(self):
+        """Target accepts a fact config."""
+        t = Target(fact=self._fact_data)  # type: ignore[arg-type]
+        assert t.fact is not None
+        assert t.fact.foreign_keys == ["customer_sk"]
+
+    def test_with_seed(self):
+        """Target accepts a seed config."""
+        t = Target(seed=self._seed_data)  # type: ignore[arg-type]
+        assert t.seed is not None
+        assert t.seed.rows == [{"id": 1, "name": "test"}]
+
+    def test_dimension_and_fact_mutually_exclusive(self):
+        """dimension and fact together raise ValidationError (DEC-016)."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            Target(
+                dimension=self._dimension_data,  # type: ignore[arg-type]
+                fact=self._fact_data,  # type: ignore[arg-type]
+            )
+
+    def test_dimension_and_seed_compatible(self):
+        """dimension and seed together are valid."""
+        t = Target(
+            dimension=self._dimension_data,  # type: ignore[arg-type]
+            seed=self._seed_data,  # type: ignore[arg-type]
+        )
+        assert t.dimension is not None
+        assert t.seed is not None
+
+    def test_fact_and_seed_compatible(self):
+        """fact and seed together are valid."""
+        t = Target(
+            fact=self._fact_data,  # type: ignore[arg-type]
+            seed=self._seed_data,  # type: ignore[arg-type]
+        )
+        assert t.fact is not None
+        assert t.seed is not None
+
+    def test_round_trip_with_dimension(self):
+        """Target with dimension round-trips."""
+        t = Target(dimension=self._dimension_data)  # type: ignore[arg-type]
+        assert Target.model_validate(t.model_dump()) == t
+
+    def test_round_trip_with_fact(self):
+        """Target with fact round-trips."""
+        t = Target(fact=self._fact_data)  # type: ignore[arg-type]
+        assert Target.model_validate(t.model_dump()) == t
+
+    def test_round_trip_with_seed(self):
+        """Target with seed round-trips."""
+        t = Target(seed=self._seed_data)  # type: ignore[arg-type]
+        assert Target.model_validate(t.model_dump()) == t

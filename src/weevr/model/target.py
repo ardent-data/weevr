@@ -5,7 +5,10 @@ from typing import Any, Literal
 from pydantic import model_validator
 
 from weevr.model.base import FrozenBase
+from weevr.model.dimension import DimensionConfig
+from weevr.model.fact import FactConfig
 from weevr.model.naming import NamingConfig
+from weevr.model.seed import SeedConfig
 from weevr.model.types import SparkExpr
 
 
@@ -41,6 +44,9 @@ class Target(FrozenBase):
     audit_template_inherit: bool = True
     audit_columns_exclude: list[str] | None = None
     naming: NamingConfig | None = None
+    dimension: DimensionConfig | None = None
+    fact: FactConfig | None = None
+    seed: SeedConfig | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -56,4 +62,11 @@ class Target(FrozenBase):
             for pattern in self.audit_columns_exclude:
                 if not pattern:
                     raise ValueError("audit_columns_exclude patterns must be non-empty strings")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_dimension_fact_exclusive(self) -> "Target":
+        """Validate that dimension and fact are mutually exclusive."""
+        if self.dimension is not None and self.fact is not None:
+            raise ValueError("'dimension' and 'fact' are mutually exclusive on a single target")
         return self

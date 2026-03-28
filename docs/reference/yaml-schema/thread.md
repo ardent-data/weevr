@@ -589,6 +589,9 @@ Defines where the thread writes its output.
 | `audit_template_inherit` | `bool` | no | `true` | When `false`, suppresses any `audit_template` inherited from parent levels. Direct `audit_template` on this target still applies. |
 | `audit_columns_exclude` | `list[string]` | no | `null` | Column names or glob patterns to exclude from the resolved template set. |
 | `naming` | `NamingConfig` | no | `null` | Column and table naming normalization |
+| `dimension` | `DimensionConfig` | no | `null` | Dimension target mode with composable SCD flags. Mutually exclusive with `fact`. See [Dimension Modeling guide](../../guides/dimension-modeling.md). |
+| `fact` | `FactConfig` | no | `null` | Fact target mode with FK validation. Mutually exclusive with `dimension`. See [Fact Tables guide](../../guides/fact-tables.md). |
+| `seed` | `SeedConfig` | no | `null` | Seed rows inserted on first write or when table is empty. Compatible with both `dimension` and `fact`. |
 
 ### target.columns (ColumnMapping)
 
@@ -625,6 +628,114 @@ target:
       drop: true
   naming:
     columns: snake_case
+```
+
+### target.dimension (DimensionConfig)
+
+Composable dimension target with behavioral flags replacing
+traditional SCD type labels. See the
+[Dimension Modeling guide](../../guides/dimension-modeling.md)
+for detailed examples.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `business_key` | `list[string]` | yes | -- | Natural key columns |
+| `surrogate_key` | `SurrogateKeyConfig` | yes | -- | SK generation (see below) |
+| `track_history` | `bool` | no | `false` | Enable SCD versioning (close-and-insert) |
+| `change_detection` | `dict[string, GroupConfig]` | no | auto | Named change detection groups. Defaults to a single auto group (`on_change: version` if `track_history`, else `overwrite`). |
+| `previous_columns` | `dict[string, string]` | no | `null` | Map of output → source for prior-value tracking |
+| `additional_keys` | `dict[string, KeyConfig]` | no | `null` | Secondary hash key definitions |
+| `columns` | `ScdColumnConfig` | no | defaults | SCD column names: `valid_from` (`_valid_from`), `valid_to` (`_valid_to`), `is_current` (`_is_current`) |
+| `dates` | `ScdDateConfig` | no | defaults | SCD boundary dates: `min` (`1970-01-01`), `max` (`9999-12-31`) |
+| `seed_system_members` | `bool` | no | `false` | Insert Kimball sentinel rows on first write |
+| `system_members` | `list[SystemMember]` | no | defaults | Custom sentinel rows (sk, code, label). Defaults: -1/unknown, -2/not_applicable |
+| `label_column` | `string` | no | `null` | Column for system member labels |
+| `history_filter` | `bool` | no | `true` | Filter target reads to `is_current = true` |
+
+**dimension.surrogate_key:**
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | `string` | yes | -- | Output column name |
+| `algorithm` | `string` | no | `"sha256"` | Hash algorithm |
+| `columns` | `list[string]` | yes | -- | Source columns to hash |
+| `output` | `string` | no | `"native"` | Output type: `"native"` or `"string"` |
+
+**dimension.change_detection group:**
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | `string` | no | dict key | Output hash column name |
+| `algorithm` | `string` | no | `"sha256"` | Hash algorithm |
+| `columns` | `list[string]` or `"auto"` | yes | -- | Columns to hash. `"auto"` selects remaining data columns. |
+| `on_change` | `string` | yes | -- | `"version"`, `"overwrite"`, or `"static"` |
+| `output` | `string` | no | `"native"` | Output type |
+
+!!! note "write/keys interaction"
+    When `dimension:` is present, `write.match_keys`,
+    `write.on_match`, `keys.business_key`,
+    `keys.surrogate_key`, and `keys.change_detection` are
+    forbidden — the engine derives these from the dimension
+    block. `write.on_no_match_source` and
+    `write.on_no_match_target` remain available as overrides.
+
+```yaml
+target:
+  path: Tables/dim_customer
+  dimension:
+    business_key: [customer_id]
+    surrogate_key:
+      name: _sk_customer
+      columns: [customer_id]
+    track_history: true
+    seed_system_members: true
+```
+
+### target.fact (FactConfig)
+
+Fact target mode providing FK column validation and sentinel
+value documentation. See the
+[Fact Tables guide](../../guides/fact-tables.md).
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `foreign_keys` | `list[string]` | yes | -- | FK column names to validate exist in output |
+| `sentinel_values` | `SentinelValueConfig` | no | defaults | Sentinel value conventions |
+
+**fact.sentinel_values:**
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `invalid` | `int` | no | `-4` | Sentinel for incomplete business keys |
+| `missing` | `int` | no | `-1` | Sentinel for unmatched lookups |
+
+```yaml
+target:
+  path: Tables/fact_orders
+  fact:
+    foreign_keys: [sk_customer, sk_product, sk_date]
+    sentinel_values:
+      invalid: -4
+      missing: -1
+```
+
+### target.seed (SeedConfig)
+
+Seed rows inserted into the target on first write or when the
+table is empty.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `on` | `string` | no | `"first_write"` | Trigger: `"first_write"` (table absent) or `"empty"` (table absent or zero rows) |
+| `rows` | `list[dict]` | yes | -- | Row data as column-value dicts |
+
+```yaml
+target:
+  seed:
+    on: first_write
+    rows:
+      - id: 1
+        name: Default Category
 ```
 
 ---
