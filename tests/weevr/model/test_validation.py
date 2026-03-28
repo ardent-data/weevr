@@ -123,3 +123,134 @@ class TestAssertion:
         """Assertion round-trips."""
         a = Assertion(type="row_count", min=0, max=500)
         assert Assertion.model_validate(a.model_dump()) == a
+
+
+# ---------------------------------------------------------------------------
+# fk_sentinel_rate assertion model (M114)
+# ---------------------------------------------------------------------------
+
+
+class TestSentinelGroup:
+    """Test SentinelGroup model."""
+
+    def test_basic(self):
+        """SentinelGroup with value and no per-group rate."""
+        from weevr.model.validation import SentinelGroup
+
+        sg = SentinelGroup(value=-4)
+        assert sg.value == -4
+        assert sg.max_rate is None
+
+    def test_with_max_rate(self):
+        """SentinelGroup with per-group max_rate."""
+        from weevr.model.validation import SentinelGroup
+
+        sg = SentinelGroup(value=-1, max_rate=0.10)
+        assert sg.max_rate == 0.10
+
+    def test_string_code_value(self):
+        """SentinelGroup supports string system member code."""
+        from weevr.model.validation import SentinelGroup
+
+        sg = SentinelGroup(value="invalid")
+        assert sg.value == "invalid"
+
+
+class TestFkSentinelRateAssertion:
+    """Test fk_sentinel_rate assertion fields and validation."""
+
+    def test_single_column_single_sentinel(self):
+        """Single column with single sentinel int."""
+        a = Assertion(
+            type="fk_sentinel_rate",
+            column="plant_id",
+            sentinel=-4,
+            max_rate=0.05,
+            message="plant FK invalid rate exceeded",
+        )
+        assert a.type == "fk_sentinel_rate"
+        assert a.column == "plant_id"
+        assert a.sentinel == -4
+        assert a.max_rate == 0.05
+
+    def test_columns_list(self):
+        """Multiple columns with shared config."""
+        a = Assertion(
+            type="fk_sentinel_rate",
+            columns=["plant_id", "company_id"],
+            sentinel=-4,
+            max_rate=0.05,
+        )
+        assert a.columns == ["plant_id", "company_id"]
+
+    def test_named_sentinel_groups_dict_of_int(self):
+        """Named sentinel groups as dict-of-int (shared max_rate)."""
+        a = Assertion(
+            type="fk_sentinel_rate",
+            column="plant_id",
+            sentinels={"invalid": -4, "unknown": -1},  # type: ignore[arg-type]
+            max_rate=0.10,
+        )
+        assert a.sentinels is not None
+        assert a.sentinels["invalid"].value == -4  # type: ignore[union-attr]
+        assert a.sentinels["unknown"].value == -1  # type: ignore[union-attr]
+
+    def test_named_sentinel_groups_dict_of_dict(self):
+        """Named sentinel groups with per-group max_rate."""
+        a = Assertion(
+            type="fk_sentinel_rate",
+            column="plant_id",
+            sentinels={  # type: ignore[arg-type]
+                "invalid": {"value": -4, "max_rate": 0.02},
+                "unknown": {"value": -1, "max_rate": 0.10},
+            },
+        )
+        assert a.sentinels is not None
+        assert a.sentinels["invalid"].value == -4  # type: ignore[union-attr]
+        assert a.sentinels["invalid"].max_rate == 0.02  # type: ignore[union-attr]
+        assert a.sentinels["unknown"].max_rate == 0.10  # type: ignore[union-attr]
+
+    def test_column_columns_mutual_exclusion(self):
+        """column and columns are mutually exclusive."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                columns=["plant_id"],
+                sentinel=-4,
+                max_rate=0.05,
+            )
+
+    def test_sentinel_sentinels_mutual_exclusion(self):
+        """sentinel and sentinels are mutually exclusive."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                sentinel=-4,
+                sentinels={"invalid": -4},  # type: ignore[arg-type]
+                max_rate=0.05,
+            )
+
+    def test_system_member_code_as_sentinel(self):
+        """String system member code as sentinel value."""
+        a = Assertion(
+            type="fk_sentinel_rate",
+            column="plant_id",
+            sentinel="invalid",
+            max_rate=0.05,
+        )
+        assert a.sentinel == "invalid"
+
+    def test_round_trip(self):
+        """fk_sentinel_rate assertion round-trips."""
+        a = Assertion(
+            type="fk_sentinel_rate",
+            column="plant_id",
+            sentinel=-4,
+            max_rate=0.05,
+            message="test",
+        )
+        restored = Assertion.model_validate(a.model_dump())
+        assert restored.type == "fk_sentinel_rate"
+        assert restored.sentinel == -4
