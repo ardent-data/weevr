@@ -714,3 +714,317 @@ class TestRenameParams:
         """Explicitly passing column_set=None is equivalent to the default."""
         p = RenameParams(columns={"x": "y"}, column_set=None)
         assert p.column_set is None
+
+
+# ---------------------------------------------------------------------------
+# Resolve step models (M114)
+# ---------------------------------------------------------------------------
+
+
+class TestCurrentConfig:
+    """Test CurrentConfig model."""
+
+    def test_basic(self):
+        """CurrentConfig with column and default value."""
+        from weevr.model.pipeline import CurrentConfig
+
+        c = CurrentConfig(column="is_current")
+        assert c.column == "is_current"
+        assert c.value is True
+
+    def test_custom_value(self):
+        """CurrentConfig with custom value."""
+        from weevr.model.pipeline import CurrentConfig
+
+        c = CurrentConfig(column="is_current", value="Y")
+        assert c.value == "Y"
+
+
+class TestEffectiveConfig:
+    """Test EffectiveConfig model validation."""
+
+    def test_date_range_mode(self):
+        """Date range with all three fields."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        e = EffectiveConfig.model_validate(
+            {"date_column": "order_date", "from": "eff_from", "to": "eff_to"}
+        )
+        assert e.date_column == "order_date"
+        assert e.from_ == "eff_from"
+        assert e.to == "eff_to"
+        assert e.current is None
+
+    def test_current_string_sugar(self):
+        """Current flag as plain string (column name, value=True)."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        e = EffectiveConfig(current="is_current")  # type: ignore[arg-type]
+        assert e.current is not None
+        assert e.current.column == "is_current"  # type: ignore[union-attr]
+        assert e.current.value is True  # type: ignore[union-attr]
+
+    def test_current_dict_form(self):
+        """Current flag with custom value via dict."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        e = EffectiveConfig(current={"column": "is_current", "value": "Y"})  # type: ignore[arg-type]
+        assert e.current.column == "is_current"  # type: ignore[union-attr]
+        assert e.current.value == "Y"  # type: ignore[union-attr]
+
+    def test_date_range_partial_raises(self):
+        """Partial date range fields raise ValidationError."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        with pytest.raises(ValidationError, match="all-or-nothing"):
+            EffectiveConfig.model_validate({"date_column": "order_date"})
+
+    def test_date_range_and_current_exclusive(self):
+        """Date range and current are mutually exclusive."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            EffectiveConfig.model_validate(
+                {
+                    "date_column": "order_date",
+                    "from": "eff_from",
+                    "to": "eff_to",
+                    "current": "is_current",
+                }
+            )
+
+    def test_empty_raises(self):
+        """EffectiveConfig with no fields raises ValidationError."""
+        from weevr.model.pipeline import EffectiveConfig
+
+        with pytest.raises(ValidationError):
+            EffectiveConfig()
+
+
+class TestResolveParams:
+    """Test ResolveParams model validation and match sugar."""
+
+    def test_required_fields(self):
+        """ResolveParams requires name, lookup, match, pk."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id", lookup="dim_plant", match={"plant_code": "natural_id"}, pk="id"
+        )
+        assert p.name == "plant_id"
+        assert p.lookup == "dim_plant"
+        assert p.match == {"plant_code": "natural_id"}
+        assert p.pk == "id"
+
+    def test_match_sugar_string(self):
+        """String match sugar: 'col' -> {'col': 'col'}."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id",
+            lookup="dim_plant",
+            match="natural_id",  # type: ignore[arg-type]
+            pk="id",
+        )
+        assert p.match == {"natural_id": "natural_id"}
+
+    def test_match_sugar_list(self):
+        """List match sugar: ['a', 'b'] -> {'a': 'a', 'b': 'b'}."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id",
+            lookup="dim_plant",
+            match=["mandt", "plant"],  # type: ignore[arg-type]
+            pk="id",
+        )
+        assert p.match == {"mandt": "mandt", "plant": "plant"}
+
+    def test_match_dict_passthrough(self):
+        """Dict match passes through unchanged."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="plant_id",
+            lookup="dim_plant",
+            match={"plant": "natural_id", "region": "region_code"},
+            pk="id",
+        )
+        assert p.match == {"plant": "natural_id", "region": "region_code"}
+
+    def test_defaults(self):
+        """Default sentinel and behavior values."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(name="fk", lookup="dim", match="bk", pk="id")  # type: ignore[arg-type]
+        assert p.on_invalid == -4
+        assert p.on_unknown == -1
+        assert p.on_duplicate == "warn"
+        assert p.on_failure == "abort"
+        assert p.normalize is None
+        assert p.drop_source_columns is False
+        assert p.include is None
+        assert p.include_prefix is None
+        assert p.effective is None
+        assert p.where is None
+        assert p.batch is None
+
+    def test_include_string_sugar(self):
+        """String include sugar: 'col' -> ['col']."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include="description",  # type: ignore[arg-type]
+        )
+        assert p.include == ["description"]
+
+    def test_include_list(self):
+        """List include passes through."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=["description", "category"],
+        )
+        assert p.include == ["description", "category"]
+
+    def test_include_dict(self):
+        """Dict include for rename passes through."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include={"description": "plant_desc"},
+        )
+        assert p.include == {"description": "plant_desc"}
+
+    def test_include_prefix_without_include_raises(self):
+        """include_prefix without include raises ValidationError."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="include_prefix"):
+            ResolveParams(
+                name="fk",
+                lookup="dim",
+                match="bk",  # type: ignore[arg-type]
+                pk="id",
+                include_prefix="dim_",
+            )
+
+    def test_effective_composable_with_where(self):
+        """Effective and where can coexist."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            effective={"current": "is_current"},  # type: ignore[arg-type]
+            where="region = ${region_code}",
+        )
+        assert p.effective is not None
+        assert p.where is not None
+
+    def test_batch_and_single_exclusive(self):
+        """Batch mode and single-mode required fields are mutually exclusive."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            ResolveParams(
+                name="fk",
+                lookup="dim",
+                match="bk",  # type: ignore[arg-type]
+                pk="id",
+                batch=[{"name": "fk2", "lookup": "d2", "match": "b2"}],  # type: ignore[list-item]
+            )
+
+    def test_batch_mode_no_required_single_fields(self):
+        """Batch mode does not require name/lookup/match/pk at outer level."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_invalid=-4,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+                {"name": "fk2", "lookup": "dim2", "match": "bk2"},
+            ],
+        )
+        assert p.batch is not None
+        assert len(p.batch) == 2
+
+
+class TestResolveBatchItem:
+    """Test ResolveBatchItem model."""
+
+    def test_required_fields(self):
+        """ResolveBatchItem requires name, lookup, match."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(name="fk", lookup="dim", match="bk")  # type: ignore[arg-type]
+        assert item.name == "fk"
+        assert item.match == {"bk": "bk"}
+
+    def test_match_sugar(self):
+        """ResolveBatchItem supports match sugar."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(name="fk", lookup="dim", match=["a", "b"])  # type: ignore[arg-type]
+        assert item.match == {"a": "a", "b": "b"}
+
+    def test_override_fields(self):
+        """ResolveBatchItem accepts optional override fields."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="sk",
+            on_invalid=-9,
+            effective={"current": "is_active"},  # type: ignore[arg-type]
+        )
+        assert item.pk == "sk"
+        assert item.on_invalid == -9
+        assert item.effective is not None
+
+
+class TestResolveStepDiscriminator:
+    """Test resolve step in the Step discriminated union."""
+
+    def _validate(self, d: dict) -> Step:  # type: ignore[type-arg]
+        return _step_adapter.validate_python(d)
+
+    def test_resolve_step_dispatches(self):
+        """Dict with 'resolve' key dispatches to ResolveStep."""
+        from weevr.model.pipeline import ResolveStep
+
+        step = self._validate(
+            {"resolve": {"name": "plant_id", "lookup": "dim_plant", "match": "bk", "pk": "id"}}
+        )
+        assert isinstance(step, ResolveStep)
+        assert step.resolve.name == "plant_id"
+
+    def test_resolve_step_round_trip(self):
+        """ResolveStep round-trips via Step union adapter."""
+        from weevr.model.pipeline import ResolveStep
+
+        step = self._validate(
+            {"resolve": {"name": "plant_id", "lookup": "dim_plant", "match": "bk", "pk": "id"}}
+        )
+        assert isinstance(step, ResolveStep)
+        dumped = step.model_dump()
+        restored = _step_adapter.validate_python(dumped)
+        assert isinstance(restored, ResolveStep)
+        assert restored.resolve.match == {"bk": "bk"}
