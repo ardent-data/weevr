@@ -91,6 +91,27 @@ def apply_resolve(
             norm_lookup_map[lc] = nl
 
     # ---------------------------------------------------------------
+    # Step 2a: Apply effective block filter to lookup
+    # ---------------------------------------------------------------
+    if params.effective is not None:
+        eff = params.effective
+        if eff.current is not None and not isinstance(eff.current, str):
+            # Current flag mode — filter lookup to active records
+            current_col = eff.current.column
+            current_val = eff.current.value
+            lookup_df = lookup_df.filter(F.col(current_col) == F.lit(current_val))
+        # Date range mode is handled in the join condition (step 3)
+
+    # ---------------------------------------------------------------
+    # Step 2b: Apply where predicate to lookup
+    # ---------------------------------------------------------------
+    if params.where is not None:
+        # Simple where without ${} interpolation at this stage
+        where_expr = params.where
+        if "${" not in where_expr:
+            lookup_df = lookup_df.filter(F.expr(where_expr))
+
+    # ---------------------------------------------------------------
     # Step 3: Build join condition
     # ---------------------------------------------------------------
     join_cols_src = [norm_source_map.get(sc, sc) for sc in source_cols]
@@ -98,6 +119,16 @@ def apply_resolve(
     join_cond: Column = F.lit(True)
     for src_c, lkp_c in zip(join_cols_src, join_cols_lkp, strict=True):
         join_cond = join_cond & (F.col(f"__fact__.{src_c}") == F.col(f"__lkp__.{lkp_c}"))
+
+    # Add effective date range condition to join
+    if params.effective is not None and params.effective.date_column is not None:
+        eff = params.effective
+        date_col = f"__fact__.{eff.date_column}"
+        from_col = f"__lkp__.{eff.from_}"
+        to_col = f"__lkp__.{eff.to}"
+        # Half-open interval: [from, to) with null to = current record
+        join_cond = join_cond & (F.col(date_col) >= F.col(from_col))
+        join_cond = join_cond & (F.col(to_col).isNull() | (F.col(date_col) < F.col(to_col)))
 
     # Alias DataFrames to avoid column ambiguity
     fact_aliased = df.alias("__fact__")

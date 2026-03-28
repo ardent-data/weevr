@@ -342,3 +342,210 @@ class TestApplyResolveSingleFK:
         )
         result = apply_resolve(fact, params, dim)
         assert "natural_id" not in result.df.columns
+
+
+# ---------------------------------------------------------------------------
+# Effective block and where predicate (Task 6)
+# ---------------------------------------------------------------------------
+
+
+class TestApplyResolveEffective:
+    """Test effective block and where predicate filtering."""
+
+    def test_current_flag_boolean(self, spark: SparkSession):
+        """Current flag with boolean true filters to active records."""
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        dim = spark.createDataFrame(
+            [(1, "A", True), (2, "A", False)],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("is_current", StringType(), True),
+                ]
+            ),
+        )
+        # Spark reads boolean YAML as string, so use "true"/"false"
+        dim = spark.createDataFrame(
+            [(1, "A", True), (2, "A", False)],
+            ["id", "natural_id", "is_current"],
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            effective={"current": "is_current"},  # type: ignore[arg-type]
+            on_duplicate="first",
+        )
+        result = apply_resolve(fact, params, dim)
+        row = result.df.collect()[0]
+        assert row["fk"] == 1
+
+    def test_current_flag_custom_value(self, spark: SparkSession):
+        """Current flag with custom value 'Y' filters correctly."""
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        dim = spark.createDataFrame(
+            [(1, "A", "Y"), (2, "A", "N")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("is_current", StringType(), True),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            effective={"current": {"column": "is_current", "value": "Y"}},  # type: ignore[arg-type]
+            on_duplicate="first",
+        )
+        result = apply_resolve(fact, params, dim)
+        row = result.df.collect()[0]
+        assert row["fk"] == 1
+
+    def test_date_range(self, spark: SparkSession):
+        """Date range effective filters to matching interval."""
+        from datetime import date
+
+        from pyspark.sql.types import DateType
+
+        fact = spark.createDataFrame(
+            [("A", date(2025, 6, 15))],
+            StructType(
+                [
+                    StructField("bk", StringType(), True),
+                    StructField("order_date", DateType(), True),
+                ]
+            ),
+        )
+        dim = spark.createDataFrame(
+            [
+                (1, "A", date(2025, 1, 1), date(2025, 6, 1)),
+                (2, "A", date(2025, 6, 1), date(2026, 1, 1)),
+            ],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("eff_from", DateType(), True),
+                    StructField("eff_to", DateType(), True),
+                ]
+            ),
+        )
+        params = ResolveParams.model_validate(
+            {
+                "name": "fk",
+                "lookup": "dim",
+                "match": {"bk": "natural_id"},
+                "pk": "id",
+                "effective": {
+                    "date_column": "order_date",
+                    "from": "eff_from",
+                    "to": "eff_to",
+                },
+                "on_duplicate": "first",
+            }
+        )
+        result = apply_resolve(fact, params, dim)
+        row = result.df.collect()[0]
+        assert row["fk"] == 2
+
+    def test_date_range_null_to_current(self, spark: SparkSession):
+        """Date range with null 'to' matches as current record."""
+        from datetime import date
+
+        from pyspark.sql.types import DateType
+
+        fact = spark.createDataFrame(
+            [("A", date(2025, 6, 15))],
+            StructType(
+                [
+                    StructField("bk", StringType(), True),
+                    StructField("order_date", DateType(), True),
+                ]
+            ),
+        )
+        dim = spark.createDataFrame(
+            [
+                (1, "A", date(2025, 1, 1), date(2025, 6, 1)),
+                (2, "A", date(2025, 6, 1), None),
+            ],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("eff_from", DateType(), True),
+                    StructField("eff_to", DateType(), True),
+                ]
+            ),
+        )
+        params = ResolveParams.model_validate(
+            {
+                "name": "fk",
+                "lookup": "dim",
+                "match": {"bk": "natural_id"},
+                "pk": "id",
+                "effective": {
+                    "date_column": "order_date",
+                    "from": "eff_from",
+                    "to": "eff_to",
+                },
+                "on_duplicate": "first",
+            }
+        )
+        result = apply_resolve(fact, params, dim)
+        row = result.df.collect()[0]
+        assert row["fk"] == 2
+
+    def test_where_predicate(self, spark: SparkSession):
+        """Where predicate filters lookup rows."""
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        dim = spark.createDataFrame(
+            [(1, "A", "active"), (2, "A", "inactive")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("status", StringType(), True),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            where="status = 'active'",
+            on_duplicate="first",
+        )
+        result = apply_resolve(fact, params, dim)
+        row = result.df.collect()[0]
+        assert row["fk"] == 1
+
+    def test_effective_and_where_composable(self, spark: SparkSession):
+        """Effective and where compose with AND semantics."""
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        dim = spark.createDataFrame(
+            [
+                (1, "A", True, "us"),
+                (2, "A", True, "eu"),
+                (3, "A", False, "us"),
+            ],
+            ["id", "natural_id", "is_current", "region"],
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            effective={"current": "is_current"},  # type: ignore[arg-type]
+            where="region = 'us'",
+            on_duplicate="first",
+        )
+        result = apply_resolve(fact, params, dim)
+        row = result.df.collect()[0]
+        assert row["fk"] == 1
