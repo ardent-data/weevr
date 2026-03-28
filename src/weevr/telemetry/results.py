@@ -117,6 +117,11 @@ class ThreadTelemetry(FrozenBase):
     cdc_deletes: int | None = None
     resolved_params: dict[str, Any] | None = None
     audit_columns_applied: list[str] = []
+    dimension_rows_versioned: int | None = None
+    dimension_rows_overwritten: int | None = None
+    dimension_rows_inserted: int | None = None
+    dimension_rows_unchanged: int | None = None
+    dimension_seeds_inserted: int | None = None
     export_results: list[ExportResult] = []
 
 

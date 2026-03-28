@@ -23,8 +23,10 @@ from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.audit import AuditContext, build_sources_json, inject_audit_columns
+from weevr.operations.dimension import DimensionMergeBuilder, execute_dimension_merge
 from weevr.operations.exports import resolve_exports, write_export
-from weevr.operations.hashing import compute_keys
+from weevr.operations.fact import validate_fact_target
+from weevr.operations.hashing import compute_dimension_keys, compute_keys
 from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import run_pipeline
 from weevr.operations.quarantine import write_quarantine
@@ -34,6 +36,7 @@ from weevr.operations.readers import (
     read_source_incremental,
     read_sources,
 )
+from weevr.operations.seeding import build_system_member_rows, execute_seeds
 from weevr.operations.validation import validate_dataframe
 from weevr.operations.writers import apply_target_mapping, execute_cdc_merge, write_target
 from weevr.state import WatermarkState, WatermarkStore, resolve_store
@@ -44,7 +47,7 @@ from weevr.telemetry.span import ExecutionSpan, SpanStatus, generate_span_id, ge
 logger = logging.getLogger(__name__)
 
 
-def execute_thread(
+def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     spark: SparkSession,
     thread: Thread,
     collector: SpanCollector | None = None,
@@ -320,8 +323,21 @@ def execute_thread(
                 df = normalize_columns(df, thread.target.naming)
 
             # Step 9 — compute keys and hashes
-            if thread.keys is not None:
+            dim_config = thread.target.dimension
+            fact_config = thread.target.fact
+            seed_config = thread.target.seed
+
+            if dim_config is not None:
+                # Dimension mode: use dimension-aware key computation
+                df = compute_dimension_keys(df, dim_config)
+            elif thread.keys is not None:
                 df = compute_keys(df, thread.keys)
+
+            # Step 9b — inject SCD columns for versioned dimensions
+            dim_builder: DimensionMergeBuilder | None = None
+            if dim_config is not None:
+                dim_builder = DimensionMergeBuilder(dim_config, thread.write)
+                df = dim_builder.inject_scd_columns(df, run_timestamp)
 
             # Step 10 — resolve and prepare audit columns
             audit_columns = thread.target.audit_columns or {}
@@ -331,6 +347,14 @@ def execute_thread(
                 audit_ctx = _build_audit_context(
                     thread, weave_name, loom_name, run_timestamp, run_id
                 )
+
+            # Step 10b — validate fact target (if fact mode)
+            if fact_config is not None:
+                fact_diags = validate_fact_target(df, fact_config)
+                for diag in fact_diags:
+                    if diag.startswith("ERROR:"):
+                        raise ExecutionError(diag)
+                    logger.warning(diag)
 
             # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
@@ -348,12 +372,48 @@ def execute_thread(
                 cdc_write = _validate_cdc_write_config(thread)
                 cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
                 rows_written = sum(cdc_counts.values())
-            else:
-                # Apply target column mapping for non-CDC writes
+
+            elif dim_config is not None and dim_builder is not None:
+                # Dimension merge routing
                 df = apply_target_mapping(df, thread.target, spark)
                 if audit_columns and audit_ctx is not None:
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
+
+                # Seed phase (before merge, DEC-009)
+                if seed_config is not None or dim_config.seed_system_members:
+                    from weevr.model.seed import SeedConfig
+
+                    target_schema = df.schema
+                    all_seed_rows: list[dict[str, Any]] = []
+                    if seed_config is not None:
+                        all_seed_rows.extend(seed_config.rows)
+                    if dim_config.seed_system_members:
+                        all_seed_rows.extend(build_system_member_rows(dim_config, df))
+                    if all_seed_rows:
+                        combined_seed = SeedConfig(
+                            on=seed_config.on if seed_config else "first_write",
+                            rows=all_seed_rows,
+                        )
+                        execute_seeds(spark, combined_seed, target_path, target_schema)
+
+                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+                with contextlib.suppress(Exception):
+                    output_sample = df.limit(10).toPandas().to_dict("records")
+                execute_dimension_merge(spark, df, dim_builder, target_path, run_timestamp)
+                rows_written = df.count()
+
+            else:
+                # Standard write path
+                df = apply_target_mapping(df, thread.target, spark)
+                if audit_columns and audit_ctx is not None:
+                    df = inject_audit_columns(df, audit_columns, audit_ctx)
+                    audit_columns_applied = list(audit_columns)
+
+                # General seed phase (non-dimension, DEC-009)
+                if seed_config is not None:
+                    execute_seeds(spark, seed_config, target_path, df.schema)
+
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
                 with contextlib.suppress(Exception):
                     output_sample = df.limit(10).toPandas().to_dict("records")
