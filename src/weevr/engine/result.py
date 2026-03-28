@@ -44,10 +44,12 @@ class WeaveResult(FrozenBase):
     """Immutable record of a completed weave execution.
 
     Attributes:
-        status: Aggregate outcome — ``"success"`` if all threads succeeded,
-            ``"failure"`` if all threads failed or were skipped, ``"partial"``
-            if some succeeded and some failed or were skipped, ``"skipped"``
-            if the weave was conditionally skipped at loom level.
+        status: Aggregate outcome — ``"success"`` if all threads succeeded
+            or were conditionally skipped (no failures), ``"failure"`` if
+            all threads failed or were skipped due to upstream failure,
+            ``"partial"`` if some threads succeeded and some failed,
+            ``"skipped"`` if the weave was conditionally skipped at loom
+            level.
         weave_name: Name of the weave that was executed.
         thread_results: Results for each thread that was executed (not skipped).
         threads_skipped: Names of threads that were skipped due to upstream failure.
