@@ -7,6 +7,7 @@ from weevr.model.column_set import (
     ReservedWordConfig,
     ReservedWordPreset,
 )
+from weevr.model.dimension import DimensionSurrogateKeyConfig
 from weevr.model.execution import ExecutionConfig, LogLevel
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
@@ -156,4 +157,6 @@ __all__ = [
     "NamingPattern",
     # Variable
     "VariableSpec",
+    # Dimension
+    "DimensionSurrogateKeyConfig",
 ]

@@ -9,6 +9,7 @@ from pyspark.sql.types import (
     StructType,
 )
 
+from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import ResolveParams, Step
 from weevr.operations.pipeline.resolve import apply_resolve
 
@@ -874,5 +875,5 @@ class TestResolveEdgeCases:
             pk="id",
             include=["description"],
         )
-        with pytest.raises(ValueError, match="[Cc]ollid"):
+        with pytest.raises(ExecutionError, match="[Cc]ollid"):
             apply_resolve(fact, params, dim)

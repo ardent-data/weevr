@@ -636,7 +636,7 @@ class TestConditionalThreadExecution:
         plan = build_plan("test_weave", threads, entries)
         conditions = {"A": ConditionSpec(when="false")}  # B has no condition
         result = execute_weave(_MOCK_SPARK, plan, threads, thread_conditions=conditions)
-        assert result.status == "partial"
+        assert result.status == "success"
         assert "A" in result.threads_skipped
         assert any(r.thread_name == "B" and r.status == "success" for r in result.thread_results)
 

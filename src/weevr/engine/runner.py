@@ -60,9 +60,7 @@ def _compute_weave_status(
 ) -> Literal["success", "failure", "partial"]:
     """Compute aggregate weave status from individual thread states."""
     states = set(thread_states.values())
-    if states <= {"succeeded"}:
-        return "success"
-    if states <= {"skipped"}:
+    if states <= {"succeeded", "skipped"}:
         return "success"
     if states <= {"failed", "skipped"}:
         return "failure"

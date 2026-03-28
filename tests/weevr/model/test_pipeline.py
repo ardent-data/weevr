@@ -771,6 +771,35 @@ class TestRenameParams:
         assert p.column_set is None
 
 
+class TestFormatSpecValidation:
+    """Test FormatSpec edge case validators."""
+
+    def test_empty_pattern_raises(self):
+        """Empty pattern string raises ValidationError."""
+        from weevr.model.pipeline import FormatSpec
+
+        with pytest.raises(ValidationError, match="must not be empty"):
+            FormatSpec(pattern="")
+
+
+class TestConcatParamsValidation:
+    """Test ConcatParams null_literal validator."""
+
+    def test_empty_null_literal_with_literal_mode_raises(self):
+        """Empty null_literal when null_mode='literal' raises."""
+        from weevr.model.pipeline import ConcatParams
+
+        with pytest.raises(ValidationError, match="null_literal"):
+            ConcatParams(target="out", columns=["a", "b"], null_mode="literal", null_literal="")
+
+    def test_null_literal_with_skip_mode_ok(self):
+        """Empty null_literal with skip mode is fine (not used)."""
+        from weevr.model.pipeline import ConcatParams
+
+        p = ConcatParams(target="out", columns=["a", "b"], null_mode="skip", null_literal="")
+        assert p.null_literal == ""
+
+
 # ---------------------------------------------------------------------------
 # Resolve step models
 # ---------------------------------------------------------------------------
