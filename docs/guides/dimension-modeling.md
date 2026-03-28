@@ -54,7 +54,9 @@ dimension:
 ```
 
 When `change_detection` is omitted, the engine defaults to a
-single auto group with `on_change` based on `track_history`.
+single auto group with `on_change: version` when
+`track_history: true`, or `on_change: overwrite` when
+`track_history: false`.
 
 **Named groups (hybrid dimension / Type 6):**
 
@@ -125,6 +127,7 @@ Default members:
 Override with custom members:
 
 ```yaml
+  seed_system_members: true
   system_members:
     - sk: -1
       code: unknown
@@ -175,7 +178,15 @@ dimension:
 
 ## SCD Column Customization
 
-Override default column names and date boundaries:
+Override default column names and date boundaries.
+
+Defaults when omitted:
+
+- `columns.valid_from`: `_valid_from`
+- `columns.valid_to`: `_valid_to`
+- `columns.is_current`: `_is_current`
+- `dates.min`: `1970-01-01` (first version `valid_from`)
+- `dates.max`: `9999-12-31` (current row `valid_to`)
 
 ```yaml
 dimension:
