@@ -15,6 +15,7 @@ import pyspark.sql.functions as F
 from pyspark.sql import Column, DataFrame
 from pyspark.sql.window import Window
 
+from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import ResolveParams
 from weevr.operations.pipeline._result import StepResult
 
@@ -57,9 +58,12 @@ def apply_resolve(
         StepResult with the resolved FK column added and metadata
         containing per-FK resolution statistics.
     """
-    assert params.match is not None, "match is required"
-    assert params.pk is not None, "pk is required"
-    assert params.name is not None, "name is required"
+    if params.match is None:
+        raise ExecutionError("match is required for resolve")
+    if params.pk is None:
+        raise ExecutionError("pk is required for resolve")
+    if params.name is None:
+        raise ExecutionError("name is required for resolve")
 
     source_cols = list(params.match.keys())
     lookup_bk_cols = list(params.match.values())
@@ -149,7 +153,7 @@ def apply_resolve(
 
     if dup_count > 0:
         if params.on_duplicate == "error":
-            raise ValueError(
+            raise ExecutionError(
                 f"Duplicate matches found during resolve of '{params.name}': "
                 f"{dup_count} extra match(es). Use on_duplicate='warn' or "
                 f"'first' to handle duplicates."
@@ -195,7 +199,7 @@ def apply_resolve(
         for src_name, tgt_name in include_renames.items():
             final_name = f"{prefix}{tgt_name}"
             if final_name in existing_cols:
-                raise ValueError(
+                raise ExecutionError(
                     f"Include column '{final_name}' collides with an "
                     f"existing fact column. Use include_prefix or a "
                     f"dict rename to avoid the collision."
@@ -297,10 +301,11 @@ def apply_resolve_batch(
         lookup_name = item.lookup
         lookup_df = lookups.get(lookup_name)
         if lookup_df is None:
-            raise ValueError(f"Lookup '{lookup_name}' not found for batch item '{item.name}'")
+            raise ExecutionError(f"Lookup '{lookup_name}' not found for batch item '{item.name}'")
 
         # Track source columns for deferred drop
-        assert item.match is not None
+        if item.match is None:
+            raise ExecutionError(f"Batch resolve item '{item.name}' requires 'match'")
         item_source_cols = set(item.match.keys())
         if item.drop_source_columns or should_drop:
             all_source_cols.update(item_source_cols)

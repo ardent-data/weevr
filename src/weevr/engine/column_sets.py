@@ -96,7 +96,8 @@ def _resolve(
         return _resolve_from_param(name, column_set, resolved_params)
 
     # Source-backed resolution
-    assert column_set.source is not None  # guaranteed by ColumnSet model validator
+    if column_set.source is None:
+        raise ExecutionError(f"Column set '{name}' has no source or param defined")
     return _resolve_from_source(spark, name, column_set)
 
 
@@ -119,7 +120,8 @@ def _resolve_from_param(
         ConfigError: If the param key is missing or the value is not a dict.
     """
     param_name = column_set.param
-    assert param_name is not None
+    if param_name is None:
+        raise ExecutionError(f"Column set '{name}' param reference is missing")
 
     if param_name not in resolved_params:
         raise ConfigError(
@@ -159,7 +161,8 @@ def _resolve_from_source(
             source is empty and on_failure=abort.
     """
     cs = column_set.source
-    assert cs is not None
+    if cs is None:
+        raise ExecutionError(f"Column set '{name}' source is not defined")
 
     on_failure = column_set.on_failure
 

@@ -158,8 +158,10 @@ def run_pipeline(
             return apply_resolve_batch(result, params, resolve_lookups)
         # Single mode — look up the named lookup DataFrame
         lookup_name = params.lookup
-        assert lookup_name is not None
-        assert params.name is not None
+        if lookup_name is None:
+            raise ExecutionError("resolve step requires 'lookup'")
+        if params.name is None:
+            raise ExecutionError("resolve step requires 'name'")
         lookup_df = resolve_lookups.get(lookup_name)
         if lookup_df is None:
             if params.on_failure == "warn":

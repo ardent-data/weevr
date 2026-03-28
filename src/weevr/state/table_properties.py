@@ -80,7 +80,8 @@ class TablePropertiesStore(WatermarkStore):
     def write(self, spark: SparkSession, state: WatermarkState) -> None:
         """Persist watermark state as table properties on the target."""
         try:
-            prefix = f"{_PROP_PREFIX}.{state.thread_name}"
+            safe_name = state.thread_name.replace("'", "''")
+            prefix = f"{_PROP_PREFIX}.{safe_name}"
             props = {
                 f"{prefix}.last_value": state.last_value,
                 f"{prefix}.watermark_column": state.watermark_column,
