@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -10,7 +11,11 @@ from pyspark.sql.types import StructType
 
 from weevr.delta import delta_table_exists
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.dimension import DimensionConfig, SystemMemberConfig
 from weevr.model.seed import SeedConfig
+from weevr.operations.pipeline.type_defaults import resolve_type_defaults
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -162,3 +167,76 @@ def execute_seeds(
         rows_inserted=rows_inserted,
         trigger_condition=seed_config.on,
     )
+
+
+# ---------------------------------------------------------------------------
+# Default system members (DEC-003)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_SYSTEM_MEMBERS: list[SystemMemberConfig] = [
+    SystemMemberConfig(sk=-1, code="unknown", label="Unknown"),
+    SystemMemberConfig(sk=-2, code="not_applicable", label="Not Applicable"),
+]
+
+
+def build_system_member_rows(
+    dimension_config: DimensionConfig,
+    target_df: DataFrame,
+) -> list[dict[str, Any]]:
+    """Build seed row dicts for dimension system member sentinel rows.
+
+    Each system member produces one row where:
+
+    - The surrogate key column receives the configured negative SK value.
+    - String columns receive the semantic code label (via
+      :func:`resolve_type_defaults`).
+    - Numeric, boolean, and date columns receive type-appropriate zero/false
+      defaults.
+    - The label column (if configured) receives the member's ``label``.
+
+    Args:
+        dimension_config: Dimension configuration with system member
+            definitions and SK column name.
+        target_df: DataFrame whose schema determines column types for
+            default value resolution.
+
+    Returns:
+        List of row dicts ready for :func:`build_seed_dataframe`.
+    """
+    members = (
+        dimension_config.system_members
+        if dimension_config.system_members
+        else _DEFAULT_SYSTEM_MEMBERS
+    )
+
+    sk_col = dimension_config.surrogate_key.name
+    rows: list[dict[str, Any]] = []
+
+    for member in members:
+        # Resolve type-aware defaults using the member's code
+        code = member.code.lower()
+        # Map code to known fill codes; fall back to "unknown"
+        fill_code = code if code in ("unknown", "not_applicable", "invalid") else "unknown"
+        defaults = resolve_type_defaults(target_df, fill_code)
+
+        row: dict[str, Any] = {**defaults}
+        row[sk_col] = member.sk
+
+        # Override string columns with the member's code for BK columns
+        for bk_col in dimension_config.business_key:
+            row[bk_col] = member.code
+
+        # Set label column if configured
+        if dimension_config.label_column is not None:
+            row[dimension_config.label_column] = member.label
+
+        # Set SCD columns for system member rows
+        if dimension_config.track_history:
+            scd = dimension_config.columns
+            row[scd.valid_from] = dimension_config.dates.min
+            row[scd.valid_to] = dimension_config.dates.max
+            row[scd.is_current] = True
+
+        rows.append(row)
+
+    return rows

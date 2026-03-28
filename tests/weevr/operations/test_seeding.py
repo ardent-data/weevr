@@ -2,13 +2,23 @@
 
 import pytest
 from pyspark.sql import SparkSession
-from pyspark.sql.types import IntegerType, LongType, StringType, StructField, StructType
+from pyspark.sql.types import (
+    BooleanType,
+    DoubleType,
+    IntegerType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+)
 
 from spark_helpers import create_delta_table
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.dimension import DimensionConfig
 from weevr.model.seed import SeedConfig
 from weevr.operations.seeding import (
     build_seed_dataframe,
+    build_system_member_rows,
     check_seed_trigger,
     execute_seeds,
 )
@@ -211,3 +221,133 @@ class TestExecuteSeeds:
         written = spark.read.format("delta").load(path)
         assert written.count() == 1
         assert written.collect()[0]["id"] == 42
+
+
+@pytest.mark.spark
+class TestBuildSystemMemberRows:
+    """Tests for build_system_member_rows."""
+
+    def _make_dim_config(self, **overrides):  # type: ignore[no-untyped-def]
+        base = {
+            "business_key": ["customer_id"],
+            "surrogate_key": {"name": "_sk", "columns": ["customer_id"]},
+        }
+        return DimensionConfig(**{**base, **overrides})
+
+    def test_default_system_members(self, spark: SparkSession) -> None:
+        """Default members are unknown (-1) and not_applicable (-2)."""
+        dim = self._make_dim_config(seed_system_members=True)
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1, "name": "Alice"}])
+        rows = build_system_member_rows(dim, df)
+        assert len(rows) == 2
+        sks = {r["_sk"] for r in rows}
+        assert sks == {-1, -2}
+
+    def test_custom_system_members(self, spark: SparkSession) -> None:
+        """Custom system_members override defaults."""
+        dim = self._make_dim_config(
+            seed_system_members=True,
+            system_members=[  # type: ignore[arg-type]
+                {"sk": -10, "code": "custom", "label": "Custom"},
+            ],
+        )
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1, "name": "Alice"}])
+        rows = build_system_member_rows(dim, df)
+        assert len(rows) == 1
+        assert rows[0]["_sk"] == -10
+
+    def test_sk_column_gets_negative_value(self, spark: SparkSession) -> None:
+        """SK column receives the configured negative value."""
+        dim = self._make_dim_config(seed_system_members=True)
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1}])
+        rows = build_system_member_rows(dim, df)
+        assert all(r["_sk"] < 0 for r in rows)
+
+    def test_string_columns_get_semantic_label(self, spark: SparkSession) -> None:
+        """String columns filled with semantic label from resolve_type_defaults."""
+        dim = self._make_dim_config(seed_system_members=True)
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1, "name": "Alice"}])
+        rows = build_system_member_rows(dim, df)
+        unknown_row = next(r for r in rows if r["_sk"] == -1)
+        assert unknown_row["name"] == "Unknown"
+
+    def test_numeric_columns_get_zero(self, spark: SparkSession) -> None:
+        """Numeric columns filled with 0."""
+        dim = self._make_dim_config(seed_system_members=True)
+        schema = StructType(
+            [
+                StructField("customer_id", StringType(), True),
+                StructField("_sk", LongType(), True),
+                StructField("amount", DoubleType(), True),
+            ]
+        )
+        df = spark.createDataFrame(
+            [{"customer_id": "C1", "_sk": 1, "amount": 99.9}],
+            schema=schema,
+        )
+        rows = build_system_member_rows(dim, df)
+        assert rows[0]["amount"] == 0.0
+
+    def test_boolean_columns_get_false(self, spark: SparkSession) -> None:
+        """Boolean columns filled with False."""
+        dim = self._make_dim_config(seed_system_members=True)
+        schema = StructType(
+            [
+                StructField("customer_id", StringType(), True),
+                StructField("_sk", LongType(), True),
+                StructField("is_active", BooleanType(), True),
+            ]
+        )
+        df = spark.createDataFrame(
+            [{"customer_id": "C1", "_sk": 1, "is_active": True}],
+            schema=schema,
+        )
+        rows = build_system_member_rows(dim, df)
+        assert rows[0]["is_active"] is False
+
+    def test_label_column_gets_label(self, spark: SparkSession) -> None:
+        """label_column receives the member's label."""
+        dim = self._make_dim_config(
+            seed_system_members=True,
+            label_column="description",
+        )
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1, "description": "test"}])
+        rows = build_system_member_rows(dim, df)
+        unknown_row = next(r for r in rows if r["_sk"] == -1)
+        assert unknown_row["description"] == "Unknown"
+
+    def test_label_column_none_skips(self, spark: SparkSession) -> None:
+        """When label_column is None, no label assignment."""
+        dim = self._make_dim_config(seed_system_members=True)
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1, "description": "test"}])
+        rows = build_system_member_rows(dim, df)
+        # description gets type default, not label
+        unknown_row = next(r for r in rows if r["_sk"] == -1)
+        assert unknown_row["description"] == "Unknown"
+
+    def test_business_key_gets_code(self, spark: SparkSession) -> None:
+        """BK columns get the member's code."""
+        dim = self._make_dim_config(seed_system_members=True)
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1}])
+        rows = build_system_member_rows(dim, df)
+        unknown_row = next(r for r in rows if r["_sk"] == -1)
+        assert unknown_row["customer_id"] == "unknown"
+
+    def test_scd_columns_set_for_track_history(self, spark: SparkSession) -> None:
+        """SCD columns set when track_history is True."""
+        dim = self._make_dim_config(
+            seed_system_members=True,
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "cd": {
+                    "columns": "auto",
+                    "on_change": "version",
+                },
+            },
+        )
+        df = spark.createDataFrame([{"customer_id": "C1", "_sk": 1, "name": "test"}])
+        rows = build_system_member_rows(dim, df)
+        unknown_row = next(r for r in rows if r["_sk"] == -1)
+        assert unknown_row["_valid_from"] == "1970-01-01"
+        assert unknown_row["_valid_to"] == "9999-12-31"
+        assert unknown_row["_is_current"] is True
