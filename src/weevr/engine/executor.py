@@ -19,6 +19,7 @@ from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import DataValidationError, ExecutionError, ExportError, StateError
 from weevr.model.column_set import ColumnSet
 from weevr.model.lookup import Lookup
+from weevr.model.seed import SeedConfig
 from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
@@ -328,8 +329,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             seed_config = thread.target.seed
 
             if dim_config is not None:
-                # Dimension mode: use dimension-aware key computation
-                df = compute_dimension_keys(df, dim_config)
+                # Dimension mode: use dimension-aware key computation.
+                # Pass audit column names so auto hash excludes them.
+                audit_col_names = (
+                    set(thread.target.audit_columns.keys()) if thread.target.audit_columns else None
+                )
+                df = compute_dimension_keys(df, dim_config, audit_columns=audit_col_names)
             elif thread.keys is not None:
                 df = compute_keys(df, thread.keys)
 
@@ -359,21 +364,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
 
-            if load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-                # CDC merge routing — skip target column mapping because
-                # execute_cdc_merge handles column selection internally
-                # (it must retain the operation column for row routing).
-                if audit_columns and audit_ctx is not None:
-                    df = inject_audit_columns(df, audit_columns, audit_ctx)
-                    audit_columns_applied = list(audit_columns)
-                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
-                cdc_write = _validate_cdc_write_config(thread)
-                cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
-                rows_written = sum(cdc_counts.values())
-
-            elif dim_config is not None and dim_builder is not None:
+            if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
                 df = apply_target_mapping(df, thread.target, spark)
                 if audit_columns and audit_ctx is not None:
@@ -382,8 +373,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
                 # Seed phase (before merge, DEC-009)
                 if seed_config is not None or dim_config.seed_system_members:
-                    from weevr.model.seed import SeedConfig
-
                     target_schema = df.schema
                     all_seed_rows: list[dict[str, Any]] = []
                     if seed_config is not None:
@@ -402,6 +391,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     output_sample = df.limit(10).toPandas().to_dict("records")
                 execute_dimension_merge(spark, df, dim_builder, target_path, run_timestamp)
                 rows_written = df.count()
+
+            elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
+                # CDC merge routing (no dimension) — skip target column
+                # mapping because execute_cdc_merge handles column
+                # selection internally (retains operation column).
+                if audit_columns and audit_ctx is not None:
+                    df = inject_audit_columns(df, audit_columns, audit_ctx)
+                    audit_columns_applied = list(audit_columns)
+                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+                with contextlib.suppress(Exception):
+                    output_sample = df.limit(10).toPandas().to_dict("records")
+                cdc_write = _validate_cdc_write_config(thread)
+                cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
+                rows_written = sum(cdc_counts.values())
 
             else:
                 # Standard write path

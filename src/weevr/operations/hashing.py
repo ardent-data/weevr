@@ -1,5 +1,7 @@
 """Hashing operations — surrogate key generation and change detection."""
 
+import logging
+
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
@@ -10,6 +12,8 @@ from weevr.model.dimension import (
     DimensionConfig,
 )
 from weevr.model.keys import ChangeDetectionConfig, KeyConfig, SurrogateKeyConfig
+
+logger = logging.getLogger(__name__)
 
 # Sentinel value substituted for NULL before hashing, ensuring consistent output.
 _NULL_SENTINEL = "__NULL__"
@@ -144,7 +148,11 @@ def _apply_hash(col_expr: Column, algorithm: str, output: str = "native") -> Col
 # ---------------------------------------------------------------------------
 
 
-def compute_dimension_keys(df: DataFrame, dimension_config: DimensionConfig) -> DataFrame:
+def compute_dimension_keys(
+    df: DataFrame,
+    dimension_config: DimensionConfig,
+    audit_columns: set[str] | None = None,
+) -> DataFrame:
     """Apply all key and hash computations declared in a :class:`DimensionConfig`.
 
     Steps are applied in this order:
@@ -158,12 +166,15 @@ def compute_dimension_keys(df: DataFrame, dimension_config: DimensionConfig) -> 
     Groups that declare ``columns: "auto"`` have their column list resolved at
     runtime by excluding the full set of engine-managed columns (business key,
     surrogate key source and output, additional key sources and outputs, SCD
-    tracking columns, and columns claimed by other explicit groups).
+    tracking columns, audit columns, previous_columns source columns, and
+    columns claimed by other explicit groups).
 
     Args:
         df: Input DataFrame.
         dimension_config: Full dimension configuration — business key, surrogate
             key, change detection groups, additional keys, and SCD settings.
+        audit_columns: Names of audit columns to exclude from ``auto`` hash
+            computation. When ``None``, no audit columns are excluded.
 
     Returns:
         DataFrame with surrogate key, change detection hash, and additional key
@@ -186,11 +197,26 @@ def compute_dimension_keys(df: DataFrame, dimension_config: DimensionConfig) -> 
     result = result.withColumn(sk_cfg.name, sk_col)
 
     # 3. Build the exclusion set used for auto column resolution.
-    exclude = _build_auto_exclusion_set(dimension_config)
+    exclude = _build_auto_exclusion_set(dimension_config, audit_columns)
 
     # 4. Compute change detection group hashes.
     if dimension_config.change_detection:
         result = compute_named_group_hashes(result, dimension_config.change_detection, exclude)
+
+        # Log unassigned columns (those not in any explicit group and not
+        # absorbed by an auto group) so users know what defaults to overwrite.
+        has_auto = any(g.columns == "auto" for g in dimension_config.change_detection.values())
+        if not has_auto:
+            assigned = set()
+            for g in dimension_config.change_detection.values():
+                if isinstance(g.columns, list):
+                    assigned.update(g.columns)
+            unassigned = sorted(c for c in df.columns if c not in exclude and c not in assigned)
+            if unassigned:
+                logger.info(
+                    "Unassigned columns default to overwrite: %s",
+                    ", ".join(unassigned),
+                )
 
     # 5. Compute additional keys.
     if dimension_config.additional_keys:
@@ -253,6 +279,11 @@ def compute_named_group_hashes(
 
         if group.columns == "auto":
             columns = resolve_auto_columns(list(result.columns), exclude_columns)
+            if not columns:
+                raise ExecutionError(
+                    f"change_detection group '{group_key}' uses columns: auto "
+                    f"but all columns are engine-managed — no data columns remain"
+                )
         else:
             columns = list(group.columns)  # type: ignore[arg-type]
 
@@ -287,7 +318,10 @@ def compute_additional_keys(
     return result
 
 
-def _build_auto_exclusion_set(config: DimensionConfig) -> set[str]:
+def _build_auto_exclusion_set(
+    config: DimensionConfig,
+    audit_columns: set[str] | None = None,
+) -> set[str]:
     """Build the full set of column names to exclude when resolving ``columns: "auto"``.
 
     The exclusion set covers all engine-managed columns so that ``auto`` groups
@@ -300,11 +334,14 @@ def _build_auto_exclusion_set(config: DimensionConfig) -> set[str]:
     - SCD tracking column names (valid_from, valid_to, is_current).
     - Columns explicitly listed in non-auto change detection groups.
     - Output column names of change detection groups (group.name or dict key).
-    - previous_columns output column names (the dict keys, which are the
-      new column names produced in the output DataFrame).
+    - previous_columns source column names (the dict values, per DEC-014).
+    - previous_columns output column names (the dict keys).
+    - Audit columns from the resolved audit config.
 
     Args:
         config: Full :class:`DimensionConfig`.
+        audit_columns: Names of audit columns to exclude. When ``None``, no
+            audit columns are excluded.
 
     Returns:
         Set of column names to pass to :func:`resolve_auto_columns`.
@@ -335,8 +372,14 @@ def _build_auto_exclusion_set(config: DimensionConfig) -> set[str]:
             if group.columns != "auto":
                 exclude.update(group.columns)  # type: ignore[arg-type]
 
-    # previous_columns: output names (keys) produced in the output DataFrame.
+    # previous_columns: both output names (keys) and source column names
+    # (values) are excluded per DEC-014.
     if config.previous_columns:
         exclude.update(config.previous_columns.keys())
+        exclude.update(config.previous_columns.values())
+
+    # Audit columns from resolved audit config.
+    if audit_columns:
+        exclude.update(audit_columns)
 
     return exclude

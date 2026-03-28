@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from functools import reduce
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -290,8 +291,13 @@ def _execute_versioned_merge(
     else:
         version_changed = F.lit(False)
 
-    # New-version rows: source rows where BK matched but hash changed
-    is_matched = F.col(f"tgt.{bk_cols[0]}").isNotNull()
+    # New-version rows: source rows where BK matched but hash changed.
+    # Check ALL target-side BK columns to handle composite keys correctly.
+    is_matched = reduce(
+        lambda a, c: a & F.col(f"tgt.{c}").isNotNull(),
+        bk_cols[1:],
+        F.col(f"tgt.{bk_cols[0]}").isNotNull(),
+    )
     new_versions = joined.filter(is_matched & version_changed)
 
     # Select only source columns for new version rows
@@ -335,8 +341,10 @@ def _execute_versioned_merge(
                 close_set[prev_col] = F.col(f"target.{_quote_identifier(src_col)}")
         merger = merger.whenMatchedUpdate(condition=version_change_sql, set=close_set)
 
-    # Not matched → insert (includes new entities AND new version rows)
-    # Drop the marker column in the insert values
+    # Not matched → insert (includes new entities AND new version rows).
+    # IMPORTANT: use source_df.columns (not merged_source.columns) to
+    # exclude the __dim_new_version__ marker from the insert values.
+    # The marker must never be written to the target schema.
     insert_cols = {c: F.col(f"source.{_quote_identifier(c)}") for c in source_df.columns}
     merger = merger.whenNotMatchedInsert(values=insert_cols)
 
