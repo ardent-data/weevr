@@ -62,6 +62,8 @@ def _evaluate_one(
         return _eval_unique(spark, assertion, target_path)
     if assertion.type == "expression":
         return _eval_expression(spark, assertion, target_path)
+    if assertion.type == "fk_sentinel_rate":
+        return _eval_fk_sentinel_rate(spark, assertion, target_path)
     return AssertionResult(
         assertion_type=assertion.type,
         severity=assertion.severity,
@@ -217,4 +219,81 @@ def _eval_expression(
         severity=assertion.severity,
         passed=passed,
         details=details,
+    )
+
+
+def _eval_fk_sentinel_rate(
+    spark: SparkSession,
+    assertion: Assertion,
+    target_path: str,
+) -> AssertionResult:
+    """Check FK sentinel value rates against thresholds.
+
+    Supports single sentinel, named sentinel groups with shared or
+    per-group max_rate, and column/columns specification.
+    """
+    from weevr.model.validation import SentinelGroup
+
+    df = read_delta(spark, target_path)
+    total = df.count()
+
+    if total == 0:
+        return AssertionResult(
+            assertion_type="fk_sentinel_rate",
+            severity=assertion.severity,
+            passed=True,
+            details="Empty table — 0% sentinel rate",
+            columns=assertion.columns or ([assertion.column] if assertion.column else None),
+        )
+
+    # Determine columns to check
+    check_cols: list[str] = []
+    if assertion.column is not None:
+        check_cols = [assertion.column]
+    elif assertion.columns is not None:
+        check_cols = list(assertion.columns)
+
+    # Build sentinel groups to evaluate
+    groups: dict[str, SentinelGroup] = {}
+    if assertion.sentinels is not None:
+        groups = dict(assertion.sentinels)
+    elif assertion.sentinel is not None:
+        groups = {"default": SentinelGroup(value=assertion.sentinel)}
+
+    shared_max_rate = assertion.max_rate
+    failures: list[str] = []
+
+    for col_name in check_cols:
+        for group_name, group in groups.items():
+            sentinel_val = group.value
+            threshold = group.max_rate if group.max_rate is not None else shared_max_rate
+            if threshold is None:
+                continue
+
+            sentinel_count = df.filter(df[col_name] == sentinel_val).count()
+            rate = sentinel_count / total
+
+            if rate > threshold:
+                failures.append(
+                    f"column '{col_name}' sentinel group '{group_name}': "
+                    f"rate {rate:.2%} exceeds threshold {threshold:.2%} "
+                    f"(sentinel={sentinel_val}, count={sentinel_count}/{total})"
+                )
+
+    if failures:
+        msg = assertion.message or "FK sentinel rate exceeded"
+        return AssertionResult(
+            assertion_type="fk_sentinel_rate",
+            severity=assertion.severity,
+            passed=False,
+            details=f"{msg}: {'; '.join(failures)}",
+            columns=check_cols,
+        )
+
+    return AssertionResult(
+        assertion_type="fk_sentinel_rate",
+        severity=assertion.severity,
+        passed=True,
+        details=f"FK sentinel rates within thresholds for {', '.join(check_cols)}",
+        columns=check_cols,
     )

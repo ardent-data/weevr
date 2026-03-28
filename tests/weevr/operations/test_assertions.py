@@ -151,3 +151,114 @@ class TestEvaluationError:
         results = evaluate_assertions(spark, assertions, target_df)
         assert results[0].passed is False
         assert "Evaluation error" in results[0].details or "error" in results[0].details.lower()
+
+
+# ---------------------------------------------------------------------------
+# fk_sentinel_rate assertions (M114)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def fk_target_df(spark: SparkSession, tmp_delta_path):
+    """Write a fact table with FK sentinel values and return its path."""
+    path = tmp_delta_path("fk_assertion_target")
+    df = spark.createDataFrame(
+        [
+            {"plant_id": 1, "company_id": 10},
+            {"plant_id": 2, "company_id": -1},
+            {"plant_id": -4, "company_id": -4},
+            {"plant_id": 3, "company_id": 10},
+            {"plant_id": -1, "company_id": 10},
+        ]
+    )
+    df.write.format("delta").mode("overwrite").save(path)
+    return path
+
+
+class TestFkSentinelRate:
+    """Test fk_sentinel_rate assertion evaluator."""
+
+    def test_single_column_under_threshold(self, spark, fk_target_df):
+        """Rate under max_rate passes."""
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                sentinel=-4,
+                max_rate=0.25,
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, fk_target_df)
+        assert results[0].passed is True
+
+    def test_single_column_over_threshold(self, spark, fk_target_df):
+        """Rate over max_rate fails."""
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                sentinel=-4,
+                max_rate=0.10,
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, fk_target_df)
+        assert results[0].passed is False
+
+    def test_columns_list(self, spark, fk_target_df):
+        """Multiple columns each checked independently."""
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                columns=["plant_id", "company_id"],
+                sentinel=-4,
+                max_rate=0.25,
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, fk_target_df)
+        assert results[0].passed is True
+
+    def test_named_sentinel_groups_shared_rate(self, spark, fk_target_df):
+        """Named sentinel groups with shared max_rate."""
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                sentinels={"invalid": -4, "unknown": -1},  # type: ignore[arg-type]
+                max_rate=0.25,
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, fk_target_df)
+        # -4 = 1/5 = 20%, -1 = 1/5 = 20%, both under 25%
+        assert results[0].passed is True
+
+    def test_named_sentinel_groups_per_group_rate(self, spark, fk_target_df):
+        """Per-group max_rate with one group failing."""
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                sentinels={  # type: ignore[arg-type]
+                    "invalid": {"value": -4, "max_rate": 0.25},
+                    "unknown": {"value": -1, "max_rate": 0.10},
+                },
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, fk_target_df)
+        # -4 = 20% (under 25%), -1 = 20% (over 10%) → fail
+        assert results[0].passed is False
+
+    def test_empty_table_passes(self, spark, tmp_delta_path):
+        """Empty table has 0% rate — passes."""
+        path = tmp_delta_path("fk_empty")
+        df = spark.createDataFrame([], "plant_id: int")
+        df.write.format("delta").mode("overwrite").save(path)
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                column="plant_id",
+                sentinel=-4,
+                max_rate=0.05,
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, path)
+        assert results[0].passed is True
