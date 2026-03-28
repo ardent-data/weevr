@@ -192,13 +192,14 @@ class TestPreviousColumns:
             [
                 StructField("customer_id", StringType()),
                 StructField("name", StringType()),
+                StructField("email", StringType()),
                 StructField("_prev_name", StringType()),
             ]
         )
 
-        # First run
+        # First run — email column ensures auto hash has data columns
         src1 = spark.createDataFrame(
-            [{"customer_id": "C1", "name": "Alice", "_prev_name": None}],
+            [{"customer_id": "C1", "name": "Alice", "email": "a@x.com", "_prev_name": None}],
             schema=schema,
         )
         src1 = compute_dimension_keys(src1, dim)
@@ -206,7 +207,7 @@ class TestPreviousColumns:
 
         # Second run — name changed
         src2 = spark.createDataFrame(
-            [{"customer_id": "C1", "name": "Alicia", "_prev_name": None}],
+            [{"customer_id": "C1", "name": "Alicia", "email": "a@x.com", "_prev_name": None}],
             schema=schema,
         )
         src2 = compute_dimension_keys(src2, dim)
@@ -259,9 +260,10 @@ class TestAdditionalKeys:
                 },
             },
         )
+        # Include email so auto change detection has a data column
         source = _prepare_source(
             spark,
-            [{"customer_id": "C1", "name": "Alice"}],
+            [{"customer_id": "C1", "name": "Alice", "email": "a@x.com"}],
             dim,
         )
         builder = DimensionMergeBuilder(dim)

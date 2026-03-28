@@ -372,11 +372,12 @@ def _build_auto_exclusion_set(
             if group.columns != "auto":
                 exclude.update(group.columns)  # type: ignore[arg-type]
 
-    # previous_columns: both output names (keys) and source column names
-    # (values) are excluded per DEC-014.
+    # previous_columns: exclude output column names (dict keys) since they
+    # are engine-managed tracking columns. Source column names (dict values)
+    # are NOT excluded — they must remain in the hash so changes to tracked
+    # attributes trigger change detection.
     if config.previous_columns:
         exclude.update(config.previous_columns.keys())
-        exclude.update(config.previous_columns.values())
 
     # Audit columns from resolved audit config.
     if audit_columns:

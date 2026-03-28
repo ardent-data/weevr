@@ -14,7 +14,7 @@ class TestValidateFactTarget:
     """Test fact target validation."""
 
     def test_all_fk_columns_present(self, spark: SparkSession):
-        """All FK columns present in output DataFrame returns empty list."""
+        """All FK columns present produces no ERROR diagnostics."""
         schema = StructType(
             [
                 StructField("dim_date_id", IntegerType(), True),
@@ -25,7 +25,8 @@ class TestValidateFactTarget:
         df = spark.createDataFrame([(1, 2, 100)], schema)
         fact_config = FactConfig(foreign_keys=["dim_date_id", "dim_product_id"])
         diagnostics = validate_fact_target(df, fact_config)
-        assert diagnostics == []
+        errors = [d for d in diagnostics if d.startswith("ERROR:")]
+        assert errors == []
 
     def test_single_fk_column_missing(self, spark: SparkSession):
         """Missing FK column returns ERROR diagnostic."""
@@ -38,8 +39,9 @@ class TestValidateFactTarget:
         df = spark.createDataFrame([(1, 100)], schema)
         fact_config = FactConfig(foreign_keys=["dim_date_id", "dim_product_id"])
         diagnostics = validate_fact_target(df, fact_config)
-        assert len(diagnostics) == 1
-        assert diagnostics[0] == "ERROR: FK column 'dim_product_id' not found in output DataFrame"
+        errors = [d for d in diagnostics if d.startswith("ERROR:")]
+        assert len(errors) == 1
+        assert errors[0] == "ERROR: FK column 'dim_product_id' not found in output DataFrame"
 
     def test_multiple_fk_columns_one_missing(self, spark: SparkSession):
         """Multiple FK columns with one missing returns one ERROR."""
@@ -53,8 +55,9 @@ class TestValidateFactTarget:
         df = spark.createDataFrame([(1, 2, 100)], schema)
         fact_config = FactConfig(foreign_keys=["dim_date_id", "dim_product_id", "dim_store_id"])
         diagnostics = validate_fact_target(df, fact_config)
-        assert len(diagnostics) == 1
-        assert diagnostics[0] == "ERROR: FK column 'dim_store_id' not found in output DataFrame"
+        errors = [d for d in diagnostics if d.startswith("ERROR:")]
+        assert len(errors) == 1
+        assert errors[0] == "ERROR: FK column 'dim_store_id' not found in output DataFrame"
 
     def test_multiple_fk_columns_all_missing(self, spark: SparkSession):
         """Multiple missing FK columns returns multiple ERRORs."""
@@ -62,10 +65,11 @@ class TestValidateFactTarget:
         df = spark.createDataFrame([(100,)], schema)
         fact_config = FactConfig(foreign_keys=["dim_date_id", "dim_product_id", "dim_store_id"])
         diagnostics = validate_fact_target(df, fact_config)
-        assert len(diagnostics) == 3
-        assert "ERROR: FK column 'dim_date_id' not found in output DataFrame" in diagnostics
-        assert "ERROR: FK column 'dim_product_id' not found in output DataFrame" in diagnostics
-        assert "ERROR: FK column 'dim_store_id' not found in output DataFrame" in diagnostics
+        errors = [d for d in diagnostics if d.startswith("ERROR:")]
+        assert len(errors) == 3
+        assert "ERROR: FK column 'dim_date_id' not found in output DataFrame" in errors
+        assert "ERROR: FK column 'dim_product_id' not found in output DataFrame" in errors
+        assert "ERROR: FK column 'dim_store_id' not found in output DataFrame" in errors
 
     def test_empty_dataframe_columns(self, spark: SparkSession):
         """Empty DataFrame with FK columns returns ERRORs for all missing."""
@@ -73,9 +77,10 @@ class TestValidateFactTarget:
         df = spark.createDataFrame([], schema)
         fact_config = FactConfig(foreign_keys=["dim_date_id", "dim_product_id"])
         diagnostics = validate_fact_target(df, fact_config)
-        assert len(diagnostics) == 2
-        assert "ERROR: FK column 'dim_date_id' not found in output DataFrame" in diagnostics
-        assert "ERROR: FK column 'dim_product_id' not found in output DataFrame" in diagnostics
+        errors = [d for d in diagnostics if d.startswith("ERROR:")]
+        assert len(errors) == 2
+        assert "ERROR: FK column 'dim_date_id' not found in output DataFrame" in errors
+        assert "ERROR: FK column 'dim_product_id' not found in output DataFrame" in errors
 
     def test_fk_column_no_sentinel_values_warns(self, spark: SparkSession):
         """FK column with no sentinel values produces WARN diagnostic."""
