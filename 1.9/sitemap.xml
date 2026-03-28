@@ -2,182 +2,190 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/contributing/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/faq/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/concepts/artifacts-model/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/concepts/execution-modes/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/concepts/idempotency/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/concepts/thread-weave-loom/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/concepts/why-weevr/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/audit-templates/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/config-resolution/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
+    </url>
+    <url>
+         <loc>https://ardent-data.github.io/weevr/1.9/guides/dimension-modeling/</loc>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/engine-internals/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/exports/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/fabric-runtime/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
+    </url>
+    <url>
+         <loc>https://ardent-data.github.io/weevr/1.9/guides/fact-tables/</loc>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/observability/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/guides/telemetry-architecture/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/how-to/add-a-thread/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/how-to/add-validation-rules/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/how-to/cache-a-lookup/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/how-to/implement-custom-telemetry-sink/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/how-to/run-from-fabric-pipeline/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/compatibility/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/configuration-keys/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/config/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/context/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/engine/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/errors/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/model/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/operations/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/state/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/api/telemetry/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/yaml-schema/loom/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/yaml-schema/thread/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/reference/yaml-schema/weave/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.0/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.1/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.2.1/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.2/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.3/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.4/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.5/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.6/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.7/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.8/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/release-notes/1.9/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.9/tutorials/your-first-loom/</loc>
-         <lastmod>2026-03-27</lastmod>
+         <lastmod>2026-03-28</lastmod>
     </url>
 </urlset>

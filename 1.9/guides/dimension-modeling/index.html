@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.9/release-notes/1.3/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.9/guides/dimension-modeling/">
       
       
-        <link rel="prev" href="../1.4/">
+        <link rel="prev" href="../audit-templates/">
       
       
-        <link rel="next" href="../1.2.1/">
+        <link rel="next" href="../fact-tables/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.3 - weevr</title>
+        <title>Dimension Modeling - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v13" class="md-skip">
+        <a href="#dimension-modeling" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.3
+              Dimension Modeling
             
           </span>
         </div>
@@ -340,11 +340,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../guides/fabric-runtime/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../fabric-runtime/" class="md-tabs__link">
           
   
   
@@ -398,13 +400,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.9/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../release-notes/1.9/" class="md-tabs__link">
           
   
   
@@ -1520,26 +1520,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1557,7 +1562,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1575,7 +1580,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/fabric-runtime/" class="md-nav__link">
+      <a href="../fabric-runtime/" class="md-nav__link">
         
   
   
@@ -1603,7 +1608,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/observability/" class="md-nav__link">
+      <a href="../observability/" class="md-nav__link">
         
   
   
@@ -1631,7 +1636,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/engine-internals/" class="md-nav__link">
+      <a href="../engine-internals/" class="md-nav__link">
         
   
   
@@ -1659,7 +1664,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/config-resolution/" class="md-nav__link">
+      <a href="../config-resolution/" class="md-nav__link">
         
   
   
@@ -1687,7 +1692,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/telemetry-architecture/" class="md-nav__link">
+      <a href="../telemetry-architecture/" class="md-nav__link">
         
   
   
@@ -1715,7 +1720,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/exports/" class="md-nav__link">
+      <a href="../exports/" class="md-nav__link">
         
   
   
@@ -1743,7 +1748,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/audit-templates/" class="md-nav__link">
+      <a href="../audit-templates/" class="md-nav__link">
         
   
   
@@ -1768,10 +1773,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../guides/dimension-modeling/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Modeling
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1787,6 +1819,164 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composable-behavioral-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composable Behavioral Flags
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composable Behavioral Flags">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#track_history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        track_history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        change_detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#previous_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        previous_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-member-seeding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Member Seeding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#general-seed-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Seed Rows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scd-column-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD Column Customization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scd-type-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD Type Mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1799,7 +1989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/fact-tables/" class="md-nav__link">
+      <a href="../fact-tables/" class="md-nav__link">
         
   
   
@@ -1885,31 +2075,26 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
             
   
   
@@ -1927,7 +2112,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1945,7 +2130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.9/" class="md-nav__link">
+      <a href="../../release-notes/1.9/" class="md-nav__link">
         
   
   
@@ -1973,7 +2158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.8/" class="md-nav__link">
+      <a href="../../release-notes/1.8/" class="md-nav__link">
         
   
   
@@ -2001,7 +2186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.7/" class="md-nav__link">
+      <a href="../../release-notes/1.7/" class="md-nav__link">
         
   
   
@@ -2029,7 +2214,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.6/" class="md-nav__link">
+      <a href="../../release-notes/1.6/" class="md-nav__link">
         
   
   
@@ -2057,7 +2242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.5/" class="md-nav__link">
+      <a href="../../release-notes/1.5/" class="md-nav__link">
         
   
   
@@ -2085,7 +2270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.4/" class="md-nav__link">
+      <a href="../../release-notes/1.4/" class="md-nav__link">
         
   
   
@@ -2110,37 +2295,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.3
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.3/" class="md-nav__link">
         
   
   
@@ -2156,65 +2314,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#schedule-aware-lookup-materialization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Schedule-Aware Lookup Materialization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Schedule-Aware Lookup Materialization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#lookup-mediated-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lookup-Mediated Dependencies
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2227,7 +2326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.2.1/" class="md-nav__link">
+      <a href="../../release-notes/1.2.1/" class="md-nav__link">
         
   
   
@@ -2255,7 +2354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.2/" class="md-nav__link">
+      <a href="../../release-notes/1.2/" class="md-nav__link">
         
   
   
@@ -2283,7 +2382,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.1/" class="md-nav__link">
+      <a href="../../release-notes/1.1/" class="md-nav__link">
         
   
   
@@ -2311,7 +2410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.0/" class="md-nav__link">
+      <a href="../../release-notes/1.0/" class="md-nav__link">
         
   
   
@@ -2366,22 +2465,55 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#schedule-aware-lookup-materialization" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schedule-Aware Lookup Materialization
+        Quick Start
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Schedule-Aware Lookup Materialization">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composable-behavioral-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composable Behavioral Flags
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Composable Behavioral Flags">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#lookup-mediated-dependencies" class="md-nav__link">
+  <a href="#track_history" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lookup-Mediated Dependencies
+        track_history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change_detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        change_detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#previous_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        previous_columns
       
     </span>
   </a>
@@ -2394,10 +2526,76 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#system-member-seeding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        System Member Seeding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#general-seed-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Seed Rows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scd-column-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD Column Customization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scd-type-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD Type Mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
       
     </span>
   </a>
@@ -2424,69 +2622,248 @@
   
 
 
-<!-- markdownlint-disable MD033 -->
-
-<h1 id="release-notes-v13">Release Notes — v1.3<a class="headerlink" href="#release-notes-v13" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>This release adds <strong>schedule-aware lookup materialization</strong> — the engine
-now defers internal lookups to the correct execution group boundary instead
-of materializing everything upfront.</p>
-<hr />
-<h2 id="schedule-aware-lookup-materialization">Schedule-Aware Lookup Materialization<a class="headerlink" href="#schedule-aware-lookup-materialization" title="Permanent link">&para;</a></h2>
-<p>When a weave-level lookup reads from a table produced by a thread in the
-same weave, the engine previously materialized all lookups before any
-thread ran. This could read stale data if the producing thread had not yet
-written its output.</p>
-<p>The planner now builds a <strong>lookup schedule</strong> that assigns each lookup to
-the correct materialization point:</p>
-<ul>
-<li><strong>External lookups</strong> (source not produced by a thread in the weave) are
-  materialized before the first execution group, as before.</li>
-<li><strong>Internal lookups</strong> (source produced by thread A in group N) are
-  deferred and materialized at the group N+1 boundary — after the
-  producing thread completes.</li>
-</ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Group 0:  dim_product runs, writes Tables/dim_product
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>          ↓ (lookup dim_product materializes here)
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Group 1:  fact_orders, fact_returns run (consume the lookup)
+<h1 id="dimension-modeling">Dimension Modeling<a class="headerlink" href="#dimension-modeling" title="Permanent link">&para;</a></h1>
+<p>weevr supports Kimball-style dimension targets with composable
+behavioral flags. Instead of selecting an SCD type label, you
+declare the specific behaviors you need — versioning, overwrite,
+static columns, and previous value tracking.</p>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<p>A minimal versioned dimension (SCD Type 2 equivalent):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/dim_customer</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk_customer</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">track_history</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>The lookup schedule is included in the <code>ExecutionPlan</code> and visible via
-<code>explain()</code> in plan mode.</p>
-<h3 id="lookup-mediated-dependencies">Lookup-Mediated Dependencies<a class="headerlink" href="#lookup-mediated-dependencies" title="Permanent link">&para;</a></h3>
-<p>The planner now infers implicit thread dependencies through lookups. If
-thread B consumes a lookup whose source is produced by thread A, B is
-placed in a later execution group than A — even without an explicit
-dependency declaration or overlapping source/target paths.</p>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. Weaves without lookups or with only external lookups
-behave identically to v1.2. The upfront materialization path is retained
-as a backward-compatibility fallback when no lookup schedule is computed.</p>
+<h2 id="composable-behavioral-flags">Composable Behavioral Flags<a class="headerlink" href="#composable-behavioral-flags" title="Permanent link">&para;</a></h2>
+<h3 id="track_history">track_history<a class="headerlink" href="#track_history" title="Permanent link">&para;</a></h3>
+<p>When <code>true</code>, the engine maintains row versions with SCD columns:</p>
+<ul>
+<li><code>_valid_from</code> — effective start timestamp</li>
+<li><code>_valid_to</code> — effective end timestamp (<code>9999-12-31</code> for current)</li>
+<li><code>_is_current</code> — boolean flag for the active row</li>
+</ul>
+<p>When <code>false</code> (default), the dimension uses standard merge:
+match on business key, update on change, insert new.</p>
+<h3 id="change_detection">change_detection<a class="headerlink" href="#change_detection" title="Permanent link">&para;</a></h3>
+<p>Declares which columns to monitor for changes and what
+action to take. Supports single-group and named-group forms.</p>
+<p><strong>Single group (auto):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">track_history</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">all_attrs</span><span class="p">:</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">on_change</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">version</span>
+</code></pre></div>
+<p>When <code>change_detection</code> is omitted, the engine defaults to a
+single auto group with <code>on_change: version</code> when
+<code>track_history: true</code>, or <code>on_change: overwrite</code> when
+<code>track_history: false</code>.</p>
+<p><strong>Named groups (hybrid dimension / Type 6):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">track_history</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">change_detection</span><span class="p">:</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">versioned</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">email</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="nt">on_change</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">version</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">overwrite</span><span class="p">:</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">tier</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">status</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="nt">on_change</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">overwrite</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">fixed</span><span class="p">:</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">created_date</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">      </span><span class="nt">on_change</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static</span>
+</code></pre></div>
+<p>Each group's <code>on_change</code> behavior:</p>
 <table>
 <thead>
 <tr>
-<th>Component</th>
-<th>Version</th>
+<th>Value</th>
+<th>Behavior</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Python</td>
-<td>3.11</td>
+<td><code>version</code></td>
+<td>Close current row, insert new version</td>
 </tr>
 <tr>
-<td>PySpark</td>
-<td>3.5.x</td>
+<td><code>overwrite</code></td>
+<td>Update in place across all versions</td>
 </tr>
 <tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
+<td><code>static</code></td>
+<td>Never update, regardless of source</td>
 </tr>
 </tbody>
 </table>
+<h3 id="previous_columns">previous_columns<a class="headerlink" href="#previous_columns" title="Permanent link">&para;</a></h3>
+<p>Track the previous value of a column before an update:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">previous_columns</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">_prev_tier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tier</span>
+</code></pre></div>
+<p>On update, <code>_prev_tier</code> receives the old <code>tier</code> value before
+the new value is written.</p>
+<h2 id="system-member-seeding">System Member Seeding<a class="headerlink" href="#system-member-seeding" title="Permanent link">&para;</a></h2>
+<p>Insert Kimball sentinel rows on first write:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">business_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">seed_system_members</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>Default members:</p>
+<table>
+<thead>
+<tr>
+<th>SK</th>
+<th>Code</th>
+<th>Label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>-1</td>
+<td>unknown</td>
+<td>Unknown</td>
+</tr>
+<tr>
+<td>-2</td>
+<td>not_applicable</td>
+<td>Not Applicable</td>
+</tr>
+</tbody>
+</table>
+<p>Override with custom members:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">  </span><span class="nt">seed_system_members</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">system_members</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">sk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">      </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unknown</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Unknown</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">sk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-2</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">not_applicable</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Not Applicable</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">sk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-3</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">      </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Error</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span><span class="nt">label_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">member_label</span>
+</code></pre></div>
+<h2 id="general-seed-rows">General Seed Rows<a class="headerlink" href="#general-seed-rows" title="Permanent link">&para;</a></h2>
+<p>Any target can declare seed rows:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">seed</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">first_write</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">rows</span><span class="p">:</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Default Category</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Uncategorized</span>
+</code></pre></div>
+<p>Trigger conditions:</p>
+<ul>
+<li><code>first_write</code> — insert when the table does not exist</li>
+<li><code>empty</code> — insert when the table is empty or missing</li>
+</ul>
+<h2 id="additional-keys">Additional Keys<a class="headerlink" href="#additional-keys" title="Permanent link">&para;</a></h2>
+<p>Generate secondary hash columns alongside the primary SK:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">surrogate_key</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk_entity</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">additional_keys</span><span class="p">:</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">version_key</span><span class="p">:</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_sk_version</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">email</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<h2 id="scd-column-customization">SCD Column Customization<a class="headerlink" href="#scd-column-customization" title="Permanent link">&para;</a></h2>
+<p>Override default column names and date boundaries.</p>
+<p>Defaults when omitted:</p>
+<ul>
+<li><code>columns.valid_from</code>: <code>_valid_from</code></li>
+<li><code>columns.valid_to</code>: <code>_valid_to</code></li>
+<li><code>columns.is_current</code>: <code>_is_current</code></li>
+<li><code>dates.min</code>: <code>1970-01-01</code> (first version <code>valid_from</code>)</li>
+<li><code>dates.max</code>: <code>9999-12-31</code> (current row <code>valid_to</code>)</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">valid_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">effective_start</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">valid_to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">effective_end</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">is_current</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_active</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">dates</span><span class="p">:</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1900-01-01&quot;</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">max</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;9999-12-31&quot;</span>
+</code></pre></div>
+<h2 id="write-overrides">Write Overrides<a class="headerlink" href="#write-overrides" title="Permanent link">&para;</a></h2>
+<p>The <code>write:</code> block can override non-dimension merge behaviors:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">on_no_match_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">soft_delete_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_is_deleted</span>
+</code></pre></div>
+<p>Forbidden fields when <code>dimension:</code> is present:</p>
+<ul>
+<li><code>write.match_keys</code> — derived from <code>business_key</code></li>
+<li><code>write.on_match</code> — derived from change detection</li>
+<li><code>keys.business_key</code> — declared in <code>dimension:</code></li>
+<li><code>keys.surrogate_key</code> — declared in <code>dimension:</code></li>
+<li><code>keys.change_detection</code> — declared in <code>dimension:</code></li>
+</ul>
+<h2 id="scd-type-mapping">SCD Type Mapping<a class="headerlink" href="#scd-type-mapping" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Traditional Type</th>
+<th>weevr Configuration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Type 0</td>
+<td><code>on_change: static</code></td>
+</tr>
+<tr>
+<td>Type 1</td>
+<td><code>track_history: false</code></td>
+</tr>
+<tr>
+<td>Type 2</td>
+<td><code>track_history: true</code>, <code>on_change: version</code></td>
+</tr>
+<tr>
+<td>Type 3</td>
+<td><code>previous_columns</code> mapping</td>
+</tr>
+<tr>
+<td>Type 6</td>
+<td>Named groups with mixed <code>on_change</code> values</td>
+</tr>
+</tbody>
+</table>
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
+<p>For large dimensions, the engine filters target reads to
+<code>is_current = true</code> by default. Disable with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">dimension</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">history_filter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>Z-ordering on business key columns is recommended for
+dimensions with 100M+ entities.</p>
 
 
 
