@@ -761,6 +761,51 @@ class ResolveParams(FrozenBase):
 
         return self
 
+    def resolve_batch_items(self) -> list[ResolveBatchItem]:
+        """Merge shared defaults into each batch item.
+
+        Returns a list of fully-resolved ``ResolveBatchItem`` objects
+        where item-level values override the shared defaults from
+        this ``ResolveParams`` instance.  Raises ``ValueError`` if a
+        required field (``pk``) is missing after merge.
+        """
+        if self.batch is None:
+            raise ValueError("resolve_batch_items() requires batch mode")
+
+        shared_defaults: dict[str, Any] = {}
+        for field_name in (
+            "pk",
+            "on_invalid",
+            "on_unknown",
+            "on_duplicate",
+            "on_failure",
+            "normalize",
+            "drop_source_columns",
+            "include",
+            "include_prefix",
+            "effective",
+            "where",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                shared_defaults[field_name] = value
+
+        items: list[ResolveBatchItem] = []
+        for batch_item in self.batch:
+            merged = dict(shared_defaults)
+            for field_name in ResolveBatchItem.model_fields:
+                val = getattr(batch_item, field_name)
+                if val is not None:
+                    merged[field_name] = val
+            item = ResolveBatchItem.model_validate(merged)
+            if item.pk is None:
+                raise ValueError(
+                    f"batch item '{item.name}' has no pk — set pk "
+                    f"at item level or as a shared default"
+                )
+            items.append(item)
+        return items
+
 
 class ResolveStep(FrozenBase):
     """Pipeline step: resolve foreign keys via lookup join."""

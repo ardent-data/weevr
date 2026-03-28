@@ -1028,3 +1028,126 @@ class TestResolveStepDiscriminator:
         restored = _step_adapter.validate_python(dumped)
         assert isinstance(restored, ResolveStep)
         assert restored.resolve.match == {"bk": "bk"}
+
+
+class TestBatchDefaultMerging:
+    """Test batch default merging on ResolveParams."""
+
+    def test_shared_pk_applied_to_items(self):
+        """Shared pk is applied to items that lack it."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_invalid=-4,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+                {"name": "fk2", "lookup": "dim2", "match": "bk2"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert len(items) == 2
+        assert items[0].pk == "id"
+        assert items[1].pk == "id"
+
+    def test_item_pk_overrides_shared(self):
+        """Item-level pk overrides the shared default."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1", "pk": "sk"},
+                {"name": "fk2", "lookup": "dim2", "match": "bk2"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].pk == "sk"
+        assert items[1].pk == "id"
+
+    def test_shared_on_invalid_applied(self):
+        """Shared on_invalid applied to items without it."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_invalid=-9,
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].on_invalid == -9
+
+    def test_item_effective_overrides_shared(self):
+        """Item-level effective overrides shared effective."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            effective={"current": "is_current"},  # type: ignore[arg-type]
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+                {
+                    "name": "fk2",
+                    "lookup": "dim2",
+                    "match": "bk2",
+                    "effective": {"current": {"column": "active", "value": "Y"}},
+                },
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].effective is not None
+        assert items[0].effective.current.column == "is_current"  # type: ignore[union-attr]
+        assert items[1].effective is not None
+        assert items[1].effective.current.column == "active"  # type: ignore[union-attr]
+
+    def test_item_with_all_fields_ignores_shared(self):
+        """Item with all fields set ignores shared defaults."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="shared_pk",
+            on_invalid=-99,
+            on_unknown=-88,
+            batch=[  # type: ignore[list-item]
+                {
+                    "name": "fk1",
+                    "lookup": "dim1",
+                    "match": "bk1",
+                    "pk": "item_pk",
+                    "on_invalid": -1,
+                    "on_unknown": -2,
+                },
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].pk == "item_pk"
+        assert items[0].on_invalid == -1
+        assert items[0].on_unknown == -2
+
+    def test_items_inherit_on_duplicate(self):
+        """Items inherit shared on_duplicate when not set."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            pk="id",
+            on_duplicate="error",
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+            ],
+        )
+        items = p.resolve_batch_items()
+        assert items[0].on_duplicate == "error"
+
+    def test_missing_pk_on_item_and_shared_raises(self):
+        """Item without pk and no shared pk raises ValueError."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            batch=[  # type: ignore[list-item]
+                {"name": "fk1", "lookup": "dim1", "match": "bk1"},
+            ],
+        )
+        with pytest.raises(ValueError, match="pk"):
+            p.resolve_batch_items()
