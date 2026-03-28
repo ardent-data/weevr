@@ -2099,6 +2099,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3144,16 +3172,16 @@ runtime parameter. A column set must have exactly one of <code>source</code> or
 <tr>
 <td><code>alias</code></td>
 <td><code>string</code></td>
-<td>no</td>
+<td>cond.</td>
 <td><code>null</code></td>
-<td>Lakehouse table alias (for Delta sources)</td>
+<td>Lakehouse table alias. Required when <code>type="delta"</code>.</td>
 </tr>
 <tr>
 <td><code>path</code></td>
 <td><code>string</code></td>
-<td>no</td>
+<td>cond.</td>
 <td><code>null</code></td>
-<td>File path (for Delta path or YAML sources)</td>
+<td>File path. Required when <code>type="yaml"</code>.</td>
 </tr>
 <tr>
 <td><code>from_column</code></td>

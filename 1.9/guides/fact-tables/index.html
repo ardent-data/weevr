@@ -16,7 +16,7 @@
         <link rel="prev" href="../dimension-modeling/">
       
       
-        <link rel="next" href="../../faq/">
+        <link rel="next" href="../resolve/">
       
       
         
@@ -1938,6 +1938,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2528,9 +2556,9 @@ is written.</p>
 </tr>
 </tbody>
 </table>
-<p>These values document the FK contract. The <code>resolve</code> step
-(M114, future) will use them to assign sentinel SKs when
-FK lookups fail.</p>
+<p>These values align with the sentinel defaults used by the
+<a href="../resolve/"><code>resolve</code> step</a>. The resolve step assigns these
+sentinel SKs when FK lookups fail or BKs are incomplete.</p>
 <h2 id="relationship-to-dimension-targets">Relationship to Dimension Targets<a class="headerlink" href="#relationship-to-dimension-targets" title="Permanent link">&para;</a></h2>
 <p><code>dimension:</code> and <code>fact:</code> are mutually exclusive on a single
 target. A thread produces either a dimension or a fact table.</p>

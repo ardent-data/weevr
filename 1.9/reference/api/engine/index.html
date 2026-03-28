@@ -2209,6 +2209,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4359,10 +4387,12 @@ rows from the quarantine DataFrame).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Aggregate outcome — <code>"success"</code> if all threads succeeded,
-<code>"failure"</code> if all threads failed or were skipped, <code>"partial"</code>
-if some succeeded and some failed or were skipped, <code>"skipped"</code>
-if the weave was conditionally skipped at loom level.</p>
+                <p>Aggregate outcome — <code>"success"</code> if all threads succeeded
+or were conditionally skipped (no failures), <code>"failure"</code> if
+all threads failed or were skipped due to upstream failure,
+<code>"partial"</code> if some threads succeeded and some failed,
+<code>"skipped"</code> if the weave was conditionally skipped at loom
+level.</p>
               </div>
             </td>
           </tr>

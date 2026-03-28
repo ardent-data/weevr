@@ -2114,6 +2114,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4020,7 +4048,7 @@ change detection spec.</p>
 
 
 <h3 id="weevr.operations.run_pipeline" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">run_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">run_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.run_pipeline" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4066,7 +4094,7 @@ with step index and type context attached.</p>
                 <code>steps</code>
             </td>
             <td>
-                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Step = Annotated[Annotated[FilterStep, Tag('filter')] | Annotated[DeriveStep, Tag('derive')] | Annotated[JoinStep, Tag('join')] | Annotated[SelectStep, Tag('select')] | Annotated[DropStep, Tag('drop')] | Annotated[RenameStep, Tag('rename')] | Annotated[CastStep, Tag('cast')] | Annotated[DedupStep, Tag('dedup')] | Annotated[SortStep, Tag('sort')] | Annotated[UnionStep, Tag('union')] | Annotated[AggregateStep, Tag('aggregate')] | Annotated[WindowStep, Tag('window')] | Annotated[PivotStep, Tag('pivot')] | Annotated[UnpivotStep, Tag('unpivot')] | Annotated[CaseWhenStep, Tag('case_when')] | Annotated[FillNullStep, Tag('fill_null')] | Annotated[CoalesceStep, Tag('coalesce')] | Annotated[StringOpsStep, Tag('string_ops')] | Annotated[DateOpsStep, Tag('date_ops')] | Annotated[ConcatStep, Tag('concat')] | Annotated[MapStep, Tag('map')] | Annotated[FormatStep, Tag('format')], Discriminator(_step_discriminator)]
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="Step = Annotated[Annotated[FilterStep, Tag('filter')] | Annotated[DeriveStep, Tag('derive')] | Annotated[JoinStep, Tag('join')] | Annotated[SelectStep, Tag('select')] | Annotated[DropStep, Tag('drop')] | Annotated[RenameStep, Tag('rename')] | Annotated[CastStep, Tag('cast')] | Annotated[DedupStep, Tag('dedup')] | Annotated[SortStep, Tag('sort')] | Annotated[UnionStep, Tag('union')] | Annotated[AggregateStep, Tag('aggregate')] | Annotated[WindowStep, Tag('window')] | Annotated[PivotStep, Tag('pivot')] | Annotated[UnpivotStep, Tag('unpivot')] | Annotated[CaseWhenStep, Tag('case_when')] | Annotated[FillNullStep, Tag('fill_null')] | Annotated[CoalesceStep, Tag('coalesce')] | Annotated[StringOpsStep, Tag('string_ops')] | Annotated[DateOpsStep, Tag('date_ops')] | Annotated[ConcatStep, Tag('concat')] | Annotated[MapStep, Tag('map')] | Annotated[FormatStep, Tag('format')] | Annotated[ResolveStep, Tag('resolve')], Discriminator(_step_discriminator)]
 
   
       module-attribute
@@ -4128,6 +4156,23 @@ here and passed to <code>apply_rename</code>.</p>
                 <p>Column set model instances keyed by name. Used to read
 <code>on_unmapped</code> and <code>on_extra</code> behaviour settings for rename steps
 that reference a column set.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookups</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="pyspark.sql.DataFrame">DataFrame</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cached lookup DataFrames keyed by name. Required for
+resolve steps that reference named lookups.</p>
               </div>
             </td>
             <td>
