@@ -293,6 +293,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map,
                 effective_column_sets,
                 effective_column_set_defs,
+                lookups=lookup_dfs or None,
             )
 
             # Capture intermediate row count for waterfall visualization

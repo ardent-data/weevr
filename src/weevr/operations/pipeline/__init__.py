@@ -24,6 +24,7 @@ from weevr.model.pipeline import (
     MapStep,
     PivotStep,
     RenameStep,
+    ResolveStep,
     SelectStep,
     SortStep,
     Step,
@@ -46,6 +47,7 @@ from weevr.operations.pipeline.formatting import apply_format
 from weevr.operations.pipeline.joins import apply_join, apply_union
 from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
 from weevr.operations.pipeline.reshaping import apply_dedup, apply_sort
+from weevr.operations.pipeline.resolve import apply_resolve, apply_resolve_batch
 from weevr.operations.pipeline.transforms import (
     apply_cast,
     apply_derive,
@@ -100,6 +102,7 @@ def run_pipeline(
     sources: dict[str, DataFrame],
     column_sets: dict[str, dict[str, str]] | None = None,
     column_set_defs: dict[str, ColumnSet] | None = None,
+    lookups: dict[str, DataFrame] | None = None,
 ) -> DataFrame:
     """Execute a sequence of pipeline steps against a working DataFrame.
 
@@ -119,6 +122,8 @@ def run_pipeline(
         column_set_defs: Column set model instances keyed by name. Used to read
             ``on_unmapped`` and ``on_extra`` behaviour settings for rename steps
             that reference a column set.
+        lookups: Cached lookup DataFrames keyed by name. Required for
+            resolve steps that reference named lookups.
 
     Returns:
         Final DataFrame after all steps have been applied.
@@ -142,11 +147,29 @@ def run_pipeline(
             )
         return StepResult(apply_rename(result, step.rename))
 
+    def _dispatch_resolve(result: DataFrame, step: ResolveStep) -> StepResult:
+        resolve_lookups = lookups or {}
+        params = step.resolve
+        if params.batch is not None:
+            return apply_resolve_batch(result, params, resolve_lookups)
+        # Single mode — look up the named lookup DataFrame
+        lookup_name = params.lookup
+        assert lookup_name is not None
+        lookup_df = resolve_lookups.get(lookup_name)
+        if lookup_df is None:
+            raise ExecutionError(
+                f"Lookup '{lookup_name}' not found for resolve step '{params.name}'",
+            )
+        return apply_resolve(result, params, lookup_df)
+
     result = df
     for i, step in enumerate(steps):
         try:
             if isinstance(step, RenameStep):
                 step_result = _dispatch_rename(result, step)
+                result = step_result.df
+            elif isinstance(step, ResolveStep):
+                step_result = _dispatch_resolve(result, step)
                 result = step_result.df
             else:
                 handler = _STEP_HANDLERS.get(type(step))
