@@ -717,7 +717,7 @@ class TestRenameParams:
 
 
 # ---------------------------------------------------------------------------
-# Resolve step models (M114)
+# Resolve step models
 # ---------------------------------------------------------------------------
 
 
@@ -963,6 +963,20 @@ class TestResolveParams:
         )
         assert p.batch is not None
         assert len(p.batch) == 2
+
+    def test_on_invalid_equals_on_unknown_raises(self):
+        """Equal sentinel values for on_invalid and on_unknown raise."""
+        from weevr.model.pipeline import ResolveParams
+
+        with pytest.raises(ValidationError, match="must be different"):
+            ResolveParams(
+                name="fk",
+                lookup="dim",
+                match={"bk": "bk"},
+                pk="id",
+                on_invalid=-1,
+                on_unknown=-1,
+            )
 
 
 class TestResolveBatchItem:

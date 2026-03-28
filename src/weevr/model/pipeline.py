@@ -586,7 +586,7 @@ class FormatStep(FrozenBase):
 
 
 # ---------------------------------------------------------------------------
-# Resolve step models (M114 — FK resolution)
+# Resolve step models
 # ---------------------------------------------------------------------------
 
 
@@ -619,11 +619,6 @@ class EffectiveConfig(FrozenBase):
     current: str | CurrentConfig | None = None
 
     model_config = {"populate_by_name": True}
-
-    @field_validator("from_", mode="before")
-    @classmethod
-    def _alias_from(cls, v: Any, info: Any) -> Any:
-        return v
 
     @model_validator(mode="before")
     @classmethod
@@ -758,6 +753,13 @@ class ResolveParams(FrozenBase):
 
         if self.include_prefix is not None and self.include is None:
             raise ValueError("include_prefix requires include to be set")
+
+        if self.on_invalid == self.on_unknown:
+            raise ValueError(
+                f"on_invalid ({self.on_invalid}) and on_unknown "
+                f"({self.on_unknown}) must be different values — "
+                f"equal sentinels prevent accurate resolution stats"
+            )
 
         return self
 

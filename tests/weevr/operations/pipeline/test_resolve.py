@@ -845,3 +845,34 @@ class TestResolveEdgeCases:
         matched = [r for r in rows if r["plant"] == "1"]
         assert partial_null[0]["fk"] == -4
         assert matched[0]["fk"] == 10
+
+    def test_include_column_collision_raises(self, spark: SparkSession):
+        """Include column that collides with fact column raises."""
+        fact = spark.createDataFrame(
+            [("A", "existing")],
+            StructType(
+                [
+                    StructField("bk", StringType(), True),
+                    StructField("description", StringType(), True),
+                ]
+            ),
+        )
+        dim = spark.createDataFrame(
+            [(1, "A", "Plant Alpha")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("description", StringType(), True),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            include=["description"],
+        )
+        with pytest.raises(ValueError, match="[Cc]ollid"):
+            apply_resolve(fact, params, dim)

@@ -130,24 +130,11 @@ def apply_resolve(
         join_cond = join_cond & (F.col(date_col) >= F.col(from_col))
         join_cond = join_cond & (F.col(to_col).isNull() | (F.col(date_col) < F.col(to_col)))
 
-    # Alias DataFrames to avoid column ambiguity
-    fact_aliased = df.alias("__fact__")
-    lkp_aliased = lookup_df.alias("__lkp__")
-
     # ---------------------------------------------------------------
-    # Step 4: Left join
-    # ---------------------------------------------------------------
-    joined = fact_aliased.join(lkp_aliased, join_cond, "left")
-
-    # ---------------------------------------------------------------
-    # Step 5: on_duplicate handling via window ROW_NUMBER
+    # Step 4: Left join with row ID for duplicate detection
     # ---------------------------------------------------------------
     pk_col = f"__lkp__.{params.pk}"
     dup_marker = "__resolve_dup_rn__"
-
-    # Add row number partitioned by fact row key columns
-    # Use monotonically_increasing_id as a unique row identifier for
-    # the fact side before the join
     row_id = "__resolve_row_id__"
     df_with_id = df.withColumn(row_id, F.monotonically_increasing_id())
     fact_aliased = df_with_id.alias("__fact__")
@@ -204,8 +191,15 @@ def apply_resolve(
             include_renames = {c: c for c in params.include}
 
         prefix = params.include_prefix or ""
+        existing_cols = set(df_with_id.columns)
         for src_name, tgt_name in include_renames.items():
             final_name = f"{prefix}{tgt_name}"
+            if final_name in existing_cols:
+                raise ValueError(
+                    f"Include column '{final_name}' collides with an "
+                    f"existing fact column. Use include_prefix or a "
+                    f"dict rename to avoid the collision."
+                )
             joined = joined.withColumn(
                 final_name,
                 F.when(
@@ -245,11 +239,18 @@ def apply_resolve(
         result_df = result_df.drop(*source_cols)
 
     # ---------------------------------------------------------------
-    # Step 10: Compute resolution stats
+    # Step 10: Compute resolution stats (single aggregation pass)
     # ---------------------------------------------------------------
-    total = result_df.count()
-    invalid_count = result_df.filter(F.col(params.name) == F.lit(params.on_invalid)).count()
-    unknown_count = result_df.filter(F.col(params.name) == F.lit(params.on_unknown)).count()
+    fk_col = F.col(params.name)
+    agg_row = result_df.agg(
+        F.count("*").alias("total"),
+        F.sum(F.when(fk_col == F.lit(params.on_invalid), 1).otherwise(0)).alias("invalid"),
+        F.sum(F.when(fk_col == F.lit(params.on_unknown), 1).otherwise(0)).alias("unknown"),
+    ).collect()[0]
+
+    total = int(agg_row["total"] or 0)
+    invalid_count = int(agg_row["invalid"] or 0)
+    unknown_count = int(agg_row["unknown"] or 0)
     matched_count = total - invalid_count - unknown_count
 
     stats: dict[str, Any] = {

@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 
 from weevr.errors.exceptions import ExecutionError
@@ -60,6 +61,8 @@ from weevr.operations.pipeline.transforms import (
 from weevr.operations.pipeline.value_mapping import apply_map
 
 __all__ = ["StepResult", "run_pipeline"]
+
+_logger = logging.getLogger(__name__)
 
 # Handler signature: (df, step, sources) -> StepResult
 # All handlers receive the full step object and source dict for a uniform interface.
@@ -149,9 +152,6 @@ def run_pipeline(
         return StepResult(apply_rename(result, step.rename))
 
     def _dispatch_resolve(result: DataFrame, step: ResolveStep) -> StepResult:
-        import pyspark.sql.functions as _F
-
-        _logger = logging.getLogger(__name__)
         resolve_lookups = lookups or {}
         params = step.resolve
         if params.batch is not None:
@@ -170,7 +170,7 @@ def run_pipeline(
                     lookup_name,
                     params.on_unknown,
                 )
-                fallback_df = result.withColumn(params.name, _F.lit(params.on_unknown))
+                fallback_df = result.withColumn(params.name, F.lit(params.on_unknown))
                 total = fallback_df.count()
                 return StepResult(
                     fallback_df,

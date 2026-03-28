@@ -253,6 +253,14 @@ def _eval_fk_sentinel_rate(
     elif assertion.columns is not None:
         check_cols = list(assertion.columns)
 
+    if not check_cols:
+        return AssertionResult(
+            assertion_type="fk_sentinel_rate",
+            severity=assertion.severity,
+            passed=False,
+            details="fk_sentinel_rate requires column or columns to be set",
+        )
+
     # Build sentinel groups to evaluate
     groups: dict[str, SentinelGroup] = {}
     if assertion.sentinels is not None:
