@@ -243,3 +243,30 @@ class TestHistoryFilter:
 
         target = spark.read.format("delta").load(path)
         assert target.count() >= 2  # Has history rows
+
+
+@pytest.mark.spark
+class TestAdditionalKeys:
+    """Additional keys produce secondary hash columns."""
+
+    def test_additional_key_present_in_output(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_addl_key")
+        dim = _make_dim(
+            additional_keys={  # type: ignore[arg-type]
+                "version_sk": {
+                    "name": "_version_sk",
+                    "columns": ["customer_id", "name"],
+                },
+            },
+        )
+        source = _prepare_source(
+            spark,
+            [{"customer_id": "C1", "name": "Alice"}],
+            dim,
+        )
+        builder = DimensionMergeBuilder(dim)
+        execute_dimension_merge(spark, source, builder, path, "2026-01-01")
+
+        target = spark.read.format("delta").load(path)
+        assert "_version_sk" in target.columns
+        assert "_sk" in target.columns
