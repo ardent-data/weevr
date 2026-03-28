@@ -317,6 +317,17 @@ class TestReferenceResolution:
         with pytest.raises(ConfigError, match="Unsupported extension"):
             resolve_ref_path("bad.yaml", tmp_path)
 
+    def test_resolve_ref_path_traversal_rejected(self, tmp_path):
+        """Raise ReferenceResolutionError when ref escapes the project root."""
+        from weevr.config.resolver import resolve_ref_path
+        from weevr.errors import ReferenceResolutionError
+
+        project_root = tmp_path / "project.weevr"
+        project_root.mkdir()
+
+        with pytest.raises(ReferenceResolutionError, match="resolves outside project root"):
+            resolve_ref_path("../escape.thread", project_root)
+
     def test_resolve_references_loom_to_weave_to_thread(self, tmp_path):
         """Resolve full hierarchy via ref entries: loom -> weave -> thread."""
         from weevr.config.resolver import resolve_references

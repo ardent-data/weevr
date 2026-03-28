@@ -292,6 +292,11 @@ def resolve_ref_path(ref: str, project_root: Path) -> Path:
         )
 
     resolved = (project_root / ref).resolve()
+    if not resolved.is_relative_to(project_root.resolve()):
+        raise ReferenceResolutionError(
+            f"Reference '{ref}' resolves outside project root",
+            file_path=str(resolved),
+        )
     if not resolved.exists():
         raise ReferenceResolutionError(
             f"Referenced file not found: {ref}",

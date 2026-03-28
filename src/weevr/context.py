@@ -740,6 +740,10 @@ class Context:
         Replicates the ``load_config`` pipeline but captures resolved child
         configs (``_resolved_threads`` / ``_resolved_weaves``) before Pydantic
         hydration strips them.
+
+        Note: This method replicates the ``load_config`` pipeline. Changes
+        to ``load_config`` must be mirrored here. A future refactor should
+        extract a shared ``_resolve_config_to_dict`` function.
         """
         file_path = self._resolve_config_path(path)
         project_root = Path(self._project_root)

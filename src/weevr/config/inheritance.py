@@ -3,6 +3,10 @@
 import logging
 from typing import Any
 
+# NOTE: This import creates a config→operations layer dependency.
+# The audit template merge logic is pure dict manipulation and does
+# not use Spark, but it lives in operations/audit.py. A future
+# refactor should extract the merge logic into a shared location.
 from weevr.operations.audit import merge_audit_columns_with_templates
 
 logger = logging.getLogger(__name__)
