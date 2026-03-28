@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.10/release-notes/1.2.1/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.10/release-notes/1.10/">
       
       
-        <link rel="prev" href="../1.3/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.2/">
+        <link rel="next" href="../1.9/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.2.1 - weevr</title>
+        <title>1.10 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v121" class="md-skip">
+        <a href="#release-notes-v110" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.2.1
+              1.10
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.10/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -1970,10 +1970,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.10/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.10
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1989,6 +2016,192 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#resolve-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolve Step
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Resolve Step">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-fk-resolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single FK Resolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scd2-narrowing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 Narrowing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fk_sentinel_rate-assertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fk_sentinel_rate Assertion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#codebase-quality-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Codebase Quality Improvements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Codebase Quality Improvements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-and-reliability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security and Reliability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetry-and-observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry and Observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minor-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Improvements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2194,37 +2407,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.2.1
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.2.1/" class="md-nav__link">
         
   
   
@@ -2240,76 +2426,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#bug-fixes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bug Fixes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Bug Fixes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#relative-source-path-resolution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Relative source path resolution
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fabric-runtime-compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fabric runtime compatibility
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2433,22 +2549,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#bug-fixes" class="md-nav__link">
+  <a href="#resolve-step" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bug Fixes
+        Resolve Step
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Bug Fixes">
+    <nav class="md-nav" aria-label="Resolve Step">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#relative-source-path-resolution" class="md-nav__link">
+  <a href="#background" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Relative source path resolution
+        Background
       
     </span>
   </a>
@@ -2456,10 +2572,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fabric-runtime-compatibility" class="md-nav__link">
+  <a href="#single-fk-resolve" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fabric runtime compatibility
+        Single FK Resolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scd2-narrowing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 Narrowing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Integration
       
     </span>
   </a>
@@ -2472,13 +2621,96 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#fk_sentinel_rate-assertion" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        fk_sentinel_rate Assertion
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#codebase-quality-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Codebase Quality Improvements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Codebase Quality Improvements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-and-reliability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security and Reliability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetry-and-observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry and Observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minor-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Improvements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2502,65 +2734,197 @@
   
 
 
-<!-- markdownlint-disable MD033 -->
-
-<h1 id="release-notes-v121">Release Notes — v1.2.1<a class="headerlink" href="#release-notes-v121" title="Permanent link">&para;</a></h1>
+<h1 id="release-notes-v110">Release Notes — v1.10<a class="headerlink" href="#release-notes-v110" title="Permanent link">&para;</a></h1>
 <p><strong>Release date:</strong> March 2026</p>
-<p>A patch release with bug fixes for Fabric runtime compatibility and config
-resolution.</p>
+<p>This release adds the <strong>resolve step</strong> for declarative FK
+resolution, the <strong>fk_sentinel_rate assertion</strong> for FK quality
+gates, and a broad set of <strong>codebase quality improvements</strong>
+spanning model validation, error handling, security hardening,
+and telemetry reliability.</p>
 <hr />
-<h2 id="bug-fixes">Bug Fixes<a class="headerlink" href="#bug-fixes" title="Permanent link">&para;</a></h2>
-<h3 id="relative-source-path-resolution">Relative source path resolution<a class="headerlink" href="#relative-source-path-resolution" title="Permanent link">&para;</a></h3>
-<p>Source paths declared as relative (e.g., <code>data/customers.csv</code>) are now
-resolved against the project root directory. Previously, relative paths
-could resolve against the working directory of the calling process, which
-produced inconsistent behavior across Fabric notebooks and local
-development environments.</p>
-<h3 id="fabric-runtime-compatibility">Fabric runtime compatibility<a class="headerlink" href="#fabric-runtime-compatibility" title="Permanent link">&para;</a></h3>
-<p>Several fixes improve compatibility with Microsoft Fabric Runtime 1.3:</p>
+<h2 id="resolve-step">Resolve Step<a class="headerlink" href="#resolve-step" title="Permanent link">&para;</a></h2>
+<h3 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h3>
+<p>Foreign key resolution is a universal pattern in dimensional
+modeling. Every fact table requires resolving business keys from
+source systems into surrogate keys from dimension tables.
+Previously, this required chaining <code>join</code>, <code>derive</code>, <code>filter</code>,
+and <code>coalesce</code> steps — verbose, error-prone, and lacking
+standardized sentinel handling.</p>
+<h3 id="single-fk-resolve">Single FK Resolve<a class="headerlink" href="#single-fk-resolve" title="Permanent link">&para;</a></h3>
+<p>The <code>resolve</code> step encapsulates the complete FK resolution
+pattern in one declarative block:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">on_invalid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">on_unknown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+</code></pre></div>
+<p>Key features:</p>
 <ul>
-<li><strong>Variable namespace preservation</strong> — <code>var.*</code> references in config
-  expressions are now passed through to <code>VariableContext</code> for runtime
-  resolution, instead of being eagerly resolved during config parsing.</li>
-<li><strong>Weave reference resolution</strong> — Name-only entries in a loom's <code>weaves</code>
-  list are now resolved by convention to <code>{name}.weave</code>, matching the
-  documented behavior.</li>
-<li><strong>Delta table operations</strong> — Improved compatibility with Delta Lake APIs
-  as bundled in the Fabric runtime for table property reads and writes.</li>
-<li><strong>Join null handling</strong> — Null-safe join key replacement is more robust
-  when source columns contain unexpected types.</li>
-<li><strong>Writer compatibility</strong> — Partition overwrite and merge operations use
-  Spark APIs that are available across Fabric runtime versions.</li>
+<li><strong>BK completeness check</strong> — null/blank source columns
+  automatically receive the <code>on_invalid</code> sentinel</li>
+<li><strong>Sentinel assignment</strong> — aligned with system member codes
+  (<code>on_invalid</code> default <code>-4</code>, <code>on_unknown</code> default <code>-1</code>)</li>
+<li><strong>Match sugar</strong> — string, list, or dict forms for column
+  mapping</li>
+<li><strong>Normalization</strong> — <code>trim_lower</code>, <code>trim_upper</code>, <code>trim</code>
+  presets applied symmetrically to both sides</li>
+<li><strong>Include columns</strong> — bring additional lookup columns into
+  the fact with optional rename dict and prefix</li>
+<li><strong>on_duplicate</strong> — <code>warn</code> (default), <code>error</code>, or <code>first</code>
+  for multi-match scenarios</li>
+<li><strong>Resolution stats</strong> — per-FK metadata (total, matched,
+  unknown, invalid, duplicates, match_rate)</li>
 </ul>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All existing configurations continue to work without
-modification.</p>
-<table>
-<thead>
-<tr>
-<th>Component</th>
-<th>Version</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Python</td>
-<td>3.11</td>
-</tr>
-<tr>
-<td>PySpark</td>
-<td>3.5.x</td>
-</tr>
-<tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
-</tr>
-</tbody>
-</table>
+<h3 id="scd2-narrowing">SCD2 Narrowing<a class="headerlink" href="#scd2-narrowing" title="Permanent link">&para;</a></h3>
+<p>The <code>effective</code> block supports two sub-modes for point-in-time
+dimension resolution:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Current flag (string sugar or dict form)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">effective</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">current</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_current</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Date range (half-open interval [from, to))</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nt">effective</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">date_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_date</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">effective_from</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">effective_to</span>
+</code></pre></div>
+<p>A general <code>where</code> predicate can compose with <code>effective</code> using
+AND semantics for custom narrowing.</p>
+<h3 id="batch-mode">Batch Mode<a class="headerlink" href="#batch-mode" title="Permanent link">&para;</a></h3>
+<p>Resolve multiple FKs in one step with shared defaults:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">on_invalid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">on_unknown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">batch</span><span class="p">:</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">        </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">        </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customer</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="nt">match</span><span class="p">:</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">          </span><span class="nt">customer_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">natural_id</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">        </span><span class="nt">normalize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">trim_lower</span>
+</code></pre></div>
+<p>Item-level values override shared defaults. Source columns are
+dropped only after all FKs complete, preventing mid-batch
+failures when columns are shared across resolutions.</p>
+<h3 id="pipeline-integration">Pipeline Integration<a class="headerlink" href="#pipeline-integration" title="Permanent link">&para;</a></h3>
+<p>The resolve step is dispatched via special handling in
+<code>run_pipeline()</code>, which now accepts an optional <code>lookups</code>
+parameter. The executor passes the effective cached lookups
+(merged from loom, weave, and thread levels) through to the
+pipeline.</p>
+<p><code>on_failure: warn</code> assigns the <code>on_unknown</code> sentinel to all
+rows and logs a warning instead of aborting the thread when a
+lookup cannot be found (single mode only).</p>
+<hr />
+<h2 id="fk_sentinel_rate-assertion">fk_sentinel_rate Assertion<a class="headerlink" href="#fk_sentinel_rate-assertion" title="Permanent link">&para;</a></h2>
+<p>A new post-write assertion type for checking FK sentinel value
+rates:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">assertions</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fk_sentinel_rate</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">sentinel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">max_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.05</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;plant</span><span class="nv"> </span><span class="s">FK</span><span class="nv"> </span><span class="s">invalid</span><span class="nv"> </span><span class="s">rate</span><span class="nv"> </span><span class="s">exceeded&quot;</span>
+</code></pre></div>
+<p>Supports:</p>
+<ul>
+<li><strong>Single column or columns list</strong> — each checked
+  independently</li>
+<li><strong>Named sentinel groups</strong> — dict-of-int (shared max_rate)
+  or dict-of-dict (per-group rates)</li>
+<li><strong>System member codes</strong> — string values resolved at
+  evaluation time</li>
+</ul>
+<hr />
+<h2 id="config-validation">Config Validation<a class="headerlink" href="#config-validation" title="Permanent link">&para;</a></h2>
+<p><code>validate_resolve_lookups()</code> checks at config time that all
+resolve steps reference defined lookup names, catching
+configuration errors before execution.</p>
+<hr />
+<h2 id="codebase-quality-improvements">Codebase Quality Improvements<a class="headerlink" href="#codebase-quality-improvements" title="Permanent link">&para;</a></h2>
+<h3 id="model-validation">Model Validation<a class="headerlink" href="#model-validation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Step discriminator fix</strong> — multi-word step types
+  (<code>case_when</code>, <code>fill_null</code>, <code>string_ops</code>, <code>date_ops</code>) now
+  round-trip correctly through the discriminated union when
+  passed as model instances</li>
+<li><strong>Empty collection guards</strong> — <code>SelectParams</code>, <code>DropParams</code>,
+  <code>CastParams</code>, <code>DeriveParams</code>, <code>SortParams</code>, <code>UnionParams</code>
+  now reject empty column/source lists at parse time</li>
+<li><strong>Target requires alias or path</strong> — at least one must be
+  set</li>
+<li><strong>Thread requires non-empty sources</strong> — empty sources dict
+  rejected at parse time</li>
+<li><strong>ColumnSetSource type validation</strong> — <code>delta</code> requires
+  <code>alias</code>, <code>yaml</code> requires <code>path</code></li>
+<li><strong>fk_sentinel_rate presence validation</strong> — requires at least
+  one of <code>column</code>/<code>columns</code> and <code>sentinel</code>/<code>sentinels</code></li>
+<li><strong>on_invalid/on_unknown uniqueness</strong> — equal sentinel values
+  rejected to prevent stats double-counting</li>
+<li><strong>DimensionSurrogateKeyConfig</strong> — renamed from
+  <code>SurrogateKeyConfig</code> in the dimension module to resolve
+  namespace collision with <code>keys.SurrogateKeyConfig</code></li>
+</ul>
+<h3 id="public-api">Public API<a class="headerlink" href="#public-api" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>STEP_TYPES</code> — renamed from <code>_STEP_TYPES</code> (now public)</li>
+<li>New exports from <code>weevr.model</code>: <code>ConcatStep</code>, <code>ConcatParams</code>,
+  <code>MapStep</code>, <code>MapParams</code>, <code>FormatStep</code>, <code>FormatSpec</code>,
+  <code>FormatParams</code>, <code>ResolveStep</code>, <code>ResolveParams</code>,
+  <code>ResolveBatchItem</code>, <code>EffectiveConfig</code>, <code>CurrentConfig</code>,
+  <code>DimensionSurrogateKeyConfig</code></li>
+<li><code>quote_identifier</code> — renamed from <code>_quote_identifier</code></li>
+<li><code>CONTEXT_VAR_PATTERN</code> — renamed from <code>_CONTEXT_VAR_PATTERN</code></li>
+</ul>
+<h3 id="security-and-reliability">Security and Reliability<a class="headerlink" href="#security-and-reliability" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>SQL injection guard</strong> — table aliases in quality gate SQL
+  queries are now backtick-escaped via <code>_quote_table_ref()</code></li>
+<li><strong>Path traversal guard</strong> — <code>resolve_ref_path</code> rejects refs
+  that escape the project root</li>
+<li><strong>Thread name sanitization</strong> — single quotes escaped in
+  table property keys</li>
+<li><strong>Assert replacement</strong> — all <code>assert</code> statements in
+  production code replaced with explicit if-raise guards that
+  survive Python <code>-O</code> optimization</li>
+<li><strong>Error type normalization</strong> — <code>ValueError</code> replaced with
+  <code>ExecutionError</code> in resolve and formatting handlers for
+  consistent error taxonomy</li>
+</ul>
+<h3 id="telemetry-and-observability">Telemetry and Observability<a class="headerlink" href="#telemetry-and-observability" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Span finalization</strong> — weave and loom telemetry spans are
+  now finalized in <code>finally</code> blocks, producing complete traces
+  even on failure paths</li>
+<li><strong>Weave status fix</strong> — a weave where all threads succeeded
+  or were conditionally skipped now correctly returns
+  <code>"success"</code> (was <code>"partial"</code>)</li>
+<li><strong>CDC count consolidation</strong> — three separate <code>.count()</code>
+  calls in <code>execute_cdc_merge</code> consolidated into a single
+  <code>groupBy</code> aggregation</li>
+</ul>
+<h3 id="minor-improvements">Minor Improvements<a class="headerlink" href="#minor-improvements" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>__dedup_rn__</code> temp column name prevents collision with user
+  columns named <code>_rn</code></li>
+<li><code>FormatSpec</code> rejects empty pattern strings</li>
+<li><code>ConcatParams</code> rejects empty <code>null_literal</code> with literal
+  mode</li>
+<li><code>Export</code> treats empty-string path/alias same as <code>None</code></li>
+<li><code>fact.py</code> logs exceptions at DEBUG level instead of
+  silently swallowing them in the FK sentinel advisory check</li>
+<li><code>WeaveTelemetry.column_set_results</code> typed as
+  <code>list[ColumnSetResult]</code> (was <code>list[Any]</code>)</li>
+<li>Internal planning IDs stripped from all source and test
+  files</li>
+</ul>
 
 
 
