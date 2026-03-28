@@ -9,7 +9,7 @@ from pyspark.sql.types import (
     StructType,
 )
 
-from weevr.model.pipeline import ResolveParams
+from weevr.model.pipeline import ResolveParams, Step
 from weevr.operations.pipeline.resolve import apply_resolve
 
 pytestmark = pytest.mark.spark
@@ -658,3 +658,50 @@ class TestApplyResolveBatch:
         stats = result.metadata.get("resolve_stats", {})
         assert "fk1" in stats
         assert stats["fk1"]["total"] == 1
+
+
+# ---------------------------------------------------------------------------
+# on_failure handling via pipeline dispatch (Task 9)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveOnFailure:
+    """Test on_failure handling for missing lookups."""
+
+    def test_on_failure_abort_raises(self, spark: SparkSession):
+        """on_failure=abort raises when lookup not found."""
+        from pydantic import TypeAdapter
+
+        from weevr.operations.pipeline import run_pipeline
+
+        adapter: TypeAdapter[Step] = TypeAdapter(Step)  # type: ignore[type-arg]
+        step = adapter.validate_python(
+            {"resolve": {"name": "fk", "lookup": "missing", "match": "bk", "pk": "id"}}
+        )
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        with pytest.raises(Exception, match="not found"):
+            run_pipeline(fact, [step], {}, lookups={})
+
+    def test_on_failure_warn_assigns_sentinel(self, spark: SparkSession):
+        """on_failure=warn assigns on_unknown sentinel when lookup missing."""
+        from pydantic import TypeAdapter
+
+        from weevr.operations.pipeline import run_pipeline
+
+        adapter: TypeAdapter[Step] = TypeAdapter(Step)  # type: ignore[type-arg]
+        step = adapter.validate_python(
+            {
+                "resolve": {
+                    "name": "fk",
+                    "lookup": "missing",
+                    "match": "bk",
+                    "pk": "id",
+                    "on_failure": "warn",
+                    "on_unknown": -1,
+                }
+            }
+        )
+        fact = spark.createDataFrame([("A",), ("B",)], _fact_schema("bk"))
+        result = run_pipeline(fact, [step], {}, lookups={})
+        rows = result.collect()
+        assert all(r["fk"] == -1 for r in rows)

@@ -1,5 +1,6 @@
 """Pipeline step dispatcher — routes each step to the appropriate handler."""
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -148,6 +149,9 @@ def run_pipeline(
         return StepResult(apply_rename(result, step.rename))
 
     def _dispatch_resolve(result: DataFrame, step: ResolveStep) -> StepResult:
+        import pyspark.sql.functions as _F
+
+        _logger = logging.getLogger(__name__)
         resolve_lookups = lookups or {}
         params = step.resolve
         if params.batch is not None:
@@ -155,8 +159,34 @@ def run_pipeline(
         # Single mode — look up the named lookup DataFrame
         lookup_name = params.lookup
         assert lookup_name is not None
+        assert params.name is not None
         lookup_df = resolve_lookups.get(lookup_name)
         if lookup_df is None:
+            if params.on_failure == "warn":
+                _logger.warning(
+                    "Resolve '%s': lookup '%s' not found; "
+                    "assigning on_unknown sentinel (%d) to all rows.",
+                    params.name,
+                    lookup_name,
+                    params.on_unknown,
+                )
+                fallback_df = result.withColumn(params.name, _F.lit(params.on_unknown))
+                total = fallback_df.count()
+                return StepResult(
+                    fallback_df,
+                    metadata={
+                        "resolve_stats": {
+                            params.name: {
+                                "total": total,
+                                "matched": 0,
+                                "unknown": total,
+                                "invalid": 0,
+                                "duplicates": 0,
+                                "match_rate": 0.0,
+                            }
+                        }
+                    },
+                )
             raise ExecutionError(
                 f"Lookup '{lookup_name}' not found for resolve step '{params.name}'",
             )
