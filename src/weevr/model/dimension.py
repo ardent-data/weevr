@@ -1,7 +1,7 @@
 """Dimension target configuration models."""
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import field_validator, model_validator
 
@@ -181,6 +181,25 @@ class DimensionConfig(FrozenBase):
     system_members: list[SystemMemberConfig] | None = None
     label_column: str | None = None
     history_filter: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_change_detection_default(cls, data: Any) -> Any:
+        """Populate change_detection with a default group when it is absent."""
+        if isinstance(data, dict) and data.get("change_detection") is None:
+            track = data.get("track_history", False)
+            data = {
+                **data,
+                "change_detection": {
+                    "_default": {
+                        "name": "_row_hash",
+                        "algorithm": "sha256",
+                        "columns": "auto",
+                        "on_change": "version" if track else "overwrite",
+                    }
+                },
+            }
+        return data
 
     @model_validator(mode="after")
     def validate_business_key_non_empty(self) -> "DimensionConfig":

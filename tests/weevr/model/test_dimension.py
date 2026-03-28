@@ -258,7 +258,7 @@ class TestDimensionConfigMinimal:
         assert d.business_key == ["customer_id"]
         assert d.surrogate_key.name == "sk_customer"
         assert d.track_history is False
-        assert d.change_detection is None
+        assert d.change_detection is not None
         assert d.additional_keys is None
         assert d.previous_columns is None
         assert d.seed_system_members is False
@@ -321,7 +321,7 @@ class TestDimensionConfigFull:
             surrogate_key={"name": "sk_customer", "columns": ["customer_id"]},  # type: ignore[arg-type]
             track_history=True,
             previous_columns={"_prev_name": "customer_name"},
-            change_detection={
+            change_detection={  # type: ignore[arg-type]
                 "attrs": {
                     "name": "attrs",
                     "algorithm": "sha256",
@@ -334,17 +334,17 @@ class TestDimensionConfigFull:
                     "on_change": "overwrite",
                 },
             },
-            additional_keys={
+            additional_keys={  # type: ignore[arg-type]
                 "ak_region": {
                     "name": "ak_region",
                     "columns": ["region"],
                     "algorithm": "md5",
                 },
             },
-            columns={"valid_from": "eff_from", "valid_to": "eff_to", "is_current": "is_active"},
-            dates={"min": "2000-01-01", "max": "2099-12-31"},
+            columns={"valid_from": "eff_from", "valid_to": "eff_to", "is_current": "is_active"},  # type: ignore[arg-type]
+            dates={"min": "2000-01-01", "max": "2099-12-31"},  # type: ignore[arg-type]
             seed_system_members=True,
-            system_members=[
+            system_members=[  # type: ignore[arg-type]
                 {"sk": -1, "code": "UNKNOWN", "label": "Unknown"},
                 {"sk": -2, "code": "NA", "label": "Not Applicable"},
             ],
@@ -365,7 +365,7 @@ class TestDimensionConfigFull:
             business_key=["id"],
             surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
             track_history=True,
-            change_detection={
+            change_detection={  # type: ignore[arg-type]
                 "grp": {
                     "name": "grp",
                     "columns": ["col_a"],
@@ -386,7 +386,7 @@ class TestDimensionConfigTrackHistory:
                 business_key=["id"],
                 surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
                 track_history=False,
-                change_detection={
+                change_detection={  # type: ignore[arg-type]
                     "grp": {
                         "columns": ["col_a"],
                         "on_change": "version",
@@ -400,7 +400,7 @@ class TestDimensionConfigTrackHistory:
             business_key=["id"],
             surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
             track_history=True,
-            change_detection={
+            change_detection={  # type: ignore[arg-type]
                 "grp": {
                     "columns": ["col_a"],
                     "on_change": "version",
@@ -415,7 +415,7 @@ class TestDimensionConfigTrackHistory:
             business_key=["id"],
             surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
             track_history=False,
-            change_detection={
+            change_detection={  # type: ignore[arg-type]
                 "grp": {
                     "columns": ["col_a"],
                     "on_change": "overwrite",
@@ -434,7 +434,7 @@ class TestDimensionConfigNamedGroups:
             DimensionConfig(
                 business_key=["id"],
                 surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
-                change_detection={
+                change_detection={  # type: ignore[arg-type]
                     "grp1": {
                         "columns": ["col_a", "col_b"],
                         "on_change": "overwrite",
@@ -452,7 +452,7 @@ class TestDimensionConfigNamedGroups:
             DimensionConfig(
                 business_key=["id"],
                 surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
-                change_detection={
+                change_detection={  # type: ignore[arg-type]
                     "grp1": {
                         "columns": "auto",
                         "on_change": "overwrite",
@@ -469,7 +469,7 @@ class TestDimensionConfigNamedGroups:
         d = DimensionConfig(
             business_key=["id"],
             surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
-            change_detection={
+            change_detection={  # type: ignore[arg-type]
                 "grp": {
                     "columns": "auto",
                     "on_change": "overwrite",
@@ -484,7 +484,7 @@ class TestDimensionConfigNamedGroups:
         d = DimensionConfig(
             business_key=["id"],
             surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
-            change_detection={
+            change_detection={  # type: ignore[arg-type]
                 "grp1": {
                     "columns": ["col_a"],
                     "on_change": "overwrite",
@@ -498,6 +498,106 @@ class TestDimensionConfigNamedGroups:
         assert len(d.change_detection) == 2  # type: ignore[arg-type]
 
 
+class TestDimensionConfigDefaultChangeDetection:
+    """Test that change_detection is auto-populated when omitted."""
+
+    def test_default_change_detection_populated_when_omitted(self):
+        """When change_detection is omitted, a default group is created."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+        )
+        assert d.change_detection is not None
+
+    def test_default_change_detection_has_single_group(self):
+        """Default change_detection contains exactly one group keyed '_default'."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+        )
+        assert d.change_detection is not None
+        assert "_default" in d.change_detection
+        assert len(d.change_detection) == 1
+
+    def test_default_group_name_is_row_hash(self):
+        """Default group has name='_row_hash'."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+        )
+        assert d.change_detection is not None
+        grp = d.change_detection["_default"]
+        assert grp.name == "_row_hash"
+
+    def test_default_group_algorithm_is_sha256(self):
+        """Default group has algorithm='sha256'."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+        )
+        assert d.change_detection is not None
+        grp = d.change_detection["_default"]
+        assert grp.algorithm == "sha256"
+
+    def test_default_group_columns_is_auto(self):
+        """Default group has columns='auto'."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+        )
+        assert d.change_detection is not None
+        grp = d.change_detection["_default"]
+        assert grp.columns == "auto"
+
+    def test_default_on_change_is_version_when_track_history_true(self):
+        """When track_history=True and change_detection omitted, on_change is 'version'."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+            track_history=True,
+        )
+        assert d.change_detection is not None
+        grp = d.change_detection["_default"]
+        assert grp.on_change == "version"
+
+    def test_default_on_change_is_overwrite_when_track_history_false(self):
+        """When track_history=False and change_detection omitted, on_change is 'overwrite'."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+            track_history=False,
+        )
+        assert d.change_detection is not None
+        grp = d.change_detection["_default"]
+        assert grp.on_change == "overwrite"
+
+    def test_explicit_change_detection_not_overridden(self):
+        """When change_detection is explicitly provided, it is not replaced by the default."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+            change_detection={  # type: ignore[arg-type]
+                "custom": {
+                    "columns": ["col_a"],
+                    "on_change": "overwrite",
+                },
+            },
+        )
+        assert d.change_detection is not None
+        assert "custom" in d.change_detection
+        assert "_default" not in d.change_detection
+
+    def test_explicit_null_change_detection_triggers_default(self):
+        """Explicitly passing change_detection=None still triggers the default."""
+        d = DimensionConfig(
+            business_key=["id"],
+            surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
+            change_detection=None,
+        )
+        assert d.change_detection is not None
+        assert "_default" in d.change_detection
+
+
 class TestDimensionConfigSystemMembers:
     """Test system member validation."""
 
@@ -506,7 +606,7 @@ class TestDimensionConfigSystemMembers:
         d = DimensionConfig(
             business_key=["id"],
             surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
-            system_members=[
+            system_members=[  # type: ignore[arg-type]
                 {"sk": -1, "code": "UNKNOWN", "label": "Unknown"},
                 {"sk": -2, "code": "NA", "label": "Not Applicable"},
             ],
@@ -520,7 +620,7 @@ class TestDimensionConfigSystemMembers:
             DimensionConfig(
                 business_key=["id"],
                 surrogate_key={"name": "sk_id", "columns": ["id"]},  # type: ignore[arg-type]
-                system_members=[
+                system_members=[  # type: ignore[arg-type]
                     {"sk": 1, "code": "BAD", "label": "Bad"},
                 ],
             )
