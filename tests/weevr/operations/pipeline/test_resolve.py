@@ -705,3 +705,143 @@ class TestResolveOnFailure:
         result = run_pipeline(fact, [step], {}, lookups={})
         rows = result.collect()
         assert all(r["fk"] == -1 for r in rows)
+
+
+# ---------------------------------------------------------------------------
+# Edge case tests (Task 12)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveEdgeCases:
+    """Edge case tests for resolve correctness."""
+
+    def test_empty_fact_dataframe(self, spark: SparkSession):
+        """Empty fact DF produces empty result with zero stats."""
+        fact = spark.createDataFrame([], _fact_schema("bk"))
+        dim = _dim_df(spark)
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+        )
+        result = apply_resolve(fact, params, dim)
+        assert result.df.count() == 0
+        stats = result.metadata["resolve_stats"]["fk"]
+        assert stats["total"] == 0
+        assert stats["matched"] == 0
+
+    def test_empty_lookup_all_unknown(self, spark: SparkSession):
+        """Empty lookup DF produces all on_unknown sentinels."""
+        fact = spark.createDataFrame([("A",), ("B",)], _fact_schema("bk"))
+        dim = spark.createDataFrame(
+            [],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            on_unknown=-1,
+        )
+        result = apply_resolve(fact, params, dim)
+        rows = result.df.collect()
+        assert len(rows) == 2
+        assert all(r["fk"] == -1 for r in rows)
+
+    def test_all_bks_invalid(self, spark: SparkSession):
+        """All null BKs produce all on_invalid sentinels."""
+        fact = spark.createDataFrame([(None,), (None,)], _fact_schema("bk"))
+        dim = _dim_df(spark)
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            on_invalid=-4,
+        )
+        result = apply_resolve(fact, params, dim)
+        rows = result.df.collect()
+        assert all(r["fk"] == -4 for r in rows)
+        stats = result.metadata["resolve_stats"]["fk"]
+        assert stats["invalid"] == 2
+
+    def test_all_bks_match(self, spark: SparkSession):
+        """100% match rate when all BKs exist in lookup."""
+        fact = spark.createDataFrame([("A",), ("B",), ("C",)], _fact_schema("bk"))
+        dim = _dim_df(spark)
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+        )
+        result = apply_resolve(fact, params, dim)
+        stats = result.metadata["resolve_stats"]["fk"]
+        assert stats["matched"] == 3
+        assert stats["unknown"] == 0
+        assert stats["invalid"] == 0
+        assert stats["match_rate"] == 100.0
+
+    def test_single_row_fact_single_row_dim(self, spark: SparkSession):
+        """Single row fact + single row dim resolves correctly."""
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        dim = spark.createDataFrame(
+            [(99, "A")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+        )
+        result = apply_resolve(fact, params, dim)
+        assert result.df.count() == 1
+        assert result.df.collect()[0]["fk"] == 99
+
+    def test_compound_bk_partial_null(self, spark: SparkSession):
+        """Compound BK with one null column in a pair gets on_invalid."""
+        fact = spark.createDataFrame(
+            [("A", None), ("A", "1")],
+            StructType(
+                [
+                    StructField("region", StringType(), True),
+                    StructField("plant", StringType(), True),
+                ]
+            ),
+        )
+        dim = spark.createDataFrame(
+            [(10, "A", "1")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("region_code", StringType(), False),
+                    StructField("plant_code", StringType(), False),
+                ]
+            ),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"region": "region_code", "plant": "plant_code"},
+            pk="id",
+            on_invalid=-4,
+        )
+        result = apply_resolve(fact, params, dim)
+        rows = result.df.collect()
+        partial_null = [r for r in rows if r["plant"] is None]
+        matched = [r for r in rows if r["plant"] == "1"]
+        assert partial_null[0]["fk"] == -4
+        assert matched[0]["fk"] == 10
