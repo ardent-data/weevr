@@ -9,10 +9,15 @@ always reflect the accepted configuration surface.
 
 | File | Description |
 |------|-------------|
-| [`thread.json`](../../schema/thread.json) | Thread configuration |
-| [`weave.json`](../../schema/weave.json) | Weave configuration |
-| [`loom.json`](../../schema/loom.json) | Loom configuration |
-| [`weevr.json`](../../schema/weevr.json) | Combined (all three) |
+| [`thread.json`][thread] | Thread configuration |
+| [`weave.json`][weave] | Weave configuration |
+| [`loom.json`][loom] | Loom configuration |
+| [`weevr.json`][combined] | Combined (all three) |
+
+[thread]: https://github.com/ardent-data/weevr/blob/main/docs/schema/thread.json
+[weave]: https://github.com/ardent-data/weevr/blob/main/docs/schema/weave.json
+[loom]: https://github.com/ardent-data/weevr/blob/main/docs/schema/loom.json
+[combined]: https://github.com/ardent-data/weevr/blob/main/docs/schema/weevr.json
 
 ## Usage with LLMs
 
