@@ -2,6 +2,8 @@
 
 from enum import StrEnum
 
+from pydantic import Field
+
 from weevr.model.base import FrozenBase
 
 
@@ -26,5 +28,11 @@ class ExecutionConfig(FrozenBase):
         trace: Whether to collect execution spans for telemetry.
     """
 
-    log_level: LogLevel = LogLevel.STANDARD
-    trace: bool = True
+    log_level: LogLevel = Field(
+        default=LogLevel.STANDARD,
+        description="Logging verbosity for execution output.",
+    )
+    trace: bool = Field(
+        default=True,
+        description="Whether to collect execution spans for telemetry.",
+    )

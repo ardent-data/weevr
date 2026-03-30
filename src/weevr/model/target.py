@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.dimension import DimensionConfig
@@ -19,10 +19,22 @@ class ColumnMapping(FrozenBase):
     - ``expr`` and ``drop=True`` are mutually exclusive.
     """
 
-    expr: SparkExpr | None = None
-    type: str | None = None
-    default: Any = None
-    drop: bool = False
+    expr: SparkExpr | None = Field(
+        default=None,
+        description="Spark SQL expression to compute this column's value.",
+    )
+    type: str | None = Field(
+        default=None,
+        description="Target data type to cast to (e.g. 'string', 'decimal(18,2)').",
+    )
+    default: Any = Field(
+        default=None,
+        description="Default value when the source column is null.",
+    )
+    drop: bool = Field(
+        default=False,
+        description="When True, exclude this column from the output.",
+    )
 
     @model_validator(mode="after")
     def _validate_expr_drop_exclusive(self) -> "ColumnMapping":
@@ -34,19 +46,70 @@ class ColumnMapping(FrozenBase):
 class Target(FrozenBase):
     """Write destination with column mapping and partitioning configuration."""
 
-    alias: str | None = None
-    path: str | None = None
-    mapping_mode: Literal["auto", "explicit"] = "auto"
-    columns: dict[str, ColumnMapping] | None = None
-    partition_by: list[str] | None = None
-    audit_columns: dict[str, str] | None = None
-    audit_template: list[str] | None = None
-    audit_template_inherit: bool = True
-    audit_columns_exclude: list[str] | None = None
-    naming: NamingConfig | None = None
-    dimension: DimensionConfig | None = None
-    fact: FactConfig | None = None
-    seed: SeedConfig | None = None
+    alias: str | None = Field(
+        default=None,
+        description="Registered table alias for the target. Required for delta targets.",
+    )
+    path: str | None = Field(
+        default=None,
+        description="OneLake path for the target. Alternative to alias.",
+    )
+    mapping_mode: Literal["auto", "explicit"] = Field(
+        default="auto",
+        description=(
+            "Column mapping mode. 'auto' passes all source columns through; "
+            "'explicit' requires all output columns to be declared in columns."
+        ),
+    )
+    columns: dict[str, ColumnMapping] | None = Field(
+        default=None,
+        description="Per-column mapping specifications for the target.",
+    )
+    partition_by: list[str] | None = Field(
+        default=None,
+        description="Columns to partition the target table by.",
+    )
+    audit_columns: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Inline audit columns as name-to-expression pairs, appended after user columns."
+        ),
+    )
+    audit_template: list[str] | None = Field(
+        default=None,
+        description="Named audit templates to apply. Accepts a single string or list.",
+    )
+    audit_template_inherit: bool = Field(
+        default=True,
+        description=(
+            "Whether to inherit audit templates from parent weave/loom. "
+            "Set to False to opt out of cascade."
+        ),
+    )
+    audit_columns_exclude: list[str] | None = Field(
+        default=None,
+        description="Glob patterns for audit columns to exclude from output.",
+    )
+    naming: NamingConfig | None = Field(
+        default=None,
+        description="Naming normalization rules for target columns and table.",
+    )
+    dimension: DimensionConfig | None = Field(
+        default=None,
+        description=(
+            "Dimension configuration for SCD Type 2 behavior. Mutually exclusive with fact."
+        ),
+    )
+    fact: FactConfig | None = Field(
+        default=None,
+        description=(
+            "Fact table configuration for FK validation. Mutually exclusive with dimension."
+        ),
+    )
+    seed: SeedConfig | None = Field(
+        default=None,
+        description="Seed rows to insert on first write or when the table is empty.",
+    )
 
     @model_validator(mode="before")
     @classmethod

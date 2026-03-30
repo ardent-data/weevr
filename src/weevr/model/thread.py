@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
@@ -30,10 +30,20 @@ class Thread(FrozenBase):
     of transformation steps, and a single target.
     """
 
-    name: str = ""
-    qualified_key: str = ""
-    config_version: str
-    sources: dict[str, Source]
+    name: str = Field(
+        default="",
+        description="Thread name, derived from filename stem for external references.",
+    )
+    qualified_key: str = Field(
+        default="",
+        description="Dot-separated namespace key, derived from directory path.",
+    )
+    config_version: str = Field(
+        description="Configuration schema version. Must be '1.0'.",
+    )
+    sources: dict[str, Source] = Field(
+        description="Named data source declarations. At least one entry required.",
+    )
 
     @field_validator("sources")
     @classmethod
@@ -42,23 +52,82 @@ class Thread(FrozenBase):
             raise ValueError("sources must contain at least one entry")
         return v
 
-    steps: list[Step] = []
-    target: Target
-    write: WriteConfig | None = None
-    keys: KeyConfig | None = None
-    validations: list[ValidationRule] | None = None
-    assertions: list[Assertion] | None = None
-    load: LoadConfig | None = None
-    tags: list[str] | None = None
-    params: dict[str, ParamSpec] | None = None
-    defaults: dict[str, Any] | None = None
-    failure: FailureConfig | None = None
-    execution: ExecutionConfig | None = None
-    cache: bool | None = None
-    exports: list[Export] | None = None
-    lookups: dict[str, Lookup] | None = None
-    column_sets: dict[str, ColumnSet] | None = None
-    variables: dict[str, VariableSpec] | None = None
-    pre_steps: list[HookStep] | None = None
-    post_steps: list[HookStep] | None = None
-    audit_templates: dict[str, AuditTemplate] | None = None
+    steps: list[Step] = Field(
+        default=[],
+        description="Ordered list of transformation steps applied to source data.",
+    )
+    target: Target = Field(
+        description="Write destination with column mapping and partitioning.",
+    )
+    write: WriteConfig | None = Field(
+        default=None,
+        description="Write mode and merge parameters for the target.",
+    )
+    keys: KeyConfig | None = Field(
+        default=None,
+        description="Business key, surrogate key, and change detection configuration.",
+    )
+    validations: list[ValidationRule] | None = Field(
+        default=None,
+        description="Pre-write data quality rules evaluated as Spark SQL expressions.",
+    )
+    assertions: list[Assertion] | None = Field(
+        default=None,
+        description="Post-execution assertions on the target dataset.",
+    )
+    load: LoadConfig | None = Field(
+        default=None,
+        description="Incremental load mode and watermark parameters.",
+    )
+    tags: list[str] | None = Field(
+        default=None,
+        description="User-defined tags for filtering and grouping threads.",
+    )
+    params: dict[str, ParamSpec] | None = Field(
+        default=None,
+        description="Typed parameter declarations with defaults and validation.",
+    )
+    defaults: dict[str, Any] | None = Field(
+        default=None,
+        description="Default values inherited by nested configuration blocks.",
+    )
+    failure: FailureConfig | None = Field(
+        default=None,
+        description="Per-thread failure handling policy.",
+    )
+    execution: ExecutionConfig | None = Field(
+        default=None,
+        description="Runtime execution settings (log level, tracing).",
+    )
+    cache: bool | None = Field(
+        default=None,
+        description="Whether to cache the thread's DataFrame after transformation.",
+    )
+    exports: list[Export] | None = Field(
+        default=None,
+        description="Secondary output destinations for thread data.",
+    )
+    lookups: dict[str, Lookup] | None = Field(
+        default=None,
+        description="Named reference datasets shared across this thread.",
+    )
+    column_sets: dict[str, ColumnSet] | None = Field(
+        default=None,
+        description="Named external column mappings for bulk rename operations.",
+    )
+    variables: dict[str, VariableSpec] | None = Field(
+        default=None,
+        description="Typed variable declarations set by hook steps via set_var.",
+    )
+    pre_steps: list[HookStep] | None = Field(
+        default=None,
+        description="Hook steps executed before the thread's pipeline runs.",
+    )
+    post_steps: list[HookStep] | None = Field(
+        default=None,
+        description="Hook steps executed after the thread's pipeline completes.",
+    )
+    audit_templates: dict[str, AuditTemplate] | None = Field(
+        default=None,
+        description="Named audit column templates for reuse across threads.",
+    )

@@ -1,5 +1,7 @@
 """AuditTemplate model for weevr audit column definitions."""
 
+from pydantic import Field
+
 from weevr.model.base import FrozenBase
 
 
@@ -19,4 +21,9 @@ class AuditTemplate(FrozenBase):
         ... )
     """
 
-    columns: dict[str, str]
+    columns: dict[str, str] = Field(
+        description=(
+            "Mapping of column names to Spark SQL expressions. Each entry defines a column"
+            " that will be appended to the output dataset."
+        )
+    )

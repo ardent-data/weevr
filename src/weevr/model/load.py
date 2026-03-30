@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from weevr.model.base import FrozenBase
 
@@ -22,12 +22,35 @@ class CdcConfig(FrozenBase):
     Preset and explicit column mappings are mutually exclusive.
     """
 
-    preset: Literal["delta_cdf"] | None = None
-    operation_column: str | None = None
-    insert_value: str | None = None
-    update_value: str | None = None
-    delete_value: str | None = None
-    on_delete: Literal["hard_delete", "soft_delete"] = "hard_delete"
+    preset: Literal["delta_cdf"] | None = Field(
+        default=None,
+        description=(
+            "CDC preset. 'delta_cdf' auto-configures for Delta Change Data Feed. "
+            "Mutually exclusive with operation_column."
+        ),
+    )
+    operation_column: str | None = Field(
+        default=None,
+        description=("Column containing the CDC operation type. Mutually exclusive with preset."),
+    )
+    insert_value: str | None = Field(
+        default=None,
+        description="Value in operation_column that indicates an insert operation.",
+    )
+    update_value: str | None = Field(
+        default=None,
+        description="Value in operation_column that indicates an update operation.",
+    )
+    delete_value: str | None = Field(
+        default=None,
+        description="Value in operation_column that indicates a delete operation.",
+    )
+    on_delete: Literal["hard_delete", "soft_delete"] = Field(
+        default="hard_delete",
+        description=(
+            "How to handle delete operations: hard_delete removes rows, soft_delete flags them."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_preset_or_explicit(self) -> CdcConfig:
@@ -58,8 +81,17 @@ class WatermarkStoreConfig(FrozenBase):
     Default store type is ``table_properties`` (zero-config).
     """
 
-    type: Literal["table_properties", "metadata_table"] = "table_properties"
-    table_path: str | None = None
+    type: Literal["table_properties", "metadata_table"] = Field(
+        default="table_properties",
+        description=(
+            "Watermark storage backend. 'table_properties' stores in Delta table "
+            "properties (zero-config). 'metadata_table' uses a dedicated table."
+        ),
+    )
+    table_path: str | None = Field(
+        default=None,
+        description="Path to the metadata table. Required when type is 'metadata_table'.",
+    )
 
     @model_validator(mode="after")
     def _validate_metadata_table_path(self) -> WatermarkStoreConfig:
@@ -78,12 +110,36 @@ class LoadConfig(FrozenBase):
       (CDF version tracking is automatic).
     """
 
-    mode: Literal["full", "incremental_watermark", "incremental_parameter", "cdc"] = "full"
-    watermark_column: str | None = None
-    watermark_type: Literal["timestamp", "date", "int", "long"] | None = None
-    watermark_inclusive: bool = False
-    watermark_store: WatermarkStoreConfig | None = None
-    cdc: CdcConfig | None = None
+    mode: Literal["full", "incremental_watermark", "incremental_parameter", "cdc"] = Field(
+        default="full",
+        description=("Load mode: full, incremental_watermark, incremental_parameter, or cdc."),
+    )
+    watermark_column: str | None = Field(
+        default=None,
+        description=(
+            "Column used for watermark-based incremental loads. "
+            "Required when mode is 'incremental_watermark'."
+        ),
+    )
+    watermark_type: Literal["timestamp", "date", "int", "long"] | None = Field(
+        default=None,
+        description="Data type of the watermark column.",
+    )
+    watermark_inclusive: bool = Field(
+        default=False,
+        description=(
+            "When True, include rows equal to the watermark value. "
+            "Pair with merge or overwrite for idempotent re-reads."
+        ),
+    )
+    watermark_store: WatermarkStoreConfig | None = Field(
+        default=None,
+        description="Watermark persistence configuration. Defaults to table_properties.",
+    )
+    cdc: CdcConfig | None = Field(
+        default=None,
+        description="CDC-specific configuration. Required when mode is 'cdc'.",
+    )
 
     @model_validator(mode="after")
     def _validate_watermark_fields(self) -> LoadConfig:

@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
@@ -11,9 +11,12 @@ from weevr.model.types import SparkExpr
 class ValidationRule(FrozenBase):
     """A pre-write data quality rule evaluated as a Spark SQL expression."""
 
-    rule: SparkExpr
-    severity: Literal["info", "warn", "error", "fatal"] = "error"
-    name: str
+    rule: SparkExpr = Field(description="Spark SQL boolean expression that must evaluate to true.")
+    severity: Literal["info", "warn", "error", "fatal"] = Field(
+        default="error",
+        description="Severity level when the rule fails.",
+    )
+    name: str = Field(description="Unique identifier for the validation rule.")
 
 
 class SentinelGroup(FrozenBase):
@@ -23,8 +26,16 @@ class SentinelGroup(FrozenBase):
     member code string (e.g. ``"invalid"``) resolved at evaluation time.
     """
 
-    value: int | str
-    max_rate: float | None = None
+    value: int | str = Field(
+        description=(
+            "Raw integer sentinel (e.g. ``-4``) or system member code string "
+            '(e.g. ``"invalid"``) resolved at evaluation time.'
+        ),
+    )
+    max_rate: float | None = Field(
+        default=None,
+        description="Maximum allowed rate (0.0–1.0) for this sentinel within the group.",
+    )
 
 
 class Assertion(FrozenBase):
@@ -36,18 +47,54 @@ class Assertion(FrozenBase):
     across resolved FK columns.
     """
 
-    type: Literal["row_count", "column_not_null", "unique", "expression", "fk_sentinel_rate"]
-    severity: Literal["info", "warn", "error", "fatal"] = "warn"
-    columns: list[str] | None = None
-    min: int | None = None
-    max: int | None = None
-    expression: SparkExpr | None = None
+    type: Literal["row_count", "column_not_null", "unique", "expression", "fk_sentinel_rate"] = (
+        Field(description="Assertion type that determines which fields are required.")
+    )
+    severity: Literal["info", "warn", "error", "fatal"] = Field(
+        default="warn",
+        description="Severity level when the assertion fails.",
+    )
+    columns: list[str] | None = Field(
+        default=None,
+        description="Columns to assert against, used by ``column_not_null`` and ``unique``.",
+    )
+    min: int | None = Field(
+        default=None,
+        description="Minimum row count threshold for the ``row_count`` assertion type.",
+    )
+    max: int | None = Field(
+        default=None,
+        description="Maximum row count threshold for the ``row_count`` assertion type.",
+    )
+    expression: SparkExpr | None = Field(
+        default=None,
+        description="Spark SQL boolean expression for the ``expression`` assertion type.",
+    )
     # fk_sentinel_rate fields
-    column: str | None = None
-    sentinel: int | str | None = None
-    sentinels: dict[str, SentinelGroup] | None = None
-    max_rate: float | None = None
-    message: str | None = None
+    column: str | None = Field(
+        default=None,
+        description="Single FK column to check; mutually exclusive with ``columns``.",
+    )
+    sentinel: int | str | None = Field(
+        default=None,
+        description=(
+            "Single sentinel value to check rate for; mutually exclusive with ``sentinels``."
+        ),
+    )
+    sentinels: dict[str, SentinelGroup] | None = Field(
+        default=None,
+        description=(
+            "Named map of sentinel groups to check rates for; mutually exclusive with ``sentinel``."
+        ),
+    )
+    max_rate: float | None = Field(
+        default=None,
+        description="Maximum allowed sentinel rate (0.0–1.0) across all sentinels.",
+    )
+    message: str | None = Field(
+        default=None,
+        description="Optional failure message appended to the assertion error output.",
+    )
 
     @field_validator("sentinels", mode="before")
     @classmethod

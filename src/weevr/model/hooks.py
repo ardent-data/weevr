@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, Literal
 
-from pydantic import Discriminator, Tag, model_validator
+from pydantic import Discriminator, Field, Tag, model_validator
 
 from weevr.model.base import FrozenBase
 
@@ -31,29 +31,75 @@ class QualityGateStep(FrozenBase):
         message: Failure message for ``expression`` check diagnostics.
     """
 
-    type: Literal["quality_gate"]
-    name: str | None = None
-    on_failure: Literal["abort", "warn"] | None = None
-    check: Literal["source_freshness", "row_count_delta", "row_count", "table_exists", "expression"]
+    type: Literal["quality_gate"] = Field(
+        description="Step type discriminator, always ``quality_gate``.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Optional name for telemetry span naming.",
+    )
+    on_failure: Literal["abort", "warn"] | None = Field(
+        default=None,
+        description=(
+            "Failure behaviour. ``None`` means the executor applies the "
+            "phase-specific default (pre=abort, post=warn)."
+        ),
+    )
+    check: Literal[
+        "source_freshness", "row_count_delta", "row_count", "table_exists", "expression"
+    ] = Field(description="Which quality gate check to perform.")
 
     # source_freshness / table_exists
-    source: str | None = None
-    max_age: str | None = None
+    source: str | None = Field(
+        default=None,
+        description="Table alias for ``source_freshness`` and ``table_exists`` checks.",
+    )
+    max_age: str | None = Field(
+        default=None,
+        description='Duration string for ``source_freshness`` (e.g. ``"24h"``).',
+    )
 
     # row_count_delta
-    target: str | None = None
-    max_decrease_pct: float | None = None
-    max_increase_pct: float | None = None
-    min_delta: int | None = None
-    max_delta: int | None = None
+    target: str | None = Field(
+        default=None,
+        description="Table alias for ``row_count_delta`` and ``row_count`` checks.",
+    )
+    max_decrease_pct: float | None = Field(
+        default=None,
+        description="Maximum allowed row count decrease percentage for ``row_count_delta``.",
+    )
+    max_increase_pct: float | None = Field(
+        default=None,
+        description="Maximum allowed row count increase percentage for ``row_count_delta``.",
+    )
+    min_delta: int | None = Field(
+        default=None,
+        description="Minimum absolute row change allowed for ``row_count_delta``.",
+    )
+    max_delta: int | None = Field(
+        default=None,
+        description="Maximum absolute row change allowed for ``row_count_delta``.",
+    )
 
     # row_count
-    min_count: int | None = None
-    max_count: int | None = None
+    min_count: int | None = Field(
+        default=None,
+        description="Minimum row count threshold for the ``row_count`` check.",
+    )
+    max_count: int | None = Field(
+        default=None,
+        description="Maximum row count threshold for the ``row_count`` check.",
+    )
 
     # expression
-    sql: str | None = None
-    message: str | None = None
+    sql: str | None = Field(
+        default=None,
+        description="Spark SQL boolean expression for the ``expression`` check.",
+    )
+    message: str | None = Field(
+        default=None,
+        description="Failure message for ``expression`` check diagnostics.",
+    )
 
     @model_validator(mode="after")
     def _validate_check_fields(self) -> "QualityGateStep":
@@ -102,11 +148,24 @@ class SqlStatementStep(FrozenBase):
         set_var: Optional variable name to capture the scalar result into.
     """
 
-    type: Literal["sql_statement"]
-    name: str | None = None
-    on_failure: Literal["abort", "warn"] | None = None
-    sql: str
-    set_var: str | None = None
+    type: Literal["sql_statement"] = Field(
+        description="Step type discriminator, always ``sql_statement``.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Optional name for telemetry span naming.",
+    )
+    on_failure: Literal["abort", "warn"] | None = Field(
+        default=None,
+        description=(
+            "Failure behaviour. ``None`` means the executor applies the phase-specific default."
+        ),
+    )
+    sql: str = Field(description="Spark SQL statement to execute.")
+    set_var: str | None = Field(
+        default=None,
+        description="Optional variable name to capture the scalar result into.",
+    )
 
 
 class LogMessageStep(FrozenBase):
@@ -121,11 +180,26 @@ class LogMessageStep(FrozenBase):
         level: Log level for the message.
     """
 
-    type: Literal["log_message"]
-    name: str | None = None
-    on_failure: Literal["abort", "warn"] | None = None
-    message: str
-    level: Literal["info", "warn", "error"] = "info"
+    type: Literal["log_message"] = Field(
+        description="Step type discriminator, always ``log_message``.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Optional name for telemetry span naming.",
+    )
+    on_failure: Literal["abort", "warn"] | None = Field(
+        default=None,
+        description=(
+            "Failure behaviour. ``None`` means the executor applies the phase-specific default."
+        ),
+    )
+    message: str = Field(
+        description="Message template to log. Supports ``${var.name}`` placeholders.",
+    )
+    level: Literal["info", "warn", "error"] = Field(
+        default="info",
+        description="Log level for the message.",
+    )
 
 
 def _hook_step_discriminator(v: Any) -> str:

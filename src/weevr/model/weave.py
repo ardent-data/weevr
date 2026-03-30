@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
@@ -24,7 +24,13 @@ class ConditionSpec(FrozenBase):
             ``table_empty()``, ``row_count()``), and simple boolean operators.
     """
 
-    when: str
+    when: str = Field(
+        description=(
+            "Condition expression string. Supports parameter references "
+            "(${param.x}), built-in checks (table_exists(), table_empty(), "
+            "row_count()), and simple boolean operators."
+        ),
+    )
 
 
 class ThreadEntry(FrozenBase):
@@ -41,29 +47,93 @@ class ThreadEntry(FrozenBase):
             thread is only executed if the condition evaluates to True.
     """
 
-    name: str = ""
-    ref: str | None = None
-    dependencies: list[str] | None = None
-    condition: ConditionSpec | None = None
+    name: str = Field(
+        default="",
+        description=(
+            "Thread name. Required for inline definitions; derived from "
+            "filename stem for external references."
+        ),
+    )
+    ref: str | None = Field(
+        default=None,
+        description=(
+            "Path to an external .thread file, relative to project root. "
+            "Mutually exclusive with inline definition."
+        ),
+    )
+    dependencies: list[str] | None = Field(
+        default=None,
+        description=(
+            "Explicit upstream thread names. Merged with auto-inferred "
+            "dependencies from source/target path matching."
+        ),
+    )
+    condition: ConditionSpec | None = Field(
+        default=None,
+        description=(
+            "Optional condition for conditional execution. Thread runs "
+            "only if the condition evaluates to True."
+        ),
+    )
 
 
 class Weave(FrozenBase):
     """A collection of thread references with optional shared defaults."""
 
-    name: str = ""
-    qualified_key: str = ""
-    config_version: str
-    threads: list[ThreadEntry]
-    defaults: dict[str, Any] | None = None
-    params: dict[str, ParamSpec] | None = None
-    execution: ExecutionConfig | None = None
-    naming: NamingConfig | None = None
-    lookups: dict[str, Lookup] | None = None
-    column_sets: dict[str, ColumnSet] | None = None
-    variables: dict[str, VariableSpec] | None = None
-    pre_steps: list[HookStep] | None = None
-    post_steps: list[HookStep] | None = None
-    audit_templates: dict[str, AuditTemplate] | None = None
+    name: str = Field(
+        default="",
+        description="Weave name, derived from filename stem for external references.",
+    )
+    qualified_key: str = Field(
+        default="",
+        description="Dot-separated namespace key, derived from directory path.",
+    )
+    config_version: str = Field(
+        description="Configuration schema version. Must be '1.0'.",
+    )
+    threads: list[ThreadEntry] = Field(
+        description="Ordered list of thread references in this weave.",
+    )
+    defaults: dict[str, Any] | None = Field(
+        default=None,
+        description="Default values inherited by all threads in this weave.",
+    )
+    params: dict[str, ParamSpec] | None = Field(
+        default=None,
+        description="Typed parameter declarations with defaults and validation.",
+    )
+    execution: ExecutionConfig | None = Field(
+        default=None,
+        description="Runtime execution settings (log level, tracing).",
+    )
+    naming: NamingConfig | None = Field(
+        default=None,
+        description="Naming normalization rules for columns and tables.",
+    )
+    lookups: dict[str, Lookup] | None = Field(
+        default=None,
+        description="Named reference datasets shared across threads in this weave.",
+    )
+    column_sets: dict[str, ColumnSet] | None = Field(
+        default=None,
+        description="Named external column mappings for bulk rename operations.",
+    )
+    variables: dict[str, VariableSpec] | None = Field(
+        default=None,
+        description="Typed variable declarations set by hook steps via set_var.",
+    )
+    pre_steps: list[HookStep] | None = Field(
+        default=None,
+        description="Hook steps executed before threads in this weave run.",
+    )
+    post_steps: list[HookStep] | None = Field(
+        default=None,
+        description="Hook steps executed after all threads in this weave complete.",
+    )
+    audit_templates: dict[str, AuditTemplate] | None = Field(
+        default=None,
+        description="Named audit column templates inherited by threads.",
+    )
 
     @model_validator(mode="before")
     @classmethod

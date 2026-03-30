@@ -42,5 +42,8 @@ jobs:
       - name: Type check
         run: uv run pyright .
 
+      - name: Schema check
+        run: uv run python scripts/generate_schema.py --check
+
       - name: Tests (fast)
         run: uv run pytest
