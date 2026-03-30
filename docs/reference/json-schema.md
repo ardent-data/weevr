@@ -32,7 +32,7 @@ Many YAML editor extensions support JSON Schema for
 autocompletion and validation. Point the extension at the
 raw GitHub URL for the relevant schema file:
 
-```
+```text
 https://raw.githubusercontent.com/ardent-data/weevr/main/docs/schema/thread.json
 ```
 
