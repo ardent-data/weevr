@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import Field
+
 from weevr.model.base import FrozenBase
 
 
@@ -16,5 +18,10 @@ class VariableSpec(FrozenBase):
         default: Optional default value used when no hook sets the variable.
     """
 
-    type: Literal["string", "int", "long", "float", "double", "boolean", "timestamp", "date"]
-    default: str | int | float | bool | None = None
+    type: Literal["string", "int", "long", "float", "double", "boolean", "timestamp", "date"] = (
+        Field(description="Scalar type of the variable value.")
+    )
+    default: str | int | float | bool | None = Field(
+        default=None,
+        description="Optional default value used when no hook sets the variable.",
+    )

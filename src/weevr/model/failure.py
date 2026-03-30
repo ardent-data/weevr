@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import Field
+
 from weevr.model.base import FrozenBase
 
 
@@ -15,4 +17,10 @@ class FailureConfig(FrozenBase):
             or ``"continue"``. See SPEC §14.2 for semantics.
     """
 
-    on_failure: Literal["skip_downstream", "continue", "abort_weave"] = "abort_weave"
+    on_failure: Literal["skip_downstream", "continue", "abort_weave"] = Field(
+        default="abort_weave",
+        description=(
+            "Policy applied to remaining threads when this thread fails."
+            " One of ``abort_weave``, ``skip_downstream``, or ``continue``."
+        ),
+    )

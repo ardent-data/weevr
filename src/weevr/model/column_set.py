@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 
@@ -48,12 +48,29 @@ class ColumnSetSource(FrozenBase):
         filter: SQL WHERE expression applied when reading a Delta source.
     """
 
-    type: Literal["delta", "yaml"]
-    alias: str | None = None
-    path: str | None = None
-    from_column: str = "source_name"
-    to_column: str = "target_name"
-    filter: str | None = None
+    type: Literal["delta", "yaml"] = Field(
+        description="Source kind — ``delta`` for a registered Delta table or ``yaml`` for a file."
+    )
+    alias: str | None = Field(
+        default=None,
+        description="Registered table alias. Required when ``type`` is ``delta``.",
+    )
+    path: str | None = Field(
+        default=None,
+        description="File path to the YAML mapping file. Required when ``type`` is ``yaml``.",
+    )
+    from_column: str = Field(
+        default="source_name",
+        description="Column name in the source that holds the incoming (original) column names.",
+    )
+    to_column: str = Field(
+        default="target_name",
+        description="Column name in the source that holds the outgoing (renamed) column names.",
+    )
+    filter: str | None = Field(
+        default=None,
+        description="SQL WHERE expression applied when reading a Delta source.",
+    )
 
     @model_validator(mode="after")
     def _validate_type_specific_fields(self) -> "ColumnSetSource":
@@ -86,11 +103,38 @@ class ColumnSet(FrozenBase):
             continues; ``"skip"`` silently skips the rename step.
     """
 
-    source: ColumnSetSource | None = None
-    param: str | None = None
-    on_unmapped: Literal["pass_through", "error"] = "pass_through"
-    on_extra: Literal["ignore", "warn", "error"] = "ignore"
-    on_failure: Literal["abort", "warn", "skip"] = "abort"
+    source: ColumnSetSource | None = Field(
+        default=None,
+        description="Source definition pointing to the column mapping data.",
+    )
+    param: str | None = Field(
+        default=None,
+        description=(
+            "Name of a runtime notebook parameter that supplies the mapping at execution time."
+        ),
+    )
+    on_unmapped: Literal["pass_through", "error"] = Field(
+        default="pass_through",
+        description=(
+            "Behaviour when an input column has no mapping entry."
+            " ``pass_through`` keeps it unchanged; ``error`` aborts."
+        ),
+    )
+    on_extra: Literal["ignore", "warn", "error"] = Field(
+        default="ignore",
+        description=(
+            "Behaviour when the mapping contains entries for columns not present in the input."
+            " ``ignore`` skips silently; ``warn`` logs a warning; ``error`` aborts."
+        ),
+    )
+    on_failure: Literal["abort", "warn", "skip"] = Field(
+        default="abort",
+        description=(
+            "Behaviour when the column set cannot be resolved (e.g. source unavailable)."
+            " ``abort`` raises; ``warn`` logs and continues; "
+            "``skip`` silently skips the rename step."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_source_xor_param(self) -> "ColumnSet":
@@ -131,11 +175,32 @@ class ReservedWordConfig(FrozenBase):
         exclude: Words to remove from the reserved word check.
     """
 
-    strategy: Literal["prefix", "quote", "error"] = "quote"
-    prefix: str = "_"
-    preset: list[ReservedWordPreset] | None = None
-    extend: list[str] = []
-    exclude: list[str] = []
+    strategy: Literal["prefix", "quote", "error"] = Field(
+        default="quote",
+        description=(
+            "How to handle reserved word collisions. ``quote`` wraps in back-ticks;"
+            " ``prefix`` prepends ``prefix``; ``error`` raises a validation error."
+        ),
+    )
+    prefix: str = Field(
+        default="_",
+        description="String prepended to colliding column names when ``strategy`` is ``prefix``.",
+    )
+    preset: list[ReservedWordPreset] | None = Field(
+        default=None,
+        description=(
+            "Built-in word list presets to activate. ``None`` uses the ANSI SQL list."
+            " Accepts a single string or a list."
+        ),
+    )
+    extend: list[str] = Field(
+        default=[],
+        description="Additional words to treat as reserved beyond the resolved preset.",
+    )
+    exclude: list[str] = Field(
+        default=[],
+        description="Words to remove from the reserved word check.",
+    )
 
     @field_validator("preset", mode="before")
     @classmethod

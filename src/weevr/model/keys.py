@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import Field
+
 from weevr.model.base import FrozenBase
 
 
@@ -20,11 +22,25 @@ class SurrogateKeyConfig(FrozenBase):
             effect on sha*/md5 which already return hex strings.
     """
 
-    name: str
+    name: str = Field(description="Output column name for the generated surrogate key.")
     algorithm: Literal[
         "xxhash64", "sha1", "sha256", "sha384", "sha512", "md5", "crc32", "murmur3"
-    ] = "sha256"
-    output: Literal["native", "string"] = "native"
+    ] = Field(
+        default="sha256",
+        description=(
+            "Hash algorithm to use. ``crc32`` has a small 32-bit output space with higher "
+            "collision risk. ``murmur3`` (Spark's ``hash()``) may produce different results "
+            "across Spark major versions."
+        ),
+    )
+    output: Literal["native", "string"] = Field(
+        default="native",
+        description=(
+            "Controls the output type for integer-returning algorithms (xxhash64, crc32, "
+            "murmur3). ``native`` preserves the algorithm's return type; ``string`` casts "
+            "to StringType."
+        ),
+    )
 
 
 class ChangeDetectionConfig(FrozenBase):
@@ -43,17 +59,40 @@ class ChangeDetectionConfig(FrozenBase):
             effect on sha*/md5 which already return hex strings.
     """
 
-    name: str
-    columns: list[str]
+    name: str = Field(description="Output column name for the generated hash.")
+    columns: list[str] = Field(description="Columns to include in the change detection hash.")
     algorithm: Literal[
         "xxhash64", "sha1", "sha256", "sha384", "sha512", "md5", "crc32", "murmur3"
-    ] = "md5"
-    output: Literal["native", "string"] = "native"
+    ] = Field(
+        default="md5",
+        description=(
+            "Hash algorithm to use. ``crc32`` has a small 32-bit output space with higher "
+            "collision risk. ``murmur3`` (Spark's ``hash()``) may produce different results "
+            "across Spark major versions."
+        ),
+    )
+    output: Literal["native", "string"] = Field(
+        default="native",
+        description=(
+            "Controls the output type for integer-returning algorithms (xxhash64, crc32, "
+            "murmur3). ``native`` preserves the algorithm's return type; ``string`` casts "
+            "to StringType."
+        ),
+    )
 
 
 class KeyConfig(FrozenBase):
     """Key management configuration for a thread."""
 
-    business_key: list[str] | None = None
-    surrogate_key: SurrogateKeyConfig | None = None
-    change_detection: ChangeDetectionConfig | None = None
+    business_key: list[str] | None = Field(
+        default=None,
+        description="One or more source columns that form the natural key for the thread.",
+    )
+    surrogate_key: SurrogateKeyConfig | None = Field(
+        default=None,
+        description="Surrogate key generation configuration.",
+    )
+    change_detection: ChangeDetectionConfig | None = Field(
+        default=None,
+        description="Change detection hash generation configuration.",
+    )

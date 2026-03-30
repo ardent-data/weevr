@@ -1,0 +1,342 @@
+# weevr
+
+Configuration-driven execution framework for Spark in Microsoft Fabric.
+Users declare data shaping intent in YAML; a stable PySpark engine
+interprets that intent to execute optimized, repeatable data
+transformations.
+
+## Configuration Hierarchy
+
+weevr uses three configuration file types, each with a typed file
+extension:
+
+- **Thread** (`.thread`) — the smallest unit of work. One or more
+  sources, a pipeline of transformation steps, and a single target.
+- **Weave** (`.weave`) — groups threads into a DAG with shared defaults,
+  lookups, parameters, and hooks. Threads within a weave execute in
+  dependency order, with independent threads running in parallel.
+- **Loom** (`.loom`) — the top-level deployment unit. Groups weaves with
+  shared defaults that cascade down to all threads.
+
+Configuration cascades from loom to weave to thread. Most-specific wins:
+a thread-level setting overrides the same setting inherited from a weave
+or loom. Scalars replace; collections replace entirely (no deep merge).
+
+Every YAML file must declare `config_version: "1.0"`.
+
+## Variable Interpolation
+
+weevr supports `${...}` variable references resolved before execution:
+
+- **Parameters**: `${param.name}` — runtime values passed from notebooks
+  or parameter files. Declared in `params:` with typed specs.
+- **Variables**: `${var.name}` — weave-scoped values set by hook steps
+  via `set_var`. Declared in `variables:` with type and optional default.
+- **Context variables**: `${run.id}`, `${run.timestamp}`, `${thread.name}`
+  — built-in values injected by the engine at execution time.
+
+Resolution order: runtime params > parameter files > config defaults.
+
+## Pipeline Steps
+
+Threads declare a `steps:` list of transformation operations applied in
+order. Each step is a single-key dict. Supported step types:
+
+| Step | Purpose |
+|------|---------|
+| `filter` | Filter rows using a Spark SQL WHERE expression |
+| `derive` | Create new columns with Spark SQL expressions |
+| `join` | Join with another source (inner/left/right/full/cross/semi/anti) |
+| `select` | Select a subset of columns |
+| `drop` | Remove columns |
+| `rename` | Rename columns |
+| `cast` | Cast column types |
+| `dedup` | Deduplicate rows by key columns |
+| `sort` | Order rows |
+| `union` | Concatenate rows from another source |
+| `aggregate` | GROUP BY with aggregate expressions |
+| `window` | Window functions (row_number, rank, etc.) |
+| `pivot` | Transpose rows to columns |
+| `unpivot` | Transpose columns to rows |
+| `case_when` | Conditional column logic |
+| `fill_null` | Replace null values (type-aware) |
+| `coalesce` | Null coalescing across columns |
+| `concat` | Null-aware string concatenation |
+| `map` | Inline value mapping |
+| `format` | Pattern/number/date formatting |
+| `resolve` | Foreign key resolution with sentinel handling |
+| `string_ops` | String operations (trim, upper, lower, etc.) |
+| `date_ops` | Date/time operations |
+
+## Write Modes
+
+The `write:` block controls how data is written to the target:
+
+- `overwrite` — replace the entire table (default)
+- `append` — add rows to the existing table
+- `merge` — upsert using `match_keys` with configurable `on_match`,
+  `on_no_match_target`, and `on_no_match_source` behaviors
+
+## Incremental Load Modes
+
+The `load:` block controls how source data is filtered for incremental
+processing:
+
+- `full` — read all source data (default)
+- `incremental_watermark` — filter by a watermark column; the high-water
+  mark is persisted between runs
+- `incremental_parameter` — filter by a runtime parameter value
+- `cdc` — Change Data Capture via Delta Change Data Feed or explicit
+  operation column mapping
+
+## Hooks
+
+Pre- and post-execution steps declared in `pre_steps:` / `post_steps:`:
+
+- `quality_gate` — checks: `table_exists`, `source_freshness`,
+  `row_count`, `row_count_delta`, `expression`
+- `sql_statement` — execute SQL with optional variable capture
+- `log_message` — emit a log message with variable interpolation
+
+## Lookups
+
+Named reference datasets shared across threads. Declared at the weave
+or loom level in `lookups:`. Threads reference them via `lookup:` in
+their `sources:` block. Support materialization with `broadcast` or
+`cache` strategy, narrow projection via `key`/`values`, and filtering.
+
+## Analytical Targets
+
+### Dimensions
+
+The `dimension:` block on a target configures SCD Type 2 behavior:
+surrogate key generation, business key, change detection groups,
+history tracking, system member seeding, and SCD column/date
+boundaries.
+
+### Fact Tables
+
+The `fact:` block declares foreign key columns and sentinel value
+conventions for validation during mapping operations.
+
+## JSON Schema
+
+Machine-readable JSON Schema files are available for all three
+configuration types. These are generated from the Pydantic models
+that the engine uses for validation, so they are always in sync
+with the actual accepted configuration.
+
+Schema files:
+- `docs/schema/thread.json` — Thread configuration schema
+- `docs/schema/weave.json` — Weave configuration schema
+- `docs/schema/loom.json` — Loom configuration schema
+- `docs/schema/weevr.json` — Combined schema (all three)
+
+## Examples
+
+### Basic Thread
+
+Read a Delta table, select columns, write to a new table:
+
+```yaml
+config_version: "1.0"
+name: dim_customer
+
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+
+steps:
+  - select:
+      columns:
+        - customer_id
+        - first_name
+        - last_name
+        - email
+        - region
+
+target:
+  alias: curated.dim_customer
+
+write:
+  mode: overwrite
+```
+
+### Thread with Transforms
+
+Chain pipeline steps — filter, derive, select, cast:
+
+```yaml
+config_version: "1.0"
+name: fact_order_summary
+
+sources:
+  orders:
+    type: delta
+    alias: raw.orders
+
+steps:
+  - filter:
+      expr: "status = 'completed' AND order_date >= '2025-01-01'"
+
+  - derive:
+      columns:
+        total_with_tax: "subtotal + tax_amount"
+        order_year: "year(order_date)"
+
+  - select:
+      columns:
+        - order_id
+        - customer_id
+        - order_date
+        - order_year
+        - subtotal
+        - tax_amount
+        - total_with_tax
+        - region
+
+  - cast:
+      columns:
+        subtotal: "decimal(18,2)"
+        tax_amount: "decimal(18,2)"
+        total_with_tax: "decimal(18,2)"
+
+target:
+  alias: curated.fact_order_summary
+  partition_by:
+    - order_year
+
+write:
+  mode: overwrite
+```
+
+### Merge with Business Keys
+
+Upsert into a target table using merge mode:
+
+```yaml
+config_version: "1.0"
+name: dim_product
+
+sources:
+  products:
+    type: delta
+    alias: staging.products
+
+steps:
+  - select:
+      columns:
+        - product_id
+        - product_name
+        - category
+        - unit_price
+        - is_active
+        - updated_at
+
+  - cast:
+      columns:
+        unit_price: "decimal(12,2)"
+
+target:
+  alias: curated.dim_product
+
+keys:
+  business_key:
+    - product_id
+
+write:
+  mode: merge
+  match_keys:
+    - product_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore
+```
+
+### Incremental Watermark Load
+
+Load only new rows since the last run using a watermark column:
+
+```yaml
+config_version: "1.0"
+name: fact_transactions
+
+sources:
+  transactions:
+    type: delta
+    alias: raw.transactions
+
+steps:
+  - filter:
+      expr: "amount > 0"
+
+  - derive:
+      columns:
+        transaction_date: "to_date(transaction_ts)"
+
+  - select:
+      columns:
+        - transaction_id
+        - account_id
+        - amount
+        - currency
+        - transaction_ts
+        - transaction_date
+
+target:
+  alias: curated.fact_transactions
+  partition_by:
+    - transaction_date
+
+load:
+  mode: incremental_watermark
+  watermark_column: transaction_ts
+  watermark_type: timestamp
+
+write:
+  mode: merge
+  match_keys:
+    - transaction_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore
+```
+
+### Loom with Parameters
+
+A deployment unit grouping weaves with shared defaults:
+
+```yaml
+config_version: "1.0"
+name: sales_lakehouse
+
+weaves:
+  - name: dimensions
+  - name: facts
+    condition:
+      when: "table_exists('curated.dim_customer')"
+
+defaults:
+  write:
+    mode: overwrite
+  execution:
+    log_level: standard
+
+params:
+  lakehouse_path:
+    name: lakehouse_path
+    type: string
+    required: true
+    description: "Root path for the lakehouse storage layer"
+  load_date:
+    name: load_date
+    type: date
+    required: false
+    default: "2025-01-01"
+    description: "Date to use for incremental load boundaries"
+
+execution:
+  log_level: standard
+  trace: true
+```

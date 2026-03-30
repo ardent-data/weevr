@@ -1,0 +1,39 @@
+# weevr
+
+> Configuration-driven execution framework for Spark in Microsoft Fabric.
+> Users declare data shaping intent in YAML; a stable PySpark engine
+> interprets that intent to execute optimized, repeatable data
+> transformations.
+
+## Documentation
+
+- [Docs home](https://ardent-data.github.io/weevr/)
+- [Thread YAML schema](https://ardent-data.github.io/weevr/reference/yaml-schema/thread/)
+- [Weave YAML schema](https://ardent-data.github.io/weevr/reference/yaml-schema/weave/)
+- [Loom YAML schema](https://ardent-data.github.io/weevr/reference/yaml-schema/loom/)
+- [Configuration keys](https://ardent-data.github.io/weevr/reference/configuration-keys/)
+
+## JSON Schema
+
+Machine-readable schema files for LLM and IDE consumption:
+
+- [thread.json](https://github.com/ardent-data/weevr/blob/main/docs/schema/thread.json)
+- [weave.json](https://github.com/ardent-data/weevr/blob/main/docs/schema/weave.json)
+- [loom.json](https://github.com/ardent-data/weevr/blob/main/docs/schema/loom.json)
+- [weevr.json](https://github.com/ardent-data/weevr/blob/main/docs/schema/weevr.json) (combined)
+
+## Key Concepts
+
+- [Thread, Weave, Loom hierarchy](https://ardent-data.github.io/weevr/concepts/thread-weave-loom/)
+- [Config resolution and variable interpolation](https://ardent-data.github.io/weevr/guides/config-resolution/)
+- [Dimension modeling](https://ardent-data.github.io/weevr/guides/dimension-modeling/)
+- [Fact tables](https://ardent-data.github.io/weevr/guides/fact-tables/)
+
+## Examples
+
+- [examples/](https://github.com/ardent-data/weevr/tree/main/examples) directory
+
+## Full Context
+
+For a self-contained reference document suitable for pasting into an
+LLM context window, see [llms-full.txt](https://github.com/ardent-data/weevr/blob/main/llms-full.txt).

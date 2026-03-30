@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.source import Source
@@ -38,16 +38,49 @@ class Lookup(FrozenBase):
             Only meaningful when ``unique_key`` is true.
     """
 
-    source: Source
-    materialize: bool = False
-    strategy: Literal["broadcast", "cache"] = "cache"
+    source: Source = Field(description="Source definition for the lookup data.")
+    materialize: bool = Field(
+        default=False,
+        description="Whether to pre-read and cache or broadcast the data before thread execution.",
+    )
+    strategy: Literal["broadcast", "cache"] = Field(
+        default="cache",
+        description=(
+            "Materialization strategy when ``materialize`` is true."
+            " ``broadcast`` uses Spark broadcast join hints; ``cache`` uses DataFrame caching."
+        ),
+    )
 
     # Narrow lookup fields
-    key: list[str] | None = None
-    values: list[str] | None = None
-    filter: str | None = None
-    unique_key: bool = False
-    on_failure: Literal["abort", "warn"] = "abort"
+    key: list[str] | None = Field(
+        default=None,
+        description=(
+            "Column(s) used for matching (join key). Retained in the cached projection"
+            " alongside ``values``."
+        ),
+    )
+    values: list[str] | None = Field(
+        default=None,
+        description=(
+            "Payload column(s) to retrieve. When set, only ``key`` + ``values`` columns are"
+            " retained in the cached DataFrame."
+        ),
+    )
+    filter: str | None = Field(
+        default=None,
+        description="SQL WHERE expression applied to the source before projection.",
+    )
+    unique_key: bool = Field(
+        default=False,
+        description="When true, validate that ``key`` columns form a unique key after filtering.",
+    )
+    on_failure: Literal["abort", "warn"] = Field(
+        default="abort",
+        description=(
+            "Behavior when the ``unique_key`` check finds duplicates."
+            " Only meaningful when ``unique_key`` is true."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_narrow_fields(self) -> "Lookup":

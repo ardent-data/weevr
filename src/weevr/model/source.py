@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from weevr.model.base import FrozenBase
 
@@ -12,8 +12,16 @@ _FILE_TYPES = {"csv", "json", "parquet", "excel"}
 class DedupConfig(FrozenBase):
     """Deduplication configuration applied immediately after reading a source."""
 
-    keys: list[str]
-    order_by: str | None = None
+    keys: list[str] = Field(
+        description="Columns to deduplicate on.",
+    )
+    order_by: str | None = Field(
+        default=None,
+        description=(
+            "Spark SQL ORDER BY expression to determine which row to keep "
+            "when duplicates are found."
+        ),
+    )
 
 
 class Source(FrozenBase):
@@ -30,12 +38,33 @@ class Source(FrozenBase):
     - ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.
     """
 
-    type: str | None = None
-    alias: str | None = None
-    path: str | None = None
-    options: dict[str, Any] = {}
-    dedup: DedupConfig | None = None
-    lookup: str | None = None
+    type: str | None = Field(
+        default=None,
+        description="Source type: delta, csv, json, parquet, or excel.",
+    )
+    alias: str | None = Field(
+        default=None,
+        description="Registered table alias. Required for delta sources.",
+    )
+    path: str | None = Field(
+        default=None,
+        description="File path. Required for file-based sources (csv, json, parquet, excel).",
+    )
+    options: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Format-specific Spark DataFrameReader options.",
+    )
+    dedup: DedupConfig | None = Field(
+        default=None,
+        description="Deduplication configuration applied after reading the source.",
+    )
+    lookup: str | None = Field(
+        default=None,
+        description=(
+            "Reference to a named lookup defined at the weave or loom level. "
+            "Mutually exclusive with type."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_type_fields(self) -> "Source":

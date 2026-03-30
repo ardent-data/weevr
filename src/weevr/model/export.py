@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from weevr.model.base import FrozenBase
 
@@ -30,16 +30,44 @@ class Export(FrozenBase):
         options: Format-specific Spark DataFrameWriter options.
     """
 
-    name: str
-    description: str | None = None
-    type: ExportFormat
-    path: str | None = None
-    alias: str | None = None
-    mode: Literal["overwrite"] = "overwrite"
-    partition_by: list[str] | None = None
-    on_failure: Literal["abort", "warn"] = "warn"
-    enabled: bool = True
-    options: dict[str, str] | None = None
+    name: str = Field(description="Unique identifier within the resolved thread.")
+    description: str | None = Field(
+        default=None,
+        description="Optional human-readable label shown in explain() output.",
+    )
+    type: ExportFormat = Field(
+        description="Output format (delta, parquet, csv, json, orc).",
+    )
+    path: str | None = Field(
+        default=None,
+        description="OneLake path for the export. Supports context variables.",
+    )
+    alias: str | None = Field(
+        default=None,
+        description="Metastore alias (delta type only, mutually exclusive with path).",
+    )
+    mode: Literal["overwrite"] = Field(
+        default="overwrite",
+        description="Write mode. Only ``overwrite`` is supported in v1.",
+    )
+    partition_by: list[str] | None = Field(
+        default=None,
+        description="Partition columns, independent of the primary target.",
+    )
+    on_failure: Literal["abort", "warn"] = Field(
+        default="warn",
+        description=(
+            "Behavior on write error. ``abort`` fails the thread; ``warn`` logs and continues."
+        ),
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Set to ``False`` to suppress an inherited export.",
+    )
+    options: dict[str, str] | None = Field(
+        default=None,
+        description="Format-specific Spark DataFrameWriter options.",
+    )
 
     @model_validator(mode="after")
     def _validate_export(self) -> "Export":

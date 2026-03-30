@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from weevr.model.base import FrozenBase
 
@@ -22,8 +22,18 @@ class SeedConfig(FrozenBase):
             row with column names as keys and cell values as values.
     """
 
-    on: Literal["first_write", "empty"] = "first_write"
-    rows: list[dict[str, Any]]
+    on: Literal["first_write", "empty"] = Field(
+        default="first_write",
+        description=(
+            "Trigger condition for seed insertion. ``first_write`` inserts on initial table"
+            " creation; ``empty`` inserts whenever the table is empty."
+        ),
+    )
+    rows: list[dict[str, Any]] = Field(
+        description=(
+            "Non-empty list of row dicts to insert. Each dict maps column names to cell values."
+        )
+    )
 
     @field_validator("rows")
     @classmethod

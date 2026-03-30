@@ -67,6 +67,7 @@ nav:
           - State: reference/api/state.md
           - Errors: reference/api/errors.md
       - Configuration Keys: reference/configuration-keys.md
+      - JSON Schema: reference/json-schema.md
       - Compatibility: reference/compatibility.md
   - Concepts:
       - Why weevr: concepts/why-weevr.md

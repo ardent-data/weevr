@@ -1,6 +1,6 @@
 """FactConfig model for foreign key validation metadata and sentinel conventions."""
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from weevr.model.base import FrozenBase
 
@@ -16,8 +16,14 @@ class SentinelValueConfig(FrozenBase):
         missing: Sentinel code for missing data. Defaults to -1.
     """
 
-    invalid: int = -4
-    missing: int = -1
+    invalid: int = Field(
+        default=-4,
+        description="Sentinel code for invalid data.",
+    )
+    missing: int = Field(
+        default=-1,
+        description="Sentinel code for missing data.",
+    )
 
 
 class FactConfig(FrozenBase):
@@ -34,8 +40,13 @@ class FactConfig(FrozenBase):
             Defaults to SentinelValueConfig() if not provided.
     """
 
-    foreign_keys: list[str]
-    sentinel_values: SentinelValueConfig = SentinelValueConfig()
+    foreign_keys: list[str] = Field(
+        description="Non-empty list of column names that reference dimension tables.",
+    )
+    sentinel_values: SentinelValueConfig = Field(
+        default=SentinelValueConfig(),
+        description="Configuration for sentinel value conventions.",
+    )
 
     @field_validator("foreign_keys")
     @classmethod

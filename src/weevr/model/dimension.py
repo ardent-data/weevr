@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 
@@ -27,10 +27,22 @@ class DimensionSurrogateKeyConfig(FrozenBase):
             return type; ``string`` casts to StringType.
     """
 
-    name: str
-    algorithm: _ALGORITHM_LITERAL = "sha256"
-    columns: list[str]
-    output: Literal["native", "string"] = "native"
+    name: str = Field(description="Output column name for the generated surrogate key.")
+    algorithm: _ALGORITHM_LITERAL = Field(
+        default="sha256",
+        description="Hash algorithm to use for surrogate key generation.",
+    )
+    columns: list[str] = Field(
+        description="Source columns to hash into the surrogate key value.",
+    )
+    output: Literal["native", "string"] = Field(
+        default="native",
+        description=(
+            "Controls the output type for integer-returning algorithms (xxhash64, crc32, "
+            "murmur3). ``native`` preserves the algorithm's return type; ``string`` casts "
+            "to StringType."
+        ),
+    )
 
 
 class ChangeDetectionGroupConfig(FrozenBase):
@@ -52,11 +64,37 @@ class ChangeDetectionGroupConfig(FrozenBase):
         output: Controls the output type for integer-returning algorithms.
     """
 
-    name: str | None = None
-    algorithm: _ALGORITHM_LITERAL | None = None
-    columns: list[str] | Literal["auto"]
-    on_change: Literal["version", "overwrite", "static"]
-    output: Literal["native", "string"] = "native"
+    name: str | None = Field(
+        default=None,
+        description=(
+            "Optional display name for the group, used as the output hash column name "
+            "when not overridden by the dict key in DimensionConfig."
+        ),
+    )
+    algorithm: _ALGORITHM_LITERAL | None = Field(
+        default=None,
+        description="Hash algorithm for this group. When ``None``, the engine applies a default.",
+    )
+    columns: list[str] | Literal["auto"] = Field(
+        description=(
+            "Source columns for this group's hash, or ``auto`` to let the engine select "
+            "the remaining unclaimed columns."
+        ),
+    )
+    on_change: Literal["version", "overwrite", "static"] = Field(
+        description=(
+            "Action when the hash changes. ``version`` creates a new SCD row, ``overwrite`` "
+            "updates in place, ``static`` marks the group as non-versioned metadata."
+        ),
+    )
+    output: Literal["native", "string"] = Field(
+        default="native",
+        description=(
+            "Controls the output type for integer-returning algorithms (xxhash64, crc32, "
+            "murmur3). ``native`` preserves the algorithm's return type; ``string`` casts "
+            "to StringType."
+        ),
+    )
 
 
 class AdditionalKeyConfig(FrozenBase):
@@ -69,10 +107,22 @@ class AdditionalKeyConfig(FrozenBase):
         output: Controls the output type for integer-returning algorithms.
     """
 
-    name: str
-    algorithm: _ALGORITHM_LITERAL = "sha256"
-    columns: list[str]
-    output: Literal["native", "string"] = "native"
+    name: str = Field(description="Output column name for the generated key.")
+    algorithm: _ALGORITHM_LITERAL = Field(
+        default="sha256",
+        description="Hash algorithm to use for key generation.",
+    )
+    columns: list[str] = Field(
+        description="Source columns to hash into the key value.",
+    )
+    output: Literal["native", "string"] = Field(
+        default="native",
+        description=(
+            "Controls the output type for integer-returning algorithms (xxhash64, crc32, "
+            "murmur3). ``native`` preserves the algorithm's return type; ``string`` casts "
+            "to StringType."
+        ),
+    )
 
 
 class SystemMemberConfig(FrozenBase):
@@ -87,9 +137,15 @@ class SystemMemberConfig(FrozenBase):
         label: Human-readable description (e.g. ``"Unknown"``).
     """
 
-    sk: int
-    code: str
-    label: str
+    sk: int = Field(
+        description="Surrogate key value for this system member. Must be negative.",
+    )
+    code: str = Field(
+        description="Short business code identifying the member (e.g. ``UNKNOWN``).",
+    )
+    label: str = Field(
+        description="Human-readable description for the system member (e.g. ``Unknown``).",
+    )
 
     @field_validator("sk")
     @classmethod
@@ -109,9 +165,18 @@ class ScdColumnConfig(FrozenBase):
         is_current: Column name for the current-row flag.
     """
 
-    valid_from: str = "_valid_from"
-    valid_to: str = "_valid_to"
-    is_current: str = "_is_current"
+    valid_from: str = Field(
+        default="_valid_from",
+        description="Column name for the row effective-from timestamp.",
+    )
+    valid_to: str = Field(
+        default="_valid_to",
+        description="Column name for the row effective-to timestamp.",
+    )
+    is_current: str = Field(
+        default="_is_current",
+        description="Column name for the current-row flag.",
+    )
 
 
 class ScdDateConfig(FrozenBase):
@@ -124,8 +189,16 @@ class ScdDateConfig(FrozenBase):
             in ``YYYY-MM-DD`` format.
     """
 
-    min: str = "1970-01-01"
-    max: str = "9999-12-31"
+    min: str = Field(
+        default="1970-01-01",
+        description=(
+            "Earliest valid-from date for the first version of a row, in ``YYYY-MM-DD`` format."
+        ),
+    )
+    max: str = Field(
+        default="9999-12-31",
+        description=("Sentinel valid-to date for currently active rows, in ``YYYY-MM-DD`` format."),
+    )
 
     @model_validator(mode="after")
     def min_before_max(self) -> "ScdDateConfig":
@@ -169,18 +242,69 @@ class DimensionConfig(FrozenBase):
             view that returns only current rows.
     """
 
-    business_key: list[str]
-    surrogate_key: DimensionSurrogateKeyConfig
-    track_history: bool = False
-    previous_columns: dict[str, str] | None = None
-    change_detection: dict[str, ChangeDetectionGroupConfig] | None = None
-    additional_keys: dict[str, AdditionalKeyConfig] | None = None
-    columns: ScdColumnConfig = ScdColumnConfig()
-    dates: ScdDateConfig = ScdDateConfig()
-    seed_system_members: bool = False
-    system_members: list[SystemMemberConfig] | None = None
-    label_column: str | None = None
-    history_filter: bool = True
+    business_key: list[str] = Field(
+        description="One or more source columns that form the natural key.",
+    )
+    surrogate_key: DimensionSurrogateKeyConfig = Field(
+        description="Surrogate key generation configuration.",
+    )
+    track_history: bool = Field(
+        default=False,
+        description=(
+            "When ``True``, the target is an SCD Type 2 table and groups with "
+            "``on_change: version`` produce new history rows."
+        ),
+    )
+    previous_columns: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Map of output column name to source column name for capturing the previous "
+            "value of selected attributes."
+        ),
+    )
+    change_detection: dict[str, ChangeDetectionGroupConfig] | None = Field(
+        default=None,
+        description=(
+            "Named map of change detection groups. Each key is the group name used as the "
+            "output hash column name unless the group config provides its own ``name``."
+        ),
+    )
+    additional_keys: dict[str, AdditionalKeyConfig] | None = Field(
+        default=None,
+        description="Named map of additional generated key configurations.",
+    )
+    columns: ScdColumnConfig = Field(
+        default=ScdColumnConfig(),
+        description=(
+            "SCD tracking column names. Defaults to ``_valid_from``, ``_valid_to``, "
+            "``_is_current``."
+        ),
+    )
+    dates: ScdDateConfig = Field(
+        default=ScdDateConfig(),
+        description=("SCD boundary dates. Defaults to ``1970-01-01`` / ``9999-12-31``."),
+    )
+    seed_system_members: bool = Field(
+        default=False,
+        description=(
+            "When ``True``, the engine inserts ``system_members`` rows during the first load."
+        ),
+    )
+    system_members: list[SystemMemberConfig] | None = Field(
+        default=None,
+        description="Reserved sentinel rows with negative SK values.",
+    )
+    label_column: str | None = Field(
+        default=None,
+        description="Optional column name for a human-readable row label.",
+    )
+    history_filter: bool = Field(
+        default=True,
+        description=(
+            "When ``True`` (default), the engine exposes a filtered view returning only "
+            "current rows."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod

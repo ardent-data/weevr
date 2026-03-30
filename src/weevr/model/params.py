@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from weevr.model.base import FrozenBase
 
@@ -10,11 +10,24 @@ from weevr.model.base import FrozenBase
 class ParamSpec(FrozenBase):
     """Typed parameter specification for config-level param declarations."""
 
-    name: str
-    type: Literal["string", "int", "float", "bool", "date", "timestamp", "list[string]"]
-    required: bool = True
-    default: Any = None
-    description: str = ""
+    name: str = Field(description="Unique name of the parameter as referenced in config.")
+    type: Literal["string", "int", "float", "bool", "date", "timestamp", "list[string]"] = Field(
+        description="Expected type of the parameter value."
+    )
+    required: bool = Field(
+        default=True,
+        description="Whether the parameter must be supplied at runtime.",
+    )
+    default: Any = Field(
+        default=None,
+        description=(
+            "Default value used when the parameter is not supplied and required is false."
+        ),
+    )
+    description: str = Field(
+        default="",
+        description="Human-readable description of the parameter's purpose.",
+    )
 
 
 class ParamsConfig(BaseModel):
@@ -28,4 +41,4 @@ class ParamsConfig(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    config_version: str
+    config_version: str = Field(description="Schema version of the parameter file.")
