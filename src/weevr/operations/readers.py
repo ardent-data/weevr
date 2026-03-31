@@ -7,18 +7,26 @@ from pyspark.sql import functions as F
 
 from weevr.delta import is_table_alias
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
 from weevr.state.watermark import WatermarkState
 
 
-def read_source(spark: SparkSession, alias: str, source: Source) -> DataFrame:
+def read_source(
+    spark: SparkSession,
+    alias: str,
+    source: Source,
+    connections: dict[str, OneLakeConnection] | None = None,
+) -> DataFrame:
     """Read a single source into a DataFrame.
 
     Args:
         spark: Active SparkSession.
         alias: Logical name for this source (used in error messages).
         source: Source configuration.
+        connections: Named connection declarations keyed by connection name.
+            Required when ``source.connection`` is set.
 
     Returns:
         DataFrame with source data, with dedup applied if configured.
@@ -27,7 +35,7 @@ def read_source(spark: SparkSession, alias: str, source: Source) -> DataFrame:
         ExecutionError: If the source cannot be read or the type is unsupported.
     """
     try:
-        df = _read_raw(spark, source)
+        df = _read_raw(spark, source, connections)
         if source.dedup is not None:
             df = _apply_dedup(df, source.dedup)
         return df
@@ -41,33 +49,63 @@ def read_source(spark: SparkSession, alias: str, source: Source) -> DataFrame:
         ) from exc
 
 
-def read_sources(spark: SparkSession, sources: dict[str, Source]) -> dict[str, DataFrame]:
+def read_sources(
+    spark: SparkSession,
+    sources: dict[str, Source],
+    connections: dict[str, OneLakeConnection] | None = None,
+) -> dict[str, DataFrame]:
     """Read all sources into a mapping of alias -> DataFrame.
 
     Args:
         spark: Active SparkSession.
         sources: Mapping of alias -> Source config.
+        connections: Named connection declarations forwarded to each read.
 
     Returns:
         Mapping of alias -> DataFrame, in the same key order as ``sources``.
     """
-    return {alias: read_source(spark, alias, source) for alias, source in sources.items()}
+    return {
+        alias: read_source(spark, alias, source, connections) for alias, source in sources.items()
+    }
 
 
-def _read_raw(spark: SparkSession, source: Source) -> DataFrame:
+def _read_raw(
+    spark: SparkSession,
+    source: Source,
+    connections: dict[str, OneLakeConnection] | None = None,
+) -> DataFrame:
     """Read source data without applying deduplication."""
+    # Connection-based read: resolve to an abfss:// path via the named connection.
+    if source.connection:
+        if not connections or source.connection not in connections:
+            raise ExecutionError(
+                f"Source references undefined connection '{source.connection}'",
+                source_name=source.connection,
+            )
+        from weevr.config.paths import build_onelake_path
+
+        conn = connections[source.connection]
+        assert source.table is not None  # guaranteed by Source validator
+        path = build_onelake_path(conn, source.schema_override, source.table)
+        return spark.read.format("delta").load(path)
+
     if source.type == "delta":
         if source.alias is None:
             raise ExecutionError("Delta source requires 'alias' to be set")
         # Table aliases (schema.table) use the metastore; file paths use load().
         if is_table_alias(source.alias):
             return spark.read.format("delta").table(source.alias)
-        return spark.read.format("delta").load(source.alias)
+        from weevr.config.paths import resolve_fuse_path
+
+        return spark.read.format("delta").load(resolve_fuse_path(source.alias, spark))
 
     if source.type in {"csv", "json", "parquet"}:
         if source.path is None:
             raise ExecutionError(f"'{source.type}' source requires 'path' to be set")
-        return spark.read.format(source.type).options(**source.options).load(source.path)
+        from weevr.config.paths import resolve_fuse_path
+
+        resolved_path = resolve_fuse_path(source.path, spark)
+        return spark.read.format(source.type).options(**source.options).load(resolved_path)
 
     raise ExecutionError(f"Unsupported source type: '{source.type}'")
 
@@ -142,6 +180,7 @@ def read_source_incremental(
     source: Source,
     load_config: LoadConfig,
     prior_state: WatermarkState | None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> tuple[DataFrame, str | None]:
     """Read source with watermark filter and capture new HWM.
 
@@ -156,12 +195,13 @@ def read_source_incremental(
         source: Source configuration.
         load_config: Thread-level load configuration.
         prior_state: Previously persisted watermark state, or ``None``.
+        connections: Named connection declarations forwarded to the read.
 
     Returns:
         Tuple of ``(DataFrame, new_hwm_value)``. ``new_hwm_value`` is
         ``None`` if the source returned zero rows.
     """
-    df = _read_raw(spark, source)
+    df = _read_raw(spark, source, connections)
 
     # Apply watermark filter if prior state exists
     if (
@@ -196,6 +236,7 @@ def read_cdc_source(
     source: Source,
     cdc_config: CdcConfig,
     last_version: int | None = None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> DataFrame:
     """Read a CDC source, optionally starting from a specific version.
 
@@ -209,6 +250,7 @@ def read_cdc_source(
         cdc_config: CDC configuration with preset or explicit mapping.
         last_version: Last processed CDF commit version. If provided,
             reads changes starting from ``last_version + 1``.
+        connections: Named connection declarations forwarded to the read.
 
     Returns:
         DataFrame with CDC data (includes change type column for CDF).
@@ -225,4 +267,4 @@ def read_cdc_source(
         return reader.load(source.alias)
 
     # Generic CDC: read source normally; change flags are in the data
-    return _read_raw(spark, source)
+    return _read_raw(spark, source, connections)

@@ -144,3 +144,49 @@ class TestSourceLookupReference:
         s = Source.model_validate({"lookup": "dim_region"})
         assert s.lookup == "dim_region"
         assert s.type is None
+
+
+class TestSourceConnectionReference:
+    """Test Source with connection-based lakehouse references."""
+
+    def test_connection_with_table(self):
+        """Source with connection and table parses correctly; type is optional."""
+        s = Source(connection="my_lakehouse", table="customers")
+        assert s.connection == "my_lakehouse"
+        assert s.table == "customers"
+        assert s.type is None
+
+    def test_connection_with_table_and_schema(self):
+        """Source with connection, table, and schema override parses correctly."""
+        s = Source.model_validate(
+            {"connection": "my_lakehouse", "table": "orders", "schema": "sales"}
+        )
+        assert s.connection == "my_lakehouse"
+        assert s.table == "orders"
+        assert s.schema_override == "sales"
+
+    def test_connection_and_alias_mutually_exclusive(self):
+        """Setting both connection and alias raises ValidationError."""
+        with pytest.raises(ValidationError, match="connection"):
+            Source(connection="my_lakehouse", table="customers", alias="raw.customers")
+
+    def test_connection_without_table_raises(self):
+        """connection without table raises ValidationError."""
+        with pytest.raises(ValidationError, match="table"):
+            Source(connection="my_lakehouse")
+
+    def test_table_without_connection_raises(self):
+        """table without connection raises ValidationError."""
+        with pytest.raises(ValidationError, match="connection"):
+            Source(type="delta", alias="raw.customers", table="customers")
+
+    def test_connection_with_explicit_delta_type(self):
+        """connection with explicit type='delta' parses correctly."""
+        s = Source(connection="my_lakehouse", table="events", type="delta")
+        assert s.type == "delta"
+        assert s.connection == "my_lakehouse"
+
+    def test_connection_with_non_delta_type_raises(self):
+        """connection with a file-based type raises ValidationError."""
+        with pytest.raises(ValidationError, match="connection"):
+            Source(connection="my_lakehouse", table="events", type="csv")

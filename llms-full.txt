@@ -119,6 +119,99 @@ boundaries.
 The `fact:` block declares foreign key columns and sentinel value
 conventions for validation during mapping operations.
 
+## Connections
+
+Named OneLake connection declarations that identify a Fabric workspace and
+lakehouse by GUID or variable reference. Connections let sources, targets,
+and exports reference a lakehouse by a short name instead of embedding raw
+GUIDs or `abfss://` paths inline.
+
+Declared in a `connections:` map at thread, weave, or loom level. Cascades
+down from loom to weave to thread; the most specific level wins on name
+collision.
+
+Connection fields:
+
+- `type` — Only `onelake` is supported in v1.
+- `workspace` — Workspace GUID or `${fabric.workspace_id}`.
+- `lakehouse` — Lakehouse GUID or `${fabric.lakehouse_id}`.
+- `default_schema` — Default schema for tables in this connection.
+
+`${fabric.workspace_id}`, `${fabric.lakehouse_id}`, and
+`${fabric.workspace_name}` are injected from the active Spark
+session, making threads portable across environments.
+
+Sources, targets, and delta-type exports reference a connection with
+`connection: <name>` and `table: <table_name>`. An optional `schema:`
+field overrides `default_schema` for that specific source or target.
+
+`connection` and `alias` are mutually exclusive. `table` requires
+`connection` to be set and vice versa.
+
+### Connection declaration
+
+```yaml
+connections:
+  raw:
+    type: onelake
+    workspace: "${fabric.workspace_id}"
+    lakehouse: "${fabric.lakehouse_id}"
+    default_schema: raw
+
+  archive:
+    type: onelake
+    workspace: "a1b2c3d4-0000-0000-0000-111111111111"
+    lakehouse: "e5f6a7b8-0000-0000-0000-222222222222"
+```
+
+### Source reference
+
+```yaml
+sources:
+  orders:
+    connection: raw
+    table: orders
+
+  archived_orders:
+    connection: archive
+    schema: history
+    table: orders
+```
+
+### Target reference
+
+```yaml
+target:
+  connection: raw
+  table: fact_orders
+```
+
+### Cross-lakehouse thread
+
+```yaml
+connections:
+  source_lh:
+    type: onelake
+    workspace: "aaaaaaaa-0000-0000-0000-000000000001"
+    lakehouse: "bbbbbbbb-0000-0000-0000-000000000002"
+    default_schema: staging
+
+  dest_lh:
+    type: onelake
+    workspace: "${fabric.workspace_id}"
+    lakehouse: "${fabric.lakehouse_id}"
+    default_schema: curated
+
+sources:
+  orders:
+    connection: source_lh
+    table: orders
+
+target:
+  connection: dest_lh
+  table: fact_orders
+```
+
 ## JSON Schema
 
 Machine-readable JSON Schema files are available for all three

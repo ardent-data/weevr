@@ -46,6 +46,8 @@ class ColumnMapping(FrozenBase):
 class Target(FrozenBase):
     """Write destination with column mapping and partitioning configuration."""
 
+    model_config = {"frozen": True, "populate_by_name": True}
+
     alias: str | None = Field(
         default=None,
         description="Registered table alias for the target. Required for delta targets.",
@@ -53,6 +55,19 @@ class Target(FrozenBase):
     path: str | None = Field(
         default=None,
         description="OneLake path for the target. Alternative to alias.",
+    )
+    connection: str | None = Field(
+        default=None,
+        description="Reference to a named connection defined at thread, weave, or loom level.",
+    )
+    schema_override: str | None = Field(
+        default=None,
+        alias="schema",
+        description="Schema override within the connection's lakehouse.",
+    )
+    table: str | None = Field(
+        default=None,
+        description="Table name within the connection's lakehouse.",
     )
     mapping_mode: Literal["auto", "explicit"] = Field(
         default="auto",
@@ -129,9 +144,27 @@ class Target(FrozenBase):
 
     @model_validator(mode="after")
     def _validate_alias_or_path(self) -> "Target":
-        """Validate that at least one of alias or path is provided."""
-        if self.alias is None and self.path is None:
-            raise ValueError("target requires at least one of 'alias' or 'path'")
+        """Validate that the target has a write destination.
+
+        Accepted combinations: alias, path, or connection + table.
+        """
+        has_alias_or_path = self.alias is not None or self.path is not None
+        has_connection_target = self.connection is not None and self.table is not None
+        if not has_alias_or_path and not has_connection_target:
+            raise ValueError(
+                "target requires at least one of 'alias', 'path', or 'connection' + 'table'"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_connection_fields(self) -> "Target":
+        """Validate cross-field rules for connection-based targets."""
+        if self.connection is not None and self.alias is not None:
+            raise ValueError("'connection' and 'alias' are mutually exclusive")
+        if self.connection is not None and self.table is None:
+            raise ValueError("'connection' requires 'table'")
+        if self.table is not None and self.connection is None:
+            raise ValueError("'table' requires 'connection'")
         return self
 
     @model_validator(mode="after")

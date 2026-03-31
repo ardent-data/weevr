@@ -11,6 +11,7 @@ from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import LookupResolutionError
 from weevr.model.base import FrozenBase
+from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
 from weevr.operations.readers import read_source
@@ -160,6 +161,7 @@ def materialize_lookups(
     lookups: dict[str, Lookup],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> tuple[dict[str, DataFrame], list[LookupResult]]:
     """Pre-read and cache/broadcast lookups marked for materialization.
 
@@ -171,6 +173,7 @@ def materialize_lookups(
         lookups: Weave-level lookup definitions keyed by name.
         collector: Optional span collector for telemetry.
         parent_span_id: Optional parent span ID for hierarchy.
+        connections: Named connection declarations forwarded to each source read.
 
     Returns:
         Tuple of (cached DataFrames mapping, list of LookupResult).
@@ -191,7 +194,7 @@ def materialize_lookups(
 
         start = time.monotonic()
         try:
-            df = read_source(spark, name, lookup.source)
+            df = read_source(spark, name, lookup.source, connections=connections)
 
             # Apply narrow pipeline (filter → project → unique_key)
             df, filter_applied, uk_checked, uk_passed = _apply_narrow_pipeline(df, lookup, name)
@@ -277,6 +280,7 @@ def resolve_thread_lookups(
     weave_lookups: dict[str, Lookup],
     cached_dfs: dict[str, DataFrame],
     spark: SparkSession,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> dict[str, DataFrame]:
     """Resolve thread source lookup references to DataFrames.
 
@@ -289,6 +293,7 @@ def resolve_thread_lookups(
         weave_lookups: Weave-level lookup definitions.
         cached_dfs: Pre-materialized DataFrames from :func:`materialize_lookups`.
         spark: Active SparkSession for on-demand reads.
+        connections: Named connection declarations forwarded to on-demand reads.
 
     Returns:
         Mapping of source alias to resolved DataFrame.
@@ -312,7 +317,7 @@ def resolve_thread_lookups(
             resolved[alias] = cached_dfs[lookup_name]
         else:
             lookup_def = weave_lookups[lookup_name]
-            df = read_source(spark, lookup_name, lookup_def.source)
+            df = read_source(spark, lookup_name, lookup_def.source, connections=connections)
             # Apply narrow pipeline for on-demand reads
             df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
             resolved[alias] = df

@@ -166,6 +166,90 @@ class TestThreadWithExports:
         assert t.exports is None
 
 
+class TestExportConnectionField:
+    """Test Export connection/schema/table field handling."""
+
+    def test_connection_with_table_parses(self):
+        """Export with connection + table (delta type) constructs successfully."""
+        e = Export(name="conn_export", type="delta", connection="my_lakehouse", table="my_table")
+        assert e.connection == "my_lakehouse"
+        assert e.table == "my_table"
+        assert e.schema_override is None
+        assert e.path is None
+        assert e.alias is None
+
+    def test_connection_with_table_and_schema_parses(self):
+        """Export with connection + table + schema constructs successfully."""
+        e = Export(
+            name="conn_schema",
+            type="delta",
+            connection="my_lakehouse",
+            table="my_table",
+            schema="dbo",
+        )
+        assert e.connection == "my_lakehouse"
+        assert e.table == "my_table"
+        assert e.schema_override == "dbo"
+
+    def test_connection_and_alias_mutually_exclusive(self):
+        """Setting both connection and alias raises validation error."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            Export(
+                name="bad_conn",
+                type="delta",
+                connection="my_lakehouse",
+                table="my_table",
+                alias="schema.table",
+            )
+
+    def test_connection_and_path_mutually_exclusive(self):
+        """Setting both connection and path raises validation error."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            Export(
+                name="bad_conn",
+                type="delta",
+                connection="my_lakehouse",
+                table="my_table",
+                path="/some/path",
+            )
+
+    def test_connection_without_table_rejected(self):
+        """connection without table raises validation error."""
+        with pytest.raises(ValidationError, match="table"):
+            Export(name="no_table", type="delta", connection="my_lakehouse")
+
+    def test_table_without_connection_rejected(self):
+        """table without connection raises validation error."""
+        with pytest.raises(ValidationError, match="connection"):
+            Export(name="no_conn", type="delta", table="my_table")
+
+    def test_connection_requires_delta_type(self):
+        """connection on non-delta type raises validation error."""
+        with pytest.raises(ValidationError, match="delta"):
+            Export(
+                name="bad_type",
+                type="parquet",
+                connection="my_lakehouse",
+                table="my_table",
+            )
+
+    def test_existing_path_export_unchanged(self):
+        """Existing path-based export still constructs without change."""
+        e = Export(name="archive", type="parquet", path="/data/archive")
+        assert e.path == "/data/archive"
+        assert e.connection is None
+        assert e.table is None
+        assert e.schema_override is None
+
+    def test_existing_alias_export_unchanged(self):
+        """Existing alias-based export still constructs without change."""
+        e = Export(name="compliance", type="delta", alias="schema.table")
+        assert e.alias == "schema.table"
+        assert e.connection is None
+        assert e.table is None
+        assert e.schema_override is None
+
+
 class TestExportImmutability:
     """Test that Export is frozen."""
 

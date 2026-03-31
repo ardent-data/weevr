@@ -109,11 +109,12 @@ loaded config.
      - Merged defaults merge into each thread config
      - Thread values always win (most specific)
 
-   Naming configuration cascades separately as a whole block rather than
-   per-field. Audit columns (`audit_columns`) and **exports** also cascade
-   separately using **additive merge** — each level extends the set, and
-   same-named entries at a lower level override the definition from the
-   higher level. Exports with `enabled: false` are removed after merge.
+   Naming configuration cascades separately as a whole block rather
+   than per-field. Audit columns (`audit_columns`), **exports**, and
+   **connections** also cascade separately using **additive merge** —
+   each level extends the set, and same-named entries at a lower
+   level override the definition from the higher level. Exports
+   with `enabled: false` are removed after merge.
 
 2. **Expand macros** — `foreach` blocks in thread step lists are expanded
    into repeated sequences. This only applies when loading a thread

@@ -14,6 +14,7 @@ from weevr.engine.lookups import (
     resolve_thread_lookups,
 )
 from weevr.errors.exceptions import LookupResolutionError
+from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
 from weevr.telemetry.collector import SpanCollector
@@ -564,3 +565,70 @@ class TestResolveThreadLookups:
         resolved = resolve_thread_lookups({"src": source}, {}, {}, spark)
 
         assert len(resolved) == 0
+
+
+class TestConnectionPassthrough:
+    """Tests that connections forward through lookup functions."""
+
+    @patch("weevr.engine.lookups.read_source")
+    def test_materialize_lookups_passes_connections(self, mock_read):
+        """materialize_lookups forwards connections kwarg to read_source."""
+        mock_df = MagicMock()
+        mock_df.count.return_value = 5
+        mock_read.return_value = mock_df
+
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid",
+            lakehouse="lh-guid",
+        )
+        connections = {"primary": conn}
+        spark = MagicMock()
+        lookups = {"ref": _make_lookup(materialize=True, strategy="cache")}
+
+        materialize_lookups(spark, lookups, connections=connections)
+
+        mock_read.assert_called_once()
+        _, kwargs = mock_read.call_args
+        assert kwargs.get("connections") is connections
+
+    @patch("weevr.engine.lookups.read_source")
+    def test_resolve_thread_lookups_passes_connections(self, mock_read):
+        """resolve_thread_lookups forwards connections kwarg to read_source."""
+        on_demand_df = MagicMock()
+        mock_read.return_value = on_demand_df
+
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid",
+            lakehouse="lh-guid",
+        )
+        connections = {"primary": conn}
+        spark = MagicMock()
+
+        source = MagicMock()
+        source.lookup = "lazy"
+
+        weave_lookups = {"lazy": _make_lookup(materialize=False)}
+
+        resolve_thread_lookups({"src": source}, weave_lookups, {}, spark, connections=connections)
+
+        mock_read.assert_called_once()
+        _, kwargs = mock_read.call_args
+        assert kwargs.get("connections") is connections
+
+    @patch("weevr.engine.lookups.read_source")
+    def test_materialize_lookups_without_connections_defaults_to_none(self, mock_read):
+        """materialize_lookups works without connections (backward compat)."""
+        mock_df = MagicMock()
+        mock_df.count.return_value = 3
+        mock_read.return_value = mock_df
+
+        spark = MagicMock()
+        lookups = {"ref": _make_lookup(materialize=True, strategy="cache")}
+
+        materialize_lookups(spark, lookups)
+
+        mock_read.assert_called_once()
+        _, kwargs = mock_read.call_args
+        assert kwargs.get("connections") is None

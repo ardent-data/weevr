@@ -7,6 +7,7 @@ from weevr.model.column_set import (
     ReservedWordConfig,
     ReservedWordPreset,
 )
+from weevr.model.connection import OneLakeConnection
 from weevr.model.dimension import DimensionSurrogateKeyConfig
 from weevr.model.execution import ExecutionConfig, LogLevel
 from weevr.model.export import Export
@@ -67,6 +68,8 @@ from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
 from weevr.model.write import WriteConfig
 
 __all__ = [
+    # Connection
+    "OneLakeConnection",
     # Top-level domain models
     "Thread",
     "Weave",

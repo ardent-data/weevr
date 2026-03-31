@@ -197,6 +197,60 @@ class TestTarget:
             Target(alias="test", audit_columns_exclude=[""])
 
 
+class TestTargetConnectionFields:
+    """Test Target connection, schema, and table fields."""
+
+    def test_connection_and_table_parses(self):
+        """Target with connection + table is valid."""
+        t = Target(connection="my_lakehouse", table="dim_customer")
+        assert t.connection == "my_lakehouse"
+        assert t.table == "dim_customer"
+        assert t.schema_override is None
+
+    def test_connection_table_schema_parses(self):
+        """Target with connection + table + schema is valid."""
+        t = Target.model_validate(
+            {"connection": "my_lakehouse", "table": "dim_customer", "schema": "gold"}
+        )
+        assert t.connection == "my_lakehouse"
+        assert t.table == "dim_customer"
+        assert t.schema_override == "gold"
+
+    def test_connection_and_alias_raises(self):
+        """connection and alias together raise ValidationError."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            Target(connection="my_lakehouse", alias="gold.dim_customer", table="dim_customer")
+
+    def test_connection_without_table_raises(self):
+        """connection without table raises ValidationError."""
+        with pytest.raises(ValidationError, match="table"):
+            Target(connection="my_lakehouse")
+
+    def test_table_without_connection_raises(self):
+        """table without connection raises ValidationError."""
+        with pytest.raises(ValidationError, match="connection"):
+            Target(table="dim_customer")
+
+    def test_existing_alias_target_unchanged(self):
+        """Existing alias-based targets still parse correctly."""
+        t = Target(alias="gold.dim_customer")
+        assert t.alias == "gold.dim_customer"
+        assert t.connection is None
+        assert t.table is None
+
+    def test_existing_path_target_unchanged(self):
+        """Existing path-based targets still parse correctly."""
+        t = Target(path="/mnt/lakehouse/tables/dim_customer")
+        assert t.path == "/mnt/lakehouse/tables/dim_customer"
+        assert t.connection is None
+        assert t.table is None
+
+    def test_round_trip_connection_target(self):
+        """Target with connection fields round-trips."""
+        t = Target(connection="my_lakehouse", table="dim_customer", schema="gold")
+        assert Target.model_validate(t.model_dump()) == t
+
+
 class TestTargetAnalyticalModes:
     """Test Target dimension, fact, and seed fields."""
 

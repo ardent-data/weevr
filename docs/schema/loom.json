@@ -460,6 +460,47 @@
       "title": "NamingPattern",
       "type": "string"
     },
+    "OneLakeConnection": {
+      "description": "A OneLake connection declaration.\n\nIdentifies the Fabric workspace and lakehouse that a source or target\nresolves against at execution time.",
+      "properties": {
+        "type": {
+          "const": "onelake",
+          "description": "Connection type identifier.",
+          "title": "Type",
+          "type": "string"
+        },
+        "workspace": {
+          "description": "OneLake workspace GUID or variable reference.",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "lakehouse": {
+          "description": "OneLake lakehouse GUID or variable reference.",
+          "title": "Lakehouse",
+          "type": "string"
+        },
+        "default_schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default schema for tables in this connection.",
+          "title": "Default Schema"
+        }
+      },
+      "required": [
+        "type",
+        "workspace",
+        "lakehouse"
+      ],
+      "title": "OneLakeConnection",
+      "type": "object"
+    },
     "ParamSpec": {
       "description": "Typed parameter specification for config-level param declarations.",
       "properties": {
@@ -780,7 +821,7 @@
       "type": "string"
     },
     "Source": {
-      "description": "A data source declaration.\n\nA source is either a direct data reference (with ``type``) or a lookup\nreference (with ``lookup``). These are mutually exclusive.\n\nCross-field validation rules:\n- If ``lookup`` is set: ``type`` must not be set (lookup references are\n  resolved at execution time from weave-level lookup definitions).\n- If ``lookup`` is not set: ``type`` is required.\n- ``type == \"delta\"`` requires ``alias`` to be set.\n- ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.",
+      "description": "A data source declaration.\n\nA source is either a direct data reference (with ``type``), a connection-based\nreference (with ``connection`` + ``table``), or a lookup reference (with\n``lookup``). ``lookup`` is mutually exclusive with all other resolution modes.\n\nCross-field validation rules:\n- If ``lookup`` is set: ``type`` must not be set.\n- If ``connection`` is set: ``table`` must be set; ``alias`` must not be set;\n  ``type`` must be None or ``\"delta\"``; ``connection`` sources resolve via the\n  named connection rather than an inline alias.\n- ``table`` without ``connection`` is rejected.\n- ``connection`` and ``alias`` are mutually exclusive.\n- If neither ``lookup`` nor ``connection`` is set: ``type`` is required.\n- ``type == \"delta\"`` without ``connection`` requires ``alias`` to be set.\n- ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.",
       "properties": {
         "type": {
           "anyOf": [
@@ -805,7 +846,7 @@
             }
           ],
           "default": null,
-          "description": "Registered table alias. Required for delta sources.",
+          "description": "Registered table alias. Required for delta sources without a connection.",
           "title": "Alias"
         },
         "path": {
@@ -851,6 +892,45 @@
           "default": null,
           "description": "Reference to a named lookup defined at the weave or loom level. Mutually exclusive with type.",
           "title": "Lookup"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a named connection defined at thread, weave, or loom level.",
+          "title": "Connection"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema override within the connection's lakehouse.",
+          "title": "Schema"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name within the connection's lakehouse.",
+          "title": "Table"
         }
       },
       "title": "Source",
@@ -1203,6 +1283,22 @@
       "default": null,
       "description": "Named audit column templates inherited by all weaves and threads.",
       "title": "Audit Templates"
+    },
+    "connections": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/OneLakeConnection"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named connection definitions for resolving source and target paths.",
+      "title": "Connections"
     }
   },
   "required": [

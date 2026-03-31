@@ -7,6 +7,7 @@ from pydantic import Field, field_validator
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
 from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import ExecutionConfig
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
@@ -130,4 +131,8 @@ class Thread(FrozenBase):
     audit_templates: dict[str, AuditTemplate] | None = Field(
         default=None,
         description="Named audit column templates for reuse across threads.",
+    )
+    connections: dict[str, OneLakeConnection] | None = Field(
+        default=None,
+        description="Named connection definitions for resolving source and target paths.",
     )

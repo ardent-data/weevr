@@ -18,6 +18,7 @@ from weevr.engine.result import ThreadResult
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import DataValidationError, ExecutionError, ExportError, StateError
 from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.seed import SeedConfig
 from weevr.model.thread import Thread
@@ -60,6 +61,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     weave_name: str = "",
     column_sets: dict[str, dict[str, str]] | None = None,
     column_set_defs: dict[str, ColumnSet] | None = None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -109,6 +111,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         column_set_defs: Column set model instances keyed by name. Passed
             through to ``run_pipeline`` so rename steps can read
             ``on_unmapped`` and ``on_extra`` settings.
+        connections: Named connection declarations keyed by connection name.
+            When provided, source reads, lookup materialization, target path
+            resolution, and export writes use connection-based paths where
+            configured.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -164,7 +170,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     try:  # noqa: PLR0912 — outer try/finally for thread-level lookup cleanup
         # Materialize thread-level lookups and merge with weave-level
         if thread.lookups:
-            thread_cached_lookups, _ = materialize_lookups(spark, thread.lookups)
+            thread_cached_lookups, _ = materialize_lookups(
+                spark, thread.lookups, connections=connections
+            )
             all_cached: dict[str, Any] = {}
             if cached_lookups:
                 all_cached.update(cached_lookups)
@@ -200,9 +208,32 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         try:
             # Resolve target path early (needed for watermark store resolution)
             target_path = thread.target.alias or thread.target.path
+            if target_path is None and thread.target.connection:
+                conn_name = thread.target.connection
+                if not connections or conn_name not in connections:
+                    raise ExecutionError(
+                        f"Target references undefined connection '{conn_name}'",
+                        thread_name=thread.name,
+                    )
+                from weevr.config.paths import build_onelake_path
+
+                conn = connections[conn_name]
+                assert thread.target.table is not None  # guaranteed by Target validator
+                target_path = build_onelake_path(
+                    conn,
+                    thread.target.schema_override,
+                    thread.target.table,
+                )
+                logger.debug(
+                    "Thread '%s': resolved target connection '%s' → %s",
+                    thread.name,
+                    conn_name,
+                    target_path,
+                )
             if target_path is None:
                 raise ExecutionError(
-                    "Target has no 'alias' or 'path' — cannot resolve write location",
+                    "Target has no 'alias', 'path', or 'connection' "
+                    "— cannot resolve write location",
                     thread_name=thread.name,
                 )
 
@@ -227,6 +258,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     effective_weave_lookups or {},
                     effective_cached_lookups or {},
                     spark,
+                    connections=connections,
                 )
 
             # --- Step 4: Read sources ---
@@ -235,14 +267,21 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 primary_alias = next(iter(thread.sources))
                 primary_source = thread.sources[primary_alias]
                 primary_df, new_hwm = read_source_incremental(
-                    spark, primary_alias, primary_source, thread.load, prior_state
+                    spark,
+                    primary_alias,
+                    primary_source,
+                    thread.load,
+                    prior_state,
+                    connections=connections,
                 )
 
                 # Read secondary sources normally (skip lookup-resolved ones)
                 sources_map = {primary_alias: primary_df}
                 for alias, source in thread.sources.items():
                     if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = read_source(spark, alias, source)
+                        sources_map[alias] = read_source(
+                            spark, alias, source, connections=connections
+                        )
                 sources_map.update(lookup_dfs)
 
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
@@ -257,7 +296,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     except (ValueError, TypeError):
                         last_version = None
 
-                primary_df = read_cdc_source(spark, primary_source, thread.load.cdc, last_version)
+                primary_df = read_cdc_source(
+                    spark, primary_source, thread.load.cdc, last_version, connections=connections
+                )
 
                 # Capture new CDF version if Delta CDF
                 if (
@@ -274,12 +315,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map = {primary_alias: primary_df}
                 for alias, source in thread.sources.items():
                     if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = read_source(spark, alias, source)
+                        sources_map[alias] = read_source(
+                            spark, alias, source, connections=connections
+                        )
                 sources_map.update(lookup_dfs)
             else:
                 # Full mode or incremental_parameter — read non-lookup sources normally
                 normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
-                sources_map = read_sources(spark, normal_sources)
+                sources_map = read_sources(spark, normal_sources, connections=connections)
                 sources_map.update(lookup_dfs)
 
             # Step 5 — primary DataFrame is the first declared source
@@ -473,7 +516,24 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
                 resolved = resolve_exports(thread.exports, audit_ctx)
                 for export in resolved:
-                    result = write_export(spark, df, export, row_count=rows_written)
+                    exp = export
+                    if export.connection:
+                        conn_name = export.connection
+                        if not connections or conn_name not in connections:
+                            raise ExportError(
+                                f"Export '{export.name}' references undefined "
+                                f"connection '{conn_name}'",
+                                thread_name=thread.name,
+                                export_name=export.name,
+                                export_type=export.type,
+                            )
+                        from weevr.config.paths import build_onelake_path
+
+                        conn = connections[conn_name]
+                        assert export.table is not None  # guaranteed by Export validator
+                        path = build_onelake_path(conn, export.schema_override, export.table)
+                        exp = export.model_copy(update={"path": path})
+                    result = write_export(spark, df, exp, row_count=rows_written)
                     export_results.append(result)
                     if result.status == "aborted":
                         raise ExportError(
