@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from weevr.model.connection import OneLakeConnection
 from weevr.model.failure import FailureConfig
 from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
@@ -382,3 +383,92 @@ class TestThreadSharedResourceFields:
                     "target": {"alias": "test"},
                 }
             )
+
+
+class TestThreadConnectionsField:
+    """Tests for the Thread.connections field."""
+
+    def test_connections_defaults_to_none(self):
+        """Thread without connections has connections=None (backward compatible)."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.connections is None
+
+    def test_connections_with_valid_onelake_connection(self):
+        """Thread with connections dict containing a valid OneLakeConnection parses."""
+        data = {
+            **_MINIMAL,
+            "connections": {
+                "main": {
+                    "type": "onelake",
+                    "workspace": "ws-guid-1234",
+                    "lakehouse": "lh-guid-5678",
+                }
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.connections is not None
+        assert "main" in t.connections
+        assert isinstance(t.connections["main"], OneLakeConnection)
+        assert t.connections["main"].workspace == "ws-guid-1234"
+        assert t.connections["main"].lakehouse == "lh-guid-5678"
+
+    def test_connections_with_default_schema(self):
+        """Thread connections entry accepts optional default_schema."""
+        data = {
+            **_MINIMAL,
+            "connections": {
+                "bronze": {
+                    "type": "onelake",
+                    "workspace": "${param.workspace}",
+                    "lakehouse": "${param.lakehouse}",
+                    "default_schema": "dbo",
+                }
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.connections is not None
+        assert t.connections["bronze"].default_schema == "dbo"
+
+    def test_connections_with_invalid_type_raises(self):
+        """Thread rejects connections with invalid connection type."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate(
+                {
+                    **_MINIMAL,
+                    "connections": {
+                        "bad": {
+                            "type": "s3",
+                            "workspace": "ws",
+                            "lakehouse": "lh",
+                        }
+                    },
+                }
+            )
+
+    def test_connections_missing_required_fields_raises(self):
+        """Thread rejects connections entry missing required workspace/lakehouse."""
+        with pytest.raises(ValidationError):
+            Thread.model_validate(
+                {
+                    **_MINIMAL,
+                    "connections": {
+                        "bad": {"type": "onelake"},
+                    },
+                }
+            )
+
+    def test_connections_round_trip(self):
+        """Thread with connections round-trips through model_dump/model_validate."""
+        data = {
+            **_MINIMAL,
+            "connections": {
+                "primary": {
+                    "type": "onelake",
+                    "workspace": "ws-1",
+                    "lakehouse": "lh-1",
+                }
+            },
+        }
+        t = Thread.model_validate(data)
+        restored = Thread.model_validate(t.model_dump())
+        assert restored.connections == t.connections

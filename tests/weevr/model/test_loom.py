@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from weevr.model.connection import OneLakeConnection
 from weevr.model.loom import Loom, WeaveEntry
 from weevr.model.weave import ConditionSpec
 
@@ -220,3 +221,100 @@ class TestWeaveEntry:
         )
         assert entry.condition is not None
         assert entry.condition.when == "row_count('staging') > 0"
+
+
+class TestLoomConnectionsField:
+    """Tests for the Loom.connections field."""
+
+    def test_connections_defaults_to_none(self):
+        """Loom without connections has connections=None (backward compatible)."""
+        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        assert loom.connections is None
+
+    def test_connections_with_valid_onelake_connection(self):
+        """Loom with connections dict containing a valid OneLakeConnection parses."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "connections": {
+                    "main": {
+                        "type": "onelake",
+                        "workspace": "ws-guid-1234",
+                        "lakehouse": "lh-guid-5678",
+                    }
+                },
+            }
+        )
+        assert loom.connections is not None
+        assert "main" in loom.connections
+        assert isinstance(loom.connections["main"], OneLakeConnection)
+        assert loom.connections["main"].workspace == "ws-guid-1234"
+        assert loom.connections["main"].lakehouse == "lh-guid-5678"
+
+    def test_connections_with_default_schema(self):
+        """Loom connections entry accepts optional default_schema."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "connections": {
+                    "silver": {
+                        "type": "onelake",
+                        "workspace": "${param.workspace}",
+                        "lakehouse": "${param.lakehouse}",
+                        "default_schema": "silver",
+                    }
+                },
+            }
+        )
+        assert loom.connections is not None
+        assert loom.connections["silver"].default_schema == "silver"
+
+    def test_connections_with_invalid_type_raises(self):
+        """Loom rejects connections with invalid connection type."""
+        with pytest.raises(ValidationError):
+            Loom.model_validate(
+                {
+                    "config_version": "1.0",
+                    "weaves": ["w1"],
+                    "connections": {
+                        "bad": {
+                            "type": "gcs",
+                            "workspace": "ws",
+                            "lakehouse": "lh",
+                        }
+                    },
+                }
+            )
+
+    def test_connections_missing_required_fields_raises(self):
+        """Loom rejects connections entry missing required workspace/lakehouse."""
+        with pytest.raises(ValidationError):
+            Loom.model_validate(
+                {
+                    "config_version": "1.0",
+                    "weaves": ["w1"],
+                    "connections": {
+                        "bad": {"type": "onelake"},
+                    },
+                }
+            )
+
+    def test_connections_round_trip(self):
+        """Loom with connections round-trips through model_dump/model_validate."""
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "connections": {
+                    "primary": {
+                        "type": "onelake",
+                        "workspace": "ws-1",
+                        "lakehouse": "lh-1",
+                    }
+                },
+            }
+        )
+        restored = Loom.model_validate(loom.model_dump())
+        assert restored.connections == loom.connections
