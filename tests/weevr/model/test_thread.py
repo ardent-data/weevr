@@ -1,5 +1,7 @@
 """Tests for Thread composite model."""
 
+import logging
+
 import pytest
 from pydantic import ValidationError
 
@@ -9,6 +11,7 @@ from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.pipeline import DeriveStep, FilterStep
 from weevr.model.source import Source
+from weevr.model.sub_pipeline import SubPipeline
 from weevr.model.target import Target
 from weevr.model.thread import Thread
 from weevr.model.validation import Assertion, ValidationRule
@@ -472,3 +475,329 @@ class TestThreadConnectionsField:
         t = Thread.model_validate(data)
         restored = Thread.model_validate(t.model_dump())
         assert restored.connections == t.connections
+
+
+# ---------------------------------------------------------------------------
+# Helpers for with: block tests
+# ---------------------------------------------------------------------------
+
+_SIMPLE_CTE = {
+    "from": "customers",
+    "steps": [{"filter": {"expr": "active = true"}}],
+}
+
+_JOIN_STEP = {
+    "join": {
+        "source": "orders_cte",
+        "type": "left",
+        "on": ["id"],
+        "alias": "ord",
+    }
+}
+
+_MINIMAL_WITH_SOURCES = {
+    "config_version": "1.0",
+    "sources": {
+        "customers": {"type": "delta", "alias": "raw.customers"},
+        "orders": {"type": "delta", "alias": "raw.orders"},
+    },
+    "target": {"alias": "test"},
+}
+
+
+class TestThreadWithBlock:
+    """Tests for the Thread with: block (named sub-pipelines / CTEs)."""
+
+    def test_with_block_absent_defaults_to_none(self):
+        """Thread without with: block has with_=None (backward compatible)."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.with_ is None
+
+    def test_with_block_parses_correctly(self):
+        """Thread with a valid with: block parses sub-pipelines into SubPipeline models."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.with_ is not None
+        assert "active_customers" in t.with_
+        assert isinstance(t.with_["active_customers"], SubPipeline)
+        assert t.with_["active_customers"].from_ == "customers"
+
+    def test_with_block_multiple_ctes(self):
+        """Thread with multiple CTEs in order parses all entries."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+                "recent_orders": {
+                    "from": "orders",
+                    "steps": [{"filter": {"expr": "year = 2024"}}],
+                },
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.with_ is not None
+        assert len(t.with_) == 2
+        assert "active_customers" in t.with_
+        assert "recent_orders" in t.with_
+
+    def test_cte_referencing_prior_cte(self):
+        """CTE may reference a CTE declared above it (forward ref allowed upward)."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+                "enriched": {
+                    "from": "active_customers",
+                    "steps": [{"filter": {"expr": "score > 50"}}],
+                },
+            },
+        }
+        t = Thread.model_validate(data)
+        assert t.with_ is not None
+        assert t.with_["enriched"].from_ == "active_customers"
+
+    def test_cte_name_collides_with_source_raises(self):
+        """CTE name that matches a source name raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "customers": {  # same as a source name
+                    "from": "orders",
+                    "steps": [{"filter": {"expr": "x > 0"}}],
+                },
+            },
+        }
+        with pytest.raises(ValidationError, match="customers"):
+            Thread.model_validate(data)
+
+    def test_cte_from_referencing_nonexistent_source_raises(self):
+        """CTE from: referencing a name not in sources or prior CTEs raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "derived": {
+                    "from": "nonexistent_table",
+                    "steps": [{"filter": {"expr": "x > 0"}}],
+                },
+            },
+        }
+        with pytest.raises(ValidationError, match="nonexistent_table"):
+            Thread.model_validate(data)
+
+    def test_cte_forward_reference_raises(self):
+        """CTE referencing a CTE declared below it (forward reference) raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "derived": {
+                    "from": "active_customers",  # declared after
+                    "steps": [{"filter": {"expr": "x > 0"}}],
+                },
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+            },
+        }
+        with pytest.raises(ValidationError, match="active_customers"):
+            Thread.model_validate(data)
+
+    def test_unused_cte_produces_warning(self, caplog):
+        """CTE that is never referenced by any join/union step produces a warning."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+            },
+            # No join/union steps referencing active_customers
+        }
+        with caplog.at_level(logging.WARNING):
+            Thread.model_validate(data)
+        assert "unused" in caplog.text.lower() or "active_customers" in caplog.text
+
+    def test_used_cte_no_warning(self, caplog):
+        """CTE referenced in a join step does not produce an unused warning."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "active_customers",
+                        "type": "inner",
+                        "on": ["id"],
+                    }
+                }
+            ],
+        }
+        with caplog.at_level(logging.WARNING):
+            Thread.model_validate(data)
+        assert "active_customers" not in caplog.text or "unused" not in caplog.text.lower()
+
+    def test_join_alias_collides_with_source_raises(self):
+        """Join step alias matching a source name raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "steps": [
+                {
+                    "join": {
+                        "source": "orders",
+                        "type": "left",
+                        "on": ["id"],
+                        "alias": "customers",  # collides with source name
+                    }
+                }
+            ],
+        }
+        with pytest.raises(ValidationError, match="customers"):
+            Thread.model_validate(data)
+
+    def test_join_alias_collides_with_cte_name_raises(self):
+        """Join step alias matching a CTE name raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "active_customers",
+                        "type": "inner",
+                        "on": ["id"],
+                        "alias": "active_customers",  # collides with CTE name
+                    }
+                }
+            ],
+        }
+        with pytest.raises(ValidationError, match="active_customers"):
+            Thread.model_validate(data)
+
+    def test_join_alias_duplicate_across_thread_raises(self):
+        """Two join steps with the same alias raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "steps": [
+                {
+                    "join": {
+                        "source": "customers",
+                        "type": "left",
+                        "on": ["id"],
+                        "alias": "cust",
+                    }
+                },
+                {
+                    "join": {
+                        "source": "orders",
+                        "type": "left",
+                        "on": ["id"],
+                        "alias": "cust",  # duplicate alias
+                    }
+                },
+            ],
+        }
+        with pytest.raises(ValidationError, match="cust"):
+            Thread.model_validate(data)
+
+    def test_join_alias_duplicate_across_cte_and_main_raises(self):
+        """Join alias duplicate spanning CTE steps and main steps raises ValidationError."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [
+                        {
+                            "join": {
+                                "source": "orders",
+                                "type": "left",
+                                "on": ["id"],
+                                "alias": "shared_alias",
+                            }
+                        }
+                    ],
+                },
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "active_customers",
+                        "type": "inner",
+                        "on": ["id"],
+                        "alias": "shared_alias",  # duplicate of CTE join alias
+                    }
+                }
+            ],
+        }
+        with pytest.raises(ValidationError, match="shared_alias"):
+            Thread.model_validate(data)
+
+    def test_join_alias_none_no_collision(self):
+        """Join steps without aliases are not subject to alias collision checks."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "steps": [
+                {
+                    "join": {
+                        "source": "orders",
+                        "type": "left",
+                        "on": ["id"],
+                        # no alias
+                    }
+                }
+            ],
+        }
+        t = Thread.model_validate(data)
+        assert t.steps is not None
+        assert len(t.steps) == 1
+
+    def test_with_block_round_trip(self):
+        """Thread with with: block round-trips through model_dump/model_validate."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "active_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "active_customers",
+                        "type": "inner",
+                        "on": ["id"],
+                    }
+                }
+            ],
+        }
+        t = Thread.model_validate(data)
+        restored = Thread.model_validate(t.model_dump())
+        assert restored.with_ is not None
+        assert "active_customers" in restored.with_
+        assert isinstance(restored.with_["active_customers"], SubPipeline)

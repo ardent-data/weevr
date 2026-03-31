@@ -32,9 +32,7 @@ class TestSubPipelineFromAlias:
     def test_missing_from_raises(self):
         """Missing ``from`` / ``from_`` raises ValidationError."""
         with pytest.raises(ValidationError):
-            SubPipeline.model_validate(
-                {"steps": [{"filter": {"expr": "amount > 0"}}]}
-            )
+            SubPipeline.model_validate({"steps": [{"filter": {"expr": "amount > 0"}}]})
 
 
 class TestSubPipelineSteps:
