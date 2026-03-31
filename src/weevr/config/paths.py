@@ -31,10 +31,7 @@ def build_onelake_path(
         A fully-qualified ``abfss://`` URI for the given table.
     """
     effective_schema = schema or connection.default_schema
-    base = (
-        f"abfss://{connection.workspace}@{_ONELAKE_HOST}"
-        f"/{connection.lakehouse}/Tables"
-    )
+    base = f"abfss://{connection.workspace}@{_ONELAKE_HOST}/{connection.lakehouse}/Tables"
     if effective_schema:
         return f"{base}/{effective_schema}/{table}"
     return f"{base}/{table}"
@@ -71,7 +68,7 @@ def resolve_fuse_path(path: str, spark: SparkSession) -> str:
     # Strip the /lakehouse/default/ prefix, keeping everything after it.
     # The FUSE layout is /lakehouse/default/Tables/... so we drop the mount
     # root and the "default" segment to obtain a Tables-relative suffix.
-    remainder = path[len(_FUSE_PREFIX):]
+    remainder = path[len(_FUSE_PREFIX) :]
     # Drop the first path component (typically "default") which is the
     # FUSE mount name, not part of the OneLake namespace.
     parts = remainder.split("/", 1)

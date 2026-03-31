@@ -99,9 +99,7 @@ class Source(FrozenBase):
             if not self.table:
                 raise ValueError("connection sources require 'table' to be set")
             if self.type is not None and self.type != "delta":
-                raise ValueError(
-                    "connection sources only support type 'delta' (or omit type)"
-                )
+                raise ValueError("connection sources only support type 'delta' (or omit type)")
             return self
 
         if self.table is not None:

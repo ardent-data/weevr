@@ -158,7 +158,9 @@ class TestSourceConnectionReference:
 
     def test_connection_with_table_and_schema(self):
         """Source with connection, table, and schema override parses correctly."""
-        s = Source.model_validate({"connection": "my_lakehouse", "table": "orders", "schema": "sales"})
+        s = Source.model_validate(
+            {"connection": "my_lakehouse", "table": "orders", "schema": "sales"}
+        )
         assert s.connection == "my_lakehouse"
         assert s.table == "orders"
         assert s.schema_override == "sales"
