@@ -22,6 +22,12 @@ class Export(FrozenBase):
         type: Output format (delta, parquet, csv, json, orc).
         path: OneLake path for the export. Supports context variables.
         alias: Metastore alias (delta type only, mutually exclusive with path).
+        connection: Named connection reference (delta type only). Mutually
+            exclusive with ``path`` and ``alias``. Requires ``table``.
+        schema_override: Schema override within the connection's lakehouse.
+            Aliased as ``schema`` in YAML configs.
+        table: Table name within the connection's lakehouse. Required when
+            ``connection`` is set; invalid without it.
         mode: Write mode. Only ``"overwrite"`` in v1.
         partition_by: Partition columns, independent of primary target.
         on_failure: Behavior on write error — ``"abort"`` fails the thread,
@@ -45,6 +51,21 @@ class Export(FrozenBase):
     alias: str | None = Field(
         default=None,
         description="Metastore alias (delta type only, mutually exclusive with path).",
+    )
+    connection: str | None = Field(
+        default=None,
+        description="Reference to a named connection defined at thread, weave, or loom level.",
+    )
+    schema_override: str | None = Field(
+        default=None,
+        alias="schema",
+        description="Schema override within the connection's lakehouse.",
+    )
+
+    model_config = {"frozen": True, "populate_by_name": True}
+    table: str | None = Field(
+        default=None,
+        description="Table name within the connection's lakehouse.",
     )
     mode: Literal["overwrite"] = Field(
         default="overwrite",
@@ -73,8 +94,12 @@ class Export(FrozenBase):
     def _validate_export(self) -> "Export":
         """Enforce cross-field constraints.
 
-        - ``alias`` requires ``type == "delta"``.
-        - Exactly one of ``path`` or ``alias`` must be set when enabled.
+        - ``alias`` and ``connection`` require ``type == "delta"``.
+        - ``connection`` and ``alias`` are mutually exclusive.
+        - ``connection`` and ``path`` are mutually exclusive.
+        - ``connection`` requires ``table``; ``table`` requires ``connection``.
+        - When enabled, exactly one of ``path``, ``alias``, or
+          ``connection`` + ``table`` must be set.
         - ``name`` must be a valid Python identifier.
         """
         if not self.name.isidentifier():
@@ -85,13 +110,34 @@ class Export(FrozenBase):
                 f"Export '{self.name}': alias is only valid for delta type, got type='{self.type}'"
             )
 
+        if self.connection is not None and self.type != "delta":
+            raise ValueError(
+                f"Export '{self.name}': connection is only valid for delta type, "
+                f"got type='{self.type}'"
+            )
+
+        if self.connection is not None and self.alias is not None:
+            raise ValueError(f"Export '{self.name}': connection and alias are mutually exclusive")
+
+        if self.connection is not None and self.path is not None:
+            raise ValueError(f"Export '{self.name}': connection and path are mutually exclusive")
+
+        if self.connection is not None and not self.table:
+            raise ValueError(f"Export '{self.name}': connection requires table to be set")
+
+        if self.table is not None and not self.connection:
+            raise ValueError(f"Export '{self.name}': table requires connection to be set")
+
         if self.enabled:
             has_path = bool(self.path)
             has_alias = bool(self.alias)
-            if has_path == has_alias:
+            has_connection = bool(self.connection)
+            destinations = sum([has_path, has_alias, has_connection])
+            if destinations != 1:
                 raise ValueError(
-                    f"Export '{self.name}': exactly one of 'path' or 'alias' "
-                    f"must be set (got path={has_path}, alias={has_alias})"
+                    f"Export '{self.name}': exactly one of 'path', 'alias', or 'connection' "
+                    f"must be set (got path={has_path}, alias={has_alias}, "
+                    f"connection={has_connection})"
                 )
 
         return self
