@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.10/release-notes/1.4/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.10/guides/connections/">
       
       
-        <link rel="prev" href="../1.5/">
+        <link rel="prev" href="../fabric-runtime/">
       
       
-        <link rel="next" href="../1.3/">
+        <link rel="next" href="../observability/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.4 - weevr</title>
+        <title>Connections - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v14" class="md-skip">
+        <a href="#connections" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.4
+              Connections
             
           </span>
         </div>
@@ -340,11 +340,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../guides/fabric-runtime/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../fabric-runtime/" class="md-tabs__link">
           
   
   
@@ -398,13 +400,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.10/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../release-notes/1.10/" class="md-tabs__link">
           
   
   
@@ -1548,26 +1548,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1585,7 +1590,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1603,7 +1608,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/fabric-runtime/" class="md-nav__link">
+      <a href="../fabric-runtime/" class="md-nav__link">
         
   
   
@@ -1628,10 +1633,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../guides/connections/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1647,6 +1679,131 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-connections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use connections
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connection-block-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection block structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection block structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connection-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-lakehouse-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-lakehouse example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#auto-detection-with-fabric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-detection with ${fabric.*}
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-target-and-export-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source, target, and export references
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cascade-and-override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cascade and override
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-from-manual-abfss-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration from manual abfss:// paths
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1659,7 +1816,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/observability/" class="md-nav__link">
+      <a href="../observability/" class="md-nav__link">
         
   
   
@@ -1687,7 +1844,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/engine-internals/" class="md-nav__link">
+      <a href="../engine-internals/" class="md-nav__link">
         
   
   
@@ -1715,7 +1872,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/config-resolution/" class="md-nav__link">
+      <a href="../config-resolution/" class="md-nav__link">
         
   
   
@@ -1743,7 +1900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/telemetry-architecture/" class="md-nav__link">
+      <a href="../telemetry-architecture/" class="md-nav__link">
         
   
   
@@ -1771,7 +1928,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/exports/" class="md-nav__link">
+      <a href="../exports/" class="md-nav__link">
         
   
   
@@ -1799,7 +1956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/audit-templates/" class="md-nav__link">
+      <a href="../audit-templates/" class="md-nav__link">
         
   
   
@@ -1827,7 +1984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/dimension-modeling/" class="md-nav__link">
+      <a href="../dimension-modeling/" class="md-nav__link">
         
   
   
@@ -1855,7 +2012,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/fact-tables/" class="md-nav__link">
+      <a href="../fact-tables/" class="md-nav__link">
         
   
   
@@ -1883,7 +2040,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/resolve/" class="md-nav__link">
+      <a href="../resolve/" class="md-nav__link">
         
   
   
@@ -1969,31 +2126,26 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
             
   
   
@@ -2011,7 +2163,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2029,7 +2181,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.10/" class="md-nav__link">
+      <a href="../../release-notes/1.10/" class="md-nav__link">
         
   
   
@@ -2057,7 +2209,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.9/" class="md-nav__link">
+      <a href="../../release-notes/1.9/" class="md-nav__link">
         
   
   
@@ -2085,7 +2237,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.8/" class="md-nav__link">
+      <a href="../../release-notes/1.8/" class="md-nav__link">
         
   
   
@@ -2113,7 +2265,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.7/" class="md-nav__link">
+      <a href="../../release-notes/1.7/" class="md-nav__link">
         
   
   
@@ -2141,7 +2293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.6/" class="md-nav__link">
+      <a href="../../release-notes/1.6/" class="md-nav__link">
         
   
   
@@ -2169,7 +2321,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.5/" class="md-nav__link">
+      <a href="../../release-notes/1.5/" class="md-nav__link">
         
   
   
@@ -2194,37 +2346,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.4
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.4/" class="md-nav__link">
         
   
   
@@ -2240,159 +2365,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#plan-mode-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Plan Mode Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Plan Mode Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#explain-detailed-plan-breakdown" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        explain() — Detailed Plan Breakdown
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#summary-compact-plan-view" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        summary() — Compact Plan View
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dag-visualization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DAG Visualization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DAG Visualization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#resultdag-exportable-svg-dags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        result.dag() — Exportable SVG DAGs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lookup-nodes-in-dags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lookup Nodes in DAGs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#executionplandag" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ExecutionPlan.dag()
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rich-notebook-rendering" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rich Notebook Rendering
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resolved-thread-context" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resolved Thread Context
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#planner-lookup-producerconsumer-tracking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planner: Lookup Producer/Consumer Tracking
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2405,7 +2377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.3/" class="md-nav__link">
+      <a href="../../release-notes/1.3/" class="md-nav__link">
         
   
   
@@ -2433,7 +2405,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.2.1/" class="md-nav__link">
+      <a href="../../release-notes/1.2.1/" class="md-nav__link">
         
   
   
@@ -2461,7 +2433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.2/" class="md-nav__link">
+      <a href="../../release-notes/1.2/" class="md-nav__link">
         
   
   
@@ -2489,7 +2461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.1/" class="md-nav__link">
+      <a href="../../release-notes/1.1/" class="md-nav__link">
         
   
   
@@ -2517,7 +2489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../1.0/" class="md-nav__link">
+      <a href="../../release-notes/1.0/" class="md-nav__link">
         
   
   
@@ -2572,33 +2544,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#plan-mode-enhancements" class="md-nav__link">
+  <a href="#when-to-use-connections" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Plan Mode Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Plan Mode Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#explain-detailed-plan-breakdown" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        explain() — Detailed Plan Breakdown
+        When to use connections
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#summary-compact-plan-view" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#connection-block-structure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        summary() — Compact Plan View
+        Connection block structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection block structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connection-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection fields
       
     </span>
   </a>
@@ -2611,60 +2583,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dag-visualization" class="md-nav__link">
+  <a href="#cross-lakehouse-example" class="md-nav__link">
     <span class="md-ellipsis">
       
-        DAG Visualization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DAG Visualization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#resultdag-exportable-svg-dags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        result.dag() — Exportable SVG DAGs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lookup-nodes-in-dags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Lookup Nodes in DAGs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#executionplandag" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ExecutionPlan.dag()
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rich-notebook-rendering" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rich Notebook Rendering
+        Cross-lakehouse example
       
     </span>
   </a>
@@ -2672,10 +2594,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#resolved-thread-context" class="md-nav__link">
+  <a href="#auto-detection-with-fabric" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resolved Thread Context
+        Auto-detection with ${fabric.*}
       
     </span>
   </a>
@@ -2683,10 +2605,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#planner-lookup-producerconsumer-tracking" class="md-nav__link">
+  <a href="#schema-overrides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Planner: Lookup Producer/Consumer Tracking
+        Schema overrides
       
     </span>
   </a>
@@ -2694,10 +2616,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#source-target-and-export-references" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        Source, target, and export references
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cascade-and-override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cascade and override
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-from-manual-abfss-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration from manual abfss:// paths
       
     </span>
   </a>
@@ -2724,116 +2668,269 @@
   
 
 
-<!-- markdownlint-disable MD033 -->
-
-<h1 id="release-notes-v14">Release Notes — v1.4<a class="headerlink" href="#release-notes-v14" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>This release adds <strong>plan display, DAG visualization, and rich result
-rendering</strong> — bringing notebook-native display, structured plan
-inspection, and exportable SVG DAGs to the engine.</p>
-<hr />
-<h2 id="plan-mode-enhancements">Plan Mode Enhancements<a class="headerlink" href="#plan-mode-enhancements" title="Permanent link">&para;</a></h2>
-<h3 id="explain-detailed-plan-breakdown"><code>explain()</code> — Detailed Plan Breakdown<a class="headerlink" href="#explain-detailed-plan-breakdown" title="Permanent link">&para;</a></h3>
-<p>Plan mode results now include an <code>explain()</code> method that produces a
-section-by-section breakdown of the execution plan:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;plan&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">explain</span><span class="p">())</span>
-</code></pre></div>
-<p>The output includes:</p>
-<ul>
-<li><strong>Dependencies</strong> with provenance (inferred vs explicit)</li>
-<li><strong>Cache targets</strong> and their downstream consumers</li>
-<li><strong>Lookup schedule</strong> with materialization points</li>
-<li><strong>Per-thread detail</strong> — sources, targets, write modes, and step counts</li>
-</ul>
-<p>For loom-scoped results, the output opens with a loom summary line
-showing the loom name and weave count.</p>
-<h3 id="summary-compact-plan-view"><code>summary()</code> — Compact Plan View<a class="headerlink" href="#summary-compact-plan-view" title="Permanent link">&para;</a></h3>
-<p>The <code>summary()</code> method provides a compact execution group view with
-cache markers (asterisk suffix) and footer counts for threads, cached
-targets, and lookups:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Group 0: dim_product*
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Group 1: fact_orders, fact_returns
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>3 threads, 1 cached, 1 lookup
-</code></pre></div>
-<h2 id="dag-visualization">DAG Visualization<a class="headerlink" href="#dag-visualization" title="Permanent link">&para;</a></h2>
-<h3 id="resultdag-exportable-svg-dags"><code>result.dag()</code> — Exportable SVG DAGs<a class="headerlink" href="#resultdag-exportable-svg-dags" title="Permanent link">&para;</a></h3>
-<p>Plan mode results expose a <code>dag()</code> method that returns a <code>DAGDiagram</code>
-object:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;nightly.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;plan&quot;</span><span class="p">)</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">dag</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">dag</span><span class="p">()</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">dag</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;plan.svg&quot;</span><span class="p">)</span>    <span class="c1"># export to file</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">dag</span>                      <span class="c1"># renders inline in a notebook</span>
-</code></pre></div>
-<p>For multi-weave looms, <code>dag()</code> returns a loom-level swimlane diagram
-with weave containers stacked vertically. Single-weave results get a
-standard DAG.</p>
-<h3 id="lookup-nodes-in-dags">Lookup Nodes in DAGs<a class="headerlink" href="#lookup-nodes-in-dags" title="Permanent link">&para;</a></h3>
-<p>Lookups are rendered as distinct pill-shaped nodes in the DAG with
-directed edges showing producer-to-lookup and lookup-to-consumer
-relationships. Internal lookups (produced by a thread in the weave) show
-the producer edge; external lookups appear as standalone nodes feeding
-into their consumers.</p>
-<h3 id="executionplandag"><code>ExecutionPlan.dag()</code><a class="headerlink" href="#executionplandag" title="Permanent link">&para;</a></h3>
-<p>Individual execution plans also expose a <code>dag()</code> method for per-weave
-access:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">plan</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">execution_plan</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">dag</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">dag</span><span class="p">()</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">dag</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;weave.svg&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2 id="rich-notebook-rendering">Rich Notebook Rendering<a class="headerlink" href="#rich-notebook-rendering" title="Permanent link">&para;</a></h2>
-<p>All result modes now render automatically as styled HTML when evaluated
-in a notebook cell:</p>
-<ul>
-<li><strong>Execute</strong> — thread results table with status badges, row counts,
-  write modes, and target paths</li>
-<li><strong>Validate</strong> — check/error report with color-coded status</li>
-<li><strong>Plan</strong> — summary table with embedded DAG diagram</li>
-<li><strong>Preview</strong> — output shape table (columns x rows per thread)</li>
-</ul>
-<p>The HTML rendering uses inline styles for compatibility with both light
-and dark Fabric notebook themes.</p>
-<h2 id="resolved-thread-context">Resolved Thread Context<a class="headerlink" href="#resolved-thread-context" title="Permanent link">&para;</a></h2>
-<p>Plan mode results now carry resolved thread metadata (sources, targets,
-step counts) through to display rendering. This enables the <code>explain()</code>
-output and the enriched DAG nodes.</p>
-<h2 id="planner-lookup-producerconsumer-tracking">Planner: Lookup Producer/Consumer Tracking<a class="headerlink" href="#planner-lookup-producerconsumer-tracking" title="Permanent link">&para;</a></h2>
-<p>The <code>ExecutionPlan</code> model now includes <code>lookup_producers</code> and
-<code>lookup_consumers</code> mappings that track which threads produce and consume
-each lookup. These fields power the lookup node rendering in DAGs and
-the lookup section in <code>explain()</code> output.</p>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All existing configurations and API usage continue
-to work without modification.</p>
+<h1 id="connections">Connections<a class="headerlink" href="#connections" title="Permanent link">&para;</a></h1>
+<p>Connections let you declare a Fabric lakehouse once by name and reference it
+from sources, targets, and exports throughout a thread. Instead of embedding
+workspace and lakehouse GUIDs — or hardcoded <code>abfss://</code> paths — in every
+source and target block, you define the connection in one place and refer to
+it by a short name.</p>
+<h2 id="when-to-use-connections">When to use connections<a class="headerlink" href="#when-to-use-connections" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Component</th>
-<th>Version</th>
+<th>Pattern</th>
+<th>Use this</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Python</td>
-<td>3.11</td>
+<td>Single-lakehouse thread, tables registered in the metastore</td>
+<td><code>alias:</code></td>
 </tr>
 <tr>
-<td>PySpark</td>
-<td>3.5.x</td>
+<td>Single-lakehouse thread, raw OneLake path</td>
+<td><code>path:</code></td>
 </tr>
 <tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
+<td>Reading from or writing to a different workspace or lakehouse</td>
+<td><code>connections:</code></td>
 </tr>
 <tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
+<td>Multiple threads sharing the same remote lakehouse</td>
+<td><code>connections:</code> at weave or loom level</td>
+</tr>
+<tr>
+<td>Portability across environments without changing GUIDs</td>
+<td><code>connections:</code> with <code>${fabric.*}</code></td>
 </tr>
 </tbody>
 </table>
+<h2 id="connection-block-structure">Connection block structure<a class="headerlink" href="#connection-block-structure" title="Permanent link">&para;</a></h2>
+<p>Connections are declared in a <code>connections:</code> map at the thread, weave, or
+loom level. Each key is a logical name; the value is a connection object.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">staging</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;a1b2c3d4-0000-0000-0000-111111111111&quot;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;e5f6a7b8-0000-0000-0000-222222222222&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">default_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+</code></pre></div>
+<h3 id="connection-fields">Connection fields<a class="headerlink" href="#connection-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>Yes</td>
+<td>Connection type. Only <code>onelake</code> is supported in v1.</td>
+</tr>
+<tr>
+<td><code>workspace</code></td>
+<td>Yes</td>
+<td>OneLake workspace GUID or <code>${fabric.workspace_id}</code>.</td>
+</tr>
+<tr>
+<td><code>lakehouse</code></td>
+<td>Yes</td>
+<td>OneLake lakehouse GUID or <code>${fabric.lakehouse_id}</code>.</td>
+</tr>
+<tr>
+<td><code>default_schema</code></td>
+<td>No</td>
+<td>Default schema for tables in this connection.</td>
+</tr>
+</tbody>
+</table>
+<p>Once declared, a connection is referenced from a source or target using
+<code>connection: &lt;name&gt;</code> together with <code>table: &lt;table_name&gt;</code>.</p>
+<h2 id="cross-lakehouse-example">Cross-lakehouse example<a class="headerlink" href="#cross-lakehouse-example" title="Permanent link">&para;</a></h2>
+<p>A common pattern is reading from a raw lakehouse and writing to a curated one
+in a different workspace.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">raw_lh</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aaaaaaaa-0000-0000-0000-000000000001&quot;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bbbbbbbb-0000-0000-0000-000000000002&quot;</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">default_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">curated_lh</span><span class="p">:</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cccccccc-0000-0000-0000-000000000003&quot;</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dddddddd-0000-0000-0000-000000000004&quot;</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">default_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_lh</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="nt">customers</span><span class="p">:</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_lh</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_lh</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">  </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fact_orders</span>
+</code></pre></div>
+<p>The engine constructs the <code>abfss://</code> path for each source and target at
+execution time from the workspace, lakehouse, schema, and table name.</p>
+<h2 id="auto-detection-with-fabric">Auto-detection with <code>${fabric.*}</code><a class="headerlink" href="#auto-detection-with-fabric" title="Permanent link">&para;</a></h2>
+<p>When all lakehouses are within the current Fabric session's workspace, you
+can use <code>${fabric.workspace_id}</code> and <code>${fabric.lakehouse_id}</code> rather than
+hardcoding GUIDs. The engine reads these values from the active Spark
+session at execution time.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">current</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${fabric.workspace_id}&quot;</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${fabric.lakehouse_id}&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">current</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_orders</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">current</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">  </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fact_orders</span>
+</code></pre></div>
+<p>This pattern makes threads portable: the same YAML file runs correctly in
+development, test, and production workspaces without modification.</p>
+<p>Available <code>${fabric.*}</code> variables:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>${fabric.workspace_id}</code></td>
+<td>GUID of the current Fabric workspace</td>
+</tr>
+<tr>
+<td><code>${fabric.lakehouse_id}</code></td>
+<td>GUID of the active lakehouse in the session</td>
+</tr>
+<tr>
+<td><code>${fabric.workspace_name}</code></td>
+<td>Display name of the current workspace</td>
+</tr>
+</tbody>
+</table>
+<h2 id="schema-overrides">Schema overrides<a class="headerlink" href="#schema-overrides" title="Permanent link">&para;</a></h2>
+<p><code>default_schema</code> on a connection applies to all tables unless overridden.
+Use <code>schema:</code> on a source or target to use a different schema for that
+specific table.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">archive</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aaaaaaaa-0000-0000-0000-000000000001&quot;</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bbbbbbbb-0000-0000-0000-000000000002&quot;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">default_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">current_year</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">transactions</span><span class="p">:</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">archive</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transactions</span><span class="w">         </span><span class="c1"># resolves to current_year.transactions</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">  </span><span class="nt">historical</span><span class="p">:</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">archive</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">    </span><span class="nt">schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prior_year</span><span class="w">          </span><span class="c1"># overrides default_schema</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transactions</span><span class="w">         </span><span class="c1"># resolves to prior_year.transactions</span>
+</code></pre></div>
+<p>The <code>schema:</code> field on a source or target always takes precedence over
+<code>default_schema</code> on the connection.</p>
+<h2 id="source-target-and-export-references">Source, target, and export references<a class="headerlink" href="#source-target-and-export-references" title="Permanent link">&para;</a></h2>
+<p>Connections work the same way in sources, the primary target, and exports.</p>
+<p><strong>Source:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_products</span>
+</code></pre></div>
+<p><strong>Target:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated_lh</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_products</span>
+</code></pre></div>
+<p><strong>Export (delta type only):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">exports</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance_copy</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">archive</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fact_orders_archive</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Export connections</p>
+<p>The <code>connection</code> field on exports is only valid when <code>type: delta</code>.
+Parquet, CSV, JSON, and ORC exports use <code>path:</code> instead.</p>
+</div>
+<h2 id="cascade-and-override">Cascade and override<a class="headerlink" href="#cascade-and-override" title="Permanent link">&para;</a></h2>
+<p>Connections cascade from loom to weave to thread. Define shared connections
+at the loom level to make them available everywhere; override at the thread
+level when a specific thread needs a different endpoint.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># loom.loom</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">shared_raw</span><span class="p">:</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${fabric.workspace_id}&quot;</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bbbbbbbb-0000-0000-0000-000000000002&quot;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># my_thread.thread — override shared_raw with a different lakehouse</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">shared_raw</span><span class="p">:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${fabric.workspace_id}&quot;</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;eeeeeeee-0000-0000-0000-000000000005&quot;</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">default_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">overridden</span>
+</code></pre></div>
+<p>The most specific level always wins. A thread-level connection with the
+same name as a loom-level connection replaces it entirely for that thread.</p>
+<h2 id="migration-from-manual-abfss-paths">Migration from manual <code>abfss://</code> paths<a class="headerlink" href="#migration-from-manual-abfss-paths" title="Permanent link">&para;</a></h2>
+<p>If you have existing threads using hardcoded <code>abfss://</code> paths in <code>source.path</code>
+or <code>target.path</code>, you can migrate to connections gradually.</p>
+<p><strong>Before:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">      </span><span class="no">abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="no">bbbbbbbb-0000-0000-0000-000000000002/Tables/raw/orders</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="no">abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="no">bbbbbbbb-0000-0000-0000-000000000002/Tables/curated/fact_orders</span>
+</code></pre></div>
+<p><strong>After:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">lh</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aaaaaaaa-0000-0000-0000-000000000001&quot;</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bbbbbbbb-0000-0000-0000-000000000002&quot;</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lh</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nt">schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lh</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">  </span><span class="nt">schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">  </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fact_orders</span>
+</code></pre></div>
+<p>Connections are also more maintainable when the same lakehouse is referenced
+across multiple threads: update the GUID in one place rather than in every
+file.</p>
 
 
 

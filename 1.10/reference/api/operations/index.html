@@ -1925,6 +1925,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/observability/" class="md-nav__link">
         
   
@@ -4402,7 +4430,7 @@ table is written to <code>{target_path}_quarantine</code>.</p>
 
 
 <h3 id="weevr.operations.read_source" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">read_source</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">alias</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">read_source</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">alias</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.read_source" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4471,6 +4499,23 @@ table is written to <code>{target_path}_quarantine</code>.</p>
                 <em>required</em>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="OneLakeConnection (weevr.model.connection.OneLakeConnection)" href="../model/#weevr.model.OneLakeConnection">OneLakeConnection</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Named connection declarations keyed by connection name.
+Required when <code>source.connection</code> is set.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4529,7 +4574,7 @@ table is written to <code>{target_path}_quarantine</code>.</p>
 
 
 <h3 id="weevr.operations.read_sources" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">read_sources</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">sources</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">read_sources</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.read_sources" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4580,6 +4625,22 @@ table is written to <code>{target_path}_quarantine</code>.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="OneLakeConnection (weevr.model.connection.OneLakeConnection)" href="../model/#weevr.model.OneLakeConnection">OneLakeConnection</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Named connection declarations forwarded to each read.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>

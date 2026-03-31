@@ -2622,6 +2622,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/observability/" class="md-nav__link">
         
   
@@ -6363,7 +6391,7 @@ are provided.</p>
 
 
 <h3 id="weevr.context.apply_inheritance" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">apply_inheritance</span><span class="p">(</span><span class="n">loom_defaults</span><span class="p">,</span> <span class="n">weave_defaults</span><span class="p">,</span> <span class="n">thread_config</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">loom_audit_templates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_audit_templates</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">apply_inheritance</span><span class="p">(</span><span class="n">loom_defaults</span><span class="p">,</span> <span class="n">weave_defaults</span><span class="p">,</span> <span class="n">thread_config</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">loom_audit_templates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_audit_templates</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.apply_inheritance" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -6462,6 +6490,38 @@ are provided.</p>
             <td>
               <div class="doc-md-description">
                 <p>User-defined audit template definitions from weave</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Named connection definitions from loom top-level</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Named connection definitions from weave top-level</p>
               </div>
             </td>
             <td>
@@ -6995,7 +7055,7 @@ typed extension was expected (caller context).</p>
 
 
 <h3 id="weevr.context.build_param_context" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">build_param_context</span><span class="p">(</span><span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config_defaults</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">build_param_context</span><span class="p">(</span><span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config_defaults</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fabric_context</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.build_param_context" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7005,7 +7065,8 @@ typed extension was expected (caller context).</p>
         <p>Build parameter context with proper priority layering.</p>
 <p>Priority order (highest to lowest):
 1. runtime_params
-2. config_defaults</p>
+2. config_defaults
+3. fabric_context</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7045,6 +7106,24 @@ typed extension was expected (caller context).</p>
             <td>
               <div class="doc-md-description">
                 <p>Default parameters from config.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fabric_context</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fabric environment values keyed as <code>fabric.&lt;field&gt;</code>
+(e.g. <code>fabric.workspace_id</code>). None values are omitted. Lowest
+priority — overridden by config_defaults and runtime_params.</p>
               </div>
             </td>
             <td>
@@ -7514,7 +7593,7 @@ File paths contain slashes or URI schemes (<code>://</code>).</p>
 
 
 <h3 id="weevr.context.execute_thread" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_thread" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7738,6 +7817,25 @@ resolved dictionaries.</p>
                 <p>Column set model instances keyed by name. Passed
 through to <code>run_pipeline</code> so rename steps can read
 <code>on_unmapped</code> and <code>on_extra</code> settings.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="OneLakeConnection (weevr.model.connection.OneLakeConnection)" href="../model/#weevr.model.OneLakeConnection">OneLakeConnection</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Named connection declarations keyed by connection name.
+When provided, source reads, lookup materialization, target path
+resolution, and export writes use connection-based paths where
+configured.</p>
               </div>
             </td>
             <td>
