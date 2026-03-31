@@ -1156,8 +1156,9 @@ at multiple levels, the most-specific level wins.
 | `lakehouse` | `string` | yes | -- | OneLake lakehouse GUID or `${fabric.lakehouse_id}` variable. |
 | `default_schema` | `string` | no | `null` | Default schema for tables in this connection. Can be overridden per-source or per-target with `schema:`. |
 
-`${fabric.workspace_id}` and `${fabric.lakehouse_id}` are injected at runtime
-from the active Fabric session. Using these variables makes a connection
+`${fabric.workspace_id}`, `${fabric.lakehouse_id}`, and
+`${fabric.workspace_name}` are injected at runtime from the
+active Fabric session. Using these variables makes a connection
 portable across environments without changing GUIDs.
 
 See the [Connections guide](../../guides/connections.md) for cross-lakehouse

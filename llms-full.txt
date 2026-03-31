@@ -137,8 +137,9 @@ Connection fields:
 - `lakehouse` — Lakehouse GUID or `${fabric.lakehouse_id}`.
 - `default_schema` — Default schema for tables in this connection.
 
-`${fabric.workspace_id}` and `${fabric.lakehouse_id}` are injected from
-the active Spark session, making threads portable across environments.
+`${fabric.workspace_id}`, `${fabric.lakehouse_id}`, and
+`${fabric.workspace_name}` are injected from the active Spark
+session, making threads portable across environments.
 
 Sources, targets, and delta-type exports reference a connection with
 `connection: <name>` and `table: <table_name>`. An optional `schema:`
