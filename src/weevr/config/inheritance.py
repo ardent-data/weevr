@@ -45,6 +45,8 @@ def apply_inheritance(
     *,
     loom_audit_templates: dict[str, Any] | None = None,
     weave_audit_templates: dict[str, Any] | None = None,
+    loom_connections: dict[str, Any] | None = None,
+    weave_connections: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Apply multi-level inheritance cascade.
 
@@ -59,6 +61,8 @@ def apply_inheritance(
         thread_config: Thread-specific config
         loom_audit_templates: User-defined audit template definitions from loom
         weave_audit_templates: User-defined audit template definitions from weave
+        loom_connections: Named connection definitions from loom top-level
+        weave_connections: Named connection definitions from weave top-level
 
     Returns:
         Fully merged config with thread values taking precedence
@@ -87,6 +91,9 @@ def apply_inheritance(
 
     # Exports cascade: loom → weave → thread with additive merge by name.
     _cascade_exports(loom_defaults, weave_defaults, result)
+
+    # Connections cascade: loom → weave → thread with additive merge by name.
+    _cascade_connections(loom_connections, weave_connections, result)
 
     return result
 
@@ -321,3 +328,32 @@ def _cascade_exports(
 
     # Filter out disabled exports and write the resolved list
     thread_config["exports"] = [e for e in merged.values() if e.get("enabled", True) is not False]
+
+
+def _cascade_connections(
+    loom_connections: dict[str, Any] | None,
+    weave_connections: dict[str, Any] | None,
+    thread_config: dict[str, Any],
+) -> None:
+    """Cascade connections from loom/weave into thread config.
+
+    Additive merge: each level extends the connections dict.
+    Same-named connections at a lower level override the definition
+    from a higher level (child wins).
+
+    Cascade order: loom → weave → thread.
+    """
+    merged: dict[str, Any] = {}
+
+    if loom_connections:
+        merged.update(loom_connections)
+    if weave_connections:
+        merged.update(weave_connections)
+
+    # Thread-level connections (highest priority)
+    thread_connections = thread_config.get("connections")
+    if thread_connections:
+        merged.update(thread_connections)
+
+    if merged:
+        thread_config["connections"] = merged

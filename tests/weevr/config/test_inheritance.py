@@ -674,6 +674,83 @@ class TestExportsInheritance:
         assert "thread_exp" in names
 
 
+class TestConnectionsInheritance:
+    """Test additive cascade for connections across loom → weave → thread."""
+
+    def test_loom_connections_inherited_by_thread(self):
+        """Loom connections cascade into thread when thread has none."""
+        loom: dict[str, Any] = {
+            "connections": {"src": {"type": "delta", "alias": "db.src"}},
+        }
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread, loom_connections=loom["connections"])
+        assert result["connections"] == {"src": {"type": "delta", "alias": "db.src"}}
+
+    def test_thread_connections_override_loom(self):
+        """Thread connection overrides loom connection with same name."""
+        loom_conns: dict[str, Any] = {"src": {"type": "delta", "alias": "db.loom_src"}}
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "connections": {"src": {"type": "delta", "alias": "db.thread_src"}},
+        }
+        result = apply_inheritance(None, None, thread, loom_connections=loom_conns)
+        assert result["connections"]["src"]["alias"] == "db.thread_src"
+        assert len(result["connections"]) == 1
+
+    def test_loom_and_thread_connections_merge_additively(self):
+        """Loom and thread connections with different names both appear."""
+        loom_conns: dict[str, Any] = {"src_a": {"type": "delta", "alias": "db.a"}}
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "connections": {"src_b": {"type": "delta", "alias": "db.b"}},
+        }
+        result = apply_inheritance(None, None, thread, loom_connections=loom_conns)
+        assert "src_a" in result["connections"]
+        assert "src_b" in result["connections"]
+        assert len(result["connections"]) == 2
+
+    def test_weave_connections_layer_between_loom_and_thread(self):
+        """Weave connections override loom connections with same name."""
+        loom_conns: dict[str, Any] = {"src": {"type": "delta", "alias": "db.loom_src"}}
+        weave_conns: dict[str, Any] = {"src": {"type": "delta", "alias": "db.weave_src"}}
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(
+            None,
+            None,
+            thread,
+            loom_connections=loom_conns,
+            weave_connections=weave_conns,
+        )
+        assert result["connections"]["src"]["alias"] == "db.weave_src"
+        assert len(result["connections"]) == 1
+
+    def test_three_level_cascade_all_unique(self):
+        """All three levels contribute unique connections additively."""
+        loom_conns: dict[str, Any] = {"loom_src": {"type": "delta", "alias": "db.loom"}}
+        weave_conns: dict[str, Any] = {"weave_src": {"type": "delta", "alias": "db.weave"}}
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "connections": {"thread_src": {"type": "delta", "alias": "db.thread"}},
+        }
+        result = apply_inheritance(
+            None,
+            None,
+            thread,
+            loom_connections=loom_conns,
+            weave_connections=weave_conns,
+        )
+        assert "loom_src" in result["connections"]
+        assert "weave_src" in result["connections"]
+        assert "thread_src" in result["connections"]
+        assert len(result["connections"]) == 3
+
+    def test_no_connections_at_any_level(self):
+        """No connections at any level leaves thread without connections key."""
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(None, None, thread)
+        assert "connections" not in result
+
+
 class TestAuditTemplateInheritance:
     """Test audit template, inherit flag, exclusion, and legacy path handling."""
 
