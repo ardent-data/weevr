@@ -44,6 +44,110 @@ class TestBuildParamContext:
         assert context["lakehouse"] == "bronze"  # Defaults (no override)
         assert context["mode"] == "test"  # Defaults (no override)
 
+    def test_fabric_context_workspace_id(self):
+        """Fabric context provides workspace_id as nested dict under 'fabric'."""
+        fabric = {"fabric.workspace_id": "ws-abc-123"}
+        context = build_param_context(fabric_context=fabric)
+        assert context["fabric"]["workspace_id"] == "ws-abc-123"
+
+    def test_fabric_context_lakehouse_id(self):
+        """Fabric context provides lakehouse_id as nested dict under 'fabric'."""
+        fabric = {"fabric.lakehouse_id": "lh-xyz-456"}
+        context = build_param_context(fabric_context=fabric)
+        assert context["fabric"]["lakehouse_id"] == "lh-xyz-456"
+
+    def test_fabric_context_none_values_excluded(self):
+        """Fabric context keys with None values are excluded from context."""
+        fabric = {"fabric.workspace_id": "ws-abc-123", "fabric.lakehouse_id": None}
+        context = build_param_context(fabric_context=fabric)
+        assert context["fabric"]["workspace_id"] == "ws-abc-123"
+        assert "lakehouse_id" not in context["fabric"]
+
+    def test_fabric_context_all_none_excluded(self):
+        """Fabric context with all None values produces no 'fabric' key."""
+        fabric = {"fabric.workspace_id": None, "fabric.lakehouse_id": None}
+        context = build_param_context(fabric_context=fabric)
+        assert "fabric" not in context
+
+    def test_runtime_param_overrides_fabric_context(self):
+        """Explicit runtime param overrides fabric context value."""
+        fabric = {"fabric.workspace_id": "ws-from-spark"}
+        runtime = {"fabric": {"workspace_id": "ws-override"}}
+        context = build_param_context(runtime_params=runtime, fabric_context=fabric)
+        assert context["fabric"]["workspace_id"] == "ws-override"
+
+    def test_config_default_overrides_fabric_context(self):
+        """Config default overrides fabric context value."""
+        fabric = {"fabric.workspace_id": "ws-from-spark"}
+        defaults = {"fabric": {"workspace_id": "ws-from-config"}}
+        context = build_param_context(config_defaults=defaults, fabric_context=fabric)
+        assert context["fabric"]["workspace_id"] == "ws-from-config"
+
+    def test_full_priority_chain_with_fabric(self):
+        """Full priority: runtime > config_defaults > fabric_context."""
+        fabric = {
+            "fabric.workspace_id": "ws-spark",
+            "fabric.lakehouse_id": "lh-spark",
+            "fabric.workspace_name": "wks-spark",
+        }
+        defaults = {"fabric": {"workspace_id": "ws-config"}, "env": "dev"}
+        runtime = {"fabric": {"workspace_id": "ws-runtime"}, "env": "prod"}
+        context = build_param_context(
+            runtime_params=runtime,
+            config_defaults=defaults,
+            fabric_context=fabric,
+        )
+        assert context["fabric"]["workspace_id"] == "ws-runtime"  # Runtime wins
+        assert context["env"] == "prod"  # Runtime wins
+
+    def test_fabric_context_none_param_no_error(self):
+        """Passing None for fabric_context is valid and produces no fabric key."""
+        context = build_param_context(fabric_context=None)
+        assert "fabric" not in context
+
+
+class TestFabricVariableResolution:
+    """Test that ${fabric.*} variables resolve from fabric context."""
+
+    def test_fabric_workspace_id_resolves(self):
+        """${fabric.workspace_id} resolves from fabric context."""
+        fabric = {"fabric.workspace_id": "ws-abc-123"}
+        context = build_param_context(fabric_context=fabric)
+        config = {"workspace": "${fabric.workspace_id}"}
+        result = resolve_variables(config, context)
+        assert result["workspace"] == "ws-abc-123"
+
+    def test_fabric_lakehouse_id_resolves(self):
+        """${fabric.lakehouse_id} resolves from fabric context."""
+        fabric = {"fabric.lakehouse_id": "lh-xyz-456"}
+        context = build_param_context(fabric_context=fabric)
+        config = {"lakehouse": "${fabric.lakehouse_id}"}
+        result = resolve_variables(config, context)
+        assert result["lakehouse"] == "lh-xyz-456"
+
+    def test_fabric_workspace_id_missing_raises(self):
+        """${fabric.workspace_id} with no fabric context raises VariableResolutionError."""
+        context = build_param_context()
+        config = {"workspace": "${fabric.workspace_id}"}
+        with pytest.raises(VariableResolutionError) as exc_info:
+            resolve_variables(config, context)
+        assert "fabric.workspace_id" in str(exc_info.value)
+
+    def test_fabric_workspace_id_with_default_fallback(self):
+        """${fabric.workspace_id:-fallback} uses default when fabric context absent."""
+        context = build_param_context()
+        config = {"workspace": "${fabric.workspace_id:-local-ws}"}
+        result = resolve_variables(config, context)
+        assert result["workspace"] == "local-ws"
+
+    def test_fabric_context_in_embedded_string(self):
+        """${fabric.workspace_id} embedded in longer string resolves correctly."""
+        fabric = {"fabric.workspace_id": "ws-abc-123"}
+        context = build_param_context(fabric_context=fabric)
+        config = {"path": "abfss://data@storage/${fabric.workspace_id}/files"}
+        result = resolve_variables(config, context)
+        assert result["path"] == "abfss://data@storage/ws-abc-123/files"
+
 
 class TestResolveVariables:
     """Test resolve_variables function."""
