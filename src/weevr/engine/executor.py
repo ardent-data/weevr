@@ -218,10 +218,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 from weevr.config.paths import build_onelake_path
 
                 conn = connections[conn_name]
+                assert thread.target.table is not None  # guaranteed by Target validator
                 target_path = build_onelake_path(
                     conn,
                     thread.target.schema_override,
-                    thread.target.table,  # type: ignore[arg-type]
+                    thread.target.table,
                 )
                 logger.debug(
                     "Thread '%s': resolved target connection '%s' → %s",
@@ -516,9 +517,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 resolved = resolve_exports(thread.exports, audit_ctx)
                 for export in resolved:
                     exp = export
-                    if export.connection and connections is not None:
+                    if export.connection:
                         conn_name = export.connection
-                        if conn_name not in connections:
+                        if not connections or conn_name not in connections:
                             raise ExportError(
                                 f"Export '{export.name}' references undefined "
                                 f"connection '{conn_name}'",
@@ -529,16 +530,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         from weevr.config.paths import build_onelake_path
 
                         conn = connections[conn_name]
-                        path = build_onelake_path(conn, export.schema_override, export.table)  # type: ignore[arg-type]
+                        assert export.table is not None  # guaranteed by Export validator
+                        path = build_onelake_path(conn, export.schema_override, export.table)
                         exp = export.model_copy(update={"path": path})
-                    elif export.connection and connections is None:
-                        raise ExportError(
-                            f"Export '{export.name}' references undefined "
-                            f"connection '{export.connection}'",
-                            thread_name=thread.name,
-                            export_name=export.name,
-                            export_type=export.type,
-                        )
                     result = write_export(spark, df, exp, row_count=rows_written)
                     export_results.append(result)
                     if result.status == "aborted":

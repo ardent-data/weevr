@@ -106,10 +106,12 @@ def load_config(
     if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
         loom_defaults = resolved_with_refs.get("defaults")
         loom_audit_templates = resolved_with_refs.get("audit_templates")
+        loom_connections = resolved_with_refs.get("connections")
         for weave in resolved_with_refs["_resolved_weaves"]:
             if "_resolved_threads" in weave:
                 weave_defaults = weave.get("defaults")
                 weave_audit_templates = weave.get("audit_templates")
+                weave_connections = weave.get("connections")
                 for i, thread in enumerate(weave["_resolved_threads"]):
                     merged = apply_inheritance(
                         loom_defaults,
@@ -117,18 +119,22 @@ def load_config(
                         thread,
                         loom_audit_templates=loom_audit_templates,
                         weave_audit_templates=weave_audit_templates,
+                        loom_connections=loom_connections,
+                        weave_connections=weave_connections,
                     )
                     weave["_resolved_threads"][i] = merged
 
     elif config_type == "weave" and "_resolved_threads" in resolved_with_refs:
         weave_defaults = resolved_with_refs.get("defaults")
         weave_audit_templates = resolved_with_refs.get("audit_templates")
+        weave_connections = resolved_with_refs.get("connections")
         for i, thread in enumerate(resolved_with_refs["_resolved_threads"]):
             merged = apply_inheritance(
                 None,
                 weave_defaults,
                 thread,
                 weave_audit_templates=weave_audit_templates,
+                weave_connections=weave_connections,
             )
             resolved_with_refs["_resolved_threads"][i] = merged
 

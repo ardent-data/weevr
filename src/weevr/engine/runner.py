@@ -290,6 +290,7 @@ def execute_weave(
                                 weave_name=weave_name,
                                 column_sets=resolved_column_sets,
                                 column_set_defs=column_set_defs,
+                                connections=threads[name].connections,
                             )
                         ] = name
                     else:
@@ -305,6 +306,7 @@ def execute_weave(
                                 weave_name=weave_name,
                                 column_sets=resolved_column_sets,
                                 column_set_defs=column_set_defs,
+                                connections=threads[name].connections,
                             )
                         ] = name
 

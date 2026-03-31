@@ -285,7 +285,11 @@ class Context:
 
             thread_collector = SpanCollector(generate_trace_id())
             engine_result = execute_thread(
-                self._spark, model, collector=thread_collector, resolved_params=self._params
+                self._spark,
+                model,
+                collector=thread_collector,
+                resolved_params=self._params,
+                connections=model.connections,
             )
             if engine_result.status not in ("success", "failure"):
                 raise ExecutionError(
@@ -765,10 +769,14 @@ class Context:
         validated = validate_schema(raw, config_type)
         config_dict = validated.model_dump(exclude_unset=True)
 
-        # Step 5: Parameter context
+        # Step 5: Parameter context (with optional Fabric runtime context)
+        from weevr.config.fabric import build_fabric_context
+
+        fabric_ctx = build_fabric_context(self._spark)
         param_context = build_param_context(
             self._params,
             config_dict.get("defaults") or config_dict.get("params"),
+            fabric_context=fabric_ctx,
         )
 
         # Step 6: Variable resolution
@@ -781,10 +789,12 @@ class Context:
         if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
             loom_defaults = resolved_with_refs.get("defaults")
             loom_audit_templates = resolved_with_refs.get("audit_templates")
+            loom_connections = resolved_with_refs.get("connections")
             for weave in resolved_with_refs["_resolved_weaves"]:
                 if "_resolved_threads" in weave:
                     weave_defaults = weave.get("defaults")
                     weave_audit_templates = weave.get("audit_templates")
+                    weave_connections = weave.get("connections")
                     for i, thread in enumerate(weave["_resolved_threads"]):
                         merged = apply_inheritance(
                             loom_defaults,
@@ -792,18 +802,22 @@ class Context:
                             thread,
                             loom_audit_templates=loom_audit_templates,
                             weave_audit_templates=weave_audit_templates,
+                            loom_connections=loom_connections,
+                            weave_connections=weave_connections,
                         )
                         weave["_resolved_threads"][i] = merged
 
         elif config_type == "weave" and "_resolved_threads" in resolved_with_refs:
             weave_defaults = resolved_with_refs.get("defaults")
             weave_audit_templates = resolved_with_refs.get("audit_templates")
+            weave_connections = resolved_with_refs.get("connections")
             for i, thread in enumerate(resolved_with_refs["_resolved_threads"]):
                 merged = apply_inheritance(
                     None,
                     weave_defaults,
                     thread,
                     weave_audit_templates=weave_audit_templates,
+                    weave_connections=weave_connections,
                 )
                 resolved_with_refs["_resolved_threads"][i] = merged
 

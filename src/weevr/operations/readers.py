@@ -85,7 +85,8 @@ def _read_raw(
         from weevr.config.paths import build_onelake_path
 
         conn = connections[source.connection]
-        path = build_onelake_path(conn, source.schema_override, source.table)  # type: ignore[arg-type]
+        assert source.table is not None  # guaranteed by Source validator
+        path = build_onelake_path(conn, source.schema_override, source.table)
         return spark.read.format("delta").load(path)
 
     if source.type == "delta":
@@ -94,12 +95,17 @@ def _read_raw(
         # Table aliases (schema.table) use the metastore; file paths use load().
         if is_table_alias(source.alias):
             return spark.read.format("delta").table(source.alias)
-        return spark.read.format("delta").load(source.alias)
+        from weevr.config.paths import resolve_fuse_path
+
+        return spark.read.format("delta").load(resolve_fuse_path(source.alias, spark))
 
     if source.type in {"csv", "json", "parquet"}:
         if source.path is None:
             raise ExecutionError(f"'{source.type}' source requires 'path' to be set")
-        return spark.read.format(source.type).options(**source.options).load(source.path)
+        from weevr.config.paths import resolve_fuse_path
+
+        resolved_path = resolve_fuse_path(source.path, spark)
+        return spark.read.format(source.type).options(**source.options).load(resolved_path)
 
     raise ExecutionError(f"Unsupported source type: '{source.type}'")
 

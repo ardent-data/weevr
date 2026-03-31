@@ -36,6 +36,8 @@ class Export(FrozenBase):
         options: Format-specific Spark DataFrameWriter options.
     """
 
+    model_config = {"frozen": True, "populate_by_name": True}
+
     name: str = Field(description="Unique identifier within the resolved thread.")
     description: str | None = Field(
         default=None,
@@ -61,8 +63,6 @@ class Export(FrozenBase):
         alias="schema",
         description="Schema override within the connection's lakehouse.",
     )
-
-    model_config = {"frozen": True, "populate_by_name": True}
     table: str | None = Field(
         default=None,
         description="Table name within the connection's lakehouse.",
