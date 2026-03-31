@@ -12,23 +12,38 @@ from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
 def build_param_context(
     runtime_params: dict[str, Any] | None = None,
     config_defaults: dict[str, Any] | None = None,
+    fabric_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build parameter context with proper priority layering.
 
     Priority order (highest to lowest):
     1. runtime_params
     2. config_defaults
+    3. fabric_context
 
     Args:
         runtime_params: Runtime parameter overrides.
         config_defaults: Default parameters from config.
+        fabric_context: Fabric environment values keyed as ``fabric.<field>``
+            (e.g. ``fabric.workspace_id``). None values are omitted. Lowest
+            priority — overridden by config_defaults and runtime_params.
 
     Returns:
         Merged parameter context dictionary with dotted key access support.
     """
     context: dict[str, Any] = {}
 
-    # Layer 2: Config defaults (lowest priority)
+    # Layer 3: Fabric context (lowest priority)
+    if fabric_context:
+        fabric_dict = {
+            k.split(".", 1)[1]: v
+            for k, v in fabric_context.items()
+            if v is not None and k.startswith("fabric.")
+        }
+        if fabric_dict:
+            context["fabric"] = fabric_dict
+
+    # Layer 2: Config defaults
     if config_defaults:
         context.update(config_defaults)
 
