@@ -185,6 +185,89 @@ class TestApplyJoin:
         with pytest.raises(ExecutionError, match="nonexistent"):
             apply_join(left_df, params, sources)
 
+    def test_filter_pre_filters_right_side(self, left_df, sources) -> None:
+        """filter narrows the right-side DataFrame before the join."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter="id = 1",
+        )
+        result = apply_join(left_df, params, sources)
+        # Without filter: ids 1 and 2 match (2 rows).
+        # With filter right-side to id=1: only id 1 matches (1 row).
+        assert result.count() == 1
+        assert result.collect()[0]["id"] == 1
+
+    def test_filter_does_not_mutate_sources(self, left_df, sources) -> None:
+        """filter is transient — the sources registry is unchanged after join."""
+        original_count = sources["right"].count()
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter="id = 1",
+        )
+        apply_join(left_df, params, sources)
+        assert sources["right"].count() == original_count
+
+    def test_alias_applies_spark_alias_to_right_side(self, spark: SparkSession) -> None:
+        """alias applies Spark .alias() so columns can be qualified by alias name."""
+        left = spark.createDataFrame([{"id": 1, "val": "a"}])
+        right = spark.createDataFrame([{"id": 1, "val": "b"}])
+        src = {"right": right}
+
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            alias="r",
+        )
+        result = apply_join(left, params, src)
+        # Both sides have 'val'; id should appear once (deduped), val appears twice
+        assert result.count() == 1
+        # id deduplication should still work
+        assert result.columns.count("id") == 1
+
+    def test_same_source_joined_twice_with_different_alias_and_filter(
+        self, spark: SparkSession
+    ) -> None:
+        """Joining the same source twice with different alias+filter produces correct schema."""
+        left = spark.createDataFrame([{"id": 1, "left_val": "a"}])
+        right = spark.createDataFrame(
+            [
+                {"id": 1, "score": 10, "category": "x"},
+                {"id": 1, "score": 20, "category": "y"},
+            ]
+        )
+        src = {"lookup": right}
+
+        # First join: filter to category=x, alias as lx
+        params_x = JoinParams(
+            source="lookup",
+            type="left",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter="category = 'x'",
+            alias="lx",
+        )
+        result = apply_join(left, params_x, src)
+        assert result.count() == 1
+        row = result.collect()[0]
+        assert row["score"] == 10
+
+        # Second join on top of result: filter to category=y, alias as ly
+        params_y = JoinParams(
+            source="lookup",
+            type="left",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter="category = 'y'",
+            alias="ly",
+        )
+        result2 = apply_join(result, params_y, src)
+        assert result2.count() == 1
+        # Sources dict should still hold the original unfiltered right DataFrame
+        assert src["lookup"].count() == 2
+
 
 class TestApplyUnion:
     """Tests for the union step handler."""

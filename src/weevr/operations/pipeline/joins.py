@@ -3,6 +3,7 @@
 from functools import reduce
 
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import expr
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import JoinParams, UnionParams
@@ -32,6 +33,11 @@ def apply_join(
             f"Available: {sorted(sources)}"
         )
     right_df = sources[params.source]
+
+    if params.filter:
+        right_df = right_df.where(expr(params.filter))
+    if params.alias:
+        right_df = right_df.alias(params.alias)
 
     if params.type == "cross":
         return df.crossJoin(right_df)
