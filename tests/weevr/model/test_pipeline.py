@@ -1418,3 +1418,126 @@ class TestResolveParamsBatchNonEmpty:
 
         with pytest.raises(ValidationError, match="batch must contain at least one item"):
             ResolveParams(batch=[])
+
+
+class TestResolveIncludeColumnAsSyntax:
+    """Test {column, as} object form for resolve include."""
+
+    def test_resolve_params_include_column_as_list(self):
+        """List of {column, as} objects normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=[  # type: ignore[arg-type]
+                {"column": "description", "as": "plant_desc"},
+                {"column": "category", "as": "plant_cat"},
+            ],
+        )
+        assert p.include == {"description": "plant_desc", "category": "plant_cat"}
+
+    def test_resolve_params_include_column_without_as(self):
+        """Object with column but no as normalizes to {col: col}."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=[{"column": "description"}],  # type: ignore[arg-type]
+        )
+        assert p.include == {"description": "description"}
+
+    def test_resolve_params_include_mixed_list(self):
+        """Mixed list of strings and {column, as} objects normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=["category", {"column": "description", "as": "plant_desc"}],  # type: ignore[arg-type]
+        )
+        assert p.include == {"category": "category", "description": "plant_desc"}
+
+    def test_resolve_params_include_list_str_unchanged(self):
+        """Plain list[str] still passes through as list[str]."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=["description", "category"],
+        )
+        assert p.include == ["description", "category"]
+
+    def test_resolve_params_include_dict_passthrough(self):
+        """dict[str, str] include still passes through unchanged."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include={"description": "plant_desc"},
+        )
+        assert p.include == {"description": "plant_desc"}
+
+    def test_resolve_batch_item_include_column_as_list(self):
+        """ResolveBatchItem list of {column, as} objects normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=[  # type: ignore[arg-type]
+                {"column": "description", "as": "plant_desc"},
+                {"column": "category", "as": "plant_cat"},
+            ],
+        )
+        assert item.include == {"description": "plant_desc", "category": "plant_cat"}
+
+    def test_resolve_batch_item_include_column_without_as(self):
+        """ResolveBatchItem object with column but no as normalizes to {col: col}."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=[{"column": "description"}],  # type: ignore[arg-type]
+        )
+        assert item.include == {"description": "description"}
+
+    def test_resolve_batch_item_include_mixed_list(self):
+        """ResolveBatchItem mixed list normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=["category", {"column": "description", "as": "plant_desc"}],  # type: ignore[arg-type]
+        )
+        assert item.include == {"category": "category", "description": "plant_desc"}
+
+    def test_resolve_batch_item_include_list_str_unchanged(self):
+        """ResolveBatchItem plain list[str] still passes through as list[str]."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=["description", "category"],
+        )
+        assert item.include == ["description", "category"]
