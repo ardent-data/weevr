@@ -33,6 +33,7 @@ target. This page documents every key accepted inside a thread YAML file.
 | `audit_templates` | `dict[string, dict[string, string]]` | no | `null` | Named audit column templates available to targets in this thread. Merged with parent-level definitions (thread wins on name collision). |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before thread core execution. Not cascaded from weave — each level runs its own list. |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps to run after thread core execution. Not cascaded from weave. |
+| `connections` | `dict[string, OneLakeConnection]` | no | `null` | Named OneLake connection declarations. Merged with weave/loom-level connections (thread wins on name collision). See [Connections guide](../../guides/connections.md). |
 
 ---
 
@@ -43,12 +44,15 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`. Required when `lookup` is not set. |
+| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`. Required when neither `lookup` nor `connection` is set. |
 | `lookup` | `string` | conditional | `null` | Weave-level lookup name. Mutually exclusive with `type`. When set, the source is resolved from the weave's `lookups` map at execution time. |
-| `alias` | `string` | no | `null` | Lakehouse table alias. Required when `type` is `"delta"`. |
-| `path` | `string` | no | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
+| `alias` | `string` | conditional | `null` | Lakehouse table alias. Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
+| `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
 | `dedup` | `DedupConfig` | no | `null` | Deduplication applied immediately after reading |
+| `connection` | `string` | conditional | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. |
+| `schema` | `string` | no | `null` | Schema override within the connection's lakehouse. Overrides `connection.default_schema`. |
+| `table` | `string` | conditional | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
 
 ### sources.dedup
 
@@ -621,8 +625,11 @@ Defines where the thread writes its output.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `alias` | `string` | cond. | `null` | Lakehouse table alias for Delta targets |
-| `path` | `string` | cond. | `null` | File path for file-based targets |
+| `alias` | `string` | cond. | `null` | Lakehouse table alias for Delta targets. Mutually exclusive with `connection`. |
+| `path` | `string` | cond. | `null` | File path for file-based targets. |
+| `connection` | `string` | cond. | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. |
+| `schema` | `string` | no | `null` | Schema override within the connection's lakehouse. Overrides `connection.default_schema`. |
+| `table` | `string` | cond. | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `mapping_mode` | `string` | no | `"auto"` | Column mapping: `"auto"` or `"explicit"` |
 | `columns` | `dict[string, ColumnMapping]` | no | `null` | Per-column mapping specifications |
 | `partition_by` | `list[string]` | no | `null` | Partition columns for the output table |
@@ -635,7 +642,7 @@ Defines where the thread writes its output.
 | `fact` | `FactConfig` | no | `null` | Fact target mode with FK validation. Mutually exclusive with `dimension`. See [Fact Tables guide](../../guides/fact-tables.md). |
 | `seed` | `SeedConfig` | no | `null` | Seed rows inserted on first write or when table is empty. |
 
-At least one of `alias` or `path` is required.
+At least one of `alias`, `path`, or `connection` + `table` is required.
 
 ### target.columns (ColumnMapping)
 
@@ -1128,6 +1135,60 @@ post_steps:
   - type: log_message
     message: "Thread complete. Rows written: ${var.row_count}."
     level: info
+```
+
+---
+
+## connections
+
+Named OneLake connection declarations. Connections identify a Fabric workspace
+and lakehouse by GUID or variable reference. Sources, targets, and exports can
+then refer to a connection by name instead of embedding raw GUIDs or
+`abfss://` paths inline.
+
+Connections cascade from loom to weave to thread. When the same name is defined
+at multiple levels, the most-specific level wins.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `type` | `string` | yes | -- | Connection type. Currently only `"onelake"` is supported. |
+| `workspace` | `string` | yes | -- | OneLake workspace GUID or `${fabric.workspace_id}` variable. |
+| `lakehouse` | `string` | yes | -- | OneLake lakehouse GUID or `${fabric.lakehouse_id}` variable. |
+| `default_schema` | `string` | no | `null` | Default schema for tables in this connection. Can be overridden per-source or per-target with `schema:`. |
+
+`${fabric.workspace_id}` and `${fabric.lakehouse_id}` are injected at runtime
+from the active Fabric session. Using these variables makes a connection
+portable across environments without changing GUIDs.
+
+See the [Connections guide](../../guides/connections.md) for cross-lakehouse
+examples, schema overrides, and migration patterns.
+
+```yaml
+connections:
+  raw:
+    type: onelake
+    workspace: "${fabric.workspace_id}"
+    lakehouse: "${fabric.lakehouse_id}"
+    default_schema: raw
+
+  archive:
+    type: onelake
+    workspace: "a1b2c3d4-0000-0000-0000-111111111111"
+    lakehouse: "e5f6a7b8-0000-0000-0000-222222222222"
+
+sources:
+  orders:
+    connection: raw
+    table: orders
+
+  archived_orders:
+    connection: archive
+    schema: history
+    table: orders
+
+target:
+  connection: raw
+  table: fact_orders
 ```
 
 ---
