@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from weevr.config.paths import build_onelake_path, resolve_fuse_path
 from weevr.model.connection import OneLakeConnection
 
@@ -21,7 +19,10 @@ def _make_connection(
     )
 
 
-def _make_spark(workspace_id: str | None = "ws-guid", lakehouse_id: str | None = "lh-guid") -> MagicMock:
+def _make_spark(
+    workspace_id: str | None = "ws-guid",
+    lakehouse_id: str | None = "lh-guid",
+) -> MagicMock:
     mapping: dict[str, str] = {}
     if workspace_id is not None:
         mapping["trident.workspace.id"] = workspace_id
@@ -76,9 +77,7 @@ class TestResolveFusePath:
         """FUSE mount path is translated to abfss:// URI."""
         spark = _make_spark(workspace_id="ws-guid", lakehouse_id="lh-guid")
         result = resolve_fuse_path("/lakehouse/default/Tables/foo", spark)
-        assert result == (
-            "abfss://ws-guid@onelake.dfs.fabric.microsoft.com/lh-guid/Tables/foo"
-        )
+        assert result == ("abfss://ws-guid@onelake.dfs.fabric.microsoft.com/lh-guid/Tables/foo")
 
     def test_abfss_path_passes_through_unchanged(self):
         """abfss:// path is returned as-is without any modification."""
