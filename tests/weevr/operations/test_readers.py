@@ -1,12 +1,14 @@
 """Tests for source readers (Spark integration tests)."""
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.connection import OneLakeConnection
 from weevr.model.source import DedupConfig, Source
 from weevr.operations.readers import read_source, read_sources
 
@@ -238,3 +240,125 @@ class TestReadSources:
             read_sources(spark, sources)
 
         assert exc_info.value.source_name == "bad"
+
+
+class TestConnectionBasedRead:
+    """Tests for connection-based source reading via _read_raw."""
+
+    def _make_connection(self) -> OneLakeConnection:
+        return OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid-1234",
+            lakehouse="lh-guid-5678",
+        )
+
+    @patch("weevr.operations.readers._read_raw")
+    def test_connection_source_reads_via_delta_load(self, mock_read_raw) -> None:
+        """Source with connection + table delegates to _read_raw which calls delta load."""
+        mock_df = MagicMock()
+        mock_read_raw.return_value = mock_df
+
+        conn = self._make_connection()
+        source = Source(connection="primary", table="customers")
+        spark = MagicMock()
+
+        connections = {"primary": conn}
+        result = read_source(spark, "customers", source, connections=connections)
+
+        assert result is mock_df
+        mock_read_raw.assert_called_once_with(spark, source, connections)
+
+    def test_connection_source_builds_abfss_path(self) -> None:
+        """Source with connection + table builds correct abfss:// path."""
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid-1234",
+            lakehouse="lh-guid-5678",
+        )
+        source = Source(connection="primary", table="customers")
+        spark = MagicMock()
+        mock_df = MagicMock()
+        spark.read.format.return_value.load.return_value = mock_df
+
+        connections = {"primary": conn}
+        result = read_source(spark, "customers", source, connections=connections)
+
+        spark.read.format.assert_called_with("delta")
+        load_call_args = spark.read.format.return_value.load.call_args[0]
+        assert load_call_args[0].startswith("abfss://ws-guid-1234@")
+        assert "lh-guid-5678" in load_call_args[0]
+        assert "customers" in load_call_args[0]
+        assert result is mock_df
+
+    def test_connection_source_with_schema_override(self) -> None:
+        """Source with connection + schema + table uses schema in path."""
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid-1234",
+            lakehouse="lh-guid-5678",
+        )
+        source = Source(connection="primary", table="orders", schema="gold")
+        spark = MagicMock()
+        mock_df = MagicMock()
+        spark.read.format.return_value.load.return_value = mock_df
+
+        connections = {"primary": conn}
+        read_source(spark, "orders", source, connections=connections)
+
+        load_call_args = spark.read.format.return_value.load.call_args[0]
+        assert "gold/orders" in load_call_args[0]
+
+    def test_connection_source_uses_default_schema_when_no_override(self) -> None:
+        """Connection default_schema is used when source has no schema_override."""
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid-1234",
+            lakehouse="lh-guid-5678",
+            default_schema="silver",
+        )
+        source = Source(connection="primary", table="events")
+        spark = MagicMock()
+        mock_df = MagicMock()
+        spark.read.format.return_value.load.return_value = mock_df
+
+        connections = {"primary": conn}
+        read_source(spark, "events", source, connections=connections)
+
+        load_call_args = spark.read.format.return_value.load.call_args[0]
+        assert "silver/events" in load_call_args[0]
+
+    def test_connection_not_in_connections_dict_raises(self) -> None:
+        """Source with undefined connection name raises ExecutionError."""
+        source = Source(connection="missing_conn", table="products")
+        spark = MagicMock()
+
+        with pytest.raises(ExecutionError, match="missing_conn"):
+            read_source(spark, "products", source, connections={})
+
+    def test_connection_with_none_connections_raises(self) -> None:
+        """Source with connection but no connections dict raises ExecutionError."""
+        source = Source(connection="primary", table="products")
+        spark = MagicMock()
+
+        with pytest.raises(ExecutionError, match="primary"):
+            read_source(spark, "products", source, connections=None)
+
+    def test_non_connection_source_unaffected_by_connections_param(self) -> None:
+        """Passing connections to a non-connection source has no effect."""
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid",
+            lakehouse="lh-guid",
+        )
+        spark = MagicMock()
+        mock_df = MagicMock()
+        spark.read.format.return_value.table.return_value = mock_df
+
+        source = Source(type="delta", alias="db.my_table")
+        connections = {"primary": conn}
+
+        result = read_source(spark, "my_table", source, connections=connections)
+
+        spark.read.format.assert_called_with("delta")
+        spark.read.format.return_value.table.assert_called_with("db.my_table")
+        assert result is mock_df
