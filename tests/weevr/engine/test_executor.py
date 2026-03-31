@@ -12,6 +12,7 @@ from weevr.errors.exceptions import (
     ExportError,
     LookupResolutionError,
 )
+from weevr.model.connection import OneLakeConnection
 from weevr.model.export import Export
 from weevr.model.keys import KeyConfig, SurrogateKeyConfig
 from weevr.model.lookup import Lookup
@@ -742,3 +743,192 @@ class TestThreadResourceLifecycle:
 
         assert result.status == "success"
         assert result.rows_written == 2
+
+
+class TestExecuteThreadConnections:
+    """Connection resolution integration in execute_thread."""
+
+    def test_thread_without_connections_backward_compatible(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Thread with path-based source and target works when no connections passed."""
+        src = tmp_delta_path("conn_compat_src")
+        tgt = tmp_delta_path("conn_compat_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        thread = _make_thread("compat_conn_thread", src, tgt)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 1
+
+    def test_target_connection_undefined_raises_execution_error(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Target referencing an undefined connection raises ExecutionError."""
+        src = tmp_delta_path("conn_undef_src")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        thread = Thread(
+            name="undef_conn_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(connection="missing_conn", table="my_table"),
+        )
+
+        with pytest.raises(ExecutionError, match="missing_conn"):
+            execute_thread(spark, thread)
+
+    def test_target_connection_resolved_to_abfss_path(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Target with a connection resolves to an abfss:// path and writes there."""
+        from unittest.mock import patch
+
+        src = tmp_delta_path("conn_tgt_src")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid-1234",
+            lakehouse="lh-guid-5678",
+        )
+        connections = {"my_conn": conn}
+
+        thread = Thread(
+            name="conn_tgt_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(connection="my_conn", table="sales"),
+        )
+
+        expected_path = (
+            "abfss://ws-guid-1234@onelake.dfs.fabric.microsoft.com/lh-guid-5678/Tables/sales"
+        )
+
+        captured_paths: list[str] = []
+
+        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg):
+            captured_paths.append(path_arg)
+            return df_arg.count()
+
+        with patch("weevr.engine.executor.write_target", side_effect=fake_write_target):
+            execute_thread(spark, thread, connections=connections)
+
+        assert len(captured_paths) == 1
+        assert captured_paths[0] == expected_path
+
+    def test_target_connection_with_schema_override(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Target with connection and schema override includes schema in resolved path."""
+        from unittest.mock import patch
+
+        src = tmp_delta_path("conn_schema_src")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-abc",
+            lakehouse="lh-def",
+        )
+        connections = {"silver_conn": conn}
+
+        thread = Thread(
+            name="schema_conn_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(connection="silver_conn", schema_override="silver", table="customers"),  # type: ignore[call-arg]
+        )
+
+        expected_path = (
+            "abfss://ws-abc@onelake.dfs.fabric.microsoft.com/lh-def/Tables/silver/customers"
+        )
+
+        captured_paths: list[str] = []
+
+        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg):
+            captured_paths.append(path_arg)
+            return df_arg.count()
+
+        with patch("weevr.engine.executor.write_target", side_effect=fake_write_target):
+            execute_thread(spark, thread, connections=connections)
+
+        assert len(captured_paths) == 1
+        assert captured_paths[0] == expected_path
+
+    def test_export_connection_undefined_raises_export_error(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Export referencing an undefined connection raises ExportError."""
+        src = tmp_delta_path("exp_conn_undef_src")
+        tgt = tmp_delta_path("exp_conn_undef_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        exports = [
+            Export(
+                name="bad_export",
+                type="delta",
+                connection="nonexistent_conn",
+                table="output",
+                on_failure="abort",
+            )
+        ]
+        thread = _make_thread("exp_conn_undef_thread", src, tgt, exports=exports)
+
+        with pytest.raises(ExportError, match="nonexistent_conn"):
+            execute_thread(spark, thread, connections={})
+
+    def test_export_connection_resolved_to_abfss_path(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Export with connection resolves to abfss:// path when writing."""
+        from unittest.mock import patch
+
+        src = tmp_delta_path("exp_conn_src")
+        tgt = tmp_delta_path("exp_conn_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        conn = OneLakeConnection(
+            type="onelake",
+            workspace="ws-exp",
+            lakehouse="lh-exp",
+        )
+        connections = {"export_conn": conn}
+
+        exports = [
+            Export(
+                name="conn_export",
+                type="delta",
+                connection="export_conn",
+                table="archive",
+                on_failure="abort",
+            )
+        ]
+        thread = _make_thread("exp_conn_thread", src, tgt, exports=exports)
+
+        expected_path = "abfss://ws-exp@onelake.dfs.fabric.microsoft.com/lh-exp/Tables/archive"
+
+        captured_export_paths: list[str] = []
+
+        def fake_write_export(spark_arg, df_arg, export_arg, row_count=None):
+            from weevr.telemetry.results import ExportResult
+
+            captured_export_paths.append(export_arg.path or "")
+            return ExportResult(
+                name=export_arg.name,
+                type=export_arg.type,
+                target=export_arg.path or "",
+                status="success",
+                rows_written=df_arg.count(),
+                duration_ms=0.0,
+            )
+
+        with patch("weevr.engine.executor.write_export", side_effect=fake_write_export):
+            execute_thread(spark, thread, connections=connections)
+
+        assert len(captured_export_paths) == 1
+        assert captured_export_paths[0] == expected_path
