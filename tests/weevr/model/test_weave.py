@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from weevr.model.connection import OneLakeConnection
 from weevr.model.hooks import LogMessageStep, QualityGateStep
 from weevr.model.lookup import Lookup
 from weevr.model.variable import VariableSpec
@@ -355,3 +356,80 @@ class TestWeaveHookFields:
         )
         restored = Weave.model_validate(w.model_dump())
         assert restored == w
+
+
+class TestWeaveConnectionsField:
+    """Tests for the Weave.connections field."""
+
+    def test_connections_defaults_to_none(self):
+        """Weave without connections has connections=None (backward compatible)."""
+        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        assert w.connections is None
+
+    def test_connections_with_valid_onelake_connection(self):
+        """Weave with connections dict containing a valid OneLakeConnection parses."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "connections": {
+                    "main": {
+                        "type": "onelake",
+                        "workspace": "ws-guid-1234",
+                        "lakehouse": "lh-guid-5678",
+                    }
+                },
+            }
+        )
+        assert w.connections is not None
+        assert "main" in w.connections
+        assert isinstance(w.connections["main"], OneLakeConnection)
+        assert w.connections["main"].workspace == "ws-guid-1234"
+
+    def test_connections_with_invalid_type_raises(self):
+        """Weave rejects connections with invalid connection type."""
+        with pytest.raises(ValidationError):
+            Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "threads": ["t1"],
+                    "connections": {
+                        "bad": {
+                            "type": "azure_blob",
+                            "workspace": "ws",
+                            "lakehouse": "lh",
+                        }
+                    },
+                }
+            )
+
+    def test_connections_missing_required_fields_raises(self):
+        """Weave rejects connections entry missing required workspace/lakehouse."""
+        with pytest.raises(ValidationError):
+            Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "threads": ["t1"],
+                    "connections": {
+                        "bad": {"type": "onelake"},
+                    },
+                }
+            )
+
+    def test_connections_round_trip(self):
+        """Weave with connections round-trips through model_dump/model_validate."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": ["t1"],
+                "connections": {
+                    "primary": {
+                        "type": "onelake",
+                        "workspace": "ws-1",
+                        "lakehouse": "lh-1",
+                    }
+                },
+            }
+        )
+        restored = Weave.model_validate(w.model_dump())
+        assert restored.connections == w.connections
