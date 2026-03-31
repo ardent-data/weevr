@@ -130,6 +130,75 @@ class TestJoinParams:
         assert jp.on[0].left == "id"
         assert jp.on[0].right == "id"
 
+    def test_new_fields_all_default_none(self):
+        """All new optional fields default to None."""
+        jp = JoinParams(source="t", on=["id"])  # type: ignore[list-item]
+        assert jp.alias is None
+        assert jp.filter is None
+        assert jp.include is None
+        assert jp.exclude is None
+        assert jp.rename is None
+        assert jp.prefix is None
+
+    def test_alias_parses(self):
+        """alias field accepts a string."""
+        jp = JoinParams(source="orders", on=["id"], alias="o")  # type: ignore[list-item]
+        assert jp.alias == "o"
+
+    def test_filter_parses(self):
+        """filter field accepts a Spark SQL expression string."""
+        jp = JoinParams(source="orders", on=["id"], filter=SparkExpr("status = 'active'"))  # type: ignore[list-item]
+        assert jp.filter == "status = 'active'"
+
+    def test_include_list_parses(self):
+        """include accepts a list of column patterns."""
+        jp = JoinParams(source="orders", on=["id"], include=["col_*", "id"])  # type: ignore[list-item]
+        assert jp.include == ["col_*", "id"]
+
+    def test_include_single_string_sugar(self):
+        """include sugar: single string is coerced to a list."""
+        jp = JoinParams(source="orders", on=["id"], include="col_*")  # type: ignore[list-item]
+        assert jp.include == ["col_*"]
+
+    def test_exclude_list_parses(self):
+        """exclude accepts a list of column patterns."""
+        jp = JoinParams(source="orders", on=["id"], exclude=["tmp_*"])  # type: ignore[list-item]
+        assert jp.exclude == ["tmp_*"]
+
+    def test_exclude_single_string_sugar(self):
+        """exclude sugar: single string is coerced to a list."""
+        jp = JoinParams(source="orders", on=["id"], exclude="tmp_*")  # type: ignore[list-item]
+        assert jp.exclude == ["tmp_*"]
+
+    def test_rename_dict_parses(self):
+        """rename accepts a dict mapping old column names to new names."""
+        jp = JoinParams(source="orders", on=["id"], rename={"cust_id": "customer_id"})  # type: ignore[list-item]
+        assert jp.rename == {"cust_id": "customer_id"}
+
+    def test_prefix_parses(self):
+        """prefix accepts a string applied to surviving source columns."""
+        jp = JoinParams(source="orders", on=["id"], prefix="ord_")  # type: ignore[list-item]
+        assert jp.prefix == "ord_"
+
+    def test_all_new_fields_together(self):
+        """All new fields can be set simultaneously."""
+        jp = JoinParams(  # type: ignore[list-item,arg-type]
+            source="orders",
+            on=["id"],  # type: ignore[list-item]
+            alias="o",
+            filter=SparkExpr("active = 1"),
+            include=["amount", "date"],
+            exclude=["tmp_*"],
+            rename={"amount": "order_amount"},
+            prefix="ord_",
+        )
+        assert jp.alias == "o"
+        assert jp.filter == "active = 1"
+        assert jp.include == ["amount", "date"]
+        assert jp.exclude == ["tmp_*"]
+        assert jp.rename == {"amount": "order_amount"}
+        assert jp.prefix == "ord_"
+
 
 class TestStepDiscriminator:
     """Test Step discriminated union dispatch for all 10 step types."""

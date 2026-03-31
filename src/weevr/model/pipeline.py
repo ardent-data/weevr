@@ -3,7 +3,7 @@
 import re
 from typing import Annotated, Any, Literal
 
-from pydantic import Discriminator, Tag, field_validator, model_validator
+from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
@@ -121,6 +121,35 @@ class JoinParams(FrozenBase):
     type: Literal["inner", "left", "right", "full", "cross", "semi", "anti"] = "inner"
     on: list[JoinKeyPair]
     null_safe: bool = True
+    alias: str | None = Field(
+        default=None,
+        description="Alias for column disambiguation via Spark .alias().",
+    )
+    filter: SparkExpr | None = Field(
+        default=None,
+        description=(
+            "Transient pre-filter expression applied to the right-side DataFrame before join."
+        ),
+    )
+    include: list[str] | None = Field(
+        default=None,
+        description=(
+            "Glob patterns for source columns to keep."
+            " When set, only matching columns are retained."
+        ),
+    )
+    exclude: list[str] | None = Field(
+        default=None,
+        description="Glob patterns for source columns to drop. Applied after include filtering.",
+    )
+    rename: dict[str, str] | None = Field(
+        default=None,
+        description="Rename source columns: {original: new_name}. Applied after prefix.",
+    )
+    prefix: str | None = Field(
+        default=None,
+        description="Prefix applied to all surviving source columns after include/exclude.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -142,6 +171,20 @@ class JoinParams(FrozenBase):
             else:
                 result.append(item)
         return result
+
+    @field_validator("include", mode="before")
+    @classmethod
+    def _include_sugar(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @field_validator("exclude", mode="before")
+    @classmethod
+    def _exclude_sugar(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [v]
+        return v
 
 
 class SelectParams(FrozenBase):
