@@ -6,6 +6,7 @@ from pyspark.sql.types import LongType, StringType, StructField, StructType
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import JoinKeyPair, JoinParams, UnionParams
+from weevr.model.types import SparkExpr
 from weevr.operations.pipeline.joins import apply_join, apply_union
 
 pytestmark = pytest.mark.spark
@@ -191,7 +192,7 @@ class TestApplyJoin:
             source="right",
             type="inner",
             on=[JoinKeyPair(left="id", right="id")],
-            filter="id = 1",
+            filter=SparkExpr("id = 1"),
         )
         result = apply_join(left_df, params, sources)
         # Without filter: ids 1 and 2 match (2 rows).
@@ -206,7 +207,7 @@ class TestApplyJoin:
             source="right",
             type="inner",
             on=[JoinKeyPair(left="id", right="id")],
-            filter="id = 1",
+            filter=SparkExpr("id = 1"),
         )
         apply_join(left_df, params, sources)
         assert sources["right"].count() == original_count
@@ -247,7 +248,7 @@ class TestApplyJoin:
             source="lookup",
             type="left",
             on=[JoinKeyPair(left="id", right="id")],
-            filter="category = 'x'",
+            filter=SparkExpr("category = 'x'"),
             alias="lx",
         )
         result = apply_join(left, params_x, src)
@@ -260,7 +261,7 @@ class TestApplyJoin:
             source="lookup",
             type="left",
             on=[JoinKeyPair(left="id", right="id")],
-            filter="category = 'y'",
+            filter=SparkExpr("category = 'y'"),
             alias="ly",
         )
         result2 = apply_join(result, params_y, src)
