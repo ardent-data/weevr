@@ -190,3 +190,171 @@ class TestSourceConnectionReference:
         """connection with a file-based type raises ValidationError."""
         with pytest.raises(ValidationError, match="connection"):
             Source(connection="my_lakehouse", table="events", type="csv")
+
+
+class TestSourceGeneratedTypes:
+    """Test Source with generated sequence types."""
+
+    def test_date_sequence_parses(self):
+        """date_sequence source with required fields parses correctly."""
+        s = Source(type="date_sequence", start="2024-01-01", end="2024-12-31", column="date")
+        assert s.type == "date_sequence"
+        assert s.start == "2024-01-01"
+        assert s.end == "2024-12-31"
+        assert s.column == "date"
+        assert s.step is None
+
+    def test_date_sequence_with_step_parses(self):
+        """date_sequence source with step parses correctly."""
+        s = Source(
+            type="date_sequence",
+            start="2024-01-01",
+            end="2024-12-31",
+            column="date",
+            step="month",
+        )
+        assert s.step == "month"
+
+    def test_int_sequence_parses(self):
+        """int_sequence source with required fields parses correctly."""
+        s = Source(type="int_sequence", start=1, end=100, column="id")
+        assert s.type == "int_sequence"
+        assert s.start == 1
+        assert s.end == 100
+        assert s.column == "id"
+        assert s.step is None
+
+    def test_int_sequence_with_step_parses(self):
+        """int_sequence source with step parses correctly."""
+        s = Source(type="int_sequence", start=1, end=100, column="id", step=5)
+        assert s.step == 5
+
+    def test_generated_missing_column_raises(self):
+        """Generated type without column raises ValidationError."""
+        with pytest.raises(ValidationError, match="column"):
+            Source(type="date_sequence", start="2024-01-01", end="2024-12-31")
+
+    def test_generated_missing_start_raises(self):
+        """Generated type without start raises ValidationError."""
+        with pytest.raises(ValidationError, match="start"):
+            Source(type="date_sequence", end="2024-12-31", column="date")
+
+    def test_generated_missing_end_raises(self):
+        """Generated type without end raises ValidationError."""
+        with pytest.raises(ValidationError, match="end"):
+            Source(type="date_sequence", start="2024-01-01", column="date")
+
+    def test_date_sequence_with_alias_raises(self):
+        """date_sequence with alias set is rejected."""
+        with pytest.raises(ValidationError, match="alias"):
+            Source(
+                type="date_sequence",
+                start="2024-01-01",
+                end="2024-12-31",
+                column="date",
+                alias="some.alias",
+            )
+
+    def test_date_sequence_with_path_raises(self):
+        """date_sequence with path set is rejected."""
+        with pytest.raises(ValidationError, match="path"):
+            Source(
+                type="date_sequence",
+                start="2024-01-01",
+                end="2024-12-31",
+                column="date",
+                path="/some/path",
+            )
+
+    def test_date_sequence_with_nonempty_options_raises(self):
+        """date_sequence with non-empty options is rejected."""
+        with pytest.raises(ValidationError, match="options"):
+            Source(
+                type="date_sequence",
+                start="2024-01-01",
+                end="2024-12-31",
+                column="date",
+                options={"k": "v"},
+            )
+
+    def test_date_sequence_with_empty_options_accepted(self):
+        """date_sequence with empty options dict is accepted."""
+        s = Source(
+            type="date_sequence",
+            start="2024-01-01",
+            end="2024-12-31",
+            column="date",
+            options={},
+        )
+        assert s.options == {}
+
+    def test_date_sequence_with_dedup_raises(self):
+        """date_sequence with dedup set is rejected."""
+        with pytest.raises(ValidationError, match="dedup"):
+            Source(
+                type="date_sequence",
+                start="2024-01-01",
+                end="2024-12-31",
+                column="date",
+                dedup={"keys": ["date"]},  # type: ignore[arg-type]
+            )
+
+    def test_date_sequence_with_connection_raises(self):
+        """date_sequence with connection set is rejected; rejected by connection branch."""
+        with pytest.raises(ValidationError, match="connection sources only support"):
+            Source(
+                type="date_sequence",
+                start="2024-01-01",
+                end="2024-12-31",
+                column="date",
+                connection="my_lakehouse",
+                table="t",
+            )
+
+    def test_date_sequence_invalid_step_raises(self):
+        """date_sequence with step not in allowed values is rejected."""
+        with pytest.raises(ValidationError, match="step"):
+            Source(
+                type="date_sequence",
+                start="2024-01-01",
+                end="2024-12-31",
+                column="date",
+                step="hour",
+            )
+
+    def test_int_sequence_step_zero_raises(self):
+        """int_sequence with step=0 is rejected."""
+        with pytest.raises(ValidationError, match="step"):
+            Source(type="int_sequence", start=1, end=100, column="id", step=0)
+
+    def test_int_sequence_negative_step_raises(self):
+        """int_sequence with a negative step is rejected."""
+        with pytest.raises(ValidationError, match="step"):
+            Source(type="int_sequence", start=1, end=100, column="id", step=-1)
+
+    def test_int_sequence_string_step_raises(self):
+        """int_sequence with a string step is rejected."""
+        with pytest.raises(ValidationError, match="step"):
+            Source(type="int_sequence", start=1, end=100, column="id", step="2")
+        with pytest.raises(ValidationError, match="step"):
+            Source(type="int_sequence", start=1, end=100, column="id", step="month")
+
+    def test_existing_delta_source_unaffected(self):
+        """Existing delta source still parses correctly after adding generated type fields."""
+        s = Source(type="delta", alias="raw.customers")
+        assert s.type == "delta"
+        assert s.start is None
+        assert s.end is None
+        assert s.column is None
+        assert s.step is None
+
+    def test_existing_csv_source_unaffected(self):
+        """Existing CSV source still parses correctly after adding generated type fields."""
+        s = Source(type="csv", path="/data/file.csv")
+        assert s.type == "csv"
+        assert s.start is None
+
+    def test_existing_json_source_unaffected(self):
+        """Existing JSON source still parses correctly after adding generated type fields."""
+        s = Source(type="json", path="/data/events/")
+        assert s.type == "json"

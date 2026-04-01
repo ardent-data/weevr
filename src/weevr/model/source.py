@@ -7,6 +7,8 @@ from pydantic import Field, model_validator
 from weevr.model.base import FrozenBase
 
 _FILE_TYPES = {"csv", "json", "parquet", "excel"}
+_GENERATED_TYPES = {"date_sequence", "int_sequence"}
+_DATE_SEQUENCE_STEPS = {"day", "week", "month", "year"}
 
 
 class DedupConfig(FrozenBase):
@@ -28,10 +30,12 @@ class Source(FrozenBase):
     """A data source declaration.
 
     A source is either a direct data reference (with ``type``), a connection-based
-    reference (with ``connection`` + ``table``), or a lookup reference (with
-    ``lookup``). ``lookup`` is mutually exclusive with all other resolution modes.
+    reference (with ``connection`` + ``table``), a lookup reference (with ``lookup``),
+    or a generated sequence (with ``type`` set to ``date_sequence`` or
+    ``int_sequence``). ``lookup`` is mutually exclusive with all other resolution modes.
 
     Cross-field validation rules:
+
     - If ``lookup`` is set: ``type`` must not be set.
     - If ``connection`` is set: ``table`` must be set; ``alias`` must not be set;
       ``type`` must be None or ``"delta"``; ``connection`` sources resolve via the
@@ -41,6 +45,12 @@ class Source(FrozenBase):
     - If neither ``lookup`` nor ``connection`` is set: ``type`` is required.
     - ``type == "delta"`` without ``connection`` requires ``alias`` to be set.
     - ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.
+    - Generated types (``date_sequence``, ``int_sequence``) require ``column``,
+      ``start``, and ``end``; ``alias``, ``path``, ``dedup``, ``connection``, and
+      non-empty ``options`` are rejected.
+    - ``date_sequence`` step must be one of ``day``, ``week``, ``month``, ``year``,
+      or omitted.
+    - ``int_sequence`` step must be a positive integer or omitted.
     """
 
     type: str | None = Field(
@@ -83,6 +93,32 @@ class Source(FrozenBase):
         default=None,
         description="Table name within the connection's lakehouse.",
     )
+    start: str | int | None = Field(
+        default=None,
+        description=(
+            "Sequence start value. Required for generated types. "
+            "Accepts a date string (date_sequence) or integer (int_sequence)."
+        ),
+    )
+    end: str | int | None = Field(
+        default=None,
+        description=(
+            "Sequence end value (inclusive). Required for generated types. "
+            "Accepts a date string (date_sequence) or integer (int_sequence)."
+        ),
+    )
+    column: str | None = Field(
+        default=None,
+        description="Output column name. Required for generated types.",
+    )
+    step: str | int | None = Field(
+        default=None,
+        description=(
+            "Sequence step. For date_sequence: one of day, week, month, year. "
+            "For int_sequence: a positive integer. Defaults to 1 (int_sequence) "
+            "or day (date_sequence) when omitted."
+        ),
+    )
 
     model_config = {"frozen": True, "populate_by_name": True}
 
@@ -104,6 +140,38 @@ class Source(FrozenBase):
 
         if self.table is not None:
             raise ValueError("'table' requires 'connection' to be set")
+
+        if self.type in _GENERATED_TYPES:
+            if not self.column:
+                raise ValueError("generated sources require 'column' to be set")
+            if self.start is None:
+                raise ValueError("generated sources require 'start' to be set")
+            if self.end is None:
+                raise ValueError("generated sources require 'end' to be set")
+            if self.alias is not None:
+                raise ValueError("generated sources must not set 'alias'")
+            if self.path is not None:
+                raise ValueError("generated sources must not set 'path'")
+            if self.options:
+                raise ValueError("generated sources must not set 'options'")
+            if self.dedup is not None:
+                raise ValueError("generated sources must not set 'dedup'")
+            if (
+                self.type == "date_sequence"
+                and self.step is not None
+                and self.step not in _DATE_SEQUENCE_STEPS
+            ):
+                raise ValueError(
+                    f"date_sequence step must be one of {sorted(_DATE_SEQUENCE_STEPS)}, "
+                    f"got {self.step!r}"
+                )
+            if (
+                self.type == "int_sequence"
+                and self.step is not None
+                and (not isinstance(self.step, int) or self.step <= 0)
+            ):
+                raise ValueError(f"int_sequence step must be a positive integer, got {self.step!r}")
+            return self
 
         if self.type is None:
             raise ValueError("sources require either 'type' or 'lookup'")
