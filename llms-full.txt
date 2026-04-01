@@ -68,6 +68,50 @@ order. Each step is a single-key dict. Supported step types:
 | `string_ops` | String operations (trim, upper, lower, etc.) |
 | `date_ops` | Date/time operations |
 
+## Sub-Pipelines (with: Block)
+
+Threads can declare named sub-pipelines under `with:` that produce
+intermediate DataFrames before the main pipeline runs. These work
+like SQL CTEs (Common Table Expressions):
+
+    with:
+      <name>:
+        from: <source_or_earlier_cte>
+        steps:
+          - <step>: { ... }
+
+- `from:` references an existing source or an earlier CTE (no
+  forward references)
+- CTE names share the source namespace — no collisions allowed
+- CTEs are resolved in declaration order
+- All step types are available in CTEs
+- Unused CTEs produce a validation warning
+
+### Join Column Control
+
+Joins support source column selection and renaming:
+
+- `alias:` — Spark .alias() for column disambiguation
+- `filter:` — transient pre-filter on right-side DataFrame
+- `include:` — glob patterns for source columns to keep
+- `exclude:` — glob patterns for source columns to drop
+- `prefix:` — prefix for surviving source columns
+- `rename:` — {original: new_name} applied after prefix
+
+Processing order: dup-key-drop → include → exclude → prefix →
+rename.
+
+### Resolve Include Extension
+
+The resolve step's `include` now also accepts object form:
+
+    include:
+      - column: src_col
+        as: target_name
+      - column: other_col    # as optional — keeps name
+
+Mixed lists (strings and objects) are supported.
+
 ## Write Modes
 
 The `write:` block controls how data is written to the target:
