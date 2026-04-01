@@ -850,10 +850,8 @@ def _apply_warp_and_drift(
         Tuple of (modified df, warp findings, drift report).
     """
     from weevr.config.warp import build_effective_warp, get_drift_baseline
-    from weevr.model.warp import DriftReport
 
     warp_findings: list[dict[str, str]] = []
-    drift_report = DriftReport.empty()
 
     # Drift detection (works with or without warp)
     baseline = get_drift_baseline(warp=resolved_warp, spark=spark, target_path=target_path)
