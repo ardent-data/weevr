@@ -130,6 +130,75 @@ class TestJoinParams:
         assert jp.on[0].left == "id"
         assert jp.on[0].right == "id"
 
+    def test_new_fields_all_default_none(self):
+        """All new optional fields default to None."""
+        jp = JoinParams(source="t", on=["id"])  # type: ignore[list-item]
+        assert jp.alias is None
+        assert jp.filter is None
+        assert jp.include is None
+        assert jp.exclude is None
+        assert jp.rename is None
+        assert jp.prefix is None
+
+    def test_alias_parses(self):
+        """alias field accepts a string."""
+        jp = JoinParams(source="orders", on=["id"], alias="o")  # type: ignore[list-item]
+        assert jp.alias == "o"
+
+    def test_filter_parses(self):
+        """filter field accepts a Spark SQL expression string."""
+        jp = JoinParams(source="orders", on=["id"], filter=SparkExpr("status = 'active'"))  # type: ignore[list-item]
+        assert jp.filter == "status = 'active'"
+
+    def test_include_list_parses(self):
+        """include accepts a list of column patterns."""
+        jp = JoinParams(source="orders", on=["id"], include=["col_*", "id"])  # type: ignore[list-item]
+        assert jp.include == ["col_*", "id"]
+
+    def test_include_single_string_sugar(self):
+        """include sugar: single string is coerced to a list."""
+        jp = JoinParams(source="orders", on=["id"], include="col_*")  # type: ignore[list-item]
+        assert jp.include == ["col_*"]
+
+    def test_exclude_list_parses(self):
+        """exclude accepts a list of column patterns."""
+        jp = JoinParams(source="orders", on=["id"], exclude=["tmp_*"])  # type: ignore[list-item]
+        assert jp.exclude == ["tmp_*"]
+
+    def test_exclude_single_string_sugar(self):
+        """exclude sugar: single string is coerced to a list."""
+        jp = JoinParams(source="orders", on=["id"], exclude="tmp_*")  # type: ignore[list-item]
+        assert jp.exclude == ["tmp_*"]
+
+    def test_rename_dict_parses(self):
+        """rename accepts a dict mapping old column names to new names."""
+        jp = JoinParams(source="orders", on=["id"], rename={"cust_id": "customer_id"})  # type: ignore[list-item]
+        assert jp.rename == {"cust_id": "customer_id"}
+
+    def test_prefix_parses(self):
+        """prefix accepts a string applied to surviving source columns."""
+        jp = JoinParams(source="orders", on=["id"], prefix="ord_")  # type: ignore[list-item]
+        assert jp.prefix == "ord_"
+
+    def test_all_new_fields_together(self):
+        """All new fields can be set simultaneously."""
+        jp = JoinParams(  # type: ignore[list-item,arg-type]
+            source="orders",
+            on=["id"],  # type: ignore[list-item]
+            alias="o",
+            filter=SparkExpr("active = 1"),
+            include=["amount", "date"],
+            exclude=["tmp_*"],
+            rename={"amount": "order_amount"},
+            prefix="ord_",
+        )
+        assert jp.alias == "o"
+        assert jp.filter == "active = 1"
+        assert jp.include == ["amount", "date"]
+        assert jp.exclude == ["tmp_*"]
+        assert jp.rename == {"amount": "order_amount"}
+        assert jp.prefix == "ord_"
+
 
 class TestStepDiscriminator:
     """Test Step discriminated union dispatch for all 10 step types."""
@@ -1349,3 +1418,126 @@ class TestResolveParamsBatchNonEmpty:
 
         with pytest.raises(ValidationError, match="batch must contain at least one item"):
             ResolveParams(batch=[])
+
+
+class TestResolveIncludeColumnAsSyntax:
+    """Test {column, as} object form for resolve include."""
+
+    def test_resolve_params_include_column_as_list(self):
+        """List of {column, as} objects normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=[  # type: ignore[arg-type]
+                {"column": "description", "as": "plant_desc"},
+                {"column": "category", "as": "plant_cat"},
+            ],
+        )
+        assert p.include == {"description": "plant_desc", "category": "plant_cat"}
+
+    def test_resolve_params_include_column_without_as(self):
+        """Object with column but no as normalizes to {col: col}."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=[{"column": "description"}],  # type: ignore[arg-type]
+        )
+        assert p.include == {"description": "description"}
+
+    def test_resolve_params_include_mixed_list(self):
+        """Mixed list of strings and {column, as} objects normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=["category", {"column": "description", "as": "plant_desc"}],  # type: ignore[arg-type]
+        )
+        assert p.include == {"category": "category", "description": "plant_desc"}
+
+    def test_resolve_params_include_list_str_unchanged(self):
+        """Plain list[str] still passes through as list[str]."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include=["description", "category"],
+        )
+        assert p.include == ["description", "category"]
+
+    def test_resolve_params_include_dict_passthrough(self):
+        """dict[str, str] include still passes through unchanged."""
+        from weevr.model.pipeline import ResolveParams
+
+        p = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            pk="id",
+            include={"description": "plant_desc"},
+        )
+        assert p.include == {"description": "plant_desc"}
+
+    def test_resolve_batch_item_include_column_as_list(self):
+        """ResolveBatchItem list of {column, as} objects normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=[  # type: ignore[arg-type]
+                {"column": "description", "as": "plant_desc"},
+                {"column": "category", "as": "plant_cat"},
+            ],
+        )
+        assert item.include == {"description": "plant_desc", "category": "plant_cat"}
+
+    def test_resolve_batch_item_include_column_without_as(self):
+        """ResolveBatchItem object with column but no as normalizes to {col: col}."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=[{"column": "description"}],  # type: ignore[arg-type]
+        )
+        assert item.include == {"description": "description"}
+
+    def test_resolve_batch_item_include_mixed_list(self):
+        """ResolveBatchItem mixed list normalizes to dict[str, str]."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=["category", {"column": "description", "as": "plant_desc"}],  # type: ignore[arg-type]
+        )
+        assert item.include == {"category": "category", "description": "plant_desc"}
+
+    def test_resolve_batch_item_include_list_str_unchanged(self):
+        """ResolveBatchItem plain list[str] still passes through as list[str]."""
+        from weevr.model.pipeline import ResolveBatchItem
+
+        item = ResolveBatchItem(
+            name="fk",
+            lookup="dim",
+            match="bk",  # type: ignore[arg-type]
+            include=["description", "category"],
+        )
+        assert item.include == ["description", "category"]

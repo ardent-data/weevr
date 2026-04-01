@@ -712,6 +712,154 @@ class TestExplain:
         assert "Plan: facts" in text
         assert "2 weaves" in text
 
+    def test_explain_thread_detail_with_sub_pipelines(self) -> None:
+        """Thread with with_ block shows sub-pipelines section."""
+        plan = self._make_plan(threads=["sales"], execution_order=[["sales"]])
+
+        class _FakeFilterStep:
+            pass
+
+        _FakeFilterStep.__name__ = "FilterStep"
+
+        class _FakeAggregateStep:
+            pass
+
+        _FakeAggregateStep.__name__ = "AggregateStep"
+
+        class _FakeCTE:
+            from_ = "bi"
+            steps = [_FakeFilterStep(), _FakeAggregateStep()]
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/sales"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/sales"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps: list[Any] = []
+            with_ = {"discounts": _FakeCTE()}
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"sales": _FakeThread()}
+        text = result.explain()
+        assert "sub-pipelines:" in text
+        assert "discounts \u2190 bi" in text
+        assert "2 steps" in text
+        assert "filter" in text
+        assert "aggregate" in text
+
+    def test_explain_thread_detail_sub_pipelines_singular_step(self) -> None:
+        """CTE with a single step uses 'step' (singular)."""
+        plan = self._make_plan(threads=["t"], execution_order=[["t"]])
+
+        class _FakeJoinStep:
+            pass
+
+        _FakeJoinStep.__name__ = "JoinStep"
+
+        class _FakeCTE:
+            from_ = "pf"
+            steps = [_FakeJoinStep()]
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/t"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/t"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps: list[Any] = []
+            with_ = {"ranked": _FakeCTE()}
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"t": _FakeThread()}
+        text = result.explain()
+        assert "1 step (join)" in text
+        assert "1 steps" not in text
+
+    def test_explain_thread_detail_multiple_ctes(self) -> None:
+        """Multiple CTEs are each listed in the sub-pipelines section."""
+        plan = self._make_plan(threads=["sales"], execution_order=[["sales"]])
+
+        class _FakeFilterStep:
+            pass
+
+        _FakeFilterStep.__name__ = "FilterStep"
+
+        class _FakeAggregateStep:
+            pass
+
+        _FakeAggregateStep.__name__ = "AggregateStep"
+
+        class _FakeDeriveStep:
+            pass
+
+        _FakeDeriveStep.__name__ = "DeriveStep"
+
+        class _FakeCTE1:
+            from_ = "bi"
+            steps = [_FakeFilterStep(), _FakeAggregateStep()]
+
+        class _FakeCTE2:
+            from_ = "pf"
+            steps = [_FakeFilterStep(), _FakeDeriveStep()]
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/sales"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/sales"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps: list[Any] = []
+            with_ = {"discounts": _FakeCTE1(), "taxes": _FakeCTE2()}
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"sales": _FakeThread()}
+        text = result.explain()
+        assert "discounts \u2190 bi" in text
+        assert "taxes \u2190 pf" in text
+
+    def test_explain_thread_detail_no_sub_pipelines_omitted(self) -> None:
+        """Thread without with_ block produces no sub-pipelines section."""
+        plan = self._make_plan(threads=["a"], execution_order=[["a"]])
+
+        class _FakeSource:
+            type = "delta"
+            alias = "raw/a"
+            path = None
+
+        class _FakeTarget:
+            alias = "out/a"
+            path = None
+
+        class _FakeThread:
+            sources = {"main": _FakeSource()}
+            target = _FakeTarget()
+            steps: list[Any] = []
+            with_ = None
+
+        result = self._make_result([plan])
+        result._resolved_threads = {"a": _FakeThread()}
+        text = result.explain()
+        assert "sub-pipelines:" not in text
+
 
 class TestReprHtml:
     """Tests for _repr_html_() on RunResult."""

@@ -59,6 +59,7 @@ from weevr.model.pipeline import (
     WindowStep,
 )
 from weevr.model.source import DedupConfig, Source
+from weevr.model.sub_pipeline import SubPipeline
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.thread import Thread
 from weevr.model.types import SparkExpr
@@ -162,4 +163,6 @@ __all__ = [
     "VariableSpec",
     # Dimension
     "DimensionSurrogateKeyConfig",
+    # Sub-pipeline
+    "SubPipeline",
 ]

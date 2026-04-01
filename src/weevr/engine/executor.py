@@ -325,6 +325,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map = read_sources(spark, normal_sources, connections=connections)
                 sources_map.update(lookup_dfs)
 
+            # Resolve with: block CTEs before the primary DataFrame is set
+            if thread.with_:
+                sources_map = _resolve_with_block(
+                    thread,
+                    sources_map,
+                    collector=collector if span_builder else None,
+                    parent_span_id=span_builder.span_id if span_builder else None,
+                )
+
             # Step 5 — primary DataFrame is the first declared source
             df = next(iter(sources_map.values()))
             rows_read = df.count()
@@ -635,6 +644,58 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         # Cleanup thread-level lookups only; weave-level cleanup is the caller's job
         if thread_cached_lookups:
             cleanup_lookups(thread_cached_lookups)
+
+
+def _resolve_with_block(
+    thread: Thread,
+    sources_map: dict[str, Any],
+    collector: SpanCollector | None = None,
+    parent_span_id: str | None = None,
+) -> dict[str, Any]:
+    """Resolve with: block CTEs, registering each result in the source registry.
+
+    Each CTE is evaluated in declaration order. The result of each CTE is
+    added to the registry so that later CTEs (and the main pipeline) can
+    reference it by name.
+
+    When a ``collector`` is provided, a child span is emitted per CTE with
+    ``row_count``, ``from``, and ``step_count`` attributes recorded on each.
+
+    Args:
+        thread: Thread configuration with a populated ``with_`` block.
+        sources_map: Current source registry (sources + lookup DataFrames).
+        collector: Optional span collector for telemetry.
+        parent_span_id: Parent span ID to link CTE spans into the thread span.
+
+    Returns:
+        An enriched copy of ``sources_map`` with each CTE result registered
+        under its declared name.
+    """
+    enriched: dict[str, Any] = dict(sources_map)
+    for cte_name, cte in thread.with_.items():  # type: ignore[union-attr]
+        cte_builder = None
+        if collector is not None:
+            cte_builder = collector.start_span(f"cte:{cte_name}", parent_span_id=parent_span_id)
+
+        if cte.from_ not in enriched:
+            raise ExecutionError(
+                f"with: CTE '{cte_name}' references '{cte.from_}' "
+                f"which is not in loaded sources. "
+                f"Available: {sorted(enriched)}"
+            )
+        cte_df = enriched[cte.from_]
+        cte_df = run_pipeline(cte_df, cte.steps, enriched)
+        row_count = cte_df.count()
+        enriched[cte_name] = cte_df
+
+        if cte_builder is not None:
+            cte_builder.set_attribute("row_count", row_count)
+            cte_builder.set_attribute("from", cte.from_)
+            cte_builder.set_attribute("step_count", len(cte.steps))
+            span = cte_builder.finish()
+            collector.add_span(span)  # type: ignore[union-attr]
+
+    return enriched
 
 
 def _build_thread_variable_context(thread: Thread) -> VariableContext:

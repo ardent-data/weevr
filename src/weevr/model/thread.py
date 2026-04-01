@@ -1,8 +1,9 @@
 """Thread domain model."""
 
+import logging
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
@@ -16,12 +17,15 @@ from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.lookup import Lookup
 from weevr.model.params import ParamSpec
-from weevr.model.pipeline import Step
+from weevr.model.pipeline import JoinStep, Step, UnionStep
 from weevr.model.source import Source
+from weevr.model.sub_pipeline import SubPipeline
 from weevr.model.target import Target
 from weevr.model.validation import Assertion, ValidationRule
 from weevr.model.variable import VariableSpec
 from weevr.model.write import WriteConfig
+
+logger = logging.getLogger(__name__)
 
 
 class Thread(FrozenBase):
@@ -30,6 +34,8 @@ class Thread(FrozenBase):
     A thread is the smallest unit of work: one or more sources, a sequence
     of transformation steps, and a single target.
     """
+
+    model_config = {"frozen": True, "populate_by_name": True}
 
     name: str = Field(
         default="",
@@ -52,6 +58,23 @@ class Thread(FrozenBase):
         if not v:
             raise ValueError("sources must contain at least one entry")
         return v
+
+    with_: dict[str, SubPipeline] | None = Field(
+        default=None,
+        alias="with",
+        description=(
+            "Named sub-pipelines (CTEs) evaluated before the main pipeline. "
+            "Each entry declares an intermediate DataFrame by name."
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap_with_key(cls, data: Any) -> Any:
+        """Remap YAML ``with`` to Python ``with_``."""
+        if isinstance(data, dict) and "with" in data and "with_" not in data:
+            data = {**data, "with_": data.pop("with")}
+        return data
 
     steps: list[Step] = Field(
         default=[],
@@ -136,3 +159,73 @@ class Thread(FrozenBase):
         default=None,
         description="Named connection definitions for resolving source and target paths.",
     )
+
+    @model_validator(mode="after")
+    def _validate_with_block(self) -> "Thread":
+        """Validate the with: block for name collisions, forward refs, and alias uniqueness."""
+        if self.with_ is None:
+            # Still check join alias uniqueness even without a with: block
+            self._check_join_alias_uniqueness(set(self.sources.keys()))
+            return self
+
+        source_names = set(self.sources.keys())
+        cte_names = set(self.with_.keys())
+
+        # 1. Name collision: CTE names must not overlap with source names
+        collisions = cte_names & source_names
+        if collisions:
+            collision_list = ", ".join(sorted(collisions))
+            raise ValueError(f"with: CTE name(s) collide with source name(s): {collision_list}")
+
+        # 2. Forward reference check: iterate CTEs in declaration order
+        available: set[str] = set(source_names)
+        for cte_name, sub_pipeline in self.with_.items():
+            if sub_pipeline.from_ not in available:
+                raise ValueError(
+                    f"with: CTE '{cte_name}' references '{sub_pipeline.from_}' which is not "
+                    f"declared above it (forward reference or unknown name)"
+                )
+            available.add(cte_name)
+
+        # 3. Unused CTE warning: collect all source references from join/union steps
+        referenced: set[str] = set()
+        all_step_lists = list(self.with_.values()) + [self]
+        for container in all_step_lists:
+            steps_list = container.steps if hasattr(container, "steps") else []
+            for step in steps_list:
+                if isinstance(step, JoinStep):
+                    referenced.add(step.join.source)
+                if isinstance(step, UnionStep):
+                    for src in step.union.sources:
+                        referenced.add(src)
+
+        for cte_name in cte_names:
+            if cte_name not in referenced:
+                logger.warning("with: CTE '%s' is declared but never referenced", cte_name)
+
+        # 4. Join alias uniqueness across all steps (CTE pipelines + main steps)
+        namespace = source_names | cte_names
+        self._check_join_alias_uniqueness(namespace)
+
+        return self
+
+    def _check_join_alias_uniqueness(self, namespace: set[str]) -> None:
+        """Check that join aliases are unique and do not collide with the source/CTE namespace."""
+        seen_aliases: set[str] = set()
+
+        step_containers: list[list[Any]] = [list(self.steps)]
+        if self.with_ is not None:
+            for sub in self.with_.values():
+                step_containers.append(list(sub.steps))
+
+        for steps in step_containers:
+            for step in steps:
+                if isinstance(step, JoinStep) and step.join.alias is not None:
+                    alias = step.join.alias
+                    if alias in namespace:
+                        raise ValueError(f"join alias '{alias}' collides with a source or CTE name")
+                    if alias in seen_aliases:
+                        raise ValueError(
+                            f"join alias '{alias}' is used more than once across the thread"
+                        )
+                    seen_aliases.add(alias)

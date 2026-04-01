@@ -6,6 +6,7 @@ from pyspark.sql.types import LongType, StringType, StructField, StructType
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import JoinKeyPair, JoinParams, UnionParams
+from weevr.model.types import SparkExpr
 from weevr.operations.pipeline.joins import apply_join, apply_union
 
 pytestmark = pytest.mark.spark
@@ -184,6 +185,281 @@ class TestApplyJoin:
         )
         with pytest.raises(ExecutionError, match="nonexistent"):
             apply_join(left_df, params, sources)
+
+    def test_filter_pre_filters_right_side(self, left_df, sources) -> None:
+        """filter narrows the right-side DataFrame before the join."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter=SparkExpr("id = 1"),
+        )
+        result = apply_join(left_df, params, sources)
+        # Without filter: ids 1 and 2 match (2 rows).
+        # With filter right-side to id=1: only id 1 matches (1 row).
+        assert result.count() == 1
+        assert result.collect()[0]["id"] == 1
+
+    def test_filter_does_not_mutate_sources(self, left_df, sources) -> None:
+        """filter is transient — the sources registry is unchanged after join."""
+        original_count = sources["right"].count()
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter=SparkExpr("id = 1"),
+        )
+        apply_join(left_df, params, sources)
+        assert sources["right"].count() == original_count
+
+    def test_alias_applies_spark_alias_to_right_side(self, spark: SparkSession) -> None:
+        """alias applies Spark .alias() so columns can be qualified by alias name."""
+        left = spark.createDataFrame([{"id": 1, "val": "a"}])
+        right = spark.createDataFrame([{"id": 1, "val": "b"}])
+        src = {"right": right}
+
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            alias="r",
+        )
+        result = apply_join(left, params, src)
+        # Both sides have 'val'; id should appear once (deduped), val appears twice
+        assert result.count() == 1
+        # id deduplication should still work
+        assert result.columns.count("id") == 1
+
+    def test_same_source_joined_twice_with_different_alias_and_filter(
+        self, spark: SparkSession
+    ) -> None:
+        """Joining the same source twice with different alias+filter produces correct schema."""
+        left = spark.createDataFrame([{"id": 1, "left_val": "a"}])
+        right = spark.createDataFrame(
+            [
+                {"id": 1, "score": 10, "category": "x"},
+                {"id": 1, "score": 20, "category": "y"},
+            ]
+        )
+        src = {"lookup": right}
+
+        # First join: filter to category=x, alias as lx
+        params_x = JoinParams(
+            source="lookup",
+            type="left",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter=SparkExpr("category = 'x'"),
+            alias="lx",
+        )
+        result = apply_join(left, params_x, src)
+        assert result.count() == 1
+        row = result.collect()[0]
+        assert row["score"] == 10
+
+        # Second join on top of result: filter to category=y, alias as ly
+        params_y = JoinParams(
+            source="lookup",
+            type="left",
+            on=[JoinKeyPair(left="id", right="id")],
+            filter=SparkExpr("category = 'y'"),
+            alias="ly",
+        )
+        result2 = apply_join(result, params_y, src)
+        assert result2.count() == 1
+        # Sources dict should still hold the original unfiltered right DataFrame
+        assert src["lookup"].count() == 2
+
+
+class TestApplyJoinColumnControl:
+    """Tests for column control (include/exclude/rename/prefix) on join."""
+
+    @pytest.fixture()
+    def left(self, spark: SparkSession):
+        return spark.createDataFrame([{"id": 1, "left_val": "a"}, {"id": 2, "left_val": "b"}])
+
+    @pytest.fixture()
+    def right(self, spark: SparkSession):
+        return spark.createDataFrame([{"id": 1, "score": 10, "category": "x", "tag": "t1"}])
+
+    @pytest.fixture()
+    def src(self, right):
+        return {"right": right}
+
+    def test_include_keeps_only_matching_source_columns(self, left, src) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=["score"],
+        )
+        result = apply_join(left, params, src)
+        assert "score" in result.columns
+        assert "category" not in result.columns
+        assert "tag" not in result.columns
+        assert "left_val" in result.columns
+
+    def test_include_glob_pattern_keeps_matching_columns(self, left, src) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=["sc*", "tag"],
+        )
+        result = apply_join(left, params, src)
+        assert "score" in result.columns
+        assert "tag" in result.columns
+        assert "category" not in result.columns
+
+    def test_exclude_drops_matching_source_columns(self, left, src) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            exclude=["category", "tag"],
+        )
+        result = apply_join(left, params, src)
+        assert "score" in result.columns
+        assert "category" not in result.columns
+        assert "tag" not in result.columns
+        assert "left_val" in result.columns
+
+    def test_include_and_exclude_compose_correctly(self, left, src) -> None:
+        """include narrows first, then exclude removes from the narrowed set."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=["score", "category"],
+            exclude=["category"],
+        )
+        result = apply_join(left, params, src)
+        assert "score" in result.columns
+        assert "category" not in result.columns
+        assert "tag" not in result.columns
+
+    def test_rename_renames_source_columns(self, left, src) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            rename={"score": "points"},
+        )
+        result = apply_join(left, params, src)
+        assert "points" in result.columns
+        assert "score" not in result.columns
+
+    def test_prefix_prefixes_source_columns(self, left, src) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            prefix="r_",
+        )
+        result = apply_join(left, params, src)
+        assert "r_score" in result.columns
+        assert "r_category" in result.columns
+        assert "r_tag" in result.columns
+        assert "score" not in result.columns
+        assert "left_val" in result.columns
+
+    def test_prefix_and_rename_rename_refs_post_prefix_names(self, left, src) -> None:
+        """rename keys reference the post-prefix column names."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            prefix="r_",
+            rename={"r_score": "points"},
+        )
+        result = apply_join(left, params, src)
+        assert "points" in result.columns
+        assert "r_score" not in result.columns
+        assert "r_category" in result.columns
+
+    def test_include_empty_list_drops_all_source_columns_with_warning(
+        self, left, src, caplog
+    ) -> None:
+        import logging
+
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=[],
+        )
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.pipeline.joins"):
+            result = apply_join(left, params, src)
+
+        assert "score" not in result.columns
+        assert "category" not in result.columns
+        assert "tag" not in result.columns
+        assert "left_val" in result.columns
+        assert any("include" in rec.message and "empty" in rec.message for rec in caplog.records)
+
+    def test_rename_key_not_in_surviving_set_raises_execution_error(self, left, src) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=["score"],
+            rename={"category": "cat"},
+        )
+        with pytest.raises(ExecutionError, match="category"):
+            apply_join(left, params, src)
+
+    def test_rename_target_collides_with_left_column_raises_execution_error(
+        self, left, src
+    ) -> None:
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            rename={"score": "left_val"},
+        )
+        with pytest.raises(ExecutionError, match="left_val"):
+            apply_join(left, params, src)
+
+    def test_cross_join_with_column_control(self, spark: SparkSession) -> None:
+        left = spark.createDataFrame([{"id": 1}])
+        right = spark.createDataFrame([{"val": "x", "extra": "y"}])
+        src = {"right": right}
+
+        params = JoinParams(
+            source="right",
+            type="cross",
+            on=[],
+            include=["val"],
+        )
+        result = apply_join(left, params, src)
+        assert "val" in result.columns
+        assert "extra" not in result.columns
+        assert "id" in result.columns
+
+    def test_prefix_with_no_surviving_source_columns_is_silent_noop(self, left, src) -> None:
+        """prefix with empty include set produces no error."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=[],
+            prefix="r_",
+        )
+        result = apply_join(left, params, src)
+        # All source columns dropped; left columns untouched
+        for col in ["score", "category", "tag", "r_score", "r_category", "r_tag"]:
+            assert col not in result.columns
+        assert "left_val" in result.columns
+
+    def test_existing_join_without_column_control_unchanged(self, left_df, sources) -> None:
+        """Joins without column control fields produce the same result as before."""
+        params = JoinParams(
+            source="right",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+        )
+        result = apply_join(left_df, params, sources)
+        assert result.count() == 2
+        assert set(result.columns) == {"id", "left_val", "right_val"}
 
 
 class TestApplyUnion:

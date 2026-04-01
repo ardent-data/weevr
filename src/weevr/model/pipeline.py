@@ -3,7 +3,7 @@
 import re
 from typing import Annotated, Any, Literal
 
-from pydantic import Discriminator, Tag, field_validator, model_validator
+from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
@@ -121,6 +121,35 @@ class JoinParams(FrozenBase):
     type: Literal["inner", "left", "right", "full", "cross", "semi", "anti"] = "inner"
     on: list[JoinKeyPair]
     null_safe: bool = True
+    alias: str | None = Field(
+        default=None,
+        description="Alias for column disambiguation via Spark .alias().",
+    )
+    filter: SparkExpr | None = Field(
+        default=None,
+        description=(
+            "Transient pre-filter expression applied to the right-side DataFrame before join."
+        ),
+    )
+    include: list[str] | None = Field(
+        default=None,
+        description=(
+            "Glob patterns for source columns to keep."
+            " When set, only matching columns are retained."
+        ),
+    )
+    exclude: list[str] | None = Field(
+        default=None,
+        description="Glob patterns for source columns to drop. Applied after include filtering.",
+    )
+    rename: dict[str, str] | None = Field(
+        default=None,
+        description="Rename source columns: {original: new_name}. Applied after prefix.",
+    )
+    prefix: str | None = Field(
+        default=None,
+        description="Prefix applied to all surviving source columns after include/exclude.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -142,6 +171,20 @@ class JoinParams(FrozenBase):
             else:
                 result.append(item)
         return result
+
+    @field_validator("include", mode="before")
+    @classmethod
+    def _include_sugar(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @field_validator("exclude", mode="before")
+    @classmethod
+    def _exclude_sugar(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [v]
+        return v
 
 
 class SelectParams(FrozenBase):
@@ -723,6 +766,33 @@ def _normalize_match(v: Any) -> dict[str, str]:
     return v
 
 
+def _normalize_include(v: Any) -> Any:
+    """Normalize include sugar for {column, as} object form.
+
+    Accepts:
+    - str               -> [str]  (single column shorthand)
+    - list[str]         -> list[str]  (passthrough — mapped at operation time)
+    - list[{column,as}] -> dict[str, str]  (source -> target mapping)
+    - mixed list        -> dict[str, str]  (strings become {col: col} entries)
+    - dict[str, str]    -> dict[str, str]  (passthrough)
+    """
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, list):
+        has_objects = any(isinstance(item, dict) for item in v)
+        if not has_objects:
+            return v
+        result: dict[str, str] = {}
+        for item in v:
+            if isinstance(item, dict):
+                col = item["column"]
+                result[col] = item.get("as", col)
+            else:
+                result[item] = item
+        return result
+    return v
+
+
 class ResolveBatchItem(FrozenBase):
     """Per-FK configuration within a batch resolve step.
 
@@ -749,6 +819,11 @@ class ResolveBatchItem(FrozenBase):
     @classmethod
     def _normalize_match(cls, v: Any) -> dict[str, str]:
         return _normalize_match(v)
+
+    @field_validator("include", mode="before")
+    @classmethod
+    def _include_sugar(cls, v: Any) -> Any:
+        return _normalize_include(v)
 
 
 class ResolveParams(FrozenBase):
@@ -790,9 +865,7 @@ class ResolveParams(FrozenBase):
     @field_validator("include", mode="before")
     @classmethod
     def _include_sugar(cls, v: Any) -> Any:
-        if isinstance(v, str):
-            return [v]
-        return v
+        return _normalize_include(v)
 
     @model_validator(mode="after")
     def _validate_resolve_mode(self) -> "ResolveParams":

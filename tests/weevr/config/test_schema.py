@@ -384,3 +384,24 @@ class TestValidateSchema:
         assert isinstance(result, ThreadConfig)
         assert result.exports is not None
         assert len(result.exports) == 2
+
+    def test_thread_with_with_block(self):
+        """Thread config with with block (named sub-pipelines) passes schema validation."""
+        data = {
+            "config_version": "1.0",
+            "sources": {"customers": "table://dim_customer", "orders": "table://fact_orders"},
+            "target": {"table": "enriched_orders"},
+            "with": {
+                "customer_filtered": {
+                    "from": "customers",
+                    "steps": [{"operation": "select", "columns": ["id", "name"]}],
+                }
+            },
+        }
+        config = ThreadConfig.model_validate(data)
+        assert config.config_version == "1.0"
+        assert "customers" in config.sources
+        assert config.target["table"] == "enriched_orders"
+        # Verify with_ field is populated via alias
+        assert config.with_ is not None
+        assert "customer_filtered" in config.with_

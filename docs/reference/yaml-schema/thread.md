@@ -13,6 +13,7 @@ target. This page documents every key accepted inside a thread YAML file.
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
 | `name` | `string` | no | `""` | Human-readable thread name. Typically set by the weave that references this thread. |
 | `sources` | `dict[string, Source]` | yes | -- | Named data sources keyed by alias. Must contain at least one entry. |
+| `with` | `dict[string, SubPipeline]` | no | `null` | Named sub-pipelines (CTEs) resolved before the main steps pipeline. |
 | `steps` | `list[Step]` | no | `[]` | Ordered transformation pipeline |
 | `target` | `Target` | yes | -- | Output destination |
 | `write` | `WriteConfig` | no | `null` | Write mode and merge settings |
@@ -81,6 +82,78 @@ sources:
 
 ---
 
+## with
+
+Named sub-pipelines that produce intermediate DataFrames before the main
+`steps` pipeline runs. Each entry defines a CTE-like named DataFrame that
+downstream steps (and other CTEs) can reference as a source.
+
+Each key in `with` is a logical CTE name. The value is a `SubPipeline`
+object:
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `from` | `string` | yes | -- | Source alias or earlier CTE name to start the sub-pipeline from |
+| `steps` | `list[Step]` | yes | -- | Ordered pipeline steps applied to the source DataFrame |
+
+**Semantics:**
+
+- Declaration order matters. A CTE may only reference sources or CTEs
+  declared before it — forward references are not allowed.
+- CTE names share the source namespace. A CTE name must not collide with
+  any key in `sources`.
+- CTEs can chain: a later CTE's `from:` may name an earlier CTE.
+- Unused CTEs (not referenced by any join, union, or the main `steps`
+  pipeline) produce a validation warning at parse time.
+
+```yaml
+sources:
+  invoices:
+    type: delta
+    alias: raw.invoices
+  invoice_lines:
+    type: delta
+    alias: raw.invoice_lines
+  plants:
+    type: delta
+    alias: raw.plants
+
+with:
+  # Pre-aggregate invoice lines before joining to invoice header
+  agg_lines:
+    from: invoice_lines
+    steps:
+      - filter:
+          expr: "line_status = 'POSTED'"
+      - aggregate:
+          group_by: [invoice_id]
+          measures:
+            net_amount: "sum(net_value)"
+            line_count: "count(*)"
+
+  # Enrich plants with region mapping
+  plants_enriched:
+    from: plants
+    steps:
+      - filter:
+          expr: "plant_active = true"
+      - derive:
+          columns:
+            region_code: "substring(plant_id, 1, 2)"
+
+steps:
+  - join:
+      source: agg_lines        # reference the CTE above
+      type: left
+      on: [invoice_id]
+  - join:
+      source: plants_enriched  # reference the second CTE
+      type: left
+      on: [plant_id]
+```
+
+---
+
 ## steps
 
 An ordered list of transformation steps. Each step is a single-key object
@@ -124,8 +197,22 @@ Join the current DataFrame with another named source.
 | `type` | `string` | no | `"inner"` | Join type: `inner`, `left`, `right`, `full`, `cross`, `semi`, `anti` |
 | `on` | `list[string or JoinKeyPair]` | yes | -- | Join keys. Strings are treated as same-name keys on both sides. |
 | `null_safe` | `bool` | no | `true` | Use null-safe equality for join conditions |
+| `alias` | `string` | no | `null` | DataFrame alias applied to the right-side source before joining. Resolves column name ambiguity via Spark `.alias()`. |
+| `filter` | `string` | no | `null` | Spark SQL predicate applied to the right-side DataFrame before the join. Reduces shuffle size for selective joins. |
+| `include` | `list[string]` | no | `null` | Glob patterns controlling which right-side columns survive into the result. Applied after duplicate key column removal. |
+| `exclude` | `list[string]` | no | `null` | Glob patterns for right-side columns to drop from the result. Applied after `include`. |
+| `rename` | `dict[string, string]` | no | `null` | Rename right-side columns after join. Map of old name to new name. Applied after `prefix`. |
+| `prefix` | `string` | no | `null` | String prepended to every surviving right-side column name. Applied before `rename`. |
 
 A `JoinKeyPair` has `left` and `right` fields for asymmetric key names.
+
+**Column processing order** (right-side columns only):
+
+1. Duplicate join key columns are dropped automatically
+2. `include` glob patterns are applied — only matching columns are kept
+3. `exclude` glob patterns are applied — matching columns are removed
+4. `prefix` is prepended to all surviving column names
+5. `rename` mappings are applied last
 
 ```yaml
 - join:
@@ -134,6 +221,18 @@ A `JoinKeyPair` has `left` and `right` fields for asymmetric key names.
     on:
       - region_id
       - { left: src_code, right: region_code }
+
+# With column control
+- join:
+    source: sap_plants
+    type: left
+    on: [plant_id]
+    filter: "plant_status = 'ACTIVE'"
+    include: ["plant_*", "region_code"]
+    exclude: ["plant_internal_*"]
+    prefix: "src_"
+    rename:
+      src_plant_name: plant_name
 ```
 
 ### select
@@ -594,7 +693,7 @@ SCD2 narrowing, batch mode, and include columns.
 | `on_failure` | `string` | no | `"abort"` | `"abort"`, `"warn"` |
 | `normalize` | `string` | no | `null` | `"trim_lower"`, `"trim_upper"`, `"trim"`, `"none"` |
 | `drop_source_columns` | `bool` | no | `false` | Drop source columns after resolve |
-| `include` | `list` or `dict` | no | `null` | Extra columns from lookup |
+| `include` | `list` or `dict` | no | `null` | Extra columns from lookup. See syntax below. |
 | `include_prefix` | `string` | no | `null` | Prefix for included columns |
 | `effective` | `EffectiveConfig` | no | `null` | SCD2 narrowing (date range or current flag) |
 | `where` | `string` | no | `null` | SQL predicate filter on lookup |
@@ -603,6 +702,37 @@ SCD2 narrowing, batch mode, and include columns.
 *Required in single mode. In batch mode, these fields are optional
 at the top level and serve as shared defaults merged into each batch
 item.
+
+**`include` syntax:**
+
+`include` accepts three forms:
+
+- **String list** — column names to carry over from the lookup as-is:
+
+  ```yaml
+  include: [region_name, country_code]
+  ```
+
+- **Dict** — map of lookup column to output alias (rename on include):
+
+  ```yaml
+  include:
+    region_name: region
+    country_code: iso_country
+  ```
+
+- **Object list** — each entry is a `{column, as}` pair for explicit
+  per-column renaming in a list form:
+
+  ```yaml
+  include:
+    - { column: region_name, as: region }
+    - { column: country_code, as: iso_country }
+  ```
+
+`include_prefix` applies after all three forms and prepends a string
+to every included column name. `include_prefix` and dict/object rename
+are mutually exclusive per column.
 
 See the [Resolve Step guide](../../guides/resolve.md) for
 detailed examples of all modes and features.
@@ -615,6 +745,16 @@ detailed examples of all modes and features.
     pk: id
     on_invalid: -4
     on_unknown: -1
+
+# With include columns
+- resolve:
+    name: customer_id
+    lookup: dim_customer
+    match: customer_code
+    pk: sk_customer
+    include:
+      - { column: customer_name, as: cust_name }
+      - { column: customer_tier, as: tier }
 ```
 
 ---

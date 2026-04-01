@@ -49,6 +49,11 @@ class ThreadConfig(BaseConfig):
     execution: dict[str, Any] | None = None
     connections: dict[str, Any] | None = None
     audit_templates: dict[str, Any] | None = None
+    with_: dict[str, Any] | None = Field(
+        default=None,
+        alias="with",
+        description="Named sub-pipelines (CTEs) resolved before the main steps pipeline.",
+    )
 
 
 class WeaveConfig(BaseConfig):
