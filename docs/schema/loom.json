@@ -821,7 +821,7 @@
       "type": "string"
     },
     "Source": {
-      "description": "A data source declaration.\n\nA source is either a direct data reference (with ``type``), a connection-based\nreference (with ``connection`` + ``table``), or a lookup reference (with\n``lookup``). ``lookup`` is mutually exclusive with all other resolution modes.\n\nCross-field validation rules:\n- If ``lookup`` is set: ``type`` must not be set.\n- If ``connection`` is set: ``table`` must be set; ``alias`` must not be set;\n  ``type`` must be None or ``\"delta\"``; ``connection`` sources resolve via the\n  named connection rather than an inline alias.\n- ``table`` without ``connection`` is rejected.\n- ``connection`` and ``alias`` are mutually exclusive.\n- If neither ``lookup`` nor ``connection`` is set: ``type`` is required.\n- ``type == \"delta\"`` without ``connection`` requires ``alias`` to be set.\n- ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.",
+      "description": "A data source declaration.\n\nA source is either a direct data reference (with ``type``), a connection-based\nreference (with ``connection`` + ``table``), a lookup reference (with ``lookup``),\nor a generated sequence (with ``type`` set to ``date_sequence`` or\n``int_sequence``). ``lookup`` is mutually exclusive with all other resolution modes.\n\nCross-field validation rules:\n\n- If ``lookup`` is set: ``type`` must not be set.\n- If ``connection`` is set: ``table`` must be set; ``alias`` must not be set;\n  ``type`` must be None or ``\"delta\"``; ``connection`` sources resolve via the\n  named connection rather than an inline alias.\n- ``table`` without ``connection`` is rejected.\n- ``connection`` and ``alias`` are mutually exclusive.\n- If neither ``lookup`` nor ``connection`` is set: ``type`` is required.\n- ``type == \"delta\"`` without ``connection`` requires ``alias`` to be set.\n- ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.\n- Generated types (``date_sequence``, ``int_sequence``) require ``column``,\n  ``start``, and ``end``; ``alias``, ``path``, ``dedup``, ``connection``, and\n  non-empty ``options`` are rejected.\n- ``date_sequence`` step must be one of ``day``, ``week``, ``month``, ``year``,\n  or omitted.\n- ``int_sequence`` step must be a positive integer or omitted.",
       "properties": {
         "type": {
           "anyOf": [
@@ -931,6 +931,67 @@
           "default": null,
           "description": "Table name within the connection's lakehouse.",
           "title": "Table"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sequence start value. Required for generated types. Accepts a date string (date_sequence) or integer (int_sequence).",
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sequence end value (inclusive). Required for generated types. Accepts a date string (date_sequence) or integer (int_sequence).",
+          "title": "End"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output column name. Required for generated types.",
+          "title": "Column"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sequence step. For date_sequence: one of day, week, month, year. For int_sequence: a positive integer. Defaults to 1 (int_sequence) or day (date_sequence) when omitted.",
+          "title": "Step"
         }
       },
       "title": "Source",
