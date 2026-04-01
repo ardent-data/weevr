@@ -45,7 +45,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`. Required when neither `lookup` nor `connection` is set. |
+| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. |
 | `lookup` | `string` | conditional | `null` | Weave-level lookup name. Mutually exclusive with `type`. When set, the source is resolved from the weave's `lookups` map at execution time. |
 | `alias` | `string` | conditional | `null` | Lakehouse table alias. Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
 | `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
@@ -54,6 +54,10 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | `connection` | `string` | conditional | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. |
 | `schema` | `string` | no | `null` | Schema override within the connection's lakehouse. Overrides `connection.default_schema`. |
 | `table` | `string` | conditional | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
+| `start` | `string` \| `int` | conditional | -- | Range start (inclusive). Required for generated types (`date_sequence`, `int_sequence`). |
+| `end` | `string` \| `int` | conditional | -- | Range end (inclusive). Required for generated types (`date_sequence`, `int_sequence`). |
+| `column` | `string` | conditional | `"date"` / `"id"` | Output column name. Required for generated types. Defaults to `"date"` for `date_sequence`, `"id"` for `int_sequence`. |
+| `step` | `string` \| `int` | no | `1` | Increment between values. Accepts integers for `int_sequence` or interval strings (e.g. `"1 month"`) for `date_sequence`. |
 
 ### sources.dedup
 
@@ -78,6 +82,65 @@ sources:
       delimiter: ","
   products:
     lookup: dim_product   # resolved from the weave's lookups map
+```
+
+### Generated Sources
+
+Generated sources produce synthetic data at runtime — no lakehouse read or file
+path is needed. They are useful for building calendar spines, surrogate key
+ranges, or any sequence-based reference table.
+
+Two generated types are available: `date_sequence` and `int_sequence`. Both
+produce a single-column DataFrame covering a closed range `[start, end]`.
+
+**Mutual exclusivity:** generated types (`date_sequence`, `int_sequence`) are
+incompatible with `alias`, `path`, `options`, `dedup`, and `connection`. Setting
+any of those keys alongside a generated type raises a validation error.
+
+#### `date_sequence`
+
+Produces a single `DateType` column containing one row per calendar interval
+from `start` to `end` (both inclusive).
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `type` | `string` | yes | -- | Must be `"date_sequence"` |
+| `start` | `string` | yes | -- | Start date, inclusive. ISO-8601 format (`"YYYY-MM-DD"`). |
+| `end` | `string` | yes | -- | End date, inclusive. ISO-8601 format (`"YYYY-MM-DD"`). |
+| `column` | `string` | no | `"date"` | Name of the output column. |
+| `step` | `string` | no | `"1 day"` | Spark interval string (e.g. `"1 day"`, `"1 month"`, `"1 week"`). |
+
+```yaml
+sources:
+  calendar:
+    type: date_sequence
+    start: "2024-01-01"
+    end: "2024-12-31"
+    column: date
+    step: "1 day"
+```
+
+#### `int_sequence`
+
+Produces a single `LongType` column containing one row per integer from `start`
+to `end` (both inclusive).
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `type` | `string` | yes | -- | Must be `"int_sequence"` |
+| `start` | `int` | yes | -- | Start value, inclusive. |
+| `end` | `int` | yes | -- | End value, inclusive. |
+| `column` | `string` | no | `"id"` | Name of the output column. |
+| `step` | `int` | no | `1` | Increment between values. Must be a positive integer. |
+
+```yaml
+sources:
+  sequence:
+    type: int_sequence
+    start: 1
+    end: 1000
+    column: id
+    step: 1
 ```
 
 ---
