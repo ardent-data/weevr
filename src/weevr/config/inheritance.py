@@ -95,6 +95,9 @@ def apply_inheritance(
     # Connections cascade: loom → weave → thread with additive merge by name.
     _cascade_connections(loom_connections, weave_connections, result)
 
+    # Target policy cascade: schema_drift, on_drift, warp_enforcement.
+    _cascade_target_policies(loom_defaults, weave_defaults, result)
+
     return result
 
 
@@ -291,6 +294,50 @@ def _cascade_audit(
     target.pop("audit_template", None)
     target.pop("audit_template_inherit", None)
     target.pop("audit_columns_exclude", None)
+
+
+_TARGET_POLICY_KEYS = ("schema_drift", "on_drift", "warp_enforcement")
+
+
+def _cascade_target_policies(
+    loom_defaults: dict[str, Any] | None,
+    weave_defaults: dict[str, Any] | None,
+    thread_config: dict[str, Any],
+) -> None:
+    """Cascade target-boundary policies from defaults.target.* into thread target.
+
+    Handles schema_drift, on_drift, and warp_enforcement keys. These
+    cascade from loom → weave → thread target with child-wins semantics.
+
+    Args:
+        loom_defaults: Defaults dict from loom level.
+        weave_defaults: Defaults dict from weave level.
+        thread_config: Fully cascaded thread config (mutated in place).
+    """
+    # Build cascaded policy values: loom < weave < thread
+    effective: dict[str, Any] = {}
+
+    loom_target = (loom_defaults or {}).get("target", {})
+    weave_target = (weave_defaults or {}).get("target", {})
+    thread_target = thread_config.get("target") or {}
+
+    for key in _TARGET_POLICY_KEYS:
+        if isinstance(loom_target, dict) and key in loom_target:
+            effective[key] = loom_target[key]
+        if isinstance(weave_target, dict) and key in weave_target:
+            effective[key] = weave_target[key]
+        if isinstance(thread_target, dict) and key in thread_target:
+            effective[key] = thread_target[key]
+
+    if not effective:
+        return
+
+    # Write resolved policies into thread's target block
+    if not isinstance(thread_config.get("target"), dict):
+        thread_config["target"] = {}
+
+    for key, value in effective.items():
+        thread_config["target"][key] = value
 
 
 def _cascade_exports(
