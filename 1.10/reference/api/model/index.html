@@ -8557,18 +8557,27 @@ required field (<code>pk</code>) is missing after merge.</p>
 
         <p>A data source declaration.</p>
 <p>A source is either a direct data reference (with <code>type</code>), a connection-based
-reference (with <code>connection</code> + <code>table</code>), or a lookup reference (with
-<code>lookup</code>). <code>lookup</code> is mutually exclusive with all other resolution modes.</p>
-<p>Cross-field validation rules:
-- If <code>lookup</code> is set: <code>type</code> must not be set.
-- If <code>connection</code> is set: <code>table</code> must be set; <code>alias</code> must not be set;
+reference (with <code>connection</code> + <code>table</code>), a lookup reference (with <code>lookup</code>),
+or a generated sequence (with <code>type</code> set to <code>date_sequence</code> or
+<code>int_sequence</code>). <code>lookup</code> is mutually exclusive with all other resolution modes.</p>
+<p>Cross-field validation rules:</p>
+<ul>
+<li>If <code>lookup</code> is set: <code>type</code> must not be set.</li>
+<li>If <code>connection</code> is set: <code>table</code> must be set; <code>alias</code> must not be set;
   <code>type</code> must be None or <code>"delta"</code>; <code>connection</code> sources resolve via the
-  named connection rather than an inline alias.
-- <code>table</code> without <code>connection</code> is rejected.
-- <code>connection</code> and <code>alias</code> are mutually exclusive.
-- If neither <code>lookup</code> nor <code>connection</code> is set: <code>type</code> is required.
-- <code>type == "delta"</code> without <code>connection</code> requires <code>alias</code> to be set.
-- <code>type</code> in file types (csv, json, parquet, excel) requires <code>path</code> to be set.</p>
+  named connection rather than an inline alias.</li>
+<li><code>table</code> without <code>connection</code> is rejected.</li>
+<li><code>connection</code> and <code>alias</code> are mutually exclusive.</li>
+<li>If neither <code>lookup</code> nor <code>connection</code> is set: <code>type</code> is required.</li>
+<li><code>type == "delta"</code> without <code>connection</code> requires <code>alias</code> to be set.</li>
+<li><code>type</code> in file types (csv, json, parquet, excel) requires <code>path</code> to be set.</li>
+<li>Generated types (<code>date_sequence</code>, <code>int_sequence</code>) require <code>column</code>,
+  <code>start</code>, and <code>end</code>; <code>alias</code>, <code>path</code>, <code>dedup</code>, <code>connection</code>, and
+  non-empty <code>options</code> are rejected.</li>
+<li><code>date_sequence</code> step must be one of <code>day</code>, <code>week</code>, <code>month</code>, <code>year</code>,
+  or omitted.</li>
+<li><code>int_sequence</code> step must be a positive integer or omitted.</li>
+</ul>
 
 
 
