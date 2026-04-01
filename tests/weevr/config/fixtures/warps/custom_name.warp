@@ -1,0 +1,8 @@
+config_version: "1.0"
+description: "Custom warp with a non-matching filename"
+columns:
+  - name: order_id
+    type: bigint
+    nullable: false
+  - name: amount
+    type: "decimal(18,2)"

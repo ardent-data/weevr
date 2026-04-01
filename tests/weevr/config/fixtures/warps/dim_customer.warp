@@ -1,0 +1,14 @@
+config_version: "1.0"
+columns:
+  - name: customer_sk
+    type: bigint
+    nullable: false
+  - name: customer_id
+    type: string
+    nullable: false
+  - name: customer_name
+    type: string
+keys:
+  surrogate: customer_sk
+  business:
+    - customer_id
