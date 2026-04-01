@@ -1078,3 +1078,648 @@ class TestResolveWithBlock:
 
         assert result.status == "success"
         assert result.rows_written == 3
+
+
+class TestResolveWithBlockTelemetry:
+    """CTE telemetry spans emitted by _resolve_with_block."""
+
+    def test_two_ctes_produce_two_child_spans(self, spark: SparkSession) -> None:
+        """A thread with 2 CTEs produces 2 cte:* child spans in the collector."""
+        from weevr.engine.executor import _resolve_with_block
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        data = spark.createDataFrame(
+            [{"id": 1, "val": 10}, {"id": 2, "val": 20}, {"id": 3, "val": 30}]
+        )
+        sources_map = {"raw": data}
+
+        thread = Thread.model_validate(
+            {
+                "name": "multi_cte",
+                "config_version": "1",
+                "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {
+                    "cte_low": {"from": "raw", "steps": [{"filter": {"expr": "val <= 20"}}]},
+                    "cte_high": {"from": "raw", "steps": [{"filter": {"expr": "val >= 20"}}]},
+                },
+            }
+        )
+
+        collector = SpanCollector(generate_trace_id())
+        _resolve_with_block(thread, sources_map, collector=collector)
+
+        spans = collector.get_spans()
+        cte_spans = [s for s in spans if s.name.startswith("cte:")]
+        assert len(cte_spans) == 2
+        cte_names = {s.name for s in cte_spans}
+        assert cte_names == {"cte:cte_low", "cte:cte_high"}
+
+    def test_cte_span_has_duration(self, spark: SparkSession) -> None:
+        """Each CTE span records a non-None end_time so duration can be derived."""
+        from weevr.engine.executor import _resolve_with_block
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        data = spark.createDataFrame([{"id": 1, "val": 5}, {"id": 2, "val": 15}])
+        sources_map = {"raw": data}
+
+        thread = Thread.model_validate(
+            {
+                "name": "dur_cte",
+                "config_version": "1",
+                "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {"filtered": {"from": "raw", "steps": [{"filter": {"expr": "val > 10"}}]}},
+            }
+        )
+
+        collector = SpanCollector(generate_trace_id())
+        _resolve_with_block(thread, sources_map, collector=collector)
+
+        spans = collector.get_spans()
+        cte_spans = [s for s in spans if s.name.startswith("cte:")]
+        assert len(cte_spans) == 1
+        assert cte_spans[0].end_time is not None
+        assert cte_spans[0].end_time >= cte_spans[0].start_time
+
+    def test_cte_span_has_row_count_attribute(self, spark: SparkSession) -> None:
+        """Each CTE span includes a row_count attribute matching the output row count."""
+        from weevr.engine.executor import _resolve_with_block
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        data = spark.createDataFrame(
+            [{"id": 1, "val": 10}, {"id": 2, "val": 20}, {"id": 3, "val": 30}]
+        )
+        sources_map = {"raw": data}
+
+        thread = Thread.model_validate(
+            {
+                "name": "rowcount_cte",
+                "config_version": "1",
+                "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {"big": {"from": "raw", "steps": [{"filter": {"expr": "val >= 20"}}]}},
+            }
+        )
+
+        collector = SpanCollector(generate_trace_id())
+        _resolve_with_block(thread, sources_map, collector=collector)
+
+        spans = collector.get_spans()
+        cte_spans = [s for s in spans if s.name == "cte:big"]
+        assert len(cte_spans) == 1
+        assert cte_spans[0].attributes["row_count"] == 2
+
+    def test_cte_span_parented_to_thread_span(self, spark: SparkSession) -> None:
+        """CTE spans use the supplied parent_span_id so they appear under the thread span."""
+        from weevr.engine.executor import _resolve_with_block
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_span_id, generate_trace_id
+
+        data = spark.createDataFrame([{"id": 1}, {"id": 2}])
+        sources_map = {"raw": data}
+
+        thread = Thread.model_validate(
+            {
+                "name": "parented_cte",
+                "config_version": "1",
+                "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {"subset": {"from": "raw", "steps": [{"filter": {"expr": "id > 0"}}]}},
+            }
+        )
+
+        collector = SpanCollector(generate_trace_id())
+        thread_span_id = generate_span_id()
+        _resolve_with_block(thread, sources_map, collector=collector, parent_span_id=thread_span_id)
+
+        spans = collector.get_spans()
+        cte_spans = [s for s in spans if s.name.startswith("cte:")]
+        assert len(cte_spans) == 1
+        assert cte_spans[0].parent_span_id == thread_span_id
+
+    def test_no_collector_no_spans_no_error(self, spark: SparkSession) -> None:
+        """_resolve_with_block works correctly when no collector is provided."""
+        from weevr.engine.executor import _resolve_with_block
+
+        data = spark.createDataFrame([{"id": 1}, {"id": 2}])
+        sources_map = {"raw": data}
+
+        thread = Thread.model_validate(
+            {
+                "name": "no_collector",
+                "config_version": "1",
+                "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {"subset": {"from": "raw", "steps": [{"filter": {"expr": "id > 0"}}]}},
+            }
+        )
+
+        result = _resolve_with_block(thread, sources_map)
+        assert "subset" in result
+
+    def test_cte_spans_visible_in_execute_thread_collector(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """CTE spans appear in the collector when execute_thread is called with collector."""
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        src = tmp_delta_path("cte_tel_src")
+        tgt = tmp_delta_path("cte_tel_tgt")
+
+        create_delta_table(
+            spark,
+            src,
+            [{"id": 1, "val": 10}, {"id": 2, "val": 20}, {"id": 3, "val": 30}],
+        )
+
+        thread = Thread.model_validate(
+            {
+                "name": "cte_tel_thread",
+                "config_version": "1",
+                "sources": {"orders": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "with": {
+                    "cte_a": {"from": "orders", "steps": [{"filter": {"expr": "val >= 20"}}]},
+                    "cte_b": {"from": "cte_a", "steps": [{"filter": {"expr": "val >= 30"}}]},
+                },
+            }
+        )
+
+        collector = SpanCollector(generate_trace_id())
+        execute_thread(spark, thread, collector=collector)
+
+        spans = collector.get_spans()
+        cte_spans = [s for s in spans if s.name.startswith("cte:")]
+        assert len(cte_spans) == 2
+        cte_names = {s.name for s in cte_spans}
+        assert cte_names == {"cte:cte_a", "cte:cte_b"}
+
+        # Each CTE span should have a row_count attribute
+        for span in cte_spans:
+            assert "row_count" in span.attributes
+
+
+class TestWithBlockIntegration:
+    """End-to-end tests for the with: block — CTE + alias + filter patterns."""
+
+    def test_sap_invoices_pattern(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Multi-CTE pipeline: aggregate CTEs and windowed CTE joined three times with alias+filter.
+
+        Mirrors the SAP customer invoices pattern: high-value aggregation, category count,
+        and ranked invoices per customer joined for top-3 positions.
+        """
+        customers_path = tmp_delta_path("sap_customers")
+        invoices_path = tmp_delta_path("sap_invoices")
+        products_path = tmp_delta_path("sap_products")
+        regions_path = tmp_delta_path("sap_regions")
+        tgt = tmp_delta_path("sap_tgt")
+
+        # 3 customers
+        create_delta_table(
+            spark,
+            customers_path,
+            [
+                {"id": 1, "name": "Alice"},
+                {"id": 2, "name": "Bob"},
+                {"id": 3, "name": "Carol"},
+            ],
+        )
+
+        # 9 invoices total across 3 customers — mix of categories and amounts.
+        # Customer 1: 3 premium invoices → ranked 1st=300, 2nd=200, 3rd=100
+        # Customer 2: 2 premium invoices → ranked 1st=500, 2nd=150; 3rd rank absent
+        # Customer 3: 1 premium invoice → ranked 1st=400; 2nd/3rd ranks absent
+        #             2 category=A invoices for the product_count CTE
+        create_delta_table(
+            spark,
+            invoices_path,
+            [
+                # customer 1 — three premium invoices
+                {"id": 1, "customer_id": 1, "amount": 300, "category": "premium"},
+                {"id": 2, "customer_id": 1, "amount": 200, "category": "premium"},
+                {"id": 3, "customer_id": 1, "amount": 100, "category": "premium"},
+                # customer 2 — two premium, one category=B (not picked up by any CTE filter)
+                {"id": 4, "customer_id": 2, "amount": 500, "category": "premium"},
+                {"id": 5, "customer_id": 2, "amount": 150, "category": "premium"},
+                {"id": 6, "customer_id": 2, "amount": 50, "category": "B"},
+                # customer 3 — one premium, two category=A
+                {"id": 7, "customer_id": 3, "amount": 400, "category": "premium"},
+                {"id": 8, "customer_id": 3, "amount": 250, "category": "A"},
+                {"id": 9, "customer_id": 3, "amount": 120, "category": "A"},
+            ],
+        )
+
+        # Products and regions are declared sources — used to demonstrate 4+ source support
+        create_delta_table(
+            spark,
+            products_path,
+            [{"id": 1, "name": "Widget"}, {"id": 2, "name": "Gadget"}],
+        )
+        create_delta_table(
+            spark,
+            regions_path,
+            [{"id": 1, "name": "North"}, {"id": 2, "name": "South"}],
+        )
+
+        thread = Thread.model_validate(
+            {
+                "name": "sap_invoices",
+                "config_version": "1",
+                "sources": {
+                    "customers": {"type": "delta", "alias": customers_path},
+                    "invoices": {"type": "delta", "alias": invoices_path},
+                    "products": {"type": "delta", "alias": products_path},
+                    "regions": {"type": "delta", "alias": regions_path},
+                },
+                "target": {"path": tgt},
+                "with": {
+                    # CTE 1: filter amount > 100, aggregate total by customer_id
+                    "high_value": {
+                        "from": "invoices",
+                        "steps": [
+                            {"filter": {"expr": "amount > 100"}},
+                            {
+                                "aggregate": {
+                                    "group_by": ["customer_id"],
+                                    "measures": {"total_amount": "sum(amount)"},
+                                }
+                            },
+                        ],
+                    },
+                    # CTE 2: filter category=A, count invoices per customer_id
+                    "product_count": {
+                        "from": "invoices",
+                        "steps": [
+                            {"filter": {"expr": "category = 'A'"}},
+                            {
+                                "aggregate": {
+                                    "group_by": ["customer_id"],
+                                    "measures": {"cat_a_count": "count(*)"},
+                                }
+                            },
+                        ],
+                    },
+                    # CTE 3: filter premium, derive tier, window rank by amount desc per customer
+                    "ranked": {
+                        "from": "invoices",
+                        "steps": [
+                            {"filter": {"expr": "category = 'premium'"}},
+                            {
+                                "derive": {
+                                    "columns": {
+                                        "tier": (
+                                            "CASE WHEN amount >= 300"
+                                            " THEN 'high' ELSE 'standard' END"
+                                        )
+                                    }
+                                }
+                            },
+                            {
+                                "window": {
+                                    "functions": {"inv_rank": "rank()"},
+                                    "partition_by": ["customer_id"],
+                                    "order_by": ["amount DESC"],
+                                }
+                            },
+                            # Drop invoice id to avoid ambiguity with customers.id in joins
+                            {"select": {"columns": ["customer_id", "amount", "tier", "inv_rank"]}},
+                        ],
+                    },
+                },
+                "steps": [
+                    # Start from customers, join high_value (only bring total_amount)
+                    {
+                        "join": {
+                            "source": "high_value",
+                            "on": [{"left": "id", "right": "customer_id"}],
+                            "type": "left",
+                            "include": ["total_amount"],
+                        }
+                    },
+                    # Join product_count (only bring cat_a_count)
+                    {
+                        "join": {
+                            "source": "product_count",
+                            "on": [{"left": "id", "right": "customer_id"}],
+                            "type": "left",
+                            "include": ["cat_a_count"],
+                        }
+                    },
+                    # Join ranked three times: rank 1, rank 2, rank 3 — each with a unique alias
+                    {
+                        "join": {
+                            "source": "ranked",
+                            "on": [{"left": "id", "right": "customer_id"}],
+                            "type": "left",
+                            "filter": "inv_rank = 1",
+                            "alias": "r1",
+                            "include": ["amount"],
+                            "prefix": "top1_",
+                        }
+                    },
+                    {
+                        "join": {
+                            "source": "ranked",
+                            "on": [{"left": "id", "right": "customer_id"}],
+                            "type": "left",
+                            "filter": "inv_rank = 2",
+                            "alias": "r2",
+                            "include": ["amount"],
+                            "prefix": "top2_",
+                        }
+                    },
+                    {
+                        "join": {
+                            "source": "ranked",
+                            "on": [{"left": "id", "right": "customer_id"}],
+                            "type": "left",
+                            "filter": "inv_rank = 3",
+                            "alias": "r3",
+                            "include": ["amount"],
+                            "prefix": "top3_",
+                        }
+                    },
+                ],
+            }
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        # All 3 customers survive the left joins
+        assert result.rows_written == 3
+
+        written = spark.read.format("delta").load(tgt)
+
+        # Schema: id, name, total_amount, cat_a_count, top1_amount, top2_amount, top3_amount
+        col_names = set(written.columns)
+        assert "id" in col_names
+        assert "name" in col_names
+        assert "total_amount" in col_names
+        assert "cat_a_count" in col_names
+        assert "top1_amount" in col_names
+        assert "top2_amount" in col_names
+        assert "top3_amount" in col_names
+
+        rows = {r["id"]: r for r in written.collect()}
+
+        # Customer 1: premium invoices — 300 and 200 are > 100 (100 is excluded)
+        # Ranked (premium only): rank 1=300, rank 2=200, rank 3=100
+        assert rows[1]["total_amount"] == 500
+        assert rows[1]["cat_a_count"] is None  # no category=A invoices
+        assert rows[1]["top1_amount"] == 300
+        assert rows[1]["top2_amount"] == 200
+        assert rows[1]["top3_amount"] == 100
+
+        # Customer 2: 500 and 150 are > 100; category=B invoice (50) is excluded
+        # Ranked (premium only): rank 1=500, rank 2=150; no rank 3
+        assert rows[2]["total_amount"] == 650
+        assert rows[2]["cat_a_count"] is None
+        assert rows[2]["top1_amount"] == 500
+        assert rows[2]["top2_amount"] == 150
+        assert rows[2]["top3_amount"] is None  # only 2 premium invoices
+
+        # Customer 3: 400 (premium), 250 and 120 (category=A) all > 100 → total 770
+        # Ranked (premium only): rank 1=400; no rank 2 or 3
+        assert rows[3]["total_amount"] == 770
+        assert rows[3]["cat_a_count"] == 2
+        assert rows[3]["top1_amount"] == 400
+        assert rows[3]["top2_amount"] is None  # only 1 premium invoice
+        assert rows[3]["top3_amount"] is None
+
+
+class TestWithBlockColumnControlIntegration:
+    """Integration tests for CTE + join column control (include/exclude/rename/prefix).
+
+    Mirrors the SAP dimension notebook pattern where a self-join is used three
+    times against a hierarchy table to pull in labelled description columns.
+    """
+
+    def test_sap_dimension_pattern_end_to_end(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Full SAP dimension pattern: hierarchy CTE + triple self-join with column control.
+
+        Verifies:
+        - derive step in a CTE produces a new column
+        - include restricts which source columns come through each join
+        - rename relabels the included column to its semantic name
+        - prefix + rename works together (prefix applied first, rename refs post-prefix name)
+        - excluded columns are absent from the result
+        - the same source joined multiple times under different aliases works correctly
+        """
+        from weevr.engine.executor import _resolve_with_block
+
+        materials = spark.createDataFrame(
+            [
+                {"mat_id": 1, "mat_name": "Widget A", "group_code": "G1", "subgroup_code": "S1"},
+                {"mat_id": 2, "mat_name": "Widget B", "group_code": "G2", "subgroup_code": "S2"},
+                {"mat_id": 3, "mat_name": "Gadget X", "group_code": "G1", "subgroup_code": "S3"},
+            ]
+        )
+        hierarchy = spark.createDataFrame(
+            [
+                {"code": "G1", "description": "Group One", "level": 1},
+                {"code": "G2", "description": "Group Two", "level": 1},
+                {"code": "S1", "description": "Subgroup One", "level": 2},
+                {"code": "S2", "description": "Subgroup Two", "level": 2},
+                {"code": "S3", "description": "Subgroup Three", "level": 2},
+            ]
+        )
+        sources_map = {"materials": materials, "hierarchy": hierarchy}
+
+        thread = Thread.model_validate(
+            {
+                "name": "sap_dim",
+                "config_version": "1",
+                "sources": {
+                    "materials": {"type": "delta", "alias": "/fake/materials"},
+                    "hierarchy": {"type": "delta", "alias": "/fake/hierarchy"},
+                },
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {
+                    # CTE 1: enrich hierarchy with a concatenated label column
+                    "hierarchy_enriched": {
+                        "from": "hierarchy",
+                        "steps": [
+                            {
+                                "derive": {
+                                    "columns": {
+                                        "enriched_label": "concat(code, ' - ', description)"
+                                    }
+                                }
+                            }
+                        ],
+                    },
+                    # CTE 2: build the product dimension via triple self-join
+                    "product_dim": {
+                        "from": "materials",
+                        "steps": [
+                            # Join 1: pull group description, rename to group_desc
+                            {
+                                "join": {
+                                    "source": "hierarchy_enriched",
+                                    "on": [{"left": "group_code", "right": "code"}],
+                                    "type": "left",
+                                    "alias": "grp",
+                                    "include": ["description"],
+                                    "rename": {"description": "group_desc"},
+                                }
+                            },
+                            # Join 2: pull subgroup description, rename to subgroup_desc
+                            {
+                                "join": {
+                                    "source": "hierarchy_enriched",
+                                    "on": [{"left": "subgroup_code", "right": "code"}],
+                                    "type": "left",
+                                    "alias": "sub",
+                                    "include": ["description"],
+                                    "rename": {"description": "subgroup_desc"},
+                                }
+                            },
+                            # Join 3: pull enriched label with prefix + rename
+                            {
+                                "join": {
+                                    "source": "hierarchy_enriched",
+                                    "on": [{"left": "group_code", "right": "code"}],
+                                    "type": "left",
+                                    "alias": "lbl",
+                                    "include": ["enriched_label"],
+                                    "prefix": "h_",
+                                    "rename": {"h_enriched_label": "group_label"},
+                                }
+                            },
+                        ],
+                    },
+                },
+            }
+        )
+
+        enriched = _resolve_with_block(thread, sources_map)
+
+        # hierarchy_enriched CTE should have the derived column
+        assert "enriched_label" in enriched["hierarchy_enriched"].columns
+        sample = enriched["hierarchy_enriched"].filter("code = 'G1'").collect()
+        assert sample[0]["enriched_label"] == "G1 - Group One"
+
+        # product_dim CTE should have all three renamed columns
+        product_dim_df = enriched["product_dim"]
+        cols = set(product_dim_df.columns)
+
+        assert "group_desc" in cols, "group_desc missing — join 1 rename failed"
+        assert "subgroup_desc" in cols, "subgroup_desc missing — join 2 rename failed"
+        assert "group_label" in cols, "group_label missing — join 3 prefix+rename failed"
+
+        # raw hierarchy columns must not bleed through
+        assert "description" not in cols, "description should have been excluded via include"
+        assert "level" not in cols, "level was never included, must be absent"
+        assert "h_enriched_label" not in cols, "intermediate prefix name must be renamed away"
+        assert "enriched_label" not in cols, "enriched_label must not appear (prefix + rename)"
+
+        # verify row count and spot-check values for a known material
+        assert product_dim_df.count() == 3
+        row = product_dim_df.filter("mat_id = 1").collect()[0]
+        assert row["group_desc"] == "Group One"
+        assert row["subgroup_desc"] == "Subgroup One"
+        assert row["group_label"] == "G1 - Group One"
+
+    def test_column_control_excluded_columns_absent_in_full_pipeline(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Column control in a CTE join flows through to execute_thread output schema."""
+        src_materials = tmp_delta_path("sap_mat_src")
+        src_hierarchy = tmp_delta_path("sap_hier_src")
+        tgt = tmp_delta_path("sap_dim_tgt")
+
+        create_delta_table(
+            spark,
+            src_materials,
+            [
+                {"mat_id": 10, "mat_name": "Part A", "group_code": "GX", "subgroup_code": "SX"},
+            ],
+        )
+        create_delta_table(
+            spark,
+            src_hierarchy,
+            [
+                {"code": "GX", "description": "Group X", "level": 5},
+                {"code": "SX", "description": "Subgroup X", "level": 6},
+            ],
+        )
+
+        thread = Thread.model_validate(
+            {
+                "name": "sap_dim_full",
+                "config_version": "1",
+                "sources": {
+                    "materials": {"type": "delta", "alias": src_materials},
+                    "hierarchy": {"type": "delta", "alias": src_hierarchy},
+                },
+                # Main pipeline starts from materials (all columns).
+                # The product_dim CTE is narrowed to only mat_id + label columns via select,
+                # so the join brings in label columns without creating ambiguous duplicates.
+                "steps": [
+                    {
+                        "join": {
+                            "source": "product_dim",
+                            "on": [{"left": "mat_id", "right": "mat_id"}],
+                            "type": "inner",
+                            "include": ["group_desc", "subgroup_desc"],
+                        }
+                    },
+                ],
+                "target": {"path": tgt},
+                "with": {
+                    "product_dim": {
+                        "from": "materials",
+                        "steps": [
+                            {
+                                "join": {
+                                    "source": "hierarchy",
+                                    "on": [{"left": "group_code", "right": "code"}],
+                                    "type": "left",
+                                    "alias": "grp",
+                                    "include": ["description"],
+                                    "rename": {"description": "group_desc"},
+                                }
+                            },
+                            {
+                                "join": {
+                                    "source": "hierarchy",
+                                    "on": [{"left": "subgroup_code", "right": "code"}],
+                                    "type": "left",
+                                    "alias": "sub",
+                                    "include": ["description"],
+                                    "rename": {"description": "subgroup_desc"},
+                                }
+                            },
+                            # Narrow the CTE to only the key + label columns before it is
+                            # referenced by the main pipeline join.
+                            {"select": {"columns": ["mat_id", "group_desc", "subgroup_desc"]}},
+                        ],
+                    }
+                },
+            }
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 1
+
+        written = spark.read.format("delta").load(tgt)
+        cols = set(written.columns)
+        assert "group_desc" in cols
+        assert "subgroup_desc" in cols
+        assert "description" not in cols
+        assert "level" not in cols
