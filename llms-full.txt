@@ -68,6 +68,43 @@ order. Each step is a single-key dict. Supported step types:
 | `string_ops` | String operations (trim, upper, lower, etc.) |
 | `date_ops` | Date/time operations |
 
+## Generated Sources
+
+Threads can use generated sources that produce synthetic data
+without reading from external storage. Two types are supported:
+
+- `date_sequence` — generates a single `DateType` column with
+  dates from `start` to `end` (inclusive). Step options: `day`
+  (default), `week`, `month`, `year`.
+- `int_sequence` — generates a single `LongType` column with
+  integers from `start` to `end` (inclusive). Default step is 1.
+
+Generated source fields: `type`, `start`, `end`, `column`,
+`step`. These are mutually exclusive with `alias`, `path`,
+`options`, `dedup`, `connection`, and `lookup`.
+
+    sources:
+      calendar:
+        type: date_sequence
+        column: calendar_date
+        start: "1970-01-01"
+        end: "2099-12-31"
+        step: day
+
+      months:
+        type: date_sequence
+        column: month_start
+        start: "2024-01-01"
+        end: "2024-12-01"
+        step: month
+
+      keys:
+        type: int_sequence
+        column: surrogate_key
+        start: 1
+        end: 1000000
+        step: 5
+
 ## Sub-Pipelines (with: Block)
 
 Threads can declare named sub-pipelines under `with:` that produce

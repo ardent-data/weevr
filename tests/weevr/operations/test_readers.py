@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 from spark_helpers import create_delta_table
 from weevr.errors.exceptions import ExecutionError
@@ -113,6 +114,10 @@ class TestFileSource:
         object.__setattr__(source, "connection", None)
         object.__setattr__(source, "schema_override", None)
         object.__setattr__(source, "table", None)
+        object.__setattr__(source, "start", None)
+        object.__setattr__(source, "end", None)
+        object.__setattr__(source, "column", None)
+        object.__setattr__(source, "step", None)
 
         with pytest.raises(ExecutionError, match="Unsupported source type: 'avro'"):
             read_source(spark, "bad_type", source)
@@ -366,3 +371,324 @@ class TestConnectionBasedRead:
         spark.read.format.assert_called_with("delta")
         spark.read.format.return_value.table.assert_called_with("db.my_table")
         assert result is mock_df
+
+
+class TestDateSequenceSource:
+    """Tests for date_sequence generated source reading."""
+
+    def test_daily_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-01-10",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 10
+
+    def test_weekly_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-01-31",
+            step="week",
+        )
+        df = read_source(spark, "dates", source)
+
+        # Jan 1, 8, 15, 22, 29 → 5 rows
+        assert df.count() == 5
+
+    def test_monthly_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-12-01",
+            step="month",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 12
+
+    def test_yearly_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2020-01-01",
+            end="2025-01-01",
+            step="year",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 6
+
+    def test_output_column_name_matches_source_column(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="report_date",
+            start="2025-01-01",
+            end="2025-01-03",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.columns == ["report_date"]
+
+    def test_output_type_is_date(self, spark: SparkSession) -> None:
+        from pyspark.sql.types import DateType
+
+        source = Source(
+            type="date_sequence",
+            column="dt",
+            start="2025-01-01",
+            end="2025-01-05",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert isinstance(df.schema["dt"].dataType, DateType)
+
+    def test_start_and_end_dates_are_inclusive(self, spark: SparkSession) -> None:
+        import datetime
+
+        source = Source(
+            type="date_sequence",
+            column="d",
+            start="2025-03-01",
+            end="2025-03-03",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        dates = {row["d"] for row in df.collect()}
+        assert datetime.date(2025, 3, 1) in dates
+        assert datetime.date(2025, 3, 3) in dates
+
+    def test_empty_range_produces_zero_rows(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-10",
+            end="2025-01-01",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 0
+
+    def test_single_row_when_start_equals_end(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-06-15",
+            end="2025-06-15",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 1
+
+    def test_step_defaults_to_day_when_omitted(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-01-05",
+        )
+        df = read_source(spark, "dates", source)
+
+        # Default day step: Jan 1-5 = 5 rows
+        assert df.count() == 5
+
+
+class TestIntSequenceSource:
+    """Tests for int_sequence generated source reading."""
+
+    def test_range_1_to_100_produces_100_rows(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=1, end=100)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 100
+
+    def test_range_with_step_produces_correct_rows(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=1, end=10, step=3)
+        df = read_source(spark, "seq", source)
+        # spark.range(1, 11, 3) → [1, 4, 7, 10]
+        assert df.count() == 4
+        values = sorted(row["n"] for row in df.collect())
+        assert values == [1, 4, 7, 10]
+
+    def test_output_column_name_matches_source_column(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="my_id", start=1, end=5)
+        df = read_source(spark, "seq", source)
+        assert df.columns == ["my_id"]
+
+    def test_output_type_is_long(self, spark: SparkSession) -> None:
+        from pyspark.sql.types import LongType
+
+        source = Source(type="int_sequence", column="val", start=0, end=3)
+        df = read_source(spark, "seq", source)
+        assert isinstance(df.schema["val"].dataType, LongType)
+
+    def test_end_value_is_inclusive_on_step_boundary(self, spark: SparkSession) -> None:
+        # end=10 with step=3 from start=1 hits 10 exactly
+        source = Source(type="int_sequence", column="n", start=1, end=10, step=3)
+        df = read_source(spark, "seq", source)
+        values = sorted(row["n"] for row in df.collect())
+        assert 10 in values
+
+    def test_empty_range_when_start_greater_than_end(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=100, end=1)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 0
+
+    def test_single_row_when_start_equals_end(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=5, end=5)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 1
+        assert df.collect()[0]["n"] == 5
+
+    def test_default_step_is_one(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=1, end=5)
+        df = read_source(spark, "seq", source)
+        values = sorted(row["n"] for row in df.collect())
+        assert values == [1, 2, 3, 4, 5]
+
+    def test_empty_range_has_correct_schema(self, spark: SparkSession) -> None:
+        from pyspark.sql.types import LongType
+
+        source = Source(type="int_sequence", column="n", start=100, end=1)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 0
+        assert df.columns == ["n"]
+        assert isinstance(df.schema["n"].dataType, LongType)
+
+
+class TestGeneratedSourceIntegration:
+    """Integration tests: generated sources in pipelines and as join inputs."""
+
+    def test_date_sequence_with_derived_columns(self, spark: SparkSession) -> None:
+        """date_sequence source supports downstream column derivation."""
+        source = Source(
+            type="date_sequence",
+            column="calendar_date",
+            start="2025-03-01",
+            end="2025-03-05",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+        result = (
+            df.withColumn("year", F.year(F.col("calendar_date")))
+            .withColumn("month", F.month(F.col("calendar_date")))
+            .withColumn("day", F.dayofmonth(F.col("calendar_date")))
+        )
+
+        assert result.count() == 5
+        assert set(result.columns) == {"calendar_date", "year", "month", "day"}
+
+        row = result.filter(F.col("calendar_date") == "2025-03-03").collect()[0]
+        assert row["year"] == 2025
+        assert row["month"] == 3
+        assert row["day"] == 3
+
+    def test_date_sequence_derived_column_types(self, spark: SparkSession) -> None:
+        """Derived year/month/day columns have integer types."""
+        from pyspark.sql.types import IntegerType
+
+        source = Source(
+            type="date_sequence",
+            column="calendar_date",
+            start="2025-01-01",
+            end="2025-01-03",
+        )
+        df = read_source(spark, "dates", source)
+        result = (
+            df.withColumn("year", F.year(F.col("calendar_date")))
+            .withColumn("month", F.month(F.col("calendar_date")))
+            .withColumn("day", F.dayofmonth(F.col("calendar_date")))
+        )
+
+        assert isinstance(result.schema["year"].dataType, IntegerType)
+        assert isinstance(result.schema["month"].dataType, IntegerType)
+        assert isinstance(result.schema["day"].dataType, IntegerType)
+
+    def test_int_sequence_joined_with_delta_source(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """int_sequence source can be inner-joined with a delta source."""
+        path = tmp_delta_path("join_data")
+        data = [{"id": 1, "label": "a"}, {"id": 3, "label": "c"}, {"id": 5, "label": "e"}]
+        create_delta_table(spark, path, data)
+
+        int_source = Source(type="int_sequence", column="n", start=1, end=5)
+        delta_source = Source(type="delta", alias=path)
+
+        int_df = read_source(spark, "keys", int_source)
+        delta_df = read_source(spark, "data", delta_source)
+        joined = int_df.join(delta_df, int_df["n"] == delta_df["id"], "inner")
+
+        assert joined.count() == 3
+        assert set(joined.columns) == {"n", "id", "label"}
+
+    def test_int_sequence_left_join_preserves_all_keys(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Left join with an int_sequence source keeps all generated keys."""
+        path = tmp_delta_path("left_join_data")
+        data = [{"id": 2, "val": "x"}, {"id": 4, "val": "y"}]
+        create_delta_table(spark, path, data)
+
+        int_source = Source(type="int_sequence", column="n", start=1, end=4)
+        delta_source = Source(type="delta", alias=path)
+
+        int_df = read_source(spark, "keys", int_source)
+        delta_df = read_source(spark, "data", delta_source)
+        joined = int_df.join(delta_df, int_df["n"] == delta_df["id"], "left")
+
+        assert joined.count() == 4
+        matched = joined.filter(F.col("val").isNotNull()).count()
+        assert matched == 2
+
+    def test_delta_source_reading_unchanged(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Existing delta source reading is unaffected by generated source changes."""
+        path = tmp_delta_path("compat_check")
+        data = [{"k": 10, "v": "alpha"}, {"k": 20, "v": "beta"}, {"k": 30, "v": "gamma"}]
+        create_delta_table(spark, path, data)
+
+        source = Source(type="delta", alias=path)
+        df = read_source(spark, "compat", source)
+
+        assert df.count() == 3
+        assert set(df.columns) == {"k", "v"}
+        values = sorted(row["k"] for row in df.collect())
+        assert values == [10, 20, 30]
+
+    def test_generated_source_as_with_block_from(self, spark: SparkSession) -> None:
+        """A generated source can serve as the from: input for a with: sub-pipeline.
+
+        Simulates the CTE resolution that _resolve_with_block performs: read the
+        generated source, then apply a column derivation step the way the engine
+        would via run_pipeline.
+        """
+        from weevr.model.pipeline import DeriveParams, DeriveStep
+        from weevr.model.types import SparkExpr
+        from weevr.operations.pipeline import run_pipeline
+
+        source = Source(
+            type="date_sequence",
+            column="dt",
+            start="2025-06-01",
+            end="2025-06-07",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        # Replicate what the engine does inside _resolve_with_block:
+        # run_pipeline applies steps to the CTE DataFrame.
+        steps: list = [
+            DeriveStep(derive=DeriveParams(columns={"week_num": SparkExpr("weekofyear(dt)")})),
+        ]
+        cte_df = run_pipeline(df, steps, sources={})
+
+        assert cte_df.count() == 7
+        assert "week_num" in cte_df.columns
+        assert "dt" in cte_df.columns

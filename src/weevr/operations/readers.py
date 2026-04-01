@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
+from pyspark.sql.types import LongType, StructField, StructType
 
 from weevr.delta import is_table_alias
 from weevr.errors.exceptions import ExecutionError
@@ -11,6 +12,13 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
 from weevr.state.watermark import WatermarkState
+
+_INTERVAL_MAP = {
+    "day": "interval 1 day",
+    "week": "interval 7 day",
+    "month": "interval 1 month",
+    "year": "interval 1 year",
+}
 
 
 def read_source(
@@ -106,6 +114,53 @@ def _read_raw(
 
         resolved_path = resolve_fuse_path(source.path, spark)
         return spark.read.format(source.type).options(**source.options).load(resolved_path)
+
+    if source.type == "date_sequence":
+        import datetime
+
+        if source.column is None or source.start is None or source.end is None:
+            raise ExecutionError("date_sequence requires 'column', 'start', and 'end'")
+        step_key = str(source.step) if source.step is not None else "day"
+        interval_expr = _INTERVAL_MAP[step_key]
+        try:
+            start_date = datetime.date.fromisoformat(str(source.start))
+            end_date = datetime.date.fromisoformat(str(source.end))
+        except ValueError as exc:
+            raise ExecutionError(
+                f"date_sequence requires ISO-8601 dates (YYYY-MM-DD), "
+                f"got start={source.start!r}, end={source.end!r}",
+                cause=exc,
+            ) from exc
+        if start_date > end_date:
+            from pyspark.sql.types import DateType
+
+            return spark.createDataFrame([], StructType([StructField(source.column, DateType())]))
+        df = spark.createDataFrame([(1,)], ["_dummy"]).select(
+            F.explode(
+                F.sequence(
+                    F.to_date(F.lit(str(source.start))),
+                    F.to_date(F.lit(str(source.end))),
+                    F.expr(interval_expr),
+                )
+            ).alias(source.column)
+        )
+        return df
+
+    if source.type == "int_sequence":
+        if source.column is None:
+            raise ExecutionError("int_sequence requires 'column' to be set")
+        try:
+            start_val = int(source.start)  # type: ignore[arg-type]
+            end_val = int(source.end)  # type: ignore[arg-type]
+            step_val = int(source.step) if source.step is not None else 1
+        except (ValueError, TypeError) as exc:
+            raise ExecutionError(
+                "int_sequence requires integer start/end/step values",
+                cause=exc,
+            ) from exc
+        if start_val > end_val:
+            return spark.createDataFrame([], StructType([StructField(source.column, LongType())]))
+        return spark.range(start_val, end_val + 1, step_val).withColumnRenamed("id", source.column)
 
     raise ExecutionError(f"Unsupported source type: '{source.type}'")
 

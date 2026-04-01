@@ -1,0 +1,48 @@
+# Calendar Dimension Example
+#
+# Generates a complete date dimension with calendar attributes.
+# Uses date_sequence source to create a row for each day from 1970 to 2099,
+# then derives calendar attributes like year, quarter, month, day, and more.
+
+config_version: "1.0"
+name: dim_calendar
+
+sources:
+  dates:
+    type: date_sequence
+    start: "1970-01-01"
+    end: "2099-12-31"
+    column: calendar_date
+    step: day
+
+# Pipeline steps applied in order
+steps:
+  - derive:
+      columns:
+        calendar_id: |
+          cast(date_format(calendar_date, 'yyyyMMdd') as int)
+        year: "year(calendar_date)"
+        quarter: "quarter(calendar_date)"
+        month: "month(calendar_date)"
+        month_name: "date_format(calendar_date, 'MMMM')"
+        day_of_month: "dayofmonth(calendar_date)"
+        day_of_week: "dayofweek(calendar_date)"
+        day_name: "date_format(calendar_date, 'EEEE')"
+        week_of_year: "weekofyear(calendar_date)"
+        is_weekend: |
+          case when dayofweek(calendar_date) in (1, 7)
+          then true else false end
+        fiscal_year: |
+          case when month(calendar_date) >= 7
+          then year(calendar_date) + 1
+          else year(calendar_date) end
+        fiscal_quarter: |
+          case when month(calendar_date) >= 7
+          then quarter(calendar_date) - 2
+          else quarter(calendar_date) + 2 end
+
+target:
+  alias: gold.dim_calendar
+
+write:
+  mode: overwrite
