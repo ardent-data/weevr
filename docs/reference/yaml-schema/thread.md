@@ -46,7 +46,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. |
-| `lookup` | `string` | conditional | `null` | Weave-level lookup name. Mutually exclusive with `type`. When set, the source is resolved from the weave's `lookups` map at execution time. |
+| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. |
 | `alias` | `string` | conditional | `null` | Lakehouse table alias. Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
 | `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
@@ -94,8 +94,9 @@ Two generated types are available: `date_sequence` and `int_sequence`. Both
 produce a single-column DataFrame covering a closed range `[start, end]`.
 
 **Mutual exclusivity:** generated types (`date_sequence`, `int_sequence`) are
-incompatible with `alias`, `path`, `options`, `dedup`, and `connection`. Setting
-any of those keys alongside a generated type raises a validation error.
+incompatible with `alias`, `path`, `options`, `dedup`, `connection`, and
+`lookup`. Setting any of those keys alongside a generated type raises a
+validation error.
 
 #### `date_sequence`
 

@@ -178,18 +178,27 @@ presets `fabric` and `minimal` do not require a declaration.
 
 ## Source
 
-A data source declaration referenced by alias within a thread. A source
-is either a direct data reference (with `type`) or a lookup reference
-(with `lookup`). These are mutually exclusive.
+A data source declaration referenced by alias within a thread.
+A source is a direct data reference (with `type`), a lookup
+reference (with `lookup`), a connection-based reference (with
+`connection` + `table`), or a generated sequence (with `type`
+set to `date_sequence` or `int_sequence`).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | `str` | conditional | Source type: `delta`, `csv`, `json`, `parquet`, `excel`. Required when `lookup` is not set. |
-| `lookup` | `str` | `None` | Weave-level lookup name. Mutually exclusive with `type`. |
-| `alias` | `str` | `None` | Table alias (required for `delta`) |
+| `type` | `str` | conditional | Source type: `delta`, `csv`, `json`, `parquet`, `excel`, `date_sequence`, `int_sequence`. Required when neither `lookup` nor `connection` is set. |
+| `lookup` | `str` | `None` | Lookup name (thread-, weave-, or loom-level). Mutually exclusive with `type`. |
+| `alias` | `str` | `None` | Table alias (required for `delta` without `connection`). Mutually exclusive with `connection`. |
 | `path` | `str` | `None` | File path (required for file-based types) |
 | `options` | `dict[str, Any]` | `{}` | Spark reader options |
 | `dedup` | `DedupConfig` | `None` | Post-read deduplication |
+| `connection` | `str` | `None` | Named connection reference. Requires `table`. |
+| `schema` | `str` | `None` | Schema override within the connection's lakehouse |
+| `table` | `str` | `None` | Table name (required when `connection` is set) |
+| `start` | `str \| int` | `None` | Range start, inclusive (required for generated types) |
+| `end` | `str \| int` | `None` | Range end, inclusive (required for generated types) |
+| `column` | `str` | `None` | Output column name (required for generated types) |
+| `step` | `str \| int` | `None` | Step interval: `day`/`week`/`month`/`year` for dates, positive int for `int_sequence` |
 
 ### DedupConfig
 

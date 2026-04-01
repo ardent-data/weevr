@@ -81,7 +81,7 @@ without reading from external storage. Two types are supported:
 
 Generated source fields: `type`, `start`, `end`, `column`,
 `step`. These are mutually exclusive with `alias`, `path`,
-`options`, `dedup`, and `connection`.
+`options`, `dedup`, `connection`, and `lookup`.
 
     sources:
       calendar:
@@ -89,12 +89,21 @@ Generated source fields: `type`, `start`, `end`, `column`,
         column: calendar_date
         start: "1970-01-01"
         end: "2099-12-31"
+        step: day
+
+      months:
+        type: date_sequence
+        column: month_start
+        start: "2024-01-01"
+        end: "2024-12-01"
+        step: month
 
       keys:
         type: int_sequence
         column: surrogate_key
         start: 1
         end: 1000000
+        step: 5
 
 ## Sub-Pipelines (with: Block)
 
