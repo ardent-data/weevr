@@ -125,6 +125,48 @@ class Target(FrozenBase):
         default=None,
         description="Seed rows to insert on first write or when the table is empty.",
     )
+    warp: str | Literal[False] | None = Field(
+        default=None,
+        description=(
+            "Warp schema contract reference. A string names an explicit .warp file; "
+            "False opts out of auto-discovery; None enables auto-discovery."
+        ),
+    )
+    warp_mode: Literal["auto"] | None = Field(
+        default=None,
+        description=(
+            "Warp generation mode. 'auto' writes/updates the .warp file after each successful run."
+        ),
+    )
+    warp_init: bool = Field(
+        default=False,
+        description=(
+            "When True and a warp exists, create the Delta table from the "
+            "effective warp before the first pipeline run."
+        ),
+    )
+    warp_enforcement: Literal["warn", "enforce", "off"] = Field(
+        default="warn",
+        description=(
+            "Warp contract enforcement mode. 'enforce' fails the thread on "
+            "violations; 'warn' logs findings; 'off' skips validation."
+        ),
+    )
+    schema_drift: Literal["lenient", "strict", "adaptive"] = Field(
+        default="lenient",
+        description=(
+            "Schema drift handling mode. 'lenient' passes extra columns through; "
+            "'strict' applies on_drift action; 'adaptive' passes through and "
+            "extends auto-generated warps."
+        ),
+    )
+    on_drift: Literal["error", "warn", "ignore"] = Field(
+        default="warn",
+        description=(
+            "Severity action for strict drift mode. 'error' aborts the thread; "
+            "'warn' drops extra columns with a warning; 'ignore' drops silently."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
