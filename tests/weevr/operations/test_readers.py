@@ -366,3 +366,131 @@ class TestConnectionBasedRead:
         spark.read.format.assert_called_with("delta")
         spark.read.format.return_value.table.assert_called_with("db.my_table")
         assert result is mock_df
+
+
+class TestDateSequenceSource:
+    """Tests for date_sequence generated source reading."""
+
+    def test_daily_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-01-10",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 10
+
+    def test_weekly_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-01-31",
+            step="week",
+        )
+        df = read_source(spark, "dates", source)
+
+        # Jan 1, 8, 15, 22, 29 → 5 rows
+        assert df.count() == 5
+
+    def test_monthly_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-12-01",
+            step="month",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 12
+
+    def test_yearly_range_produces_correct_row_count(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2020-01-01",
+            end="2025-01-01",
+            step="year",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 6
+
+    def test_output_column_name_matches_source_column(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="report_date",
+            start="2025-01-01",
+            end="2025-01-03",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.columns == ["report_date"]
+
+    def test_output_type_is_date(self, spark: SparkSession) -> None:
+        from pyspark.sql.types import DateType
+
+        source = Source(
+            type="date_sequence",
+            column="dt",
+            start="2025-01-01",
+            end="2025-01-05",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert isinstance(df.schema["dt"].dataType, DateType)
+
+    def test_start_and_end_dates_are_inclusive(self, spark: SparkSession) -> None:
+        import datetime
+
+        source = Source(
+            type="date_sequence",
+            column="d",
+            start="2025-03-01",
+            end="2025-03-03",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        dates = {row["d"] for row in df.collect()}
+        assert datetime.date(2025, 3, 1) in dates
+        assert datetime.date(2025, 3, 3) in dates
+
+    def test_empty_range_produces_zero_rows(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-10",
+            end="2025-01-01",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 0
+
+    def test_single_row_when_start_equals_end(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-06-15",
+            end="2025-06-15",
+        )
+        df = read_source(spark, "dates", source)
+
+        assert df.count() == 1
+
+    def test_step_defaults_to_day_when_omitted(self, spark: SparkSession) -> None:
+        source = Source(
+            type="date_sequence",
+            column="date",
+            start="2025-01-01",
+            end="2025-01-05",
+        )
+        df = read_source(spark, "dates", source)
+
+        # Default day step: Jan 1-5 = 5 rows
+        assert df.count() == 5
