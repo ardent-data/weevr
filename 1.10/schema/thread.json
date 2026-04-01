@@ -1826,6 +1826,93 @@
           "default": true,
           "title": "Null Safe",
           "type": "boolean"
+        },
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alias for column disambiguation via Spark .alias().",
+          "title": "Alias"
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transient pre-filter expression applied to the right-side DataFrame before join.",
+          "title": "Filter"
+        },
+        "include": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob patterns for source columns to keep. When set, only matching columns are retained.",
+          "title": "Include"
+        },
+        "exclude": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob patterns for source columns to drop. Applied after include filtering.",
+          "title": "Exclude"
+        },
+        "rename": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Rename source columns: {original: new_name}. Applied after prefix.",
+          "title": "Rename"
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prefix applied to all surviving source columns after include/exclude.",
+          "title": "Prefix"
         }
       },
       "required": [
@@ -3542,6 +3629,100 @@
       "title": "StringOpsStep",
       "type": "object"
     },
+    "SubPipeline": {
+      "description": "A named sub-pipeline that produces an intermediate DataFrame.\n\nSub-pipelines are declared under the ``with:`` block of a thread and are\nreferenced by name in subsequent join or union steps.",
+      "properties": {
+        "from": {
+          "description": "Name of the source or earlier CTE this sub-pipeline reads from.",
+          "title": "From",
+          "type": "string"
+        },
+        "steps": {
+          "description": "Ordered list of pipeline steps applied to the source.",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FilterStep"
+              },
+              {
+                "$ref": "#/$defs/DeriveStep"
+              },
+              {
+                "$ref": "#/$defs/JoinStep"
+              },
+              {
+                "$ref": "#/$defs/SelectStep"
+              },
+              {
+                "$ref": "#/$defs/DropStep"
+              },
+              {
+                "$ref": "#/$defs/RenameStep"
+              },
+              {
+                "$ref": "#/$defs/CastStep"
+              },
+              {
+                "$ref": "#/$defs/DedupStep"
+              },
+              {
+                "$ref": "#/$defs/SortStep"
+              },
+              {
+                "$ref": "#/$defs/UnionStep"
+              },
+              {
+                "$ref": "#/$defs/AggregateStep"
+              },
+              {
+                "$ref": "#/$defs/WindowStep"
+              },
+              {
+                "$ref": "#/$defs/PivotStep"
+              },
+              {
+                "$ref": "#/$defs/UnpivotStep"
+              },
+              {
+                "$ref": "#/$defs/CaseWhenStep"
+              },
+              {
+                "$ref": "#/$defs/FillNullStep"
+              },
+              {
+                "$ref": "#/$defs/CoalesceStep"
+              },
+              {
+                "$ref": "#/$defs/StringOpsStep"
+              },
+              {
+                "$ref": "#/$defs/DateOpsStep"
+              },
+              {
+                "$ref": "#/$defs/ConcatStep"
+              },
+              {
+                "$ref": "#/$defs/MapStep"
+              },
+              {
+                "$ref": "#/$defs/FormatStep"
+              },
+              {
+                "$ref": "#/$defs/ResolveStep"
+              }
+            ]
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "from",
+        "steps"
+      ],
+      "title": "SubPipeline",
+      "type": "object"
+    },
     "SurrogateKeyConfig": {
       "description": "Configuration for surrogate key generation.\n\nAttributes:\n    name: Output column name for the generated surrogate key.\n    algorithm: Hash algorithm to use. ``crc32`` has a small 32-bit output\n        space with higher collision risk. ``murmur3`` (Spark's ``hash()``)\n        may produce different results across Spark major versions. Neither\n        is recommended for high-cardinality surrogate key use cases.\n    output: Controls the output type for integer-returning algorithms\n        (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's\n        return type; ``string`` casts to StringType. Has no practical\n        effect on sha*/md5 which already return hex strings.",
       "properties": {
@@ -4223,6 +4404,22 @@
       "description": "Named data source declarations. At least one entry required.",
       "title": "Sources",
       "type": "object"
+    },
+    "with": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/SubPipeline"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named sub-pipelines (CTEs) evaluated before the main pipeline. Each entry declares an intermediate DataFrame by name.",
+      "title": "With"
     },
     "steps": {
       "default": [],
