@@ -114,6 +114,10 @@ class TestFileSource:
         object.__setattr__(source, "connection", None)
         object.__setattr__(source, "schema_override", None)
         object.__setattr__(source, "table", None)
+        object.__setattr__(source, "start", None)
+        object.__setattr__(source, "end", None)
+        object.__setattr__(source, "column", None)
+        object.__setattr__(source, "step", None)
 
         with pytest.raises(ExecutionError, match="Unsupported source type: 'avro'"):
             read_source(spark, "bad_type", source)

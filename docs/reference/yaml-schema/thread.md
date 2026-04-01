@@ -56,8 +56,8 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | `table` | `string` | conditional | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `start` | `string` \| `int` | conditional | -- | Range start (inclusive). Required for generated types (`date_sequence`, `int_sequence`). |
 | `end` | `string` \| `int` | conditional | -- | Range end (inclusive). Required for generated types (`date_sequence`, `int_sequence`). |
-| `column` | `string` | conditional | `"date"` / `"id"` | Output column name. Required for generated types. Defaults to `"date"` for `date_sequence`, `"id"` for `int_sequence`. |
-| `step` | `string` \| `int` | no | `1` | Increment between values. Accepts integers for `int_sequence` or interval strings (e.g. `"1 month"`) for `date_sequence`. |
+| `column` | `string` | conditional | -- | Output column name. Required for generated types (`date_sequence`, `int_sequence`). |
+| `step` | `string` \| `int` | no | `"day"` / `1` | Step interval. For `date_sequence`: `"day"`, `"week"`, `"month"`, or `"year"`. For `int_sequence`: a positive integer. |
 
 ### sources.dedup
 
@@ -107,8 +107,8 @@ from `start` to `end` (both inclusive).
 | `type` | `string` | yes | -- | Must be `"date_sequence"` |
 | `start` | `string` | yes | -- | Start date, inclusive. ISO-8601 format (`"YYYY-MM-DD"`). |
 | `end` | `string` | yes | -- | End date, inclusive. ISO-8601 format (`"YYYY-MM-DD"`). |
-| `column` | `string` | no | `"date"` | Name of the output column. |
-| `step` | `string` | no | `"1 day"` | Spark interval string (e.g. `"1 day"`, `"1 month"`, `"1 week"`). |
+| `column` | `string` | yes | -- | Name of the output column. |
+| `step` | `string` | no | `"day"` | Step interval: `"day"`, `"week"`, `"month"`, or `"year"`. |
 
 ```yaml
 sources:
@@ -117,7 +117,7 @@ sources:
     start: "2024-01-01"
     end: "2024-12-31"
     column: date
-    step: "1 day"
+    step: day
 ```
 
 #### `int_sequence`
@@ -130,7 +130,7 @@ to `end` (both inclusive).
 | `type` | `string` | yes | -- | Must be `"int_sequence"` |
 | `start` | `int` | yes | -- | Start value, inclusive. |
 | `end` | `int` | yes | -- | End value, inclusive. |
-| `column` | `string` | no | `"id"` | Name of the output column. |
+| `column` | `string` | yes | -- | Name of the output column. |
 | `step` | `int` | no | `1` | Increment between values. Must be a positive integer. |
 
 ```yaml

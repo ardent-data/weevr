@@ -116,14 +116,22 @@ def _read_raw(
         return spark.read.format(source.type).options(**source.options).load(resolved_path)
 
     if source.type == "date_sequence":
-        # column, start, and end are guaranteed non-None by Source model validation.
-        assert source.column is not None
-        assert source.start is not None
-        assert source.end is not None
+        import datetime
+
+        if source.column is None or source.start is None or source.end is None:
+            raise ExecutionError("date_sequence requires 'column', 'start', and 'end'")
         step_key = str(source.step) if source.step is not None else "day"
         interval_expr = _INTERVAL_MAP[step_key]
-        # When start > end the sequence would have illegal boundaries; return empty.
-        if str(source.start) > str(source.end):
+        try:
+            start_date = datetime.date.fromisoformat(str(source.start))
+            end_date = datetime.date.fromisoformat(str(source.end))
+        except ValueError as exc:
+            raise ExecutionError(
+                f"date_sequence requires ISO-8601 dates (YYYY-MM-DD), "
+                f"got start={source.start!r}, end={source.end!r}",
+                cause=exc,
+            ) from exc
+        if start_date > end_date:
             from pyspark.sql.types import DateType
 
             return spark.createDataFrame([], StructType([StructField(source.column, DateType())]))
@@ -139,7 +147,8 @@ def _read_raw(
         return df
 
     if source.type == "int_sequence":
-        assert source.column is not None  # guaranteed by Source validator
+        if source.column is None:
+            raise ExecutionError("int_sequence requires 'column' to be set")
         try:
             start_val = int(source.start)  # type: ignore[arg-type]
             end_val = int(source.end)  # type: ignore[arg-type]
