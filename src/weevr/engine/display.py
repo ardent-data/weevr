@@ -93,6 +93,8 @@ _FLOW_LIGHT = {
     "assertion_stroke": "#6366f1",
     "export_fill": "#f0fdf4",
     "export_stroke": "#22c55e",
+    "cte_fill": "#fdf4ff",
+    "cte_stroke": "#9333ea",
     "text": "#2d3748",
     "edge": "#a0aec0",
     "bg": "#ffffff",
@@ -115,6 +117,8 @@ _FLOW_DARK = {
     "assertion_stroke": "#818cf8",
     "export_fill": "#14532d",
     "export_stroke": "#4ade80",
+    "cte_fill": "#3b0764",
+    "cte_stroke": "#a855f7",
     "text": "#e2e8f0",
     "edge": "#718096",
     "bg": "#1a202c",
@@ -943,6 +947,10 @@ def _build_flow_svg_style(dark: bool | None = None) -> str:
             f"  .flow-export{{fill:{lt['export_fill']};"
             f"stroke:{lt['export_stroke']};stroke-width:1.5;stroke-dasharray:6,3}}"
         ),
+        (
+            f"  .flow-cte{{fill:{lt['cte_fill']};"
+            f"stroke:{lt['cte_stroke']};stroke-width:1.5;stroke-dasharray:5,3}}"
+        ),
         f"  .flow-label{{fill:{lt['text']};font-family:{font};font-size:{fs}px;{ta}}}",
         f"  .flow-sublabel{{fill:{lt['text']};font-family:{font};font-size:{fa}px;{ta};"
         "opacity:0.7}}",
@@ -967,6 +975,7 @@ def _build_flow_svg_style(dark: bool | None = None) -> str:
                 f"    .flow-assertion{{fill:{dk['assertion_fill']};"
                 f"stroke:{dk['assertion_stroke']}}}",
                 f"    .flow-export{{fill:{dk['export_fill']};stroke:{dk['export_stroke']}}}",
+                f"    .flow-cte{{fill:{dk['cte_fill']};stroke:{dk['cte_stroke']}}}",
                 f"    .flow-label{{fill:{dk['text']}}}",
                 f"    .flow-sublabel{{fill:{dk['text']}}}",
                 f"    .flow-badge{{fill:{dk['badge_bg']}}}",
@@ -1023,6 +1032,16 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
         tgt_label = "\u2026" + tgt_label[-27:]
     write_mode = thread.write.mode if thread.write else "overwrite"
 
+    # CTE sub-pipelines: (cte_name, from_source, step_count)
+    # Each CTE sits between its source and the join node that consumes it.
+    with_block = getattr(thread, "with_", None)
+    cte_defs: list[tuple[str, str, int]] = []
+    if with_block:
+        for cte_name, sub in with_block.items():
+            from_src = getattr(sub, "from_", "") or ""
+            step_count = len(getattr(sub, "steps", []))
+            cte_defs.append((cte_name, from_src, step_count))
+
     # --- Estimate widths ---
     def _est_w(text: str) -> float:
         return max(len(text) * cw + np * 2, 80.0)
@@ -1041,15 +1060,24 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
     target_w = _est_w(tgt_label)
 
     # --- Classify sources: primary (left-stacked) vs join (above their join node) ---
+    # CTE names that appear as join sources are treated like join sources, but
+    # are rendered as CTE nodes rather than regular source nodes.
+    cte_names: set[str] = {cte_name for cte_name, _, _ in cte_defs}
     join_source_names: set[str] = set()
     join_source_to_pipe_idx: dict[str, int] = {}
+    # Track CTE nodes that feed directly into join nodes
+    cte_join_pipe_idx: dict[str, int] = {}
     for pidx, (_ntype, _label, _count, jsrc) in enumerate(pipeline_nodes):
         if _ntype == "join" and jsrc:
-            for slabel, _stype in source_nodes:
-                if slabel == jsrc:
-                    join_source_names.add(slabel)
-                    join_source_to_pipe_idx[slabel] = pidx
-                    break
+            # Check if the join source is a CTE name
+            if jsrc in cte_names:
+                cte_join_pipe_idx[jsrc] = pidx
+            else:
+                for slabel, _stype in source_nodes:
+                    if slabel == jsrc:
+                        join_source_names.add(slabel)
+                        join_source_to_pipe_idx[slabel] = pidx
+                        break
 
     primary_sources = [(sn, st) for sn, st in source_nodes if sn not in join_source_names]
     join_sources = [(sn, st) for sn, st in source_nodes if sn in join_source_names]
@@ -1096,6 +1124,27 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
         jx = jpx + jpw / 2 - sw / 2
         jy = center_y - nh - vgap
         join_positions[slabel] = (jx, jy, sw)
+
+    # CTE node positions: centered above the join node they feed into.
+    # If a CTE isn't referenced by any join, place it above the first pipeline node.
+    cte_positions: dict[str, tuple[float, float, float]] = {}
+    for cte_name, _from_src, step_count in cte_defs:
+        step_hint = f"{step_count}s" if step_count > 0 else ""
+        cte_label = f"{cte_name} ({step_hint})" if step_hint else cte_name
+        cw_val = _est_w(cte_label)
+        if cte_name in cte_join_pipe_idx:
+            pidx = cte_join_pipe_idx[cte_name]
+            jpx, _jpy, jpw = pipe_positions[pidx]
+            cx = jpx + jpw / 2 - cw_val / 2
+        elif pipe_positions:
+            jpx, _jpy, jpw = pipe_positions[0]
+            cx = jpx + jpw / 2 - cw_val / 2
+        else:
+            cx = pad
+        # Stack CTE rows above join row (two rows up if join sources also present)
+        has_join_row = bool(join_source_names)
+        cy = center_y - nh - vgap - (nh + vgap if has_join_row else 0)
+        cte_positions[cte_name] = (cx, cy, cw_val)
 
     # Build combined source position list (in original order, for node rendering)
     src_positions: list[tuple[float, float, float]] = []
@@ -1146,6 +1195,9 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
 
     # Canvas dimensions
     top_edge = min(y for _, y, _ in src_positions) if src_positions else pad
+    # Account for CTE nodes above the main pipeline row
+    for _, cy_val, _ in cte_positions.values():
+        top_edge = min(top_edge, cy_val)
     bot_edge = max(y + nh for _, y, _ in src_positions) if src_positions else center_y + nh
     bot_edge = max(bot_edge, center_y + nh)
     # Account for quarantine branch
@@ -1173,6 +1225,7 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
     if assertion_pos:
         assertion_pos = (assertion_pos[0], assertion_pos[1] + y_offset, assertion_pos[2])
     export_positions = [(x, y + y_offset, w, n, t) for x, y, w, n, t in export_positions]
+    cte_positions = {k: (x, y + y_offset, w) for k, (x, y, w) in cte_positions.items()}
     center_y += y_offset
 
     # --- Render SVG ---
@@ -1225,6 +1278,33 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
             f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
             f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
         )
+
+    # CTE edges: source → CTE node, and CTE node → join node
+    src_label_map = {
+        slabel: (sx, sy, sw)
+        for (slabel, _), (sx, sy, sw) in zip(source_nodes, src_positions, strict=True)
+    }
+    for cte_name, from_src, _step_count in cte_defs:
+        if cte_name not in cte_positions:
+            continue
+        cx, cy_val, cw_val = cte_positions[cte_name]
+        # from_source → CTE node (vertical arrow down from source)
+        if from_src in src_label_map:
+            fx, fy, fw = src_label_map[from_src]
+            parts.append(
+                f'<line x1="{fx + fw / 2:.1f}" y1="{fy + nh:.1f}" '
+                f'x2="{cx + cw_val / 2:.1f}" y2="{cy_val:.1f}" '
+                f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+            )
+        # CTE node → join node (if this CTE feeds a join)
+        if cte_name in cte_join_pipe_idx:
+            pidx = cte_join_pipe_idx[cte_name]
+            jx, jy, jw = pipe_positions[pidx]
+            parts.append(
+                f'<line x1="{cx + cw_val / 2:.1f}" y1="{cy_val + nh:.1f}" '
+                f'x2="{jx + jw / 2:.1f}" y2="{jy:.1f}" '
+                f'class="flow-edge" marker-end="url(#flow-arrow)"/>'
+            )
 
     # Pipeline node → next pipeline node
     for i in range(len(pipe_positions) - 1):
@@ -1318,6 +1398,26 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
         parts.append(
             f'<text x="{sx + sw / 2:.1f}" y="{sy + nh / 2 + 8:.1f}" '
             f'class="flow-sublabel">{_xml_escape(stype)}</text>'
+        )
+
+    # --- CTE nodes ---
+    for cte_name, _from_src, step_count in cte_defs:
+        if cte_name not in cte_positions:
+            continue
+        cx, cy_val, cw_val = cte_positions[cte_name]
+        step_hint = f"{step_count}s" if step_count > 0 else ""
+        cte_display = f"{cte_name} ({step_hint})" if step_hint else cte_name
+        parts.append(
+            f'<rect x="{cx:.1f}" y="{cy_val:.1f}" width="{cw_val:.1f}" height="{nh}" '
+            f'rx="{cr}" class="flow-cte"/>'
+        )
+        parts.append(
+            f'<text x="{cx + cw_val / 2:.1f}" y="{cy_val + nh / 2 - 5:.1f}" '
+            f'class="flow-label">{_xml_escape(cte_name)}</text>'
+        )
+        parts.append(
+            f'<text x="{cx + cw_val / 2:.1f}" y="{cy_val + nh / 2 + 8:.1f}" '
+            f'class="flow-sublabel">{_xml_escape(cte_display)}</text>'
         )
 
     # --- Pipeline nodes ---

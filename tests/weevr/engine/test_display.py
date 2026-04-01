@@ -757,6 +757,18 @@ def _fake_join_step(jtype: str = "inner", keys: list[str] | None = None) -> obje
     return _fake_step("join", params)
 
 
+def _fake_sub_pipeline(*, from_src: str = "main", steps: list[object] | None = None) -> object:
+    """Build a duck-typed SubPipeline for CTE flow diagram tests."""
+    return type(
+        "SubPipeline",
+        (),
+        {
+            "from_": from_src,
+            "steps": steps or [_fake_step("filter")],
+        },
+    )()
+
+
 def _fake_thread(
     *,
     name: str = "test_thread",
@@ -767,6 +779,7 @@ def _fake_thread(
     validations: list[object] | None = None,
     assertions: list[object] | None = None,
     exports: list[object] | None = None,
+    with_: dict[str, object] | None = None,
 ) -> Any:
     """Build a duck-typed Thread model for flow diagram tests."""
     return type(
@@ -781,6 +794,7 @@ def _fake_thread(
             "validations": validations,
             "assertions": assertions,
             "exports": exports,
+            "with_": with_,
         },
     )()
 
@@ -1037,6 +1051,86 @@ class TestRenderFlowSvg:
         assert 'class="flow-quarantine"' not in svg
         assert 'class="flow-assertion"' not in svg
         assert 'class="flow-export"' not in svg
+
+
+# ---------------------------------------------------------------------------
+# CTE visualization in thread flow SVG
+# ---------------------------------------------------------------------------
+
+
+class TestRenderFlowSvgCTE:
+    def test_cte_name_present_in_svg(self) -> None:
+        """Thread with a CTE produces SVG containing the CTE name."""
+        cte = _fake_sub_pipeline(from_src="main", steps=[_fake_step("filter")])
+        thread = _fake_thread(with_={"order_summary": cte})
+        svg = render_flow_svg(thread)
+        assert "order_summary" in svg
+
+    def test_two_ctes_both_labels_present(self) -> None:
+        """Thread with two CTEs produces SVG with both CTE name labels."""
+        cte1 = _fake_sub_pipeline(from_src="main", steps=[_fake_step("filter")])
+        cte2 = _fake_sub_pipeline(from_src="main", steps=[_fake_step("rename"), _fake_step("cast")])
+        thread = _fake_thread(with_={"cte_alpha": cte1, "cte_beta": cte2})
+        svg = render_flow_svg(thread)
+        assert "cte_alpha" in svg
+        assert "cte_beta" in svg
+
+    def test_cte_node_css_class_present(self) -> None:
+        """CTE nodes use the flow-cte CSS class."""
+        cte = _fake_sub_pipeline(from_src="main")
+        thread = _fake_thread(with_={"prep": cte})
+        svg = render_flow_svg(thread)
+        assert 'class="flow-cte"' in svg
+
+    def test_no_cte_nodes_without_with_block(self) -> None:
+        """Thread without with: block produces no CTE nodes."""
+        thread = _fake_thread()
+        svg = render_flow_svg(thread)
+        assert 'class="flow-cte"' not in svg
+
+    def test_cte_with_join_that_references_it(self) -> None:
+        """CTE referenced by a join step appears connected in the flow."""
+        sources = {"main": _fake_source(alias="orders"), "right": _fake_source(alias="items")}
+        cte = _fake_sub_pipeline(from_src="main", steps=[_fake_step("filter")])
+        steps = [_fake_join_step("inner", ["id"])]
+        thread = _fake_thread(sources=sources, steps=steps, with_={"order_summary": cte})
+        svg = render_flow_svg(thread)
+        assert "order_summary" in svg
+        assert 'class="flow-cte"' in svg
+        assert "<svg" in svg
+
+    def test_cte_valid_xml(self) -> None:
+        """SVG with CTE nodes is valid XML."""
+        cte1 = _fake_sub_pipeline(from_src="main", steps=[_fake_step("filter")])
+        cte2 = _fake_sub_pipeline(from_src="main", steps=[_fake_step("rename")])
+        thread = _fake_thread(with_={"first_cte": cte1, "second_cte": cte2})
+        svg = render_flow_svg(thread)
+        ET.fromstring(svg)
+
+    def test_no_regressions_with_existing_features(self) -> None:
+        """Thread with CTEs plus validations and exports renders without error."""
+        cte = _fake_sub_pipeline(from_src="main")
+        exports: list[object] = [type("E", (), {"name": "archive", "type": "parquet"})()]
+        thread = _fake_thread(
+            with_={"prep": cte},
+            validations=[{"rule": "test"}],
+            exports=exports,
+        )
+        svg = render_flow_svg(thread)
+        assert "prep" in svg
+        assert 'class="flow-cte"' in svg
+        assert 'class="flow-validation"' in svg
+        assert 'class="flow-export"' in svg
+        ET.fromstring(svg)
+
+    def test_cte_step_count_shown_in_sublabel(self) -> None:
+        """CTE sublabel reflects the step count from the sub-pipeline."""
+        steps = [_fake_step("filter"), _fake_step("rename"), _fake_step("cast")]
+        cte = _fake_sub_pipeline(from_src="main", steps=steps)
+        thread = _fake_thread(with_={"summary": cte})
+        svg = render_flow_svg(thread)
+        # Step count "3s" appears as part of the sublabel text
+        assert "3s" in svg
 
 
 # ---------------------------------------------------------------------------
