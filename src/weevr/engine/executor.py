@@ -6,6 +6,7 @@ import contextlib
 import logging
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from pyspark.sql import SparkSession
@@ -250,8 +251,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             drift_report = None
 
             if thread.target.warp is not False:
-                from pathlib import Path
-
                 from weevr.config.warp import resolve_warp
 
                 # Derive thread directory from target_path or current directory
@@ -265,6 +264,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 )
 
             # --- Warp pre-initialization ---
+            # Note: SCD and soft-delete columns are not yet known at this
+            # point. Dimension targets using warp_init should declare SCD
+            # columns in the warp itself.
             if resolved_warp is not None and thread.target.warp_init:
                 from weevr.config.warp import build_effective_warp
 
@@ -464,7 +466,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     [c for c in df.columns if c.startswith("_weevr_")]
                 )
                 df, warp_findings, drift_report = _apply_warp_and_drift(
-                    df, resolved_warp, thread, engine_col_names
+                    df,
+                    resolved_warp,
+                    thread,
+                    engine_col_names,
+                    spark=spark,
+                    target_path=target_path,
                 )
 
                 # Seed phase (before merge)
@@ -490,8 +497,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
                 # Auto-generate warp after successful write
                 if thread.target.warp_mode == "auto":
-                    from pathlib import Path
-
                     auto_generate_warp(
                         df,
                         resolved_warp,
@@ -512,7 +517,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # Warp enforcement, drift detection, warp-only append
                 engine_col_names = audit_columns_applied[:]
                 df, warp_findings, drift_report = _apply_warp_and_drift(
-                    df, resolved_warp, thread, engine_col_names
+                    df,
+                    resolved_warp,
+                    thread,
+                    engine_col_names,
+                    spark=spark,
+                    target_path=target_path,
                 )
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
@@ -524,8 +534,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
                 # Auto-generate warp after successful write
                 if thread.target.warp_mode == "auto":
-                    from pathlib import Path
-
                     auto_generate_warp(
                         df,
                         resolved_warp,
@@ -545,7 +553,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # Warp enforcement, drift detection, warp-only append
                 engine_col_names = audit_columns_applied[:]
                 df, warp_findings, drift_report = _apply_warp_and_drift(
-                    df, resolved_warp, thread, engine_col_names
+                    df,
+                    resolved_warp,
+                    thread,
+                    engine_col_names,
+                    spark=spark,
+                    target_path=target_path,
                 )
 
                 # General seed phase (non-dimension)
@@ -559,8 +572,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
                 # Auto-generate warp after successful write
                 if thread.target.warp_mode == "auto":
-                    from pathlib import Path
-
                     auto_generate_warp(
                         df,
                         resolved_warp,
@@ -819,6 +830,8 @@ def _apply_warp_and_drift(
     resolved_warp: Any,
     thread: Thread,
     engine_col_names: list[str],
+    spark: SparkSession | None = None,
+    target_path: str | None = None,
 ) -> tuple[Any, list[dict[str, str]], Any]:
     """Apply warp enforcement, drift detection, and warp-only append.
 
@@ -830,6 +843,8 @@ def _apply_warp_and_drift(
         resolved_warp: Resolved WarpConfig, or None.
         thread: Thread configuration.
         engine_col_names: Engine-managed column names (audit, SCD, etc.).
+        spark: SparkSession for table-based drift baseline fallback.
+        target_path: Target path for table-based drift baseline fallback.
 
     Returns:
         Tuple of (modified df, warp findings, drift report).
@@ -841,27 +856,35 @@ def _apply_warp_and_drift(
     drift_report = DriftReport.empty()
 
     # Drift detection (works with or without warp)
-    baseline = get_drift_baseline(warp=resolved_warp)
+    baseline = get_drift_baseline(warp=resolved_warp, spark=spark, target_path=target_path)
+    baseline_source = (
+        "warp" if resolved_warp is not None else ("table" if baseline is not None else "none")
+    )
     df, drift_report = handle_drift(
         df,
         baseline,
         thread.target.schema_drift,
         thread.target.on_drift,
         engine_columns=engine_col_names,
+        baseline_source=baseline_source,
     )
 
     # Warp enforcement (only with warp)
     if resolved_warp is not None:
+        # Compute effective warp to identify warp-only columns
+        pipeline_cols = [f.name for f in df.schema.fields]
+        effective = build_effective_warp(resolved_warp.columns, pipeline_cols, engine_col_names)
+        warp_only_names = [c.name for c in effective.warp_only]
+
         warp_findings = enforce_warp(
             df,
             resolved_warp,
             thread.target.warp_enforcement,
             engine_columns=engine_col_names,
+            warp_only_columns=warp_only_names,
         )
 
         # Warp-only column append
-        pipeline_cols = [f.name for f in df.schema.fields]
-        effective = build_effective_warp(resolved_warp.columns, pipeline_cols, engine_col_names)
         if effective.warp_only:
             df = append_warp_only_columns(df, effective.warp_only)
 

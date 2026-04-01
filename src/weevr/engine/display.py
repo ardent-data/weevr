@@ -2398,6 +2398,7 @@ def render_plan_html(
                 parts.append(f"<div>{flow_svg}</div>")
             except Exception:
                 parts.append(f'<span style="{_S_NONE}">(flow diagram unavailable)</span>')
+            parts.append(_render_plan_warp_summary(thread_model))
             parts.append("</div></details>")
 
     parts.append("</div>")
@@ -2751,6 +2752,70 @@ def _render_drift_report_section(report: dict[str, Any]) -> str:
     parts.append(
         f'<tr><td style="{_S_TD}">Extra Columns</td><td style="{_S_TD}">{cols_str}</td></tr>'
     )
+    parts.append("</table>")
+    return "\n".join(parts)
+
+
+def _render_plan_warp_summary(thread_model: Any) -> str:
+    """Render warp configuration summary for plan mode.
+
+    Shows warp reference, enforcement mode, drift mode, and warp-only
+    status when a warp-related setting is configured on the target.
+    """
+    target = getattr(thread_model, "target", None)
+    if target is None:
+        return ""
+
+    warp_ref = getattr(target, "warp", None)
+    warp_enforcement = getattr(target, "warp_enforcement", "warn")
+    schema_drift = getattr(target, "schema_drift", "lenient")
+    on_drift = getattr(target, "on_drift", "warn")
+    warp_mode = getattr(target, "warp_mode", None)
+    warp_init = getattr(target, "warp_init", False)
+
+    # Only render if non-default warp settings are present
+    has_explicit_warp = warp_ref is not None
+    has_non_default = (
+        warp_enforcement != "warn"
+        or schema_drift != "lenient"
+        or warp_mode is not None
+        or warp_init
+    )
+    if not has_explicit_warp and not has_non_default:
+        return ""
+
+    parts = [f'<h4 style="{_S_H4}">Warp Configuration</h4>']
+    parts.append(f'<table style="{_S_TABLE}">')
+    parts.append(f'<tr><th style="{_S_TH}">Setting</th><th style="{_S_TH}">Value</th></tr>')
+
+    warp_display = "auto-discover"
+    if warp_ref is False:
+        warp_display = "disabled"
+    elif isinstance(warp_ref, str):
+        warp_display = html.escape(warp_ref)
+    parts.append(f'<tr><td style="{_S_TD}">Warp</td><td style="{_S_TD}">{warp_display}</td></tr>')
+    parts.append(
+        f'<tr><td style="{_S_TD}">Enforcement</td>'
+        f'<td style="{_S_TD}">{html.escape(warp_enforcement)}</td></tr>'
+    )
+    parts.append(
+        f'<tr><td style="{_S_TD}">Schema Drift</td>'
+        f'<td style="{_S_TD}">{html.escape(schema_drift)}</td></tr>'
+    )
+    if schema_drift == "strict":
+        parts.append(
+            f'<tr><td style="{_S_TD}">On Drift</td>'
+            f'<td style="{_S_TD}">{html.escape(on_drift)}</td></tr>'
+        )
+    if warp_mode:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Warp Mode</td>'
+            f'<td style="{_S_TD}">{html.escape(warp_mode)}</td></tr>'
+        )
+    if warp_init:
+        parts.append(
+            f'<tr><td style="{_S_TD}">Pre-initialize</td><td style="{_S_TD}">yes</td></tr>'
+        )
     parts.append("</table>")
     return "\n".join(parts)
 

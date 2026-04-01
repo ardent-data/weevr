@@ -125,6 +125,31 @@ class TestEnforceWarp:
         findings = enforce_warp(df, warp, "enforce", engine_columns=["_loaded_at"])
         assert findings == []
 
+    def test_warp_only_columns_excluded(self, spark: SparkSession):
+        """Warp-only columns excluded from missing check."""
+        df = spark.createDataFrame([(1,)], ["id"])
+        warp = self._make_warp(
+            [
+                {"name": "id", "type": "bigint"},
+                {"name": "status", "type": "string"},
+            ]
+        )
+        # 'status' is warp-only — should not produce a missing_column finding
+        findings = enforce_warp(df, warp, "enforce", warp_only_columns=["status"])
+        assert findings == []
+
+    def test_warp_only_not_excluded_without_param(self, spark: SparkSession):
+        """Without warp_only_columns param, absent columns are flagged."""
+        df = spark.createDataFrame([(1,)], ["id"])
+        warp = self._make_warp(
+            [
+                {"name": "id", "type": "bigint"},
+                {"name": "status", "type": "string"},
+            ]
+        )
+        with pytest.raises(WarpEnforcementError):
+            enforce_warp(df, warp, "enforce")
+
 
 # ---------------------------------------------------------------------------
 # append_warp_only_columns (Task 12)
@@ -317,13 +342,14 @@ class TestAutoGenerateWarp:
         new_col = next(c for c in data["columns"] if c["name"] == "new_col")
         assert new_col.get("discovered") is True
 
-    def test_write_failure_returns_false(self, spark: SparkSession):
+    def test_write_failure_returns_false(self, spark: SparkSession, tmp_path: Path):
         """Write failure returns False without raising."""
+        from unittest.mock import patch
+
         df = spark.createDataFrame([(1,)], ["id"])
-        # Invalid path
-        result = auto_generate_warp(df, None, None, "test", "/nonexistent/deep/path/x/y/z")
-        # Should not raise, should return False
-        assert result is False or result is True  # Best-effort, may succeed on some systems
+        with patch("builtins.open", side_effect=PermissionError("mocked")):
+            result = auto_generate_warp(df, None, None, "test", str(tmp_path))
+        assert result is False
 
     def test_column_types_serialized(self, spark: SparkSession, tmp_path: Path):
         """Column types serialized as Spark SQL type strings."""

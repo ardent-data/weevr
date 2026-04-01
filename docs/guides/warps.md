@@ -166,6 +166,10 @@ target:
 
 Pre-initialization is a no-op if the table already exists.
 
+For dimension targets, SCD columns (effective date, current flag,
+etc.) are engine-managed and not known at pre-init time. Declare
+them in the warp if using `warp_init` with dimension targets.
+
 ## Configuration reference
 
 | Key | Level | Default | Description |

@@ -31,6 +31,7 @@ def enforce_warp(
     warp: WarpConfig,
     mode: str,
     engine_columns: list[str] | None = None,
+    warp_only_columns: list[str] | None = None,
 ) -> list[dict[str, str]]:
     """Validate a DataFrame against a warp contract.
 
@@ -43,6 +44,8 @@ def enforce_warp(
         warp: Warp config with column declarations.
         mode: Enforcement mode ('enforce', 'warn', 'off').
         engine_columns: Engine-managed column names to exclude from checks.
+        warp_only_columns: Warp-only column names to exclude from the
+            missing-column check (they will be appended after enforcement).
 
     Returns:
         List of finding dicts. Empty if no issues found.
@@ -54,6 +57,7 @@ def enforce_warp(
         return []
 
     engine_set = set(engine_columns or [])
+    warp_only_set = set(warp_only_columns or [])
     df_fields = {field.name: field for field in df.schema.fields}
     findings: list[dict[str, str]] = []
 
@@ -62,11 +66,11 @@ def enforce_warp(
         if col.name in engine_set:
             continue
 
-        # Skip warp-only columns (not in pipeline output)
+        # Skip warp-only columns (will be appended after enforcement)
+        if col.name in warp_only_set:
+            continue
+
         if col.name not in df_fields:
-            # This is a warp-only column if it's expected to be appended later
-            # But if the column is expected to come from the pipeline and is
-            # missing, that's a finding
             findings.append(
                 {
                     "type": "missing_column",
@@ -364,8 +368,15 @@ def _parse_spark_type(type_str: str) -> T.DataType:
             return T.DecimalType(int(match.group(1)), int(match.group(2)))
         return T.DecimalType()
 
-    # Fallback: let Spark parse it
-    # This handles array, map, struct types
-    from pyspark.sql.types import _parse_datatype_string
+    # Fallback for complex types (array, map, struct).
+    # _parse_datatype_string is a private PySpark API — guard against
+    # removal or signature changes across PySpark versions.
+    try:
+        from pyspark.sql.types import _parse_datatype_string  # type: ignore[attr-defined]
 
-    return _parse_datatype_string(type_str)
+        return _parse_datatype_string(type_str)
+    except (ImportError, AttributeError, Exception):
+        raise ValueError(
+            f"Unsupported Spark type '{type_str}'. Supported simple types: "
+            f"{', '.join(sorted(_SIMPLE_TYPES))} and decimal(p,s)."
+        ) from None

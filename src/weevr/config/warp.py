@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from weevr.config.parser import parse_yaml
 from weevr.config.validation import validate_schema
 from weevr.errors import ConfigError
 from weevr.model.warp import EffectiveWarp, WarpColumn, WarpConfig
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +143,8 @@ def _load_warp(path: Path) -> WarpConfig:
     """
     raw = parse_yaml(path)
     result = validate_schema(raw, "warp")
-    assert isinstance(result, WarpConfig)
+    if not isinstance(result, WarpConfig):
+        raise ConfigError(f"Expected WarpConfig from '{path}', got {type(result).__name__}")
     return result
 
 

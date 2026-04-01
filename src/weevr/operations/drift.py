@@ -18,6 +18,7 @@ def handle_drift(
     schema_drift: str,
     on_drift: str,
     engine_columns: list[str] | None = None,
+    baseline_source: str = "unknown",
 ) -> tuple[DataFrame, DriftReport]:
     """Detect and handle schema drift (extra columns) at the target boundary.
 
@@ -32,6 +33,7 @@ def handle_drift(
         on_drift: Severity for strict mode ('error', 'warn', 'ignore').
         engine_columns: Engine-managed column names to exclude from
             drift detection.
+        baseline_source: Provenance of the baseline ('warp' or 'table').
 
     Returns:
         Tuple of (possibly modified DataFrame, DriftReport).
@@ -56,7 +58,7 @@ def handle_drift(
     report = DriftReport(
         extra_columns=extra,
         drift_mode=schema_drift,
-        baseline_source="warp" if len(baseline) > 0 else "table",
+        baseline_source=baseline_source,
     )
 
     if schema_drift == "lenient":
