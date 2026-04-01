@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 from spark_helpers import create_delta_table
 from weevr.errors.exceptions import ExecutionError
@@ -556,3 +557,134 @@ class TestIntSequenceSource:
         assert df.count() == 0
         assert df.columns == ["n"]
         assert isinstance(df.schema["n"].dataType, LongType)
+
+
+class TestGeneratedSourceIntegration:
+    """Integration tests: generated sources in pipelines and as join inputs."""
+
+    def test_date_sequence_with_derived_columns(self, spark: SparkSession) -> None:
+        """date_sequence source supports downstream column derivation."""
+        source = Source(
+            type="date_sequence",
+            column="calendar_date",
+            start="2025-03-01",
+            end="2025-03-05",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+        result = (
+            df.withColumn("year", F.year(F.col("calendar_date")))
+            .withColumn("month", F.month(F.col("calendar_date")))
+            .withColumn("day", F.dayofmonth(F.col("calendar_date")))
+        )
+
+        assert result.count() == 5
+        assert set(result.columns) == {"calendar_date", "year", "month", "day"}
+
+        row = result.filter(F.col("calendar_date") == "2025-03-03").collect()[0]
+        assert row["year"] == 2025
+        assert row["month"] == 3
+        assert row["day"] == 3
+
+    def test_date_sequence_derived_column_types(self, spark: SparkSession) -> None:
+        """Derived year/month/day columns have integer types."""
+        from pyspark.sql.types import IntegerType
+
+        source = Source(
+            type="date_sequence",
+            column="calendar_date",
+            start="2025-01-01",
+            end="2025-01-03",
+        )
+        df = read_source(spark, "dates", source)
+        result = (
+            df.withColumn("year", F.year(F.col("calendar_date")))
+            .withColumn("month", F.month(F.col("calendar_date")))
+            .withColumn("day", F.dayofmonth(F.col("calendar_date")))
+        )
+
+        assert isinstance(result.schema["year"].dataType, IntegerType)
+        assert isinstance(result.schema["month"].dataType, IntegerType)
+        assert isinstance(result.schema["day"].dataType, IntegerType)
+
+    def test_int_sequence_joined_with_delta_source(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """int_sequence source can be inner-joined with a delta source."""
+        path = tmp_delta_path("join_data")
+        data = [{"id": 1, "label": "a"}, {"id": 3, "label": "c"}, {"id": 5, "label": "e"}]
+        create_delta_table(spark, path, data)
+
+        int_source = Source(type="int_sequence", column="n", start=1, end=5)
+        delta_source = Source(type="delta", alias=path)
+
+        int_df = read_source(spark, "keys", int_source)
+        delta_df = read_source(spark, "data", delta_source)
+        joined = int_df.join(delta_df, int_df["n"] == delta_df["id"], "inner")
+
+        assert joined.count() == 3
+        assert set(joined.columns) == {"n", "id", "label"}
+
+    def test_int_sequence_left_join_preserves_all_keys(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Left join with an int_sequence source keeps all generated keys."""
+        path = tmp_delta_path("left_join_data")
+        data = [{"id": 2, "val": "x"}, {"id": 4, "val": "y"}]
+        create_delta_table(spark, path, data)
+
+        int_source = Source(type="int_sequence", column="n", start=1, end=4)
+        delta_source = Source(type="delta", alias=path)
+
+        int_df = read_source(spark, "keys", int_source)
+        delta_df = read_source(spark, "data", delta_source)
+        joined = int_df.join(delta_df, int_df["n"] == delta_df["id"], "left")
+
+        assert joined.count() == 4
+        matched = joined.filter(F.col("val").isNotNull()).count()
+        assert matched == 2
+
+    def test_delta_source_reading_unchanged(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Existing delta source reading is unaffected by generated source changes."""
+        path = tmp_delta_path("compat_check")
+        data = [{"k": 10, "v": "alpha"}, {"k": 20, "v": "beta"}, {"k": 30, "v": "gamma"}]
+        create_delta_table(spark, path, data)
+
+        source = Source(type="delta", alias=path)
+        df = read_source(spark, "compat", source)
+
+        assert df.count() == 3
+        assert set(df.columns) == {"k", "v"}
+        values = sorted(row["k"] for row in df.collect())
+        assert values == [10, 20, 30]
+
+    def test_generated_source_as_with_block_from(self, spark: SparkSession) -> None:
+        """A generated source can serve as the from: input for a with: sub-pipeline.
+
+        Simulates the CTE resolution that _resolve_with_block performs: read the
+        generated source, then apply a column derivation step the way the engine
+        would via run_pipeline.
+        """
+        from weevr.model.pipeline import DeriveParams, DeriveStep
+        from weevr.model.types import SparkExpr
+        from weevr.operations.pipeline import run_pipeline
+
+        source = Source(
+            type="date_sequence",
+            column="dt",
+            start="2025-06-01",
+            end="2025-06-07",
+            step="day",
+        )
+        df = read_source(spark, "dates", source)
+
+        # Replicate what the engine does inside _resolve_with_block:
+        # run_pipeline applies steps to the CTE DataFrame.
+        steps = [
+            DeriveStep(derive=DeriveParams(columns={"week_num": SparkExpr("weekofyear(dt)")})),
+        ]
+        cte_df = run_pipeline(df, steps, sources={})
+
+        assert cte_df.count() == 7
+        assert "week_num" in cte_df.columns
+        assert "dt" in cte_df.columns
