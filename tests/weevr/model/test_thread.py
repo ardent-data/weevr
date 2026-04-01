@@ -477,24 +477,6 @@ class TestThreadConnectionsField:
         assert restored.connections == t.connections
 
 
-# ---------------------------------------------------------------------------
-# Helpers for with: block tests
-# ---------------------------------------------------------------------------
-
-_SIMPLE_CTE = {
-    "from": "customers",
-    "steps": [{"filter": {"expr": "active = true"}}],
-}
-
-_JOIN_STEP = {
-    "join": {
-        "source": "orders_cte",
-        "type": "left",
-        "on": ["id"],
-        "alias": "ord",
-    }
-}
-
 _MINIMAL_WITH_SOURCES = {
     "config_version": "1.0",
     "sources": {
