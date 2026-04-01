@@ -3634,7 +3634,7 @@
         "description": "A named sub-pipeline that produces an intermediate DataFrame.\n\nSub-pipelines are declared under the ``with:`` block of a thread and are\nreferenced by name in subsequent join or union steps.",
         "properties": {
           "from": {
-            "description": "Name of the source thread or table this sub-pipeline reads from.",
+            "description": "Name of the source or earlier CTE this sub-pipeline reads from.",
             "title": "From",
             "type": "string"
           },
