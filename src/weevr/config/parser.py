@@ -99,6 +99,7 @@ SUPPORTED_VERSIONS: dict[str, tuple[int, int]] = {
     "weave": (1, 0),
     "loom": (1, 0),
     "params": (1, 0),
+    "warp": (1, 0),
 }
 
 
@@ -133,6 +134,7 @@ TYPED_EXTENSIONS: dict[str, str] = {
     ".thread": "thread",
     ".weave": "weave",
     ".loom": "loom",
+    ".warp": "warp",
 }
 
 
@@ -157,7 +159,7 @@ def detect_config_type_from_extension(path: str | Path) -> str | None:
     if suffix in (".yaml", ".yml"):
         return None
     raise ConfigError(
-        f"Unsupported extension '{suffix}'. Expected .thread, .weave, or .loom",
+        f"Unsupported extension '{suffix}'. Expected .thread, .weave, .loom, or .warp",
         file_path=str(path),
     )
 

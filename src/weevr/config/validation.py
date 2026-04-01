@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from weevr.errors import ConfigSchemaError
 from weevr.model.params import ParamsConfig
+from weevr.model.warp import WarpConfig
 
 
 class BaseConfig(BaseModel):
@@ -104,6 +105,7 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
         "weave": WeaveConfig,
         "loom": LoomConfig,
         "params": ParamsConfig,
+        "warp": WarpConfig,
     }
 
     if config_type not in model_map:
