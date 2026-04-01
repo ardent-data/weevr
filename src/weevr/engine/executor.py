@@ -325,6 +325,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map = read_sources(spark, normal_sources, connections=connections)
                 sources_map.update(lookup_dfs)
 
+            # Resolve with: block CTEs before the primary DataFrame is set
+            if thread.with_:
+                sources_map = _resolve_with_block(thread, sources_map)
+
             # Step 5 — primary DataFrame is the first declared source
             df = next(iter(sources_map.values()))
             rows_read = df.count()
@@ -635,6 +639,32 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         # Cleanup thread-level lookups only; weave-level cleanup is the caller's job
         if thread_cached_lookups:
             cleanup_lookups(thread_cached_lookups)
+
+
+def _resolve_with_block(
+    thread: Thread,
+    sources_map: dict[str, Any],
+) -> dict[str, Any]:
+    """Resolve with: block CTEs, registering each result in the source registry.
+
+    Each CTE is evaluated in declaration order. The result of each CTE is
+    added to the registry so that later CTEs (and the main pipeline) can
+    reference it by name.
+
+    Args:
+        thread: Thread configuration with a populated ``with_`` block.
+        sources_map: Current source registry (sources + lookup DataFrames).
+
+    Returns:
+        An enriched copy of ``sources_map`` with each CTE result registered
+        under its declared name.
+    """
+    enriched: dict[str, Any] = dict(sources_map)
+    for cte_name, cte in thread.with_.items():  # type: ignore[union-attr]
+        cte_df = enriched[cte.from_]
+        cte_df = run_pipeline(cte_df, cte.steps, enriched)
+        enriched[cte_name] = cte_df
+    return enriched
 
 
 def _build_thread_variable_context(thread: Thread) -> VariableContext:

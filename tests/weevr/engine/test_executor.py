@@ -932,3 +932,149 @@ class TestExecuteThreadConnections:
 
         assert len(captured_export_paths) == 1
         assert captured_export_paths[0] == expected_path
+
+
+class TestResolveWithBlock:
+    """Unit tests for _resolve_with_block — CTE resolution phase."""
+
+    def test_single_cte_filter_registered_in_sources(self, spark: SparkSession) -> None:
+        """A CTE with a filter step produces a filtered DataFrame in the enriched registry."""
+        from weevr.engine.executor import _resolve_with_block
+
+        orders = spark.createDataFrame(
+            [{"id": 1, "amount": 200}, {"id": 2, "amount": 30}, {"id": 3, "amount": 150}]
+        )
+        sources_map = {"orders": orders}
+
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1",
+                "sources": {"orders": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {
+                    "big_orders": {
+                        "from": "orders",
+                        "steps": [{"filter": {"expr": "amount > 100"}}],
+                    }
+                },
+            }
+        )
+
+        result = _resolve_with_block(thread, sources_map)
+
+        assert "big_orders" in result
+        assert result["big_orders"].count() == 2
+
+    def test_original_sources_preserved(self, spark: SparkSession) -> None:
+        """_resolve_with_block does not mutate the original sources_map."""
+        from weevr.engine.executor import _resolve_with_block
+
+        orders = spark.createDataFrame([{"id": 1, "amount": 50}])
+        sources_map = {"orders": orders}
+
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1",
+                "sources": {"orders": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {
+                    "filtered": {"from": "orders", "steps": [{"filter": {"expr": "amount > 10"}}]}
+                },
+            }
+        )
+
+        _resolve_with_block(thread, sources_map)
+
+        assert set(sources_map.keys()) == {"orders"}
+
+    def test_cte_result_joinable_in_main_pipeline(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """CTE registered by _resolve_with_block can be joined in the main pipeline."""
+        src = tmp_delta_path("cte_join_src")
+        tgt = tmp_delta_path("cte_join_tgt")
+
+        create_delta_table(
+            spark,
+            src,
+            [
+                {"id": 1, "amount": 200},
+                {"id": 2, "amount": 30},
+                {"id": 3, "amount": 150},
+            ],
+        )
+
+        # CTE: filter to high-value rows, then keep only `id` to avoid join column ambiguity
+        thread = Thread.model_validate(
+            {
+                "name": "cte_join",
+                "config_version": "1",
+                "sources": {"orders": {"type": "delta", "alias": src}},
+                "steps": [{"join": {"source": "big_orders", "on": ["id"], "type": "inner"}}],
+                "target": {"path": tgt},
+                "with": {
+                    "big_orders": {
+                        "from": "orders",
+                        "steps": [
+                            {"filter": {"expr": "amount > 100"}},
+                            {"select": {"columns": ["id"]}},
+                        ],
+                    }
+                },
+            }
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.rows_written == 2
+
+    def test_cte_chaining_b_from_a(self, spark: SparkSession) -> None:
+        """CTE B declared after CTE A can reference CTE A as its source."""
+        from weevr.engine.executor import _resolve_with_block
+
+        data = spark.createDataFrame(
+            [{"id": 1, "val": 10}, {"id": 2, "val": 20}, {"id": 3, "val": 30}]
+        )
+        sources_map = {"raw": data}
+
+        thread = Thread.model_validate(
+            {
+                "name": "chain",
+                "config_version": "1",
+                "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [],
+                "target": {"path": "/fake/target"},
+                "with": {
+                    "cte_a": {"from": "raw", "steps": [{"filter": {"expr": "val >= 20"}}]},
+                    "cte_b": {"from": "cte_a", "steps": [{"filter": {"expr": "val >= 30"}}]},
+                },
+            }
+        )
+
+        result = _resolve_with_block(thread, sources_map)
+
+        assert result["cte_a"].count() == 2
+        assert result["cte_b"].count() == 1
+
+    def test_thread_without_with_block_unchanged(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Thread with no with: block executes without change — backward compatibility."""
+        src = tmp_delta_path("no_cte_src")
+        tgt = tmp_delta_path("no_cte_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}, {"id": 3}])
+
+        thread = Thread(
+            name="no_cte",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt),
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.rows_written == 3
