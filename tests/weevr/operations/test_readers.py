@@ -680,7 +680,7 @@ class TestGeneratedSourceIntegration:
 
         # Replicate what the engine does inside _resolve_with_block:
         # run_pipeline applies steps to the CTE DataFrame.
-        steps = [
+        steps: list = [
             DeriveStep(derive=DeriveParams(columns={"week_num": SparkExpr("weekofyear(dt)")})),
         ]
         cte_df = run_pipeline(df, steps, sources={})
