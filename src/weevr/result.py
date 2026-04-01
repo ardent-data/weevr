@@ -233,6 +233,23 @@ class RunResult:
                             )
                             export_parts.append(f"{exp_name} ({exp_type} → {exp_target})")
                         lines.append(f"    exports: {', '.join(export_parts)}")
+                    # Show sub-pipelines if with: block is present
+                    with_block = getattr(thread, "with_", None)
+                    if with_block:
+                        lines.append("    sub-pipelines:")
+                        for cte_name, cte in with_block.items():
+                            cte_steps = getattr(cte, "steps", [])
+                            step_types = [
+                                type(s).__name__.replace("Step", "").lower() for s in cte_steps
+                            ]
+                            cte_count = len(cte_steps)
+                            cte_label = "step" if cte_count == 1 else "steps"
+                            cte_from = getattr(cte, "from_", "?")
+                            type_str = f" ({', '.join(step_types)})" if step_types else ""
+                            lines.append(
+                                f"      {cte_name} \u2190 {cte_from}"
+                                f"  {cte_count} {cte_label}{type_str}"
+                            )
 
         return "\n".join(lines)
 
