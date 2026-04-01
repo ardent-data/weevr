@@ -4063,6 +4063,76 @@
           ],
           "default": null,
           "description": "Seed rows to insert on first write or when the table is empty."
+        },
+        "warp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "const": false,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Warp schema contract reference. A string names an explicit .warp file; False opts out of auto-discovery; None enables auto-discovery.",
+          "title": "Warp"
+        },
+        "warp_mode": {
+          "anyOf": [
+            {
+              "const": "auto",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Warp generation mode. 'auto' writes/updates the .warp file after each successful run.",
+          "title": "Warp Mode"
+        },
+        "warp_init": {
+          "default": false,
+          "description": "When True and a warp exists, create the Delta table from the effective warp before the first pipeline run.",
+          "title": "Warp Init",
+          "type": "boolean"
+        },
+        "warp_enforcement": {
+          "default": "warn",
+          "description": "Warp contract enforcement mode. 'enforce' fails the thread on violations; 'warn' logs findings; 'off' skips validation.",
+          "enum": [
+            "warn",
+            "enforce",
+            "off"
+          ],
+          "title": "Warp Enforcement",
+          "type": "string"
+        },
+        "schema_drift": {
+          "default": "lenient",
+          "description": "Schema drift handling mode. 'lenient' passes extra columns through; 'strict' applies on_drift action; 'adaptive' passes through and extends auto-generated warps.",
+          "enum": [
+            "lenient",
+            "strict",
+            "adaptive"
+          ],
+          "title": "Schema Drift",
+          "type": "string"
+        },
+        "on_drift": {
+          "default": "warn",
+          "description": "Severity action for strict drift mode. 'error' aborts the thread; 'warn' drops extra columns with a warning; 'ignore' drops silently.",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "On Drift",
+          "type": "string"
         }
       },
       "title": "Target",

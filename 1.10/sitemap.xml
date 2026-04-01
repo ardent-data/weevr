@@ -73,11 +73,19 @@
          <lastmod>2026-04-01</lastmod>
     </url>
     <url>
+         <loc>https://ardent-data.github.io/weevr/1.10/guides/schema-drift/</loc>
+         <lastmod>2026-04-01</lastmod>
+    </url>
+    <url>
          <loc>https://ardent-data.github.io/weevr/1.10/guides/sub-pipelines/</loc>
          <lastmod>2026-04-01</lastmod>
     </url>
     <url>
          <loc>https://ardent-data.github.io/weevr/1.10/guides/telemetry-architecture/</loc>
+         <lastmod>2026-04-01</lastmod>
+    </url>
+    <url>
+         <loc>https://ardent-data.github.io/weevr/1.10/guides/warps/</loc>
          <lastmod>2026-04-01</lastmod>
     </url>
     <url>
