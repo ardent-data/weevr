@@ -998,3 +998,62 @@ class TestAuditTemplateInheritance:
         ac = result["target"]["audit_columns"]
         assert "_keep" in ac
         assert "_drop_me" not in ac
+
+
+class TestTargetPolicyInheritance:
+    """Test defaults.target.* cascade for schema_drift, on_drift, warp_enforcement."""
+
+    def test_loom_schema_drift_cascades(self):
+        """Loom defaults.target.schema_drift cascades to thread target."""
+        loom: dict[str, Any] = {"target": {"schema_drift": "strict"}}
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["schema_drift"] == "strict"
+
+    def test_weave_on_drift_overrides_loom(self):
+        """Weave defaults.target.on_drift overrides loom."""
+        loom: dict[str, Any] = {"target": {"on_drift": "warn"}}
+        weave: dict[str, Any] = {"target": {"on_drift": "error"}}
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["target"]["on_drift"] == "error"
+
+    def test_thread_warp_enforcement_overrides_weave(self):
+        """Thread target.warp_enforcement overrides weave."""
+        weave: dict[str, Any] = {"target": {"warp_enforcement": "warn"}}
+        thread: dict[str, Any] = {"target": {"alias": "data.out", "warp_enforcement": "enforce"}}
+        result = apply_inheritance(None, weave, thread)
+        assert result["target"]["warp_enforcement"] == "enforce"
+
+    def test_missing_key_uses_default_not_set(self):
+        """Missing key at any level means no value is set (model defaults apply)."""
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        result = apply_inheritance(None, None, thread)
+        # Keys not set in any level → not in cascaded result
+        assert "schema_drift" not in result["target"]
+        assert "on_drift" not in result["target"]
+        assert "warp_enforcement" not in result["target"]
+
+    def test_non_target_keys_unaffected(self):
+        """Non-target keys like mapping_mode are not touched by policy cascade."""
+        loom: dict[str, Any] = {"target": {"schema_drift": "strict"}}
+        thread: dict[str, Any] = {"target": {"alias": "data.out", "mapping_mode": "explicit"}}
+        result = apply_inheritance(loom, None, thread)
+        assert result["target"]["mapping_mode"] == "explicit"
+        assert result["target"]["schema_drift"] == "strict"
+
+    def test_full_cascade_loom_weave_thread(self):
+        """Full three-level cascade with mixed overrides."""
+        loom: dict[str, Any] = {
+            "target": {
+                "schema_drift": "lenient",
+                "on_drift": "warn",
+                "warp_enforcement": "warn",
+            }
+        }
+        weave: dict[str, Any] = {"target": {"schema_drift": "strict"}}
+        thread: dict[str, Any] = {"target": {"alias": "data.out", "on_drift": "error"}}
+        result = apply_inheritance(loom, weave, thread)
+        assert result["target"]["schema_drift"] == "strict"
+        assert result["target"]["on_drift"] == "error"
+        assert result["target"]["warp_enforcement"] == "warn"

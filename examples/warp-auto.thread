@@ -1,0 +1,20 @@
+config_version: "1.0"
+name: warp-auto
+
+sources:
+  orders:
+    type: delta
+    alias: bronze.raw_orders
+
+steps:
+  - operation: select
+    columns:
+      - order_id
+      - customer_id
+      - amount
+      - order_date
+
+target:
+  alias: gold.fact_orders
+  warp_mode: auto
+  schema_drift: adaptive

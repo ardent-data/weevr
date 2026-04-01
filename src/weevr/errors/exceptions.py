@@ -1,5 +1,12 @@
 """Exception hierarchy for weevr."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from weevr.model.warp import DriftReport
+
 
 class WeevError(Exception):
     """Base exception for all weevr errors."""
@@ -325,6 +332,83 @@ class LookupResolutionError(ConfigError):
     """
 
     pass
+
+
+class WarpEnforcementError(ExecutionError):
+    """Raised when warp contract enforcement finds violations.
+
+    Carries the list of enforcement findings (missing columns, type
+    mismatches, nullable violations) that caused the failure.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        thread_name: str | None = None,
+        findings: list[dict[str, str]] | None = None,
+    ) -> None:
+        """Initialize WarpEnforcementError.
+
+        Args:
+            message: Human-readable error message.
+            cause: Optional underlying exception.
+            thread_name: Name of the thread where the error occurred.
+            findings: List of enforcement findings (dicts with type, column, etc.).
+        """
+        super().__init__(message, cause=cause, thread_name=thread_name)
+        self.findings = findings or []
+
+    def __str__(self) -> str:
+        """Return string representation with findings count."""
+        parts = [self.message]
+        if self.thread_name:
+            parts.append(f"in thread '{self.thread_name}'")
+        parts.append(f"({len(self.findings)} finding(s))")
+        base_msg = " ".join(parts)
+        if self.cause:
+            return f"{base_msg} (caused by: {self.cause})"
+        return base_msg
+
+
+class SchemaDriftError(ExecutionError):
+    """Raised when schema drift is detected in strict mode with on_drift: error.
+
+    Carries the drift report with details about which extra columns
+    were found and the configured drift handling mode.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        thread_name: str | None = None,
+        drift_report: DriftReport | None = None,
+    ) -> None:
+        """Initialize SchemaDriftError.
+
+        Args:
+            message: Human-readable error message.
+            cause: Optional underlying exception.
+            thread_name: Name of the thread where the error occurred.
+            drift_report: DriftReport instance with drift details.
+        """
+        super().__init__(message, cause=cause, thread_name=thread_name)
+        self.drift_report = drift_report
+
+    def __str__(self) -> str:
+        """Return string representation with drift info."""
+        parts = [self.message]
+        if self.thread_name:
+            parts.append(f"in thread '{self.thread_name}'")
+        if self.drift_report is not None:
+            extra = getattr(self.drift_report, "extra_columns", [])
+            if extra:
+                parts.append(f"({len(extra)} extra column(s))")
+        base_msg = " ".join(parts)
+        if self.cause:
+            return f"{base_msg} (caused by: {self.cause})"
+        return base_msg
 
 
 class DataValidationError(WeevError):

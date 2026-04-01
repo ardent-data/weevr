@@ -21,6 +21,7 @@ MODELS = {
     "thread": "weevr.model.thread:Thread",
     "weave": "weevr.model.weave:Weave",
     "loom": "weevr.model.loom:Loom",
+    "warp": "weevr.model.warp:WarpConfig",
 }
 
 

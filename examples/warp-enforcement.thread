@@ -1,0 +1,22 @@
+config_version: "1.0"
+name: warp-enforcement
+
+sources:
+  customers:
+    type: delta
+    alias: bronze.raw_customers
+
+steps:
+  - operation: select
+    columns:
+      - customer_id
+      - customer_name
+      - email
+      - region
+
+target:
+  alias: gold.dim_customer
+  warp: dim_customer
+  warp_enforcement: enforce
+  schema_drift: strict
+  on_drift: warn

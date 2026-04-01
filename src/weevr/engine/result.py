@@ -38,6 +38,8 @@ class ThreadResult(FrozenBase):
     error: str | None = None
     output_schema: list[tuple[str, str]] | None = None
     samples: dict[str, list[dict[str, Any]]] | None = None
+    drift_report: dict[str, Any] | None = None
+    warp_findings: list[dict[str, str]] | None = None
 
 
 class WeaveResult(FrozenBase):

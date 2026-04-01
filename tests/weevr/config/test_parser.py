@@ -133,6 +133,10 @@ class TestValidateConfigVersion:
         assert "Unsupported" in str(exc_info.value)
         assert "2.0" in str(exc_info.value)
 
+    def test_warp_version_1_0(self):
+        """Accept version 1.0 for warp."""
+        validate_config_version((1, 0), "warp")  # Should not raise
+
     def test_unknown_config_type(self):
         """Raise ConfigVersionError for unknown config type."""
         with pytest.raises(ConfigVersionError) as exc_info:
@@ -257,6 +261,9 @@ class TestExtensionDetection:
     def test_case_insensitive(self):
         assert detect_config_type_from_extension("file.THREAD") == "thread"
         assert detect_config_type_from_extension("file.Weave") == "weave"
+
+    def test_warp_extension(self):
+        assert detect_config_type_from_extension("dim_customer.warp") == "warp"
 
     def test_path_with_directories(self):
         assert detect_config_type_from_extension("dims/dim_customer.thread") == "thread"

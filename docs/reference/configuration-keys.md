@@ -217,6 +217,9 @@ Write destination with column mapping and partitioning.
 |-------|------|---------|-------------|
 | `alias` | `str` | `None` | Lakehouse table alias |
 | `path` | `str` | `None` | File path for file-based targets |
+| `connection` | `str` | `None` | Named connection reference. Requires `table`. Mutually exclusive with `alias`. |
+| `schema` | `str` | `None` | Schema override within the connection's lakehouse |
+| `table` | `str` | `None` | Table name within the connection's lakehouse. Requires `connection`. |
 | `mapping_mode` | `"auto" \| "explicit"` | `"auto"` | Column mapping strategy |
 | `columns` | `dict[str, ColumnMapping]` | `None` | Per-column mapping |
 | `partition_by` | `list[str]` | `None` | Partition columns |
@@ -225,6 +228,12 @@ Write destination with column mapping and partitioning.
 | `audit_template_inherit` | `bool` | `True` | When `False`, suppresses inherited `audit_template` from parent levels |
 | `audit_columns_exclude` | `list[str]` | `None` | Column names or glob patterns excluded from the resolved template set |
 | `naming` | `NamingConfig` | `None` | Naming normalization |
+| `warp` | `str \| false \| null` | `null` | Warp reference, opt-out, or auto-discover |
+| `warp_mode` | `"auto" \| null` | `null` | Auto-generate warp after write |
+| `warp_init` | `bool` | `false` | Pre-initialize table from warp |
+| `warp_enforcement` | `"warn" \| "enforce" \| "off"` | `"warn"` | Warp contract enforcement mode |
+| `schema_drift` | `"lenient" \| "strict" \| "adaptive"` | `"lenient"` | Schema drift handling mode |
+| `on_drift` | `"error" \| "warn" \| "ignore"` | `"warn"` | Severity for strict drift mode |
 
 ### ColumnMapping
 

@@ -13,9 +13,11 @@ from weevr.errors.exceptions import (
     LookupResolutionError,
     ModelValidationError,
     ReferenceResolutionError,
+    SchemaDriftError,
     SparkError,
     StateError,
     VariableResolutionError,
+    WarpEnforcementError,
     WeevError,
 )
 
@@ -36,4 +38,6 @@ __all__ = [
     "HookError",
     "LookupResolutionError",
     "DataValidationError",
+    "WarpEnforcementError",
+    "SchemaDriftError",
 ]

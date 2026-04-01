@@ -197,6 +197,108 @@ class TestTarget:
             Target(alias="test", audit_columns_exclude=[""])
 
 
+class TestTargetWarpFields:
+    """Test Target warp and drift fields."""
+
+    def test_warp_default_none(self):
+        """warp defaults to None (auto-discovery enabled)."""
+        t = Target(alias="test")
+        assert t.warp is None
+
+    def test_warp_string_reference(self):
+        """warp accepts a string naming a .warp file."""
+        t = Target(alias="test", warp="dim_customer")
+        assert t.warp == "dim_customer"
+
+    def test_warp_false_opt_out(self):
+        """warp: false opts out of auto-discovery."""
+        t = Target(alias="test", warp=False)
+        assert t.warp is False
+
+    def test_warp_mode_auto(self):
+        """warp_mode accepts 'auto'."""
+        t = Target(alias="test", warp_mode="auto")
+        assert t.warp_mode == "auto"
+
+    def test_warp_mode_default_none(self):
+        """warp_mode defaults to None."""
+        t = Target(alias="test")
+        assert t.warp_mode is None
+
+    def test_warp_init_default_false(self):
+        """warp_init defaults to False."""
+        t = Target(alias="test")
+        assert t.warp_init is False
+
+    def test_warp_init_true(self):
+        """warp_init accepts True."""
+        t = Target(alias="test", warp_init=True)
+        assert t.warp_init is True
+
+    def test_warp_enforcement_default_warn(self):
+        """warp_enforcement defaults to 'warn'."""
+        t = Target(alias="test")
+        assert t.warp_enforcement == "warn"
+
+    def test_warp_enforcement_enforce(self):
+        """warp_enforcement accepts 'enforce'."""
+        t = Target(alias="test", warp_enforcement="enforce")
+        assert t.warp_enforcement == "enforce"
+
+    def test_warp_enforcement_off(self):
+        """warp_enforcement accepts 'off'."""
+        t = Target(alias="test", warp_enforcement="off")
+        assert t.warp_enforcement == "off"
+
+    def test_schema_drift_default_lenient(self):
+        """schema_drift defaults to 'lenient'."""
+        t = Target(alias="test")
+        assert t.schema_drift == "lenient"
+
+    def test_schema_drift_strict(self):
+        """schema_drift accepts 'strict'."""
+        t = Target(alias="test", schema_drift="strict")
+        assert t.schema_drift == "strict"
+
+    def test_schema_drift_adaptive(self):
+        """schema_drift accepts 'adaptive'."""
+        t = Target(alias="test", schema_drift="adaptive")
+        assert t.schema_drift == "adaptive"
+
+    def test_on_drift_default_warn(self):
+        """on_drift defaults to 'warn'."""
+        t = Target(alias="test")
+        assert t.on_drift == "warn"
+
+    def test_on_drift_error(self):
+        """on_drift accepts 'error'."""
+        t = Target(alias="test", on_drift="error")
+        assert t.on_drift == "error"
+
+    def test_on_drift_ignore(self):
+        """on_drift accepts 'ignore'."""
+        t = Target(alias="test", on_drift="ignore")
+        assert t.on_drift == "ignore"
+
+    def test_round_trip_with_warp_fields(self):
+        """Target with warp fields round-trips."""
+        t = Target(
+            alias="test",
+            warp="dim_customer",
+            warp_mode="auto",
+            warp_init=True,
+            warp_enforcement="enforce",
+            schema_drift="strict",
+            on_drift="error",
+        )
+        assert Target.model_validate(t.model_dump()) == t
+
+    def test_round_trip_warp_false(self):
+        """Target with warp: false round-trips."""
+        t = Target(alias="test", warp=False)
+        assert Target.model_validate(t.model_dump()) == t
+
+
 class TestTargetConnectionFields:
     """Test Target connection, schema, and table fields."""
 

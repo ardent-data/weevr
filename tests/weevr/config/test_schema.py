@@ -11,6 +11,7 @@ from weevr.config.validation import (
 )
 from weevr.errors import ConfigSchemaError
 from weevr.model.params import ParamsConfig, ParamSpec
+from weevr.model.warp import WarpConfig
 
 
 class TestThreadConfig:
@@ -341,6 +342,19 @@ class TestValidateSchema:
         }
         result = validate_schema(data, "params")
         assert isinstance(result, ParamsConfig)
+
+    def test_validate_warp(self):
+        """Validate warp config."""
+        data = {
+            "config_version": "1.0",
+            "columns": [
+                {"name": "customer_id", "type": "bigint"},
+                {"name": "customer_name", "type": "string"},
+            ],
+        }
+        result = validate_schema(data, "warp")
+        assert isinstance(result, WarpConfig)
+        assert len(result.columns) == 2
 
     def test_unknown_config_type(self):
         """Raise ConfigSchemaError for unknown type."""
