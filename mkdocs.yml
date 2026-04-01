@@ -87,6 +87,7 @@ nav:
       - Dimension Modeling: guides/dimension-modeling.md
       - Fact Tables: guides/fact-tables.md
       - Resolve Step: guides/resolve.md
+      - Sub-Pipelines: guides/sub-pipelines.md
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:
