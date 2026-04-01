@@ -494,3 +494,65 @@ class TestDateSequenceSource:
 
         # Default day step: Jan 1-5 = 5 rows
         assert df.count() == 5
+
+
+class TestIntSequenceSource:
+    """Tests for int_sequence generated source reading."""
+
+    def test_range_1_to_100_produces_100_rows(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=1, end=100)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 100
+
+    def test_range_with_step_produces_correct_rows(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=1, end=10, step=3)
+        df = read_source(spark, "seq", source)
+        # spark.range(1, 11, 3) → [1, 4, 7, 10]
+        assert df.count() == 4
+        values = sorted(row["n"] for row in df.collect())
+        assert values == [1, 4, 7, 10]
+
+    def test_output_column_name_matches_source_column(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="my_id", start=1, end=5)
+        df = read_source(spark, "seq", source)
+        assert df.columns == ["my_id"]
+
+    def test_output_type_is_long(self, spark: SparkSession) -> None:
+        from pyspark.sql.types import LongType
+
+        source = Source(type="int_sequence", column="val", start=0, end=3)
+        df = read_source(spark, "seq", source)
+        assert isinstance(df.schema["val"].dataType, LongType)
+
+    def test_end_value_is_inclusive_on_step_boundary(self, spark: SparkSession) -> None:
+        # end=10 with step=3 from start=1 hits 10 exactly
+        source = Source(type="int_sequence", column="n", start=1, end=10, step=3)
+        df = read_source(spark, "seq", source)
+        values = sorted(row["n"] for row in df.collect())
+        assert 10 in values
+
+    def test_empty_range_when_start_greater_than_end(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=100, end=1)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 0
+
+    def test_single_row_when_start_equals_end(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=5, end=5)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 1
+        assert df.collect()[0]["n"] == 5
+
+    def test_default_step_is_one(self, spark: SparkSession) -> None:
+        source = Source(type="int_sequence", column="n", start=1, end=5)
+        df = read_source(spark, "seq", source)
+        values = sorted(row["n"] for row in df.collect())
+        assert values == [1, 2, 3, 4, 5]
+
+    def test_empty_range_has_correct_schema(self, spark: SparkSession) -> None:
+        from pyspark.sql.types import LongType
+
+        source = Source(type="int_sequence", column="n", start=100, end=1)
+        df = read_source(spark, "seq", source)
+        assert df.count() == 0
+        assert df.columns == ["n"]
+        assert isinstance(df.schema["n"].dataType, LongType)

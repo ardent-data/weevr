@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
+from pyspark.sql.types import LongType, StructField, StructType
 
 from weevr.delta import is_table_alias
 from weevr.errors.exceptions import ExecutionError
@@ -123,7 +124,7 @@ def _read_raw(
         interval_expr = _INTERVAL_MAP[step_key]
         # When start > end the sequence would have illegal boundaries; return empty.
         if str(source.start) > str(source.end):
-            from pyspark.sql.types import DateType, StructField, StructType
+            from pyspark.sql.types import DateType
 
             return spark.createDataFrame([], StructType([StructField(source.column, DateType())]))
         df = spark.createDataFrame([(1,)], ["_dummy"]).select(
@@ -136,6 +137,21 @@ def _read_raw(
             ).alias(source.column)
         )
         return df
+
+    if source.type == "int_sequence":
+        assert source.column is not None  # guaranteed by Source validator
+        try:
+            start_val = int(source.start)  # type: ignore[arg-type]
+            end_val = int(source.end)  # type: ignore[arg-type]
+            step_val = int(source.step) if source.step is not None else 1
+        except (ValueError, TypeError) as exc:
+            raise ExecutionError(
+                "int_sequence requires integer start/end/step values",
+                cause=exc,
+            ) from exc
+        if start_val > end_val:
+            return spark.createDataFrame([], StructType([StructField(source.column, LongType())]))
+        return spark.range(start_val, end_val + 1, step_val).withColumnRenamed("id", source.column)
 
     raise ExecutionError(f"Unsupported source type: '{source.type}'")
 
