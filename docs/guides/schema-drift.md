@@ -114,8 +114,8 @@ intentional curation.
 Drift events are captured regardless of mode:
 
 - **Telemetry** — `drift_detected`, `drift_columns`,
-  `drift_mode`, and `drift_action_taken` attributes on the
-  thread execution span
+  `drift_mode`, and `drift_action_taken` fields on the
+  `ThreadTelemetry` object
 - **Notebook output** — drift report section in the
   `_repr_html_()` display with extra columns and action taken
 - **Logging** — drift findings logged at the appropriate level

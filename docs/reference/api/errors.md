@@ -39,6 +39,8 @@ WeevError: WeevError {
     StateError
     HookError
     ExportError
+    WarpEnforcementError
+    SchemaDriftError
   }
   DataValidationError
 }
@@ -537,6 +539,85 @@ exports:
 ```
 
 **Related:** [Exports guide](../../guides/exports.md)
+
+---
+
+### WarpEnforcementError
+
+Raised when warp contract enforcement finds violations and
+`warp_enforcement` is set to `enforce`. Carries a `findings`
+list with details about each violation.
+
+**Attributes:**
+
+- `findings` — `list[dict[str, str]]` with keys: `type`
+  (`missing_column`, `type_mismatch`, `nullable_violation`),
+  `column`, `expected`, `actual`
+- `thread_name` — name of the thread that failed
+
+**Common causes:**
+
+- Pipeline output is missing a column declared in the warp
+- A column's Spark type differs from the warp declaration
+- A non-nullable warp column contains null values
+
+**Resolution:**
+
+1. Inspect `findings` to identify which columns failed
+2. Fix the pipeline to produce the expected columns and types
+3. Or update the warp to reflect the actual output schema
+4. Set `warp_enforcement: warn` to log findings without failing
+
+**Example:**
+
+```yaml
+target:
+  alias: gold.dim_customer
+  warp: dim_customer
+  warp_enforcement: enforce  # raises WarpEnforcementError
+```
+
+**Related:** [Warps guide](../../guides/warps.md)
+
+---
+
+### SchemaDriftError
+
+Raised when schema drift is detected in `strict` mode with
+`on_drift: error`. Carries a `drift_report` with details about
+the extra columns found.
+
+**Attributes:**
+
+- `drift_report` — `DriftReport` instance with `extra_columns`,
+  `action_taken`, `drift_mode`, and `baseline_source`
+- `thread_name` — name of the thread that failed
+
+**Common causes:**
+
+- Upstream source added columns that flow through all transforms
+  to the target boundary
+- A new transform step introduces extra columns
+
+**Resolution:**
+
+1. Inspect `drift_report.extra_columns` to see which columns
+   are unexpected
+2. Add the columns to the warp if they are intentional
+3. Add a `select` step to filter unwanted columns
+4. Change `on_drift: warn` to drop extra columns with a warning
+   instead of failing
+
+**Example:**
+
+```yaml
+target:
+  alias: gold.dim_customer
+  schema_drift: strict
+  on_drift: error  # raises SchemaDriftError on extra columns
+```
+
+**Related:** [Schema Drift guide](../../guides/schema-drift.md)
 
 ---
 

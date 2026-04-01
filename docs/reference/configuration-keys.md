@@ -217,6 +217,9 @@ Write destination with column mapping and partitioning.
 |-------|------|---------|-------------|
 | `alias` | `str` | `None` | Lakehouse table alias |
 | `path` | `str` | `None` | File path for file-based targets |
+| `connection` | `str` | `None` | Named connection reference. Requires `table`. Mutually exclusive with `alias`. |
+| `schema` | `str` | `None` | Schema override within the connection's lakehouse |
+| `table` | `str` | `None` | Table name within the connection's lakehouse. Requires `connection`. |
 | `mapping_mode` | `"auto" \| "explicit"` | `"auto"` | Column mapping strategy |
 | `columns` | `dict[str, ColumnMapping]` | `None` | Per-column mapping |
 | `partition_by` | `list[str]` | `None` | Partition columns |

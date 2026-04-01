@@ -178,3 +178,6 @@ them in the warp if using `warp_init` with dimension targets.
 | `target.warp_mode` | Thread | `null` | `auto` for auto-gen |
 | `target.warp_init` | Thread | `false` | Pre-init from warp |
 | `target.warp_enforcement` | Cascadable | `warn` | Enforcement mode |
+
+See [Schema Drift](schema-drift.md) for `target.schema_drift`
+and `target.on_drift` settings.
