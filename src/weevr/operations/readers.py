@@ -12,6 +12,13 @@ from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
 from weevr.state.watermark import WatermarkState
 
+_INTERVAL_MAP = {
+    "day": "interval 1 day",
+    "week": "interval 7 day",
+    "month": "interval 1 month",
+    "year": "interval 1 year",
+}
+
 
 def read_source(
     spark: SparkSession,
@@ -106,6 +113,29 @@ def _read_raw(
 
         resolved_path = resolve_fuse_path(source.path, spark)
         return spark.read.format(source.type).options(**source.options).load(resolved_path)
+
+    if source.type == "date_sequence":
+        # column, start, and end are guaranteed non-None by Source model validation.
+        assert source.column is not None
+        assert source.start is not None
+        assert source.end is not None
+        step_key = str(source.step) if source.step is not None else "day"
+        interval_expr = _INTERVAL_MAP[step_key]
+        # When start > end the sequence would have illegal boundaries; return empty.
+        if str(source.start) > str(source.end):
+            from pyspark.sql.types import DateType, StructField, StructType
+
+            return spark.createDataFrame([], StructType([StructField(source.column, DateType())]))
+        df = spark.createDataFrame([(1,)], ["_dummy"]).select(
+            F.explode(
+                F.sequence(
+                    F.to_date(F.lit(str(source.start))),
+                    F.to_date(F.lit(str(source.end))),
+                    F.expr(interval_expr),
+                )
+            ).alias(source.column)
+        )
+        return df
 
     raise ExecutionError(f"Unsupported source type: '{source.type}'")
 
