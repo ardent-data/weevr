@@ -1128,6 +1128,7 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
     # CTE node positions: centered above the join node they feed into.
     # If a CTE isn't referenced by any join, place it above the first pipeline node.
     cte_positions: dict[str, tuple[float, float, float]] = {}
+    cte_stack_count: dict[int, int] = {}  # pipe_idx → count of CTEs stacked
     for cte_name, _from_src, step_count in cte_defs:
         step_hint = f"{step_count}s" if step_count > 0 else ""
         cte_label = f"{cte_name} ({step_hint})" if step_hint else cte_name
@@ -1137,13 +1138,18 @@ def render_flow_svg(thread: Thread, *, dark: bool | None = None) -> str:
             jpx, _jpy, jpw = pipe_positions[pidx]
             cx = jpx + jpw / 2 - cw_val / 2
         elif pipe_positions:
+            pidx = 0
             jpx, _jpy, jpw = pipe_positions[0]
             cx = jpx + jpw / 2 - cw_val / 2
         else:
+            pidx = -1
             cx = pad
-        # Stack CTE rows above join row (two rows up if join sources also present)
+        # Stack CTEs vertically when multiple share the same join target
+        stack_idx = cte_stack_count.get(pidx, 0)
+        cte_stack_count[pidx] = stack_idx + 1
         has_join_row = bool(join_source_names)
-        cy = center_y - nh - vgap - (nh + vgap if has_join_row else 0)
+        base_cy = center_y - nh - vgap - (nh + vgap if has_join_row else 0)
+        cy = base_cy - stack_idx * (nh + vgap)
         cte_positions[cte_name] = (cx, cy, cw_val)
 
     # Build combined source position list (in original order, for node rendering)

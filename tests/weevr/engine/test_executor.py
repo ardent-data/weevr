@@ -1633,10 +1633,18 @@ class TestWithBlockColumnControlIntegration:
         assert row["subgroup_desc"] == "Subgroup One"
         assert row["group_label"] == "G1 - Group One"
 
-    def test_column_control_excluded_columns_absent_in_full_pipeline(
+    def test_sap_dimension_full_pipeline_with_two_ctes(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """Column control in a CTE join flows through to execute_thread output schema."""
+        """Full end-to-end: 2 CTEs + main pipeline via execute_thread.
+
+        CTE 1 (hierarchy_enriched): enriches hierarchy with a derived label.
+        CTE 2 (product_dim): triple self-join with include+rename+prefix.
+        Main pipeline: joins product_dim CTE into materials.
+
+        Verifies column control flows through to the written Delta output
+        and that excluded/raw columns are absent.
+        """
         src_materials = tmp_delta_path("sap_mat_src")
         src_hierarchy = tmp_delta_path("sap_hier_src")
         tgt = tmp_delta_path("sap_dim_tgt")
@@ -1645,7 +1653,12 @@ class TestWithBlockColumnControlIntegration:
             spark,
             src_materials,
             [
-                {"mat_id": 10, "mat_name": "Part A", "group_code": "GX", "subgroup_code": "SX"},
+                {
+                    "mat_id": 10,
+                    "mat_name": "Part A",
+                    "group_code": "GX",
+                    "subgroup_code": "SX",
+                },
             ],
         )
         create_delta_table(
@@ -1665,28 +1678,48 @@ class TestWithBlockColumnControlIntegration:
                     "materials": {"type": "delta", "alias": src_materials},
                     "hierarchy": {"type": "delta", "alias": src_hierarchy},
                 },
-                # Main pipeline starts from materials (all columns).
-                # The product_dim CTE is narrowed to only mat_id + label columns via select,
-                # so the join brings in label columns without creating ambiguous duplicates.
                 "steps": [
                     {
                         "join": {
                             "source": "product_dim",
                             "on": [{"left": "mat_id", "right": "mat_id"}],
                             "type": "inner",
-                            "include": ["group_desc", "subgroup_desc"],
+                            "include": [
+                                "group_desc",
+                                "subgroup_desc",
+                                "group_label",
+                            ],
                         }
                     },
                 ],
                 "target": {"path": tgt},
                 "with": {
+                    # CTE 1: enrich hierarchy with derived label
+                    "hierarchy_enriched": {
+                        "from": "hierarchy",
+                        "steps": [
+                            {
+                                "derive": {
+                                    "columns": {
+                                        "enriched_label": ("concat(code, ' - ', description)")
+                                    }
+                                }
+                            }
+                        ],
+                    },
+                    # CTE 2: triple self-join with column control
                     "product_dim": {
                         "from": "materials",
                         "steps": [
                             {
                                 "join": {
-                                    "source": "hierarchy",
-                                    "on": [{"left": "group_code", "right": "code"}],
+                                    "source": "hierarchy_enriched",
+                                    "on": [
+                                        {
+                                            "left": "group_code",
+                                            "right": "code",
+                                        }
+                                    ],
                                     "type": "left",
                                     "alias": "grp",
                                     "include": ["description"],
@@ -1695,19 +1728,47 @@ class TestWithBlockColumnControlIntegration:
                             },
                             {
                                 "join": {
-                                    "source": "hierarchy",
-                                    "on": [{"left": "subgroup_code", "right": "code"}],
+                                    "source": "hierarchy_enriched",
+                                    "on": [
+                                        {
+                                            "left": "subgroup_code",
+                                            "right": "code",
+                                        }
+                                    ],
                                     "type": "left",
                                     "alias": "sub",
                                     "include": ["description"],
                                     "rename": {"description": "subgroup_desc"},
                                 }
                             },
-                            # Narrow the CTE to only the key + label columns before it is
-                            # referenced by the main pipeline join.
-                            {"select": {"columns": ["mat_id", "group_desc", "subgroup_desc"]}},
+                            {
+                                "join": {
+                                    "source": "hierarchy_enriched",
+                                    "on": [
+                                        {
+                                            "left": "group_code",
+                                            "right": "code",
+                                        }
+                                    ],
+                                    "type": "left",
+                                    "alias": "lbl",
+                                    "include": ["enriched_label"],
+                                    "prefix": "h_",
+                                    "rename": {"h_enriched_label": "group_label"},
+                                }
+                            },
+                            {
+                                "select": {
+                                    "columns": [
+                                        "mat_id",
+                                        "group_desc",
+                                        "subgroup_desc",
+                                        "group_label",
+                                    ]
+                                }
+                            },
                         ],
-                    }
+                    },
                 },
             }
         )
@@ -1716,6 +1777,20 @@ class TestWithBlockColumnControlIntegration:
 
         assert result.status == "success"
         assert result.rows_written == 1
+
+        written = spark.read.format("delta").load(tgt)
+        cols = set(written.columns)
+        assert "group_desc" in cols
+        assert "subgroup_desc" in cols
+        assert "group_label" in cols
+        assert "description" not in cols
+        assert "level" not in cols
+        assert "h_enriched_label" not in cols
+
+        row = written.collect()[0]
+        assert row["group_desc"] == "Group X"
+        assert row["subgroup_desc"] == "Subgroup X"
+        assert row["group_label"] == "GX - Group X"
 
         written = spark.read.format("delta").load(tgt)
         cols = set(written.columns)

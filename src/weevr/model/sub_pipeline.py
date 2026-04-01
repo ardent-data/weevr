@@ -15,13 +15,13 @@ class SubPipeline(FrozenBase):
     referenced by name in subsequent join or union steps.
     """
 
-    model_config = {"frozen": True, "populate_by_name": True}
+    model_config = {"populate_by_name": True}
 
     from_: str = Field(
         alias="from",
-        description="Name of the source thread or table this sub-pipeline reads from.",
+        description="Name of the source or earlier CTE this sub-pipeline reads from.",
     )
-    steps: list[Step] = Field(  # type: ignore[type-arg]
+    steps: list[Step] = Field(
         description="Ordered list of pipeline steps applied to the source.",
     )
 

@@ -677,6 +677,12 @@ def _resolve_with_block(
         if collector is not None:
             cte_builder = collector.start_span(f"cte:{cte_name}", parent_span_id=parent_span_id)
 
+        if cte.from_ not in enriched:
+            raise ExecutionError(
+                f"with: CTE '{cte_name}' references '{cte.from_}' "
+                f"which is not in loaded sources. "
+                f"Available: {sorted(enriched)}"
+            )
         cte_df = enriched[cte.from_]
         cte_df = run_pipeline(cte_df, cte.steps, enriched)
         row_count = cte_df.count()

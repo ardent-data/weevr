@@ -72,6 +72,10 @@ def _apply_column_control(
     """Apply include/exclude/prefix/rename column control to joined source columns.
 
     Processing order (per DEC-017): dup-key-drop → include → exclude → prefix → rename.
+
+    Note: when a non-key column name exists on both sides of the join, the
+    source-column detection cannot distinguish left from right copies. Use
+    ``alias`` + ``prefix`` to disambiguate before column control in that case.
     """
     no_control = (
         params.include is None

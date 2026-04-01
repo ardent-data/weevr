@@ -17,7 +17,7 @@ from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.lookup import Lookup
 from weevr.model.params import ParamSpec
-from weevr.model.pipeline import JoinStep, Step
+from weevr.model.pipeline import JoinStep, Step, UnionStep
 from weevr.model.source import Source
 from weevr.model.sub_pipeline import SubPipeline
 from weevr.model.target import Target
@@ -165,7 +165,7 @@ class Thread(FrozenBase):
         """Validate the with: block for name collisions, forward refs, and alias uniqueness."""
         if self.with_ is None:
             # Still check join alias uniqueness even without a with: block
-            self._check_join_alias_uniqueness(set(self.sources.keys()), {})
+            self._check_join_alias_uniqueness(set(self.sources.keys()))
             return self
 
         source_names = set(self.sources.keys())
@@ -195,10 +195,8 @@ class Thread(FrozenBase):
             for step in steps_list:
                 if isinstance(step, JoinStep):
                     referenced.add(step.join.source)
-                # UnionStep sources field
-                step_type = type(step).__name__
-                if step_type == "UnionStep":
-                    for src in step.union.sources:  # type: ignore[attr-defined]
+                if isinstance(step, UnionStep):
+                    for src in step.union.sources:
                         referenced.add(src)
 
         for cte_name in cte_names:
@@ -207,13 +205,13 @@ class Thread(FrozenBase):
 
         # 4. Join alias uniqueness across all steps (CTE pipelines + main steps)
         namespace = source_names | cte_names
-        self._check_join_alias_uniqueness(namespace, {})
+        self._check_join_alias_uniqueness(namespace)
 
         return self
 
-    def _check_join_alias_uniqueness(self, namespace: set[str], _unused: dict[str, str]) -> None:
+    def _check_join_alias_uniqueness(self, namespace: set[str]) -> None:
         """Check that join aliases are unique and do not collide with the source/CTE namespace."""
-        seen_aliases: dict[str, str] = {}
+        seen_aliases: set[str] = set()
 
         step_containers: list[list[Any]] = [list(self.steps)]
         if self.with_ is not None:
@@ -230,4 +228,4 @@ class Thread(FrozenBase):
                         raise ValueError(
                             f"join alias '{alias}' is used more than once across the thread"
                         )
-                    seen_aliases[alias] = alias
+                    seen_aliases.add(alias)
