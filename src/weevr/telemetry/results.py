@@ -118,6 +118,13 @@ class ThreadTelemetry(FrozenBase):
     resolved_params: dict[str, Any] | None = None
     audit_columns_applied: list[str] = []
     export_results: list[ExportResult] = []
+    warp_name: str | None = None
+    warp_source: str | None = None
+    warp_enforcement: str | None = None
+    drift_detected: bool = False
+    drift_columns: list[str] = []
+    drift_mode: str | None = None
+    drift_action_taken: str | None = None
 
 
 class ColumnSetResult(FrozenBase):

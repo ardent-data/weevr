@@ -683,7 +683,26 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 resolved_params=resolved_params,
                 audit_columns_applied=audit_columns_applied,
                 export_results=export_results,
+                warp_name=resolved_warp.description if resolved_warp else None,
+                warp_source="explicit"
+                if isinstance(thread.target.warp, str)
+                else ("auto" if resolved_warp is not None else None),
+                warp_enforcement_mode=thread.target.warp_enforcement if resolved_warp else None,
+                drift_detected=drift_report.has_drift if drift_report else False,
+                drift_columns=drift_report.extra_columns if drift_report else None,
+                drift_mode=drift_report.drift_mode if drift_report else None,
+                drift_action_taken=drift_report.action_taken if drift_report else None,
             )
+
+            # Build drift report dict for ThreadResult
+            drift_report_dict = None
+            if drift_report is not None and drift_report.has_drift:
+                drift_report_dict = {
+                    "extra_columns": drift_report.extra_columns,
+                    "action_taken": drift_report.action_taken,
+                    "drift_mode": drift_report.drift_mode,
+                    "baseline_source": drift_report.baseline_source,
+                }
 
             return ThreadResult(
                 status="success",
@@ -694,6 +713,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 telemetry=telemetry,
                 output_schema=output_schema,
                 samples=samples,
+                drift_report=drift_report_dict,
+                warp_findings=warp_findings if warp_findings else None,
             )
 
         except DataValidationError:
@@ -943,6 +964,13 @@ def _build_telemetry(
     resolved_params: dict[str, Any] | None = None,
     audit_columns_applied: list[str] | None = None,
     export_results: list[ExportResult] | None = None,
+    warp_name: str | None = None,
+    warp_source: str | None = None,
+    warp_enforcement_mode: str | None = None,
+    drift_detected: bool = False,
+    drift_columns: list[str] | None = None,
+    drift_mode: str | None = None,
+    drift_action_taken: str | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
@@ -979,4 +1007,11 @@ def _build_telemetry(
         resolved_params=resolved_params,
         audit_columns_applied=audit_columns_applied or [],
         export_results=export_results or [],
+        warp_name=warp_name,
+        warp_source=warp_source,
+        warp_enforcement=warp_enforcement_mode,
+        drift_detected=drift_detected,
+        drift_columns=drift_columns or [],
+        drift_mode=drift_mode,
+        drift_action_taken=drift_action_taken,
     )
