@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.11/release-notes/1.8/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.11/release-notes/1.11/">
       
       
-        <link rel="prev" href="../1.9/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.7/">
+        <link rel="next" href="../1.10/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.8 - weevr</title>
+        <title>1.11 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v18" class="md-skip">
+        <a href="#release-notes-v111" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.8
+              1.11
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.11/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -2110,10 +2110,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.11/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.11
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2129,6 +2156,242 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#connections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connections
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sub-pipelines-with-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sub-Pipelines (with: block)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generated-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generated Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#date_sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        date_sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#int_sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        int_sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warp-schema-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warp Schema Contracts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Warp Schema Contracts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#warp-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warp enforcement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warp-only-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warp-only columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auto-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-drift-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Drift Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema Drift Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#drift-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on_drift-severity-strict-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        on_drift severity (strict mode)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drift-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adaptive-auto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adaptive + auto
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cascade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cascade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Improvements
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2194,37 +2457,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.8
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.8/" class="md-nav__link">
         
   
   
@@ -2240,181 +2476,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#dictionary-rename-column-sets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dictionary Rename (Column Sets)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Dictionary Rename (Column Sets)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#source-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Source Types
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#behavior-controls" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Behavior Controls
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cascade" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cascade
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#naming-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Naming Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Naming Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#kebab-case-pattern" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        kebab-case Pattern
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#collision-dedup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collision Dedup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reserved-word-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reserved Word Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pipeline-order" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Order
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Public Exports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2706,22 +2767,44 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#dictionary-rename-column-sets" class="md-nav__link">
+  <a href="#connections" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dictionary Rename (Column Sets)
+        Connections
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Dictionary Rename (Column Sets)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sub-pipelines-with-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sub-Pipelines (with: block)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generated-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generated Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generated Sources">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
+  <a href="#date_sequence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration
+        date_sequence
       
     </span>
   </a>
@@ -2729,10 +2812,38 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#source-types" class="md-nav__link">
+  <a href="#int_sequence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Source Types
+        int_sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warp-schema-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warp Schema Contracts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Warp Schema Contracts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#warp-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warp enforcement
       
     </span>
   </a>
@@ -2740,10 +2851,93 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#behavior-controls" class="md-nav__link">
+  <a href="#warp-only-columns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Behavior Controls
+        Warp-only columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auto-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-drift-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Drift Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema Drift Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#drift-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on_drift-severity-strict-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        on_drift severity (strict mode)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drift-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adaptive-auto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adaptive + auto
       
     </span>
   </a>
@@ -2761,73 +2955,7 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#naming-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Naming Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Naming Enhancements">
-      <ul class="md-nav__list">
-        
           <li class="md-nav__item">
-  <a href="#kebab-case-pattern" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        kebab-case Pattern
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#collision-dedup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collision Dedup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reserved-word-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reserved Word Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pipeline-order" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Order
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#observability" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2837,23 +2965,17 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Public Exports
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#other-improvements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        Other Improvements
       
     </span>
   </a>
@@ -2880,229 +3002,278 @@
   
 
 
-<h1 id="release-notes-v18">Release Notes — v1.8<a class="headerlink" href="#release-notes-v18" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>This release adds <strong>dictionary rename</strong> — named column sets that
-source bulk column mappings from Delta tables, YAML files, or
-runtime parameters — and <strong>naming enhancements</strong> including
-kebab-case, collision dedup, and reserved word protection.</p>
+<h1 id="release-notes-v111">Release Notes — v1.11<a class="headerlink" href="#release-notes-v111" title="Permanent link">&para;</a></h1>
+<p><strong>Release date:</strong> April 2026</p>
+<p>This release adds <strong>connections</strong> for cross-lakehouse data
+pipelines with Fabric context variables, <strong>sub-pipelines</strong>
+(<code>with:</code> block) for CTE-style intermediate transformations,
+<strong>generated sources</strong> (<code>date_sequence</code>, <code>int_sequence</code>) for
+creating data without external tables, and <strong>warp schema
+contracts</strong> with <strong>schema drift handling</strong> for target-boundary
+validation and evolution control.</p>
 <hr />
-<h2 id="dictionary-rename-column-sets">Dictionary Rename (Column Sets)<a class="headerlink" href="#dictionary-rename-column-sets" title="Permanent link">&para;</a></h2>
-<h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
-<p>Declare <code>column_sets</code> at the weave or loom level. Each column set
-maps raw column names to friendly names from an external source.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">column_sets</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">sap_dictionary</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref.column_dictionary</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">from_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_name</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">to_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">friendly_name</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">filter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;system</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;SAP&#39;&quot;</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">on_unmapped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass_through</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">on_extra</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ignore</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span>
+<h2 id="connections">Connections<a class="headerlink" href="#connections" title="Permanent link">&para;</a></h2>
+<p>Declare a Fabric lakehouse once by name and reference it from
+sources, targets, and exports. Eliminates hardcoded <code>abfss://</code>
+paths and workspace GUIDs.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">raw_lh</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${fabric.workspace_id}&quot;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${fabric.lakehouse_id}&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">default_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_lh</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_orders</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">runtime_overrides</span><span class="p">:</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_overrides</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_lh</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fact_orders</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated</span>
 </code></pre></div>
-<p>Reference a column set in a rename step:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">      </span><span class="nt">column_set</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sap_dictionary</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="nt">MANUAL_COL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manual_override</span><span class="w">  </span><span class="c1"># static wins</span>
-</code></pre></div>
-<h3 id="source-types">Source Types<a class="headerlink" href="#source-types" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Source</th>
-<th>Configuration</th>
-<th>Use case</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Delta table</td>
-<td><code>type: delta</code>, <code>alias</code> or <code>path</code></td>
-<td>Shared dictionary in lakehouse</td>
-</tr>
-<tr>
-<td>YAML file</td>
-<td><code>type: yaml</code>, <code>path</code></td>
-<td>Version-controlled mappings</td>
-</tr>
-<tr>
-<td>Runtime parameter</td>
-<td><code>param: &lt;name&gt;</code></td>
-<td>Orchestration-driven mappings</td>
-</tr>
-</tbody>
-</table>
-<h3 id="behavior-controls">Behavior Controls<a class="headerlink" href="#behavior-controls" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Setting</th>
-<th>Values</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>on_unmapped</code></td>
-<td><code>pass_through</code>, <code>error</code></td>
-<td><code>pass_through</code></td>
-<td>DataFrame columns with no mapping entry</td>
-</tr>
-<tr>
-<td><code>on_extra</code></td>
-<td><code>ignore</code>, <code>warn</code>, <code>error</code></td>
-<td><code>ignore</code></td>
-<td>Mapping entries for non-existent columns</td>
-</tr>
-<tr>
-<td><code>on_failure</code></td>
-<td><code>abort</code>, <code>warn</code>, <code>skip</code></td>
-<td><code>abort</code></td>
-<td>Source read failure or empty result</td>
-</tr>
-</tbody>
-</table>
-<h3 id="cascade">Cascade<a class="headerlink" href="#cascade" title="Permanent link">&para;</a></h3>
-<p>Column sets cascade from loom → weave. Weave-level definitions
-with the same name override loom-level definitions.</p>
+<p>Key features:</p>
+<ul>
+<li><strong>Cross-lakehouse reads and writes</strong> — reference different
+  workspaces and lakehouses by name within the same thread</li>
+<li><strong>Fabric context variables</strong> — <code>${fabric.workspace_id}</code>,
+  <code>${fabric.lakehouse_id}</code>, and <code>${fabric.workspace_name}</code>
+  auto-resolve from the active Spark session at execution time</li>
+<li><strong>Schema overrides</strong> — <code>default_schema</code> on the connection
+  applies to all tables; <code>schema:</code> on a source or target
+  overrides for that specific table</li>
+<li><strong>Cascade</strong> — connections defined at loom or weave level are
+  inherited by all threads; thread-level connections override
+  by name</li>
+<li><strong>Export support</strong> — exports reference connections for
+  secondary output destinations</li>
+</ul>
+<p>See the <a href="../../guides/connections/">Connections guide</a> for full
+documentation.</p>
 <hr />
-<h2 id="naming-enhancements">Naming Enhancements<a class="headerlink" href="#naming-enhancements" title="Permanent link">&para;</a></h2>
-<h3 id="kebab-case-pattern">kebab-case Pattern<a class="headerlink" href="#kebab-case-pattern" title="Permanent link">&para;</a></h3>
-<p><code>kebab-case</code> is now a supported naming pattern:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kebab-case</span>
+<h2 id="sub-pipelines-with-block">Sub-Pipelines (<code>with:</code> block)<a class="headerlink" href="#sub-pipelines-with-block" title="Permanent link">&para;</a></h2>
+<p>Define named sub-pipelines that run before the main thread
+steps. Each sub-pipeline reads from a source or another
+sub-pipeline, applies its own step chain, and produces a named
+DataFrame available to downstream steps.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/stg_orders</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">customers</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/dim_customer</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">with</span><span class="p">:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">active_customers</span><span class="p">:</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">          </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;is_active</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">true&quot;</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">join</span><span class="p">:</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">active_customers</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[{</span><span class="nt">left</span><span class="p">:</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">,</span><span class="nt"> right</span><span class="p">:</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">}]</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inner</span>
 </code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Backtick-quoting required</p>
-<p>Hyphenated column names require backtick-quoting in Spark SQL
-expressions. A validation warning is emitted when selected.</p>
-</div>
-<h3 id="collision-dedup">Collision Dedup<a class="headerlink" href="#collision-dedup" title="Permanent link">&para;</a></h3>
-<p>When normalization produces duplicate column names, the new
-<code>on_collision</code> setting controls the behavior:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">on_collision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">suffix</span><span class="w">  </span><span class="c1"># _2, _3 suffixes in source order</span>
+<p>Key features:</p>
+<ul>
+<li><strong>CTE-like composition</strong> — named intermediate results without
+  writing to storage</li>
+<li><strong>Chaining</strong> — sub-pipelines can reference earlier
+  sub-pipelines by name</li>
+<li><strong>Full step support</strong> — each sub-pipeline accepts any step
+  type (filter, select, join, rename, etc.)</li>
+<li><strong>Explain visibility</strong> — sub-pipelines appear in plan output
+  with row counts and step counts</li>
+<li><strong>Telemetry</strong> — each sub-pipeline emits its own span under
+  the thread span</li>
+</ul>
+<p>See the <a href="../../guides/sub-pipelines/">Sub-Pipelines guide</a> for
+full documentation.</p>
+<hr />
+<h2 id="generated-sources">Generated Sources<a class="headerlink" href="#generated-sources" title="Permanent link">&para;</a></h2>
+<p>Two new source types produce single-column DataFrames from a
+range definition — no external table required.</p>
+<h3 id="date_sequence"><code>date_sequence</code><a class="headerlink" href="#date_sequence" title="Permanent link">&para;</a></h3>
+<p>Generates one row per calendar interval over a date range.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">calendar</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date_sequence</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">start</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01&quot;</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">end</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-12-31&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">step</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">day</span>
 </code></pre></div>
+<ul>
+<li><strong>step</strong> — <code>day</code> (default), <code>week</code>, <code>month</code>, or <code>year</code></li>
+<li>Output column is <code>DateType</code></li>
+<li>Both <code>start</code> and <code>end</code> are inclusive</li>
+</ul>
+<h3 id="int_sequence"><code>int_sequence</code><a class="headerlink" href="#int_sequence" title="Permanent link">&para;</a></h3>
+<p>Generates one row per integer over a numeric range.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">ids</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int_sequence</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">start</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">end</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">step</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<ul>
+<li><strong>step</strong> — any positive integer (default <code>1</code>)</li>
+<li>Output column is <code>LongType</code></li>
+<li>Both <code>start</code> and <code>end</code> are inclusive</li>
+</ul>
+<p>Generated sources are mutually exclusive with <code>alias</code>, <code>path</code>,
+<code>connection</code>, <code>lookup</code>, <code>options</code>, and <code>dedup</code>.</p>
+<hr />
+<h2 id="warp-schema-contracts">Warp Schema Contracts<a class="headerlink" href="#warp-schema-contracts" title="Permanent link">&para;</a></h2>
+<p>Warps are typed configuration files (<code>.warp</code>) that declare the
+intended shape of a target table — columns, types, nullability,
+and keys. They enable contract validation, pre-initialization,
+stub columns, and documentation independent of pipeline
+execution.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># dim_customer.warp</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_sk</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bigint</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_name</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;unknown&quot;</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="nt">keys</span><span class="p">:</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">  </span><span class="nt">surrogate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_sk</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="nt">business</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<h3 id="warp-enforcement">Warp enforcement<a class="headerlink" href="#warp-enforcement" title="Permanent link">&para;</a></h3>
+<p>Validates pipeline output against the declared contract.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gold.dim_customer</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">warp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customer</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">warp_enforcement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enforce</span>
+</code></pre></div>
+<p>Three modes:</p>
+<ul>
+<li><strong>warn</strong> (default) — log findings, continue execution</li>
+<li><strong>enforce</strong> — fail the thread on any violation</li>
+<li><strong>off</strong> — skip validation</li>
+</ul>
+<p>Checks missing columns, type mismatches, and nullable
+violations. Findings include column-level detail in both log
+messages and the <code>WarpEnforcementError</code> payload.</p>
+<h3 id="warp-only-columns">Warp-only columns<a class="headerlink" href="#warp-only-columns" title="Permanent link">&para;</a></h3>
+<p>Columns declared in the warp but absent from pipeline output
+are appended with their declared default value (or null).
+This enables stub columns for downstream consumers without
+requiring the pipeline to produce them.</p>
+<h3 id="pre-initialization">Pre-initialization<a class="headerlink" href="#pre-initialization" title="Permanent link">&para;</a></h3>
+<p>Set <code>warp_init: true</code> to create the Delta table from the
+effective warp before the first pipeline run. Solves the
+seed-row chicken-and-egg problem for dimension targets.</p>
+<h3 id="auto-generation">Auto-generation<a class="headerlink" href="#auto-generation" title="Permanent link">&para;</a></h3>
+<p>Set <code>warp_mode: auto</code> to write or update the <code>.warp</code> file
+after each successful run. The generated file carries
+<code>auto_generated: true</code> as a marker.</p>
+<p>See the <a href="../../guides/warps/">Warps guide</a> for full
+documentation.</p>
+<hr />
+<h2 id="schema-drift-handling">Schema Drift Handling<a class="headerlink" href="#schema-drift-handling" title="Permanent link">&para;</a></h2>
+<p>Configurable behavior when extra columns from upstream source
+changes reach the target boundary. Operates with or without
+a warp.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gold.dim_customer</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">schema_drift</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">strict</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">on_drift</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+</code></pre></div>
+<h3 id="drift-modes">Drift modes<a class="headerlink" href="#drift-modes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Value</th>
+<th>Mode</th>
 <th>Behavior</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>error</code> (default)</td>
-<td>Raise <code>ConfigError</code> listing collisions</td>
+<td><code>lenient</code> (default)</td>
+<td>Extra columns pass through</td>
 </tr>
 <tr>
-<td><code>suffix</code></td>
-<td>Append <code>_2</code>, <code>_3</code> in source column order</td>
+<td><code>strict</code></td>
+<td>Extra columns handled per <code>on_drift</code></td>
+</tr>
+<tr>
+<td><code>adaptive</code></td>
+<td>Extra columns pass through and extend auto-generated warps</td>
 </tr>
 </tbody>
 </table>
-<h3 id="reserved-word-protection">Reserved Word Protection<a class="headerlink" href="#reserved-word-protection" title="Permanent link">&para;</a></h3>
-<p>Prevent SQL-reserved column names from breaking downstream queries:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">reserved_words</span><span class="p">:</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;_&quot;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">extend</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">timestamp</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">value</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">to</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">by</span><span class="p p-Indicator">]</span>
-</code></pre></div>
+<h3 id="on_drift-severity-strict-mode"><code>on_drift</code> severity (strict mode)<a class="headerlink" href="#on_drift-severity-strict-mode" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Strategy</th>
-<th>Behavior</th>
+<th>Action</th>
+<th>Effect</th>
 </tr>
 </thead>
 <tbody>
-<tr>
-<td><code>quote</code> (default)</td>
-<td>No-op — Spark backtick-quotes automatically</td>
-</tr>
-<tr>
-<td><code>prefix</code></td>
-<td>Prepend configured prefix string</td>
-</tr>
 <tr>
 <td><code>error</code></td>
-<td>Raise <code>ConfigError</code> listing conflicts</td>
+<td>Thread fails with <code>SchemaDriftError</code></td>
+</tr>
+<tr>
+<td><code>warn</code> (default)</td>
+<td>Extra columns dropped with warning</td>
+</tr>
+<tr>
+<td><code>ignore</code></td>
+<td>Extra columns dropped silently</td>
 </tr>
 </tbody>
 </table>
-<p>The default reserved word list contains 82 ANSI SQL:2016 keywords.
-Use <code>extend</code> and <code>exclude</code> to customize.</p>
-<h3 id="pipeline-order">Pipeline Order<a class="headerlink" href="#pipeline-order" title="Permanent link">&para;</a></h3>
-<p>The full naming pipeline executes in a fixed order:</p>
-<ol>
-<li><strong>Rename</strong> — column set + static mappings applied</li>
-<li><strong>Normalize</strong> — pattern transformation (snake_case, etc.)</li>
-<li><strong>Dedup</strong> — collision resolution (suffix or error)</li>
-<li><strong>Reserved words</strong> — protection applied (prefix, quote, error)</li>
-</ol>
+<h3 id="drift-baseline">Drift baseline<a class="headerlink" href="#drift-baseline" title="Permanent link">&para;</a></h3>
+<p>When a warp exists, the warp column list is the baseline.
+Without a warp, the existing Delta table schema is used.
+On first write with no table, drift detection is skipped.</p>
+<h3 id="adaptive-auto">Adaptive + auto<a class="headerlink" href="#adaptive-auto" title="Permanent link">&para;</a></h3>
+<p>When <code>schema_drift: adaptive</code> and <code>warp_mode: auto</code> are both
+active, new pipeline columns pass through to Delta and are
+added to the auto-generated warp with <code>discovered: true</code>.</p>
+<h3 id="cascade">Cascade<a class="headerlink" href="#cascade" title="Permanent link">&para;</a></h3>
+<p>All three settings (<code>schema_drift</code>, <code>on_drift</code>,
+<code>warp_enforcement</code>) cascade through <code>defaults.target.*</code> at
+loom, weave, and thread levels.</p>
+<h3 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h3>
+<p>Drift events are captured regardless of mode:</p>
+<ul>
+<li><strong>Telemetry</strong> — <code>drift_detected</code>, <code>drift_columns</code>,
+  <code>drift_mode</code>, <code>drift_action_taken</code> on <code>ThreadTelemetry</code></li>
+<li><strong>Notebook output</strong> — drift report and warp findings
+  sections in <code>_repr_html_()</code></li>
+</ul>
+<p>See the <a href="../../guides/schema-drift/">Schema Drift guide</a>
+for full documentation.</p>
 <hr />
-<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<h2 id="other-improvements">Other Improvements<a class="headerlink" href="#other-improvements" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>ColumnSetResult</code> captures per-column-set resolution outcome
-  (name, source_type, mappings_loaded, skipped)</li>
-<li><code>WeaveTelemetry.column_set_results</code> populates structured
-  results from materialization</li>
-<li>DEBUG-level per-mapping logs for rename, normalize, and
-  reserved word operations</li>
+<li><strong>JSON Schema and LLM discoverability</strong> — all Pydantic
+  models export JSON Schema with <code>Field(description=...)</code>
+  for LLM tooling. Schema files at <code>docs/schema/</code>.</li>
+<li><strong>New error types</strong> — <code>WarpEnforcementError</code> and
+  <code>SchemaDriftError</code> carry structured payloads (<code>findings</code>,
+  <code>drift_report</code>) for programmatic error handling.</li>
+<li><strong>Plan mode warp summary</strong> — plan/explain output shows
+  warp configuration per thread when non-default settings
+  are present.</li>
 </ul>
-<h2 id="new-public-exports">New Public Exports<a class="headerlink" href="#new-public-exports" title="Permanent link">&para;</a></h2>
-<p>From <code>weevr.model</code>:</p>
-<ul>
-<li><code>ColumnSet</code> — column set domain model</li>
-<li><code>ColumnSetSource</code> — source configuration for column sets</li>
-<li><code>ReservedWordConfig</code> — reserved word protection settings</li>
-</ul>
-<p>From <code>weevr.telemetry</code>:</p>
-<ul>
-<li><code>ColumnSetResult</code> — per-column-set resolution result</li>
-</ul>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All new fields default to <code>None</code> or safe
-defaults — existing configurations work without modification.</p>
-<table>
-<thead>
-<tr>
-<th>Component</th>
-<th>Version</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Python</td>
-<td>3.11</td>
-</tr>
-<tr>
-<td>PySpark</td>
-<td>3.5.x</td>
-</tr>
-<tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
-</tr>
-</tbody>
-</table>
 
 
 
