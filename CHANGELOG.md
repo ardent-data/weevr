@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/ardent-data/weevr/compare/weevr-v1.11.0...weevr-v1.11.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* **engine:** render summary and explain without escaped newlines in REPLs ([#123](https://github.com/ardent-data/weevr/issues/123)) ([655ce42](https://github.com/ardent-data/weevr/commit/655ce42553d43b7f6c495e4ae696bb70012712a6))
+
 ## [1.11.0](https://github.com/ardent-data/weevr/compare/weevr-v1.10.0...weevr-v1.11.0) (2026-04-02)
 
 
