@@ -14,6 +14,22 @@ if TYPE_CHECKING:
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
 
 
+class FormattedText(str):
+    r"""String subclass that displays without quotes in REPLs and notebooks.
+
+    Overrides ``__repr__`` so that interactive environments (Python REPL,
+    Jupyter, Fabric notebooks) render the text with real newlines instead
+    of showing escaped ``\n`` sequences inside quotes.
+
+    Behaves identically to ``str`` in all other contexts — comparisons,
+    slicing, formatting, ``print()``, and serialization are unaffected.
+    """
+
+    def __repr__(self) -> str:
+        """Return the string value without quoting or escaping."""
+        return str(self)
+
+
 class ExecutionMode(StrEnum):
     """Execution modes for ``Context.run()``.
 
@@ -125,7 +141,7 @@ class RunResult:
         are omitted. Returns empty string for non-plan modes.
         """
         if self.mode is not ExecutionMode.PLAN or not self.execution_plan:
-            return ""
+            return FormattedText("")
 
         lines: list[str] = []
         plans = self.execution_plan
@@ -251,7 +267,7 @@ class RunResult:
                                 f"  {cte_count} {cte_label}{type_str}"
                             )
 
-        return "\n".join(lines)
+        return FormattedText("\n".join(lines))
 
     def summary(self) -> str:
         """Return a formatted, human-readable execution summary."""
@@ -272,7 +288,7 @@ class RunResult:
             for w in self.warnings:
                 lines.append(f"  - {w}")
 
-        return "\n".join(lines)
+        return FormattedText("\n".join(lines))
 
     def _repr_html_(self) -> str | None:
         """Notebook rich display protocol.
