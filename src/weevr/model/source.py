@@ -55,7 +55,9 @@ class Source(FrozenBase):
 
     type: str | None = Field(
         default=None,
-        description="Source type: delta, csv, json, parquet, or excel.",
+        description=(
+            "Source type: delta, csv, json, parquet, excel, date_sequence, or int_sequence."
+        ),
     )
     alias: str | None = Field(
         default=None,

@@ -17,7 +17,14 @@ from weevr.engine.lookups import cleanup_lookups, materialize_lookups, resolve_t
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
 from weevr.engine.variables import VariableContext
-from weevr.errors.exceptions import DataValidationError, ExecutionError, ExportError, StateError
+from weevr.errors.exceptions import (
+    DataValidationError,
+    ExecutionError,
+    ExportError,
+    SchemaDriftError,
+    StateError,
+    WarpEnforcementError,
+)
 from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
@@ -226,7 +233,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 from weevr.config.paths import build_onelake_path
 
                 conn = connections[conn_name]
-                assert thread.target.table is not None  # guaranteed by Target validator
+                if thread.target.table is None:
+                    raise ExecutionError(
+                        "Target connection requires 'table'",
+                        thread_name=thread.name,
+                    )
                 target_path = build_onelake_path(
                     conn,
                     thread.target.schema_override,
@@ -250,10 +261,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             warp_findings: list[dict[str, str]] = []
             drift_report = None
 
-            if thread.target.warp is not False:
+            # Only resolve warp when explicitly referenced (string).
+            # Auto-discovery from target_path is unreliable because
+            # alias-based targets are not filesystem paths.
+            if isinstance(thread.target.warp, str):
                 from weevr.config.warp import resolve_warp
 
-                # Derive thread directory from target_path or current directory
                 thread_dir = Path(target_path).parent if target_path else Path(".")
                 config_root = thread_dir
                 resolved_warp = resolve_warp(
@@ -462,9 +475,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     audit_columns_applied = list(audit_columns)
 
                 # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied + (
-                    [c for c in df.columns if c.startswith("_weevr_")]
-                )
+                engine_col_names = audit_columns_applied[:]
                 df, warp_findings, drift_report = _apply_warp_and_drift(
                     df,
                     resolved_warp,
@@ -495,17 +506,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 execute_dimension_merge(spark, df, dim_builder, target_path, run_timestamp)
                 rows_written = df.count()
 
-                # Auto-generate warp after successful write
-                if thread.target.warp_mode == "auto":
-                    auto_generate_warp(
-                        df,
-                        resolved_warp,
-                        drift_report,
-                        thread.name,
-                        str(Path(target_path).parent) if target_path else ".",
-                        adaptive=thread.target.schema_drift == "adaptive",
-                    )
-
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
                 # CDC merge routing (no dimension) — skip target column
                 # mapping because execute_cdc_merge handles column
@@ -531,17 +531,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 cdc_write = _validate_cdc_write_config(thread)
                 cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
                 rows_written = sum(cdc_counts.values())
-
-                # Auto-generate warp after successful write
-                if thread.target.warp_mode == "auto":
-                    auto_generate_warp(
-                        df,
-                        resolved_warp,
-                        drift_report,
-                        thread.name,
-                        str(Path(target_path).parent) if target_path else ".",
-                        adaptive=thread.target.schema_drift == "adaptive",
-                    )
 
             else:
                 # Standard write path
@@ -570,16 +559,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     output_sample = df.limit(10).toPandas().to_dict("records")
                 rows_written = write_target(spark, df, thread.target, thread.write, target_path)
 
-                # Auto-generate warp after successful write
-                if thread.target.warp_mode == "auto":
-                    auto_generate_warp(
-                        df,
-                        resolved_warp,
-                        drift_report,
-                        thread.name,
-                        str(Path(target_path).parent) if target_path else ".",
-                        adaptive=thread.target.schema_drift == "adaptive",
-                    )
+            # Auto-generate warp after successful write (all paths)
+            if thread.target.warp_mode == "auto":
+                auto_generate_warp(
+                    df,
+                    resolved_warp,
+                    drift_report,
+                    thread.name,
+                    str(Path(target_path).parent) if target_path else ".",
+                    adaptive=thread.target.schema_drift == "adaptive",
+                )
 
             # Step 14 — persist watermark state
             if (
@@ -645,7 +634,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         from weevr.config.paths import build_onelake_path
 
                         conn = connections[conn_name]
-                        assert export.table is not None  # guaranteed by Export validator
+                        if export.table is None:
+                            raise ExportError(
+                                f"Export '{export.name}' connection requires 'table'",
+                                thread_name=thread.name,
+                                export_name=export.name,
+                            )
                         path = build_onelake_path(conn, export.schema_override, export.table)
                         exp = export.model_copy(update={"path": path})
                     result = write_export(spark, df, exp, row_count=rows_written)
@@ -739,6 +733,24 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 status=SpanStatus.ERROR,
                 collector=collector,
             )
+            raise
+
+        except WarpEnforcementError as exc:
+            if span_builder is not None:
+                span = span_builder.finish(status=SpanStatus.ERROR)
+                if collector is not None:
+                    collector.add_span(span)
+            if exc.thread_name is None:
+                exc.thread_name = thread.name
+            raise
+
+        except SchemaDriftError as exc:
+            if span_builder is not None:
+                span = span_builder.finish(status=SpanStatus.ERROR)
+                if collector is not None:
+                    collector.add_span(span)
+            if exc.thread_name is None:
+                exc.thread_name = thread.name
             raise
 
         except ExecutionError as exc:
@@ -853,6 +865,11 @@ def _apply_warp_and_drift(
 
     warp_findings: list[dict[str, str]] = []
 
+    # Include _weevr_-prefixed engine columns (SCD, soft-delete)
+    # consistently across all write paths
+    weevr_cols = [c for c in df.schema.names if c.startswith("_weevr_")]
+    all_engine = list(set(engine_col_names + weevr_cols))
+
     # Drift detection (works with or without warp)
     baseline = get_drift_baseline(warp=resolved_warp, spark=spark, target_path=target_path)
     baseline_source = (
@@ -863,7 +880,7 @@ def _apply_warp_and_drift(
         baseline,
         thread.target.schema_drift,
         thread.target.on_drift,
-        engine_columns=engine_col_names,
+        engine_columns=all_engine,
         baseline_source=baseline_source,
     )
 
@@ -871,14 +888,14 @@ def _apply_warp_and_drift(
     if resolved_warp is not None:
         # Compute effective warp to identify warp-only columns
         pipeline_cols = [f.name for f in df.schema.fields]
-        effective = build_effective_warp(resolved_warp.columns, pipeline_cols, engine_col_names)
+        effective = build_effective_warp(resolved_warp.columns, pipeline_cols, all_engine)
         warp_only_names = [c.name for c in effective.warp_only]
 
         warp_findings = enforce_warp(
             df,
             resolved_warp,
             thread.target.warp_enforcement,
-            engine_columns=engine_col_names,
+            engine_columns=all_engine,
             warp_only_columns=warp_only_names,
         )
 

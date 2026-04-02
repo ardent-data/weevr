@@ -210,9 +210,10 @@ def get_drift_baseline(
             df = spark.read.format("delta").load(target_path)  # type: ignore[union-attr]
             return [field.name for field in df.schema.fields]  # type: ignore[union-attr]
         except Exception:
-            logger.debug(
+            logger.warning(
                 "Could not read table schema for drift baseline: %s",
                 target_path,
+                exc_info=True,
             )
             return None
 

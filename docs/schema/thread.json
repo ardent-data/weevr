@@ -3417,7 +3417,7 @@
             }
           ],
           "default": null,
-          "description": "Source type: delta, csv, json, parquet, or excel.",
+          "description": "Source type: delta, csv, json, parquet, excel, date_sequence, or int_sequence.",
           "title": "Type"
         },
         "alias": {
