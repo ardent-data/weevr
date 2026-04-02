@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.11.0](https://github.com/ardent-data/weevr/compare/weevr-v1.10.0...weevr-v1.11.0) (2026-04-02)
+
+
+### Features
+
+* **config:** add connection abstraction and fabric context variables ([#115](https://github.com/ardent-data/weevr/issues/115)) ([b8b1cfe](https://github.com/ardent-data/weevr/commit/b8b1cfe1e24b883c77f46f763dc8bd9477f731ec))
+* **engine:** add date_sequence and int_sequence generated source types ([#119](https://github.com/ardent-data/weevr/issues/119)) ([cd191c4](https://github.com/ardent-data/weevr/commit/cd191c454277677f14b9277ab5d3c7d0ca982a74))
+* **engine:** add warp schema contracts and schema drift handling ([#120](https://github.com/ardent-data/weevr/issues/120)) ([0216379](https://github.com/ardent-data/weevr/commit/02163793b8cb58dec62b47c534fa13284aa7a50c))
+* **engine:** add with block for named sub-pipelines ([#118](https://github.com/ardent-data/weevr/issues/118)) ([dc1447f](https://github.com/ardent-data/weevr/commit/dc1447f3236f93894a23970985b1c422039bc8fe))
+
+
+### Bug Fixes
+
+* **engine:** address pre-release review findings ([#121](https://github.com/ardent-data/weevr/issues/121)) ([19f57b7](https://github.com/ardent-data/weevr/commit/19f57b72b030e47dd686e3395be5028aa9712de0))
+
 ## [1.10.0](https://github.com/ardent-data/weevr/compare/weevr-v1.9.0...weevr-v1.10.0) (2026-03-28)
 
 
