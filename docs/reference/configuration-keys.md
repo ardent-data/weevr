@@ -130,6 +130,8 @@ The top-level configuration unit for a single data pipeline.
 | `pre_steps` | `list[HookStep]` | `None` | Hook steps run before thread execution |
 | `post_steps` | `list[HookStep]` | `None` | Hook steps run after thread execution |
 | `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates available to all targets |
+| `connections` | `dict[str, OneLakeConnection]` | `None` | Named connection definitions |
+| `with` | `dict[str, SubPipeline]` | `None` | Named sub-pipelines (CTEs) resolved before main steps |
 
 ---
 
@@ -342,12 +344,17 @@ Post-execution assertions on the target dataset.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | `"row_count" \| "column_not_null" \| "unique" \| "expression"` | *required* | Assertion type |
+| `type` | `"row_count" \| "column_not_null" \| "unique" \| "expression" \| "fk_sentinel_rate"` | *required* | Assertion type |
 | `severity` | `"info" \| "warn" \| "error" \| "fatal"` | `"warn"` | Failure severity |
 | `columns` | `list[str]` | `None` | Columns for `column_not_null` and `unique` |
+| `column` | `str` | `None` | FK column for `fk_sentinel_rate` |
 | `min` | `int` | `None` | Minimum for `row_count` |
 | `max` | `int` | `None` | Maximum for `row_count` |
 | `expression` | `SparkExpr` | `None` | Expression for `expression` type |
+| `sentinel` | `Any` | `None` | Single sentinel value for `fk_sentinel_rate` |
+| `sentinels` | `list[Any]` | `None` | Multiple sentinel values for `fk_sentinel_rate` |
+| `max_rate` | `float` | `None` | Maximum acceptable sentinel rate (0.0-1.0) for `fk_sentinel_rate` |
+| `message` | `str` | `None` | Custom failure message for `fk_sentinel_rate` |
 
 ---
 
@@ -475,6 +482,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets for bulk rename |
 | `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to threads |
+| `connections` | `dict[str, OneLakeConnection]` | `None` | Named connection definitions cascaded to threads |
 
 ### ThreadEntry
 
@@ -512,6 +520,7 @@ Deployment unit grouping one or more weaves.
 | `pre_steps` | `list[HookStep]` | `None` | Hook steps run before any weave executes |
 | `post_steps` | `list[HookStep]` | `None` | Hook steps run after all weaves complete |
 | `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to weaves and threads |
+| `connections` | `dict[str, OneLakeConnection]` | `None` | Named connection definitions cascaded to weaves and threads |
 
 ### WeaveEntry
 

@@ -10,7 +10,7 @@ target. This page documents every key accepted inside a thread YAML file.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable thread name. Typically set by the weave that references this thread. |
 | `sources` | `dict[string, Source]` | yes | -- | Named data sources keyed by alias. Must contain at least one entry. |
 | `with` | `dict[string, SubPipeline]` | no | `null` | Named sub-pipelines (CTEs) resolved before the main steps pipeline. |
@@ -1401,7 +1401,7 @@ target:
 ## Complete example
 
 ```yaml
-config_version: "1"
+config_version: "1.0"
 
 sources:
   orders:

@@ -10,7 +10,7 @@ runtime settings that cascade down through weaves to threads.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1"`) |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
 | `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
@@ -130,7 +130,7 @@ The most specific level always wins.
 ## Complete example
 
 ```yaml
-config_version: "1"
+config_version: "1.0"
 name: daily_etl
 
 weaves:

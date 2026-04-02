@@ -60,7 +60,7 @@ Accumulating snapshot patterns use `fact:` combined with
 ## Example: Transactional Fact
 
 ```yaml
-config_version: "1"
+config_version: "1.0"
 sources:
   orders:
     path: Tables/stg_orders

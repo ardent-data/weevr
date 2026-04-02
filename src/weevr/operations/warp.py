@@ -110,8 +110,10 @@ def enforce_warp(
                 )
 
     if findings and mode == "enforce":
+        summary = ", ".join(f"{f['column']} ({f['type']})" for f in findings[:3])
+        suffix = f" and {len(findings) - 3} more" if len(findings) > 3 else ""
         raise WarpEnforcementError(
-            "Warp contract violation: output does not match declared schema",
+            f"Warp contract violation: {len(findings)} finding(s): {summary}{suffix}",
             findings=findings,
         )
 
@@ -190,8 +192,13 @@ def pre_initialize_table(
         spark.read.format("delta").load(target_path)
         logger.debug("Table already exists at %s, skipping pre-init", target_path)
         return False
-    except Exception:
-        pass
+    except Exception as exc:
+        # Only proceed if the table genuinely doesn't exist.
+        # AnalysisException indicates missing table; other errors
+        # (auth, network, permissions) should propagate.
+        exc_name = type(exc).__name__
+        if "AnalysisException" not in exc_name:
+            raise
 
     schema = _build_spark_schema(effective_warp)
     empty_df = spark.createDataFrame([], schema)
@@ -375,8 +382,8 @@ def _parse_spark_type(type_str: str) -> T.DataType:
         from pyspark.sql.types import _parse_datatype_string  # type: ignore[attr-defined]
 
         return _parse_datatype_string(type_str)
-    except (ImportError, AttributeError, Exception):
+    except Exception as exc:
         raise ValueError(
             f"Unsupported Spark type '{type_str}'. Supported simple types: "
             f"{', '.join(sorted(_SIMPLE_TYPES))} and decimal(p,s)."
-        ) from None
+        ) from exc
