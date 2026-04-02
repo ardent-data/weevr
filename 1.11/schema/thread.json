@@ -1,0 +1,4945 @@
+{
+  "$defs": {
+    "AdditionalKeyConfig": {
+      "description": "Configuration for an additional (non-surrogate) generated key.\n\nAttributes:\n    name: Output column name for the generated key.\n    algorithm: Hash algorithm to use.\n    columns: Source columns to hash into the key value.\n    output: Controls the output type for integer-returning algorithms.",
+      "properties": {
+        "name": {
+          "description": "Output column name for the generated key.",
+          "title": "Name",
+          "type": "string"
+        },
+        "algorithm": {
+          "default": "sha256",
+          "description": "Hash algorithm to use for key generation.",
+          "enum": [
+            "xxhash64",
+            "sha1",
+            "sha256",
+            "sha384",
+            "sha512",
+            "md5",
+            "crc32",
+            "murmur3"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "columns": {
+          "description": "Source columns to hash into the key value.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "output": {
+          "default": "native",
+          "description": "Controls the output type for integer-returning algorithms (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's return type; ``string`` casts to StringType.",
+          "enum": [
+            "native",
+            "string"
+          ],
+          "title": "Output",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "columns"
+      ],
+      "title": "AdditionalKeyConfig",
+      "type": "object"
+    },
+    "AggregateParams": {
+      "description": "Parameters for the aggregate step.\n\n``measures`` maps output aliases to Spark SQL aggregate expressions.\n``group_by`` is optional; when omitted, aggregation covers the entire DataFrame.",
+      "properties": {
+        "group_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group By"
+        },
+        "measures": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Measures",
+          "type": "object"
+        }
+      },
+      "required": [
+        "measures"
+      ],
+      "title": "AggregateParams",
+      "type": "object"
+    },
+    "AggregateStep": {
+      "description": "Pipeline step: aggregate rows with optional grouping.",
+      "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/AggregateParams"
+        }
+      },
+      "required": [
+        "aggregate"
+      ],
+      "title": "AggregateStep",
+      "type": "object"
+    },
+    "Assertion": {
+      "description": "A post-execution assertion on the target dataset.\n\nSupports built-in types (``row_count``, ``column_not_null``,\n``unique``, ``expression``) and the FK-specific\n``fk_sentinel_rate`` type for checking sentinel value rates\nacross resolved FK columns.",
+      "properties": {
+        "type": {
+          "description": "Assertion type that determines which fields are required.",
+          "enum": [
+            "row_count",
+            "column_not_null",
+            "unique",
+            "expression",
+            "fk_sentinel_rate"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "severity": {
+          "default": "warn",
+          "description": "Severity level when the assertion fails.",
+          "enum": [
+            "info",
+            "warn",
+            "error",
+            "fatal"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to assert against, used by ``column_not_null`` and ``unique``.",
+          "title": "Columns"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum row count threshold for the ``row_count`` assertion type.",
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum row count threshold for the ``row_count`` assertion type.",
+          "title": "Max"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Spark SQL boolean expression for the ``expression`` assertion type.",
+          "title": "Expression"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Single FK column to check; mutually exclusive with ``columns``.",
+          "title": "Column"
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Single sentinel value to check rate for; mutually exclusive with ``sentinels``.",
+          "title": "Sentinel"
+        },
+        "sentinels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/SentinelGroup"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Named map of sentinel groups to check rates for; mutually exclusive with ``sentinel``.",
+          "title": "Sentinels"
+        },
+        "max_rate": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum allowed sentinel rate (0.0\u20131.0) across all sentinels.",
+          "title": "Max Rate"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional failure message appended to the assertion error output.",
+          "title": "Message"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "AuditTemplate": {
+      "description": "A named set of audit columns applied during data shaping.\n\nAttributes:\n    columns: Mapping of column names to Spark SQL expressions. Each entry\n        defines a column that will be appended to the output dataset.\n\nExample:\n    >>> template = AuditTemplate(\n    ...     columns={\n    ...         \"created_at\": \"current_timestamp()\",\n    ...         \"created_by\": \"current_user()\",\n    ...     }\n    ... )",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mapping of column names to Spark SQL expressions. Each entry defines a column that will be appended to the output dataset.",
+          "title": "Columns",
+          "type": "object"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "AuditTemplate",
+      "type": "object"
+    },
+    "CaseWhenBranch": {
+      "description": "A single when/then pair for the case_when step.",
+      "properties": {
+        "when": {
+          "title": "When",
+          "type": "string"
+        },
+        "then": {
+          "title": "Then",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "then"
+      ],
+      "title": "CaseWhenBranch",
+      "type": "object"
+    },
+    "CaseWhenParams": {
+      "description": "Parameters for the case_when step.\n\nOne output column per step, with a list of when/then conditions.",
+      "properties": {
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/CaseWhenBranch"
+          },
+          "title": "Cases",
+          "type": "array"
+        },
+        "otherwise": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Otherwise"
+        }
+      },
+      "required": [
+        "column",
+        "cases"
+      ],
+      "title": "CaseWhenParams",
+      "type": "object"
+    },
+    "CaseWhenStep": {
+      "description": "Pipeline step: conditional column values.",
+      "properties": {
+        "case_when": {
+          "$ref": "#/$defs/CaseWhenParams"
+        }
+      },
+      "required": [
+        "case_when"
+      ],
+      "title": "CaseWhenStep",
+      "type": "object"
+    },
+    "CastParams": {
+      "description": "Parameters for the cast step.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "object"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "CastParams",
+      "type": "object"
+    },
+    "CastStep": {
+      "description": "Pipeline step: cast column types.",
+      "properties": {
+        "cast": {
+          "$ref": "#/$defs/CastParams"
+        }
+      },
+      "required": [
+        "cast"
+      ],
+      "title": "CastStep",
+      "type": "object"
+    },
+    "CdcConfig": {
+      "description": "CDC-specific configuration.\n\nSupports two modes:\n- **Preset**: ``preset: delta_cdf`` auto-configures for Delta Change Data Feed conventions.\n- **Explicit**: Declare ``operation_column`` and value mappings directly.\n\nPreset and explicit column mappings are mutually exclusive.",
+      "properties": {
+        "preset": {
+          "anyOf": [
+            {
+              "const": "delta_cdf",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CDC preset. 'delta_cdf' auto-configures for Delta Change Data Feed. Mutually exclusive with operation_column.",
+          "title": "Preset"
+        },
+        "operation_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column containing the CDC operation type. Mutually exclusive with preset.",
+          "title": "Operation Column"
+        },
+        "insert_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Value in operation_column that indicates an insert operation.",
+          "title": "Insert Value"
+        },
+        "update_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Value in operation_column that indicates an update operation.",
+          "title": "Update Value"
+        },
+        "delete_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Value in operation_column that indicates a delete operation.",
+          "title": "Delete Value"
+        },
+        "on_delete": {
+          "default": "hard_delete",
+          "description": "How to handle delete operations: hard_delete removes rows, soft_delete flags them.",
+          "enum": [
+            "hard_delete",
+            "soft_delete"
+          ],
+          "title": "On Delete",
+          "type": "string"
+        }
+      },
+      "title": "CdcConfig",
+      "type": "object"
+    },
+    "ChangeDetectionConfig": {
+      "description": "Configuration for change detection hash generation.\n\nAttributes:\n    name: Output column name for the generated hash.\n    columns: Columns to include in the change detection hash.\n    algorithm: Hash algorithm to use. ``crc32`` has a small 32-bit output\n        space with higher collision risk. ``murmur3`` (Spark's ``hash()``)\n        may produce different results across Spark major versions. Neither\n        is recommended for high-cardinality change detection use cases.\n    output: Controls the output type for integer-returning algorithms\n        (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's\n        return type; ``string`` casts to StringType. Has no practical\n        effect on sha*/md5 which already return hex strings.",
+      "properties": {
+        "name": {
+          "description": "Output column name for the generated hash.",
+          "title": "Name",
+          "type": "string"
+        },
+        "columns": {
+          "description": "Columns to include in the change detection hash.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "algorithm": {
+          "default": "md5",
+          "description": "Hash algorithm to use. ``crc32`` has a small 32-bit output space with higher collision risk. ``murmur3`` (Spark's ``hash()``) may produce different results across Spark major versions.",
+          "enum": [
+            "xxhash64",
+            "sha1",
+            "sha256",
+            "sha384",
+            "sha512",
+            "md5",
+            "crc32",
+            "murmur3"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "output": {
+          "default": "native",
+          "description": "Controls the output type for integer-returning algorithms (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's return type; ``string`` casts to StringType.",
+          "enum": [
+            "native",
+            "string"
+          ],
+          "title": "Output",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "columns"
+      ],
+      "title": "ChangeDetectionConfig",
+      "type": "object"
+    },
+    "ChangeDetectionGroupConfig": {
+      "description": "Configuration for a single change detection group within a dimension.\n\nGroups may be named (part of a named-groups map) or anonymous. When\n``columns`` is ``\"auto\"``, the engine selects all non-key source columns\nnot already claimed by another group.\n\nAttributes:\n    name: Optional display name for the group (used as output column name\n        when not overridden by the dict key in DimensionConfig).\n    algorithm: Hash algorithm. When ``None``, the engine applies a default.\n    columns: Source columns for this group's hash, or ``\"auto\"`` to let the\n        engine select the remaining unclaimed columns.\n    on_change: Action when the hash changes: ``version`` creates a new SCD\n        row (requires ``track_history: true``), ``overwrite`` updates in\n        place, ``static`` marks the group as non-versioned metadata.\n    output: Controls the output type for integer-returning algorithms.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional display name for the group, used as the output hash column name when not overridden by the dict key in DimensionConfig.",
+          "title": "Name"
+        },
+        "algorithm": {
+          "anyOf": [
+            {
+              "enum": [
+                "xxhash64",
+                "sha1",
+                "sha256",
+                "sha384",
+                "sha512",
+                "md5",
+                "crc32",
+                "murmur3"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hash algorithm for this group. When ``None``, the engine applies a default.",
+          "title": "Algorithm"
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "const": "auto",
+              "type": "string"
+            }
+          ],
+          "description": "Source columns for this group's hash, or ``auto`` to let the engine select the remaining unclaimed columns.",
+          "title": "Columns"
+        },
+        "on_change": {
+          "description": "Action when the hash changes. ``version`` creates a new SCD row, ``overwrite`` updates in place, ``static`` marks the group as non-versioned metadata.",
+          "enum": [
+            "version",
+            "overwrite",
+            "static"
+          ],
+          "title": "On Change",
+          "type": "string"
+        },
+        "output": {
+          "default": "native",
+          "description": "Controls the output type for integer-returning algorithms (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's return type; ``string`` casts to StringType.",
+          "enum": [
+            "native",
+            "string"
+          ],
+          "title": "Output",
+          "type": "string"
+        }
+      },
+      "required": [
+        "columns",
+        "on_change"
+      ],
+      "title": "ChangeDetectionGroupConfig",
+      "type": "object"
+    },
+    "CoalesceParams": {
+      "description": "Parameters for the coalesce step.\n\nMaps output column names to ordered lists of source columns.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Columns",
+          "type": "object"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "CoalesceParams",
+      "type": "object"
+    },
+    "CoalesceStep": {
+      "description": "Pipeline step: coalesce columns.",
+      "properties": {
+        "coalesce": {
+          "$ref": "#/$defs/CoalesceParams"
+        }
+      },
+      "required": [
+        "coalesce"
+      ],
+      "title": "CoalesceStep",
+      "type": "object"
+    },
+    "ColumnMapping": {
+      "description": "Mapping specification for a single target column.\n\nCross-field validation:\n- ``expr`` and ``drop=True`` are mutually exclusive.",
+      "properties": {
+        "expr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Spark SQL expression to compute this column's value.",
+          "title": "Expr"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target data type to cast to (e.g. 'string', 'decimal(18,2)').",
+          "title": "Type"
+        },
+        "default": {
+          "default": null,
+          "description": "Default value when the source column is null.",
+          "title": "Default"
+        },
+        "drop": {
+          "default": false,
+          "description": "When True, exclude this column from the output.",
+          "title": "Drop",
+          "type": "boolean"
+        }
+      },
+      "title": "ColumnMapping",
+      "type": "object"
+    },
+    "ColumnSet": {
+      "description": "A named column set that defines an external column mapping.\n\nColumn sets describe where to find a mapping of incoming column names to\noutgoing column names.  The mapping data can come from a Delta table, a\nYAML file, or a runtime notebook parameter.  Exactly one of ``source`` or\n``param`` must be provided.\n\nAttributes:\n    source: Source definition pointing to the mapping data.\n    param: Name of a runtime notebook parameter that supplies the mapping\n        at execution time.\n    on_unmapped: Behaviour when an input column has no mapping entry.\n        ``\"pass_through\"`` keeps the column unchanged; ``\"error\"`` aborts.\n    on_extra: Behaviour when the mapping contains entries for columns not\n        present in the input. ``\"ignore\"`` silently skips; ``\"warn\"`` logs\n        a warning; ``\"error\"`` aborts.\n    on_failure: Behaviour when the column set cannot be resolved (e.g.\n        source unavailable). ``\"abort\"`` raises; ``\"warn\"`` logs and\n        continues; ``\"skip\"`` silently skips the rename step.",
+      "properties": {
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnSetSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source definition pointing to the column mapping data."
+        },
+        "param": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of a runtime notebook parameter that supplies the mapping at execution time.",
+          "title": "Param"
+        },
+        "on_unmapped": {
+          "default": "pass_through",
+          "description": "Behaviour when an input column has no mapping entry. ``pass_through`` keeps it unchanged; ``error`` aborts.",
+          "enum": [
+            "pass_through",
+            "error"
+          ],
+          "title": "On Unmapped",
+          "type": "string"
+        },
+        "on_extra": {
+          "default": "ignore",
+          "description": "Behaviour when the mapping contains entries for columns not present in the input. ``ignore`` skips silently; ``warn`` logs a warning; ``error`` aborts.",
+          "enum": [
+            "ignore",
+            "warn",
+            "error"
+          ],
+          "title": "On Extra",
+          "type": "string"
+        },
+        "on_failure": {
+          "default": "abort",
+          "description": "Behaviour when the column set cannot be resolved (e.g. source unavailable). ``abort`` raises; ``warn`` logs and continues; ``skip`` silently skips the rename step.",
+          "enum": [
+            "abort",
+            "warn",
+            "skip"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        }
+      },
+      "title": "ColumnSet",
+      "type": "object"
+    },
+    "ColumnSetSource": {
+      "description": "Source definition for a named column set.\n\nDescribes where the column mapping data lives \u2014 either a Delta table or a\nYAML file. Delta sources reference a registered table alias; YAML sources\nreference a file path relative to the project root.\n\nAttributes:\n    type: Source kind \u2014 ``\"delta\"`` or ``\"yaml\"``.\n    alias: Registered table alias. Required for ``type=\"delta\"``.\n    path: File path to the YAML mapping file. Required for ``type=\"yaml\"``.\n    from_column: Column name in the source that holds the incoming column\n        names. Defaults to ``\"source_name\"``.\n    to_column: Column name in the source that holds the outgoing (renamed)\n        column names. Defaults to ``\"target_name\"``.\n    filter: SQL WHERE expression applied when reading a Delta source.",
+      "properties": {
+        "type": {
+          "description": "Source kind \u2014 ``delta`` for a registered Delta table or ``yaml`` for a file.",
+          "enum": [
+            "delta",
+            "yaml"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Registered table alias. Required when ``type`` is ``delta``.",
+          "title": "Alias"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the YAML mapping file. Required when ``type`` is ``yaml``.",
+          "title": "Path"
+        },
+        "from_column": {
+          "default": "source_name",
+          "description": "Column name in the source that holds the incoming (original) column names.",
+          "title": "From Column",
+          "type": "string"
+        },
+        "to_column": {
+          "default": "target_name",
+          "description": "Column name in the source that holds the outgoing (renamed) column names.",
+          "title": "To Column",
+          "type": "string"
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SQL WHERE expression applied when reading a Delta source.",
+          "title": "Filter"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ColumnSetSource",
+      "type": "object"
+    },
+    "ConcatParams": {
+      "description": "Parameters for the concat step.\n\nConcatenates multiple columns into a single string column with\nconfigurable null handling, separator, and trimming.",
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "separator": {
+          "default": "",
+          "title": "Separator",
+          "type": "string"
+        },
+        "null_mode": {
+          "default": "skip",
+          "enum": [
+            "skip",
+            "empty",
+            "literal"
+          ],
+          "title": "Null Mode",
+          "type": "string"
+        },
+        "null_literal": {
+          "default": "<NULL>",
+          "title": "Null Literal",
+          "type": "string"
+        },
+        "trim": {
+          "default": false,
+          "title": "Trim",
+          "type": "boolean"
+        },
+        "collapse_separators": {
+          "default": true,
+          "title": "Collapse Separators",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target",
+        "columns"
+      ],
+      "title": "ConcatParams",
+      "type": "object"
+    },
+    "ConcatStep": {
+      "description": "Pipeline step: concatenate columns into a string.",
+      "properties": {
+        "concat": {
+          "$ref": "#/$defs/ConcatParams"
+        }
+      },
+      "required": [
+        "concat"
+      ],
+      "title": "ConcatStep",
+      "type": "object"
+    },
+    "CurrentConfig": {
+      "description": "Current-flag sub-mode for SCD2 narrowing.\n\nWhen the lookup dimension uses a boolean or coded column to mark the\nactive record, ``column`` identifies that column and ``value`` is the\nactive marker (defaults to ``True``).",
+      "properties": {
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "value": {
+          "default": true,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "column"
+      ],
+      "title": "CurrentConfig",
+      "type": "object"
+    },
+    "DateOpsParams": {
+      "description": "Parameters for the date_ops step.\n\nApplies a Spark SQL expression template across selected columns.\nUse ``{col}`` as the column placeholder in the expression.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "expr": {
+          "title": "Expr",
+          "type": "string"
+        },
+        "on_empty": {
+          "default": "warn",
+          "enum": [
+            "warn",
+            "error"
+          ],
+          "title": "On Empty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "columns",
+        "expr"
+      ],
+      "title": "DateOpsParams",
+      "type": "object"
+    },
+    "DateOpsStep": {
+      "description": "Pipeline step: apply expression template to date/timestamp columns.",
+      "properties": {
+        "date_ops": {
+          "$ref": "#/$defs/DateOpsParams"
+        }
+      },
+      "required": [
+        "date_ops"
+      ],
+      "title": "DateOpsStep",
+      "type": "object"
+    },
+    "DedupConfig": {
+      "description": "Deduplication configuration applied immediately after reading a source.",
+      "properties": {
+        "keys": {
+          "description": "Columns to deduplicate on.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Keys",
+          "type": "array"
+        },
+        "order_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Spark SQL ORDER BY expression to determine which row to keep when duplicates are found.",
+          "title": "Order By"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "title": "DedupConfig",
+      "type": "object"
+    },
+    "DedupParams": {
+      "description": "Parameters for the dedup step.",
+      "properties": {
+        "keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keys",
+          "type": "array"
+        },
+        "order_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order By"
+        },
+        "keep": {
+          "default": "last",
+          "enum": [
+            "first",
+            "last"
+          ],
+          "title": "Keep",
+          "type": "string"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "title": "DedupParams",
+      "type": "object"
+    },
+    "DedupStep": {
+      "description": "Pipeline step: deduplicate rows.",
+      "properties": {
+        "dedup": {
+          "$ref": "#/$defs/DedupParams"
+        }
+      },
+      "required": [
+        "dedup"
+      ],
+      "title": "DedupStep",
+      "type": "object"
+    },
+    "DeriveParams": {
+      "description": "Parameters for the derive step.\n\n``columns`` maps output column names to Spark SQL expressions.\nMultiple columns can be derived in a single step.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "object"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "DeriveParams",
+      "type": "object"
+    },
+    "DeriveStep": {
+      "description": "Pipeline step: derive one or more new columns from Spark SQL expressions.",
+      "properties": {
+        "derive": {
+          "$ref": "#/$defs/DeriveParams"
+        }
+      },
+      "required": [
+        "derive"
+      ],
+      "title": "DeriveStep",
+      "type": "object"
+    },
+    "DimensionConfig": {
+      "description": "Full configuration for a dimension analytical target.\n\nDefines the surrogate key, business key, optional SCD tracking, change\ndetection groups, additional keys, system members, and SCD column/date\nboundaries for a dimension table produced by the weevr engine.\n\nAttributes:\n    business_key: One or more source columns that form the natural key.\n    surrogate_key: Surrogate key generation configuration.\n    track_history: When ``True``, the target is an SCD Type 2 table and\n        groups with ``on_change: version`` produce new history rows.\n    previous_columns: Map of output column name \u2192 source column name for\n        capturing the previous value of selected attributes.\n    change_detection: Named map of change detection groups. Each key is the\n        group name (used as the output hash column name unless the group\n        config provides its own ``name``).\n    additional_keys: Named map of additional generated key configurations.\n    columns: SCD tracking column names. Defaults to ``_valid_from``,\n        ``_valid_to``, ``_is_current``.\n    dates: SCD boundary dates. Defaults to ``1970-01-01`` / ``9999-12-31``.\n    seed_system_members: When ``True``, the engine inserts ``system_members``\n        rows during the first load.\n    system_members: Reserved sentinel rows with negative SK values.\n    label_column: Optional column name for a human-readable row label.\n    history_filter: When ``True`` (default), the engine exposes a filtered\n        view that returns only current rows.",
+      "properties": {
+        "business_key": {
+          "description": "One or more source columns that form the natural key.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Business Key",
+          "type": "array"
+        },
+        "surrogate_key": {
+          "$ref": "#/$defs/DimensionSurrogateKeyConfig",
+          "description": "Surrogate key generation configuration."
+        },
+        "track_history": {
+          "default": false,
+          "description": "When ``True``, the target is an SCD Type 2 table and groups with ``on_change: version`` produce new history rows.",
+          "title": "Track History",
+          "type": "boolean"
+        },
+        "previous_columns": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Map of output column name to source column name for capturing the previous value of selected attributes.",
+          "title": "Previous Columns"
+        },
+        "change_detection": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/ChangeDetectionGroupConfig"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Named map of change detection groups. Each key is the group name used as the output hash column name unless the group config provides its own ``name``.",
+          "title": "Change Detection"
+        },
+        "additional_keys": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/AdditionalKeyConfig"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Named map of additional generated key configurations.",
+          "title": "Additional Keys"
+        },
+        "columns": {
+          "$ref": "#/$defs/ScdColumnConfig",
+          "default": {
+            "valid_from": "_valid_from",
+            "valid_to": "_valid_to",
+            "is_current": "_is_current"
+          },
+          "description": "SCD tracking column names. Defaults to ``_valid_from``, ``_valid_to``, ``_is_current``."
+        },
+        "dates": {
+          "$ref": "#/$defs/ScdDateConfig",
+          "default": {
+            "min": "1970-01-01",
+            "max": "9999-12-31"
+          },
+          "description": "SCD boundary dates. Defaults to ``1970-01-01`` / ``9999-12-31``."
+        },
+        "seed_system_members": {
+          "default": false,
+          "description": "When ``True``, the engine inserts ``system_members`` rows during the first load.",
+          "title": "Seed System Members",
+          "type": "boolean"
+        },
+        "system_members": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SystemMemberConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reserved sentinel rows with negative SK values.",
+          "title": "System Members"
+        },
+        "label_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional column name for a human-readable row label.",
+          "title": "Label Column"
+        },
+        "history_filter": {
+          "default": true,
+          "description": "When ``True`` (default), the engine exposes a filtered view returning only current rows.",
+          "title": "History Filter",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "business_key",
+        "surrogate_key"
+      ],
+      "title": "DimensionConfig",
+      "type": "object"
+    },
+    "DimensionSurrogateKeyConfig": {
+      "description": "Surrogate key generation configuration for a dimension target.\n\nUnlike the keys.py SurrogateKeyConfig, this variant includes a ``columns``\nfield that specifies which source columns are hashed to produce the SK.\n\nAttributes:\n    name: Output column name for the generated surrogate key.\n    algorithm: Hash algorithm to use.\n    columns: Source columns to hash into the surrogate key value.\n    output: Controls the output type for integer-returning algorithms\n        (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's\n        return type; ``string`` casts to StringType.",
+      "properties": {
+        "name": {
+          "description": "Output column name for the generated surrogate key.",
+          "title": "Name",
+          "type": "string"
+        },
+        "algorithm": {
+          "default": "sha256",
+          "description": "Hash algorithm to use for surrogate key generation.",
+          "enum": [
+            "xxhash64",
+            "sha1",
+            "sha256",
+            "sha384",
+            "sha512",
+            "md5",
+            "crc32",
+            "murmur3"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "columns": {
+          "description": "Source columns to hash into the surrogate key value.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "output": {
+          "default": "native",
+          "description": "Controls the output type for integer-returning algorithms (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's return type; ``string`` casts to StringType.",
+          "enum": [
+            "native",
+            "string"
+          ],
+          "title": "Output",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "columns"
+      ],
+      "title": "DimensionSurrogateKeyConfig",
+      "type": "object"
+    },
+    "DropParams": {
+      "description": "Parameters for the drop step.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "DropParams",
+      "type": "object"
+    },
+    "DropStep": {
+      "description": "Pipeline step: drop columns.",
+      "properties": {
+        "drop": {
+          "$ref": "#/$defs/DropParams"
+        }
+      },
+      "required": [
+        "drop"
+      ],
+      "title": "DropStep",
+      "type": "object"
+    },
+    "EffectiveConfig": {
+      "description": "SCD2 narrowing configuration for resolve step.\n\nSupports two mutually exclusive sub-modes:\n\n* **Date range** \u2014 half-open interval ``[from, to)`` checked against\n  a fact ``date_column``.\n* **Current flag** \u2014 filter lookup rows where a column equals a\n  specific value (string sugar or dict form with custom value).",
+      "properties": {
+        "date_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date Column"
+        },
+        "from_": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To"
+        },
+        "current": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/CurrentConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current"
+        }
+      },
+      "title": "EffectiveConfig",
+      "type": "object"
+    },
+    "ExecutionConfig": {
+      "description": "Runtime execution settings that cascade through loom/weave/thread.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.",
+      "properties": {
+        "log_level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "standard",
+          "description": "Logging verbosity for execution output."
+        },
+        "trace": {
+          "default": true,
+          "description": "Whether to collect execution spans for telemetry.",
+          "title": "Trace",
+          "type": "boolean"
+        }
+      },
+      "title": "ExecutionConfig",
+      "type": "object"
+    },
+    "Export": {
+      "description": "A named secondary output destination for thread data.\n\nExports write the same post-mapping, audit-injected DataFrame as the\nprimary target to additional locations in configurable formats.\n\nAttributes:\n    name: Unique identifier within the resolved thread.\n    description: Optional human-readable label shown in explain() output.\n    type: Output format (delta, parquet, csv, json, orc).\n    path: OneLake path for the export. Supports context variables.\n    alias: Metastore alias (delta type only, mutually exclusive with path).\n    connection: Named connection reference (delta type only). Mutually\n        exclusive with ``path`` and ``alias``. Requires ``table``.\n    schema_override: Schema override within the connection's lakehouse.\n        Aliased as ``schema`` in YAML configs.\n    table: Table name within the connection's lakehouse. Required when\n        ``connection`` is set; invalid without it.\n    mode: Write mode. Only ``\"overwrite\"`` in v1.\n    partition_by: Partition columns, independent of primary target.\n    on_failure: Behavior on write error \u2014 ``\"abort\"`` fails the thread,\n        ``\"warn\"`` logs and continues.\n    enabled: Set to ``False`` to suppress an inherited export.\n    options: Format-specific Spark DataFrameWriter options.",
+      "properties": {
+        "name": {
+          "description": "Unique identifier within the resolved thread.",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional human-readable label shown in explain() output.",
+          "title": "Description"
+        },
+        "type": {
+          "description": "Output format (delta, parquet, csv, json, orc).",
+          "enum": [
+            "delta",
+            "parquet",
+            "csv",
+            "json",
+            "orc"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OneLake path for the export. Supports context variables.",
+          "title": "Path"
+        },
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Metastore alias (delta type only, mutually exclusive with path).",
+          "title": "Alias"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a named connection defined at thread, weave, or loom level.",
+          "title": "Connection"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema override within the connection's lakehouse.",
+          "title": "Schema"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name within the connection's lakehouse.",
+          "title": "Table"
+        },
+        "mode": {
+          "const": "overwrite",
+          "default": "overwrite",
+          "description": "Write mode. Only ``overwrite`` is supported in v1.",
+          "title": "Mode",
+          "type": "string"
+        },
+        "partition_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Partition columns, independent of the primary target.",
+          "title": "Partition By"
+        },
+        "on_failure": {
+          "default": "warn",
+          "description": "Behavior on write error. ``abort`` fails the thread; ``warn`` logs and continues.",
+          "enum": [
+            "abort",
+            "warn"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Set to ``False`` to suppress an inherited export.",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Format-specific Spark DataFrameWriter options.",
+          "title": "Options"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "Export",
+      "type": "object"
+    },
+    "FactConfig": {
+      "description": "Configuration metadata for fact table validation.\n\nFactConfig declares foreign key columns and sentinel value conventions\nfor a fact table, enabling validation and data quality enforcement\nduring mapping operations.\n\nAttributes:\n    foreign_keys: Non-empty list of column names that reference\n        dimension tables. Required field.\n    sentinel_values: Configuration for sentinel value conventions.\n        Defaults to SentinelValueConfig() if not provided.",
+      "properties": {
+        "foreign_keys": {
+          "description": "Non-empty list of column names that reference dimension tables.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Foreign Keys",
+          "type": "array"
+        },
+        "sentinel_values": {
+          "$ref": "#/$defs/SentinelValueConfig",
+          "default": {
+            "invalid": -4,
+            "missing": -1
+          },
+          "description": "Configuration for sentinel value conventions."
+        }
+      },
+      "required": [
+        "foreign_keys"
+      ],
+      "title": "FactConfig",
+      "type": "object"
+    },
+    "FailureConfig": {
+      "description": "Per-thread failure handling policy.\n\nControls what happens to remaining threads in a weave when this thread fails.\n\nAttributes:\n    on_failure: One of ``\"abort_weave\"`` (default), ``\"skip_downstream\"``,\n        or ``\"continue\"``. See SPEC \u00a714.2 for semantics.",
+      "properties": {
+        "on_failure": {
+          "default": "abort_weave",
+          "description": "Policy applied to remaining threads when this thread fails. One of ``abort_weave``, ``skip_downstream``, or ``continue``.",
+          "enum": [
+            "skip_downstream",
+            "continue",
+            "abort_weave"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        }
+      },
+      "title": "FailureConfig",
+      "type": "object"
+    },
+    "FillNullParams": {
+      "description": "Parameters for the fill_null step.\n\nSupports two composable modes: explicit column-to-value mapping\n(``columns``) and schema-driven type defaults (``mode:\ntype_defaults``). Both may appear in the same step \u2014 type defaults\napply first, then explicit columns override.",
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columns"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "const": "type_defaults",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mode"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "enum": [
+                "unknown",
+                "not_applicable",
+                "invalid"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "include": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include"
+        },
+        "exclude": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude"
+        },
+        "overrides": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Overrides"
+        },
+        "where": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Where"
+        }
+      },
+      "title": "FillNullParams",
+      "type": "object"
+    },
+    "FillNullStep": {
+      "description": "Pipeline step: fill null values with defaults.",
+      "properties": {
+        "fill_null": {
+          "$ref": "#/$defs/FillNullParams"
+        }
+      },
+      "required": [
+        "fill_null"
+      ],
+      "title": "FillNullStep",
+      "type": "object"
+    },
+    "FilterParams": {
+      "description": "Parameters for the filter step.",
+      "properties": {
+        "expr": {
+          "title": "Expr",
+          "type": "string"
+        }
+      },
+      "required": [
+        "expr"
+      ],
+      "title": "FilterParams",
+      "type": "object"
+    },
+    "FilterStep": {
+      "description": "Pipeline step: filter rows using a Spark SQL expression.",
+      "properties": {
+        "filter": {
+          "$ref": "#/$defs/FilterParams"
+        }
+      },
+      "required": [
+        "filter"
+      ],
+      "title": "FilterStep",
+      "type": "object"
+    },
+    "FormatParams": {
+      "description": "Parameters for the format step.\n\nMaps target column names to format specifications. Multiple columns\ncan be formatted in a single step.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FormatSpec"
+          },
+          "title": "Columns",
+          "type": "object"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "FormatParams",
+      "type": "object"
+    },
+    "FormatSpec": {
+      "description": "Per-column format specification.\n\nExactly one of ``pattern``, ``number``, or ``date`` must be set.\n``source`` defaults to the target column name when omitted.",
+      "properties": {
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pattern"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        },
+        "on_short": {
+          "default": "null",
+          "enum": [
+            "null",
+            "partial"
+          ],
+          "title": "On Short",
+          "type": "string"
+        },
+        "strict_types": {
+          "default": false,
+          "title": "Strict Types",
+          "type": "boolean"
+        }
+      },
+      "title": "FormatSpec",
+      "type": "object"
+    },
+    "FormatStep": {
+      "description": "Pipeline step: format columns using pattern, number, or date rules.",
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/FormatParams"
+        }
+      },
+      "required": [
+        "format"
+      ],
+      "title": "FormatStep",
+      "type": "object"
+    },
+    "JoinKeyPair": {
+      "description": "An explicit left/right key pair for join conditions.",
+      "properties": {
+        "left": {
+          "title": "Left",
+          "type": "string"
+        },
+        "right": {
+          "title": "Right",
+          "type": "string"
+        }
+      },
+      "required": [
+        "left",
+        "right"
+      ],
+      "title": "JoinKeyPair",
+      "type": "object"
+    },
+    "JoinParams": {
+      "description": "Parameters for the join step.\n\n``on`` accepts simple string keys (``[\"id\"]``) or explicit pairs\n(``[{\"left\": \"a\", \"right\": \"b\"}]``). Simple keys are normalised to\n``JoinKeyPair`` during validation.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "type": {
+          "default": "inner",
+          "enum": [
+            "inner",
+            "left",
+            "right",
+            "full",
+            "cross",
+            "semi",
+            "anti"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/JoinKeyPair"
+          },
+          "title": "On",
+          "type": "array"
+        },
+        "null_safe": {
+          "default": true,
+          "title": "Null Safe",
+          "type": "boolean"
+        },
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alias for column disambiguation via Spark .alias().",
+          "title": "Alias"
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transient pre-filter expression applied to the right-side DataFrame before join.",
+          "title": "Filter"
+        },
+        "include": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob patterns for source columns to keep. When set, only matching columns are retained.",
+          "title": "Include"
+        },
+        "exclude": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob patterns for source columns to drop. Applied after include filtering.",
+          "title": "Exclude"
+        },
+        "rename": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Rename source columns: {original: new_name}. Applied after prefix.",
+          "title": "Rename"
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prefix applied to all surviving source columns after include/exclude.",
+          "title": "Prefix"
+        }
+      },
+      "required": [
+        "source",
+        "on"
+      ],
+      "title": "JoinParams",
+      "type": "object"
+    },
+    "JoinStep": {
+      "description": "Pipeline step: join with another source.",
+      "properties": {
+        "join": {
+          "$ref": "#/$defs/JoinParams"
+        }
+      },
+      "required": [
+        "join"
+      ],
+      "title": "JoinStep",
+      "type": "object"
+    },
+    "KeyConfig": {
+      "description": "Key management configuration for a thread.",
+      "properties": {
+        "business_key": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "One or more source columns that form the natural key for the thread.",
+          "title": "Business Key"
+        },
+        "surrogate_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SurrogateKeyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Surrogate key generation configuration."
+        },
+        "change_detection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChangeDetectionConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Change detection hash generation configuration."
+        }
+      },
+      "title": "KeyConfig",
+      "type": "object"
+    },
+    "LoadConfig": {
+      "description": "Incremental load mode and watermark parameters.\n\nCross-field validation:\n- ``mode == \"incremental_watermark\"`` requires ``watermark_column`` to be set.\n- ``mode == \"cdc\"`` requires ``cdc`` config to be set.\n- ``mode == \"cdc\"`` must not have ``watermark_column`` set\n  (CDF version tracking is automatic).",
+      "properties": {
+        "mode": {
+          "default": "full",
+          "description": "Load mode: full, incremental_watermark, incremental_parameter, or cdc.",
+          "enum": [
+            "full",
+            "incremental_watermark",
+            "incremental_parameter",
+            "cdc"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "watermark_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column used for watermark-based incremental loads. Required when mode is 'incremental_watermark'.",
+          "title": "Watermark Column"
+        },
+        "watermark_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "timestamp",
+                "date",
+                "int",
+                "long"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Data type of the watermark column.",
+          "title": "Watermark Type"
+        },
+        "watermark_inclusive": {
+          "default": false,
+          "description": "When True, include rows equal to the watermark value. Pair with merge or overwrite for idempotent re-reads.",
+          "title": "Watermark Inclusive",
+          "type": "boolean"
+        },
+        "watermark_store": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WatermarkStoreConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Watermark persistence configuration. Defaults to table_properties."
+        },
+        "cdc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CdcConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CDC-specific configuration. Required when mode is 'cdc'."
+        }
+      },
+      "title": "LoadConfig",
+      "type": "object"
+    },
+    "LogLevel": {
+      "description": "Configurable log level for weevr execution.\n\nControls the verbosity of structured logging output during pipeline\nexecution. Maps to Python logging levels internally.",
+      "enum": [
+        "minimal",
+        "standard",
+        "verbose",
+        "debug"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "LogMessageStep": {
+      "description": "A log message emitted as a hook step.\n\nAttributes:\n    type: Step type discriminator, always ``\"log_message\"``.\n    name: Optional name for telemetry span naming.\n    on_failure: Failure behaviour. ``None`` means the executor applies the\n        phase-specific default.\n    message: Message template to log. Supports ``${var.name}`` placeholders.\n    level: Log level for the message.",
+      "properties": {
+        "type": {
+          "const": "log_message",
+          "description": "Step type discriminator, always ``log_message``.",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for telemetry span naming.",
+          "title": "Name"
+        },
+        "on_failure": {
+          "anyOf": [
+            {
+              "enum": [
+                "abort",
+                "warn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failure behaviour. ``None`` means the executor applies the phase-specific default.",
+          "title": "On Failure"
+        },
+        "message": {
+          "description": "Message template to log. Supports ``${var.name}`` placeholders.",
+          "title": "Message",
+          "type": "string"
+        },
+        "level": {
+          "default": "info",
+          "description": "Log level for the message.",
+          "enum": [
+            "info",
+            "warn",
+            "error"
+          ],
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "message"
+      ],
+      "title": "LogMessageStep",
+      "type": "object"
+    },
+    "Lookup": {
+      "description": "A weave-level named data definition that can be referenced by threads.\n\nLookups define small reference datasets shared across threads in a weave.\nWhen ``materialize`` is true, the data is read once and cached (or broadcast)\nbefore threads execute.\n\nNarrow lookup fields (``key``, ``values``, ``filter``) control projection\nand filtering applied during materialization or on-demand reads.  When set,\nonly the declared key and value columns are retained, reducing memory and\nimproving join performance.\n\nAttributes:\n    source: Source definition for the lookup data.\n    materialize: Whether to pre-read and cache/broadcast the data before\n        thread execution.\n    strategy: Materialization strategy. Only meaningful when ``materialize``\n        is true. ``\"broadcast\"`` uses Spark broadcast join hints;\n        ``\"cache\"`` uses DataFrame caching.\n    key: Column(s) used for matching (join key). Kept in the cached\n        projection alongside ``values``.\n    values: Payload column(s) to retrieve. When set, only ``key`` + ``values``\n        columns are retained in the cached DataFrame.\n    filter: SQL WHERE expression applied to the source before projection.\n    unique_key: When true, validate that ``key`` columns form a unique key\n        after filtering and projection.\n    on_failure: Behavior when ``unique_key`` check finds duplicates.\n        Only meaningful when ``unique_key`` is true.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/Source",
+          "description": "Source definition for the lookup data."
+        },
+        "materialize": {
+          "default": false,
+          "description": "Whether to pre-read and cache or broadcast the data before thread execution.",
+          "title": "Materialize",
+          "type": "boolean"
+        },
+        "strategy": {
+          "default": "cache",
+          "description": "Materialization strategy when ``materialize`` is true. ``broadcast`` uses Spark broadcast join hints; ``cache`` uses DataFrame caching.",
+          "enum": [
+            "broadcast",
+            "cache"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column(s) used for matching (join key). Retained in the cached projection alongside ``values``.",
+          "title": "Key"
+        },
+        "values": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Payload column(s) to retrieve. When set, only ``key`` + ``values`` columns are retained in the cached DataFrame.",
+          "title": "Values"
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SQL WHERE expression applied to the source before projection.",
+          "title": "Filter"
+        },
+        "unique_key": {
+          "default": false,
+          "description": "When true, validate that ``key`` columns form a unique key after filtering.",
+          "title": "Unique Key",
+          "type": "boolean"
+        },
+        "on_failure": {
+          "default": "abort",
+          "description": "Behavior when the ``unique_key`` check finds duplicates. Only meaningful when ``unique_key`` is true.",
+          "enum": [
+            "abort",
+            "warn"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "Lookup",
+      "type": "object"
+    },
+    "MapParams": {
+      "description": "Parameters for the map step.\n\nMaps discrete values in a column to new values using a lookup dict.\nNull handling and unmapped value behavior are independently\nconfigurable.",
+      "properties": {
+        "column": {
+          "title": "Column",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "values": {
+          "additionalProperties": true,
+          "title": "Values",
+          "type": "object"
+        },
+        "default": {
+          "default": null,
+          "title": "Default"
+        },
+        "on_null": {
+          "default": null,
+          "title": "On Null"
+        },
+        "unmapped": {
+          "default": "keep",
+          "enum": [
+            "keep",
+            "null",
+            "validate"
+          ],
+          "title": "Unmapped",
+          "type": "string"
+        },
+        "case_sensitive": {
+          "default": true,
+          "title": "Case Sensitive",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "column",
+        "values"
+      ],
+      "title": "MapParams",
+      "type": "object"
+    },
+    "MapStep": {
+      "description": "Pipeline step: map discrete values.",
+      "properties": {
+        "map": {
+          "$ref": "#/$defs/MapParams"
+        }
+      },
+      "required": [
+        "map"
+      ],
+      "title": "MapStep",
+      "type": "object"
+    },
+    "NamingConfig": {
+      "description": "Configuration for naming normalization.\n\nAttributes:\n    columns: Pattern to apply to column names. None means inherit from parent.\n    tables: Pattern to apply to table names. None means inherit from parent.\n    exclude: Glob patterns or explicit names to exclude from column normalization.\n    on_collision: Behaviour when two columns normalise to the same name.\n        ``\"suffix\"`` appends a numeric suffix to the later column; ``\"error\"``\n        aborts with a validation error.\n    reserved_words: Optional configuration for handling SQL reserved word\n        collisions in column names. None means no reserved word handling.",
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NamingPattern"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern to apply to column names. None means inherit from parent."
+        },
+        "tables": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NamingPattern"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pattern to apply to table names. None means inherit from parent."
+        },
+        "exclude": {
+          "default": [],
+          "description": "Glob patterns or explicit names to exclude from column normalization.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "on_collision": {
+          "default": "error",
+          "description": "Behaviour when two columns normalise to the same name. ``suffix`` appends a numeric suffix to the later column; ``error`` aborts with a validation error.",
+          "enum": [
+            "suffix",
+            "error"
+          ],
+          "title": "On Collision",
+          "type": "string"
+        },
+        "reserved_words": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReservedWordConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional configuration for handling SQL reserved word collisions in column names."
+        }
+      },
+      "title": "NamingConfig",
+      "type": "object"
+    },
+    "NamingPattern": {
+      "description": "Column and table naming patterns.\n\nAttributes:\n    SNAKE_CASE: ``http_status``\n    CAMEL_CASE: ``httpStatus``\n    PASCAL_CASE: ``HttpStatus``\n    UPPER_SNAKE_CASE: ``HTTP_STATUS``\n    TITLE_SNAKE_CASE: ``Http_Status``\n    TITLE_CASE: ``Http Status``\n    LOWERCASE: ``httpstatus``\n    UPPERCASE: ``HTTPSTATUS``\n    KEBAB_CASE: ``http-status``\n    NONE: Opt-out sentinel \u2014 no normalization applied.",
+      "enum": [
+        "snake_case",
+        "camelCase",
+        "PascalCase",
+        "UPPER_SNAKE_CASE",
+        "Title_Snake_Case",
+        "Title Case",
+        "lowercase",
+        "UPPERCASE",
+        "kebab-case",
+        "none"
+      ],
+      "title": "NamingPattern",
+      "type": "string"
+    },
+    "OneLakeConnection": {
+      "description": "A OneLake connection declaration.\n\nIdentifies the Fabric workspace and lakehouse that a source or target\nresolves against at execution time.",
+      "properties": {
+        "type": {
+          "const": "onelake",
+          "description": "Connection type identifier.",
+          "title": "Type",
+          "type": "string"
+        },
+        "workspace": {
+          "description": "OneLake workspace GUID or variable reference.",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "lakehouse": {
+          "description": "OneLake lakehouse GUID or variable reference.",
+          "title": "Lakehouse",
+          "type": "string"
+        },
+        "default_schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default schema for tables in this connection.",
+          "title": "Default Schema"
+        }
+      },
+      "required": [
+        "type",
+        "workspace",
+        "lakehouse"
+      ],
+      "title": "OneLakeConnection",
+      "type": "object"
+    },
+    "ParamSpec": {
+      "description": "Typed parameter specification for config-level param declarations.",
+      "properties": {
+        "name": {
+          "description": "Unique name of the parameter as referenced in config.",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Expected type of the parameter value.",
+          "enum": [
+            "string",
+            "int",
+            "float",
+            "bool",
+            "date",
+            "timestamp",
+            "list[string]"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "description": "Whether the parameter must be supplied at runtime.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "default": {
+          "default": null,
+          "description": "Default value used when the parameter is not supplied and required is false.",
+          "title": "Default"
+        },
+        "description": {
+          "default": "",
+          "description": "Human-readable description of the parameter's purpose.",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ParamSpec",
+      "type": "object"
+    },
+    "PivotParams": {
+      "description": "Parameters for the pivot step.\n\nExplicit values are required for deterministic output columns.",
+      "properties": {
+        "group_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Group By",
+          "type": "array"
+        },
+        "pivot_column": {
+          "title": "Pivot Column",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "aggregate": {
+          "title": "Aggregate",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_by",
+        "pivot_column",
+        "values",
+        "aggregate"
+      ],
+      "title": "PivotParams",
+      "type": "object"
+    },
+    "PivotStep": {
+      "description": "Pipeline step: pivot rows to columns.",
+      "properties": {
+        "pivot": {
+          "$ref": "#/$defs/PivotParams"
+        }
+      },
+      "required": [
+        "pivot"
+      ],
+      "title": "PivotStep",
+      "type": "object"
+    },
+    "QualityGateStep": {
+      "description": "A quality gate check executed as a hook step.\n\nThe ``check`` field determines which check-specific fields are required.\n\nAttributes:\n    type: Step type discriminator, always ``\"quality_gate\"``.\n    name: Optional name for telemetry span naming.\n    on_failure: Failure behaviour. ``None`` means the executor applies the\n        phase-specific default (pre=abort, post=warn).\n    check: Which quality gate check to perform.\n    source: Table alias for ``source_freshness`` and ``table_exists`` checks.\n    max_age: Duration string for ``source_freshness`` (e.g. ``\"24h\"``).\n    target: Table alias for ``row_count_delta`` and ``row_count`` checks.\n    max_decrease_pct: Max allowed decrease percentage for ``row_count_delta``.\n    max_increase_pct: Max allowed increase percentage for ``row_count_delta``.\n    min_delta: Minimum absolute row change for ``row_count_delta``.\n    max_delta: Maximum absolute row change for ``row_count_delta``.\n    min_count: Minimum row count for ``row_count``.\n    max_count: Maximum row count for ``row_count``.\n    sql: Spark SQL boolean expression for ``expression`` check.\n    message: Failure message for ``expression`` check diagnostics.",
+      "properties": {
+        "type": {
+          "const": "quality_gate",
+          "description": "Step type discriminator, always ``quality_gate``.",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for telemetry span naming.",
+          "title": "Name"
+        },
+        "on_failure": {
+          "anyOf": [
+            {
+              "enum": [
+                "abort",
+                "warn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failure behaviour. ``None`` means the executor applies the phase-specific default (pre=abort, post=warn).",
+          "title": "On Failure"
+        },
+        "check": {
+          "description": "Which quality gate check to perform.",
+          "enum": [
+            "source_freshness",
+            "row_count_delta",
+            "row_count",
+            "table_exists",
+            "expression"
+          ],
+          "title": "Check",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table alias for ``source_freshness`` and ``table_exists`` checks.",
+          "title": "Source"
+        },
+        "max_age": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration string for ``source_freshness`` (e.g. ``\"24h\"``).",
+          "title": "Max Age"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table alias for ``row_count_delta`` and ``row_count`` checks.",
+          "title": "Target"
+        },
+        "max_decrease_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum allowed row count decrease percentage for ``row_count_delta``.",
+          "title": "Max Decrease Pct"
+        },
+        "max_increase_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum allowed row count increase percentage for ``row_count_delta``.",
+          "title": "Max Increase Pct"
+        },
+        "min_delta": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum absolute row change allowed for ``row_count_delta``.",
+          "title": "Min Delta"
+        },
+        "max_delta": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum absolute row change allowed for ``row_count_delta``.",
+          "title": "Max Delta"
+        },
+        "min_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum row count threshold for the ``row_count`` check.",
+          "title": "Min Count"
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum row count threshold for the ``row_count`` check.",
+          "title": "Max Count"
+        },
+        "sql": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Spark SQL boolean expression for the ``expression`` check.",
+          "title": "Sql"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failure message for ``expression`` check diagnostics.",
+          "title": "Message"
+        }
+      },
+      "required": [
+        "type",
+        "check"
+      ],
+      "title": "QualityGateStep",
+      "type": "object"
+    },
+    "RenameParams": {
+      "description": "Parameters for the rename step.\n\n``columns`` maps old column names to new names for static renames.\n``column_set`` names a pre-declared column set whose entries are merged\nat execution time, allowing shared rename dictionaries to be reused\nacross pipelines.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Columns",
+          "type": "object"
+        },
+        "column_set": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column Set"
+        }
+      },
+      "title": "RenameParams",
+      "type": "object"
+    },
+    "RenameStep": {
+      "description": "Pipeline step: rename columns.",
+      "properties": {
+        "rename": {
+          "$ref": "#/$defs/RenameParams"
+        }
+      },
+      "required": [
+        "rename"
+      ],
+      "title": "RenameStep",
+      "type": "object"
+    },
+    "ReservedWordConfig": {
+      "description": "Configuration for handling reserved word collisions in column names.\n\nWhen a column or table name matches a reserved word, the engine can\nhandle the collision in one of three ways: quote the name, prefix it,\nor raise an error.\n\nThe ``preset`` field selects one or more built-in word lists. When\nomitted, the ANSI SQL list is used as the default. Specifying any\npreset replaces that default \u2014 to include ANSI words alongside other\npresets, list ``\"ansi\"`` explicitly. A single string is accepted as\nshorthand for a one-element list.\n\nThe ``extend`` and ``exclude`` lists compose on top of the resolved\npreset union, adding or removing individual words.\n\nAttributes:\n    strategy: How to handle reserved word collisions. ``\"quote\"`` wraps\n        the name in back-ticks; ``\"prefix\"`` prepends ``prefix``;\n        ``\"error\"`` raises a validation error.\n    prefix: String prepended to colliding column names when\n        ``strategy=\"prefix\"``.\n    preset: Built-in word list presets to activate. ``None`` (default)\n        uses the ANSI SQL list. Accepts a single string or a list.\n    extend: Additional words to treat as reserved beyond the preset.\n    exclude: Words to remove from the reserved word check.",
+      "properties": {
+        "strategy": {
+          "default": "quote",
+          "description": "How to handle reserved word collisions. ``quote`` wraps in back-ticks; ``prefix`` prepends ``prefix``; ``error`` raises a validation error.",
+          "enum": [
+            "prefix",
+            "quote",
+            "error"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "prefix": {
+          "default": "_",
+          "description": "String prepended to colliding column names when ``strategy`` is ``prefix``.",
+          "title": "Prefix",
+          "type": "string"
+        },
+        "preset": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ReservedWordPreset"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Built-in word list presets to activate. ``None`` uses the ANSI SQL list. Accepts a single string or a list.",
+          "title": "Preset"
+        },
+        "extend": {
+          "default": [],
+          "description": "Additional words to treat as reserved beyond the resolved preset.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Extend",
+          "type": "array"
+        },
+        "exclude": {
+          "default": [],
+          "description": "Words to remove from the reserved word check.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude",
+          "type": "array"
+        }
+      },
+      "title": "ReservedWordConfig",
+      "type": "object"
+    },
+    "ReservedWordPreset": {
+      "description": "Built-in reserved word list presets.\n\nEach preset represents a self-contained set of reserved words for a\nspecific query language or engine context. Presets can be combined\nvia list composition; the effective word set is the union.\n\nAttributes:\n    ANSI: ANSI SQL reserved keywords (~80 words).\n    DAX: DAX reserved words for Power BI semantic models.\n    M: M language (Power Query) reserved words.\n    POWERBI: Convenience alias expanding to DAX + M union.\n    TSQL: T-SQL reserved keywords for Fabric SQL endpoints.",
+      "enum": [
+        "ansi",
+        "dax",
+        "m",
+        "powerbi",
+        "tsql"
+      ],
+      "title": "ReservedWordPreset",
+      "type": "string"
+    },
+    "ResolveBatchItem": {
+      "description": "Per-FK configuration within a batch resolve step.\n\nEvery item requires ``name``, ``lookup``, and ``match``.  All other\nfields are optional overrides merged with shared defaults at runtime.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "lookup": {
+          "title": "Lookup",
+          "type": "string"
+        },
+        "match": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Match",
+          "type": "object"
+        },
+        "pk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pk"
+        },
+        "on_invalid": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Invalid"
+        },
+        "on_unknown": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Unknown"
+        },
+        "on_duplicate": {
+          "anyOf": [
+            {
+              "enum": [
+                "error",
+                "warn",
+                "first"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Duplicate"
+        },
+        "on_failure": {
+          "anyOf": [
+            {
+              "enum": [
+                "abort",
+                "warn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Failure"
+        },
+        "normalize": {
+          "anyOf": [
+            {
+              "enum": [
+                "trim_lower",
+                "trim_upper",
+                "trim",
+                "none"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalize"
+        },
+        "drop_source_columns": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Drop Source Columns"
+        },
+        "include": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include"
+        },
+        "include_prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Prefix"
+        },
+        "effective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffectiveConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "where": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Where"
+        }
+      },
+      "required": [
+        "name",
+        "lookup",
+        "match"
+      ],
+      "title": "ResolveBatchItem",
+      "type": "object"
+    },
+    "ResolveParams": {
+      "description": "Parameters for the resolve step.\n\nEncapsulates FK resolution: BK completeness check, multi-column\nequi-join against a named lookup, sentinel assignment for invalid\nand unknown BKs, optional SCD2 narrowing, include columns, and\nbatch mode for multi-FK fact tables.\n\nIn single mode, ``name``, ``lookup``, ``match``, and ``pk`` are\nrequired.  In batch mode, ``batch`` contains the per-FK specs and\nthe outer-level fields serve as shared defaults.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "lookup": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lookup"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Match"
+        },
+        "pk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pk"
+        },
+        "on_invalid": {
+          "default": -4,
+          "title": "On Invalid",
+          "type": "integer"
+        },
+        "on_unknown": {
+          "default": -1,
+          "title": "On Unknown",
+          "type": "integer"
+        },
+        "on_duplicate": {
+          "default": "warn",
+          "enum": [
+            "error",
+            "warn",
+            "first"
+          ],
+          "title": "On Duplicate",
+          "type": "string"
+        },
+        "on_failure": {
+          "default": "abort",
+          "enum": [
+            "abort",
+            "warn"
+          ],
+          "title": "On Failure",
+          "type": "string"
+        },
+        "normalize": {
+          "anyOf": [
+            {
+              "enum": [
+                "trim_lower",
+                "trim_upper",
+                "trim",
+                "none"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalize"
+        },
+        "drop_source_columns": {
+          "default": false,
+          "title": "Drop Source Columns",
+          "type": "boolean"
+        },
+        "include": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include"
+        },
+        "include_prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Prefix"
+        },
+        "effective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffectiveConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "where": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Where"
+        },
+        "batch": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ResolveBatchItem"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Batch"
+        }
+      },
+      "title": "ResolveParams",
+      "type": "object"
+    },
+    "ResolveStep": {
+      "description": "Pipeline step: resolve foreign keys via lookup join.",
+      "properties": {
+        "resolve": {
+          "$ref": "#/$defs/ResolveParams"
+        }
+      },
+      "required": [
+        "resolve"
+      ],
+      "title": "ResolveStep",
+      "type": "object"
+    },
+    "ScdColumnConfig": {
+      "description": "SCD tracking column name configuration.\n\nAttributes:\n    valid_from: Column name for the row effective-from timestamp.\n    valid_to: Column name for the row effective-to timestamp.\n    is_current: Column name for the current-row flag.",
+      "properties": {
+        "valid_from": {
+          "default": "_valid_from",
+          "description": "Column name for the row effective-from timestamp.",
+          "title": "Valid From",
+          "type": "string"
+        },
+        "valid_to": {
+          "default": "_valid_to",
+          "description": "Column name for the row effective-to timestamp.",
+          "title": "Valid To",
+          "type": "string"
+        },
+        "is_current": {
+          "default": "_is_current",
+          "description": "Column name for the current-row flag.",
+          "title": "Is Current",
+          "type": "string"
+        }
+      },
+      "title": "ScdColumnConfig",
+      "type": "object"
+    },
+    "ScdDateConfig": {
+      "description": "Boundary dates used in SCD valid-from / valid-to columns.\n\nAttributes:\n    min: Earliest valid-from date for the first version of a row,\n        in ``YYYY-MM-DD`` format.\n    max: Sentinel valid-to date for currently active rows,\n        in ``YYYY-MM-DD`` format.",
+      "properties": {
+        "min": {
+          "default": "1970-01-01",
+          "description": "Earliest valid-from date for the first version of a row, in ``YYYY-MM-DD`` format.",
+          "title": "Min",
+          "type": "string"
+        },
+        "max": {
+          "default": "9999-12-31",
+          "description": "Sentinel valid-to date for currently active rows, in ``YYYY-MM-DD`` format.",
+          "title": "Max",
+          "type": "string"
+        }
+      },
+      "title": "ScdDateConfig",
+      "type": "object"
+    },
+    "SeedConfig": {
+      "description": "Configuration for seed rows to insert into a target table.\n\nDeclares seed rows that should be inserted into a table on first write\nor when the table is empty, enabling population of reference data and\nbaseline records.\n\nAttributes:\n    on: Trigger condition for seed insertion. ``\"first_write\"`` inserts\n        on initial table creation; ``\"empty\"`` inserts whenever the table\n        is empty. Defaults to ``\"first_write\"``.\n    rows: Non-empty list of row dicts to insert. Each dict is a complete\n        row with column names as keys and cell values as values.",
+      "properties": {
+        "on": {
+          "default": "first_write",
+          "description": "Trigger condition for seed insertion. ``first_write`` inserts on initial table creation; ``empty`` inserts whenever the table is empty.",
+          "enum": [
+            "first_write",
+            "empty"
+          ],
+          "title": "On",
+          "type": "string"
+        },
+        "rows": {
+          "description": "Non-empty list of row dicts to insert. Each dict maps column names to cell values.",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rows"
+      ],
+      "title": "SeedConfig",
+      "type": "object"
+    },
+    "SelectParams": {
+      "description": "Parameters for the select step.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "SelectParams",
+      "type": "object"
+    },
+    "SelectStep": {
+      "description": "Pipeline step: select a subset of columns.",
+      "properties": {
+        "select": {
+          "$ref": "#/$defs/SelectParams"
+        }
+      },
+      "required": [
+        "select"
+      ],
+      "title": "SelectStep",
+      "type": "object"
+    },
+    "SentinelGroup": {
+      "description": "A named sentinel with value and optional per-group rate threshold.\n\n``value`` is either a raw integer sentinel (e.g. ``-4``) or a system\nmember code string (e.g. ``\"invalid\"``) resolved at evaluation time.",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Raw integer sentinel (e.g. ``-4``) or system member code string (e.g. ``\"invalid\"``) resolved at evaluation time.",
+          "title": "Value"
+        },
+        "max_rate": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum allowed rate (0.0\u20131.0) for this sentinel within the group.",
+          "title": "Max Rate"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "SentinelGroup",
+      "type": "object"
+    },
+    "SentinelValueConfig": {
+      "description": "Configuration for sentinel value conventions in fact tables.\n\nSentinel values are special numeric codes used to represent missing,\ninvalid, or explicitly null data within fact table columns.\n\nAttributes:\n    invalid: Sentinel code for invalid data. Defaults to -4.\n    missing: Sentinel code for missing data. Defaults to -1.",
+      "properties": {
+        "invalid": {
+          "default": -4,
+          "description": "Sentinel code for invalid data.",
+          "title": "Invalid",
+          "type": "integer"
+        },
+        "missing": {
+          "default": -1,
+          "description": "Sentinel code for missing data.",
+          "title": "Missing",
+          "type": "integer"
+        }
+      },
+      "title": "SentinelValueConfig",
+      "type": "object"
+    },
+    "SortParams": {
+      "description": "Parameters for the sort step.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "ascending": {
+          "default": true,
+          "title": "Ascending",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "SortParams",
+      "type": "object"
+    },
+    "SortStep": {
+      "description": "Pipeline step: sort rows.",
+      "properties": {
+        "sort": {
+          "$ref": "#/$defs/SortParams"
+        }
+      },
+      "required": [
+        "sort"
+      ],
+      "title": "SortStep",
+      "type": "object"
+    },
+    "Source": {
+      "description": "A data source declaration.\n\nA source is either a direct data reference (with ``type``), a connection-based\nreference (with ``connection`` + ``table``), a lookup reference (with ``lookup``),\nor a generated sequence (with ``type`` set to ``date_sequence`` or\n``int_sequence``). ``lookup`` is mutually exclusive with all other resolution modes.\n\nCross-field validation rules:\n\n- If ``lookup`` is set: ``type`` must not be set.\n- If ``connection`` is set: ``table`` must be set; ``alias`` must not be set;\n  ``type`` must be None or ``\"delta\"``; ``connection`` sources resolve via the\n  named connection rather than an inline alias.\n- ``table`` without ``connection`` is rejected.\n- ``connection`` and ``alias`` are mutually exclusive.\n- If neither ``lookup`` nor ``connection`` is set: ``type`` is required.\n- ``type == \"delta\"`` without ``connection`` requires ``alias`` to be set.\n- ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.\n- Generated types (``date_sequence``, ``int_sequence``) require ``column``,\n  ``start``, and ``end``; ``alias``, ``path``, ``dedup``, ``connection``, and\n  non-empty ``options`` are rejected.\n- ``date_sequence`` step must be one of ``day``, ``week``, ``month``, ``year``,\n  or omitted.\n- ``int_sequence`` step must be a positive integer or omitted.",
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source type: delta, csv, json, parquet, excel, date_sequence, or int_sequence.",
+          "title": "Type"
+        },
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Registered table alias. Required for delta sources without a connection.",
+          "title": "Alias"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path. Required for file-based sources (csv, json, parquet, excel).",
+          "title": "Path"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Format-specific Spark DataFrameReader options.",
+          "title": "Options",
+          "type": "object"
+        },
+        "dedup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DedupConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Deduplication configuration applied after reading the source."
+        },
+        "lookup": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a named lookup defined at the weave or loom level. Mutually exclusive with type.",
+          "title": "Lookup"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a named connection defined at thread, weave, or loom level.",
+          "title": "Connection"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema override within the connection's lakehouse.",
+          "title": "Schema"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name within the connection's lakehouse.",
+          "title": "Table"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sequence start value. Required for generated types. Accepts a date string (date_sequence) or integer (int_sequence).",
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sequence end value (inclusive). Required for generated types. Accepts a date string (date_sequence) or integer (int_sequence).",
+          "title": "End"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Output column name. Required for generated types.",
+          "title": "Column"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sequence step. For date_sequence: one of day, week, month, year. For int_sequence: a positive integer. Defaults to 1 (int_sequence) or day (date_sequence) when omitted.",
+          "title": "Step"
+        }
+      },
+      "title": "Source",
+      "type": "object"
+    },
+    "SqlStatementStep": {
+      "description": "An arbitrary SQL statement executed as a hook step.\n\nOptionally captures the scalar result into a weave-scoped variable\nvia ``set_var``.\n\nAttributes:\n    type: Step type discriminator, always ``\"sql_statement\"``.\n    name: Optional name for telemetry span naming.\n    on_failure: Failure behaviour. ``None`` means the executor applies the\n        phase-specific default.\n    sql: Spark SQL statement to execute.\n    set_var: Optional variable name to capture the scalar result into.",
+      "properties": {
+        "type": {
+          "const": "sql_statement",
+          "description": "Step type discriminator, always ``sql_statement``.",
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional name for telemetry span naming.",
+          "title": "Name"
+        },
+        "on_failure": {
+          "anyOf": [
+            {
+              "enum": [
+                "abort",
+                "warn"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failure behaviour. ``None`` means the executor applies the phase-specific default.",
+          "title": "On Failure"
+        },
+        "sql": {
+          "description": "Spark SQL statement to execute.",
+          "title": "Sql",
+          "type": "string"
+        },
+        "set_var": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional variable name to capture the scalar result into.",
+          "title": "Set Var"
+        }
+      },
+      "required": [
+        "type",
+        "sql"
+      ],
+      "title": "SqlStatementStep",
+      "type": "object"
+    },
+    "StringOpsParams": {
+      "description": "Parameters for the string_ops step.\n\nApplies a Spark SQL expression template across selected columns.\nUse ``{col}`` as the column placeholder in the expression.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "expr": {
+          "title": "Expr",
+          "type": "string"
+        },
+        "on_empty": {
+          "default": "warn",
+          "enum": [
+            "warn",
+            "error"
+          ],
+          "title": "On Empty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "columns",
+        "expr"
+      ],
+      "title": "StringOpsParams",
+      "type": "object"
+    },
+    "StringOpsStep": {
+      "description": "Pipeline step: apply expression template to string columns.",
+      "properties": {
+        "string_ops": {
+          "$ref": "#/$defs/StringOpsParams"
+        }
+      },
+      "required": [
+        "string_ops"
+      ],
+      "title": "StringOpsStep",
+      "type": "object"
+    },
+    "SubPipeline": {
+      "description": "A named sub-pipeline that produces an intermediate DataFrame.\n\nSub-pipelines are declared under the ``with:`` block of a thread and are\nreferenced by name in subsequent join or union steps.",
+      "properties": {
+        "from": {
+          "description": "Name of the source or earlier CTE this sub-pipeline reads from.",
+          "title": "From",
+          "type": "string"
+        },
+        "steps": {
+          "description": "Ordered list of pipeline steps applied to the source.",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FilterStep"
+              },
+              {
+                "$ref": "#/$defs/DeriveStep"
+              },
+              {
+                "$ref": "#/$defs/JoinStep"
+              },
+              {
+                "$ref": "#/$defs/SelectStep"
+              },
+              {
+                "$ref": "#/$defs/DropStep"
+              },
+              {
+                "$ref": "#/$defs/RenameStep"
+              },
+              {
+                "$ref": "#/$defs/CastStep"
+              },
+              {
+                "$ref": "#/$defs/DedupStep"
+              },
+              {
+                "$ref": "#/$defs/SortStep"
+              },
+              {
+                "$ref": "#/$defs/UnionStep"
+              },
+              {
+                "$ref": "#/$defs/AggregateStep"
+              },
+              {
+                "$ref": "#/$defs/WindowStep"
+              },
+              {
+                "$ref": "#/$defs/PivotStep"
+              },
+              {
+                "$ref": "#/$defs/UnpivotStep"
+              },
+              {
+                "$ref": "#/$defs/CaseWhenStep"
+              },
+              {
+                "$ref": "#/$defs/FillNullStep"
+              },
+              {
+                "$ref": "#/$defs/CoalesceStep"
+              },
+              {
+                "$ref": "#/$defs/StringOpsStep"
+              },
+              {
+                "$ref": "#/$defs/DateOpsStep"
+              },
+              {
+                "$ref": "#/$defs/ConcatStep"
+              },
+              {
+                "$ref": "#/$defs/MapStep"
+              },
+              {
+                "$ref": "#/$defs/FormatStep"
+              },
+              {
+                "$ref": "#/$defs/ResolveStep"
+              }
+            ]
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "from",
+        "steps"
+      ],
+      "title": "SubPipeline",
+      "type": "object"
+    },
+    "SurrogateKeyConfig": {
+      "description": "Configuration for surrogate key generation.\n\nAttributes:\n    name: Output column name for the generated surrogate key.\n    algorithm: Hash algorithm to use. ``crc32`` has a small 32-bit output\n        space with higher collision risk. ``murmur3`` (Spark's ``hash()``)\n        may produce different results across Spark major versions. Neither\n        is recommended for high-cardinality surrogate key use cases.\n    output: Controls the output type for integer-returning algorithms\n        (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's\n        return type; ``string`` casts to StringType. Has no practical\n        effect on sha*/md5 which already return hex strings.",
+      "properties": {
+        "name": {
+          "description": "Output column name for the generated surrogate key.",
+          "title": "Name",
+          "type": "string"
+        },
+        "algorithm": {
+          "default": "sha256",
+          "description": "Hash algorithm to use. ``crc32`` has a small 32-bit output space with higher collision risk. ``murmur3`` (Spark's ``hash()``) may produce different results across Spark major versions.",
+          "enum": [
+            "xxhash64",
+            "sha1",
+            "sha256",
+            "sha384",
+            "sha512",
+            "md5",
+            "crc32",
+            "murmur3"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "output": {
+          "default": "native",
+          "description": "Controls the output type for integer-returning algorithms (xxhash64, crc32, murmur3). ``native`` preserves the algorithm's return type; ``string`` casts to StringType.",
+          "enum": [
+            "native",
+            "string"
+          ],
+          "title": "Output",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "SurrogateKeyConfig",
+      "type": "object"
+    },
+    "SystemMemberConfig": {
+      "description": "Configuration for a single system-reserved dimension member.\n\nSystem members occupy negative SK space and represent well-known sentinel\nrows such as \"Unknown\" or \"Not Applicable\".\n\nAttributes:\n    sk: Surrogate key value for this system member. Must be negative.\n    code: Short business code identifying the member (e.g. ``\"UNKNOWN\"``).\n    label: Human-readable description (e.g. ``\"Unknown\"``).",
+      "properties": {
+        "sk": {
+          "description": "Surrogate key value for this system member. Must be negative.",
+          "title": "Sk",
+          "type": "integer"
+        },
+        "code": {
+          "description": "Short business code identifying the member (e.g. ``UNKNOWN``).",
+          "title": "Code",
+          "type": "string"
+        },
+        "label": {
+          "description": "Human-readable description for the system member (e.g. ``Unknown``).",
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sk",
+        "code",
+        "label"
+      ],
+      "title": "SystemMemberConfig",
+      "type": "object"
+    },
+    "Target": {
+      "description": "Write destination with column mapping and partitioning configuration.",
+      "properties": {
+        "alias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Registered table alias for the target. Required for delta targets.",
+          "title": "Alias"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OneLake path for the target. Alternative to alias.",
+          "title": "Path"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a named connection defined at thread, weave, or loom level.",
+          "title": "Connection"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema override within the connection's lakehouse.",
+          "title": "Schema"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name within the connection's lakehouse.",
+          "title": "Table"
+        },
+        "mapping_mode": {
+          "default": "auto",
+          "description": "Column mapping mode. 'auto' passes all source columns through; 'explicit' requires all output columns to be declared in columns.",
+          "enum": [
+            "auto",
+            "explicit"
+          ],
+          "title": "Mapping Mode",
+          "type": "string"
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/ColumnMapping"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Per-column mapping specifications for the target.",
+          "title": "Columns"
+        },
+        "partition_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to partition the target table by.",
+          "title": "Partition By"
+        },
+        "audit_columns": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Inline audit columns as name-to-expression pairs, appended after user columns.",
+          "title": "Audit Columns"
+        },
+        "audit_template": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Named audit templates to apply. Accepts a single string or list.",
+          "title": "Audit Template"
+        },
+        "audit_template_inherit": {
+          "default": true,
+          "description": "Whether to inherit audit templates from parent weave/loom. Set to False to opt out of cascade.",
+          "title": "Audit Template Inherit",
+          "type": "boolean"
+        },
+        "audit_columns_exclude": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob patterns for audit columns to exclude from output.",
+          "title": "Audit Columns Exclude"
+        },
+        "naming": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NamingConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Naming normalization rules for target columns and table."
+        },
+        "dimension": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DimensionConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Dimension configuration for SCD Type 2 behavior. Mutually exclusive with fact."
+        },
+        "fact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FactConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fact table configuration for FK validation. Mutually exclusive with dimension."
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SeedConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Seed rows to insert on first write or when the table is empty."
+        },
+        "warp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "const": false,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Warp schema contract reference. A string names an explicit .warp file; False opts out of auto-discovery; None enables auto-discovery.",
+          "title": "Warp"
+        },
+        "warp_mode": {
+          "anyOf": [
+            {
+              "const": "auto",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Warp generation mode. 'auto' writes/updates the .warp file after each successful run.",
+          "title": "Warp Mode"
+        },
+        "warp_init": {
+          "default": false,
+          "description": "When True and a warp exists, create the Delta table from the effective warp before the first pipeline run.",
+          "title": "Warp Init",
+          "type": "boolean"
+        },
+        "warp_enforcement": {
+          "default": "warn",
+          "description": "Warp contract enforcement mode. 'enforce' fails the thread on violations; 'warn' logs findings; 'off' skips validation.",
+          "enum": [
+            "warn",
+            "enforce",
+            "off"
+          ],
+          "title": "Warp Enforcement",
+          "type": "string"
+        },
+        "schema_drift": {
+          "default": "lenient",
+          "description": "Schema drift handling mode. 'lenient' passes extra columns through; 'strict' applies on_drift action; 'adaptive' passes through and extends auto-generated warps.",
+          "enum": [
+            "lenient",
+            "strict",
+            "adaptive"
+          ],
+          "title": "Schema Drift",
+          "type": "string"
+        },
+        "on_drift": {
+          "default": "warn",
+          "description": "Severity action for strict drift mode. 'error' aborts the thread; 'warn' drops extra columns with a warning; 'ignore' drops silently.",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "On Drift",
+          "type": "string"
+        }
+      },
+      "title": "Target",
+      "type": "object"
+    },
+    "UnionParams": {
+      "description": "Parameters for the union step.",
+      "properties": {
+        "sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "mode": {
+          "default": "by_name",
+          "enum": [
+            "by_name",
+            "by_position"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "allow_missing": {
+          "default": false,
+          "title": "Allow Missing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sources"
+      ],
+      "title": "UnionParams",
+      "type": "object"
+    },
+    "UnionStep": {
+      "description": "Pipeline step: union with other sources.",
+      "properties": {
+        "union": {
+          "$ref": "#/$defs/UnionParams"
+        }
+      },
+      "required": [
+        "union"
+      ],
+      "title": "UnionStep",
+      "type": "object"
+    },
+    "UnpivotParams": {
+      "description": "Parameters for the unpivot step.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "name_column": {
+          "title": "Name Column",
+          "type": "string"
+        },
+        "value_column": {
+          "title": "Value Column",
+          "type": "string"
+        }
+      },
+      "required": [
+        "columns",
+        "name_column",
+        "value_column"
+      ],
+      "title": "UnpivotParams",
+      "type": "object"
+    },
+    "UnpivotStep": {
+      "description": "Pipeline step: unpivot columns to rows.",
+      "properties": {
+        "unpivot": {
+          "$ref": "#/$defs/UnpivotParams"
+        }
+      },
+      "required": [
+        "unpivot"
+      ],
+      "title": "UnpivotStep",
+      "type": "object"
+    },
+    "ValidationRule": {
+      "description": "A pre-write data quality rule evaluated as a Spark SQL expression.",
+      "properties": {
+        "rule": {
+          "description": "Spark SQL boolean expression that must evaluate to true.",
+          "title": "Rule",
+          "type": "string"
+        },
+        "severity": {
+          "default": "error",
+          "description": "Severity level when the rule fails.",
+          "enum": [
+            "info",
+            "warn",
+            "error",
+            "fatal"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique identifier for the validation rule.",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "name"
+      ],
+      "title": "ValidationRule",
+      "type": "object"
+    },
+    "VariableSpec": {
+      "description": "Declaration of a weave-scoped variable.\n\nVariables are typed scalar values that can be set by hook steps via\n``set_var`` and referenced in downstream config as ``${var.name}``.\n\nAttributes:\n    type: Scalar type of the variable value.\n    default: Optional default value used when no hook sets the variable.",
+      "properties": {
+        "type": {
+          "description": "Scalar type of the variable value.",
+          "enum": [
+            "string",
+            "int",
+            "long",
+            "float",
+            "double",
+            "boolean",
+            "timestamp",
+            "date"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional default value used when no hook sets the variable.",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "VariableSpec",
+      "type": "object"
+    },
+    "WatermarkStoreConfig": {
+      "description": "Watermark store configuration.\n\nInheritable via loom -> weave -> thread cascade.\nDefault store type is ``table_properties`` (zero-config).",
+      "properties": {
+        "type": {
+          "default": "table_properties",
+          "description": "Watermark storage backend. 'table_properties' stores in Delta table properties (zero-config). 'metadata_table' uses a dedicated table.",
+          "enum": [
+            "table_properties",
+            "metadata_table"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "table_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to the metadata table. Required when type is 'metadata_table'.",
+          "title": "Table Path"
+        }
+      },
+      "title": "WatermarkStoreConfig",
+      "type": "object"
+    },
+    "WindowFrame": {
+      "description": "Frame specification for window functions.",
+      "properties": {
+        "type": {
+          "enum": [
+            "rows",
+            "range"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "title": "End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "start",
+        "end"
+      ],
+      "title": "WindowFrame",
+      "type": "object"
+    },
+    "WindowParams": {
+      "description": "Parameters for the window step.\n\nEach step defines a single window specification shared across all functions.\nMultiple window specs require multiple window steps.",
+      "properties": {
+        "functions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Functions",
+          "type": "object"
+        },
+        "partition_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Partition By",
+          "type": "array"
+        },
+        "order_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order By"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WindowFrame"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "functions",
+        "partition_by"
+      ],
+      "title": "WindowParams",
+      "type": "object"
+    },
+    "WindowStep": {
+      "description": "Pipeline step: apply window functions.",
+      "properties": {
+        "window": {
+          "$ref": "#/$defs/WindowParams"
+        }
+      },
+      "required": [
+        "window"
+      ],
+      "title": "WindowStep",
+      "type": "object"
+    },
+    "WriteConfig": {
+      "description": "Write mode and merge parameters for a thread target.\n\nCross-field validation:\n- ``mode == \"merge\"`` requires ``match_keys`` to be set.\n- ``on_no_match_source == \"soft_delete\"`` requires ``soft_delete_column`` to be set.",
+      "properties": {
+        "mode": {
+          "default": "overwrite",
+          "description": "Write mode: overwrite, append, or merge (upsert).",
+          "enum": [
+            "overwrite",
+            "append",
+            "merge"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "match_keys": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Columns to match on for merge mode. Required when mode is 'merge'.",
+          "title": "Match Keys"
+        },
+        "on_match": {
+          "default": "update",
+          "description": "Action for matched rows in merge mode.",
+          "enum": [
+            "update",
+            "ignore"
+          ],
+          "title": "On Match",
+          "type": "string"
+        },
+        "on_no_match_target": {
+          "default": "insert",
+          "description": "Action for source rows with no target match in merge mode.",
+          "enum": [
+            "insert",
+            "ignore"
+          ],
+          "title": "On No Match Target",
+          "type": "string"
+        },
+        "on_no_match_source": {
+          "default": "ignore",
+          "description": "Action for target rows with no source match in merge mode. 'soft_delete' requires soft_delete_column.",
+          "enum": [
+            "delete",
+            "soft_delete",
+            "ignore"
+          ],
+          "title": "On No Match Source",
+          "type": "string"
+        },
+        "soft_delete_column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column name for soft delete flag. Required when on_no_match_source is 'soft_delete'.",
+          "title": "Soft Delete Column"
+        },
+        "soft_delete_value": {
+          "default": true,
+          "description": "Value written to the soft delete column when a row is soft-deleted.",
+          "title": "Soft Delete Value",
+          "type": "boolean"
+        }
+      },
+      "title": "WriteConfig",
+      "type": "object"
+    }
+  },
+  "description": "Complete domain model for a thread configuration.\n\nA thread is the smallest unit of work: one or more sources, a sequence\nof transformation steps, and a single target.",
+  "properties": {
+    "name": {
+      "default": "",
+      "description": "Thread name, derived from filename stem for external references.",
+      "title": "Name",
+      "type": "string"
+    },
+    "qualified_key": {
+      "default": "",
+      "description": "Dot-separated namespace key, derived from directory path.",
+      "title": "Qualified Key",
+      "type": "string"
+    },
+    "config_version": {
+      "description": "Configuration schema version. Must be '1.0'.",
+      "title": "Config Version",
+      "type": "string"
+    },
+    "sources": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Source"
+      },
+      "description": "Named data source declarations. At least one entry required.",
+      "title": "Sources",
+      "type": "object"
+    },
+    "with": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/SubPipeline"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named sub-pipelines (CTEs) evaluated before the main pipeline. Each entry declares an intermediate DataFrame by name.",
+      "title": "With"
+    },
+    "steps": {
+      "default": [],
+      "description": "Ordered list of transformation steps applied to source data.",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/FilterStep"
+          },
+          {
+            "$ref": "#/$defs/DeriveStep"
+          },
+          {
+            "$ref": "#/$defs/JoinStep"
+          },
+          {
+            "$ref": "#/$defs/SelectStep"
+          },
+          {
+            "$ref": "#/$defs/DropStep"
+          },
+          {
+            "$ref": "#/$defs/RenameStep"
+          },
+          {
+            "$ref": "#/$defs/CastStep"
+          },
+          {
+            "$ref": "#/$defs/DedupStep"
+          },
+          {
+            "$ref": "#/$defs/SortStep"
+          },
+          {
+            "$ref": "#/$defs/UnionStep"
+          },
+          {
+            "$ref": "#/$defs/AggregateStep"
+          },
+          {
+            "$ref": "#/$defs/WindowStep"
+          },
+          {
+            "$ref": "#/$defs/PivotStep"
+          },
+          {
+            "$ref": "#/$defs/UnpivotStep"
+          },
+          {
+            "$ref": "#/$defs/CaseWhenStep"
+          },
+          {
+            "$ref": "#/$defs/FillNullStep"
+          },
+          {
+            "$ref": "#/$defs/CoalesceStep"
+          },
+          {
+            "$ref": "#/$defs/StringOpsStep"
+          },
+          {
+            "$ref": "#/$defs/DateOpsStep"
+          },
+          {
+            "$ref": "#/$defs/ConcatStep"
+          },
+          {
+            "$ref": "#/$defs/MapStep"
+          },
+          {
+            "$ref": "#/$defs/FormatStep"
+          },
+          {
+            "$ref": "#/$defs/ResolveStep"
+          }
+        ]
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "target": {
+      "$ref": "#/$defs/Target",
+      "description": "Write destination with column mapping and partitioning."
+    },
+    "write": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WriteConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Write mode and merge parameters for the target."
+    },
+    "keys": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/KeyConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Business key, surrogate key, and change detection configuration."
+    },
+    "validations": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/ValidationRule"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Pre-write data quality rules evaluated as Spark SQL expressions.",
+      "title": "Validations"
+    },
+    "assertions": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Post-execution assertions on the target dataset.",
+      "title": "Assertions"
+    },
+    "load": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LoadConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Incremental load mode and watermark parameters."
+    },
+    "tags": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "User-defined tags for filtering and grouping threads.",
+      "title": "Tags"
+    },
+    "params": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/ParamSpec"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Typed parameter declarations with defaults and validation.",
+      "title": "Params"
+    },
+    "defaults": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default values inherited by nested configuration blocks.",
+      "title": "Defaults"
+    },
+    "failure": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FailureConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Per-thread failure handling policy."
+    },
+    "execution": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExecutionConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Runtime execution settings (log level, tracing)."
+    },
+    "cache": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whether to cache the thread's DataFrame after transformation.",
+      "title": "Cache"
+    },
+    "exports": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Export"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Secondary output destinations for thread data.",
+      "title": "Exports"
+    },
+    "lookups": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/Lookup"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named reference datasets shared across this thread.",
+      "title": "Lookups"
+    },
+    "column_sets": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/ColumnSet"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named external column mappings for bulk rename operations.",
+      "title": "Column Sets"
+    },
+    "variables": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/VariableSpec"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Typed variable declarations set by hook steps via set_var.",
+      "title": "Variables"
+    },
+    "pre_steps": {
+      "anyOf": [
+        {
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/QualityGateStep"
+              },
+              {
+                "$ref": "#/$defs/SqlStatementStep"
+              },
+              {
+                "$ref": "#/$defs/LogMessageStep"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Hook steps executed before the thread's pipeline runs.",
+      "title": "Pre Steps"
+    },
+    "post_steps": {
+      "anyOf": [
+        {
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/QualityGateStep"
+              },
+              {
+                "$ref": "#/$defs/SqlStatementStep"
+              },
+              {
+                "$ref": "#/$defs/LogMessageStep"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Hook steps executed after the thread's pipeline completes.",
+      "title": "Post Steps"
+    },
+    "audit_templates": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/AuditTemplate"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named audit column templates for reuse across threads.",
+      "title": "Audit Templates"
+    },
+    "connections": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/OneLakeConnection"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Named connection definitions for resolving source and target paths.",
+      "title": "Connections"
+    }
+  },
+  "required": [
+    "config_version",
+    "sources",
+    "target"
+  ],
+  "title": "Thread",
+  "type": "object"
+}
