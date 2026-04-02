@@ -1851,6 +1851,34 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.result.FormattedText" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FormattedText
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FormattedText">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.FormattedText.__repr__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __repr__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.result.ExecutionMode" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4233,6 +4261,34 @@
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.FormattedText" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FormattedText
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FormattedText">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.FormattedText.__repr__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __repr__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -10015,6 +10071,77 @@ Populated on the outermost telemetry object only (weave-level runs).</p>
 
 
 
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.result.FormattedText" class="doc doc-heading">
+            <code>FormattedText</code>
+
+
+<a href="#weevr.result.FormattedText" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="str">str</span></code></p>
+
+
+
+        <p>String subclass that displays without quotes in REPLs and notebooks.</p>
+<p>Overrides <code>__repr__</code> so that interactive environments (Python REPL,
+Jupyter, Fabric notebooks) render the text with real newlines instead
+of showing escaped <code>\n</code> sequences inside quotes.</p>
+<p>Behaves identically to <code>str</code> in all other contexts — comparisons,
+slicing, formatting, <code>print()</code>, and serialization are unaffected.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.result.FormattedText.__repr__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__repr__</span><span class="p">()</span></code>
+
+<a href="#weevr.result.FormattedText.__repr__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the string value without quoting or escaping.</p>
+
+
+    </div>
+
+</div>
 
 
 
