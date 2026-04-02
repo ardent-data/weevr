@@ -14,7 +14,81 @@ from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry, Weave
-from weevr.result import ExecutionMode, LoadedConfig, RunResult
+from weevr.result import ExecutionMode, FormattedText, LoadedConfig, RunResult
+
+
+class TestFormattedText:
+    def test_repr_shows_raw_text(self) -> None:
+        text = FormattedText("line one\nline two")
+        assert repr(text) == "line one\nline two"
+
+    def test_str_unchanged(self) -> None:
+        text = FormattedText("line one\nline two")
+        assert str(text) == "line one\nline two"
+
+    def test_is_str_instance(self) -> None:
+        text = FormattedText("hello")
+        assert isinstance(text, str)
+
+    def test_equality_with_str(self) -> None:
+        assert FormattedText("abc") == "abc"
+        assert FormattedText("") == ""
+
+    def test_contains_operator(self) -> None:
+        text = FormattedText("Status: success\nRows: 10")
+        assert "success" in text
+        assert "Rows" in text
+
+    def test_split(self) -> None:
+        text = FormattedText("a:b:c")
+        assert text.split(":") == ["a", "b", "c"]
+
+    def test_summary_returns_formatted_text(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="t",
+            duration_ms=100,
+        )
+        s = result.summary()
+        assert isinstance(s, FormattedText)
+        assert "\n" in s
+        assert "\\n" not in repr(s)
+
+    def test_explain_empty_returns_formatted_text(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="t",
+        )
+        e = result.explain()
+        assert isinstance(e, FormattedText)
+        assert e == ""
+
+    def test_explain_plan_mode_returns_formatted_text(self) -> None:
+        plan = ExecutionPlan(
+            weave_name="dimensions",
+            threads=["a", "b"],
+            dependencies={"a": [], "b": ["a"]},
+            dependents={"a": ["b"], "b": []},
+            execution_order=[["a"], ["b"]],
+            cache_targets=[],
+            inferred_dependencies={"a": [], "b": ["a"]},
+            explicit_dependencies={"a": [], "b": []},
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="dimensions",
+            execution_plan=[plan],
+        )
+        e = result.explain()
+        assert isinstance(e, FormattedText)
+        assert "\n" in e
+        assert "\\n" not in repr(e)
 
 
 class TestExecutionMode:
