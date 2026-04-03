@@ -53,6 +53,28 @@ uv run pyright .
 uv run pytest
 ```
 
+### JSON schema check
+
+If your changes touch any model files under `src/weevr/model/`,
+you must regenerate the JSON schema files before committing:
+
+```bash
+uv run python scripts/generate_schema.py
+```
+
+This updates the schema files in `docs/schema/` to match the
+current Pydantic models. To verify schemas are up-to-date
+without writing files:
+
+```bash
+uv run python scripts/generate_schema.py --check
+```
+
+CI runs the `--check` variant and will fail if committed
+schemas do not match the models. If you see a "Schema check"
+failure in CI, run the generate command above and commit the
+updated schema files.
+
 ### Documentation build
 
 ```bash
