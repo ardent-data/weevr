@@ -99,7 +99,12 @@ def main() -> None:
             print("JSON schemas are up-to-date.")
         else:
             print(
-                "\nSchemas are out of date. Run 'python scripts/generate_schema.py' to regenerate.",
+                "\nJSON schemas are out of date. This usually means a model "
+                "file under src/weevr/model/ was changed without regenerating "
+                "the schemas.\n\n"
+                "To fix, run locally:\n\n"
+                "    uv run python scripts/generate_schema.py\n\n"
+                "Then commit the updated files in docs/schema/.",
                 file=sys.stderr,
             )
             sys.exit(1)
