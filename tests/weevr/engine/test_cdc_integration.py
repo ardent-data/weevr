@@ -151,10 +151,10 @@ class TestCdcSoftDelete:
         assert result.count() == 1
         assert result.collect()[0]["id"] == 1
 
-    def test_soft_delete_default_value_on_insert_and_update(
+    def test_soft_delete_retain_value_on_insert_and_update(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """soft_delete_default_value is written to inserted/updated rows;
+        """soft_delete_retain_value is written to inserted/updated rows;
         delete op still sets soft_delete_value."""
         tgt = tmp_delta_path("cdc_sd_default_tgt")
         create_delta_table(
@@ -187,7 +187,7 @@ class TestCdcSoftDelete:
             match_keys=["id"],
             soft_delete_column="is_deleted",
             soft_delete_value=True,
-            soft_delete_default_value=False,
+            soft_delete_retain_value=False,
         )
 
         # id=4 doesn't exist in target — create it first so the merge sees it as a target row
@@ -216,11 +216,11 @@ class TestCdcSoftDelete:
 
         result = spark.read.format("delta").load(tgt2)
         rows = {r["id"]: r for r in result.collect()}
-        # id=1 updated: soft_delete_default_value resets the flag to False
+        # id=1 updated: soft_delete_retain_value resets the flag to False
         assert rows[1]["is_deleted"] is False
-        # id=2 updated normally: soft_delete_default_value written
+        # id=2 updated normally: soft_delete_retain_value written
         assert rows[2]["is_deleted"] is False
-        # id=3 inserted: soft_delete_default_value written
+        # id=3 inserted: soft_delete_retain_value written
         assert rows[3]["is_deleted"] is False
         # id=4 soft-deleted: soft_delete_value (True) written
         assert rows[4]["is_deleted"] is True

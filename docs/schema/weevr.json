@@ -4426,7 +4426,7 @@
         "type": "object"
       },
       "WriteConfig": {
-        "description": "Write mode and merge parameters for a thread target.\n\nCross-field validation:\n- ``mode == \"merge\"`` requires ``match_keys`` to be set.\n- ``on_no_match_source == \"soft_delete\"`` requires ``soft_delete_column`` to be set.\n\nOptional fields:\n- ``soft_delete_default_value``: when set, non-deleted rows (matched updates and\n  new inserts) are written with this value in ``soft_delete_column`` instead of\n  ``null``. Defaults to ``None`` to preserve existing behaviour.",
+        "description": "Write mode and merge parameters for a thread target.\n\nCross-field validation:\n- ``mode == \"merge\"`` requires ``match_keys`` to be set.\n- ``on_no_match_source == \"soft_delete\"`` requires ``soft_delete_column`` to be set.",
         "properties": {
           "mode": {
             "default": "overwrite",
@@ -4505,7 +4505,7 @@
             "title": "Soft Delete Value",
             "type": "boolean"
           },
-          "soft_delete_default_value": {
+          "soft_delete_retain_value": {
             "anyOf": [
               {
                 "type": "boolean"
@@ -4515,8 +4515,8 @@
               }
             ],
             "default": null,
-            "description": "Default value written to the soft delete column for rows that are not soft-deleted (matched updates and new inserts). When None (the default), those rows receive null, preserving existing behaviour.",
-            "title": "Soft Delete Default Value"
+            "description": "Value written to the soft delete column for retained rows (matched updates and new inserts). When None (the default), those rows receive null.",
+            "title": "Soft Delete Retain Value"
           }
         },
         "title": "WriteConfig",

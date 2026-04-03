@@ -75,7 +75,7 @@ class DimensionMergeBuilder:
         The engine always uses merge mode with business key as match keys.
         User overrides for ``on_no_match_source``, ``on_no_match_target``,
         ``soft_delete_column``, ``soft_delete_value``, and
-        ``soft_delete_default_value`` are applied.
+        ``soft_delete_retain_value`` are applied.
 
         Returns:
             WriteConfig configured for dimension merge semantics.
@@ -84,14 +84,14 @@ class DimensionMergeBuilder:
         on_no_match_source = "ignore"
         soft_delete_column = None
         soft_delete_value = True
-        soft_delete_default_value = None
+        soft_delete_retain_value = None
 
         if self._overrides:
             on_no_match_target = self._overrides.on_no_match_target
             on_no_match_source = self._overrides.on_no_match_source
             soft_delete_column = self._overrides.soft_delete_column
             soft_delete_value = self._overrides.soft_delete_value
-            soft_delete_default_value = self._overrides.soft_delete_default_value
+            soft_delete_retain_value = self._overrides.soft_delete_retain_value
 
         return WriteConfig(
             mode="merge",
@@ -101,7 +101,7 @@ class DimensionMergeBuilder:
             on_no_match_source=on_no_match_source,
             soft_delete_column=soft_delete_column,
             soft_delete_value=soft_delete_value,
-            soft_delete_default_value=soft_delete_default_value,
+            soft_delete_retain_value=soft_delete_retain_value,
         )
 
     def inject_scd_columns(
