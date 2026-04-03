@@ -48,7 +48,12 @@
     "cspell",
     "powerbi",
     "tsql",
-    "dataflows"
+    "dataflows",
+    "LaFromboise",
+    "Fromboise",
+    "sublicense",
+    "relicensing",
+    "sublicensees"
   ],
   "ignorePaths": [
     "**/*.py",

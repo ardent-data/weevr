@@ -53,6 +53,28 @@ uv run pyright .
 uv run pytest
 ```
 
+### JSON schema check
+
+If your changes touch any model files under `src/weevr/model/`,
+you must regenerate the JSON schema files before committing:
+
+```bash
+uv run python scripts/generate_schema.py
+```
+
+This updates the schema files in `docs/schema/` to match the
+current Pydantic models. To verify schemas are up-to-date
+without writing files:
+
+```bash
+uv run python scripts/generate_schema.py --check
+```
+
+CI runs the `--check` variant and will fail if committed
+schemas do not match the models. If you see a "Schema check"
+failure in CI, run the generate command above and commit the
+updated schema files.
+
 ### Documentation build
 
 ```bash
@@ -274,6 +296,81 @@ If a change introduces a breaking change, indicate it explicitly using one of th
 ### Merge strategy
 
 Preferred merge strategy is **Squash and merge** so the pull request title becomes the authoritative release note entry.
+
+## Contributor License Agreement (CLA)
+
+All contributors must sign the weevr Contributor License
+Agreement before their first pull request can be merged. The
+CLA establishes a clear chain of intellectual property rights
+for the Project while providing contributors with strong
+assurances that weevr's core will remain open source under a
+permissive license.
+
+### Why a CLA?
+
+The CLA assigns copyright to the Project Maintainer so that
+the Project has a single, clean IP owner who can enforce the
+license and defend contributors' work. In exchange, the CLA
+contractually guarantees:
+
+* **License-back**: You receive a perpetual, irrevocable
+  license to your own contributions and any derivatives.
+* **Permissive open-source commitment**: The core engine
+  and framework will always be distributed under a
+  permissive OSI-approved license (currently Apache 2.0).
+  Relicensing to a proprietary, source-available, or
+  copyleft license requires written consent from affected
+  contributors.
+* **Successor binding**: These commitments transfer to any
+  future maintainer or entity — they cannot be dropped
+  during an ownership change.
+
+### Which CLA applies to you?
+
+* **Individual contributors**: Sign the
+  [Individual CLA](CLA-I.md). The CLA Assistant
+  bot will prompt you automatically on your first pull
+  request.
+* **Contributing on behalf of your employer**: Your
+  organization must sign the
+  [Entity CLA](CLA-E.md). Contact the maintainers
+  to arrange signing.
+
+### Signing process
+
+The CLA Assistant bot is configured as a required status
+check. On your first pull request, the bot will comment with
+a link to review and accept the CLA. Once signed, the check
+turns green and no further action is needed for future
+contributions.
+
+### Our commitment to contributors
+
+weevr uses a CLA with copyright assignment so that the
+project has a single, clear IP owner who can enforce the
+license and defend the community's work without needing to
+coordinate with every individual contributor. We recognize
+that copyright assignment is a significant ask. In return,
+the CLA provides enforceable guarantees — not aspirational
+promises — that protect your contributions:
+
+* The core engine will always be distributed under a
+  permissive open-source license from an explicit
+  allowlist (currently Apache 2.0).
+* You receive an irrevocable license back to your own
+  work, including the right to create derivatives.
+* These commitments bind any future successor entity.
+  They cannot be dropped during an ownership change,
+  acquisition, or transfer.
+* If governance of the project changes, we will
+  communicate those changes transparently and in
+  advance.
+
+Our intent is to build an open ecosystem around weevr.
+Adjacent services and tooling may be offered under
+separate terms, but the core remains open. The CLA
+ensures that this is a contractual obligation, not just
+a statement of intent.
 
 ## Commit sign-off (DCO)
 
