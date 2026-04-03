@@ -151,6 +151,80 @@ class TestCdcSoftDelete:
         assert result.count() == 1
         assert result.collect()[0]["id"] == 1
 
+    def test_soft_delete_default_value_on_insert_and_update(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """soft_delete_default_value is written to inserted/updated rows;
+        delete op still sets soft_delete_value."""
+        tgt = tmp_delta_path("cdc_sd_default_tgt")
+        create_delta_table(
+            spark,
+            tgt,
+            [
+                {"id": 1, "name": "Alice", "is_deleted": True},  # previously soft-deleted
+                {"id": 2, "name": "Bob", "is_deleted": False},  # will be updated
+            ],
+        )
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Alice", "op": "U", "is_deleted": False},  # re-appears via update
+                {"id": 2, "name": "Bobby", "op": "U", "is_deleted": False},  # normal update
+                {"id": 3, "name": "Charlie", "op": "I", "is_deleted": False},  # new insert
+                {"id": 4, "name": "Dave", "op": "D", "is_deleted": False},  # soft-delete
+            ]
+        )
+
+        cdc_config = CdcConfig(
+            operation_column="op",
+            insert_value="I",
+            update_value="U",
+            delete_value="D",
+            on_delete="soft_delete",
+        )
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            soft_delete_column="is_deleted",
+            soft_delete_value=True,
+            soft_delete_default_value=False,
+        )
+
+        # id=4 doesn't exist in target — create it first so the merge sees it as a target row
+        from pyspark.sql.types import BooleanType, LongType, StringType, StructField, StructType
+
+        schema = StructType(
+            [
+                StructField("id", LongType()),
+                StructField("name", StringType()),
+                StructField("is_deleted", BooleanType(), nullable=True),
+            ]
+        )
+        tgt2 = tmp_delta_path("cdc_sd_default_tgt2")
+        create_delta_table(
+            spark,
+            tgt2,
+            [
+                {"id": 1, "name": "Alice", "is_deleted": True},
+                {"id": 2, "name": "Bob", "is_deleted": False},
+                {"id": 4, "name": "Dave", "is_deleted": False},
+            ],
+            schema=schema,
+        )
+
+        execute_cdc_merge(spark, cdc_df, tgt2, write_config, cdc_config)
+
+        result = spark.read.format("delta").load(tgt2)
+        rows = {r["id"]: r for r in result.collect()}
+        # id=1 updated: soft_delete_default_value resets the flag to False
+        assert rows[1]["is_deleted"] is False
+        # id=2 updated normally: soft_delete_default_value written
+        assert rows[2]["is_deleted"] is False
+        # id=3 inserted: soft_delete_default_value written
+        assert rows[3]["is_deleted"] is False
+        # id=4 soft-deleted: soft_delete_value (True) written
+        assert rows[4]["is_deleted"] is True
+
 
 class TestCdcInsertOnly:
     """CDC with insert-only operations (no update/delete values)."""

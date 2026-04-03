@@ -15,6 +15,11 @@ class WriteConfig(FrozenBase):
     Cross-field validation:
     - ``mode == "merge"`` requires ``match_keys`` to be set.
     - ``on_no_match_source == "soft_delete"`` requires ``soft_delete_column`` to be set.
+
+    Optional fields:
+    - ``soft_delete_default_value``: when set, non-deleted rows (matched updates and
+      new inserts) are written with this value in ``soft_delete_column`` instead of
+      ``null``. Defaults to ``None`` to preserve existing behaviour.
     """
 
     mode: Literal["overwrite", "append", "merge"] = Field(
@@ -49,6 +54,14 @@ class WriteConfig(FrozenBase):
     soft_delete_value: bool = Field(
         default=True,
         description="Value written to the soft delete column when a row is soft-deleted.",
+    )
+    soft_delete_default_value: bool | None = Field(
+        default=None,
+        description=(
+            "Default value written to the soft delete column for rows that are not "
+            "soft-deleted (matched updates and new inserts). When None (the default), "
+            "those rows receive null, preserving existing behaviour."
+        ),
     )
 
     @model_validator(mode="after")
