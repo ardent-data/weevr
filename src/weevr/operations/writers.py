@@ -181,9 +181,8 @@ def _execute_merge(
     delta_table = resolve_delta_table(spark, target_path)
 
     # Add soft-delete column to source so updateAll/insertAll can resolve it.
-    # Matched rows and new inserts receive soft_delete_retain_value (null when not set,
-    # preserving existing behaviour); unmatched target rows are handled by
-    # whenNotMatchedBySourceUpdate.
+    # Matched rows and new inserts receive soft_delete_retain_value (null when not set).
+    # Unmatched target rows are handled by whenNotMatchedBySourceUpdate.
     if write_config.soft_delete_column and write_config.soft_delete_column not in df.columns:
         df = df.withColumn(
             write_config.soft_delete_column,

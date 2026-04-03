@@ -260,7 +260,7 @@ Write mode and merge behavior for the target.
 | `on_no_match_target` | `"insert" \| "ignore"` | `"insert"` | Action for new source rows |
 | `on_no_match_source` | `"delete" \| "soft_delete" \| "ignore"` | `"ignore"` | Action for missing source rows |
 | `soft_delete_column` | `str` | `None` | Column for soft delete flag (required for `soft_delete`) |
-| `soft_delete_value` | `bool` | `True` | Value written to the soft delete column for deleted rows |
+| `soft_delete_value` | `bool` | `True` | Value written to the soft delete column when a row is soft-deleted |
 | `soft_delete_retain_value` | `bool` | `None` | Value written to the soft delete column for retained (non-deleted) rows |
 
 ---
