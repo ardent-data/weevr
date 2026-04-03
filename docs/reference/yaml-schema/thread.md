@@ -1007,7 +1007,8 @@ Controls how data is written to the target.
 | `on_no_match_target` | `string` | no | `"insert"` | Merge behavior for new source rows: `"insert"` or `"ignore"` |
 | `on_no_match_source` | `string` | no | `"ignore"` | Merge behavior for missing source rows: `"delete"`, `"soft_delete"`, `"ignore"` |
 | `soft_delete_column` | `string` | no | `null` | Column to flag soft deletes. Required when `on_no_match_source` is `"soft_delete"`. |
-| `soft_delete_value` | `bool` | no | `true` | Value written to the soft delete column |
+| `soft_delete_value` | `bool` | no | `true` | Value written to the soft delete column when a row is soft-deleted. |
+| `soft_delete_active_value` | `bool` | no | `null` | Value written to the soft delete column for active rows (matched updates and new inserts). When omitted, those rows receive `null`. |
 
 ```yaml
 write:
@@ -1018,6 +1019,7 @@ write:
   on_no_match_source: soft_delete
   soft_delete_column: is_deleted
   soft_delete_value: true
+  soft_delete_active_value: false
 ```
 
 ---
