@@ -71,33 +71,33 @@ class TestWriteConfig:
         )
         assert WriteConfig.model_validate(w.model_dump()) == w
 
-    def test_soft_delete_retain_value_defaults_to_none(self):
-        """soft_delete_retain_value is None by default."""
+    def test_soft_delete_active_value_defaults_to_none(self):
+        """soft_delete_active_value is None by default."""
         w = WriteConfig()
-        assert w.soft_delete_retain_value is None
+        assert w.soft_delete_active_value is None
 
-    def test_soft_delete_retain_value_false_round_trip(self):
-        """soft_delete_retain_value=False round-trips correctly."""
+    def test_soft_delete_active_value_false_round_trip(self):
+        """soft_delete_active_value=False round-trips correctly."""
         w = WriteConfig(
             mode="merge",
             match_keys=["id"],
             on_no_match_source="soft_delete",
             soft_delete_column="is_deleted",
-            soft_delete_retain_value=False,
+            soft_delete_active_value=False,
         )
         restored = WriteConfig.model_validate(w.model_dump())
         assert restored == w
-        assert restored.soft_delete_retain_value is False
+        assert restored.soft_delete_active_value is False
 
-    def test_soft_delete_retain_value_true_round_trip(self):
-        """soft_delete_retain_value=True round-trips correctly."""
+    def test_soft_delete_active_value_true_round_trip(self):
+        """soft_delete_active_value=True round-trips correctly."""
         w = WriteConfig(
             mode="merge",
             match_keys=["id"],
             on_no_match_source="soft_delete",
             soft_delete_column="is_deleted",
-            soft_delete_retain_value=True,
+            soft_delete_active_value=True,
         )
         restored = WriteConfig.model_validate(w.model_dump())
         assert restored == w
-        assert restored.soft_delete_retain_value is True
+        assert restored.soft_delete_active_value is True

@@ -518,10 +518,10 @@ class TestWriteTargetMerge:
                 on_no_match_source="soft_delete",
             )
 
-    def test_merge_soft_delete_retain_value_seeds_schema(
+    def test_merge_soft_delete_active_value_seeds_schema(
         self, spark: SparkSession, tmp_delta_path, simple_df
     ) -> None:
-        """First merge with soft_delete_retain_value seeds the column with that value."""
+        """First merge with soft_delete_active_value seeds the column with that value."""
         path = tmp_delta_path("merge_sd_default_seed")
         target = Target(path=path)
         write_config = WriteConfig(
@@ -529,18 +529,18 @@ class TestWriteTargetMerge:
             match_keys=["id"],
             on_no_match_source="soft_delete",
             soft_delete_column="is_deleted",
-            soft_delete_retain_value=False,
+            soft_delete_active_value=False,
         )
         write_target(spark, simple_df, target, write_config, path)
         result = spark.read.format("delta").load(path)
         assert "is_deleted" in result.columns
-        # First write seeds with soft_delete_retain_value, not null
+        # First write seeds with soft_delete_active_value, not null
         assert all(r["is_deleted"] is False for r in result.collect())
 
-    def test_merge_soft_delete_retain_value_on_match_and_insert(
+    def test_merge_soft_delete_active_value_on_match_and_insert(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """soft_delete_retain_value is written to matched/inserted rows;
+        """soft_delete_active_value is written to matched/inserted rows;
         orphans still get soft_delete_value."""
         from pyspark.sql.types import BooleanType, LongType, StringType, StructField, StructType
 
@@ -573,24 +573,24 @@ class TestWriteTargetMerge:
             on_no_match_source="soft_delete",
             soft_delete_column="is_deleted",
             soft_delete_value=True,
-            soft_delete_retain_value=False,
+            soft_delete_active_value=False,
         )
         write_target(spark, incoming, target, write_config, path)
         result = spark.read.format("delta").load(path)
         rows = {r["id"]: r for r in result.collect()}
-        # id=1 re-appeared: soft_delete_retain_value (False) should be written
+        # id=1 re-appeared: soft_delete_active_value (False) should be written
         assert rows[1]["is_deleted"] is False
         # id=2 was not in incoming source: becomes orphan → soft_delete_value (True)
         assert rows[2]["is_deleted"] is True
         # id=3 was not in incoming source: becomes orphan → soft_delete_value (True)
         assert rows[3]["is_deleted"] is True
-        # id=4 was inserted: soft_delete_retain_value (False) should be written
+        # id=4 was inserted: soft_delete_active_value (False) should be written
         assert rows[4]["is_deleted"] is False
 
-    def test_merge_soft_delete_retain_value_none_preserves_null(
+    def test_merge_soft_delete_active_value_none_preserves_null(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """soft_delete_retain_value=None (default) keeps existing null behaviour
+        """soft_delete_active_value=None (default) keeps existing null behaviour
         on update/insert."""
         from pyspark.sql.types import BooleanType, LongType, StringType, StructField, StructType
 
@@ -619,7 +619,7 @@ class TestWriteTargetMerge:
             on_match="update",
             on_no_match_source="soft_delete",
             soft_delete_column="is_deleted",
-            # soft_delete_retain_value omitted → None
+            # soft_delete_active_value omitted → None
         )
         write_target(spark, incoming, target, write_config, path)
         result = spark.read.format("delta").load(path)

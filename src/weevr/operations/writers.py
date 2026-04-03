@@ -128,7 +128,7 @@ def write_target(
             ):
                 df = df.withColumn(
                     write_config.soft_delete_column,
-                    F.lit(write_config.soft_delete_retain_value).cast("boolean"),
+                    F.lit(write_config.soft_delete_active_value).cast("boolean"),
                 )
             writer = df.write.format("delta").mode("overwrite")
             if partition_cols:
@@ -181,12 +181,12 @@ def _execute_merge(
     delta_table = resolve_delta_table(spark, target_path)
 
     # Add soft-delete column to source so updateAll/insertAll can resolve it.
-    # Matched rows and new inserts receive soft_delete_retain_value (null when not set).
+    # Matched rows and new inserts receive soft_delete_active_value (null when not set).
     # Unmatched target rows are handled by whenNotMatchedBySourceUpdate.
     if write_config.soft_delete_column and write_config.soft_delete_column not in df.columns:
         df = df.withColumn(
             write_config.soft_delete_column,
-            F.lit(write_config.soft_delete_retain_value).cast("boolean"),
+            F.lit(write_config.soft_delete_active_value).cast("boolean"),
         )
 
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
@@ -318,7 +318,7 @@ def execute_cdc_merge(
             if cdc_config.on_delete == "soft_delete" and write_config.soft_delete_column:
                 first_write_df = first_write_df.withColumn(
                     write_config.soft_delete_column,
-                    F.lit(write_config.soft_delete_retain_value).cast("boolean"),
+                    F.lit(write_config.soft_delete_active_value).cast("boolean"),
                 )
             cdc_writer = first_write_df.write.format("delta").mode("overwrite")
             if is_table_alias(target_path):
@@ -343,13 +343,13 @@ def execute_cdc_merge(
                 for c in data_cols
                 if c not in write_config.match_keys
             }
-            # When soft_delete_retain_value is set, reset the flag on re-appearing rows.
+            # When soft_delete_active_value is set, reset the flag on re-appearing rows.
             if (
                 write_config.soft_delete_column
-                and write_config.soft_delete_retain_value is not None
+                and write_config.soft_delete_active_value is not None
             ):
                 update_set[write_config.soft_delete_column] = F.lit(
-                    write_config.soft_delete_retain_value
+                    write_config.soft_delete_active_value
                 )
             merger = merger.whenMatchedUpdate(
                 condition=f"source.{quoted_op} = '{escaped_val}'",
@@ -375,13 +375,13 @@ def execute_cdc_merge(
             insert_set: dict[str, str | Column] = {
                 c: F.col(f"source.{quote_identifier(c)}") for c in data_cols
             }
-            # When soft_delete_retain_value is set, seed the flag on new inserts.
+            # When soft_delete_active_value is set, seed the flag on new inserts.
             if (
                 write_config.soft_delete_column
-                and write_config.soft_delete_retain_value is not None
+                and write_config.soft_delete_active_value is not None
             ):
                 insert_set[write_config.soft_delete_column] = F.lit(
-                    write_config.soft_delete_retain_value
+                    write_config.soft_delete_active_value
                 )
             merger = merger.whenNotMatchedInsert(
                 condition=f"source.{quoted_op} = '{escaped_ins}'",

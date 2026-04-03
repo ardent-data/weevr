@@ -50,11 +50,11 @@ class WriteConfig(FrozenBase):
         default=True,
         description="Value written to the soft delete column when a row is soft-deleted.",
     )
-    soft_delete_retain_value: bool | None = Field(
+    soft_delete_active_value: bool | None = Field(
         default=None,
         description=(
-            "Value written to the soft delete column for retained rows (matched updates "
-            "and new inserts). When None (the default), those rows receive null"
+            "Value written to the soft delete column for active rows (matched updates "
+            "and new inserts). When None (the default), those rows receive null."
         ),
     )
 

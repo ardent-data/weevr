@@ -4505,7 +4505,7 @@
             "title": "Soft Delete Value",
             "type": "boolean"
           },
-          "soft_delete_retain_value": {
+          "soft_delete_active_value": {
             "anyOf": [
               {
                 "type": "boolean"
@@ -4515,8 +4515,8 @@
               }
             ],
             "default": null,
-            "description": "Value written to the soft delete column for retained rows (matched updates and new inserts). When None (the default), those rows receive null.",
-            "title": "Soft Delete Retain Value"
+            "description": "Value written to the soft delete column for active rows (matched updates and new inserts). When None (the default), those rows receive null.",
+            "title": "Soft Delete Active Value"
           }
         },
         "title": "WriteConfig",
