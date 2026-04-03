@@ -4504,6 +4504,19 @@
             "description": "Value written to the soft delete column when a row is soft-deleted.",
             "title": "Soft Delete Value",
             "type": "boolean"
+          },
+          "soft_delete_active_value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Value written to the soft delete column for active rows (matched updates and new inserts). When None (the default), those rows receive null.",
+            "title": "Soft Delete Active Value"
           }
         },
         "title": "WriteConfig",

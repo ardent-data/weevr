@@ -6383,7 +6383,14 @@ table is empty.</p>
 <td><code>bool</code></td>
 <td>no</td>
 <td><code>true</code></td>
-<td>Value written to the soft delete column</td>
+<td>Value written to the soft delete column when a row is soft-deleted.</td>
+</tr>
+<tr>
+<td><code>soft_delete_active_value</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Value written to the soft delete column for active rows (matched updates and new inserts). When omitted, those rows receive <code>null</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -6395,6 +6402,7 @@ table is empty.</p>
 <a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a><span class="w">  </span><span class="nt">on_no_match_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
 <a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a><span class="w">  </span><span class="nt">soft_delete_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_deleted</span>
 <a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a><span class="w">  </span><span class="nt">soft_delete_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a><span class="w">  </span><span class="nt">soft_delete_active_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
 <hr />
 <h2 id="keys">keys<a class="headerlink" href="#keys" title="Permanent link">&para;</a></h2>
