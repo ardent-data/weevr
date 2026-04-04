@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from weevr.model.base import FrozenBase
 from weevr.model.connection import OneLakeConnection
 from weevr.model.hooks import LogMessageStep, QualityGateStep
 from weevr.model.lookup import Lookup
@@ -152,6 +153,75 @@ class TestThreadEntry:
         )
         restored = Weave.model_validate(w.model_dump())
         assert restored == w
+
+
+class TestThreadEntryParameterization:
+    """Tests for ThreadEntry as/params fields (M121)."""
+
+    def test_thread_entry_with_as_alias(self):
+        """ThreadEntry accepts 'as' alias via dict."""
+        entry = ThreadEntry.model_validate({"ref": "silver/sap_table.thread", "as": "sap_adr6"})
+        assert entry.as_ == "sap_adr6"
+
+    def test_thread_entry_with_params(self):
+        """ThreadEntry accepts params dict."""
+        entry = ThreadEntry.model_validate(
+            {"ref": "silver/sap_table.thread", "params": {"table": "ADR6"}}
+        )
+        assert entry.params == {"table": "ADR6"}
+
+    def test_thread_entry_with_as_and_params(self):
+        """ThreadEntry accepts both as and params."""
+        entry = ThreadEntry.model_validate(
+            {
+                "ref": "silver/sap_table.thread",
+                "as": "sap_adr6",
+                "params": {"table": "ADR6", "schema": "raw"},
+            }
+        )
+        assert entry.as_ == "sap_adr6"
+        assert entry.params == {"table": "ADR6", "schema": "raw"}
+
+    def test_thread_entry_without_as_or_params(self):
+        """ThreadEntry without as/params defaults to None (backwards compat)."""
+        entry = ThreadEntry(name="my_thread")
+        assert entry.as_ is None
+        assert entry.params is None
+
+    def test_thread_entry_inline_with_as(self):
+        """Inline ThreadEntry accepts as alias (DEC-005)."""
+        entry = ThreadEntry.model_validate({"name": "inline_thread", "as": "my_alias"})
+        assert entry.as_ == "my_alias"
+
+    def test_thread_entry_model_config_isolation(self):
+        """ThreadEntry model_config override does not leak to FrozenBase (ASM-002)."""
+        # FrozenBase should NOT have populate_by_name
+        assert FrozenBase.model_config.get("populate_by_name") is not True
+        # ThreadEntry should have it
+        assert ThreadEntry.model_config.get("populate_by_name") is True
+
+    def test_weave_with_parameterized_entries(self):
+        """Weave accepts thread entries with as and params."""
+        w = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    {
+                        "ref": "silver/sap.thread",
+                        "as": "sap_adr6",
+                        "params": {"table": "ADR6"},
+                    },
+                    {
+                        "ref": "silver/sap.thread",
+                        "as": "sap_adr2",
+                        "params": {"table": "ADR2"},
+                    },
+                ],
+            }
+        )
+        assert len(w.threads) == 2
+        assert w.threads[0].as_ == "sap_adr6"
+        assert w.threads[1].as_ == "sap_adr2"
 
 
 class TestConditionSpec:
