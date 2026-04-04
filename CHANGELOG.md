@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/ardent-data/weevr/compare/weevr-v1.12.0...weevr-v1.13.0) (2026-04-04)
+
+
+### Features
+
+* **engine:** add thread parameterization and instance aliasing ([#130](https://github.com/ardent-data/weevr/issues/130)) ([404e9eb](https://github.com/ardent-data/weevr/commit/404e9ebea1c7b451108f71e3f1a9ebeb88f9dcbb))
+
 ## [1.12.0](https://github.com/ardent-data/weevr/compare/weevr-v1.11.1...weevr-v1.12.0) (2026-04-03)
 
 
