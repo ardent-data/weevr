@@ -30,7 +30,13 @@ from weevr.delta import is_table_alias
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
 from weevr.engine.runner import execute_loom, execute_weave
-from weevr.errors import ConfigError, DataValidationError, ExecutionError, ModelValidationError
+from weevr.errors import (
+    ConfigError,
+    DataValidationError,
+    ExecutionError,
+    ModelValidationError,
+    VariableResolutionError,
+)
 from weevr.model.execution import LogLevel
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
@@ -780,7 +786,16 @@ class Context:
         )
 
         # Step 6: Variable resolution
-        resolved = resolve_variables(config_dict, param_context)
+        try:
+            resolved = resolve_variables(config_dict, param_context)
+        except VariableResolutionError as exc:
+            if config_type == "thread" and "param." in str(exc):
+                raise VariableResolutionError(
+                    f"{exc}. This thread may be a template designed for "
+                    f"use with 'as' and 'params' on a ThreadEntry in a weave.",
+                    config_key=getattr(exc, "config_key", None),
+                ) from exc
+            raise
 
         # Step 7: Resolve child references
         resolved_with_refs = resolve_references(resolved, config_type, project_root, self._params)
@@ -931,7 +946,9 @@ class Context:
         """Hydrate resolved thread dicts into a name->Thread mapping."""
         result: dict[str, Thread] = {}
         for entry, thread_dict in zip(thread_entries, resolved_dicts, strict=True):
-            # Pop stashed entry-level fields (consumed by resolver)
+            # Pop stashed entry-level fields before model validation.
+            # _entry_params was already consumed by the resolver during
+            # two-phase param resolution; popped here for model cleanliness.
             entry_as = thread_dict.pop("_entry_as", None)
             thread_dict.pop("_entry_params", None)
 

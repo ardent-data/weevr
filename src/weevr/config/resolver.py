@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -520,8 +521,6 @@ def resolve_references(
         resolved_threads = []
 
         # Validate: duplicate refs without aliases
-        from collections import Counter
-
         ref_entries = [e for e in config["threads"] if isinstance(e, dict) and e.get("ref")]
         ref_counts = Counter(e["ref"] for e in ref_entries)
         for ref_val, count in ref_counts.items():
