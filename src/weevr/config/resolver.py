@@ -13,13 +13,15 @@ def build_param_context(
     runtime_params: dict[str, Any] | None = None,
     config_defaults: dict[str, Any] | None = None,
     fabric_context: dict[str, Any] | None = None,
+    entry_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build parameter context with proper priority layering.
 
     Priority order (highest to lowest):
     1. runtime_params
-    2. config_defaults
-    3. fabric_context
+    2. entry_params (nested under ``param`` key for ``${param.x}`` access)
+    3. config_defaults
+    4. fabric_context
 
     Args:
         runtime_params: Runtime parameter overrides.
@@ -27,13 +29,15 @@ def build_param_context(
         fabric_context: Fabric environment values keyed as ``fabric.<field>``
             (e.g. ``fabric.workspace_id``). None values are omitted. Lowest
             priority — overridden by config_defaults and runtime_params.
+        entry_params: ThreadEntry-level parameters injected under the
+            ``param`` namespace for ``${param.x}`` dotted-key resolution.
 
     Returns:
         Merged parameter context dictionary with dotted key access support.
     """
     context: dict[str, Any] = {}
 
-    # Layer 3: Fabric context (lowest priority)
+    # Layer 4: Fabric context (lowest priority)
     if fabric_context:
         fabric_dict = {
             k.split(".", 1)[1]: v
@@ -43,9 +47,13 @@ def build_param_context(
         if fabric_dict:
             context["fabric"] = fabric_dict
 
-    # Layer 2: Config defaults
+    # Layer 3: Config defaults
     if config_defaults:
         context.update(config_defaults)
+
+    # Layer 2: Entry params (under "param" namespace)
+    if entry_params:
+        context["param"] = entry_params
 
     # Layer 1: Runtime params (highest priority)
     if runtime_params:
@@ -476,6 +484,22 @@ def resolve_references(
     elif config_type == "weave" and "threads" in config:
         resolved_threads = []
 
+        # Validate: duplicate refs without aliases
+        from collections import Counter
+
+        ref_entries = [e for e in config["threads"] if isinstance(e, dict) and e.get("ref")]
+        ref_counts = Counter(e["ref"] for e in ref_entries)
+        for ref_val, count in ref_counts.items():
+            if count > 1:
+                aliases = [e.get("as") for e in ref_entries if e["ref"] == ref_val]
+                if not all(aliases):
+                    raise ConfigError(
+                        f"Thread ref '{ref_val}' appears multiple times without "
+                        f"'as' aliases. Use 'as' to give each instance a unique name."
+                    )
+
+        seen_effective_names: set[str] = set()
+
         for entry in config["threads"]:
             # Normalize: string entries become {"name": string}
             if isinstance(entry, str):
@@ -509,13 +533,37 @@ def resolve_references(
                     # Set qualified key
                     child_dict["qualified_key"] = ref
 
-                    context = build_param_context(runtime_params, child_dict.get("defaults"))
+                    # Two-phase param resolution: resolve expressions
+                    # in entry param values against parent context first,
+                    # then inject resolved values into thread's param context.
+                    raw_entry_params = entry.get("params")
+                    resolved_entry_params = None
+                    if raw_entry_params:
+                        parent_context = build_param_context(runtime_params, config.get("defaults"))
+                        resolved_entry_params = resolve_variables(raw_entry_params, parent_context)
+
+                    context = build_param_context(
+                        runtime_params,
+                        child_dict.get("defaults"),
+                        entry_params=resolved_entry_params,
+                    )
                     resolved_child = resolve_variables(child_dict, context)
 
-                    # Preserve entry-level overrides (dependencies, condition)
-                    for key in ("dependencies", "condition"):
+                    # Preserve entry-level overrides
+                    for key in ("dependencies", "condition", "as", "params"):
                         if key in entry:
                             resolved_child[f"_entry_{key}"] = entry[key]
+
+                    # Track effective name uniqueness
+                    effective_name = (
+                        entry.get("as") or resolved_child.get("name") or thread_path.stem
+                    )
+                    if effective_name in seen_effective_names:
+                        raise ConfigError(
+                            f"Duplicate effective thread name '{effective_name}' "
+                            f"in weave. Use 'as' to give each instance a unique name."
+                        )
+                    seen_effective_names.add(effective_name)
 
                     resolved_threads.append(resolved_child)
                 finally:
@@ -529,6 +577,18 @@ def resolve_references(
                 if isinstance(entry, dict):
                     inline = entry.copy()
                     inline["qualified_key"] = entry.get("name", "")
+                    if "as" in entry:
+                        inline["_entry_as"] = entry["as"]
+
+                    # Track effective name uniqueness
+                    effective_name = entry.get("as") or entry.get("name", "")
+                    if effective_name in seen_effective_names:
+                        raise ConfigError(
+                            f"Duplicate effective thread name '{effective_name}' "
+                            f"in weave. Use 'as' to give each instance a unique name."
+                        )
+                    seen_effective_names.add(effective_name)
+
                     resolved_threads.append(inline)
 
         result["_resolved_threads"] = resolved_threads
