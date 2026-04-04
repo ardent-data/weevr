@@ -37,6 +37,8 @@ Each entry in the `threads` list is either a plain string (shorthand) or a
 |-----|------|----------|---------|-------------|
 | `ref` | `string` | no | `null` | Path to an external `.thread` file, relative to the project root. Mutually exclusive with inline `name`. |
 | `name` | `string` | no | `""` | Thread name. Required for inline definitions; derived from filename stem when using `ref`. |
+| `as` | `string` | no | `null` | Alias overriding the thread's effective name. Required when the same `ref` appears multiple times. See [Thread Templates guide](../../guides/thread-templates.md). |
+| `params` | `dict[string, any]` | no | `null` | Key-value pairs injected into the thread's `${param.x}` namespace for this entry. See [Thread Templates guide](../../guides/thread-templates.md). |
 | `dependencies` | `list[string]` | no | `null` | Explicit upstream thread names. Merged with auto-inferred dependencies from source/target path matching. |
 | `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
 

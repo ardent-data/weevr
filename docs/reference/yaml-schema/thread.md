@@ -4,6 +4,10 @@ A thread is the smallest unit of work in weevr. It defines one or more data
 sources, an ordered sequence of transformation steps, and a single output
 target. This page documents every key accepted inside a thread YAML file.
 
+Threads can be used as **parameterized templates** via `as` and `params` on
+[ThreadEntry](weave.md#threads-threadentry) in a weave. See the
+[Thread Templates guide](../../guides/thread-templates.md) for usage.
+
 ---
 
 ## Top-level keys
