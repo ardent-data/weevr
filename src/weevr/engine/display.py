@@ -2304,13 +2304,23 @@ def render_execution_plan_html(
     for group_idx, group in enumerate(plan.execution_order):
         for thread_name in sorted(group):
             name_esc = html.escape(thread_name)
+            # Show template origin when thread was loaded from a ref
+            template_label = ""
+            if resolved_threads:
+                thread_model = resolved_threads.get(thread_name)
+                tpl_ref = getattr(thread_model, "template_ref", None)
+                if tpl_ref:
+                    tpl_esc = html.escape(tpl_ref)
+                    template_label = (
+                        f' <span style="color:#888;font-size:0.85em">({tpl_esc})</span>'
+                    )
             cache_badge = (
                 f'<span style="{_S_BADGE_CACHE}">cached</span>' if thread_name in cache_set else ""
             )
             dep_badges = _html_dep_badges(thread_name, plan)
             parts.append(
                 f'<tr><td style="{_S_TD}">{group_idx}</td>'
-                f'<td style="{_S_TD}">{name_esc}</td>'
+                f'<td style="{_S_TD}">{name_esc}{template_label}</td>'
                 f'<td style="{_S_TD}">{dep_badges}</td>'
                 f'<td style="{_S_TD}">{cache_badge}</td></tr>'
             )

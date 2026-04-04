@@ -148,6 +148,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     if collector is not None:
         span_label = thread.qualified_key or thread.name
         span_builder = collector.start_span(f"thread:{span_label}", parent_span_id=parent_span_id)
+        if thread.template_ref:
+            span_builder.set_attribute("thread.template_ref", thread.template_ref)
 
     validation_results: list = []
     assertion_results: list = []

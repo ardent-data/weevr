@@ -931,7 +931,11 @@ class Context:
         """Hydrate resolved thread dicts into a name->Thread mapping."""
         result: dict[str, Thread] = {}
         for entry, thread_dict in zip(thread_entries, resolved_dicts, strict=True):
-            # Determine the thread name from the entry or resolved dict
+            # Pop stashed entry-level fields (consumed by resolver)
+            entry_as = thread_dict.pop("_entry_as", None)
+            thread_dict.pop("_entry_params", None)
+
+            # Determine the base name from the entry or resolved dict
             if isinstance(entry, dict):
                 name = entry.get("name", "") or entry.get("ref", "")
                 if entry.get("ref") and not entry.get("name"):
@@ -939,17 +943,25 @@ class Context:
             else:
                 name = str(entry)
 
-            if not thread_dict.get("name"):
-                thread_dict["name"] = name
+            # Effective name: as > name > stem
+            effective_name = entry_as or name
+
+            if not thread_dict.get("name") or entry_as:
+                thread_dict["name"] = effective_name
+
+            # Set template_ref for telemetry provenance
+            ref = entry.get("ref") if isinstance(entry, dict) else None
+            if ref:
+                thread_dict["template_ref"] = ref
 
             if project_root is not None:
                 Context._resolve_source_paths(thread_dict, project_root)
 
             try:
-                result[name] = Thread.model_validate(thread_dict)
+                result[effective_name] = Thread.model_validate(thread_dict)
             except ValidationError as exc:
                 raise ModelValidationError(
-                    f"Thread hydration failed for '{name}': {exc}",
+                    f"Thread hydration failed for '{effective_name}': {exc}",
                     cause=exc,
                     file_path=str(source_path),
                 ) from exc

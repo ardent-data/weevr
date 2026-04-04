@@ -236,7 +236,11 @@ class RunResult:
                     if join_count > 0:
                         join_label = "join" if join_count == 1 else "joins"
                         detail += f", {join_count} {join_label}"
-                    lines.append(f"  {thread_name}: {detail}")
+                    label = thread_name
+                    tpl_ref = getattr(thread, "template_ref", None)
+                    if tpl_ref:
+                        label = f"{thread_name} ({tpl_ref})"
+                    lines.append(f"  {label}: {detail}")
                     # Show exports if configured
                     exports = getattr(thread, "exports", None)
                     if exports:
