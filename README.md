@@ -105,10 +105,21 @@ weevr's engine is a general-purpose library distributed via PyPI. It contains no
 | Delta Lake | 3.2 |
 | Microsoft Fabric Runtime | 1.3 |
 
+## CLI
+
+[weevr-cli](https://github.com/ardent-data/weevr-cli) is a standalone
+command-line companion for validating configs, inspecting schemas, and
+running dry-run operations outside of a notebook. Install it separately:
+
+```bash
+pip install weevr-cli
+```
+
+Full CLI documentation: [ardent-data.github.io/weevr-cli](https://ardent-data.github.io/weevr-cli/latest/)
+
 ## What's Next
 
 * Extensibility — Reusable stitch patterns, project-level UDF and helper registries
-* Developer tooling — Test framework, CLI validation, dry-run modes
 * Advanced merge patterns — Insert-only mode, complex update strategies
 
 ## Documentation

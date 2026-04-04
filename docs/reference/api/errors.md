@@ -294,7 +294,7 @@ threads:
 ### InheritanceError
 
 Raised when the configuration inheritance cascade fails. Reserved for
-future use — not currently raised in v1.0.
+future use — not currently raised.
 
 **Intended for:** Failures during loom → weave → thread default merging.
 
@@ -410,8 +410,7 @@ write:
 ### SparkError
 
 Raised for Spark-specific execution failures. Reserved for future use —
-not currently raised in v1.0. `ExecutionError` is used for all runtime
-failures.
+not currently raised. `ExecutionError` is used for all runtime failures.
 
 ---
 

@@ -22,7 +22,7 @@ runtime settings.
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) cascaded to threads |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to threads |
-| `audit_templates` | `dict[string, dict[string, string]]` | no | `null` | Named audit column templates cascaded to all threads in this weave. Thread-level definitions override weave-level definitions with the same name. See [Audit Templates guide](../../guides/audit-templates.md). |
+| `audit_templates` | `dict[string, AuditTemplate]` | no | `null` | Named audit column templates cascaded to all threads in this weave. Thread-level definitions override weave-level definitions with the same name. A flat `dict[string, string]` shorthand is also accepted. See [Audit Templates guide](../../guides/audit-templates.md). |
 | `connections` | `dict[string, OneLakeConnection]` | no | `null` | Named connection definitions cascaded to threads. Thread-level connections with the same name override weave-level. See [Connections guide](../../guides/connections.md). |
 
 ---

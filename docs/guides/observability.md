@@ -16,8 +16,8 @@ record as a single-line JSON object with OTel-compatible field names:
   "level": "INFO",
   "logger": "weevr.engine.executor",
   "message": "Thread 'stg_customers' completed: 1204 rows written",
-  "thread_name": "stg_customers",
-  "weave_name": "staging",
+  "weevr_thread": "stg_customers",
+  "weevr_weave": "staging",
   "trace_id": "a1b2c3d4e5f67890a1b2c3d4e5f67890",
   "span_id": "f1e2d3c4b5a67890"
 }
@@ -29,7 +29,7 @@ Each entry includes:
 - **level** -- Python log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
 - **logger** -- Dotted module path that emitted the record
 - **message** -- Human-readable description
-- **thread_name**, **weave_name**, **loom_name** -- Execution context
+- **weevr_thread**, **weevr_weave**, **weevr_loom** -- Execution context
   (included when available)
 - **trace_id**, **span_id** -- Correlation IDs linking the log entry to
   its execution span
@@ -196,13 +196,10 @@ any OTel-compatible backend:
 result = ctx.run("nightly.loom")
 
 # Navigate the tree
-for weave_name, weave_trace in result.detail.trace.weaves.items():
-    for thread_name, thread_trace in weave_trace.threads.items():
-        span = thread_trace.span
+for weave_name, wt in result.telemetry.weave_telemetry.items():
+    for thread_name, tt in wt.thread_telemetry.items():
+        span = tt.span
         print(f"{thread_name}: {span.status} in {span.duration_ms}ms")
-
-# Or flatten for export
-all_spans = result.detail.trace.to_spans()
 ```
 
 ## Telemetry results

@@ -13,11 +13,13 @@ always reflect the accepted configuration surface.
 | [`weave.json`][weave] | Weave configuration |
 | [`loom.json`][loom] | Loom configuration |
 | [`weevr.json`][combined] | Combined (all three) |
+| [`warp.json`][warp] | Warp schema contract |
 
 [thread]: https://github.com/ardent-data/weevr/blob/main/docs/schema/thread.json
 [weave]: https://github.com/ardent-data/weevr/blob/main/docs/schema/weave.json
 [loom]: https://github.com/ardent-data/weevr/blob/main/docs/schema/loom.json
 [combined]: https://github.com/ardent-data/weevr/blob/main/docs/schema/weevr.json
+[warp]: https://github.com/ardent-data/weevr/blob/main/docs/schema/warp.json
 
 ## Usage with LLMs
 

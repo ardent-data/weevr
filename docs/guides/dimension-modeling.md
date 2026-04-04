@@ -207,6 +207,7 @@ The `write:` block can override non-dimension merge behaviors:
 write:
   on_no_match_source: soft_delete
   soft_delete_column: _is_deleted
+  soft_delete_value: true  # default; boolean
 ```
 
 Forbidden fields when `dimension:` is present:

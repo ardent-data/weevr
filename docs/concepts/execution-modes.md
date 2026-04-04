@@ -194,7 +194,7 @@ write:
   match_keys: [customer_id]
   on_no_match_source: soft_delete
   soft_delete_column: is_deleted
-  soft_delete_value: "true"
+  soft_delete_value: true
 ```
 
 Merge is idempotent by match key -- rerunning with the same data produces
