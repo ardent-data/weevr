@@ -2905,10 +2905,10 @@ runtime settings that cascade down through weaves to threads.</p>
 </tr>
 <tr>
 <td><code>audit_templates</code></td>
-<td><code>dict[string, dict[string, string]]</code></td>
+<td><code>dict[string, AuditTemplate]</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Named audit column templates cascaded to all weaves and threads. Weave and thread definitions override loom-level definitions with the same name. See <a href="../../../guides/audit-templates/">Audit Templates guide</a>.</td>
+<td>Named audit column templates cascaded to all weaves and threads. Weave and thread definitions override loom-level definitions with the same name. A flat <code>dict[string, string]</code> shorthand is also accepted. See <a href="../../../guides/audit-templates/">Audit Templates guide</a>.</td>
 </tr>
 <tr>
 <td><code>connections</code></td>
