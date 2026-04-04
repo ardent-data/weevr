@@ -1333,3 +1333,184 @@ class TestRunVariableSkip:
         config = {"path": "/lakehouse/${env}/${run.timestamp}"}
         result = resolve_variables(config, {"env": "prod"})
         assert result["path"] == "/lakehouse/prod/${run.timestamp}"
+
+
+class TestThreadParameterizationE2E:
+    """End-to-end integration tests for thread parameterization (M121 Task 17)."""
+
+    def _write_template(self, tmp_path, name="template.thread"):
+        """Write a parameterized template thread file."""
+        f = tmp_path / name
+        f.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n"
+            "  data:\n"
+            "    type: delta\n"
+            "    alias: ${param.schema}.${param.table_name}\n"
+            "target:\n"
+            "  alias: silver.${param.table_name}\n"
+        )
+        return f
+
+    def test_two_instances_resolve_independently(self, tmp_path):
+        """Two instances of same ref with different params resolve independently."""
+        from weevr.config.resolver import resolve_references
+
+        self._write_template(tmp_path)
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [
+                {
+                    "ref": "template.thread",
+                    "as": "sap_adr6",
+                    "params": {"schema": "raw", "table_name": "ADR6"},
+                },
+                {
+                    "ref": "template.thread",
+                    "as": "sap_adr2",
+                    "params": {"schema": "raw", "table_name": "ADR2"},
+                },
+            ],
+        }
+        result = resolve_references(weave_config, "weave", tmp_path)
+        resolved = result["_resolved_threads"]
+
+        assert len(resolved) == 2
+        assert resolved[0]["sources"]["data"]["alias"] == "raw.ADR6"
+        assert resolved[0]["target"]["alias"] == "silver.ADR6"
+        assert resolved[0]["_entry_as"] == "sap_adr6"
+        assert resolved[1]["sources"]["data"]["alias"] == "raw.ADR2"
+        assert resolved[1]["target"]["alias"] == "silver.ADR2"
+        assert resolved[1]["_entry_as"] == "sap_adr2"
+
+    def test_three_instances_same_ref(self, tmp_path):
+        """Three instances of same ref all resolve independently."""
+        from weevr.config.resolver import resolve_references
+
+        self._write_template(tmp_path)
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [
+                {
+                    "ref": "template.thread",
+                    "as": "inst_a",
+                    "params": {"schema": "raw", "table_name": "A"},
+                },
+                {
+                    "ref": "template.thread",
+                    "as": "inst_b",
+                    "params": {"schema": "raw", "table_name": "B"},
+                },
+                {
+                    "ref": "template.thread",
+                    "as": "inst_c",
+                    "params": {"schema": "stg", "table_name": "C"},
+                },
+            ],
+        }
+        result = resolve_references(weave_config, "weave", tmp_path)
+        resolved = result["_resolved_threads"]
+        assert len(resolved) == 3
+        assert resolved[2]["sources"]["data"]["alias"] == "stg.C"
+
+    def test_nested_param_expression(self, tmp_path):
+        """ThreadEntry param values with ${env} resolve against parent."""
+        from weevr.config.resolver import resolve_references
+
+        f = tmp_path / "schema_thread.thread"
+        f.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n"
+            "  data:\n"
+            "    type: delta\n"
+            "    alias: ${param.target_schema}.customers\n"
+            "target:\n"
+            "  alias: ${param.target_schema}.dim_customers\n"
+        )
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [
+                {
+                    "ref": "schema_thread.thread",
+                    "as": "dim_cust",
+                    "params": {"target_schema": "${env}_silver"},
+                },
+            ],
+        }
+        result = resolve_references(
+            weave_config,
+            "weave",
+            tmp_path,
+            runtime_params={"env": "prod"},
+        )
+        resolved = result["_resolved_threads"][0]
+        assert resolved["sources"]["data"]["alias"] == "prod_silver.customers"
+        assert resolved["target"]["alias"] == "prod_silver.dim_customers"
+
+    def test_loom_with_aliased_threads_in_weave(self, tmp_path):
+        """Loom resolves weave with aliased thread instances."""
+        from weevr.config.resolver import resolve_references
+
+        self._write_template(tmp_path)
+
+        weave_file = tmp_path / "silver.weave"
+        weave_file.write_text(
+            'config_version: "1.0"\n'
+            "threads:\n"
+            "  - ref: template.thread\n"
+            "    as: sap_adr6\n"
+            "    params:\n"
+            "      schema: raw\n"
+            "      table_name: ADR6\n"
+            "  - ref: template.thread\n"
+            "    as: sap_adr2\n"
+            "    params:\n"
+            "      schema: raw\n"
+            "      table_name: ADR2\n"
+        )
+
+        loom_config = {
+            "config_version": "1.0",
+            "weaves": [{"ref": "silver.weave"}],
+        }
+        result = resolve_references(loom_config, "loom", tmp_path)
+        weave = result["_resolved_weaves"][0]
+        threads = weave["_resolved_threads"]
+        assert len(threads) == 2
+        assert threads[0]["_entry_as"] == "sap_adr6"
+        assert threads[1]["_entry_as"] == "sap_adr2"
+
+    def test_standalone_template_raises(self):
+        """Standalone thread with unresolved ${param.x} raises."""
+        config = {
+            "config_version": "1.0",
+            "sources": {"d": {"type": "delta", "alias": "${param.table}"}},
+            "target": {},
+        }
+        context = build_param_context()
+        with pytest.raises(VariableResolutionError, match="param.table"):
+            resolve_variables(config, context)
+
+    def test_backwards_compat_no_as_no_params(self, tmp_path):
+        """Existing weave configs without as/params still work."""
+        from weevr.config.resolver import resolve_references
+
+        thread_file = tmp_path / "simple.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target: {}\n"
+        )
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [{"ref": "simple.thread"}],
+        }
+        result = resolve_references(weave_config, "weave", tmp_path)
+        resolved = result["_resolved_threads"]
+        assert len(resolved) == 1
+        assert "_entry_as" not in resolved[0]
+        assert "_entry_params" not in resolved[0]
