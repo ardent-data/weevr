@@ -2838,6 +2838,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/thread-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/warps/" class="md-nav__link">
         
   
@@ -9202,6 +9230,32 @@ filename stem for external references.</p>
               <div class="doc-md-description">
                 <p>Path to an external <code>.thread</code> file, relative to project root.
 Mutually exclusive with inline definition (name + body).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ThreadEntry.as_">as_</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Alias that overrides the thread's effective name for all downstream
+consumers (planner, executor, telemetry, watermark, display).
+Required when the same ref appears multiple times in a weave.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ThreadEntry.params">params</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Key-value dict injected into the thread's parameter resolution
+context under the <code>param</code> namespace, enabling <code>${param.x}</code>
+references in the thread config.</p>
               </div>
             </td>
           </tr>

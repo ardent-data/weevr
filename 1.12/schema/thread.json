@@ -4536,6 +4536,19 @@
       "title": "Qualified Key",
       "type": "string"
     },
+    "template_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Raw ref string from the ThreadEntry that loaded this thread. Populated during hydration for telemetry and display.",
+      "title": "Template Ref"
+    },
     "config_version": {
       "description": "Configuration schema version. Must be '1.0'.",
       "title": "Config Version",

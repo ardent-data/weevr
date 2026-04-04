@@ -1063,7 +1063,7 @@
       "type": "object"
     },
     "ThreadEntry": {
-      "description": "A thread reference within a weave, with optional per-thread overrides.\n\nAttributes:\n    name: Thread name. Required for inline definitions; derived from\n        filename stem for external references.\n    ref: Path to an external ``.thread`` file, relative to project root.\n        Mutually exclusive with inline definition (name + body).\n    dependencies: Explicit upstream thread names. When set, these are merged\n        with any auto-inferred dependencies from source/target path matching.\n    condition: Optional condition for conditional execution. When set, the\n        thread is only executed if the condition evaluates to True.",
+      "description": "A thread reference within a weave, with optional per-thread overrides.\n\nAttributes:\n    name: Thread name. Required for inline definitions; derived from\n        filename stem for external references.\n    ref: Path to an external ``.thread`` file, relative to project root.\n        Mutually exclusive with inline definition (name + body).\n    as_: Alias that overrides the thread's effective name for all downstream\n        consumers (planner, executor, telemetry, watermark, display).\n        Required when the same ref appears multiple times in a weave.\n    params: Key-value dict injected into the thread's parameter resolution\n        context under the ``param`` namespace, enabling ``${param.x}``\n        references in the thread config.\n    dependencies: Explicit upstream thread names. When set, these are merged\n        with any auto-inferred dependencies from source/target path matching.\n    condition: Optional condition for conditional execution. When set, the\n        thread is only executed if the condition evaluates to True.",
       "properties": {
         "name": {
           "default": "",
@@ -1083,6 +1083,33 @@
           "default": null,
           "description": "Path to an external .thread file, relative to project root. Mutually exclusive with inline definition.",
           "title": "Ref"
+        },
+        "as": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alias that overrides the thread's effective name. Required when the same ref appears multiple times in a weave.",
+          "title": "As"
+        },
+        "params": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Key-value dict injected into the thread's parameter context under the param namespace, enabling ${param.x} references.",
+          "title": "Params"
         },
         "dependencies": {
           "anyOf": [

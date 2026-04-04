@@ -1227,6 +1227,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.VariableResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VariableResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.LogLevel" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2958,6 +2969,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/thread-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/warps/" class="md-nav__link">
         
   
@@ -3634,6 +3673,17 @@
     <span class="md-ellipsis">
       
         ModelValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.VariableResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VariableResolutionError
       
     </span>
   </a>
@@ -4986,6 +5036,56 @@ within a thread pipeline.</p>
 <p>This occurs after variable resolution and inheritance, when the concrete
 values are validated through the Pydantic domain model (Thread, Weave, or
 Loom). Semantic constraints that span multiple fields are checked here.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.context.VariableResolutionError" class="doc doc-heading">
+            <code>VariableResolutionError</code>
+
+
+<a href="#weevr.context.VariableResolutionError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.context.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when a <code>${variable}</code> reference cannot be resolved.</p>
+<p>This occurs when a variable placeholder has no matching entry in the
+parameter context and no default value (<code>${var:-default}</code>) is provided.</p>
 
 
 
@@ -7223,7 +7323,7 @@ typed extension was expected (caller context).</p>
 
 
 <h3 id="weevr.context.build_param_context" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">build_param_context</span><span class="p">(</span><span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config_defaults</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fabric_context</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">build_param_context</span><span class="p">(</span><span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config_defaults</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fabric_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">entry_params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.build_param_context" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7233,8 +7333,9 @@ typed extension was expected (caller context).</p>
         <p>Build parameter context with proper priority layering.</p>
 <p>Priority order (highest to lowest):
 1. runtime_params
-2. config_defaults
-3. fabric_context</p>
+2. entry_params (nested under <code>param</code> key for <code>${param.x}</code> access)
+3. config_defaults
+4. fabric_context</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -7292,6 +7393,23 @@ typed extension was expected (caller context).</p>
                 <p>Fabric environment values keyed as <code>fabric.&lt;field&gt;</code>
 (e.g. <code>fabric.workspace_id</code>). None values are omitted. Lowest
 priority — overridden by config_defaults and runtime_params.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>entry_params</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>ThreadEntry-level parameters injected under the
+<code>param</code> namespace for <code>${param.x}</code> dotted-key resolution.</p>
               </div>
             </td>
             <td>
@@ -7516,7 +7634,7 @@ reference detected.</p>
 
 
 <h3 id="weevr.context.resolve_variables" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">resolve_variables</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">resolve_variables</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="n">consumed_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.resolve_variables" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7570,6 +7688,24 @@ reference detected.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>consumed_keys</code>
+            </td>
+            <td>
+                  <code><span title="set">set</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional set to track which context keys were consumed
+during resolution. When provided, each resolved dotted key is
+added to the set for post-resolution unused-param analysis.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
