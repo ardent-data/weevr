@@ -81,10 +81,13 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 ### Stage 5–6: Resolve values
 
 1. **Build parameter context** — Merge runtime parameters (highest
-   priority) over config-declared defaults over fabric context
-   (lowest priority) into a flat context dictionary. The
-   `${fabric.*}` namespace comes from this third layer. Dotted
-   keys like `env.lakehouse` support nested access.
+   priority) over ThreadEntry `params` (under the `param`
+   namespace for `${param.x}` access) over config-declared
+   defaults over fabric context (lowest priority) into a flat
+   context dictionary. The `${fabric.*}` namespace comes from
+   the fabric layer. Dotted keys like `env.lakehouse` support
+   nested access. See [Thread Templates](thread-templates.md)
+   for the `${param.x}` pattern.
 2. **Resolve variables** — Recursively walk all values in the config and
    resolve `${var}` references from the parameter context. Whole-value
    references return the native type; embedded references coerce to

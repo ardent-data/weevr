@@ -94,6 +94,8 @@ nav:
   - FAQ: faq.md
   - Contributing: contributing.md
   - Release Notes:
+      - "1.13": release-notes/1.13.md
+      - "1.12": release-notes/1.12.md
       - "1.11": release-notes/1.11.md
       - "1.10": release-notes/1.10.md
       - "1.9": release-notes/1.9.md
