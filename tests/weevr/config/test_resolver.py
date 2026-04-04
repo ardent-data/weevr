@@ -145,6 +145,171 @@ class TestEntryParams:
         assert context["param"]["table"] == "OVERRIDE"
 
 
+class TestConsumedKeysTracking:
+    """Test consumed_keys param tracking in resolve_variables (M121 Task 12)."""
+
+    def test_param_keys_tracked(self):
+        """${param.x} and ${param.y} usage tracked in consumed_keys."""
+        context = build_param_context(entry_params={"x": 1, "y": 2})
+        consumed: set[str] = set()
+        resolve_variables(
+            {"a": "${param.x}", "b": "${param.y}"},
+            context,
+            consumed_keys=consumed,
+        )
+        assert consumed == {"param.x", "param.y"}
+
+    def test_duplicate_usage_idempotent(self):
+        """Same param used twice produces single entry in consumed_keys."""
+        context = build_param_context(entry_params={"x": 1})
+        consumed: set[str] = set()
+        resolve_variables(
+            {"a": "${param.x}", "b": "${param.x}"},
+            context,
+            consumed_keys=consumed,
+        )
+        assert consumed == {"param.x"}
+
+    def test_no_param_refs_empty_set(self):
+        """Config with no param references yields empty consumed_keys."""
+        context = {"env": "prod"}
+        consumed: set[str] = set()
+        resolve_variables({"a": "${env}"}, context, consumed_keys=consumed)
+        assert consumed == {"env"}
+
+    def test_var_namespace_not_tracked(self):
+        """${var.x} references are runtime-deferred, not tracked."""
+        context = {"env": "prod"}
+        consumed: set[str] = set()
+        resolve_variables(
+            {"a": "${env}", "b": "${var.x}"},
+            context,
+            consumed_keys=consumed,
+        )
+        assert consumed == {"env"}
+
+    def test_consumed_keys_none_no_error(self):
+        """consumed_keys=None (default) causes no tracking or error."""
+        context = {"env": "prod"}
+        result = resolve_variables({"a": "${env}"}, context)
+        assert result == {"a": "prod"}
+
+
+class TestUnusedParamWarnings:
+    """Test unused-param telemetry warnings (M121 Task 13)."""
+
+    def test_unused_entry_param_warns(self, tmp_path, caplog):
+        """Entry param not consumed by thread emits warning."""
+        import logging
+
+        from weevr.config.resolver import resolve_references
+
+        thread_file = tmp_path / "simple.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target: {}\n"
+        )
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [
+                {
+                    "ref": "simple.thread",
+                    "as": "inst",
+                    "params": {"unused_key": "val"},
+                },
+            ],
+        }
+        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
+            resolve_references(weave_config, "weave", tmp_path)
+        assert any("unused_key" in r.message for r in caplog.records)
+
+    def test_all_params_consumed_no_warning(self, tmp_path, caplog):
+        """All entry params consumed by thread emits no warning."""
+        import logging
+
+        from weevr.config.resolver import resolve_references
+
+        thread_file = tmp_path / "parameterized.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n"
+            "    alias: ${param.table}\n"
+            "target: {}\n"
+        )
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [
+                {
+                    "ref": "parameterized.thread",
+                    "as": "inst",
+                    "params": {"table": "ADR6"},
+                },
+            ],
+        }
+        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
+            resolve_references(weave_config, "weave", tmp_path)
+        assert not any("unused" in r.message.lower() for r in caplog.records)
+
+    def test_shadowed_default_no_warning(self, tmp_path, caplog):
+        """Entry param that shadows a thread default emits no warning."""
+        import logging
+
+        from weevr.config.resolver import resolve_references
+
+        thread_file = tmp_path / "with_default.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\n'
+            "defaults:\n  env: dev\n"
+            "sources:\n  data:\n    type: delta\n"
+            "    alias: ${env}\n"
+            "target: {}\n"
+        )
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [
+                {"ref": "with_default.thread"},
+            ],
+        }
+        with caplog.at_level(logging.WARNING, logger="weevr.config.resolver"):
+            resolve_references(weave_config, "weave", tmp_path)
+        # env is consumed, no warning expected
+        assert not any("unused" in r.message.lower() for r in caplog.records)
+
+
+class TestStandaloneTemplateErrors:
+    """Test enhanced error messages for standalone templates (M121 Task 14)."""
+
+    def test_standalone_unresolved_param_hints_template(self):
+        """Standalone thread with ${param.x} raises with param.table in msg."""
+        context = build_param_context()
+        config = {"alias": "${param.table}"}
+        with pytest.raises(VariableResolutionError, match="param.table"):
+            resolve_variables(config, context)
+
+    def test_ref_loaded_thread_unresolved_param_shows_ref(self, tmp_path):
+        """Thread loaded via ref with unresolved ${param.x} raises with ref."""
+        from weevr.config.resolver import resolve_references
+
+        thread_file = tmp_path / "template.thread"
+        thread_file.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n"
+            "    alias: ${param.table}\n"
+            "target: {}\n"
+        )
+
+        weave_config = {
+            "config_version": "1.0",
+            "threads": [{"ref": "template.thread"}],
+        }
+        with pytest.raises(VariableResolutionError, match="param.table"):
+            resolve_references(weave_config, "weave", tmp_path)
+
+
 class TestFabricVariableResolution:
     """Test that ${fabric.*} variables resolve from fabric context."""
 

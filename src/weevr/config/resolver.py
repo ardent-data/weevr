@@ -1,5 +1,6 @@
 """Variable interpolation and reference resolution."""
 
+import logging
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -7,6 +8,8 @@ from typing import Any
 
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
+
+logger = logging.getLogger(__name__)
 
 
 def build_param_context(
@@ -62,6 +65,29 @@ def build_param_context(
     return context
 
 
+def _warn_unused_params(
+    consumed: set[str],
+    context: dict[str, Any],
+    entry_params: dict[str, Any] | None = None,
+    thread_name: str = "",
+) -> None:
+    """Emit warnings for param-namespace keys not consumed during resolution."""
+    if not entry_params:
+        return
+
+    # Build the set of param keys that should have been consumed
+    expected = {f"param.{k}" for k in entry_params}
+    unused = expected - consumed
+    for key in sorted(unused):
+        param_name = key.split(".", 1)[1] if "." in key else key
+        logger.warning(
+            "Thread '%s': entry param '%s' was not consumed by the "
+            "thread config (source: entry_params)",
+            thread_name,
+            param_name,
+        )
+
+
 def _get_dotted_value(context: dict[str, Any], key: str) -> Any:
     """Get value from context using dotted key notation.
 
@@ -97,6 +123,7 @@ WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-(.*?))?\}$")
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
     context: dict[str, Any],
+    consumed_keys: set[str] | None = None,
 ) -> Any:
     """Recursively resolve variable references in config.
 
@@ -107,6 +134,9 @@ def resolve_variables(
     Args:
         config: Config structure to resolve (dict, list, str, or primitive)
         context: Parameter context for variable lookup
+        consumed_keys: Optional set to track which context keys were consumed
+            during resolution. When provided, each resolved dotted key is
+            added to the set for post-resolution unused-param analysis.
 
     Returns:
         Config with all variables resolved
@@ -115,10 +145,10 @@ def resolve_variables(
         VariableResolutionError: If variable not found and no default provided
     """
     if isinstance(config, dict):
-        return {k: resolve_variables(v, context) for k, v in config.items()}
+        return {k: resolve_variables(v, context, consumed_keys) for k, v in config.items()}
 
     elif isinstance(config, list):
-        return [resolve_variables(item, context) for item in config]
+        return [resolve_variables(item, context, consumed_keys) for item in config]
 
     elif isinstance(config, str):
         # Whole-value check: if the entire string is a single ${param} reference,
@@ -130,7 +160,10 @@ def resolve_variables(
 
             if not var_name.startswith(("var.", "run.")):
                 try:
-                    return _get_dotted_value(context, var_name)
+                    value = _get_dotted_value(context, var_name)
+                    if consumed_keys is not None:
+                        consumed_keys.add(var_name)
+                    return value
                 except KeyError as exc:
                     if default_value is not None:
                         return default_value
@@ -153,6 +186,8 @@ def resolve_variables(
             try:
                 # Try dotted key access first
                 value = _get_dotted_value(context, var_name)
+                if consumed_keys is not None:
+                    consumed_keys.add(var_name)
                 return str(value)
             except KeyError as exc:
                 if default_value is not None:
@@ -547,7 +582,16 @@ def resolve_references(
                         child_dict.get("defaults"),
                         entry_params=resolved_entry_params,
                     )
-                    resolved_child = resolve_variables(child_dict, context)
+                    consumed: set[str] = set()
+                    resolved_child = resolve_variables(child_dict, context, consumed_keys=consumed)
+
+                    # Warn on unused params with source attribution
+                    _warn_unused_params(
+                        consumed,
+                        context,
+                        entry_params=resolved_entry_params,
+                        thread_name=entry.get("as") or child_dict.get("name", ref),
+                    )
 
                     # Preserve entry-level overrides
                     for key in ("dependencies", "condition", "as", "params"):
