@@ -80,9 +80,11 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 
 ### Stage 5–6: Resolve values
 
-1. **Build parameter context** — Merge runtime parameters (highest priority)
-   over config-declared defaults (lowest priority) into a flat context
-   dictionary. Dotted keys like `env.lakehouse` support nested access.
+1. **Build parameter context** — Merge runtime parameters (highest
+   priority) over config-declared defaults over fabric context
+   (lowest priority) into a flat context dictionary. The
+   `${fabric.*}` namespace comes from this third layer. Dotted
+   keys like `env.lakehouse` support nested access.
 2. **Resolve variables** — Recursively walk all values in the config and
    resolve `${var}` references from the parameter context. Whole-value
    references return the native type; embedded references coerce to
@@ -142,6 +144,8 @@ checked as post-resolution cross-cutting validations.
 | `config/inheritance.py` | Three-level cascade: loom → weave → thread |
 | `config/validation.py` | Pre-resolution schema validation, post-resolution constraint checks |
 | `config/macros.py` | `foreach` block expansion in step lists |
+| `config/fabric.py` | Builds `${fabric.*}` context from Fabric runtime variables |
+| `config/warp.py` | Warp schema contract discovery and drift baseline resolution |
 | `config/__init__.py` | `load_config()` — orchestrates the full pipeline |
 
 ## Deferred variable namespaces

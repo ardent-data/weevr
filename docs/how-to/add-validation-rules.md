@@ -158,7 +158,9 @@ result = ctx.run("staging/stg_customers.thread")
 # Check overall status
 print(result.status)  # "success", "failure", or "partial"
 
-# Access per-rule results through telemetry
+# Access per-rule results through telemetry (thread-level runs).
+# For weave/loom runs, drill into nested telemetry:
+# result.telemetry.weave_telemetry["name"].thread_telemetry["name"]
 if result.telemetry:
     for vr in result.telemetry.validation_results:
         print(f"{vr.rule_name}: {vr.rows_passed} passed, {vr.rows_failed} failed")

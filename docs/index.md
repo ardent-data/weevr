@@ -70,6 +70,19 @@ engine -> spark: executes
 spark -> fabric: reads / writes
 ```
 
+## CLI
+
+[weevr-cli](https://github.com/ardent-data/weevr-cli) is a standalone
+command-line companion for validating configs, inspecting schemas, and
+running dry-run operations outside of a notebook.
+
+```bash
+pip install weevr-cli
+```
+
+See the [CLI documentation](https://ardent-data.github.io/weevr-cli/latest/)
+for usage and command reference.
+
 ## Learn more
 
 | | |

@@ -31,7 +31,7 @@ target. This page documents every key accepted inside a thread YAML file.
 | `lookups` | `dict[string, Lookup]` | no | `null` | Thread-level lookup definitions. Merged with weave-level lookups (thread wins on name collision). |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Thread-level column set definitions for rename steps. Merged with weave-level column sets (thread wins). |
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Thread-level variable declarations. Resolved before `pre_steps` execution. |
-| `audit_templates` | `dict[string, dict[string, string]]` | no | `null` | Named audit column templates available to targets in this thread. Merged with parent-level definitions (thread wins on name collision). |
+| `audit_templates` | `dict[string, AuditTemplate]` | no | `null` | Named audit column templates available to targets in this thread. Merged with parent-level definitions (thread wins on name collision). A flat `dict[string, string]` shorthand is also accepted. |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before thread core execution. Not cascaded from weave — each level runs its own list. |
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps to run after thread core execution. Not cascaded from weave. |
 | `connections` | `dict[string, OneLakeConnection]` | no | `null` | Named OneLake connection declarations. Merged with weave/loom-level connections (thread wins on name collision). See [Connections guide](../../guides/connections.md). |
@@ -222,6 +222,8 @@ steps:
 
 An ordered list of transformation steps. Each step is a single-key object
 where the key identifies the step type. weevr supports 23 step types.
+In addition, [`foreach`](#foreach) macro blocks are accepted and expanded
+before model hydration.
 
 ### filter
 
@@ -821,6 +823,28 @@ detailed examples of all modes and features.
       - { column: customer_tier, as: tier }
 ```
 
+### foreach
+
+A macro block that expands into repeated step sequences before model
+hydration. Not a step type itself — expanded by the config preprocessor.
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `values` | `list` | yes | -- | Items to iterate over |
+| `as` | `string` | yes | -- | Variable name bound to each item during expansion |
+| `steps` | `list[Step]` | yes | -- | Step template repeated for each value |
+
+```yaml
+steps:
+  - foreach:
+      values: [revenue, cost, margin]
+      as: col
+      steps:
+        - derive:
+            name: "${col}_rounded"
+            expr: "round(${col}, 2)"
+```
+
 ---
 
 ## target
@@ -845,6 +869,12 @@ Defines where the thread writes its output.
 | `dimension` | `DimensionConfig` | no | `null` | Dimension target mode with composable SCD flags. Mutually exclusive with `fact`. See [Dimension Modeling guide](../../guides/dimension-modeling.md). |
 | `fact` | `FactConfig` | no | `null` | Fact target mode with FK validation. Mutually exclusive with `dimension`. See [Fact Tables guide](../../guides/fact-tables.md). |
 | `seed` | `SeedConfig` | no | `null` | Seed rows inserted on first write or when table is empty. |
+| `warp` | `string \| false \| null` | no | `null` | Warp schema contract reference. A string names an explicit `.warp` file; `false` opts out of auto-discovery; `null` enables auto-discovery. |
+| `warp_mode` | `"auto" \| null` | no | `null` | Warp generation mode. `"auto"` writes/updates the `.warp` file after each successful run. |
+| `warp_init` | `bool` | no | `false` | When `true` and a warp exists, create the Delta table from the effective warp before the first pipeline run. |
+| `warp_enforcement` | `"warn" \| "enforce" \| "off"` | no | `"warn"` | Warp contract enforcement mode. `"enforce"` fails the thread on violations; `"warn"` logs findings; `"off"` skips validation. |
+| `schema_drift` | `"lenient" \| "strict" \| "adaptive"` | no | `"lenient"` | Schema drift handling mode. `"lenient"` passes extra columns through; `"strict"` applies `on_drift` action; `"adaptive"` passes through and extends auto-generated warps. |
+| `on_drift` | `"error" \| "warn" \| "ignore"` | no | `"warn"` | Severity action for strict drift mode. `"error"` aborts the thread; `"warn"` drops extra columns with a warning; `"ignore"` drops silently. |
 
 At least one of `alias`, `path`, or `connection` + `table` is required.
 

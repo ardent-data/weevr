@@ -155,7 +155,7 @@ with OTel-compatible fields:
 
 - Standard fields: `timestamp`, `level`, `logger`, `message`
 - Correlation fields: `trace_id`, `span_id` (when available)
-- Context fields: `thread_name`, `weave_name`, `loom_name`
+- Context fields: `weevr_thread`, `weevr_weave`, `weevr_loom`
 - Extra: `attributes` dict for custom key-value context
 
 Log level mapping from weevr config values to Python levels:
