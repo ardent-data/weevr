@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.11/" class="md-tabs__link">
+        <a href="../../../release-notes/1.13/" class="md-tabs__link">
           
   
   
@@ -2415,6 +2415,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.13/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.13
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.12
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.11/" class="md-nav__link">
         
   
@@ -3188,6 +3244,20 @@ runtime settings.</p>
 <td>no</td>
 <td><code>""</code></td>
 <td>Thread name. Required for inline definitions; derived from filename stem when using <code>ref</code>.</td>
+</tr>
+<tr>
+<td><code>as</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Alias overriding the thread's effective name. Required when the same <code>ref</code> appears multiple times. See <a href="../../../guides/thread-templates/">Thread Templates guide</a>.</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td><code>dict[string, any]</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Key-value pairs injected into the thread's <code>${param.x}</code> namespace for this entry. See <a href="../../../guides/thread-templates/">Thread Templates guide</a>.</td>
 </tr>
 <tr>
 <td><code>dependencies</code></td>
