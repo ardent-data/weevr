@@ -45,6 +45,13 @@ class Thread(FrozenBase):
         default="",
         description="Dot-separated namespace key, derived from directory path.",
     )
+    template_ref: str | None = Field(
+        default=None,
+        description=(
+            "Raw ref string from the ThreadEntry that loaded this thread. "
+            "Populated during hydration for telemetry and display."
+        ),
+    )
     config_version: str = Field(
         description="Configuration schema version. Must be '1.0'.",
     )

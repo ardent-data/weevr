@@ -196,6 +196,26 @@ class TestThreadNameField:
         assert restored.name == "facts.fact_order"
 
 
+class TestThreadTemplateRef:
+    """Test Thread.template_ref field (M121)."""
+
+    def test_template_ref_defaults_to_none(self):
+        """template_ref defaults to None when not provided."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.template_ref is None
+
+    def test_template_ref_set_explicitly(self):
+        """template_ref stores the raw ref string."""
+        t = Thread.model_validate({**_MINIMAL, "template_ref": "silver/sap_table.thread"})
+        assert t.template_ref == "silver/sap_table.thread"
+
+    def test_template_ref_round_trip(self):
+        """template_ref survives a model_dump/model_validate round-trip."""
+        t = Thread.model_validate({**_MINIMAL, "template_ref": "silver/sap.thread"})
+        restored = Thread.model_validate(t.model_dump())
+        assert restored.template_ref == "silver/sap.thread"
+
+
 class TestThreadFailureConfig:
     """Tests for the Thread.failure field and FailureConfig model."""
 

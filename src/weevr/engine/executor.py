@@ -146,8 +146,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
     span_builder = None
     if collector is not None:
-        span_label = thread.qualified_key or thread.name
+        # For aliased template threads, prefer the effective name (alias)
+        # over qualified_key (which retains the raw ref path).
+        span_label = thread.name if thread.template_ref else thread.qualified_key or thread.name
         span_builder = collector.start_span(f"thread:{span_label}", parent_span_id=parent_span_id)
+        if thread.template_ref:
+            span_builder.set_attribute("thread.template_ref", thread.template_ref)
 
     validation_results: list = []
     assertion_results: list = []

@@ -42,11 +42,19 @@ class ThreadEntry(FrozenBase):
             filename stem for external references.
         ref: Path to an external ``.thread`` file, relative to project root.
             Mutually exclusive with inline definition (name + body).
+        as_: Alias that overrides the thread's effective name for all downstream
+            consumers (planner, executor, telemetry, watermark, display).
+            Required when the same ref appears multiple times in a weave.
+        params: Key-value dict injected into the thread's parameter resolution
+            context under the ``param`` namespace, enabling ``${param.x}``
+            references in the thread config.
         dependencies: Explicit upstream thread names. When set, these are merged
             with any auto-inferred dependencies from source/target path matching.
         condition: Optional condition for conditional execution. When set, the
             thread is only executed if the condition evaluates to True.
     """
+
+    model_config = {"frozen": True, "populate_by_name": True}
 
     name: str = Field(
         default="",
@@ -60,6 +68,21 @@ class ThreadEntry(FrozenBase):
         description=(
             "Path to an external .thread file, relative to project root. "
             "Mutually exclusive with inline definition."
+        ),
+    )
+    as_: str | None = Field(
+        default=None,
+        alias="as",
+        description=(
+            "Alias that overrides the thread's effective name. Required "
+            "when the same ref appears multiple times in a weave."
+        ),
+    )
+    params: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Key-value dict injected into the thread's parameter context "
+            "under the param namespace, enabling ${param.x} references."
         ),
     )
     dependencies: list[str] | None = Field(

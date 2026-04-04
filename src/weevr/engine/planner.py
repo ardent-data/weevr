@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
@@ -160,14 +161,15 @@ def _build_dependency_graph(
     # Build explicit deps index from ThreadEntry list
     explicit_index: dict[str, list[str]] = {name: [] for name in threads}
     for entry in thread_entries:
+        effective_name = entry.as_ or entry.name or (Path(entry.ref).stem if entry.ref else "")
         if entry.dependencies:
             for dep in entry.dependencies:
                 if dep not in threads:
                     raise ConfigError(
-                        f"Thread '{entry.name}' declares explicit dependency on '{dep}', "
+                        f"Thread '{effective_name}' declares explicit dependency on '{dep}', "
                         f"but '{dep}' is not defined in the weave"
                     )
-            explicit_index[entry.name] = list(entry.dependencies)
+            explicit_index[effective_name] = list(entry.dependencies)
 
     # Infer dependencies from path matching
     inferred: dict[str, list[str]] = {name: [] for name in threads}

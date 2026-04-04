@@ -88,6 +88,7 @@ nav:
       - Fact Tables: guides/fact-tables.md
       - Resolve Step: guides/resolve.md
       - Sub-Pipelines: guides/sub-pipelines.md
+      - Thread Templates: guides/thread-templates.md
       - Warps: guides/warps.md
       - Schema Drift: guides/schema-drift.md
   - FAQ: faq.md

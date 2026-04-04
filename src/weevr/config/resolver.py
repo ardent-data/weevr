@@ -1,6 +1,8 @@
 """Variable interpolation and reference resolution."""
 
+import logging
 import re
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -8,18 +10,22 @@ from typing import Any
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
 
+logger = logging.getLogger(__name__)
+
 
 def build_param_context(
     runtime_params: dict[str, Any] | None = None,
     config_defaults: dict[str, Any] | None = None,
     fabric_context: dict[str, Any] | None = None,
+    entry_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build parameter context with proper priority layering.
 
     Priority order (highest to lowest):
     1. runtime_params
-    2. config_defaults
-    3. fabric_context
+    2. entry_params (nested under ``param`` key for ``${param.x}`` access)
+    3. config_defaults
+    4. fabric_context
 
     Args:
         runtime_params: Runtime parameter overrides.
@@ -27,13 +33,15 @@ def build_param_context(
         fabric_context: Fabric environment values keyed as ``fabric.<field>``
             (e.g. ``fabric.workspace_id``). None values are omitted. Lowest
             priority — overridden by config_defaults and runtime_params.
+        entry_params: ThreadEntry-level parameters injected under the
+            ``param`` namespace for ``${param.x}`` dotted-key resolution.
 
     Returns:
         Merged parameter context dictionary with dotted key access support.
     """
     context: dict[str, Any] = {}
 
-    # Layer 3: Fabric context (lowest priority)
+    # Layer 4: Fabric context (lowest priority)
     if fabric_context:
         fabric_dict = {
             k.split(".", 1)[1]: v
@@ -43,15 +51,42 @@ def build_param_context(
         if fabric_dict:
             context["fabric"] = fabric_dict
 
-    # Layer 2: Config defaults
+    # Layer 3: Config defaults
     if config_defaults:
         context.update(config_defaults)
+
+    # Layer 2: Entry params (under "param" namespace)
+    if entry_params:
+        context["param"] = entry_params
 
     # Layer 1: Runtime params (highest priority)
     if runtime_params:
         context.update(runtime_params)
 
     return context
+
+
+def _warn_unused_params(
+    consumed: set[str],
+    context: dict[str, Any],
+    entry_params: dict[str, Any] | None = None,
+    thread_name: str = "",
+) -> None:
+    """Emit warnings for param-namespace keys not consumed during resolution."""
+    if not entry_params:
+        return
+
+    # Build the set of param keys that should have been consumed
+    expected = {f"param.{k}" for k in entry_params}
+    unused = expected - consumed
+    for key in sorted(unused):
+        param_name = key.split(".", 1)[1] if "." in key else key
+        logger.warning(
+            "Thread '%s': entry param '%s' was not consumed by the "
+            "thread config (source: entry_params)",
+            thread_name,
+            param_name,
+        )
 
 
 def _get_dotted_value(context: dict[str, Any], key: str) -> Any:
@@ -89,6 +124,7 @@ WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-(.*?))?\}$")
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
     context: dict[str, Any],
+    consumed_keys: set[str] | None = None,
 ) -> Any:
     """Recursively resolve variable references in config.
 
@@ -99,6 +135,9 @@ def resolve_variables(
     Args:
         config: Config structure to resolve (dict, list, str, or primitive)
         context: Parameter context for variable lookup
+        consumed_keys: Optional set to track which context keys were consumed
+            during resolution. When provided, each resolved dotted key is
+            added to the set for post-resolution unused-param analysis.
 
     Returns:
         Config with all variables resolved
@@ -107,10 +146,10 @@ def resolve_variables(
         VariableResolutionError: If variable not found and no default provided
     """
     if isinstance(config, dict):
-        return {k: resolve_variables(v, context) for k, v in config.items()}
+        return {k: resolve_variables(v, context, consumed_keys) for k, v in config.items()}
 
     elif isinstance(config, list):
-        return [resolve_variables(item, context) for item in config]
+        return [resolve_variables(item, context, consumed_keys) for item in config]
 
     elif isinstance(config, str):
         # Whole-value check: if the entire string is a single ${param} reference,
@@ -122,7 +161,10 @@ def resolve_variables(
 
             if not var_name.startswith(("var.", "run.")):
                 try:
-                    return _get_dotted_value(context, var_name)
+                    value = _get_dotted_value(context, var_name)
+                    if consumed_keys is not None:
+                        consumed_keys.add(var_name)
+                    return value
                 except KeyError as exc:
                     if default_value is not None:
                         return default_value
@@ -145,6 +187,8 @@ def resolve_variables(
             try:
                 # Try dotted key access first
                 value = _get_dotted_value(context, var_name)
+                if consumed_keys is not None:
+                    consumed_keys.add(var_name)
                 return str(value)
             except KeyError as exc:
                 if default_value is not None:
@@ -476,6 +520,20 @@ def resolve_references(
     elif config_type == "weave" and "threads" in config:
         resolved_threads = []
 
+        # Validate: duplicate refs without aliases
+        ref_entries = [e for e in config["threads"] if isinstance(e, dict) and e.get("ref")]
+        ref_counts = Counter(e["ref"] for e in ref_entries)
+        for ref_val, count in ref_counts.items():
+            if count > 1:
+                aliases = [e.get("as") for e in ref_entries if e["ref"] == ref_val]
+                if not all(aliases):
+                    raise ConfigError(
+                        f"Thread ref '{ref_val}' appears multiple times without "
+                        f"'as' aliases. Use 'as' to give each instance a unique name."
+                    )
+
+        seen_effective_names: set[str] = set()
+
         for entry in config["threads"]:
             # Normalize: string entries become {"name": string}
             if isinstance(entry, str):
@@ -509,13 +567,46 @@ def resolve_references(
                     # Set qualified key
                     child_dict["qualified_key"] = ref
 
-                    context = build_param_context(runtime_params, child_dict.get("defaults"))
-                    resolved_child = resolve_variables(child_dict, context)
+                    # Two-phase param resolution: resolve expressions
+                    # in entry param values against parent context first,
+                    # then inject resolved values into thread's param context.
+                    raw_entry_params = entry.get("params")
+                    resolved_entry_params = None
+                    if raw_entry_params:
+                        parent_context = build_param_context(runtime_params, config.get("defaults"))
+                        resolved_entry_params = resolve_variables(raw_entry_params, parent_context)
 
-                    # Preserve entry-level overrides (dependencies, condition)
-                    for key in ("dependencies", "condition"):
+                    context = build_param_context(
+                        runtime_params,
+                        child_dict.get("defaults"),
+                        entry_params=resolved_entry_params,
+                    )
+                    consumed: set[str] = set()
+                    resolved_child = resolve_variables(child_dict, context, consumed_keys=consumed)
+
+                    # Warn on unused params with source attribution
+                    _warn_unused_params(
+                        consumed,
+                        context,
+                        entry_params=resolved_entry_params,
+                        thread_name=entry.get("as") or child_dict.get("name", ref),
+                    )
+
+                    # Preserve entry-level overrides
+                    for key in ("dependencies", "condition", "as", "params"):
                         if key in entry:
                             resolved_child[f"_entry_{key}"] = entry[key]
+
+                    # Track effective name uniqueness
+                    effective_name = (
+                        entry.get("as") or resolved_child.get("name") or thread_path.stem
+                    )
+                    if effective_name in seen_effective_names:
+                        raise ConfigError(
+                            f"Duplicate effective thread name '{effective_name}' "
+                            f"in weave. Use 'as' to give each instance a unique name."
+                        )
+                    seen_effective_names.add(effective_name)
 
                     resolved_threads.append(resolved_child)
                 finally:
@@ -529,6 +620,18 @@ def resolve_references(
                 if isinstance(entry, dict):
                     inline = entry.copy()
                     inline["qualified_key"] = entry.get("name", "")
+                    if "as" in entry:
+                        inline["_entry_as"] = entry["as"]
+
+                    # Track effective name uniqueness
+                    effective_name = entry.get("as") or entry.get("name", "")
+                    if effective_name in seen_effective_names:
+                        raise ConfigError(
+                            f"Duplicate effective thread name '{effective_name}' "
+                            f"in weave. Use 'as' to give each instance a unique name."
+                        )
+                    seen_effective_names.add(effective_name)
+
                     resolved_threads.append(inline)
 
         result["_resolved_threads"] = resolved_threads
