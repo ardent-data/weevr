@@ -245,6 +245,65 @@ class TestNormalizeTableNameReservedWords:
         assert normalize_table_name("Select", config) == "select"
 
 
+class TestNormalizeTableNameNewStrategies:
+    """Test new reserved word strategies for table names."""
+
+    def test_suffix_strategy(self):
+        """Suffix strategy appends suffix to reserved table name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="suffix"),
+        )
+        assert normalize_table_name("Select", config) == "select_col"
+
+    def test_rename_strategy(self):
+        """Rename strategy applies map to reserved table name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_table"},
+            ),
+        )
+        assert normalize_table_name("Select", config) == "select_table"
+
+    def test_revert_strategy_keeps_original(self):
+        """Revert strategy returns pre-normalization name."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="revert"),
+        )
+        # "Select" normalizes to "select" (reserved) -> revert to "Select"
+        assert normalize_table_name("Select", config) == "Select"
+
+    def test_revert_non_reserved_keeps_normalized(self):
+        """Revert strategy keeps normalized name if not reserved."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="revert"),
+        )
+        assert normalize_table_name("DimCustomer", config) == "dim_customer"
+
+    def test_drop_strategy_raises(self):
+        """Drop strategy raises ConfigError for table names."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="drop"),
+        )
+        with pytest.raises(ConfigError, match="drop.*table"):
+            normalize_table_name("Select", config)
+
+
 class TestNamingConfig:
     """Test NamingConfig model."""
 

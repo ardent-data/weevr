@@ -390,18 +390,14 @@ def normalize_table_name(name: str, config: NamingConfig) -> str:
         result = normalize_name(name, config.tables)
 
     if config.reserved_words is not None:
+        if config.reserved_words.strategy == "drop":
+            raise ConfigError("Reserved word strategy 'drop' is not valid for table names")
         effective_words = resolve_effective_words(config.reserved_words)
         if result.lower() in effective_words:
-            if config.reserved_words.strategy == "prefix":
-                prefixed = config.reserved_words.prefix + result
-                _log.debug(
-                    "Reserved word protection (table): '%s' -> '%s'",
-                    result,
-                    prefixed,
-                )
-                result = prefixed
-            elif config.reserved_words.strategy == "error":
-                raise ConfigError(f"Table name is a reserved word: {result}")
-            # strategy == "quote": no-op
+            # Build a single-entry renames dict for dispatch
+            renames = {name: result}
+            strategy_fn = _STRATEGY_DISPATCH[config.reserved_words.strategy]
+            resolved = strategy_fn(renames, config.reserved_words, effective_words)
+            result = resolved[name] or result  # None shouldn't happen (drop blocked above)
 
     return result
