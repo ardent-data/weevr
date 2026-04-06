@@ -165,6 +165,63 @@ def _resolve_error(
     return updated
 
 
+def _resolve_suffix(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Suffix strategy: append config.suffix to colliding names."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            suffixed = output + config.suffix
+            _log.debug("Reserved word protection: '%s' -> '%s'", output, suffixed)
+            updated[original] = suffixed
+        else:
+            updated[original] = output
+    return updated
+
+
+def _resolve_revert(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Revert strategy: discard rename for collisions, keep original name."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            _log.warning(
+                "Reserved word protection: reverted '%s' -> kept '%s'",
+                output,
+                original,
+            )
+            updated[original] = original
+        else:
+            updated[original] = output
+    return updated
+
+
+def _resolve_drop(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Drop strategy: remove colliding columns (None sentinel)."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            _log.warning(
+                "Reserved word protection: dropped column '%s' (reserved word '%s')",
+                original,
+                output,
+            )
+            updated[original] = None
+        else:
+            updated[original] = output
+    return updated
+
+
 _STRATEGY_DISPATCH: dict[
     str,
     Callable[
@@ -175,6 +232,9 @@ _STRATEGY_DISPATCH: dict[
     "quote": _resolve_quote,
     "prefix": _resolve_prefix,
     "error": _resolve_error,
+    "suffix": _resolve_suffix,
+    "revert": _resolve_revert,
+    "drop": _resolve_drop,
 }
 
 

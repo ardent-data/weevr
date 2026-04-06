@@ -476,6 +476,125 @@ class TestNormalizeColumnsReservedWords:
         assert "select" in message
         assert "from" in message
 
+    def test_suffix_strategy_default(self, spark):
+        """Suffix strategy appends default '_col' to colliding names."""
+        df = spark.createDataFrame([(1,)], ["select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="suffix"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_col"]
+
+    def test_suffix_strategy_custom(self, spark):
+        """Suffix strategy appends custom suffix to colliding names."""
+        df = spark.createDataFrame([(1,)], ["select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="suffix", suffix="_column"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_column"]
+
+    def test_suffix_non_colliding_unchanged(self, spark):
+        """Suffix strategy leaves non-colliding names unchanged."""
+        df = spark.createDataFrame([(1, 2)], ["amount", "select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="suffix"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["amount", "select_col"]
+
+    def test_revert_strategy(self, spark):
+        """Revert strategy keeps original name for colliding columns."""
+        df = spark.createDataFrame([(1, 2)], ["order_date", "amount"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.NONE,
+            reserved_words=ReservedWordConfig(
+                strategy="revert",
+                extend=["order_date"],
+            ),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["order_date", "amount"]
+
+    def test_revert_non_colliding_unchanged(self, spark):
+        """Revert strategy leaves non-colliding renames intact."""
+        df = spark.createDataFrame([(1, 2)], ["OrderDate", "select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="revert"),
+        )
+        result = normalize_columns(df, config)
+        # "select" is reserved -> reverts to "select" (the original name, same here)
+        # "OrderDate" normalizes to "order_date" (not reserved) -> kept
+        assert result.columns == ["order_date", "select"]
+
+    def test_drop_strategy(self, spark):
+        """Drop strategy removes colliding columns from output."""
+        df = spark.createDataFrame([(1, 2, 3)], ["amount", "select", "total"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="drop"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["amount", "total"]
+
+    def test_drop_non_colliding_unchanged(self, spark):
+        """Drop strategy keeps non-colliding columns."""
+        df = spark.createDataFrame([(1,)], ["amount"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="drop"),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["amount"]
+
+    def test_revert_warning_logged(self, spark, caplog):
+        """Revert strategy logs warning per reverted column."""
+        import logging
+
+        df = spark.createDataFrame([(1,)], ["select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="revert"),
+        )
+        with caplog.at_level(logging.WARNING):
+            normalize_columns(df, config)
+        assert any("revert" in msg.lower() for msg in caplog.messages)
+
+    def test_drop_warning_logged(self, spark, caplog):
+        """Drop strategy logs warning per dropped column."""
+        import logging
+
+        df = spark.createDataFrame([(1, 2)], ["amount", "select"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(strategy="drop"),
+        )
+        with caplog.at_level(logging.WARNING):
+            normalize_columns(df, config)
+        assert any("drop" in msg.lower() for msg in caplog.messages)
+
 
 @pytest.mark.spark
 class TestNormalizeColumnsPresetIntegration:
