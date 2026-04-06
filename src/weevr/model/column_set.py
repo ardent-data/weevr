@@ -1,11 +1,16 @@
 """Column set models for named external column mappings."""
 
+from __future__ import annotations
+
+import logging
 from enum import StrEnum
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
+
+_log = logging.getLogger(__name__)
 
 
 class ReservedWordPreset(StrEnum):
@@ -73,7 +78,7 @@ class ColumnSetSource(FrozenBase):
     )
 
     @model_validator(mode="after")
-    def _validate_type_specific_fields(self) -> "ColumnSetSource":
+    def _validate_type_specific_fields(self) -> ColumnSetSource:
         if self.type == "delta" and self.alias is None:
             raise ValueError("'alias' is required when type is 'delta'")
         if self.type == "yaml" and self.path is None:
@@ -137,7 +142,7 @@ class ColumnSet(FrozenBase):
     )
 
     @model_validator(mode="after")
-    def _validate_source_xor_param(self) -> "ColumnSet":
+    def _validate_source_xor_param(self) -> ColumnSet:
         has_source = self.source is not None
         has_param = self.param is not None
         if has_source and has_param:
@@ -150,9 +155,21 @@ class ColumnSet(FrozenBase):
 class ReservedWordConfig(FrozenBase):
     """Configuration for handling reserved word collisions in column names.
 
-    When a column or table name matches a reserved word, the engine can
-    handle the collision in one of three ways: quote the name, prefix it,
-    or raise an error.
+    When a column or table name matches a reserved word, the engine applies
+    the configured strategy to resolve the collision.
+
+    Strategies:
+
+    - ``"quote"`` — keep the name as-is; rely on backtick-quoting in SQL.
+    - ``"prefix"`` — prepend ``prefix`` to colliding names.
+    - ``"suffix"`` — append ``suffix`` to colliding names.
+    - ``"error"`` — raise a ``ConfigError`` listing all colliding names.
+    - ``"rename"`` — apply explicit ``rename_map``; unmapped collisions
+      fall through to ``fallback`` strategy.
+    - ``"revert"`` — discard the rename for collisions, keeping the
+      pre-normalization name.
+    - ``"drop"`` — remove colliding columns from the output (columns
+      only; not valid for table names).
 
     The ``preset`` field selects one or more built-in word lists. When
     omitted, the ANSI SQL list is used as the default. Specifying any
@@ -164,27 +181,53 @@ class ReservedWordConfig(FrozenBase):
     preset union, adding or removing individual words.
 
     Attributes:
-        strategy: How to handle reserved word collisions. ``"quote"`` wraps
-            the name in back-ticks; ``"prefix"`` prepends ``prefix``;
-            ``"error"`` raises a validation error.
+        strategy: How to handle reserved word collisions.
         prefix: String prepended to colliding column names when
             ``strategy="prefix"``.
+        suffix: String appended to colliding column names when
+            ``strategy="suffix"``.
+        rename_map: Explicit mapping of reserved words to replacement
+            names. Required when ``strategy="rename"``.
+        fallback: Fallback strategy for unmapped collisions when
+            ``strategy="rename"``. Cannot be ``"rename"``.
         preset: Built-in word list presets to activate. ``None`` (default)
             uses the ANSI SQL list. Accepts a single string or a list.
         extend: Additional words to treat as reserved beyond the preset.
         exclude: Words to remove from the reserved word check.
     """
 
-    strategy: Literal["prefix", "quote", "error"] = Field(
+    strategy: Literal["prefix", "quote", "error", "suffix", "rename", "revert", "drop"] = Field(
         default="quote",
         description=(
             "How to handle reserved word collisions. ``quote`` wraps in back-ticks;"
-            " ``prefix`` prepends ``prefix``; ``error`` raises a validation error."
+            " ``prefix`` prepends ``prefix``; ``suffix`` appends ``suffix``;"
+            " ``error`` raises a validation error; ``rename`` applies an explicit"
+            " mapping with fallback; ``revert`` keeps the pre-normalization name;"
+            " ``drop`` removes colliding columns."
         ),
     )
     prefix: str = Field(
         default="_",
         description="String prepended to colliding column names when ``strategy`` is ``prefix``.",
+    )
+    suffix: str = Field(
+        default="_col",
+        description="String appended to colliding column names when ``strategy`` is ``suffix``.",
+    )
+    rename_map: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Explicit mapping of reserved words to replacement names."
+            " Required when ``strategy`` is ``rename``. Keys are matched"
+            " case-insensitively."
+        ),
+    )
+    fallback: Literal["prefix", "quote", "error", "suffix", "revert", "drop"] | None = Field(
+        default="quote",
+        description=(
+            "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``."
+            " Cannot be ``rename`` (no nesting)."
+        ),
     )
     preset: list[ReservedWordPreset] | None = Field(
         default=None,
@@ -209,3 +252,29 @@ class ReservedWordConfig(FrozenBase):
         if isinstance(v, str):
             return [v]
         return v
+
+    @field_validator("rename_map", mode="before")
+    @classmethod
+    def _normalize_rename_map_keys(cls, v: object) -> object:
+        """Normalize rename_map keys to lowercase for case-insensitive matching."""
+        if isinstance(v, dict):
+            return {k.lower(): val for k, val in v.items()}
+        return v
+
+    @model_validator(mode="after")
+    def _validate_rename_strategy(self) -> ReservedWordConfig:
+        """Cross-field validation for rename strategy constraints."""
+        if self.strategy == "rename" and (self.rename_map is None or len(self.rename_map) == 0):
+            raise ValueError("rename_map must be provided and non-empty when strategy is 'rename'")
+        # Warn if rename_map values are themselves reserved words
+        if self.rename_map and self.strategy == "rename":
+            from weevr.operations.reserved_words import resolve_effective_words
+
+            effective = resolve_effective_words(self)
+            reserved_values = [v for v in self.rename_map.values() if v.lower() in effective]
+            if reserved_values:
+                _log.warning(
+                    "rename_map values are reserved words: %s",
+                    ", ".join(sorted(reserved_values)),
+                )
+        return self
