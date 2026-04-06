@@ -307,11 +307,20 @@ Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `strategy` | `string` | no | `"quote"` | How to handle reserved words: `"prefix"`, `"quote"`, or `"error"` |
-| `prefix` | `string` | no | `"_"` | Prefix when `strategy` is `"prefix"` |
-| `preset` | `string \| list[string] \| null` | no | `null` | Built-in word list presets (`ansi`, `dax`, `m`, `powerbi`, `tsql`) |
-| `extend` | `list[string]` | no | `[]` | Extra words to treat as reserved |
-| `exclude` | `list[string]` | no | `[]` | Words to remove from the check |
+| `strategy` | `string` | no | `"quote"` | Collision strategy (see below) |
+| `prefix` | `string` | no | `"_"` | Prefix for `prefix` strategy |
+| `suffix` | `string` | no | `"_col"` | Suffix for `suffix` strategy |
+| `rename_map` | `dict` | cond. | `null` | Map for `rename` strategy |
+| `fallback` | `string` | no | `"quote"` | Fallback for unmapped `rename` |
+| `preset` | `string \| list` | no | `null` | Word list presets |
+| `extend` | `list[string]` | no | `[]` | Extra reserved words |
+| `exclude` | `list[string]` | no | `[]` | Words to remove from check |
+
+Strategies: `quote`, `prefix`, `suffix`, `error`, `rename`,
+`revert`, `drop`. The `rename` strategy requires `rename_map`
+(non-empty dict). The `drop` strategy is not valid for table
+names. See [Configuration Keys](../configuration-keys.md) for
+full strategy descriptions and YAML examples.
 
 ---
 
