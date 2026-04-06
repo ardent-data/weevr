@@ -303,6 +303,21 @@ class TestNormalizeTableNameNewStrategies:
         with pytest.raises(ConfigError, match="drop.*table"):
             normalize_table_name("Select", config)
 
+    def test_rename_fallback_drop_raises(self):
+        """Rename with fallback=drop raises ConfigError for table names."""
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            tables=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_table"},
+                fallback="drop",
+            ),
+        )
+        with pytest.raises(ConfigError, match="drop.*table"):
+            normalize_table_name("Order", config)
+
 
 class TestNamingConfig:
     """Test NamingConfig model."""

@@ -183,7 +183,11 @@ write -> finalize
 4. Run pipeline steps against the working DataFrame
 5. Evaluate validation rules; quarantine or abort on failures
 6. Apply column and table naming normalization, including
-   reserved word protection (if configured)
+   reserved word protection (if configured). Seven strategies
+   are available: `quote`, `prefix`, `suffix`, `error`,
+   `rename`, `revert`, and `drop`. See
+   [configuration keys](../reference/configuration-keys.md#reservedwordconfig)
+   for details.
 7. Compute business keys and change detection hashes
 8. Resolve the target write path
 9. Apply target column mapping

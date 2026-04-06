@@ -392,6 +392,8 @@ def normalize_table_name(name: str, config: NamingConfig) -> str:
     if config.reserved_words is not None:
         if config.reserved_words.strategy == "drop":
             raise ConfigError("Reserved word strategy 'drop' is not valid for table names")
+        if config.reserved_words.strategy == "rename" and config.reserved_words.fallback == "drop":
+            raise ConfigError("Reserved word fallback 'drop' is not valid for table names")
         effective_words = resolve_effective_words(config.reserved_words)
         if result.lower() in effective_words:
             # Build a single-entry renames dict for dispatch

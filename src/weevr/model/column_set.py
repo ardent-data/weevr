@@ -227,6 +227,7 @@ class ReservedWordConfig(FrozenBase):
         description=(
             "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``."
             " Cannot be ``rename`` (no nesting)."
+            " ``drop`` is not valid when applied to table names."
         ),
     )
     preset: list[ReservedWordPreset] | None = Field(
