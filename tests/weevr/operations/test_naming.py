@@ -595,6 +595,100 @@ class TestNormalizeColumnsReservedWords:
             normalize_columns(df, config)
         assert any("drop" in msg.lower() for msg in caplog.messages)
 
+    def test_rename_strategy_mapped(self, spark):
+        """Rename strategy applies rename_map for collisions."""
+        df = spark.createDataFrame([(1, 2)], ["select", "amount"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_col"},
+            ),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_col", "amount"]
+
+    def test_rename_strategy_fallback_default_quote(self, spark):
+        """Rename strategy falls back to quote for unmapped collisions."""
+        df = spark.createDataFrame([(1, 2)], ["select", "from"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_col"},
+                # fallback defaults to "quote" — from stays unchanged
+            ),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_col", "from"]
+
+    def test_rename_strategy_fallback_error(self, spark):
+        """Rename strategy with fallback=error raises for unmapped collisions."""
+        df = spark.createDataFrame([(1, 2)], ["select", "from"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_col"},
+                fallback="error",
+            ),
+        )
+        with pytest.raises(ConfigError, match="from"):
+            normalize_columns(df, config)
+
+    def test_rename_strategy_fallback_prefix(self, spark):
+        """Rename strategy with fallback=prefix prepends prefix for unmapped."""
+        df = spark.createDataFrame([(1, 2)], ["select", "from"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_col"},
+                fallback="prefix",
+            ),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_col", "_from"]
+
+    def test_rename_strategy_fallback_suffix(self, spark):
+        """Rename strategy with fallback=suffix appends suffix for unmapped."""
+        df = spark.createDataFrame([(1, 2)], ["select", "from"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_col"},
+                fallback="suffix",
+            ),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_col", "from_col"]
+
+    def test_rename_strategy_non_colliding_unchanged(self, spark):
+        """Rename strategy leaves non-colliding names unchanged."""
+        df = spark.createDataFrame([(1, 2, 3)], ["select", "amount", "total"])
+        from weevr.model.column_set import ReservedWordConfig
+
+        config = NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            reserved_words=ReservedWordConfig(
+                strategy="rename",
+                rename_map={"select": "select_col"},
+            ),
+        )
+        result = normalize_columns(df, config)
+        assert result.columns == ["select_col", "amount", "total"]
+
 
 @pytest.mark.spark
 class TestNormalizeColumnsPresetIntegration:

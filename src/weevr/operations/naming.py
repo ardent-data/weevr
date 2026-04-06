@@ -222,6 +222,41 @@ def _resolve_drop(
     return updated
 
 
+def _resolve_rename(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Rename strategy: apply rename_map, delegate unmapped to fallback."""
+    rename_map = config.rename_map or {}
+    updated: dict[str, str | None] = {}
+    unmapped: dict[str, str] = {}
+
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            mapped_name = rename_map.get(output.lower())
+            if mapped_name is not None:
+                _log.debug(
+                    "Reserved word protection: '%s' -> '%s' (rename_map)",
+                    output,
+                    mapped_name,
+                )
+                updated[original] = mapped_name
+            else:
+                unmapped[original] = output
+        else:
+            updated[original] = output
+
+    # Delegate unmapped collisions to the fallback strategy
+    if unmapped:
+        fallback = config.fallback or "quote"
+        fallback_fn = _STRATEGY_DISPATCH[fallback]
+        fallback_result = fallback_fn(unmapped, config, effective_words)
+        updated.update(fallback_result)
+
+    return updated
+
+
 _STRATEGY_DISPATCH: dict[
     str,
     Callable[
@@ -233,6 +268,7 @@ _STRATEGY_DISPATCH: dict[
     "prefix": _resolve_prefix,
     "error": _resolve_error,
     "suffix": _resolve_suffix,
+    "rename": _resolve_rename,
     "revert": _resolve_revert,
     "drop": _resolve_drop,
 }
