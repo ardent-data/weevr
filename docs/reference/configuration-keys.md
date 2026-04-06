@@ -415,11 +415,11 @@ Supported `NamingPattern` values: `snake_case`, `camelCase`,
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `strategy` | `str` | `"quote"` | How to handle reserved words |
+| `strategy` | `Literal[7 values]` | `"quote"` | How to handle reserved words |
 | `prefix` | `str` | `"_"` | Prefix when strategy is `prefix` |
 | `suffix` | `str` | `"_col"` | Suffix when strategy is `suffix` |
-| `rename_map` | `dict` | `None` | Explicit collision map for `rename` |
-| `fallback` | `str` | `"quote"` | Fallback for unmapped `rename` collisions |
+| `rename_map` | `dict[str, str]` | `None` | Explicit collision map for `rename` |
+| `fallback` | `Literal[6 values]` | `"quote"` | Fallback for unmapped `rename` collisions |
 | `preset` | `str \| list` | `None` | Built-in word list presets |
 | `extend` | `list[str]` | `[]` | Extra words to treat as reserved |
 | `exclude` | `list[str]` | `[]` | Words to remove from check |
@@ -435,6 +435,10 @@ Supported `NamingPattern` values: `snake_case`, `camelCase`,
 | `rename` | Apply `rename_map`; unmapped use `fallback` |
 | `revert` | Discard the rename, keep pre-normalization name |
 | `drop` | Remove colliding columns (not valid for tables) |
+
+The `drop` strategy is not valid for table names — neither as a
+direct `strategy` nor as a `fallback`. Both raise `ConfigError`
+at runtime in `normalize_table_name`.
 
 #### Presets
 

@@ -2831,7 +2831,7 @@
               }
             ],
             "default": "quote",
-            "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting).",
+            "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting). ``drop`` is not valid when applied to table names.",
             "title": "Fallback"
           },
           "preset": {
@@ -5833,7 +5833,7 @@
               }
             ],
             "default": "quote",
-            "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting).",
+            "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting). ``drop`` is not valid when applied to table names.",
             "title": "Fallback"
           },
           "preset": {
@@ -7294,7 +7294,7 @@
               }
             ],
             "default": "quote",
-            "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting).",
+            "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting). ``drop`` is not valid when applied to table names.",
             "title": "Fallback"
           },
           "preset": {

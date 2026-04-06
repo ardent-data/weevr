@@ -319,8 +319,9 @@ Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
 Strategies: `quote`, `prefix`, `suffix`, `error`, `rename`,
 `revert`, `drop`. The `rename` strategy requires `rename_map`
 (non-empty dict). The `drop` strategy is not valid for table
-names. See [Configuration Keys](../configuration-keys.md) for
-full strategy descriptions and YAML examples.
+names — neither as a direct `strategy` nor as a `fallback`.
+See [Configuration Keys](../configuration-keys.md) for full
+strategy descriptions and YAML examples.
 
 ---
 
