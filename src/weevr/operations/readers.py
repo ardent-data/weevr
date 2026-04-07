@@ -406,6 +406,7 @@ def read_cdc_source(
             watermark_type=load_config.watermark_type,
             last_value=prior_state.last_value,
             inclusive=load_config.watermark_inclusive,
+            watermark_format=load_config.watermark_format,
         )
         df = df.filter(filter_expr)
 
@@ -413,8 +414,22 @@ def read_cdc_source(
     # so D rows still advance the window (DEC-003).
     new_hwm: str | None = None
     if load_config is not None and load_config.watermark_column is not None:
-        hwm_row = df.agg(F.max(F.col(load_config.watermark_column)).alias("hwm")).collect()
+        typed = _typed_watermark_col(
+            load_config.watermark_column,
+            load_config.watermark_type,
+            load_config.watermark_format,
+        )
+        hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
         if hwm_row and hwm_row[0]["hwm"] is not None:
             new_hwm = str(hwm_row[0]["hwm"])
+
+        if load_config.watermark_format is not None:
+            logger.debug(
+                "Thread watermark_format applied: column=%s format=%s prior=%s new=%s",
+                load_config.watermark_column,
+                load_config.watermark_format,
+                prior_state.last_value if prior_state else None,
+                new_hwm,
+            )
 
     return df, new_hwm
