@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.16/release-notes/1.2.1/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.16/release-notes/1.16/">
       
       
-        <link rel="prev" href="../1.3/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.2/">
+        <link rel="next" href="../1.15/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.2.1 - weevr</title>
+        <title>1.16 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v121" class="md-skip">
+        <a href="#release-notes-v116" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.2.1
+              1.16
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.16/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -2138,10 +2138,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.16/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.16
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2157,6 +2184,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#declarative-parse-intent-for-string-timestamps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declarative parse intent for string timestamps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Declarative parse intent for string timestamps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-stays-the-same" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stays the same
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canonical-iso-hwm-decoupled-from-the-source-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical ISO HWM, decoupled from the source format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silent-drop-for-unparseable-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silent drop for unparseable rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internal-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backwards-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backwards compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2530,37 +2660,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.2.1
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.2.1/" class="md-nav__link">
         
   
   
@@ -2576,76 +2679,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#bug-fixes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bug Fixes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Bug Fixes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#relative-source-path-resolution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Relative source path resolution
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fabric-runtime-compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fabric runtime compatibility
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2769,22 +2802,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#bug-fixes" class="md-nav__link">
+  <a href="#declarative-parse-intent-for-string-timestamps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bug Fixes
+        Declarative parse intent for string timestamps
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Bug Fixes">
+    <nav class="md-nav" aria-label="Declarative parse intent for string timestamps">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#relative-source-path-resolution" class="md-nav__link">
+  <a href="#what-stays-the-same" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Relative source path resolution
+        What stays the same
       
     </span>
   </a>
@@ -2792,10 +2825,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fabric-runtime-compatibility" class="md-nav__link">
+  <a href="#canonical-iso-hwm-decoupled-from-the-source-format" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fabric runtime compatibility
+        Canonical ISO HWM, decoupled from the source format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silent-drop-for-unparseable-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Silent drop for unparseable rows
       
     </span>
   </a>
@@ -2808,10 +2852,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#configuration-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        Configuration summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internal-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backwards-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backwards compatibility
       
     </span>
   </a>
@@ -2838,65 +2904,182 @@
   
 
 
-<!-- markdownlint-disable MD033 -->
-
-<h1 id="release-notes-v121">Release Notes — v1.2.1<a class="headerlink" href="#release-notes-v121" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>A patch release with bug fixes for Fabric runtime compatibility and config
-resolution.</p>
+<h1 id="release-notes-v116">Release Notes — v1.16<a class="headerlink" href="#release-notes-v116" title="Permanent link">&para;</a></h1>
+<p><strong>Release date:</strong> April 2026</p>
+<p>This release adds a new <strong><code>watermark_format</code></strong> field on <code>load:</code> that
+lets you declare the parse pattern for a string-typed watermark
+column. Sources that land change timestamps as text — SAP extracts
+via Fabric Open Database Mirror, mainframe files, JSON dumps — can
+now drive incremental and generic-CDC reads reliably without
+depending on Spark's implicit string-to-timestamp coercion or
+lexicographic ordering.</p>
 <hr />
-<h2 id="bug-fixes">Bug Fixes<a class="headerlink" href="#bug-fixes" title="Permanent link">&para;</a></h2>
-<h3 id="relative-source-path-resolution">Relative source path resolution<a class="headerlink" href="#relative-source-path-resolution" title="Permanent link">&para;</a></h3>
-<p>Source paths declared as relative (e.g., <code>data/customers.csv</code>) are now
-resolved against the project root directory. Previously, relative paths
-could resolve against the working directory of the calling process, which
-produced inconsistent behavior across Fabric notebooks and local
-development environments.</p>
-<h3 id="fabric-runtime-compatibility">Fabric runtime compatibility<a class="headerlink" href="#fabric-runtime-compatibility" title="Permanent link">&para;</a></h3>
-<p>Several fixes improve compatibility with Microsoft Fabric Runtime 1.3:</p>
+<h2 id="declarative-parse-intent-for-string-timestamps">Declarative parse intent for string timestamps<a class="headerlink" href="#declarative-parse-intent-for-string-timestamps" title="Permanent link">&para;</a></h2>
+<p>Prior to v1.16, weevr built the watermark filter as
+<code>col &gt; lit(last_value).cast('timestamp')</code> and captured the new
+high-water mark via <code>max(col)</code>. For a real Delta <code>TIMESTAMP</code> column
+this is perfect: the filter pushes down to file stats and <code>max()</code>
+returns a true chronological maximum. For a string column the same
+code path has two quiet failure modes:</p>
+<ol>
+<li>The filter depends on Spark's implicit string parser, which
+   accepts some shapes and silently drops others as NULL — the user
+   has no way to say "this string is in <em>this</em> format".</li>
+<li><code>max()</code> over a string column returns the <em>lexicographic</em> maximum,
+   which matches the chronological maximum only for fixed-width
+   year-first formats. Anything else — trailing <code>Z</code>, variable
+   fractional-second widths, offset notation — can silently advance
+   the HWM to the wrong row.</li>
+</ol>
+<p><code>watermark_format</code> fixes both at the source. When set, the engine
+wraps the column once in <code>to_timestamp(col, watermark_format)</code> for
+<code>watermark_type: timestamp</code> or <code>to_date(col, watermark_format)</code> for
+<code>watermark_type: date</code>, then reuses the typed expression for both
+the filter predicate and the HWM aggregate. A single shared helper,
+<code>_typed_watermark_col</code>, keeps the <code>incremental_watermark</code> and generic
+CDC code paths in lockstep.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cdc</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">cdc</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">operation_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">OPFLAG</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">insert_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;I&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">update_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;U&quot;</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">delete_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;D&quot;</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">on_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AEDATTM</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">watermark_format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;yyyy-MM-dd</span><span class="nv"> </span><span class="s">HH:mm:ss.SSSSSX&quot;</span>
+</code></pre></div>
+<p>The same field works identically in <code>mode: incremental_watermark</code>,
+for threads that use an append-only event log with a string
+timestamp.</p>
+<h3 id="what-stays-the-same">What stays the same<a class="headerlink" href="#what-stays-the-same" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Variable namespace preservation</strong> — <code>var.*</code> references in config
-  expressions are now passed through to <code>VariableContext</code> for runtime
-  resolution, instead of being eagerly resolved during config parsing.</li>
-<li><strong>Weave reference resolution</strong> — Name-only entries in a loom's <code>weaves</code>
-  list are now resolved by convention to <code>{name}.weave</code>, matching the
-  documented behavior.</li>
-<li><strong>Delta table operations</strong> — Improved compatibility with Delta Lake APIs
-  as bundled in the Fabric runtime for table property reads and writes.</li>
-<li><strong>Join null handling</strong> — Null-safe join key replacement is more robust
-  when source columns contain unexpected types.</li>
-<li><strong>Writer compatibility</strong> — Partition overwrite and merge operations use
-  Spark APIs that are available across Fabric runtime versions.</li>
+<li>Delta-typed <code>TIMESTAMP</code> and <code>DATE</code> columns should <strong>not</strong> set
+  <code>watermark_format</code>. The implicit-cast path is already correct and
+  keeps Delta predicate pushdown available — wrapping a native
+  temporal column in <code>to_timestamp</code> would defeat file skipping.</li>
+<li>Existing thread configs that don't set <code>watermark_format</code> are
+  byte-identical to v1.15. A snapshot regression guard locks the
+  legacy <code>build_watermark_filter</code> expression shape.</li>
+<li>The Delta CDF preset (<code>cdc.preset: delta_cdf</code>) is unchanged and
+  still ignores column-based watermarks — CDF's commit-version
+  tracking is the incremental mechanism for that path.</li>
+<li>Numeric watermark types (<code>int</code>, <code>long</code>) are unaffected.
+  <code>watermark_format</code> is meaningless for them and is rejected at
+  config-parse time if you try to pair them.</li>
+<li>Failure semantics mirror v1.15: HWM is persisted only after a
+  successful write, and a mid-run failure leaves the prior HWM in
+  place so the next run idempotently reprocesses the same window.</li>
 </ul>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All existing configurations continue to work without
-modification.</p>
+<h3 id="canonical-iso-hwm-decoupled-from-the-source-format">Canonical ISO HWM, decoupled from the source format<a class="headerlink" href="#canonical-iso-hwm-decoupled-from-the-source-format" title="Permanent link">&para;</a></h3>
+<p>The persisted high-water mark is stored as the Python <code>str()</code> of the
+Spark <code>Timestamp</code> — a canonical ISO form like
+<code>"2026-01-02 10:00:00.12345"</code> — regardless of the source format. On
+the next run the stored HWM is cast back through the existing
+<code>F.lit(...).cast(watermark_type)</code> path, which accepts canonical ISO
+for both <code>timestamp</code> and <code>date</code>. This decouples persisted state from
+source layout: changing <code>watermark_format</code> on a later run does not
+require replaying state, and the watermark store format stays stable
+across schema evolution on the source side.</p>
+<h3 id="silent-drop-for-unparseable-rows">Silent drop for unparseable rows<a class="headerlink" href="#silent-drop-for-unparseable-rows" title="Permanent link">&para;</a></h3>
+<p>Rows whose values fail the declared pattern resolve to NULL under
+Spark's default <code>to_timestamp</code>/<code>to_date</code> semantics. NULL fails the
+<code>col &gt; hwm</code> comparison and is skipped by <code>max()</code>, so unparseable
+rows are silently excluded from both the filter and the HWM. This
+matches the principle of "make the first-run symptom loud": if the
+pattern is completely wrong, the first run reads zero rows, captures
+no HWM, persists nothing, and the thread telemetry shows the drop
+clearly. A targeted DEBUG log line is emitted from the reader
+whenever <code>watermark_format</code> is active, capturing the thread column,
+format, prior HWM, and new HWM. Enable DEBUG on
+<code>weevr.operations.readers</code> to see it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;weevr.operations.readers&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+</code></pre></div>
+<p>The log line fires symmetrically from both <code>read_source_incremental</code>
+and <code>read_cdc_source</code> so downstream log analysis can correlate
+watermark behavior across load modes.</p>
+<hr />
+<h2 id="configuration-summary">Configuration summary<a class="headerlink" href="#configuration-summary" title="Permanent link">&para;</a></h2>
+<p>One new field and one new cross-field rule on <code>LoadConfig</code>:</p>
 <table>
 <thead>
 <tr>
-<th>Component</th>
-<th>Version</th>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Effect</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Python</td>
-<td>3.11</td>
-</tr>
-<tr>
-<td>PySpark</td>
-<td>3.5.x</td>
-</tr>
-<tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
+<td><code>watermark_format</code></td>
+<td><code>str</code></td>
+<td><code>None</code></td>
+<td>Spark <code>DateTimeFormatter</code> pattern used to parse a string-typed <code>watermark_column</code>. Only valid with <code>watermark_type</code> of <code>"timestamp"</code> or <code>"date"</code>.</td>
 </tr>
 </tbody>
 </table>
+<p>Cross-field rules now enforced by <code>LoadConfig</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>watermark_format</code> set without <code>watermark_column</code></td>
+<td>Rejected at config load</td>
+</tr>
+<tr>
+<td><code>watermark_format</code> + <code>watermark_type: int</code> or <code>long</code></td>
+<td>Rejected at config load</td>
+</tr>
+<tr>
+<td><code>watermark_format</code> + <code>watermark_type: timestamp</code> or <code>date</code></td>
+<td>Accepted</td>
+</tr>
+</tbody>
+</table>
+<p>See the
+<a href="../../reference/configuration-keys/#loadconfig">load configuration reference</a>
+for the full field table and the
+<a href="../../concepts/execution-modes/">execution modes guide</a> for a
+worked SAP-style example including the "zero rows through"
+diagnostic workflow.</p>
+<h2 id="internal-changes">Internal changes<a class="headerlink" href="#internal-changes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>New module-private <code>_typed_watermark_col(column, type, format)</code>
+  helper in <code>src/weevr/operations/readers.py</code> that returns a bare
+  <code>F.col</code> when no format is set, wraps in <code>to_timestamp</code> for
+  <code>timestamp</code> type, wraps in <code>to_date</code> for <code>date</code> type, and raises
+  <code>ValueError</code> for any other type as a defensive guard.</li>
+<li><code>build_watermark_filter</code> gained an optional keyword-only
+  <code>watermark_format</code> parameter, default <code>None</code>. The signature
+  change is backwards compatible — existing callers that do not
+  pass the argument see no change in behavior.</li>
+<li><code>read_source_incremental</code> and the generic-CDC branch of
+  <code>read_cdc_source</code> thread <code>load_config.watermark_format</code> through
+  to both the filter and the HWM aggregate. The CDF preset branch
+  was intentionally left untouched.</li>
+<li><code>src/weevr/engine/executor.py</code> was <strong>not</strong> modified — both reader
+  functions already took <code>load_config</code>, so the new field flows
+  through implicitly.</li>
+</ul>
+<h2 id="backwards-compatibility">Backwards compatibility<a class="headerlink" href="#backwards-compatibility" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Existing configurations keep working without changes.</li>
+<li>No new state schema. Persisted HWM round-trips through both
+  <code>table_properties</code> and <code>metadata_table</code> backends in the same
+  canonical ISO form that the engine already used.</li>
+<li>No new credentials, no new session-state mutation. The engine
+  does not pin <code>spark.sql.legacy.timeParserPolicy</code>; sessions that
+  override it observe whatever parse semantics Spark applies under
+  that policy.</li>
+</ul>
 
 
 
