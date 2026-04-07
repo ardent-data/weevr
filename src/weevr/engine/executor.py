@@ -343,15 +343,25 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 primary_alias = next(iter(thread.sources))
                 primary_source = thread.sources[primary_alias]
 
+                # last_version is only meaningful for the CDF preset path,
+                # where prior_state.last_value is a stringified commit version.
+                # For generic CDC, the persisted value is a watermark string
+                # (timestamp / date / int / long) and must not be coerced to int.
                 last_version: int | None = None
-                if prior_state is not None:
+                if thread.load.cdc.preset == "delta_cdf" and prior_state is not None:
                     try:
                         last_version = int(prior_state.last_value)
                     except (ValueError, TypeError):
                         last_version = None
 
-                primary_df = read_cdc_source(
-                    spark, primary_source, thread.load.cdc, last_version, connections=connections
+                primary_df, cdc_new_hwm = read_cdc_source(
+                    spark,
+                    primary_source,
+                    thread.load.cdc,
+                    last_version,
+                    load_config=thread.load,
+                    prior_state=prior_state,
+                    connections=connections,
                 )
 
                 # Capture new CDF version if Delta CDF
@@ -364,6 +374,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
                     if max_row and max_row[0]["mv"] is not None:
                         new_hwm = str(max_row[0]["mv"])
+                elif cdc_new_hwm is not None:
+                    # Generic CDC + watermark composition: HWM was captured
+                    # from the filtered DataFrame at read time. Persistence
+                    # still goes through the existing save_watermark path
+                    # below, which keys on `new_hwm is not None`.
+                    new_hwm = cdc_new_hwm
 
                 # Read secondary sources normally (skip lookup-resolved ones)
                 sources_map = {primary_alias: primary_df}

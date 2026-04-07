@@ -1,6 +1,7 @@
 """Tests for source readers (Spark integration tests)."""
 
 import json
+from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,8 +11,10 @@ from pyspark.sql import functions as F
 from spark_helpers import create_delta_table
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.connection import OneLakeConnection
+from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
-from weevr.operations.readers import read_source, read_sources
+from weevr.operations.readers import read_cdc_source, read_source, read_sources
+from weevr.state.watermark import WatermarkState
 
 pytestmark = pytest.mark.spark
 
@@ -692,3 +695,305 @@ class TestGeneratedSourceIntegration:
         assert cte_df.count() == 7
         assert "week_num" in cte_df.columns
         assert "dt" in cte_df.columns
+
+
+def _generic_cdc_config() -> CdcConfig:
+    return CdcConfig(
+        operation_column="OPFLAG",
+        insert_value="I",
+        update_value="U",
+        delete_value="D",
+    )
+
+
+def _watermark_state(value: str, type_: str = "timestamp") -> WatermarkState:
+    return WatermarkState(
+        thread_name="t",
+        watermark_column="AEDATTM",
+        watermark_type=type_,  # type: ignore[arg-type]
+        last_value=value,
+        last_updated=datetime(2026, 1, 1),
+    )
+
+
+def _cdc_load_config(
+    *, watermark_column: str | None = "AEDATTM", inclusive: bool = False
+) -> LoadConfig:
+    return LoadConfig(
+        mode="cdc",
+        cdc=_generic_cdc_config(),
+        watermark_column=watermark_column,
+        watermark_type="timestamp" if watermark_column else None,
+        watermark_inclusive=inclusive,
+    )
+
+
+class TestReadCdcSourceGenericWatermark:
+    """Unit tests for ``read_cdc_source`` generic CDC + watermark composition.
+
+    Mirrors the ``read_source_incremental`` pattern: filter by prior HWM,
+    capture new HWM from the filtered DataFrame *before* operation routing.
+    Empty windows return ``None`` so the executor leaves prior state alone.
+    """
+
+    def test_first_run_with_rows_captures_max(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("cdc_first_run_rows")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-01 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-02 10:00:00"},
+            {"id": 3, "OPFLAG": "D", "AEDATTM": "2026-01-03 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config()
+
+        df, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=None,
+        )
+
+        assert df.count() == 3
+        assert new_hwm is not None
+        assert "2026-01-03" in new_hwm
+
+    def test_first_run_empty_source_returns_none_hwm(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """DEC-002: empty first-run source -> capture None, skip persistence."""
+        path = tmp_delta_path("cdc_first_run_empty")
+        empty_df = spark.createDataFrame([], "id INT, OPFLAG STRING, AEDATTM TIMESTAMP")
+        empty_df.write.format("delta").save(path)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config()
+
+        df, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=None,
+        )
+        assert df.count() == 0
+        assert new_hwm is None
+
+    def test_subsequent_run_filters_and_captures_new_max(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("cdc_subsequent")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-01 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-02 10:00:00"},
+            {"id": 3, "OPFLAG": "U", "AEDATTM": "2026-01-05 10:00:00"},
+            {"id": 4, "OPFLAG": "D", "AEDATTM": "2026-01-07 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config()
+        prior = _watermark_state("2026-01-02 10:00:00")
+
+        df, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=prior,
+        )
+
+        assert df.count() == 2  # rows 3 and 4 only (strict greater-than)
+        assert new_hwm is not None
+        assert "2026-01-07" in new_hwm
+
+    def test_subsequent_run_empty_window_returns_none_hwm(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("cdc_empty_window")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-01 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-02 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config()
+        prior = _watermark_state("2026-12-31 23:59:59")
+
+        df, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=prior,
+        )
+
+        assert df.count() == 0
+        assert new_hwm is None
+
+    def test_inclusive_boundary_row_included(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("cdc_inclusive")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-02 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-03 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config(inclusive=True)
+        prior = _watermark_state("2026-01-02 10:00:00")
+
+        df, _ = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=prior,
+        )
+        # Inclusive: boundary row at 2026-01-02 10:00:00 is kept
+        assert df.count() == 2
+
+    def test_exclusive_boundary_row_excluded(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("cdc_exclusive")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-02 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-03 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config(inclusive=False)
+        prior = _watermark_state("2026-01-02 10:00:00")
+
+        df, _ = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=prior,
+        )
+        # Exclusive: boundary row excluded; only row at 2026-01-03 returned
+        assert df.count() == 1
+
+    def test_hwm_capture_includes_delete_rows(self, spark: SparkSession, tmp_delta_path) -> None:
+        """DEC-003: HWM is computed pre-routing — D rows participate."""
+        path = tmp_delta_path("cdc_hwm_with_deletes")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-01 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-02 10:00:00"},
+            # D row carries the maximum timestamp
+            {"id": 3, "OPFLAG": "D", "AEDATTM": "2026-01-10 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _cdc_load_config()
+
+        _, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=None,
+        )
+
+        assert new_hwm is not None
+        # The D row's timestamp should be captured even though it would be
+        # routed to a delete operation downstream.
+        assert "2026-01-10" in new_hwm
+
+    @pytest.mark.parametrize(
+        ("watermark_type", "ddl", "row_value", "prior_value", "later_value"),
+        [
+            (
+                "timestamp",
+                "id INT, OPFLAG STRING, AEDATTM TIMESTAMP",
+                datetime(2026, 1, 5, 10, 0, 0),
+                "2026-01-01 10:00:00",
+                "2026-01-05",
+            ),
+            (
+                "date",
+                "id INT, OPFLAG STRING, AEDATTM DATE",
+                date(2026, 1, 5),
+                "2026-01-01",
+                "2026-01-05",
+            ),
+            (
+                "long",
+                "id INT, OPFLAG STRING, AEDATTM BIGINT",
+                100,
+                10,
+                "100",
+            ),
+            (
+                "int",
+                "id INT, OPFLAG STRING, AEDATTM INT",
+                42,
+                10,
+                "42",
+            ),
+        ],
+    )
+    def test_all_watermark_types_supported(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        watermark_type: str,
+        ddl: str,
+        row_value,
+        prior_value,
+        later_value: str,
+    ) -> None:
+        """DEC-004 (widened): timestamp, date, long, int all work."""
+        path = tmp_delta_path(f"cdc_type_{watermark_type}")
+        df_in = spark.createDataFrame([(1, "I", row_value)], ddl)
+        df_in.write.format("delta").save(path)
+
+        source = Source(type="delta", alias=path)
+        load = LoadConfig(
+            mode="cdc",
+            cdc=_generic_cdc_config(),
+            watermark_column="AEDATTM",
+            watermark_type=watermark_type,  # type: ignore[arg-type]
+        )
+        prior = WatermarkState(
+            thread_name="t",
+            watermark_column="AEDATTM",
+            watermark_type=watermark_type,  # type: ignore[arg-type]
+            last_value=str(prior_value),
+            last_updated=datetime(2026, 1, 1),
+        )
+
+        df, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=prior,
+        )
+
+        assert df.count() == 1
+        assert new_hwm is not None
+        assert later_value in new_hwm
+
+    def test_no_watermark_config_reads_full_source(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """EC-013: generic CDC without watermark_column reads full source."""
+        path = tmp_delta_path("cdc_no_watermark")
+        data = [
+            {"id": 1, "OPFLAG": "I", "AEDATTM": "2026-01-01 10:00:00"},
+            {"id": 2, "OPFLAG": "U", "AEDATTM": "2026-01-02 10:00:00"},
+            {"id": 3, "OPFLAG": "D", "AEDATTM": "2026-01-03 10:00:00"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = LoadConfig(mode="cdc", cdc=_generic_cdc_config())
+
+        df, new_hwm = read_cdc_source(
+            spark,
+            source,
+            load.cdc,  # type: ignore[arg-type]
+            load_config=load,
+            prior_state=None,
+        )
+
+        assert df.count() == 3
+        assert new_hwm is None

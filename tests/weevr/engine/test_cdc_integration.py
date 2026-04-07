@@ -284,7 +284,7 @@ class TestCdcDeltaCdf:
         # Read CDF changes starting after our initial version
         source = Source(type="delta", alias=src)
         cdc_config = CdcConfig(preset="delta_cdf")
-        cdf_df = read_cdc_source(spark, source, cdc_config, last_version=initial_version)
+        cdf_df, _ = read_cdc_source(spark, source, cdc_config, last_version=initial_version)
 
         # Verify CDF columns present
         assert "_change_type" in cdf_df.columns
@@ -319,7 +319,7 @@ class TestCdcDeltaCdf:
         # Read CDF
         source = Source(type="delta", alias=src)
         cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
-        cdf_df = read_cdc_source(spark, source, cdc_config, last_version=initial_version)
+        cdf_df, _ = read_cdc_source(spark, source, cdc_config, last_version=initial_version)
 
         # Merge CDF changes to target
         write_config = WriteConfig(mode="merge", match_keys=["id"])
