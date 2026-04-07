@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/ardent-data/weevr/compare/weevr-v1.14.0...weevr-v1.15.0) (2026-04-07)
+
+
+### Features
+
+* **engine:** compose watermark_column with generic cdc reads ([#136](https://github.com/ardent-data/weevr/issues/136)) ([0d3469d](https://github.com/ardent-data/weevr/commit/0d3469d82dc34908ea3a8aebcb05b291e012f3e5))
+
 ## [1.14.0](https://github.com/ardent-data/weevr/compare/weevr-v1.13.0...weevr-v1.14.0) (2026-04-07)
 
 
