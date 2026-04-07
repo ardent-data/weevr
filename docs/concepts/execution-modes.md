@@ -195,7 +195,14 @@ write:
   on_no_match_source: soft_delete
   soft_delete_column: is_deleted
   soft_delete_value: true
+  soft_delete_active_value: false   # explicit value on retained rows
 ```
+
+`soft_delete_active_value` is optional — when set, retained rows have
+the column populated with that value on every merge. When omitted,
+active rows keep whatever value the source supplied (often `null`),
+which is the right choice if downstream queries treat `null` as "not
+deleted".
 
 Merge is idempotent by match key -- rerunning with the same data produces
 the same target state.

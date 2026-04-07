@@ -587,6 +587,25 @@ Deployment unit grouping one or more weaves.
 
 ---
 
+## OneLakeConnection
+
+Named connection declaration for Fabric OneLake sources and targets.
+Declared in the `connections:` block at loom, weave, or thread level
+and cascaded through the standard merge rules.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `Literal["onelake"]` | *required* | Connection type identifier. Only `onelake` is supported. |
+| `workspace` | `str` | *required* | OneLake workspace GUID or `${param.*}` variable reference |
+| `lakehouse` | `str` | *required* | OneLake lakehouse GUID or `${param.*}` variable reference |
+| `default_schema` | `str` | `None` | Default schema applied to tables in this connection when none is set |
+
+`workspace` and `lakehouse` both support `${param.*}` and
+`${variable.*}` substitution so one declaration can serve multiple
+environments.
+
+---
+
 ## ColumnSet
 
 Named column mapping sourced from Delta, YAML, or runtime parameters.
