@@ -1,0 +1,6629 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.15/reference/api/errors/">
+      
+      
+        <link rel="prev" href="../state/">
+      
+      
+        <link rel="next" href="../../configuration-keys/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Errors - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/mkdocs_d2_plugin.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#errors-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Errors
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../yaml-schema/thread/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../release-notes/1.14/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../yaml-schema/loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context & Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#weevr.errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __all__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ConfigError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigParseError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigParseError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigSchemaError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigSchemaError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigVersionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigVersionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.DataValidationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExecutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ExecutionError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExecutionError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExecutionError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExportError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ExportError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExportError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExportError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.HookError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HookError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HookError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.HookError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.HookError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.InheritanceError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InheritanceError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.LookupResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LookupResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ModelValidationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ReferenceResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReferenceResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SchemaDriftError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchemaDriftError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SchemaDriftError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SchemaDriftError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SchemaDriftError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SparkError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.StateError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StateError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StateError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.StateError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.StateError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.VariableResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VariableResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WarpEnforcementError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WarpEnforcementError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WarpEnforcementError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WarpEnforcementError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WarpEnforcementError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WeevError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeevError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WeevError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WeevError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WeevError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-troubleshooting-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Troubleshooting Catalog
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Error Troubleshooting Catalog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exception-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exception hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weeverror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeevError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configparseerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigParseError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configschemaerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigSchemaError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configversionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigVersionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variableresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VariableResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#referenceresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReferenceResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inheritanceerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InheritanceError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modelvalidationerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookupresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LookupResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparkerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stateerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StateError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hookerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HookError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporterror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warpenforcementerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WarpEnforcementError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schemadrifterror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchemaDriftError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datavalidationerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../json-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/engine-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/config-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/telemetry-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/exports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/audit-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/dimension-modeling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Modeling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/fact-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/sub-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sub-Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/thread-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/warps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Warps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/schema-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.14/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.14
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.13/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.13
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.12
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.11
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.10/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.10
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.9
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#weevr.errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.__all__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __all__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ConfigError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigParseError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigParseError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigSchemaError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigSchemaError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ConfigVersionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigVersionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.DataValidationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExecutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ExecutionError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExecutionError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExecutionError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExportError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ExportError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExportError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ExportError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.HookError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HookError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HookError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.HookError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.HookError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.InheritanceError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InheritanceError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.LookupResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LookupResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ModelValidationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.ReferenceResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReferenceResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SchemaDriftError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchemaDriftError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SchemaDriftError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SchemaDriftError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SchemaDriftError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.SparkError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.StateError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StateError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StateError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.StateError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.StateError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.VariableResolutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VariableResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WarpEnforcementError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WarpEnforcementError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WarpEnforcementError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WarpEnforcementError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WarpEnforcementError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WeevError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeevError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WeevError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WeevError.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.errors.WeevError.__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __str__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-troubleshooting-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Troubleshooting Catalog
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Error Troubleshooting Catalog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exception-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exception hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weeverror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeevError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configparseerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigParseError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configschemaerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigSchemaError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configversionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigVersionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variableresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VariableResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#referenceresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReferenceResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inheritanceerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InheritanceError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modelvalidationerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookupresolutionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LookupResolutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparkerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stateerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StateError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hookerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HookError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exporterror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExportError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warpenforcementerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WarpEnforcementError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schemadrifterror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchemaDriftError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datavalidationerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataValidationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="errors-api">Errors API<a class="headerlink" href="#errors-api" title="Permanent link">&para;</a></h1>
+<p>The <code>weevr.errors</code> module defines the exception hierarchy used throughout
+the framework. All weevr-specific exceptions inherit from a common base
+class for consistent error handling.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="weevr.errors" class="doc doc-heading">
+            <code>weevr.errors</code>
+
+
+<a href="#weevr.errors" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Error handling for weevr.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="weevr.errors.__all__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;WeevError&#39;</span><span class="p">,</span> <span class="s1">&#39;ConfigError&#39;</span><span class="p">,</span> <span class="s1">&#39;ConfigParseError&#39;</span><span class="p">,</span> <span class="s1">&#39;ConfigSchemaError&#39;</span><span class="p">,</span> <span class="s1">&#39;ConfigVersionError&#39;</span><span class="p">,</span> <span class="s1">&#39;VariableResolutionError&#39;</span><span class="p">,</span> <span class="s1">&#39;ReferenceResolutionError&#39;</span><span class="p">,</span> <span class="s1">&#39;InheritanceError&#39;</span><span class="p">,</span> <span class="s1">&#39;ModelValidationError&#39;</span><span class="p">,</span> <span class="s1">&#39;ExecutionError&#39;</span><span class="p">,</span> <span class="s1">&#39;ExportError&#39;</span><span class="p">,</span> <span class="s1">&#39;SparkError&#39;</span><span class="p">,</span> <span class="s1">&#39;StateError&#39;</span><span class="p">,</span> <span class="s1">&#39;HookError&#39;</span><span class="p">,</span> <span class="s1">&#39;LookupResolutionError&#39;</span><span class="p">,</span> <span class="s1">&#39;DataValidationError&#39;</span><span class="p">,</span> <span class="s1">&#39;WarpEnforcementError&#39;</span><span class="p">,</span> <span class="s1">&#39;SchemaDriftError&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#weevr.errors.__all__" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ConfigError" class="doc doc-heading">
+            <code>ConfigError</code>
+
+
+<a href="#weevr.errors.ConfigError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="WeevError (weevr.errors.exceptions.WeevError)" href="#weevr.errors.WeevError">WeevError</a></code></p>
+
+
+
+        <p>Base exception for configuration-related errors.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.ConfigError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config_key</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.ConfigError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize ConfigError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>file_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the config file where the error occurred</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config_key</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Specific config key that caused the error</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.ConfigError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.ConfigError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with context.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ConfigParseError" class="doc doc-heading">
+            <code>ConfigParseError</code>
+
+
+<a href="#weevr.errors.ConfigParseError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when a YAML config file cannot be read or parsed.</p>
+<p>Common triggers include missing files, empty content, invalid YAML syntax,
+non-dictionary top-level structures, and malformed <code>config_version</code> fields.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ConfigSchemaError" class="doc doc-heading">
+            <code>ConfigSchemaError</code>
+
+
+<a href="#weevr.errors.ConfigSchemaError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when config structure does not match the expected Pydantic schema.</p>
+<p>This covers missing required fields, unknown config types, parameter type
+mismatches, and invalid format for typed parameters (dates, timestamps).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ConfigVersionError" class="doc doc-heading">
+            <code>ConfigVersionError</code>
+
+
+<a href="#weevr.errors.ConfigVersionError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when <code>config_version</code> specifies an unsupported major version.</p>
+<p>weevr validates that the declared version is compatible with the current
+parser. Only major version <code>1.x</code> is supported.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.DataValidationError" class="doc doc-heading">
+            <code>DataValidationError</code>
+
+
+<a href="#weevr.errors.DataValidationError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="WeevError (weevr.errors.exceptions.WeevError)" href="#weevr.errors.WeevError">WeevError</a></code></p>
+
+
+
+        <p>Raised when a fatal-severity validation rule has failing rows.</p>
+<p>When any row fails a validation rule declared with <code>severity: fatal</code>,
+the thread aborts immediately without writing data. Downgrade to
+<code>severity: error</code> to quarantine failing rows instead of aborting.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ExecutionError" class="doc doc-heading">
+            <code>ExecutionError</code>
+
+
+<a href="#weevr.errors.ExecutionError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="WeevError (weevr.errors.exceptions.WeevError)" href="#weevr.errors.WeevError">WeevError</a></code></p>
+
+
+
+        <p>Base exception for execution-time errors.</p>
+<p>Carries optional execution context to pinpoint where a failure occurred
+within a thread pipeline.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.ExecutionError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">step_index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">step_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source_name</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.ExecutionError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize ExecutionError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the thread where the error occurred.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>step_index</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Zero-based index of the pipeline step that failed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>step_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Step type key (e.g. "filter", "join") that failed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>source_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Source alias that caused the error.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.ExecutionError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.ExecutionError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with execution context.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ExportError" class="doc doc-heading">
+            <code>ExportError</code>
+
+
+<a href="#weevr.errors.ExportError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="#weevr.errors.ExecutionError">ExecutionError</a></code></p>
+
+
+
+        <p>Raised when an export write fails with on_failure: abort.</p>
+<p>Carries export-specific context to identify which export failed
+and what format was being written.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.ExportError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">export_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">export_type</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.ExportError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize ExportError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the thread where the error occurred.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>export_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the export that failed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>export_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Format type of the export (e.g. "parquet", "csv").</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.ExportError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.ExportError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with export context.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.HookError" class="doc doc-heading">
+            <code>HookError</code>
+
+
+<a href="#weevr.errors.HookError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="#weevr.errors.ExecutionError">ExecutionError</a></code></p>
+
+
+
+        <p>Raised when a hook step fails with on_failure: abort.</p>
+<p>Carries hook-specific context to identify which step failed and
+in which phase of the weave lifecycle.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.HookError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hook_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hook_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.HookError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize HookError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hook_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the hook step that failed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hook_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Step type key (e.g. "quality_gate", "sql_statement").</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>phase</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Execution phase ("pre" or "post").</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.HookError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.HookError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with hook context.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.InheritanceError" class="doc doc-heading">
+            <code>InheritanceError</code>
+
+
+<a href="#weevr.errors.InheritanceError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when the configuration inheritance cascade fails.</p>
+<p>Reserved for failures during the loom → weave → thread default merging
+process. Not currently raised in v1.0.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.LookupResolutionError" class="doc doc-heading">
+            <code>LookupResolutionError</code>
+
+
+<a href="#weevr.errors.LookupResolutionError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when a thread references a lookup not defined in the weave.</p>
+<p>This is a fail-fast validation error caught during config resolution,
+before any data is read or threads are executed.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ModelValidationError" class="doc doc-heading">
+            <code>ModelValidationError</code>
+
+
+<a href="#weevr.errors.ModelValidationError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when a fully resolved config fails to hydrate into a typed model.</p>
+<p>This occurs after variable resolution and inheritance, when the concrete
+values are validated through the Pydantic domain model (Thread, Weave, or
+Loom). Semantic constraints that span multiple fields are checked here.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.ReferenceResolutionError" class="doc doc-heading">
+            <code>ReferenceResolutionError</code>
+
+
+<a href="#weevr.errors.ReferenceResolutionError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when a <code>ref:</code> entry cannot be loaded or creates a circular chain.</p>
+<p>Common causes include missing referenced files, incorrect relative paths,
+and circular reference chains between weaves or threads.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.SchemaDriftError" class="doc doc-heading">
+            <code>SchemaDriftError</code>
+
+
+<a href="#weevr.errors.SchemaDriftError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="#weevr.errors.ExecutionError">ExecutionError</a></code></p>
+
+
+
+        <p>Raised when schema drift is detected in strict mode with on_drift: error.</p>
+<p>Carries the drift report with details about which extra columns
+were found and the configured drift handling mode.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.SchemaDriftError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">drift_report</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.SchemaDriftError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize SchemaDriftError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the thread where the error occurred.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>drift_report</code>
+            </td>
+            <td>
+                  <code><span title="weevr.model.warp.DriftReport">DriftReport</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DriftReport instance with drift details.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.SchemaDriftError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.SchemaDriftError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with drift info.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.SparkError" class="doc doc-heading">
+            <code>SparkError</code>
+
+
+<a href="#weevr.errors.SparkError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="#weevr.errors.ExecutionError">ExecutionError</a></code></p>
+
+
+
+        <p>Raised for Spark API-level failures during thread execution.</p>
+<p>Intended for errors originating from PySpark operations (reader failures,
+write exceptions, catalyst errors). Reserved for future use — v1.0 uses
+<code>ExecutionError</code> for all runtime failures.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.StateError" class="doc doc-heading">
+            <code>StateError</code>
+
+
+<a href="#weevr.errors.StateError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="#weevr.errors.ExecutionError">ExecutionError</a></code></p>
+
+
+
+        <p>Watermark state persistence errors.</p>
+<p>Raised when watermark state cannot be read from or written to the
+configured store. Carries <code>store_type</code> context in addition to
+the standard execution context fields.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.StateError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">store_type</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.StateError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize StateError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the thread where the error occurred.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>store_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Watermark store type (e.g. "table_properties", "metadata_table").</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.StateError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.StateError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with store context.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.VariableResolutionError" class="doc doc-heading">
+            <code>VariableResolutionError</code>
+
+
+<a href="#weevr.errors.VariableResolutionError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.errors.ConfigError">ConfigError</a></code></p>
+
+
+
+        <p>Raised when a <code>${variable}</code> reference cannot be resolved.</p>
+<p>This occurs when a variable placeholder has no matching entry in the
+parameter context and no default value (<code>${var:-default}</code>) is provided.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.WarpEnforcementError" class="doc doc-heading">
+            <code>WarpEnforcementError</code>
+
+
+<a href="#weevr.errors.WarpEnforcementError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ExecutionError (weevr.errors.exceptions.ExecutionError)" href="#weevr.errors.ExecutionError">ExecutionError</a></code></p>
+
+
+
+        <p>Raised when warp contract enforcement finds violations.</p>
+<p>Carries the list of enforcement findings (missing columns, type
+mismatches, nullable violations) that caused the failure.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.WarpEnforcementError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">findings</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.WarpEnforcementError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize WarpEnforcementError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the thread where the error occurred.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>findings</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of enforcement findings (dicts with type, column, etc.).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.WarpEnforcementError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.WarpEnforcementError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation with findings count.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.errors.WeevError" class="doc doc-heading">
+            <code>WeevError</code>
+
+
+<a href="#weevr.errors.WeevError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Base exception for all weevr errors.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.WeevError.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">cause</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.errors.WeevError.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize WeevError.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable error message</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cause</code>
+            </td>
+            <td>
+                  <code><span title="Exception">Exception</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional underlying exception that triggered this error</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.errors.WeevError.__str__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+
+<a href="#weevr.errors.WeevError.__str__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return string representation of the error.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+<h2 id="error-troubleshooting-catalog">Error Troubleshooting Catalog<a class="headerlink" href="#error-troubleshooting-catalog" title="Permanent link">&para;</a></h2>
+<p>This section provides actionable guidance for every exception class in
+<code>weevr.errors</code>. Each entry explains when the error is raised, common
+causes, and how to resolve it.</p>
+<h3 id="exception-hierarchy">Exception hierarchy<a class="headerlink" href="#exception-hierarchy" title="Permanent link">&para;</a></h3>
+<div class="d2"><svg data-d2-version="v0.7.1" preserveAspectRatio="xMinYMin meet" viewBox="0 0 3403 468" role="img" aria-label="Diagram"><svg class="d2-0bb9d5e6dbb740b198c73072f0a31b30 d2-svg" width="3403" height="468" viewBox="-89 -89 3403 468"><rect x="-89.000000" y="-89.000000" width="3403.000000" height="468.000000" rx="0.000000" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-0bb9d5e6dbb740b198c73072f0a31b30 .text {
+	font-family: "d2-0bb9d5e6dbb740b198c73072f0a31b30-font-regular";
+}
+@font-face {
+	font-family: d2-0bb9d5e6dbb740b198c73072f0a31b30-font-regular;
+	src: url("data:application/font-woff;base64,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");
+}
+.d2-0bb9d5e6dbb740b198c73072f0a31b30 .text-bold {
+	font-family: "d2-0bb9d5e6dbb740b198c73072f0a31b30-font-bold";
+}
+@font-face {
+	font-family: d2-0bb9d5e6dbb740b198c73072f0a31b30-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}</style><style type="text/css">.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N1{fill:#0A0F25;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N2{fill:#676C7E;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N3{fill:#9499AB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N4{fill:#CFD2DD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N5{fill:#DEE1EB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N6{fill:#EEF1F8;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-N7{fill:#FFFFFF;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-B1{fill:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-B2{fill:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-B3{fill:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-B4{fill:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-B5{fill:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-B6{fill:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-AA2{fill:#4A6FF3;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-AA4{fill:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-AA5{fill:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-AB4{fill:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .fill-AB5{fill:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N1{stroke:#0A0F25;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N2{stroke:#676C7E;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N3{stroke:#9499AB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N4{stroke:#CFD2DD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N5{stroke:#DEE1EB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N6{stroke:#EEF1F8;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-N7{stroke:#FFFFFF;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-B1{stroke:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-B2{stroke:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-B3{stroke:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-B4{stroke:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-B5{stroke:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-B6{stroke:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-AA2{stroke:#4A6FF3;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-AA4{stroke:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-AA5{stroke:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-AB4{stroke:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .stroke-AB5{stroke:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N1{background-color:#0A0F25;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N2{background-color:#676C7E;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N3{background-color:#9499AB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N4{background-color:#CFD2DD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N5{background-color:#DEE1EB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N6{background-color:#EEF1F8;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-N7{background-color:#FFFFFF;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-B1{background-color:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-B2{background-color:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-B3{background-color:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-B4{background-color:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-B5{background-color:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-B6{background-color:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-AA2{background-color:#4A6FF3;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-AA4{background-color:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-AA5{background-color:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-AB4{background-color:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .background-color-AB5{background-color:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N1{color:#0A0F25;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N2{color:#676C7E;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N3{color:#9499AB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N4{color:#CFD2DD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N5{color:#DEE1EB;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N6{color:#EEF1F8;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-N7{color:#FFFFFF;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-B1{color:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-B2{color:#0D32B2;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-B3{color:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-B4{color:#E3E9FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-B5{color:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-B6{color:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-AA2{color:#4A6FF3;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-AA4{color:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-AA5{color:#F7F8FE;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-AB4{color:#EDF0FD;}
+		.d2-0bb9d5e6dbb740b198c73072f0a31b30 .color-AB5{color:#F7F8FE;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.sketch-overlay-B1{fill:url(#streaks-darker-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:lighten}.sketch-overlay-B2{fill:url(#streaks-darker-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:lighten}.sketch-overlay-B3{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-B4{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-B5{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-B6{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-AA2{fill:url(#streaks-dark-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:overlay}.sketch-overlay-AA4{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-AA5{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-AB4{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-AB5{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-N1{fill:url(#streaks-darker-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:lighten}.sketch-overlay-N2{fill:url(#streaks-dark-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:overlay}.sketch-overlay-N3{fill:url(#streaks-normal-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:color-burn}.sketch-overlay-N4{fill:url(#streaks-normal-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:color-burn}.sketch-overlay-N5{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-N6{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.sketch-overlay-N7{fill:url(#streaks-bright-d2-0bb9d5e6dbb740b198c73072f0a31b30);mix-blend-mode:darken}.light-code{display: block}.dark-code{display: none}</style><g class="V2VldkVycm9y"><g class="shape"><rect x="12.000000" y="12.000000" width="3201.000000" height="266.000000" stroke="#0D32B2" fill="#E3E9FD" class=" stroke-B1 fill-B4" style="stroke-width:2;" /></g><text x="1612.500000" y="45.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">WeevError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9y"><g class="shape"><rect x="62.000000" y="62.000000" width="1796.000000" height="166.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="960.000000" y="91.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">ConfigError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9y"><g class="shape"><rect x="1878.000000" y="62.000000" width="1077.000000" height="166.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2416.500000" y="91.000000" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">ExecutionError</text></g><g class="V2VldkVycm9yLkRhdGFWYWxpZGF0aW9uRXJyb3I="><g class="shape"><rect x="2975.000000" y="112.000000" width="188.000000" height="66.000000" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="3069.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">DataValidationError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1BhcnNlRXJyb3I="><g class="shape"><rect x="112.000000" y="112.000000" width="168.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="196.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigParseError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1NjaGVtYUVycm9y"><g class="shape"><rect x="300.000000" y="112.000000" width="185.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="392.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigSchemaError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkNvbmZpZ1ZlcnNpb25FcnJvcg=="><g class="shape"><rect x="505.000000" y="112.000000" width="182.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="596.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ConfigVersionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLlZhcmlhYmxlUmVzb2x1dGlvbkVycm9y"><g class="shape"><rect x="707.000000" y="112.000000" width="219.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="816.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">VariableResolutionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLlJlZmVyZW5jZVJlc29sdXRpb25FcnJvcg=="><g class="shape"><rect x="946.000000" y="112.000000" width="230.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1061.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ReferenceResolutionError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkluaGVyaXRhbmNlRXJyb3I="><g class="shape"><rect x="1196.000000" y="112.000000" width="164.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1278.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">InheritanceError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLk1vZGVsVmFsaWRhdGlvbkVycm9y"><g class="shape"><rect x="1380.000000" y="112.000000" width="197.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1478.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ModelValidationError</text></g><g class="V2VldkVycm9yLkNvbmZpZ0Vycm9yLkxvb2t1cFJlc29sdXRpb25FcnJvcg=="><g class="shape"><rect x="1597.000000" y="112.000000" width="211.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1702.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">LookupResolutionError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlNwYXJrRXJyb3I="><g class="shape"><rect x="1928.000000" y="112.000000" width="125.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="1990.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">SparkError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlN0YXRlRXJyb3I="><g class="shape"><rect x="2073.000000" y="112.000000" width="121.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2133.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">StateError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLkhvb2tFcnJvcg=="><g class="shape"><rect x="2214.000000" y="112.000000" width="119.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2273.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">HookError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLkV4cG9ydEVycm9y"><g class="shape"><rect x="2353.000000" y="112.000000" width="129.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2417.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ExportError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLldhcnBFbmZvcmNlbWVudEVycm9y"><g class="shape"><rect x="2502.000000" y="112.000000" width="212.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2608.000000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">WarpEnforcementError</text></g><g class="V2VldkVycm9yLkV4ZWN1dGlvbkVycm9yLlNjaGVtYURyaWZ0RXJyb3I="><g class="shape"><rect x="2734.000000" y="112.000000" width="171.000000" height="66.000000" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="2819.500000" y="150.500000" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">SchemaDriftError</text></g><mask id="d2-0bb9d5e6dbb740b198c73072f0a31b30" maskUnits="userSpaceOnUse" x="-89" y="-89" width="3403" height="468">
+<rect x="-89" y="-89" width="3403" height="468" fill="white" />
+
+</mask></svg></svg></div>
+<hr />
+<h3 id="weeverror">WeevError<a class="headerlink" href="#weeverror" title="Permanent link">&para;</a></h3>
+<p>Base exception for all weevr errors. Not raised directly — catch this to
+handle any weevr-specific exception.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">WeevError</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;daily.loom&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">except</span> <span class="n">WeevError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;weevr error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">if</span> <span class="n">e</span><span class="o">.</span><span class="n">cause</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  caused by: </span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">cause</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Related:</strong> All exceptions below inherit from <code>WeevError</code>.</p>
+<hr />
+<h3 id="configerror">ConfigError<a class="headerlink" href="#configerror" title="Permanent link">&para;</a></h3>
+<p>Base exception for configuration-related errors. Carries optional
+<code>file_path</code> and <code>config_key</code> context.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Project directory missing <code>.weevr</code> extension</li>
+<li>Unsupported file extension (not <code>.thread</code>, <code>.weave</code>, or <code>.loom</code>)</li>
+<li>Declared config name does not match filename stem</li>
+<li>Circular dependency detected in weave thread ordering</li>
+<li>Invalid <code>foreach</code> block structure in step list</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Verify the project directory ends with <code>.weevr</code></li>
+<li>Check that all config files use typed extensions</li>
+<li>Ensure the <code>name:</code> field matches the filename (or omit it)</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># This file is saved as &quot;orders/fact_orders.thread&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># but declares a different name — triggers ConfigError</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wrong_name</span><span class="w">  </span><span class="c1"># should be &quot;fact_orders&quot; or omitted</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../configuration-keys/">Configuration Keys</a></p>
+<hr />
+<h3 id="configparseerror">ConfigParseError<a class="headerlink" href="#configparseerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a YAML file cannot be read or parsed.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>File not found at the specified path</li>
+<li>Empty or null YAML content</li>
+<li>Invalid YAML syntax (indentation, special characters)</li>
+<li>YAML content is not a dictionary (e.g., a list or scalar)</li>
+<li>Missing required <code>config_version</code> field</li>
+<li><code>config_version</code> not in <code>"major.minor"</code> format</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Verify the file exists at the expected path</li>
+<li>Validate YAML syntax with a linter or <code>yamllint</code></li>
+<li>Ensure the file starts with key-value pairs (a YAML mapping)</li>
+<li>Add <code>config_version: "1.0"</code> as the first field</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Invalid — missing config_version</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Fixed</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../yaml-schema/thread/">YAML Schema: Thread</a></p>
+<hr />
+<h3 id="configschemaerror">ConfigSchemaError<a class="headerlink" href="#configschemaerror" title="Permanent link">&para;</a></h3>
+<p>Raised when the configuration structure does not match the expected schema.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Required fields missing (e.g., <code>sources</code> or <code>target</code> in a thread)</li>
+<li>Unknown config type passed to validation</li>
+<li>Required parameter not supplied at runtime</li>
+<li>Parameter value does not match declared type (wrong type for int, bool,
+  date, etc.)</li>
+<li>Date parameter not in <code>YYYY-MM-DD</code> format</li>
+<li>Timestamp parameter not in ISO 8601 format</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Compare your config against the
+   <a href="../../yaml-schema/thread/">YAML Schema Reference</a> for required fields</li>
+<li>Check that all declared parameters are supplied with correct types</li>
+<li>Use <code>YYYY-MM-DD</code> for date parameters and ISO 8601 for timestamps</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Invalid — thread missing required &#39;target&#39; field</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;active&#39;&quot;</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Missing: target</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1"># Fixed — add target</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/stg_orders</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../configuration-keys/">Configuration Keys</a>,
+<a href="../../yaml-schema/thread/">YAML Schema: Thread</a></p>
+<hr />
+<h3 id="configversionerror">ConfigVersionError<a class="headerlink" href="#configversionerror" title="Permanent link">&para;</a></h3>
+<p>Raised when the <code>config_version</code> is not supported.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Major version does not match the supported version</li>
+<li>Unknown config type for version validation</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Set <code>config_version: "1.0"</code> — this is the only supported version</li>
+<li>Check that the file extension matches the intended config type</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Invalid — unsupported version</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2.0&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># Fixed</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+</code></pre></div>
+<hr />
+<h3 id="variableresolutionerror">VariableResolutionError<a class="headerlink" href="#variableresolutionerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a <code>${variable}</code> reference cannot be resolved and has no
+default value.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Variable referenced in config but not supplied in runtime parameters</li>
+<li>Typo in variable name</li>
+<li>Missing <code>params:</code> declaration in parent config</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Supply the missing parameter at runtime:
+   <code>ctx.run("daily.loom", params={"env": "prod"})</code></li>
+<li>Add a default value in the config: <code>${env:-dev}</code></li>
+<li>Check for typos in the variable name</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># This will fail if &quot;env&quot; is not supplied at runtime</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env}.raw.orders</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Fixed — add a default value</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">orders</span><span class="p">:</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:-dev}.raw.orders</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../guides/config-resolution/">Config Resolution</a></p>
+<hr />
+<h3 id="referenceresolutionerror">ReferenceResolutionError<a class="headerlink" href="#referenceresolutionerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a referenced config file cannot be loaded or when circular
+references are detected.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Referenced file does not exist at the resolved path</li>
+<li>Circular reference chain (A references B which references A)</li>
+<li>Incorrect relative path in <code>ref:</code> entries</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Verify the referenced file exists relative to the project root</li>
+<li>Check for circular <code>ref:</code> chains between weaves and threads</li>
+<li>Use typed extensions in references (<code>.thread</code>, <code>.weave</code>, <code>.loom</code>)</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Weave referencing a non-existent thread</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">threads</span><span class="p">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders/fact_orders.thread</span><span class="w">  </span><span class="c1"># file must exist at this path</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># Circular reference — thread A depends on thread B&#39;s target,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># and thread B depends on thread A&#39;s target</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../concepts/thread-weave-loom/">Thread, Weave, Loom</a></p>
+<hr />
+<h3 id="inheritanceerror">InheritanceError<a class="headerlink" href="#inheritanceerror" title="Permanent link">&para;</a></h3>
+<p>Raised when the configuration inheritance cascade fails. Reserved for
+future use — not currently raised.</p>
+<p><strong>Intended for:</strong> Failures during loom → weave → thread default merging.</p>
+<hr />
+<h3 id="modelvalidationerror">ModelValidationError<a class="headerlink" href="#modelvalidationerror" title="Permanent link">&para;</a></h3>
+<p>Raised when the fully resolved configuration fails to hydrate into a
+typed model (Thread, Weave, or Loom).</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Semantic validation failure after variable resolution</li>
+<li>Field values that pass schema validation but fail model constraints</li>
+<li>Inconsistent combinations of settings that are only detectable after
+  all variables are resolved</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check the error message for the specific field that failed</li>
+<li>Verify that resolved variable values produce valid combinations</li>
+<li>Run with <code>mode="validate"</code> to test config without executing</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Validate config without running — catches ModelValidationError early</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;daily.loom&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;validate&quot;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h3 id="lookupresolutionerror">LookupResolutionError<a class="headerlink" href="#lookupresolutionerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a thread references a lookup name that is not defined in the
+weave's <code>lookups</code> map. This is a fail-fast validation error caught during
+config resolution, before any data is read.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Typo in the <code>lookup</code> field of a source definition</li>
+<li>Thread uses <code>lookup: foo</code> but the weave does not declare a <code>foo</code> entry
+  in its <code>lookups</code> block</li>
+<li>Thread was moved to a different weave that does not define the lookup</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check that the lookup name in the thread's source matches a key in the
+   weave's <code>lookups</code> block</li>
+<li>Verify the thread is referenced by the correct weave</li>
+<li>If the lookup was renamed, update all thread references</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Thread source references a lookup</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span><span class="w">   </span><span class="c1"># must exist in the weave&#39;s lookups</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="c1"># Weave must define it</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">lookups</span><span class="p">:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">dim_product</span><span class="p">:</span><span class="w">            </span><span class="c1"># matches the thread&#39;s lookup reference</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">silver.dim_product</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../yaml-schema/weave/">YAML Schema: Weave</a></p>
+<hr />
+<h3 id="executionerror">ExecutionError<a class="headerlink" href="#executionerror" title="Permanent link">&para;</a></h3>
+<p>Base exception for runtime execution failures. Carries optional context:
+<code>thread_name</code>, <code>step_index</code>, <code>step_type</code>, and <code>source_name</code>.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Source read failure (Delta table not found, file path invalid)</li>
+<li>Pipeline step failure (invalid Spark SQL expression, missing columns)</li>
+<li>Write failure (target path not accessible, schema mismatch)</li>
+<li>Merge mode missing <code>write_config</code> or <code>match_keys</code></li>
+<li>Target has no <code>alias</code> or <code>path</code> configured</li>
+<li>Unsupported source type</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check the error message for the thread name and step index</li>
+<li>Verify source tables/files exist and are accessible</li>
+<li>For merge mode, ensure <code>write.match_keys</code> is declared</li>
+<li>Test expressions in Spark SQL directly to isolate syntax issues</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Will fail — merge mode requires match_keys</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="c1"># Missing: match_keys</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Fixed</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">merge</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../how-to/add-a-thread/">Add a Thread</a>,
+<a href="../../../concepts/execution-modes/">Execution Modes</a></p>
+<hr />
+<h3 id="sparkerror">SparkError<a class="headerlink" href="#sparkerror" title="Permanent link">&para;</a></h3>
+<p>Raised for Spark-specific execution failures. Reserved for future use —
+not currently raised. <code>ExecutionError</code> is used for all runtime failures.</p>
+<hr />
+<h3 id="stateerror">StateError<a class="headerlink" href="#stateerror" title="Permanent link">&para;</a></h3>
+<p>Raised when watermark state cannot be read from or written to the
+configured store. Carries optional <code>store_type</code> context.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Target path contains backtick characters (unsupported by table
+  properties store)</li>
+<li>Failed to read watermark from table properties or metadata table</li>
+<li>Failed to write watermark after successful execution</li>
+<li>Metadata table path is not accessible</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Remove backticks from target paths</li>
+<li>Verify the target Delta table exists and has table properties enabled</li>
+<li>For metadata table store, verify the <code>table_path</code> is accessible</li>
+<li>Check Spark permissions for reading/writing table properties</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Will fail with StateError — backticks not allowed</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Tables/`my_table`&quot;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Fixed</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/my_table</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../concepts/idempotency/">Idempotency</a>,
+<a href="../../../concepts/execution-modes/">Execution Modes</a></p>
+<hr />
+<h3 id="hookerror">HookError<a class="headerlink" href="#hookerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a hook step (in <code>pre_steps</code> or <code>post_steps</code>) fails and its
+<code>on_failure</code> policy is set to <code>abort</code>. Carries hook-specific context:
+<code>hook_name</code>, <code>hook_type</code>, and <code>phase</code>.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>A <code>quality_gate</code> check failed (e.g., source freshness exceeded
+  <code>max_age</code>, row count outside bounds, table does not exist)</li>
+<li>A <code>sql_statement</code> hook produced an error</li>
+<li>An <code>expression</code> quality gate evaluated to false</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check the error message for the hook name and phase (<code>pre</code> or <code>post</code>)</li>
+<li>For quality gate failures, verify the underlying data condition
+   (source freshness, row counts, table existence)</li>
+<li>To make the hook non-blocking, set <code>on_failure: warn</code> instead of
+   <code>abort</code></li>
+<li>For SQL statement errors, test the SQL directly in Spark</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">pre_steps</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="c1"># This will raise HookError if the source is older than 24h</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_freshness</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;24h&quot;</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span><span class="w">    </span><span class="c1"># raise HookError on failure</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="c1"># Change to warn to log the issue without aborting</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quality_gate</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_freshness</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="nt">check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">source_freshness</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw.orders</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;24h&quot;</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">     </span><span class="c1"># log warning and continue</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../yaml-schema/weave/">YAML Schema: Weave</a></p>
+<hr />
+<h3 id="exporterror">ExportError<a class="headerlink" href="#exporterror" title="Permanent link">&para;</a></h3>
+<p>Raised when an export write fails and its <code>on_failure</code> policy is set to
+<code>abort</code>. Carries export-specific context: <code>export_name</code>, <code>export_type</code>,
+and <code>thread_name</code>.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Export path is not writable or does not exist</li>
+<li>Complex column types incompatible with the export format (e.g.,
+  arrays/maps in CSV)</li>
+<li>Spark format writer error (invalid options, codec not available)</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check the error message for the export name and format type</li>
+<li>Verify the export path is accessible and writable</li>
+<li>For format compatibility issues, simplify the schema or use a
+   format that supports complex types (Delta, Parquet)</li>
+<li>To make the export non-blocking, set <code>on_failure: warn</code> instead of
+   <code>abort</code></li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">exports</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="c1"># This will raise ExportError if the write fails</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance_copy</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance.orders</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span><span class="w">    </span><span class="c1"># raise ExportError on failure</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">  </span><span class="c1"># Change to warn to log the issue without aborting</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">archive</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parquet</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/archive/orders/</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">     </span><span class="c1"># log warning and continue</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../guides/exports/">Exports guide</a></p>
+<hr />
+<h3 id="warpenforcementerror">WarpEnforcementError<a class="headerlink" href="#warpenforcementerror" title="Permanent link">&para;</a></h3>
+<p>Raised when warp contract enforcement finds violations and
+<code>warp_enforcement</code> is set to <code>enforce</code>. Carries a <code>findings</code>
+list with details about each violation.</p>
+<p><strong>Attributes:</strong></p>
+<ul>
+<li><code>findings</code> — <code>list[dict[str, str]]</code> with keys: <code>type</code>
+  (<code>missing_column</code>, <code>type_mismatch</code>, <code>nullable_violation</code>),
+  <code>column</code>, <code>expected</code>, <code>actual</code></li>
+<li><code>thread_name</code> — name of the thread that failed</li>
+</ul>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Pipeline output is missing a column declared in the warp</li>
+<li>A column's Spark type differs from the warp declaration</li>
+<li>A non-nullable warp column contains null values</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Inspect <code>findings</code> to identify which columns failed</li>
+<li>Fix the pipeline to produce the expected columns and types</li>
+<li>Or update the warp to reflect the actual output schema</li>
+<li>Set <code>warp_enforcement: warn</code> to log findings without failing</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gold.dim_customer</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">warp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customer</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">warp_enforcement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enforce</span><span class="w">  </span><span class="c1"># raises WarpEnforcementError</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../guides/warps/">Warps guide</a></p>
+<hr />
+<h3 id="schemadrifterror">SchemaDriftError<a class="headerlink" href="#schemadrifterror" title="Permanent link">&para;</a></h3>
+<p>Raised when schema drift is detected in <code>strict</code> mode with
+<code>on_drift: error</code>. Carries a <code>drift_report</code> with details about
+the extra columns found.</p>
+<p><strong>Attributes:</strong></p>
+<ul>
+<li><code>drift_report</code> — <code>DriftReport</code> instance with <code>extra_columns</code>,
+  <code>action_taken</code>, <code>drift_mode</code>, and <code>baseline_source</code></li>
+<li><code>thread_name</code> — name of the thread that failed</li>
+</ul>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>Upstream source added columns that flow through all transforms
+  to the target boundary</li>
+<li>A new transform step introduces extra columns</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Inspect <code>drift_report.extra_columns</code> to see which columns
+   are unexpected</li>
+<li>Add the columns to the warp if they are intentional</li>
+<li>Add a <code>select</code> step to filter unwanted columns</li>
+<li>Change <code>on_drift: warn</code> to drop extra columns with a warning
+   instead of failing</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gold.dim_customer</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">schema_drift</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">strict</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">on_drift</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span><span class="w">  </span><span class="c1"># raises SchemaDriftError on extra columns</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../guides/schema-drift/">Schema Drift guide</a></p>
+<hr />
+<h3 id="datavalidationerror">DataValidationError<a class="headerlink" href="#datavalidationerror" title="Permanent link">&para;</a></h3>
+<p>Raised when a validation rule with <code>fatal</code> severity has failing rows.
+The thread aborts immediately — no data is written.</p>
+<p><strong>Common causes:</strong></p>
+<ul>
+<li>A <code>fatal</code>-severity validation rule has one or more failing rows</li>
+<li>Source data violates an invariant that should never occur</li>
+</ul>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Inspect the source data for the failing condition</li>
+<li>Check the validation rule expression for correctness</li>
+<li>Consider downgrading severity to <code>error</code> (quarantine) if the rule
+   should allow partial writes</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">validations</span><span class="p">:</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="c1"># This will abort the thread if ANY row has a null customer_id</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id_required</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id</span><span class="nv"> </span><span class="s">IS</span><span class="nv"> </span><span class="s">NOT</span><span class="nv"> </span><span class="s">NULL&quot;</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fatal</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="c1"># Downgrade to error to quarantine bad rows instead of aborting</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id_required</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id</span><span class="nv"> </span><span class="s">IS</span><span class="nv"> </span><span class="s">NOT</span><span class="nv"> </span><span class="s">NULL&quot;</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span><span class="w">  </span><span class="c1"># bad rows go to quarantine table</span>
+</code></pre></div>
+<p><strong>Related:</strong> <a href="../../../how-to/add-validation-rules/">Add Validation Rules</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
