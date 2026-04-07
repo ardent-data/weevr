@@ -201,11 +201,33 @@ def _parse_order_col(order_by: str):  # type: ignore[return]
     return col.desc() if direction == "DESC" else col.asc()
 
 
+def _typed_watermark_col(
+    watermark_column: str,
+    watermark_type: str,
+    watermark_format: str | None,
+) -> Column:
+    """Return the watermark column expression, optionally parsed from a string.
+
+    When ``watermark_format`` is ``None``, returns a bare ``F.col`` reference
+    so existing call sites stay byte-identical. When set, wraps the column
+    in ``to_timestamp``/``to_date`` so a string-typed source column is parsed
+    against the user-supplied Spark DateTimeFormatter pattern before any
+    comparison or aggregate. Only meaningful for ``timestamp`` / ``date``;
+    callers are responsible for passing ``None`` on numeric watermark types.
+    """
+    col = F.col(watermark_column)
+    if watermark_format is None:
+        return col
+    parser = F.to_timestamp if watermark_type == "timestamp" else F.to_date
+    return parser(col, watermark_format)
+
+
 def build_watermark_filter(
     watermark_column: str,
     watermark_type: str,
     last_value: str,
     inclusive: bool = False,
+    watermark_format: str | None = None,
 ) -> Column:
     """Build a Spark Column filter expression for watermark-based incremental reads.
 
@@ -215,18 +237,22 @@ def build_watermark_filter(
         last_value: Serialized high-water mark value.
         inclusive: If ``True``, use ``>=`` (re-read boundary row).
             Defaults to ``False`` (strict ``>``).
+        watermark_format: Optional Spark DateTimeFormatter pattern. When set,
+            the column is parsed with ``to_timestamp``/``to_date(col, fmt)``
+            before the comparison. Only valid with ``timestamp``/``date``
+            watermark types; ignored for numeric types.
 
     Returns:
         A Spark Column expression suitable for ``df.filter()``.
     """
-    col = F.col(watermark_column)
+    typed = _typed_watermark_col(watermark_column, watermark_type, watermark_format)
     if watermark_type in ("timestamp", "date"):
         lit_val = F.lit(last_value).cast(watermark_type)
     elif watermark_type == "long":
         lit_val = F.lit(int(last_value)).cast("long")
     else:
         lit_val = F.lit(int(last_value))
-    return col >= lit_val if inclusive else col > lit_val
+    return typed >= lit_val if inclusive else typed > lit_val
 
 
 def read_source_incremental(

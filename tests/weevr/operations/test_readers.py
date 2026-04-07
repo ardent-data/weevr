@@ -14,7 +14,13 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
-from weevr.operations.readers import read_cdc_source, read_source, read_sources
+from weevr.operations.readers import (
+    _typed_watermark_col,
+    build_watermark_filter,
+    read_cdc_source,
+    read_source,
+    read_sources,
+)
 from weevr.state.watermark import WatermarkState
 
 pytestmark = pytest.mark.spark
@@ -1027,3 +1033,65 @@ class TestReadCdcSourceGenericWatermark:
 
         assert df.count() == 3
         assert new_hwm is None
+
+
+class TestTypedWatermarkCol:
+    """Unit tests for the ``_typed_watermark_col`` helper."""
+
+    def test_passthrough_when_format_is_none(self, spark: SparkSession) -> None:
+        col = _typed_watermark_col("AEDATTM", "timestamp", None)
+        # Bare column reference — no parse wrapper.
+        assert str(col) == str(F.col("AEDATTM"))
+
+    def test_wraps_in_to_timestamp_for_timestamp_type(self, spark: SparkSession) -> None:
+        col = _typed_watermark_col("AEDATTM", "timestamp", "yyyy-MM-dd HH:mm:ss.SSSSSX")
+        rendered = str(col)
+        assert "to_timestamp(" in rendered
+        assert "AEDATTM" in rendered
+
+    def test_wraps_in_to_date_for_date_type(self, spark: SparkSession) -> None:
+        col = _typed_watermark_col("event_date", "date", "yyyyMMdd")
+        rendered = str(col)
+        assert "to_date(" in rendered
+        assert "event_date" in rendered
+
+
+class TestBuildWatermarkFilter:
+    """Unit tests for ``build_watermark_filter`` parameter shape."""
+
+    def test_without_format_matches_legacy_repr(self, spark: SparkSession) -> None:
+        """Regression guard: omitting watermark_format must produce the
+        same Column expression as the pre-M124 implementation.
+        """
+        col = build_watermark_filter(
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            last_value="2026-01-01 10:00:00",
+        )
+        # Frozen snapshot of the legacy expression shape: bare column on
+        # the left, literal-cast on the right, strict greater-than.
+        expected = F.col("AEDATTM") > F.lit("2026-01-01 10:00:00").cast("timestamp")
+        assert str(col) == str(expected)
+
+    def test_with_format_composes_typed_column_and_literal_cast(self, spark: SparkSession) -> None:
+        col = build_watermark_filter(
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            last_value="2026-01-01 10:00:00",
+            watermark_format="yyyy-MM-dd HH:mm:ss.SSSSSX",
+        )
+        rendered = str(col)
+        assert "to_timestamp(" in rendered
+        assert "CAST(2026-01-01 10:00:00 AS TIMESTAMP)" in rendered
+
+    def test_with_format_inclusive_uses_ge(self, spark: SparkSession) -> None:
+        col = build_watermark_filter(
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            last_value="2026-01-01 10:00:00",
+            inclusive=True,
+            watermark_format="yyyy-MM-dd HH:mm:ss.SSSSSX",
+        )
+        rendered = str(col)
+        assert " >= " in rendered
+        assert "to_timestamp(" in rendered
