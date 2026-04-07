@@ -3116,8 +3116,12 @@ all watermark types (timestamp, date, int, long).</p>
 <p>Cross-field validation:
 - <code>mode == "incremental_watermark"</code> requires <code>watermark_column</code> to be set.
 - <code>mode == "cdc"</code> requires <code>cdc</code> config to be set.
-- <code>mode == "cdc"</code> must not have <code>watermark_column</code> set
-  (CDF version tracking is automatic).</p>
+- <code>mode == "cdc"</code> with <code>cdc.preset == "delta_cdf"</code> rejects
+  <code>watermark_column</code> (CDF uses commit-version tracking automatically).
+- <code>mode == "cdc"</code> with <code>cdc.operation_column</code> (generic CDC) may
+  compose with <code>watermark_column</code> to narrow the read window for
+  append-only CDC history tables; <code>watermark_type</code> is required
+  whenever <code>watermark_column</code> is set in cdc mode.</p>
 
 
 

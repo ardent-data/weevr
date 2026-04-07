@@ -1983,7 +1983,7 @@
       "type": "object"
     },
     "LoadConfig": {
-      "description": "Incremental load mode and watermark parameters.\n\nCross-field validation:\n- ``mode == \"incremental_watermark\"`` requires ``watermark_column`` to be set.\n- ``mode == \"cdc\"`` requires ``cdc`` config to be set.\n- ``mode == \"cdc\"`` must not have ``watermark_column`` set\n  (CDF version tracking is automatic).",
+      "description": "Incremental load mode and watermark parameters.\n\nCross-field validation:\n- ``mode == \"incremental_watermark\"`` requires ``watermark_column`` to be set.\n- ``mode == \"cdc\"`` requires ``cdc`` config to be set.\n- ``mode == \"cdc\"`` with ``cdc.preset == \"delta_cdf\"`` rejects\n  ``watermark_column`` (CDF uses commit-version tracking automatically).\n- ``mode == \"cdc\"`` with ``cdc.operation_column`` (generic CDC) may\n  compose with ``watermark_column`` to narrow the read window for\n  append-only CDC history tables; ``watermark_type`` is required\n  whenever ``watermark_column`` is set in cdc mode.",
       "properties": {
         "mode": {
           "default": "full",
@@ -2007,7 +2007,7 @@
             }
           ],
           "default": null,
-          "description": "Column used for watermark-based incremental loads. Required when mode is 'incremental_watermark'.",
+          "description": "Column used for watermark-based incremental loads. Required when mode is 'incremental_watermark'. When mode is 'cdc' with cdc.operation_column set, narrows the read window for append-only CDC history tables; rejected when cdc.preset is 'delta_cdf'.",
           "title": "Watermark Column"
         },
         "watermark_type": {
@@ -2026,7 +2026,7 @@
             }
           ],
           "default": null,
-          "description": "Data type of the watermark column.",
+          "description": "Data type of the watermark column. Required whenever watermark_column is set.",
           "title": "Watermark Type"
         },
         "watermark_inclusive": {
