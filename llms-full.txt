@@ -579,13 +579,15 @@ When the source lands the watermark column as a string rather than a
 native Delta `TIMESTAMP` — common for SAP Open Database Mirror extracts
 where `AEDATTM` arrives as text — declare the parse pattern via
 `watermark_format`. weevr wraps the column in
-`to_timestamp(col, watermark_format)` in both the filter predicate and
-the HWM aggregate, and persists the HWM as a canonical ISO string in the
-configured watermark store. Rows that fail to parse are silently
-excluded from both the predicate and the HWM (a "zero rows through"
-first run indicates the format pattern is wrong). `watermark_format` is
-only valid with `watermark_type: timestamp` or `date`; pairing it with
-`int` or `long` is rejected at config-parse time.
+`to_timestamp(col, watermark_format)` for `watermark_type: timestamp`
+or `to_date(col, watermark_format)` for `watermark_type: date` — in
+both the filter predicate and the HWM aggregate — and persists the HWM
+as a canonical ISO string in the configured watermark store. Rows that
+fail to parse are silently excluded from both the predicate and the
+HWM (a "zero rows through" first run indicates the format pattern is
+wrong). `watermark_format` is only valid with `watermark_type: timestamp`
+or `date`; pairing it with `int` or `long` is rejected at config-parse
+time.
 
 ```yaml
 config_version: "1.0"

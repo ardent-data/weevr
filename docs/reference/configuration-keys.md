@@ -292,8 +292,8 @@ Cross-field rules enforced at parse time:
   with `watermark_column` to narrow the read window for append-only CDC
   history tables; `watermark_type` is required whenever `watermark_column`
   is set in cdc mode
-- `watermark_format` requires `watermark_column` and is rejected when
-  `watermark_type` is `"int"` or `"long"`
+- `watermark_format` requires `watermark_column` and requires
+  `watermark_type` to be `"timestamp"` or `"date"`
 
 ### WatermarkStoreConfig
 
