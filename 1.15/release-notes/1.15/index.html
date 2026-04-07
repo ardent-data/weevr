@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.15/release-notes/1.8/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.15/release-notes/1.15/">
       
       
-        <link rel="prev" href="../1.9/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.7/">
+        <link rel="next" href="../1.14/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.8 - weevr</title>
+        <title>1.15 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v18" class="md-skip">
+        <a href="#release-notes-v115" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.8
+              1.15
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.15/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -2138,10 +2138,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.15/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.15
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2157,6 +2184,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#cdc-watermark-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CDC + watermark composition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CDC + watermark composition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-stays-the-same" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stays the same
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-rows-advance-the-watermark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delete rows advance the watermark
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-three-watermark-types-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All three watermark types supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internal-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backwards-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backwards compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2334,37 +2464,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.8
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.8/" class="md-nav__link">
         
   
   
@@ -2380,181 +2483,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#dictionary-rename-column-sets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dictionary Rename (Column Sets)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Dictionary Rename (Column Sets)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#source-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Source Types
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#behavior-controls" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Behavior Controls
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cascade" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cascade
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#naming-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Naming Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Naming Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#kebab-case-pattern" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        kebab-case Pattern
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#collision-dedup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collision Dedup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reserved-word-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reserved Word Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pipeline-order" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Order
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Public Exports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2846,22 +2774,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#dictionary-rename-column-sets" class="md-nav__link">
+  <a href="#cdc-watermark-composition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dictionary Rename (Column Sets)
+        CDC + watermark composition
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Dictionary Rename (Column Sets)">
+    <nav class="md-nav" aria-label="CDC + watermark composition">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
+  <a href="#what-stays-the-same" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration
+        What stays the same
       
     </span>
   </a>
@@ -2869,10 +2797,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#source-types" class="md-nav__link">
+  <a href="#delete-rows-advance-the-watermark" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Source Types
+        Delete rows advance the watermark
       
     </span>
   </a>
@@ -2880,21 +2808,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#behavior-controls" class="md-nav__link">
+  <a href="#all-three-watermark-types-supported" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Behavior Controls
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cascade" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cascade
+        All three watermark types supported
       
     </span>
   </a>
@@ -2907,71 +2824,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#naming-enhancements" class="md-nav__link">
+  <a href="#configuration-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Naming Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Naming Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#kebab-case-pattern" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        kebab-case Pattern
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#collision-dedup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collision Dedup
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reserved-word-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reserved Word Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pipeline-order" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline Order
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observability
+        Configuration summary
       
     </span>
   </a>
@@ -2979,10 +2835,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
+  <a href="#internal-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New Public Exports
+        Internal changes
       
     </span>
   </a>
@@ -2990,10 +2846,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#backwards-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        Backwards compatibility
       
     </span>
   </a>
@@ -3020,229 +2876,125 @@
   
 
 
-<h1 id="release-notes-v18">Release Notes — v1.8<a class="headerlink" href="#release-notes-v18" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>This release adds <strong>dictionary rename</strong> — named column sets that
-source bulk column mappings from Delta tables, YAML files, or
-runtime parameters — and <strong>naming enhancements</strong> including
-kebab-case, collision dedup, and reserved word protection.</p>
+<h1 id="release-notes-v115">Release Notes — v1.15<a class="headerlink" href="#release-notes-v115" title="Permanent link">&para;</a></h1>
+<p><strong>Release date:</strong> April 2026</p>
+<p>This release lets the <strong>generic CDC load path compose with a
+watermark column</strong>, so append-only change data capture history
+tables no longer reread the full history on every run. The
+dominant use case is SAP data landed by Fabric Open Database
+Mirror, where every change row carries an operation flag like
+<code>OPFLAG</code> and a change timestamp like <code>AEDATTM</code>.</p>
 <hr />
-<h2 id="dictionary-rename-column-sets">Dictionary Rename (Column Sets)<a class="headerlink" href="#dictionary-rename-column-sets" title="Permanent link">&para;</a></h2>
-<h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
-<p>Declare <code>column_sets</code> at the weave or loom level. Each column set
-maps raw column names to friendly names from an external source.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">column_sets</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">sap_dictionary</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref.column_dictionary</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">from_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_name</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">to_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">friendly_name</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">filter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;system</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;SAP&#39;&quot;</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">on_unmapped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass_through</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">on_extra</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ignore</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">runtime_overrides</span><span class="p">:</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_overrides</span>
+<h2 id="cdc-watermark-composition">CDC + watermark composition<a class="headerlink" href="#cdc-watermark-composition" title="Permanent link">&para;</a></h2>
+<p>Prior releases rejected this configuration at model validation
+time, under the assumption that any CDC use meant the Delta
+Change Data Feed preset. The generic CDC path — the one with an
+explicit <code>operation_column</code> and I/U/D value mapping — was caught
+in the same rejection even though it had no built-in incremental
+mechanism and left users rereading the entire source on every
+thread run.</p>
+<p>Starting with v1.15, <code>mode: cdc</code> and <code>watermark_column</code> compose
+for the generic path:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">load</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cdc</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">cdc</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">operation_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">OPFLAG</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">insert_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;I&quot;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">update_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;U&quot;</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">delete_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;D&quot;</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">on_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">soft_delete</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AEDATTM</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="c1"># watermark_store omitted: defaults to table_properties</span>
 </code></pre></div>
-<p>Reference a column set in a rename step:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">      </span><span class="nt">column_set</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sap_dictionary</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">columns</span><span class="p">:</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="nt">MANUAL_COL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manual_override</span><span class="w">  </span><span class="c1"># static wins</span>
-</code></pre></div>
-<h3 id="source-types">Source Types<a class="headerlink" href="#source-types" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Source</th>
-<th>Configuration</th>
-<th>Use case</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Delta table</td>
-<td><code>type: delta</code>, <code>alias</code> or <code>path</code></td>
-<td>Shared dictionary in lakehouse</td>
-</tr>
-<tr>
-<td>YAML file</td>
-<td><code>type: yaml</code>, <code>path</code></td>
-<td>Version-controlled mappings</td>
-</tr>
-<tr>
-<td>Runtime parameter</td>
-<td><code>param: &lt;name&gt;</code></td>
-<td>Orchestration-driven mappings</td>
-</tr>
-</tbody>
-</table>
-<h3 id="behavior-controls">Behavior Controls<a class="headerlink" href="#behavior-controls" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Setting</th>
-<th>Values</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>on_unmapped</code></td>
-<td><code>pass_through</code>, <code>error</code></td>
-<td><code>pass_through</code></td>
-<td>DataFrame columns with no mapping entry</td>
-</tr>
-<tr>
-<td><code>on_extra</code></td>
-<td><code>ignore</code>, <code>warn</code>, <code>error</code></td>
-<td><code>ignore</code></td>
-<td>Mapping entries for non-existent columns</td>
-</tr>
-<tr>
-<td><code>on_failure</code></td>
-<td><code>abort</code>, <code>warn</code>, <code>skip</code></td>
-<td><code>abort</code></td>
-<td>Source read failure or empty result</td>
-</tr>
-</tbody>
-</table>
-<h3 id="cascade">Cascade<a class="headerlink" href="#cascade" title="Permanent link">&para;</a></h3>
-<p>Column sets cascade from loom → weave. Weave-level definitions
-with the same name override loom-level definitions.</p>
+<p>On the <strong>first run</strong> weevr reads the full source and captures
+<code>max(AEDATTM)</code> as the new high-water mark. On <strong>subsequent runs</strong>
+the source read is narrowed to rows past the stored HWM, the
+usual I/U/D routing runs over only the new window, and the HWM
+advances after a successful write. Steady-state cost drops from
+O(history) to O(delta).</p>
+<h3 id="what-stays-the-same">What stays the same<a class="headerlink" href="#what-stays-the-same" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The Delta CDF preset (<code>cdc.preset: delta_cdf</code>) is <strong>unchanged</strong>.
+  It still rejects <code>watermark_column</code> — CDF's commit-version
+  tracking is the incremental mechanism for that path, and
+  combining the two would be redundant.</li>
+<li>Generic CDC threads that don't set <code>watermark_column</code> keep
+  full-source read behavior. No existing configuration changes
+  meaning.</li>
+<li>Failure semantics mirror <code>incremental_watermark</code>: the HWM is
+  persisted <strong>only</strong> after a successful write, so a mid-run
+  failure leaves the prior HWM in place and the next run
+  idempotently reprocesses the same window via CDC merge match
+  keys.</li>
+<li>Both <code>watermark_store: table_properties</code> (default, zero-config)
+  and <code>watermark_store: metadata_table</code> backends work.</li>
+</ul>
+<h3 id="delete-rows-advance-the-watermark">Delete rows advance the watermark<a class="headerlink" href="#delete-rows-advance-the-watermark" title="Permanent link">&para;</a></h3>
+<p>The HWM is captured from the filtered DataFrame <strong>before</strong> any
+I/U/D routing. That means delete rows (the D branch of the
+operation column) still participate in <code>max(watermark_column)</code>
+— their change timestamp counts toward advancing the window,
+even though they route to the delete path during the merge. This
+avoids a subtle bug where a run that only saw delete rows would
+fail to advance the HWM and reread them on the next run.</p>
+<h3 id="all-three-watermark-types-supported">All three watermark types supported<a class="headerlink" href="#all-three-watermark-types-supported" title="Permanent link">&para;</a></h3>
+<p><code>watermark_type: timestamp</code>, <code>date</code>, and <code>long</code> all work for CDC
+composition, via the same <code>build_watermark_filter</code> helper that
+<code>incremental_watermark</code> mode uses. <code>watermark_inclusive: true</code>
+behaves identically to the incremental watermark mode: the
+filter becomes <code>&gt;= prior_hwm</code> instead of <code>&gt; prior_hwm</code>, which is
+the safer default when pairing with merge or overwrite writes.</p>
 <hr />
-<h2 id="naming-enhancements">Naming Enhancements<a class="headerlink" href="#naming-enhancements" title="Permanent link">&para;</a></h2>
-<h3 id="kebab-case-pattern">kebab-case Pattern<a class="headerlink" href="#kebab-case-pattern" title="Permanent link">&para;</a></h3>
-<p><code>kebab-case</code> is now a supported naming pattern:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kebab-case</span>
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Backtick-quoting required</p>
-<p>Hyphenated column names require backtick-quoting in Spark SQL
-expressions. A validation warning is emitted when selected.</p>
-</div>
-<h3 id="collision-dedup">Collision Dedup<a class="headerlink" href="#collision-dedup" title="Permanent link">&para;</a></h3>
-<p>When normalization produces duplicate column names, the new
-<code>on_collision</code> setting controls the behavior:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">on_collision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">suffix</span><span class="w">  </span><span class="c1"># _2, _3 suffixes in source order</span>
-</code></pre></div>
+<h2 id="configuration-summary">Configuration summary<a class="headerlink" href="#configuration-summary" title="Permanent link">&para;</a></h2>
+<p>No new fields were added. The change is a validator relaxation
+plus an internal wiring change, so the public YAML schema and
+the state schema are both unchanged.</p>
+<p>Cross-field rules now enforced by <code>LoadConfig</code>:</p>
 <table>
 <thead>
 <tr>
-<th>Value</th>
-<th>Behavior</th>
+<th>Rule</th>
+<th>Effect</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>error</code> (default)</td>
-<td>Raise <code>ConfigError</code> listing collisions</td>
+<td><code>mode=cdc</code> + <code>cdc.operation_column</code> + <code>watermark_column</code></td>
+<td>Accepted; composition path</td>
 </tr>
 <tr>
-<td><code>suffix</code></td>
-<td>Append <code>_2</code>, <code>_3</code> in source column order</td>
+<td><code>mode=cdc</code> + <code>cdc.preset=delta_cdf</code> + <code>watermark_column</code></td>
+<td>Rejected with a preset-specific error</td>
+</tr>
+<tr>
+<td><code>watermark_column</code> set without <code>watermark_type</code> in cdc mode</td>
+<td>Rejected</td>
 </tr>
 </tbody>
 </table>
-<h3 id="reserved-word-protection">Reserved Word Protection<a class="headerlink" href="#reserved-word-protection" title="Permanent link">&para;</a></h3>
-<p>Prevent SQL-reserved column names from breaking downstream queries:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">reserved_words</span><span class="p">:</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;_&quot;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">extend</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">timestamp</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">value</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">to</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">by</span><span class="p p-Indicator">]</span>
-</code></pre></div>
-<table>
-<thead>
-<tr>
-<th>Strategy</th>
-<th>Behavior</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>quote</code> (default)</td>
-<td>No-op — Spark backtick-quotes automatically</td>
-</tr>
-<tr>
-<td><code>prefix</code></td>
-<td>Prepend configured prefix string</td>
-</tr>
-<tr>
-<td><code>error</code></td>
-<td>Raise <code>ConfigError</code> listing conflicts</td>
-</tr>
-</tbody>
-</table>
-<p>The default reserved word list contains 82 ANSI SQL:2016 keywords.
-Use <code>extend</code> and <code>exclude</code> to customize.</p>
-<h3 id="pipeline-order">Pipeline Order<a class="headerlink" href="#pipeline-order" title="Permanent link">&para;</a></h3>
-<p>The full naming pipeline executes in a fixed order:</p>
-<ol>
-<li><strong>Rename</strong> — column set + static mappings applied</li>
-<li><strong>Normalize</strong> — pattern transformation (snake_case, etc.)</li>
-<li><strong>Dedup</strong> — collision resolution (suffix or error)</li>
-<li><strong>Reserved words</strong> — protection applied (prefix, quote, error)</li>
-</ol>
-<hr />
-<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<p>See the
+<a href="../../reference/configuration-keys/#loadconfig">load configuration reference</a>
+for the full field table and the
+<a href="../../reference/yaml-schema/thread/">thread YAML schema</a> for
+labelled YAML examples of all three load patterns
+(<code>incremental_watermark</code>, CDC via <code>delta_cdf</code> preset, and CDC
+with a watermark column).</p>
+<h2 id="internal-changes">Internal changes<a class="headerlink" href="#internal-changes" title="Permanent link">&para;</a></h2>
+<p><code>read_cdc_source</code> now returns <code>tuple[DataFrame, str | None]</code>.
+The second element is the HWM captured from this run, or <code>None</code>
+when nothing was captured (CDF preset path, empty first run, or
+empty subsequent window). The executor unpacks the tuple, wires
+<code>new_hwm</code> through the existing <code>save_watermark</code> plumbing, and
+only sets <code>last_version</code> on the CDF preset branch — explicit,
+with no reliance on incidental exception behavior in <code>int()</code>.</p>
+<h2 id="backwards-compatibility">Backwards compatibility<a class="headerlink" href="#backwards-compatibility" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>ColumnSetResult</code> captures per-column-set resolution outcome
-  (name, source_type, mappings_loaded, skipped)</li>
-<li><code>WeaveTelemetry.column_set_results</code> populates structured
-  results from materialization</li>
-<li>DEBUG-level per-mapping logs for rename, normalize, and
-  reserved word operations</li>
+<li>Existing configurations keep working without changes.</li>
+<li>No new YAML keys, no new state schema, no new credentials.</li>
+<li>Only an internal helper signature changed; the executor is the
+  sole non-test caller and was migrated in the same commit.</li>
 </ul>
-<h2 id="new-public-exports">New Public Exports<a class="headerlink" href="#new-public-exports" title="Permanent link">&para;</a></h2>
-<p>From <code>weevr.model</code>:</p>
-<ul>
-<li><code>ColumnSet</code> — column set domain model</li>
-<li><code>ColumnSetSource</code> — source configuration for column sets</li>
-<li><code>ReservedWordConfig</code> — reserved word protection settings</li>
-</ul>
-<p>From <code>weevr.telemetry</code>:</p>
-<ul>
-<li><code>ColumnSetResult</code> — per-column-set resolution result</li>
-</ul>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All new fields default to <code>None</code> or safe
-defaults — existing configurations work without modification.</p>
-<table>
-<thead>
-<tr>
-<th>Component</th>
-<th>Version</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Python</td>
-<td>3.11</td>
-</tr>
-<tr>
-<td>PySpark</td>
-<td>3.5.x</td>
-</tr>
-<tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
-</tr>
-</tbody>
-</table>
 
 
 

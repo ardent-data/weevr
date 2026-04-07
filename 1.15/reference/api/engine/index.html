@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.14/" class="md-tabs__link">
+        <a href="../../../release-notes/1.15/" class="md-tabs__link">
           
   
   
@@ -2525,6 +2525,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../release-notes/1.15/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.15
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../release-notes/1.14/" class="md-nav__link">
         
   
@@ -4623,6 +4651,31 @@ DataFrame before write. Each tuple is <code>(column_name, type_string)</code>.</
                 <p>Data samples captured before write, keyed by category. Contains
 <code>"output"</code> (up to 10 rows) and optionally <code>"quarantine"</code> (up to 10
 rows from the quarantine DataFrame).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.engine.ThreadResult.drift_report">drift_report</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Schema drift report captured before write when schema drift
+detection is active. <code>None</code> when no drift handling is configured.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.engine.ThreadResult.warp_findings">warp_findings</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Warp enforcement findings from this run — each entry names
+a column and the mismatch reason. <code>None</code> when warp enforcement is
+not configured for the target.</p>
               </div>
             </td>
           </tr>
