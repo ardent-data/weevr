@@ -26,6 +26,11 @@ class ThreadResult(FrozenBase):
         samples: Data samples captured before write, keyed by category. Contains
             ``"output"`` (up to 10 rows) and optionally ``"quarantine"`` (up to 10
             rows from the quarantine DataFrame).
+        drift_report: Schema drift report captured before write when schema drift
+            detection is active. ``None`` when no drift handling is configured.
+        warp_findings: Warp enforcement findings from this run — each entry names
+            a column and the mismatch reason. ``None`` when warp enforcement is
+            not configured for the target.
     """
 
     status: Literal["success", "failure", "skipped"]

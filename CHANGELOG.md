@@ -26,7 +26,7 @@
 
 ### Features
 
-* add `soft_delete_retain_value` for retained rows in merge ([#125](https://github.com/ardent-data/weevr/issues/125)) ([f7e8000](https://github.com/ardent-data/weevr/commit/f7e80005deeb0b52c446346387fadca22f641a8a))
+* add `soft_delete_active_value` for retained rows in merge ([#125](https://github.com/ardent-data/weevr/issues/125)) ([f7e8000](https://github.com/ardent-data/weevr/commit/f7e80005deeb0b52c446346387fadca22f641a8a))
 
 ## [1.11.1](https://github.com/ardent-data/weevr/compare/weevr-v1.11.0...weevr-v1.11.1) (2026-04-02)
 

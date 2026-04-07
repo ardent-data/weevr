@@ -156,7 +156,11 @@ The `write:` block controls how data is written to the target:
 - `overwrite` — replace the entire table (default)
 - `append` — add rows to the existing table
 - `merge` — upsert using `match_keys` with configurable `on_match`,
-  `on_no_match_target`, and `on_no_match_source` behaviors
+  `on_no_match_target`, and `on_no_match_source` behaviors. Soft
+  delete support via `on_no_match_source: soft_delete` with
+  `soft_delete_column`, `soft_delete_value`, and the optional
+  `soft_delete_active_value` (explicit value written on retained
+  rows; defaults to leaving the source value untouched).
 
 ## Incremental Load Modes
 
@@ -297,6 +301,47 @@ target:
   connection: dest_lh
   table: fact_orders
 ```
+
+## Thread Templates
+
+Threads can be parameterized and reused as templates from the weave's
+`threads:` list. Each `ThreadEntry` supports:
+
+- `name` / `ref` — inline name or external file reference
+- `as` — alias for this instance (effective name precedence:
+  `as` > `name` > filename stem); required when the same thread is
+  instantiated more than once in the same weave
+- `params` — per-instance parameter overrides, resolved in a
+  two-phase pass (weave-level params first, then thread-level
+  `params` applied on top)
+- `template_ref` — reserved telemetry field, populated from the
+  underlying thread identity when `as` is used
+- `dependencies`, `condition` — standard execution gates
+
+Unused `params` keys surface as telemetry warnings attributed to the
+source weave, so typo-class errors are visible in RunResult.
+
+## Reserved Word Strategies
+
+Naming pipelines (column and table) run `rename → normalize → dedup →
+reserved word protection`. The reserved word stage supports seven
+strategies on `target.naming.reserved_words.strategy`:
+
+- `prefix` — prepend a configurable string (default `"col_"`)
+- `suffix` — append a configurable string (default `"_col"`)
+- `quote` — wrap the name in backticks
+- `rename` — explicit `rename_map` of reserved → replacement, with a
+  configurable `fallback` strategy for unmapped collisions (default
+  `quote`; `rename` and `drop` are not valid fallbacks)
+- `revert` — discard the rename and keep the pre-normalization name
+- `drop` — remove the colliding column from the DataFrame (column
+  names only; not valid for table names, not valid as a fallback
+  when applied to tables)
+- `error` — fail with `ConfigError`
+
+Five built-in presets expose reserved word lists: `ansi`, `dax`, `m`,
+`powerbi` (= `dax ∪ m`), `tsql`. Presets and explicit lists compose
+via `extend` / `exclude`.
 
 ## JSON Schema
 
