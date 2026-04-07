@@ -5,6 +5,7 @@ from __future__ import annotations
 import fnmatch
 import logging
 import re
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
@@ -121,9 +122,161 @@ def is_excluded(column_name: str, exclude_patterns: list[str]) -> bool:
     return any(fnmatch.fnmatch(column_name, p) for p in exclude_patterns)
 
 
+def _resolve_quote(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Quote strategy: return renames unchanged (backtick-quoting is implicit)."""
+    return dict(renames)
+
+
+def _resolve_prefix(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Prefix strategy: prepend config.prefix to colliding names."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            prefixed = config.prefix + output
+            _log.debug("Reserved word protection: '%s' -> '%s'", output, prefixed)
+            updated[original] = prefixed
+        else:
+            updated[original] = output
+    return updated
+
+
+def _resolve_error(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Error strategy: raise ConfigError listing all colliding names."""
+    conflicts: list[str] = []
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            conflicts.append(output)
+        updated[original] = output
+    if conflicts:
+        raise ConfigError(f"Column names are SQL reserved words: {', '.join(sorted(conflicts))}")
+    return updated
+
+
+def _resolve_suffix(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Suffix strategy: append config.suffix to colliding names."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            suffixed = output + config.suffix
+            _log.debug("Reserved word protection: '%s' -> '%s'", output, suffixed)
+            updated[original] = suffixed
+        else:
+            updated[original] = output
+    return updated
+
+
+def _resolve_revert(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Revert strategy: discard rename for collisions, keep original name."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            _log.warning(
+                "Reserved word protection: reverted '%s' -> kept '%s'",
+                output,
+                original,
+            )
+            updated[original] = original
+        else:
+            updated[original] = output
+    return updated
+
+
+def _resolve_drop(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Drop strategy: remove colliding columns (None sentinel)."""
+    updated: dict[str, str | None] = {}
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            _log.warning(
+                "Reserved word protection: dropped column '%s' (reserved word '%s')",
+                original,
+                output,
+            )
+            updated[original] = None
+        else:
+            updated[original] = output
+    return updated
+
+
+def _resolve_rename(
+    renames: dict[str, str],
+    config: ReservedWordConfig,
+    effective_words: frozenset[str],
+) -> dict[str, str | None]:
+    """Rename strategy: apply rename_map, delegate unmapped to fallback."""
+    rename_map = config.rename_map or {}
+    updated: dict[str, str | None] = {}
+    unmapped: dict[str, str] = {}
+
+    for original, output in renames.items():
+        if output.lower() in effective_words:
+            mapped_name = rename_map.get(output.lower())
+            if mapped_name is not None:
+                _log.debug(
+                    "Reserved word protection: '%s' -> '%s' (rename_map)",
+                    output,
+                    mapped_name,
+                )
+                updated[original] = mapped_name
+            else:
+                unmapped[original] = output
+        else:
+            updated[original] = output
+
+    # Delegate unmapped collisions to the fallback strategy
+    if unmapped:
+        fallback = config.fallback or "quote"
+        fallback_fn = _STRATEGY_DISPATCH[fallback]
+        fallback_result = fallback_fn(unmapped, config, effective_words)
+        updated.update(fallback_result)
+
+    return updated
+
+
+_STRATEGY_DISPATCH: dict[
+    str,
+    Callable[
+        [dict[str, str], ReservedWordConfig, frozenset[str]],
+        dict[str, str | None],
+    ],
+] = {
+    "quote": _resolve_quote,
+    "prefix": _resolve_prefix,
+    "error": _resolve_error,
+    "suffix": _resolve_suffix,
+    "rename": _resolve_rename,
+    "revert": _resolve_revert,
+    "drop": _resolve_drop,
+}
+
+
 def _apply_reserved_word_protection(
     renames: dict[str, str], config: ReservedWordConfig
-) -> dict[str, str]:
+) -> dict[str, str | None]:
     """Apply reserved word protection to a column rename mapping.
 
     Checks each output column name against the effective reserved word set and
@@ -134,35 +287,15 @@ def _apply_reserved_word_protection(
         config: Reserved word configuration with strategy, prefix, extend, and exclude.
 
     Returns:
-        Updated renames dict with reserved word conflicts resolved.
+        Updated renames dict with reserved word conflicts resolved. ``None``
+        values indicate columns to be dropped (``strategy="drop"``).
 
     Raises:
         ConfigError: If ``strategy="error"`` and any output names are reserved words.
     """
     effective_words = resolve_effective_words(config)
-
-    if config.strategy == "quote":
-        return renames
-
-    conflicts: list[str] = []
-    updated: dict[str, str] = {}
-    for original, output in renames.items():
-        if output.lower() in effective_words:
-            if config.strategy == "prefix":
-                prefixed = config.prefix + output
-                _log.debug("Reserved word protection: '%s' -> '%s'", output, prefixed)
-                updated[original] = prefixed
-            else:
-                # strategy == "error": collect for later reporting
-                conflicts.append(output)
-                updated[original] = output
-        else:
-            updated[original] = output
-
-    if conflicts:
-        raise ConfigError(f"Column names are SQL reserved words: {', '.join(sorted(conflicts))}")
-
-    return updated
+    strategy_fn = _STRATEGY_DISPATCH[config.strategy]
+    return strategy_fn(renames, config, effective_words)
 
 
 def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
@@ -216,15 +349,21 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
                 renames[old_col] = suffixed
 
     if config.reserved_words is not None:
-        renames = _apply_reserved_word_protection(renames, config.reserved_words)
+        protected = _apply_reserved_word_protection(renames, config.reserved_words)
+        # Filter out dropped columns (None sentinel from drop strategy)
+        kept = {k: v for k, v in protected.items() if v is not None}
+    else:
+        kept = renames
 
-    for old, new in renames.items():
+    for old, new in kept.items():
         if old != new:
             _log.debug("  normalize: '%s' -> '%s'", old, new)
 
     # Rename via toDF() to avoid ambiguous column references when dedup
     # creates output names that collide with other columns' original names.
-    return df.toDF(*renames.values())
+    if len(kept) < len(df.columns):
+        df = df.select(list(kept.keys()))
+    return df.toDF(*kept.values())
 
 
 def normalize_table_name(name: str, config: NamingConfig) -> str:
@@ -251,18 +390,16 @@ def normalize_table_name(name: str, config: NamingConfig) -> str:
         result = normalize_name(name, config.tables)
 
     if config.reserved_words is not None:
+        if config.reserved_words.strategy == "drop":
+            raise ConfigError("Reserved word strategy 'drop' is not valid for table names")
+        if config.reserved_words.strategy == "rename" and config.reserved_words.fallback == "drop":
+            raise ConfigError("Reserved word fallback 'drop' is not valid for table names")
         effective_words = resolve_effective_words(config.reserved_words)
         if result.lower() in effective_words:
-            if config.reserved_words.strategy == "prefix":
-                prefixed = config.reserved_words.prefix + result
-                _log.debug(
-                    "Reserved word protection (table): '%s' -> '%s'",
-                    result,
-                    prefixed,
-                )
-                result = prefixed
-            elif config.reserved_words.strategy == "error":
-                raise ConfigError(f"Table name is a reserved word: {result}")
-            # strategy == "quote": no-op
+            # Build a single-entry renames dict for dispatch
+            renames = {name: result}
+            strategy_fn = _STRATEGY_DISPATCH[config.reserved_words.strategy]
+            resolved = strategy_fn(renames, config.reserved_words, effective_words)
+            result = resolved[name] or result  # None shouldn't happen (drop blocked above)
 
     return result

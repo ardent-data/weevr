@@ -415,11 +415,30 @@ Supported `NamingPattern` values: `snake_case`, `camelCase`,
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `strategy` | `Literal["prefix", "quote", "error"]` | `"quote"` | How to handle reserved words |
-| `prefix` | `str` | `"_"` | Prefix when `strategy` is `"prefix"` |
-| `preset` | `str \| list[str] \| None` | `None` | Built-in word list presets |
+| `strategy` | `Literal[7 values]` | `"quote"` | How to handle reserved words |
+| `prefix` | `str` | `"_"` | Prefix when strategy is `prefix` |
+| `suffix` | `str` | `"_col"` | Suffix when strategy is `suffix` |
+| `rename_map` | `dict[str, str]` | `None` | Explicit collision map for `rename` |
+| `fallback` | `Literal[6 values]` | `"quote"` | Fallback for unmapped `rename` collisions |
+| `preset` | `str \| list` | `None` | Built-in word list presets |
 | `extend` | `list[str]` | `[]` | Extra words to treat as reserved |
 | `exclude` | `list[str]` | `[]` | Words to remove from check |
+
+#### Strategies
+
+| Strategy | Behavior |
+|----------|----------|
+| `quote` | Keep name as-is; Spark backtick-quotes in SQL |
+| `prefix` | Prepend `prefix` to colliding names |
+| `suffix` | Append `suffix` to colliding names |
+| `error` | Raise `ConfigError` listing all collisions |
+| `rename` | Apply `rename_map`; unmapped use `fallback` |
+| `revert` | Discard the rename, keep pre-normalization name |
+| `drop` | Remove colliding columns (not valid for tables) |
+
+The `drop` strategy is not valid for table names — neither as a
+direct `strategy` nor as a `fallback`. Both raise `ConfigError`
+at runtime in `normalize_table_name`.
 
 #### Presets
 
@@ -445,6 +464,27 @@ full T-SQL protection without needing to add `ansi`.
 # Default (no preset = ANSI):
 reserved_words:
   strategy: prefix
+
+# Suffix — append string to collisions:
+reserved_words:
+  strategy: suffix
+  suffix: "_col"       # order -> order_col
+
+# Explicit rename map with fallback:
+reserved_words:
+  strategy: rename
+  rename_map:
+    order: order_name
+    select: select_col
+  fallback: error      # unmapped collisions fail
+
+# Revert — keep original name on collision:
+reserved_words:
+  strategy: revert
+
+# Drop — remove colliding columns:
+reserved_words:
+  strategy: drop
 
 # Power BI convenience alias (= dax + m):
 reserved_words:

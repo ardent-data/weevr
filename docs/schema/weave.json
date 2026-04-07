@@ -751,15 +751,19 @@
       "type": "object"
     },
     "ReservedWordConfig": {
-      "description": "Configuration for handling reserved word collisions in column names.\n\nWhen a column or table name matches a reserved word, the engine can\nhandle the collision in one of three ways: quote the name, prefix it,\nor raise an error.\n\nThe ``preset`` field selects one or more built-in word lists. When\nomitted, the ANSI SQL list is used as the default. Specifying any\npreset replaces that default \u2014 to include ANSI words alongside other\npresets, list ``\"ansi\"`` explicitly. A single string is accepted as\nshorthand for a one-element list.\n\nThe ``extend`` and ``exclude`` lists compose on top of the resolved\npreset union, adding or removing individual words.\n\nAttributes:\n    strategy: How to handle reserved word collisions. ``\"quote\"`` wraps\n        the name in back-ticks; ``\"prefix\"`` prepends ``prefix``;\n        ``\"error\"`` raises a validation error.\n    prefix: String prepended to colliding column names when\n        ``strategy=\"prefix\"``.\n    preset: Built-in word list presets to activate. ``None`` (default)\n        uses the ANSI SQL list. Accepts a single string or a list.\n    extend: Additional words to treat as reserved beyond the preset.\n    exclude: Words to remove from the reserved word check.",
+      "description": "Configuration for handling reserved word collisions in column names.\n\nWhen a column or table name matches a reserved word, the engine applies\nthe configured strategy to resolve the collision.\n\nStrategies:\n\n- ``\"quote\"`` \u2014 keep the name as-is; rely on backtick-quoting in SQL.\n- ``\"prefix\"`` \u2014 prepend ``prefix`` to colliding names.\n- ``\"suffix\"`` \u2014 append ``suffix`` to colliding names.\n- ``\"error\"`` \u2014 raise a ``ConfigError`` listing all colliding names.\n- ``\"rename\"`` \u2014 apply explicit ``rename_map``; unmapped collisions\n  fall through to ``fallback`` strategy.\n- ``\"revert\"`` \u2014 discard the rename for collisions, keeping the\n  pre-normalization name.\n- ``\"drop\"`` \u2014 remove colliding columns from the output (columns\n  only; not valid for table names).\n\nThe ``preset`` field selects one or more built-in word lists. When\nomitted, the ANSI SQL list is used as the default. Specifying any\npreset replaces that default \u2014 to include ANSI words alongside other\npresets, list ``\"ansi\"`` explicitly. A single string is accepted as\nshorthand for a one-element list.\n\nThe ``extend`` and ``exclude`` lists compose on top of the resolved\npreset union, adding or removing individual words.\n\nAttributes:\n    strategy: How to handle reserved word collisions.\n    prefix: String prepended to colliding column names when\n        ``strategy=\"prefix\"``.\n    suffix: String appended to colliding column names when\n        ``strategy=\"suffix\"``.\n    rename_map: Explicit mapping of reserved words to replacement\n        names. Required when ``strategy=\"rename\"``.\n    fallback: Fallback strategy for unmapped collisions when\n        ``strategy=\"rename\"``. Cannot be ``\"rename\"``.\n    preset: Built-in word list presets to activate. ``None`` (default)\n        uses the ANSI SQL list. Accepts a single string or a list.\n    extend: Additional words to treat as reserved beyond the preset.\n    exclude: Words to remove from the reserved word check.",
       "properties": {
         "strategy": {
           "default": "quote",
-          "description": "How to handle reserved word collisions. ``quote`` wraps in back-ticks; ``prefix`` prepends ``prefix``; ``error`` raises a validation error.",
+          "description": "How to handle reserved word collisions. ``quote`` wraps in back-ticks; ``prefix`` prepends ``prefix``; ``suffix`` appends ``suffix``; ``error`` raises a validation error; ``rename`` applies an explicit mapping with fallback; ``revert`` keeps the pre-normalization name; ``drop`` removes colliding columns.",
           "enum": [
             "prefix",
             "quote",
-            "error"
+            "error",
+            "suffix",
+            "rename",
+            "revert",
+            "drop"
           ],
           "title": "Strategy",
           "type": "string"
@@ -769,6 +773,49 @@
           "description": "String prepended to colliding column names when ``strategy`` is ``prefix``.",
           "title": "Prefix",
           "type": "string"
+        },
+        "suffix": {
+          "default": "_col",
+          "description": "String appended to colliding column names when ``strategy`` is ``suffix``.",
+          "title": "Suffix",
+          "type": "string"
+        },
+        "rename_map": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Explicit mapping of reserved words to replacement names. Required when ``strategy`` is ``rename``. Keys are matched case-insensitively.",
+          "title": "Rename Map"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "enum": [
+                "prefix",
+                "quote",
+                "error",
+                "suffix",
+                "revert",
+                "drop"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "quote",
+          "description": "Fallback strategy for unmapped collisions when ``strategy`` is ``rename``. Cannot be ``rename`` (no nesting). ``drop`` is not valid when applied to table names.",
+          "title": "Fallback"
         },
         "preset": {
           "anyOf": [

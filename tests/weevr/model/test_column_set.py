@@ -320,6 +320,116 @@ class TestReservedWordConfig:
             cfg.strategy = "prefix"  # type: ignore[misc]
 
 
+class TestReservedWordConfigNewStrategies:
+    """Test new strategy fields: suffix, rename, revert, drop."""
+
+    def test_suffix_strategy_accepted(self):
+        """Suffix strategy constructs successfully."""
+        cfg = ReservedWordConfig(strategy="suffix")
+        assert cfg.strategy == "suffix"
+
+    def test_suffix_default_value(self):
+        """Suffix field defaults to '_col'."""
+        cfg = ReservedWordConfig(strategy="suffix")
+        assert cfg.suffix == "_col"
+
+    def test_suffix_custom_value(self):
+        """Custom suffix value is stored."""
+        cfg = ReservedWordConfig(strategy="suffix", suffix="_column")
+        assert cfg.suffix == "_column"
+
+    def test_revert_strategy_accepted(self):
+        """Revert strategy constructs successfully."""
+        cfg = ReservedWordConfig(strategy="revert")
+        assert cfg.strategy == "revert"
+
+    def test_drop_strategy_accepted(self):
+        """Drop strategy constructs successfully."""
+        cfg = ReservedWordConfig(strategy="drop")
+        assert cfg.strategy == "drop"
+
+    def test_rename_strategy_with_map(self):
+        """Rename strategy with rename_map constructs successfully."""
+        cfg = ReservedWordConfig(
+            strategy="rename",
+            rename_map={"order": "order_name", "select": "select_col"},
+        )
+        assert cfg.strategy == "rename"
+        assert cfg.rename_map == {"order": "order_name", "select": "select_col"}
+
+    def test_rename_strategy_requires_map(self):
+        """Rename strategy without rename_map raises ValidationError."""
+        with pytest.raises(ValidationError, match="rename_map"):
+            ReservedWordConfig(strategy="rename")
+
+    def test_rename_strategy_empty_map_raises(self):
+        """Rename strategy with empty rename_map raises ValidationError."""
+        with pytest.raises(ValidationError, match="rename_map"):
+            ReservedWordConfig(strategy="rename", rename_map={})
+
+    def test_fallback_defaults_to_quote(self):
+        """Fallback field defaults to 'quote'."""
+        cfg = ReservedWordConfig(strategy="rename", rename_map={"order": "order_name"})
+        assert cfg.fallback == "quote"
+
+    def test_fallback_custom_value(self):
+        """Custom fallback value is stored."""
+        cfg = ReservedWordConfig(
+            strategy="rename",
+            rename_map={"order": "order_name"},
+            fallback="error",
+        )
+        assert cfg.fallback == "error"
+
+    def test_fallback_rename_raises(self):
+        """Fallback='rename' raises ValidationError (no nesting)."""
+        with pytest.raises(ValidationError, match="fallback"):
+            ReservedWordConfig(
+                strategy="rename",
+                rename_map={"order": "order_name"},
+                fallback="rename",  # type: ignore[arg-type]
+            )
+
+    def test_rename_map_keys_normalized_to_lowercase(self):
+        """Rename map keys are normalized to lowercase at validation."""
+        cfg = ReservedWordConfig(
+            strategy="rename",
+            rename_map={"ORDER": "order_name", "Select": "select_col"},
+        )
+        assert cfg.rename_map == {"order": "order_name", "select": "select_col"}
+
+    def test_rename_map_values_warn_if_reserved(self, caplog):
+        """Warning emitted when rename_map values are reserved words."""
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            ReservedWordConfig(
+                strategy="rename",
+                rename_map={"order": "select"},
+            )
+        assert any("select" in msg.lower() for msg in caplog.messages)
+
+    def test_rename_map_ignored_for_other_strategies(self):
+        """rename_map is accepted but ignored when strategy is not rename."""
+        cfg = ReservedWordConfig(strategy="prefix", rename_map={"a": "b"})
+        assert cfg.rename_map == {"a": "b"}
+
+    def test_all_seven_strategies_accepted(self):
+        """All 7 strategy values are accepted."""
+        for strategy in ("prefix", "quote", "error", "suffix", "rename", "revert", "drop"):
+            if strategy == "rename":
+                cfg = ReservedWordConfig(strategy=strategy, rename_map={"a": "b"})
+            else:
+                cfg = ReservedWordConfig(strategy=strategy)
+            assert cfg.strategy == strategy
+
+    def test_existing_strategies_unchanged(self):
+        """Existing prefix/quote/error strategies still work."""
+        assert ReservedWordConfig(strategy="quote").strategy == "quote"
+        assert ReservedWordConfig(strategy="prefix").prefix == "_"
+        assert ReservedWordConfig(strategy="error").strategy == "error"
+
+
 class TestReservedWordPreset:
     """Test ReservedWordPreset enum."""
 
