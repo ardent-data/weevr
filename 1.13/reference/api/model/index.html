@@ -4840,9 +4840,21 @@ column names. Defaults to <code>"target_name"</code>.</p>
 
 
         <p>Configuration for handling reserved word collisions in column names.</p>
-<p>When a column or table name matches a reserved word, the engine can
-handle the collision in one of three ways: quote the name, prefix it,
-or raise an error.</p>
+<p>When a column or table name matches a reserved word, the engine applies
+the configured strategy to resolve the collision.</p>
+<p>Strategies:</p>
+<ul>
+<li><code>"quote"</code> — keep the name as-is; rely on backtick-quoting in SQL.</li>
+<li><code>"prefix"</code> — prepend <code>prefix</code> to colliding names.</li>
+<li><code>"suffix"</code> — append <code>suffix</code> to colliding names.</li>
+<li><code>"error"</code> — raise a <code>ConfigError</code> listing all colliding names.</li>
+<li><code>"rename"</code> — apply explicit <code>rename_map</code>; unmapped collisions
+  fall through to <code>fallback</code> strategy.</li>
+<li><code>"revert"</code> — discard the rename for collisions, keeping the
+  pre-normalization name.</li>
+<li><code>"drop"</code> — remove colliding columns from the output (columns
+  only; not valid for table names).</li>
+</ul>
 <p>The <code>preset</code> field selects one or more built-in word lists. When
 omitted, the ANSI SQL list is used as the default. Specifying any
 preset replaces that default — to include ANSI words alongside other
@@ -4865,13 +4877,11 @@ preset union, adding or removing individual words.</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.model.ReservedWordConfig.strategy">strategy</span></code></td>
             <td>
-                  <code><span title="typing.Literal">Literal</span>[&#39;prefix&#39;, &#39;quote&#39;, &#39;error&#39;]</code>
+                  <code><span title="typing.Literal">Literal</span>[&#39;prefix&#39;, &#39;quote&#39;, &#39;error&#39;, &#39;suffix&#39;, &#39;rename&#39;, &#39;revert&#39;, &#39;drop&#39;]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>How to handle reserved word collisions. <code>"quote"</code> wraps
-the name in back-ticks; <code>"prefix"</code> prepends <code>prefix</code>;
-<code>"error"</code> raises a validation error.</p>
+                <p>How to handle reserved word collisions.</p>
               </div>
             </td>
           </tr>
@@ -4884,6 +4894,42 @@ the name in back-ticks; <code>"prefix"</code> prepends <code>prefix</code>;
               <div class="doc-md-description">
                 <p>String prepended to colliding column names when
 <code>strategy="prefix"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ReservedWordConfig.suffix">suffix</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>String appended to colliding column names when
+<code>strategy="suffix"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ReservedWordConfig.rename_map">rename_map</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Explicit mapping of reserved words to replacement
+names. Required when <code>strategy="rename"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ReservedWordConfig.fallback">fallback</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;prefix&#39;, &#39;quote&#39;, &#39;error&#39;, &#39;suffix&#39;, &#39;revert&#39;, &#39;drop&#39;] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fallback strategy for unmapped collisions when
+<code>strategy="rename"</code>. Cannot be <code>"rename"</code>.</p>
               </div>
             </td>
           </tr>
