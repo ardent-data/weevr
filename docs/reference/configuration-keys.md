@@ -280,6 +280,7 @@ Incremental load mode and watermark tracking.
 | `watermark_inclusive` | `bool` | `False` | Include rows equal to last watermark |
 | `watermark_store` | `WatermarkStoreConfig` | `None` | Watermark persistence backend |
 | `cdc` | `CdcConfig` | `None` | CDC configuration |
+| `watermark_format` | `str` | `None` | Spark `DateTimeFormatter` pattern used to parse a string-typed `watermark_column`. Only valid with `watermark_type` of `"timestamp"` or `"date"`. |
 
 Cross-field rules enforced at parse time:
 
@@ -291,6 +292,8 @@ Cross-field rules enforced at parse time:
   with `watermark_column` to narrow the read window for append-only CDC
   history tables; `watermark_type` is required whenever `watermark_column`
   is set in cdc mode
+- `watermark_format` requires `watermark_column` and is rejected when
+  `watermark_type` is `"int"` or `"long"`
 
 ### WatermarkStoreConfig
 

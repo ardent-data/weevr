@@ -349,6 +349,54 @@ the watermark, weevr re-reads the full history on every run. The
 `delta_cdf` preset tracks progress via commit versions and rejects
 `watermark_column`.
 
+### String-typed watermark columns (`watermark_format`)
+
+When a source lands the watermark column as a string rather than a native
+Delta `TIMESTAMP` or `DATE` — common for SAP/mainframe extracts and JSON
+dumps — declare a Spark `DateTimeFormatter` pattern via `watermark_format`:
+
+```yaml
+load:
+  mode: cdc
+  cdc:
+    operation_column: OPFLAG
+    insert_value: "I"
+    update_value: "U"
+    delete_value: "D"
+  watermark_column: AEDATTM
+  watermark_type: timestamp
+  watermark_format: "yyyy-MM-dd HH:mm:ss.SSSSSX"
+```
+
+With the field set, weevr wraps the column in `to_timestamp(col, format)`
+(or `to_date(col, format)` for `watermark_type: date`) in both the filter
+predicate and the high-water mark aggregate. The persisted HWM is stored
+as a canonical ISO string and is independent of the source pattern, so
+changing `watermark_format` on a later run does not require replaying
+state. `watermark_format` is opt-in and only valid with `watermark_type`
+of `timestamp` or `date`; pairing it with `int` or `long` is rejected at
+config load time.
+
+Rows whose values do not parse against the declared pattern are silently
+excluded from both the predicate and the HWM — Spark's `to_timestamp`
+and `to_date` return `NULL` on parse failure. The practical implication:
+if every row fails to parse on the first run, the thread reads zero
+rows, captures no HWM, and nothing is persisted. This is the
+"zero rows through" diagnostic signal that the format string is wrong;
+fix the pattern and re-run. A DEBUG log line is emitted from the reader
+whenever `watermark_format` is active, capturing the column, format,
+prior HWM, and new HWM — enable DEBUG on `weevr.operations.readers` to
+see it.
+
+This field assumes the default Fabric Spark 3.5+ time parser policy.
+Sessions that override `spark.sql.legacy.timeParserPolicy` will observe
+whatever parse semantics Spark applies under that policy.
+
+Delta-typed timestamp and date columns should not set `watermark_format`;
+the implicit-cast path is already correct and keeps Delta predicate
+pushdown available. Wrapping a Delta-typed column in `to_timestamp` has
+no functional benefit and would defeat file skipping.
+
 ## Choosing the right combination
 
 | Scenario | Load mode | Write mode |

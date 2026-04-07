@@ -1124,6 +1124,7 @@ Incremental load configuration with watermark tracking.
 | `watermark_inclusive` | `bool` | no | `false` | Include rows equal to the last watermark value (use with merge/overwrite for idempotency) |
 | `watermark_store` | `WatermarkStoreConfig` | no | `null` | Watermark persistence backend |
 | `cdc` | `CdcConfig` | no | `null` | CDC configuration. Required when `mode` is `"cdc"`. |
+| `watermark_format` | `string` | no | `null` | Spark `DateTimeFormatter` pattern used to parse a string-typed `watermark_column` at read time. Only valid with `watermark_type` of `"timestamp"` or `"date"`. |
 
 ### load.watermark_store
 
@@ -1193,6 +1194,22 @@ load:
   watermark_column: AEDATTM
   watermark_type: timestamp
   # watermark_store omitted: defaults to table_properties on the target Delta table
+```
+
+```yaml
+# CDC with a string-typed watermark column — declares the parse pattern.
+# Use this for SAP/mainframe sources where AEDATTM lands as text rather
+# than a Delta TIMESTAMP column.
+load:
+  mode: cdc
+  cdc:
+    operation_column: OPFLAG
+    insert_value: "I"
+    update_value: "U"
+    delete_value: "D"
+  watermark_column: AEDATTM
+  watermark_type: timestamp
+  watermark_format: "yyyy-MM-dd HH:mm:ss.SSSSSX"
 ```
 
 ---
