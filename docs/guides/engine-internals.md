@@ -189,7 +189,19 @@ write -> finalize
 1. Initialize thread-level resources (variables, lookups, column_sets)
 2. Run thread-level `pre_steps`
 3. Resolve lookup-based sources from cached or on-demand DataFrames
-4. Read all remaining declared sources (with watermark/CDC filtering if applicable)
+4. Read all remaining declared sources (with watermark/CDC filtering if
+   applicable). For `mode: incremental_watermark`, the primary source
+   is filtered against the prior HWM and the new HWM is captured from
+   the filtered DataFrame before transforms. For generic `mode: cdc`
+   (explicit `cdc.operation_column`) composed with a `watermark_column`,
+   the same pattern applies and the HWM aggregate runs *before*
+   I/U/D operation routing — delete rows participate in advancing the
+   window so append-only CDC history tables (e.g. SAP Open Database
+   Mirror) do not reprocess deletes on every run. Empty filtered
+   windows yield `new_hwm = None` so step 14 leaves the persisted HWM
+   untouched. The Delta CDF preset path (`cdc.preset: delta_cdf`) is
+   unchanged: it captures `_commit_version` instead of a column-based
+   watermark and rejects `watermark_column` at config-parse time.
 5. Set the primary (first) source as the working DataFrame
 6. Run pipeline steps against the working DataFrame
 7. Evaluate validation rules; quarantine or abort on failures

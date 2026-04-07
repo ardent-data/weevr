@@ -291,24 +291,49 @@ def read_cdc_source(
     source: Source,
     cdc_config: CdcConfig,
     last_version: int | None = None,
+    *,
+    load_config: LoadConfig | None = None,
+    prior_state: WatermarkState | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
-) -> DataFrame:
-    """Read a CDC source, optionally starting from a specific version.
+) -> tuple[DataFrame, str | None]:
+    """Read a CDC source, optionally narrowed by a watermark filter.
 
-    For ``preset=delta_cdf``, reads with Delta Change Data Feed options.
-    For generic CDC (explicit column mapping), reads the source normally
-    since change flags are already in the data.
+    For ``preset=delta_cdf``, reads with Delta Change Data Feed options;
+    the second tuple element is always ``None`` because CDF version
+    capture is performed by the executor against ``_commit_version``.
+
+    For generic CDC (explicit ``operation_column``), reads the source
+    normally since change flags are already in the data. When
+    ``load_config.watermark_column`` is set and ``prior_state`` is
+    provided, applies a watermark filter built by
+    ``build_watermark_filter`` (matching ``incremental_watermark``
+    semantics) and captures ``MAX(watermark_column)`` from the filtered
+    DataFrame *before* operation routing — delete rows participate in
+    the HWM aggregate so append-only CDC history tables advance their
+    window past delete events. An empty filtered window (or empty
+    first-run source) yields ``new_hwm = None`` so the executor can
+    skip ``save_watermark`` and leave prior state untouched.
 
     Args:
         spark: Active SparkSession.
         source: Source configuration (must be Delta for CDF preset).
         cdc_config: CDC configuration with preset or explicit mapping.
         last_version: Last processed CDF commit version. If provided,
-            reads changes starting from ``last_version + 1``.
-        connections: Named connection declarations forwarded to the read.
+            reads changes starting from ``last_version + 1``. Only
+            meaningful for the CDF preset path.
+        load_config: Thread-level load configuration. Required for
+            generic-CDC watermark composition; ignored for the CDF
+            preset.
+        prior_state: Previously persisted watermark state, or ``None``
+            for the first run. Only consulted when ``load_config`` has
+            a ``watermark_column``.
+        connections: Named connection declarations forwarded to the
+            read.
 
     Returns:
-        DataFrame with CDC data (includes change type column for CDF).
+        Tuple of ``(DataFrame, new_hwm_value)``. ``new_hwm_value`` is
+        ``None`` for the CDF preset, for generic CDC without
+        ``watermark_column``, or when the (filtered) source is empty.
     """
     if cdc_config.preset == "delta_cdf":
         if source.type != "delta" or source.alias is None:
@@ -318,8 +343,33 @@ def read_cdc_source(
         if last_version is not None:
             reader = reader.option("startingVersion", last_version + 1)
         if is_table_alias(source.alias):
-            return reader.table(source.alias)
-        return reader.load(source.alias)
+            return reader.table(source.alias), None
+        return reader.load(source.alias), None
 
-    # Generic CDC: read source normally; change flags are in the data
-    return _read_raw(spark, source, connections)
+    # Generic CDC: read source normally; change flags are in the data.
+    df = _read_raw(spark, source, connections)
+
+    # Apply watermark filter on subsequent runs (matches read_source_incremental).
+    if (
+        load_config is not None
+        and load_config.watermark_column is not None
+        and load_config.watermark_type is not None
+        and prior_state is not None
+    ):
+        filter_expr = build_watermark_filter(
+            watermark_column=load_config.watermark_column,
+            watermark_type=load_config.watermark_type,
+            last_value=prior_state.last_value,
+            inclusive=load_config.watermark_inclusive,
+        )
+        df = df.filter(filter_expr)
+
+    # Capture HWM from the filtered DataFrame *before* operation routing
+    # so D rows still advance the window (DEC-003).
+    new_hwm: str | None = None
+    if load_config is not None and load_config.watermark_column is not None:
+        hwm_row = df.agg(F.max(F.col(load_config.watermark_column)).alias("hwm")).collect()
+        if hwm_row and hwm_row[0]["hwm"] is not None:
+            new_hwm = str(hwm_row[0]["hwm"])
+
+    return df, new_hwm

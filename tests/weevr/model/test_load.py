@@ -87,14 +87,66 @@ class TestLoadConfig:
         with pytest.raises(ValidationError, match="cdc mode requires 'cdc' config"):
             LoadConfig(mode="cdc")
 
-    def test_cdc_mode_must_not_have_watermark_column(self):
-        """cdc mode with watermark_column raises ValidationError."""
-        with pytest.raises(ValidationError, match="must not set 'watermark_column'"):
+    def test_cdc_preset_rejects_watermark_column(self):
+        """cdc preset 'delta_cdf' with watermark_column raises ValidationError.
+
+        CDF uses commit-version tracking automatically, so a column-based
+        watermark is incoherent for the preset path.
+        """
+        with pytest.raises(ValidationError, match="delta_cdf"):
             LoadConfig(
                 mode="cdc",
                 cdc={"preset": "delta_cdf"},  # type: ignore[arg-type]
                 watermark_column="ts",
+                watermark_type="timestamp",
             )
+
+    def test_cdc_generic_accepts_watermark_column(self):
+        """Generic CDC (operation_column) composes with watermark_column."""
+        lc = LoadConfig(
+            mode="cdc",
+            cdc={  # type: ignore[arg-type]
+                "operation_column": "OPFLAG",
+                "insert_value": "I",
+                "update_value": "U",
+                "delete_value": "D",
+            },
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+        )
+        assert lc.watermark_column == "AEDATTM"
+        assert lc.watermark_type == "timestamp"
+        assert lc.cdc is not None
+        assert lc.cdc.operation_column == "OPFLAG"
+
+    def test_cdc_generic_watermark_requires_type(self):
+        """watermark_column without watermark_type in cdc mode raises."""
+        with pytest.raises(ValidationError, match="watermark_type"):
+            LoadConfig(
+                mode="cdc",
+                cdc={  # type: ignore[arg-type]
+                    "operation_column": "OPFLAG",
+                    "insert_value": "I",
+                    "update_value": "U",
+                    "delete_value": "D",
+                },
+                watermark_column="AEDATTM",
+            )
+
+    def test_cdc_generic_without_watermark_unchanged(self):
+        """Existing generic CDC configs without watermark_column still pass."""
+        lc = LoadConfig(
+            mode="cdc",
+            cdc={  # type: ignore[arg-type]
+                "operation_column": "OPFLAG",
+                "insert_value": "I",
+                "update_value": "U",
+                "delete_value": "D",
+            },
+        )
+        assert lc.watermark_column is None
+        assert lc.cdc is not None
+        assert lc.cdc.operation_column == "OPFLAG"
 
     def test_cdc_config_not_valid_on_non_cdc_mode(self):
         """cdc config on non-cdc mode raises ValidationError."""

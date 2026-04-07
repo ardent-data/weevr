@@ -328,7 +328,19 @@ load:
     insert_value: "I"
     update_value: "U"
     delete_value: "D"
+  # Optional: compose with a watermark column to narrow reads on
+  # append-only history tables (see below).
+  # watermark_column: updated_at
+  # watermark_type: timestamp
 ```
+
+The explicit path may be combined with `watermark_column` and
+`watermark_type` to narrow the read window for append-only CDC history
+tables — for example, SAP data landed by Fabric Open Database Mirror,
+where every change row carries a change timestamp like `AEDATTM`. Without
+the watermark, weevr re-reads the full history on every run. The
+`delta_cdf` preset tracks progress via commit versions and rejects
+`watermark_column`.
 
 ## Choosing the right combination
 
@@ -338,6 +350,7 @@ load:
 | Accumulating event log | `incremental_watermark` | `append` |
 | Dimension table with updates | `full` or `incremental_watermark` | `merge` |
 | CDC from upstream system | `cdc` | `merge` |
+| CDC from append-only history table | `cdc` + `watermark_column` | `merge` |
 | Externally bounded batch | `incremental_parameter` | `append` or `merge` |
 
 ## Next steps

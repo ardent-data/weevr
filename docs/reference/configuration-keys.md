@@ -275,11 +275,22 @@ Incremental load mode and watermark tracking.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | `"full" \| "incremental_watermark" \| "incremental_parameter" \| "cdc"` | `"full"` | Load strategy |
-| `watermark_column` | `str` | `None` | Column for watermark comparison |
-| `watermark_type` | `"timestamp" \| "date" \| "int" \| "long"` | `None` | Watermark column data type |
+| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; optional for `cdc` mode when `cdc.operation_column` is set (rejected when `cdc.preset` is `"delta_cdf"`). |
+| `watermark_type` | `"timestamp" \| "date" \| "int" \| "long"` | `None` | Watermark column data type. Required whenever `watermark_column` is set. |
 | `watermark_inclusive` | `bool` | `False` | Include rows equal to last watermark |
 | `watermark_store` | `WatermarkStoreConfig` | `None` | Watermark persistence backend |
 | `cdc` | `CdcConfig` | `None` | CDC configuration |
+
+Cross-field rules enforced at parse time:
+
+- `mode == "incremental_watermark"` requires `watermark_column`
+- `mode == "cdc"` requires `cdc` config
+- `mode == "cdc"` with `cdc.preset == "delta_cdf"` rejects `watermark_column`
+  (CDF uses commit-version tracking automatically)
+- `mode == "cdc"` with `cdc.operation_column` (generic CDC) may compose
+  with `watermark_column` to narrow the read window for append-only CDC
+  history tables; `watermark_type` is required whenever `watermark_column`
+  is set in cdc mode
 
 ### WatermarkStoreConfig
 
