@@ -2058,6 +2058,19 @@
           ],
           "default": null,
           "description": "CDC-specific configuration. Required when mode is 'cdc'."
+        },
+        "watermark_format": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Spark DateTimeFormatter pattern used to parse a string-typed watermark_column at read time. Only valid with watermark_type 'timestamp' or 'date'. When set, the engine wraps the column in to_timestamp/to_date(col, watermark_format) for both the predicate and the HWM aggregate.",
+          "title": "Watermark Format"
         }
       },
       "title": "LoadConfig",
