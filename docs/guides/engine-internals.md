@@ -131,72 +131,84 @@ After each thread completes:
   consumers remain.
 - Thread-level telemetry collectors are merged into the weave collector.
 
-**Thread level** (`execute_thread`) — A single thread runs through a 15-step
+**Thread level** (`execute_thread`) — A single thread runs through an 18-step
 pipeline:
 
 ```d2
 direction: down
 
+setup: Setup {
+  style.fill: "#ECEFF1"
+  s0a: "1. Initialize thread resources\n(variables, lookups, column_sets)"
+  s0b: "2. Run thread pre_steps"
+  s0a -> s0b
+}
+
 sources: Sources {
   style.fill: "#E3F2FD"
-  s1: "1. Resolve lookups"
-  s2: "2. Read sources\n(watermark/CDC filter)"
-  s3: "3. Set primary DataFrame"
+  s1: "3. Resolve lookups"
+  s2: "4. Read sources\n(watermark/CDC filter)"
+  s3: "5. Set primary DataFrame"
   s1 -> s2 -> s3
 }
 
 transforms: Transforms {
   style.fill: "#FFF3E0"
-  s4: "4. Run pipeline steps"
-  s5: "5. Validate rules\n(quarantine on failure)"
-  s5b: "6. Naming normalization"
-  s6: "7. Compute business keys\n+ change hashes"
+  s4: "6. Run pipeline steps"
+  s5: "7. Validate rules\n(quarantine on failure)"
+  s5b: "8. Naming normalization"
+  s6: "9. Compute business keys\n+ change hashes"
   s4 -> s5 -> s5b -> s6
 }
 
 write: Write {
   style.fill: "#E8F5E9"
-  s7: "8. Resolve target path"
-  s8: "9. Apply column mapping"
-  s8b: "10. Inject audit columns"
-  s9: "11. Write to Delta\n(overwrite/append/merge/CDC)"
+  s7: "10. Resolve target path"
+  s8: "11. Apply column mapping"
+  s8b: "12. Inject audit columns"
+  s9: "13. Write to Delta\n(overwrite/append/merge/CDC)"
   s7 -> s8 -> s8b -> s9
 }
 
 finalize: Finalize {
   style.fill: "#F3E5F5"
-  s10: "12. Persist watermark/CDC state"
-  s11: "13. Post-write assertions"
-  s11b: "14. Write exports\n(secondary outputs)"
-  s12: "15. Build telemetry\n→ ThreadResult"
-  s10 -> s11 -> s11b -> s12
+  s10: "14. Persist watermark/CDC state"
+  s11: "15. Post-write assertions"
+  s11b: "16. Write exports\n(secondary outputs)"
+  s11c: "17. Run thread post_steps"
+  s12: "18. Build telemetry\n→ ThreadResult"
+  s10 -> s11 -> s11b -> s11c -> s12
 }
 
+setup -> sources
 sources -> transforms
 transforms -> write
 write -> finalize
 ```
 
-1. Resolve lookup-based sources from cached or on-demand DataFrames
-2. Read all remaining declared sources (with watermark/CDC filtering if applicable)
-3. Set the primary (first) source as the working DataFrame
-4. Run pipeline steps against the working DataFrame
-5. Evaluate validation rules; quarantine or abort on failures
-6. Apply column and table naming normalization, including
+1. Initialize thread-level resources (variables, lookups, column_sets)
+2. Run thread-level `pre_steps`
+3. Resolve lookup-based sources from cached or on-demand DataFrames
+4. Read all remaining declared sources (with watermark/CDC filtering if applicable)
+5. Set the primary (first) source as the working DataFrame
+6. Run pipeline steps against the working DataFrame
+7. Evaluate validation rules; quarantine or abort on failures
+8. Apply column and table naming normalization, including
    reserved word protection (if configured). Seven strategies
    are available: `quote`, `prefix`, `suffix`, `error`,
    `rename`, `revert`, and `drop`. See
    [configuration keys](../reference/configuration-keys.md#reservedwordconfig)
    for details.
-7. Compute business keys and change detection hashes
-8. Resolve the target write path
-9. Apply target column mapping
-10. Inject audit columns (bypasses mapping mode; applied for all write modes)
-11. Write to the Delta target (standard write or CDC merge routing)
-12. Persist watermark or CDC state
-13. Run post-write assertions
-14. Write exports (secondary outputs, if configured)
-15. Build telemetry and return `ThreadResult`
+9. Compute business keys and change detection hashes
+10. Resolve the target write path
+11. Apply target column mapping
+12. Inject audit columns (bypasses mapping mode; applied for all write modes)
+13. Write to the Delta target (standard write or CDC merge routing)
+14. Persist watermark or CDC state
+15. Run post-write assertions
+16. Write exports (secondary outputs, if configured)
+17. Run thread-level `post_steps`
+18. Build telemetry and return `ThreadResult`
 
 ### Failure handling
 
