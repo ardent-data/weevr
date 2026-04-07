@@ -19,6 +19,7 @@ from weevr.operations.readers import (
     build_watermark_filter,
     read_cdc_source,
     read_source,
+    read_source_incremental,
     read_sources,
 )
 from weevr.state.watermark import WatermarkState
@@ -1095,3 +1096,136 @@ class TestBuildWatermarkFilter:
         rendered = str(col)
         assert " >= " in rendered
         assert "to_timestamp(" in rendered
+
+
+_SAP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSSSX"
+
+
+def _string_ts_load_config() -> LoadConfig:
+    return LoadConfig(
+        mode="incremental_watermark",
+        watermark_column="AEDATTM",
+        watermark_type="timestamp",
+        watermark_format=_SAP_FORMAT,
+    )
+
+
+class TestReadSourceIncrementalWatermarkFormat:
+    """Integration tests for ``read_source_incremental`` + ``watermark_format``."""
+
+    def test_first_run_string_timestamps_capture_canonical_hwm(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("inc_first_string_ts")
+        data = [
+            {"id": 1, "AEDATTM": "2026-01-01 10:00:00.12345Z"},
+            {"id": 2, "AEDATTM": "2026-01-02 10:00:00.12345Z"},
+            {"id": 3, "AEDATTM": "2026-01-03 10:00:00.12345Z"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _string_ts_load_config()
+
+        df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=None)
+
+        assert df.count() == 3
+        # HWM is captured as a Spark Timestamp converted to a Python str —
+        # *not* the raw source string. The trailing Z and the literal source
+        # text are gone because the typed aggregate produced a real Timestamp.
+        assert new_hwm is not None
+        assert new_hwm.startswith("2026-01-03 10:00:00")
+        assert "Z" not in new_hwm
+
+    def test_subsequent_run_filters_above_prior_hwm(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("inc_subsequent_string_ts")
+        data = [
+            {"id": 1, "AEDATTM": "2026-01-01 10:00:00.00000Z"},
+            {"id": 2, "AEDATTM": "2026-01-05 10:00:00.00000Z"},
+            {"id": 3, "AEDATTM": "2026-01-07 10:00:00.00000Z"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _string_ts_load_config()
+        prior = WatermarkState(
+            thread_name="t",
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            last_value="2026-01-05 10:00:00",
+            last_updated=datetime(2026, 1, 5),
+        )
+
+        df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=prior)
+
+        assert df.count() == 1  # only row 3 (strict greater-than)
+        assert new_hwm is not None
+        assert new_hwm.startswith("2026-01-07 10:00:00")
+
+    def test_unparseable_rows_silently_dropped(self, spark: SparkSession, tmp_delta_path) -> None:
+        """DEC-003: parseable rows flow through, unparseable rows drop out
+        of both the predicate and the HWM aggregate.
+        """
+        path = tmp_delta_path("inc_mixed_format")
+        data = [
+            {"id": 1, "AEDATTM": "2026-01-01 10:00:00.00000Z"},
+            {"id": 2, "AEDATTM": "not-a-timestamp"},
+            {"id": 3, "AEDATTM": "2026-01-04 10:00:00.00000Z"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _string_ts_load_config()
+        prior = WatermarkState(
+            thread_name="t",
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            last_value="2026-01-01 10:00:00",
+            last_updated=datetime(2026, 1, 1),
+        )
+
+        df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=prior)
+
+        # Garbage row never satisfies the predicate; only the parseable row
+        # above the prior HWM remains.
+        assert df.count() == 1
+        assert new_hwm is not None
+        assert new_hwm.startswith("2026-01-04 10:00:00")
+
+    def test_debug_log_emitted_when_format_set(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        import logging
+
+        path = tmp_delta_path("inc_debug_log")
+        data = [{"id": 1, "AEDATTM": "2026-01-01 10:00:00.00000Z"}]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _string_ts_load_config()
+
+        with caplog.at_level(logging.DEBUG, logger="weevr.operations.readers"):
+            read_source_incremental(spark, "src", source, load, prior_state=None)
+
+        assert any("watermark_format applied" in rec.getMessage() for rec in caplog.records)
+
+    def test_format_unset_path_unchanged(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Regression guard: when watermark_format is None, the existing
+        Delta-typed timestamp path is byte-identical to today.
+        """
+        path = tmp_delta_path("inc_no_format")
+        data = [
+            {"id": 1, "AEDATTM": datetime(2026, 1, 1, 10, 0, 0)},
+            {"id": 2, "AEDATTM": datetime(2026, 1, 5, 10, 0, 0)},
+        ]
+        spark.createDataFrame(data).write.format("delta").save(path)
+        source = Source(type="delta", alias=path)
+        load = LoadConfig(
+            mode="incremental_watermark",
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+        )
+
+        df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=None)
+
+        assert df.count() == 2
+        assert new_hwm is not None
+        assert new_hwm.startswith("2026-01-05 10:00:00")
