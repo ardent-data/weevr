@@ -389,8 +389,11 @@ prior HWM, and new HWM — enable DEBUG on `weevr.operations.readers` to
 see it.
 
 This field assumes the default Fabric Spark 3.5+ time parser policy.
-Sessions that override `spark.sql.legacy.timeParserPolicy` will observe
-whatever parse semantics Spark applies under that policy.
+Under the default policy, `to_timestamp` and `to_date` with an explicit
+format return `NULL` on parse failure rather than throwing — which is
+what the silent-drop contract above relies on. Sessions that override
+`spark.sql.legacy.timeParserPolicy` will observe whatever parse
+semantics Spark applies under that policy.
 
 Delta-typed timestamp and date columns should not set `watermark_format`;
 the implicit-cast path is already correct and keeps Delta predicate
