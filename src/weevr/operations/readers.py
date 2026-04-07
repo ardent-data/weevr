@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import LongType, StructField, StructType
@@ -12,6 +14,8 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
 from weevr.state.watermark import WatermarkState
+
+logger = logging.getLogger(__name__)
 
 _INTERVAL_MAP = {
     "day": "interval 1 day",
@@ -201,11 +205,39 @@ def _parse_order_col(order_by: str):  # type: ignore[return]
     return col.desc() if direction == "DESC" else col.asc()
 
 
+def _typed_watermark_col(
+    watermark_column: str,
+    watermark_type: str | None,
+    watermark_format: str | None,
+) -> Column:
+    """Return the watermark column expression, optionally parsed from a string.
+
+    When ``watermark_format`` is ``None``, returns a bare ``F.col`` reference
+    so existing call sites stay byte-identical. When set, wraps the column
+    in ``to_timestamp``/``to_date`` so a string-typed source column is parsed
+    against the user-supplied Spark DateTimeFormatter pattern before any
+    comparison or aggregate. Only meaningful for ``timestamp`` / ``date``;
+    callers are responsible for passing ``None`` on numeric watermark types.
+    """
+    col = F.col(watermark_column)
+    if watermark_format is None:
+        return col
+    if watermark_type == "timestamp":
+        return F.to_timestamp(col, watermark_format)
+    if watermark_type == "date":
+        return F.to_date(col, watermark_format)
+    raise ValueError(
+        f"watermark_format is only valid with watermark_type 'timestamp' "
+        f"or 'date', got {watermark_type!r}"
+    )
+
+
 def build_watermark_filter(
     watermark_column: str,
     watermark_type: str,
     last_value: str,
     inclusive: bool = False,
+    watermark_format: str | None = None,
 ) -> Column:
     """Build a Spark Column filter expression for watermark-based incremental reads.
 
@@ -215,18 +247,22 @@ def build_watermark_filter(
         last_value: Serialized high-water mark value.
         inclusive: If ``True``, use ``>=`` (re-read boundary row).
             Defaults to ``False`` (strict ``>``).
+        watermark_format: Optional Spark DateTimeFormatter pattern. When set,
+            the column is parsed with ``to_timestamp``/``to_date(col, fmt)``
+            before the comparison. Only valid with ``timestamp``/``date``
+            watermark types; ignored for numeric types.
 
     Returns:
         A Spark Column expression suitable for ``df.filter()``.
     """
-    col = F.col(watermark_column)
+    typed = _typed_watermark_col(watermark_column, watermark_type, watermark_format)
     if watermark_type in ("timestamp", "date"):
         lit_val = F.lit(last_value).cast(watermark_type)
     elif watermark_type == "long":
         lit_val = F.lit(int(last_value)).cast("long")
     else:
         lit_val = F.lit(int(last_value))
-    return col >= lit_val if inclusive else col > lit_val
+    return typed >= lit_val if inclusive else typed > lit_val
 
 
 def read_source_incremental(
@@ -269,15 +305,30 @@ def read_source_incremental(
             watermark_type=load_config.watermark_type,
             last_value=prior_state.last_value,
             inclusive=load_config.watermark_inclusive,
+            watermark_format=load_config.watermark_format,
         )
         df = df.filter(filter_expr)
 
     # Capture HWM before dedup (from filtered source)
     new_hwm: str | None = None
     if load_config.watermark_column is not None:
-        hwm_row = df.agg(F.max(F.col(load_config.watermark_column)).alias("hwm")).collect()
+        typed = _typed_watermark_col(
+            load_config.watermark_column,
+            load_config.watermark_type,
+            load_config.watermark_format,
+        )
+        hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
         if hwm_row and hwm_row[0]["hwm"] is not None:
             new_hwm = str(hwm_row[0]["hwm"])
+
+        if load_config.watermark_format is not None:
+            logger.debug(
+                "Thread watermark_format applied: column=%s format=%s prior=%s new=%s",
+                load_config.watermark_column,
+                load_config.watermark_format,
+                prior_state.last_value if prior_state else None,
+                new_hwm,
+            )
 
     # Apply dedup after HWM capture
     if source.dedup is not None:
@@ -361,6 +412,7 @@ def read_cdc_source(
             watermark_type=load_config.watermark_type,
             last_value=prior_state.last_value,
             inclusive=load_config.watermark_inclusive,
+            watermark_format=load_config.watermark_format,
         )
         df = df.filter(filter_expr)
 
@@ -368,8 +420,22 @@ def read_cdc_source(
     # so D rows still advance the window (DEC-003).
     new_hwm: str | None = None
     if load_config is not None and load_config.watermark_column is not None:
-        hwm_row = df.agg(F.max(F.col(load_config.watermark_column)).alias("hwm")).collect()
+        typed = _typed_watermark_col(
+            load_config.watermark_column,
+            load_config.watermark_type,
+            load_config.watermark_format,
+        )
+        hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
         if hwm_row and hwm_row[0]["hwm"] is not None:
             new_hwm = str(hwm_row[0]["hwm"])
+
+        if load_config.watermark_format is not None:
+            logger.debug(
+                "Thread watermark_format applied: column=%s format=%s prior=%s new=%s",
+                load_config.watermark_column,
+                load_config.watermark_format,
+                prior_state.last_value if prior_state else None,
+                new_hwm,
+            )
 
     return df, new_hwm

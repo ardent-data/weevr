@@ -19,6 +19,7 @@ from weevr.model.write import WriteConfig
 from weevr.operations.readers import read_cdc_source
 from weevr.operations.writers import execute_cdc_merge
 from weevr.state.metadata_table import MetadataTableStore
+from weevr.state.table_properties import TablePropertiesStore
 
 pytestmark = pytest.mark.spark
 
@@ -31,6 +32,7 @@ def _make_cdc_watermark_thread(
     wm_store_path: str | None = None,
     watermark_inclusive: bool = False,
     store_type: Literal["table_properties", "metadata_table"] = "metadata_table",
+    watermark_format: str | None = None,
 ) -> Thread:
     """Build a generic-CDC thread that composes with a watermark column.
 
@@ -63,6 +65,7 @@ def _make_cdc_watermark_thread(
             watermark_type="timestamp",
             watermark_inclusive=watermark_inclusive,
             watermark_store=wm_store,
+            watermark_format=watermark_format,
         ),
     )
 
@@ -666,3 +669,85 @@ class TestCdcWatermarkComposition:
         target_df = spark.read.format("delta").load(tgt).orderBy("id")
         ids = [row["id"] for row in target_df.collect()]
         assert ids == [1, 2]
+
+    def _seed_string_ts_cdc_source(
+        self, spark: SparkSession, path: str, rows: list[tuple[int, str, str]]
+    ) -> None:
+        """Seed a Delta source with AEDATTM as a STRING column (SAP-style)."""
+        df = spark.createDataFrame(rows, "id INT, OPFLAG STRING, AEDATTM STRING")
+        df.write.format("delta").mode("overwrite").save(path)
+
+    def _append_string_ts_cdc_rows(
+        self, spark: SparkSession, path: str, rows: list[tuple[int, str, str]]
+    ) -> None:
+        df = spark.createDataFrame(rows, "id INT, OPFLAG STRING, AEDATTM STRING")
+        df.write.format("delta").mode("append").save(path)
+
+    def test_watermark_format_round_trip_table_properties(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """End-to-end: SAP-style string AEDATTM with watermark_format set;
+        HWM round-trips through table_properties; second run narrows.
+        """
+        src = tmp_delta_path("cdc_wm_fmt_src")
+        tgt = tmp_delta_path("cdc_wm_fmt_tgt")
+
+        self._seed_string_ts_cdc_source(
+            spark,
+            src,
+            [
+                (1, "I", "2026-01-01 10:00:00.12345Z"),
+                (2, "I", "2026-01-02 10:00:00.12345Z"),
+            ],
+        )
+
+        thread = _make_cdc_watermark_thread(
+            "cdc_wm_fmt_t1",
+            src,
+            tgt,
+            store_type="table_properties",
+            watermark_format="yyyy-MM-dd HH:mm:ss.SSSSSX",
+        )
+
+        # First run: reads both rows, persists canonical-ISO HWM in target
+        # table properties via the existing save_watermark path.
+        result1 = execute_thread(spark, thread)
+        assert result1.status == "success"
+        assert result1.telemetry is not None
+        assert result1.telemetry.rows_read == 2
+
+        # Direct round-trip assertion: the HWM was persisted in canonical
+        # ISO form (Python str of Spark Timestamp) — not the raw source
+        # format. This locks DEC-005 independent of the second-run
+        # behavioral proof below.
+        tp_store = TablePropertiesStore(tgt)
+        state1 = tp_store.read(spark, "cdc_wm_fmt_t1")
+        assert state1 is not None
+        assert state1.last_value.startswith("2026-01-02 10:00:00")
+        assert "Z" not in state1.last_value  # source-format Z stripped
+        assert state1.watermark_column == "AEDATTM"
+        assert state1.watermark_type == "timestamp"
+
+        # Append a row past the HWM and a row at the boundary that must be
+        # excluded by the strict greater-than filter.
+        self._append_string_ts_cdc_rows(
+            spark,
+            src,
+            [
+                (3, "I", "2026-01-02 10:00:00.12345Z"),  # boundary, excluded
+                (4, "I", "2026-01-05 10:00:00.12345Z"),  # past HWM, included
+                (2, "D", "2026-01-07 10:00:00.12345Z"),  # delete advances HWM
+            ],
+        )
+
+        # Second run: HWM read from target table properties, only the rows
+        # past the HWM are processed.
+        result2 = execute_thread(spark, thread)
+        assert result2.status == "success"
+        assert result2.telemetry is not None
+        assert result2.telemetry.rows_read == 2  # rows 4 and the delete
+
+        # Target reflects cumulative state: id=4 inserted, id=2 deleted.
+        target_ids = {r["id"] for r in spark.read.format("delta").load(tgt).collect()}
+        assert 4 in target_ids
+        assert 2 not in target_ids

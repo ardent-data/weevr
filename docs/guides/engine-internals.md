@@ -201,7 +201,10 @@ write -> finalize
    windows yield `new_hwm = None` so step 14 leaves the persisted HWM
    untouched. The Delta CDF preset path (`cdc.preset: delta_cdf`) is
    unchanged: it captures `_commit_version` instead of a column-based
-   watermark and rejects `watermark_column` at config-parse time.
+   watermark and rejects `watermark_column` at config-parse time. When
+   `load.watermark_format` is set, both reader paths wrap the column
+   in `to_timestamp`/`to_date(col, format)` so string-typed watermark
+   columns (SAP, mainframe, JSON) can be parsed declaratively.
 5. Set the primary (first) source as the working DataFrame
 6. Run pipeline steps against the working DataFrame
 7. Evaluate validation rules; quarantine or abort on failures

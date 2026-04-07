@@ -573,6 +573,55 @@ write:
   on_no_match_source: ignore
 ```
 
+### CDC with Watermark Format (string-typed timestamp columns)
+
+When the source lands the watermark column as a string rather than a
+native Delta `TIMESTAMP` — common for SAP Open Database Mirror extracts
+where `AEDATTM` arrives as text — declare the parse pattern via
+`watermark_format`. weevr wraps the column in
+`to_timestamp(col, watermark_format)` for `watermark_type: timestamp`
+or `to_date(col, watermark_format)` for `watermark_type: date` — in
+both the filter predicate and the HWM aggregate — and persists the HWM
+as a canonical ISO string in the configured watermark store. Rows that
+fail to parse are silently excluded from both the predicate and the
+HWM (a "zero rows through" first run indicates the format pattern is
+wrong). `watermark_format` is only valid with `watermark_type: timestamp`
+or `date`; pairing it with `int` or `long` is rejected at config-parse
+time.
+
+```yaml
+config_version: "1.0"
+name: dim_customer_cdc_string_ts
+
+sources:
+  customer_history:
+    type: delta
+    alias: raw.sap_kna1_history
+
+target:
+  alias: curated.dim_customer
+
+load:
+  mode: cdc
+  cdc:
+    operation_column: OPFLAG
+    insert_value: "I"
+    update_value: "U"
+    delete_value: "D"
+    on_delete: soft_delete
+  watermark_column: AEDATTM
+  watermark_type: timestamp
+  watermark_format: "yyyy-MM-dd HH:mm:ss.SSSSSX"
+
+write:
+  mode: merge
+  match_keys:
+    - customer_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore
+```
+
 ### Loom with Parameters
 
 A deployment unit grouping weaves with shared defaults:
