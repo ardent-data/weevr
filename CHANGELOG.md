@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/ardent-data/weevr/compare/weevr-v1.15.0...weevr-v1.16.0) (2026-04-07)
+
+
+### Features
+
+* **engine:** parse string-typed watermark columns with watermark_format ([#139](https://github.com/ardent-data/weevr/issues/139)) ([a17eb98](https://github.com/ardent-data/weevr/commit/a17eb985ba26cc7f5180ba5ffe016792bb6d377d))
+
 ## [1.15.0](https://github.com/ardent-data/weevr/compare/weevr-v1.14.0...weevr-v1.15.0) (2026-04-07)
 
 
