@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/ardent-data/weevr/compare/weevr-v1.13.0...weevr-v1.14.0) (2026-04-07)
+
+
+### Features
+
+* **engine:** add suffix, rename, revert, and drop reserved word strategies ([#133](https://github.com/ardent-data/weevr/issues/133)) ([505159d](https://github.com/ardent-data/weevr/commit/505159d466605cee19574e74de2084431d377051))
+
 ## [1.13.0](https://github.com/ardent-data/weevr/compare/weevr-v1.12.0...weevr-v1.13.0) (2026-04-04)
 
 
