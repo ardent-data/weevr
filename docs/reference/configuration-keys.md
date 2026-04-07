@@ -236,6 +236,9 @@ Write destination with column mapping and partitioning.
 | `warp_enforcement` | `"warn" \| "enforce" \| "off"` | `"warn"` | Warp contract enforcement mode |
 | `schema_drift` | `"lenient" \| "strict" \| "adaptive"` | `"lenient"` | Schema drift handling mode |
 | `on_drift` | `"error" \| "warn" \| "ignore"` | `"warn"` | Severity for strict drift mode |
+| `dimension` | `DimensionConfig` | `None` | SCD Type 2 behavior. Mutually exclusive with `fact`. See [thread schema: target.dimension](yaml-schema/thread.md#targetdimension-dimensionconfig). |
+| `fact` | `FactConfig` | `None` | Fact table FK validation. Mutually exclusive with `dimension`. See [thread schema: target.fact](yaml-schema/thread.md#targetfact-factconfig). |
+| `seed` | `SeedConfig` | `None` | Static seed rows inserted on initial load. See [thread schema: target.seed](yaml-schema/thread.md#targetseed-seedconfig). |
 
 ### ColumnMapping
 
