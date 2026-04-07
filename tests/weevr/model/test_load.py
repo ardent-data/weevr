@@ -185,6 +185,51 @@ class TestLoadConfig:
         lc = LoadConfig()
         assert lc.watermark_store is None
 
+    def test_watermark_format_with_timestamp_accepted(self):
+        """watermark_format pairs cleanly with timestamp + watermark_column."""
+        lc = LoadConfig(
+            mode="incremental_watermark",
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            watermark_format="yyyy-MM-dd HH:mm:ss.SSSSSX",
+        )
+        assert lc.watermark_format == "yyyy-MM-dd HH:mm:ss.SSSSSX"
+
+    def test_watermark_format_with_date_accepted(self):
+        """watermark_format pairs cleanly with date + watermark_column."""
+        lc = LoadConfig(
+            mode="incremental_watermark",
+            watermark_column="event_date",
+            watermark_type="date",
+            watermark_format="yyyyMMdd",
+        )
+        assert lc.watermark_format == "yyyyMMdd"
+
+    def test_watermark_format_without_column_raises(self):
+        """watermark_format requires watermark_column to be set."""
+        with pytest.raises(ValidationError, match="watermark_column"):
+            LoadConfig(watermark_format="yyyy-MM-dd")
+
+    def test_watermark_format_with_int_raises(self):
+        """watermark_format is incoherent with int watermark_type."""
+        with pytest.raises(ValidationError, match="watermark_type"):
+            LoadConfig(
+                mode="incremental_watermark",
+                watermark_column="seq",
+                watermark_type="int",
+                watermark_format="yyyy-MM-dd",
+            )
+
+    def test_watermark_format_with_long_raises(self):
+        """watermark_format is incoherent with long watermark_type."""
+        with pytest.raises(ValidationError, match="watermark_type"):
+            LoadConfig(
+                mode="incremental_watermark",
+                watermark_column="seq",
+                watermark_type="long",
+                watermark_format="yyyy-MM-dd",
+            )
+
     def test_cdc_round_trip(self):
         """LoadConfig with cdc config round-trips."""
         lc = LoadConfig(

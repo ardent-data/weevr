@@ -149,6 +149,16 @@ class LoadConfig(FrozenBase):
         default=None,
         description="CDC-specific configuration. Required when mode is 'cdc'.",
     )
+    watermark_format: str | None = Field(
+        default=None,
+        description=(
+            "Spark DateTimeFormatter pattern used to parse a string-typed "
+            "watermark_column at read time. Only valid with watermark_type "
+            "'timestamp' or 'date'. When set, the engine wraps the column "
+            "in to_timestamp/to_date(col, watermark_format) for both the "
+            "predicate and the HWM aggregate."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_watermark_fields(self) -> LoadConfig:
@@ -175,6 +185,18 @@ class LoadConfig(FrozenBase):
         elif self.cdc:
             raise ValueError("'cdc' config is only valid when mode is 'cdc'")
 
+        return self
+
+    @model_validator(mode="after")
+    def _validate_watermark_format(self) -> LoadConfig:
+        if self.watermark_format is None:
+            return self
+        if self.watermark_column is None:
+            raise ValueError("watermark_format requires 'watermark_column' to be set")
+        if self.watermark_type not in ("timestamp", "date"):
+            raise ValueError(
+                "watermark_format is only valid when watermark_type is 'timestamp' or 'date'"
+            )
         return self
 
     @model_validator(mode="after")
