@@ -1056,6 +1056,17 @@ class TestTypedWatermarkCol:
         assert "to_date(" in rendered
         assert "event_date" in rendered
 
+    @pytest.mark.parametrize("bad_type", ["int", "long", None, "datetime"])
+    def test_rejects_non_temporal_watermark_type_when_format_set(
+        self, spark: SparkSession, bad_type: str | None
+    ) -> None:
+        """Defensive guard: the pydantic validator prevents this pairing in
+        practice, but direct callers must fail loudly rather than silently
+        route to ``to_date``.
+        """
+        with pytest.raises(ValueError, match="watermark_format is only valid"):
+            _typed_watermark_col("col", bad_type, "yyyy-MM-dd")
+
 
 class TestBuildWatermarkFilter:
     """Unit tests for ``build_watermark_filter`` parameter shape."""
@@ -1165,6 +1176,10 @@ class TestReadSourceIncrementalWatermarkFormat:
     def test_unparseable_rows_silently_dropped(self, spark: SparkSession, tmp_delta_path) -> None:
         """DEC-003: parseable rows flow through, unparseable rows drop out
         of both the predicate and the HWM aggregate.
+
+        Pins the source cardinality explicitly so the assertion isolates
+        the NULL-comparison mechanism: 3 rows in the source, 1 above the
+        prior HWM after the garbage row drops to NULL via ``to_timestamp``.
         """
         path = tmp_delta_path("inc_mixed_format")
         data = [
@@ -1183,6 +1198,11 @@ class TestReadSourceIncrementalWatermarkFormat:
             last_updated=datetime(2026, 1, 1),
         )
 
+        # Source cardinality is 3 — the garbage row is present in the raw
+        # read. The exclusion must come from the filter predicate, not from
+        # the source being smaller than expected.
+        assert spark.read.format("delta").load(path).count() == 3
+
         df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=prior)
 
         # Garbage row never satisfies the predicate; only the parseable row
@@ -1190,6 +1210,41 @@ class TestReadSourceIncrementalWatermarkFormat:
         assert df.count() == 1
         assert new_hwm is not None
         assert new_hwm.startswith("2026-01-04 10:00:00")
+
+    def test_unparseable_row_above_hwm_still_dropped(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """DEC-003 mechanism isolation: a garbage row whose *position* in
+        the source is above the prior HWM is still excluded purely via
+        NULL-comparison semantics, not by HWM ordering.
+        """
+        path = tmp_delta_path("inc_garbage_above_hwm")
+        data = [
+            # Prior run already covered 2026-01-01.
+            {"id": 1, "AEDATTM": "2026-01-03 10:00:00.00000Z"},
+            # Garbage row — cannot be compared against a prior HWM by
+            # definition. Under silent-drop, it must be excluded.
+            {"id": 2, "AEDATTM": "garbage"},
+        ]
+        create_delta_table(spark, path, data)
+        source = Source(type="delta", alias=path)
+        load = _string_ts_load_config()
+        prior = WatermarkState(
+            thread_name="t",
+            watermark_column="AEDATTM",
+            watermark_type="timestamp",
+            last_value="2026-01-02 10:00:00",
+            last_updated=datetime(2026, 1, 2),
+        )
+
+        assert spark.read.format("delta").load(path).count() == 2
+
+        df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=prior)
+
+        # Only the parseable row above the prior HWM survives.
+        assert df.count() == 1
+        assert new_hwm is not None
+        assert new_hwm.startswith("2026-01-03 10:00:00")
 
     def test_debug_log_emitted_when_format_set(
         self, spark: SparkSession, tmp_delta_path, caplog

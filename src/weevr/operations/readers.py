@@ -222,8 +222,14 @@ def _typed_watermark_col(
     col = F.col(watermark_column)
     if watermark_format is None:
         return col
-    parser = F.to_timestamp if watermark_type == "timestamp" else F.to_date
-    return parser(col, watermark_format)
+    if watermark_type == "timestamp":
+        return F.to_timestamp(col, watermark_format)
+    if watermark_type == "date":
+        return F.to_date(col, watermark_format)
+    raise ValueError(
+        f"watermark_format is only valid with watermark_type 'timestamp' "
+        f"or 'date', got {watermark_type!r}"
+    )
 
 
 def build_watermark_filter(
