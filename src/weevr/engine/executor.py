@@ -380,6 +380,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     # still goes through the existing save_watermark path
                     # below, which keys on `new_hwm is not None`.
                     new_hwm = cdc_new_hwm
+                    prior_hwm_value = prior_state.last_value if prior_state is not None else None
+                    logger.debug(
+                        "Thread '%s': CDC watermark captured on %s "
+                        "(prior=%s, new=%s, filter_applied=%s)",
+                        thread.name,
+                        thread.load.watermark_column,
+                        prior_hwm_value,
+                        cdc_new_hwm,
+                        prior_state is not None,
+                    )
 
                 # Read secondary sources normally (skip lookup-resolved ones)
                 sources_map = {primary_alias: primary_df}

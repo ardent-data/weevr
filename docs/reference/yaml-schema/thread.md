@@ -1120,7 +1120,7 @@ Incremental load configuration with watermark tracking.
 |-----|------|----------|---------|-------------|
 | `mode` | `string` | no | `"full"` | Load mode: `"full"`, `"incremental_watermark"`, `"incremental_parameter"`, `"cdc"` |
 | `watermark_column` | `string` | no | `null` | Column for watermark comparison. Required for `incremental_watermark`. May be combined with `cdc` mode when `cdc.operation_column` is set, to narrow the read window for append-only CDC history tables; rejected when `cdc.preset` is `"delta_cdf"`. |
-| `watermark_type` | `string` | no | `null` | Data type of the watermark column: `"timestamp"`, `"date"`, `"int"`, `"long"` |
+| `watermark_type` | `string` | no | `null` | Data type of the watermark column: `"timestamp"`, `"date"`, `"int"`, `"long"`. Required whenever `watermark_column` is set. |
 | `watermark_inclusive` | `bool` | no | `false` | Include rows equal to the last watermark value (use with merge/overwrite for idempotency) |
 | `watermark_store` | `WatermarkStoreConfig` | no | `null` | Watermark persistence backend |
 | `cdc` | `CdcConfig` | no | `null` | CDC configuration. Required when `mode` is `"cdc"`. |
@@ -1161,6 +1161,7 @@ Data Feed's commit-version tracking and rejects `watermark_column` because
 the two mechanisms are redundant.
 
 ```yaml
+# Incremental watermark load
 load:
   mode: incremental_watermark
   watermark_column: updated_at
@@ -1170,6 +1171,7 @@ load:
 ```
 
 ```yaml
+# CDC via Delta Change Data Feed (preset)
 load:
   mode: cdc
   cdc:
@@ -1177,8 +1179,9 @@ load:
 ```
 
 ```yaml
-# Generic CDC composed with a watermark column. Recommended for SAP
-# Open Database Mirror history tables and similar append-only CDC sources.
+# CDC with watermark column — generic CDC composed with a watermark.
+# Recommended for SAP Open Database Mirror history tables and similar
+# append-only CDC sources.
 load:
   mode: cdc
   cdc:

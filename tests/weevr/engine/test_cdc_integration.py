@@ -34,9 +34,8 @@ def _make_cdc_watermark_thread(
 ) -> Thread:
     """Build a generic-CDC thread that composes with a watermark column.
 
-    Mirrors ``_make_watermark_thread`` from test_watermark_integration.py
-    but uses ``mode=cdc`` with explicit operation_column mapping and an
-    AEDATTM-style timestamp watermark.
+    Uses ``mode=cdc`` with an explicit operation_column mapping and an
+    AEDATTM-style timestamp watermark column.
     """
     if store_type == "metadata_table":
         assert wm_store_path is not None
@@ -597,10 +596,21 @@ class TestCdcWatermarkComposition:
         assert state_after is not None
         assert state_after.last_value == prior_hwm
 
-    def test_persistence_failure_leaves_prior_hwm_untouched(
+    def test_state_write_failure_leaves_prior_hwm_untouched(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """Failure recovery: a write failure does not advance the persisted HWM."""
+        """A watermark-store write failure does not advance the persisted HWM
+        and the next run reprocesses the same window idempotently.
+
+        Two phases:
+        1. First run succeeds and persists HWM for row 1.
+        2. Second run adds row 2 to the source but the state-store write
+           is patched to raise StateError. The data-layer merge still
+           runs (that's the failure mode being exercised), but the HWM
+           is not advanced.
+        3. Third run (no patch) re-reads the same window, remerges row 2
+           idempotently via match keys, and advances the HWM.
+        """
         src = tmp_delta_path("cdc_wm_fail_src")
         tgt = tmp_delta_path("cdc_wm_fail_tgt")
         wm = tmp_delta_path("cdc_wm_fail_store")
@@ -613,13 +623,46 @@ class TestCdcWatermarkComposition:
 
         thread = _make_cdc_watermark_thread("cdc_wm_fail_t1", src, tgt, wm_store_path=wm)
 
+        # Phase 1: successful first run establishes prior HWM.
+        execute_thread(spark, thread)
+        store = MetadataTableStore(wm)
+        prior_state = store.read(spark, "cdc_wm_fail_t1")
+        assert prior_state is not None
+        prior_hwm = prior_state.last_value
+
+        # Append a second row so the next run has new work to do.
+        self._append_cdc_rows(spark, src, [(2, "I", "2026-01-02T10:00:00")])
+
+        # Phase 2: patch the state store write to simulate a failure after
+        # the data-write succeeds. Preserve the real read so prior_state is
+        # still loaded.
+        real_store = MetadataTableStore(wm)
         with patch("weevr.engine.executor.resolve_store") as mock_resolve:
             mock_store = MagicMock()
-            mock_store.read.return_value = None
+            mock_store.read.side_effect = lambda s, name: real_store.read(s, name)
             mock_store.write.side_effect = StateError(
-                "Simulated CDC write failure", thread_name="cdc_wm_fail_t1"
+                "Simulated state write failure", thread_name="cdc_wm_fail_t1"
             )
             mock_resolve.return_value = mock_store
 
-            with pytest.raises(StateError, match="Simulated CDC write failure"):
+            with pytest.raises(StateError, match="Simulated state write failure"):
                 execute_thread(spark, thread)
+
+        # Persisted HWM unchanged.
+        state_after_failure = store.read(spark, "cdc_wm_fail_t1")
+        assert state_after_failure is not None
+        assert state_after_failure.last_value == prior_hwm
+
+        # Phase 3: rerun without the patch. The same filtered window is
+        # reprocessed; CDC merge is idempotent on match keys so row 2 ends
+        # up present exactly once, and the HWM advances.
+        result = execute_thread(spark, thread)
+        assert result.status == "success"
+
+        state_after_recovery = store.read(spark, "cdc_wm_fail_t1")
+        assert state_after_recovery is not None
+        assert state_after_recovery.last_value != prior_hwm
+
+        target_df = spark.read.format("delta").load(tgt).orderBy("id")
+        ids = [row["id"] for row in target_df.collect()]
+        assert ids == [1, 2]

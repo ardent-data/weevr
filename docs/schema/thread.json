@@ -2007,7 +2007,7 @@
             }
           ],
           "default": null,
-          "description": "Column used for watermark-based incremental loads. Required when mode is 'incremental_watermark'.",
+          "description": "Column used for watermark-based incremental loads. Required when mode is 'incremental_watermark'. When mode is 'cdc' with cdc.operation_column set, narrows the read window for append-only CDC history tables; rejected when cdc.preset is 'delta_cdf'.",
           "title": "Watermark Column"
         },
         "watermark_type": {
@@ -2026,7 +2026,7 @@
             }
           ],
           "default": null,
-          "description": "Data type of the watermark column.",
+          "description": "Data type of the watermark column. Required whenever watermark_column is set.",
           "title": "Watermark Type"
         },
         "watermark_inclusive": {

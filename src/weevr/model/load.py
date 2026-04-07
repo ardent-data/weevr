@@ -122,12 +122,17 @@ class LoadConfig(FrozenBase):
         default=None,
         description=(
             "Column used for watermark-based incremental loads. "
-            "Required when mode is 'incremental_watermark'."
+            "Required when mode is 'incremental_watermark'. When mode is "
+            "'cdc' with cdc.operation_column set, narrows the read window "
+            "for append-only CDC history tables; rejected when "
+            "cdc.preset is 'delta_cdf'."
         ),
     )
     watermark_type: Literal["timestamp", "date", "int", "long"] | None = Field(
         default=None,
-        description="Data type of the watermark column.",
+        description=(
+            "Data type of the watermark column. Required whenever watermark_column is set."
+        ),
     )
     watermark_inclusive: bool = Field(
         default=False,
@@ -153,19 +158,21 @@ class LoadConfig(FrozenBase):
 
     @model_validator(mode="after")
     def _validate_cdc_fields(self) -> LoadConfig:
-        if self.mode == "cdc" and not self.cdc:
-            raise ValueError("cdc mode requires 'cdc' config to be set")
+        if self.mode == "cdc":
+            if self.cdc is None:
+                raise ValueError("cdc mode requires 'cdc' config to be set")
 
-        if self.mode == "cdc" and self.watermark_column:
-            if self.cdc is None or self.cdc.preset == "delta_cdf":
-                raise ValueError(
-                    "watermark_column is not valid with cdc preset 'delta_cdf'; "
-                    "CDF uses commit-version tracking automatically"
-                )
-            if self.watermark_type is None:
-                raise ValueError("watermark_column requires watermark_type when used with cdc mode")
-
-        if self.mode != "cdc" and self.cdc:
+            if self.watermark_column:
+                if self.cdc.preset == "delta_cdf":
+                    raise ValueError(
+                        "watermark_column is not valid with cdc preset 'delta_cdf'; "
+                        "CDF uses commit-version tracking automatically"
+                    )
+                if self.watermark_type is None:
+                    raise ValueError(
+                        "watermark_column requires watermark_type when used with cdc mode"
+                    )
+        elif self.cdc:
             raise ValueError("'cdc' config is only valid when mode is 'cdc'")
 
         return self

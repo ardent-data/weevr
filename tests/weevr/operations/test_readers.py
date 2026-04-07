@@ -5,6 +5,7 @@ from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
@@ -972,6 +973,35 @@ class TestReadCdcSourceGenericWatermark:
         assert df.count() == 1
         assert new_hwm is not None
         assert later_value in new_hwm
+
+    def test_cdf_preset_returns_none_hwm(self, spark: SparkSession, tmp_delta_path) -> None:
+        """CDF preset returns (df, None) — HWM capture is not applicable.
+
+        The second tuple element is reserved for the generic-CDC watermark
+        path; CDF tracks progress via commit version instead.
+        """
+        path = tmp_delta_path("cdf_preset_hwm")
+        create_delta_table(spark, path, [{"id": 1, "name": "Alice"}])
+        spark.sql(
+            f"ALTER TABLE delta.`{path}` SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')"
+        )
+        initial_version = (
+            DeltaTable.forPath(spark, path).history(1).select("version").collect()[0]["version"]
+        )
+        spark.createDataFrame([{"id": 2, "name": "Bob"}]).write.format("delta").mode("append").save(
+            path
+        )
+
+        source = Source(type="delta", alias=path)
+        cdc_config = CdcConfig(preset="delta_cdf")
+
+        result = read_cdc_source(spark, source, cdc_config, last_version=initial_version)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        df, new_hwm = result
+        assert new_hwm is None
+        assert "_change_type" in df.columns
 
     def test_no_watermark_config_reads_full_source(
         self, spark: SparkSession, tmp_delta_path
