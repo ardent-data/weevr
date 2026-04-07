@@ -167,8 +167,13 @@ processing:
 - `incremental_watermark` — filter by a watermark column; the high-water
   mark is persisted between runs
 - `incremental_parameter` — filter by a runtime parameter value
-- `cdc` — Change Data Capture via Delta Change Data Feed or explicit
-  operation column mapping
+- `cdc` — Change Data Capture via Delta Change Data Feed
+  (`cdc.preset: delta_cdf`) or explicit operation column mapping
+  (`cdc.operation_column`). The explicit mapping path can be combined
+  with `watermark_column` to narrow the read window for append-only CDC
+  history tables (e.g. SAP via Fabric Open Database Mirror); the CDF
+  preset uses automatic commit-version tracking and rejects
+  `watermark_column`.
 
 ## Hooks
 
@@ -472,6 +477,52 @@ write:
   mode: merge
   match_keys:
     - transaction_id
+  on_match: update
+  on_no_match_target: insert
+  on_no_match_source: ignore
+```
+
+### CDC with Watermark (append-only history tables)
+
+Generic CDC composed with a watermark column. Recommended for SAP data
+landed by Fabric Open Database Mirror, where every change row carries an
+operation flag (e.g. `OPFLAG`) and a change timestamp (e.g. `AEDATTM`).
+Without the watermark, weevr re-reads the full history on every run; with
+it, the second and subsequent runs only read rows past the persisted
+high-water mark. The HWM is captured from the source DataFrame before
+operation routing, so delete rows still advance the window. The CDF preset
+path (`cdc.preset: delta_cdf`) is a separate code path that uses Delta
+commit-version tracking and rejects `watermark_column`. See
+`reference/yaml-schema/thread/` for the full schema.
+
+```yaml
+config_version: "1.0"
+name: dim_customer_cdc
+
+sources:
+  customer_history:
+    type: delta
+    alias: raw.sap_kna1_history
+
+target:
+  alias: curated.dim_customer
+
+load:
+  mode: cdc
+  cdc:
+    operation_column: OPFLAG
+    insert_value: "I"
+    update_value: "U"
+    delete_value: "D"
+    on_delete: soft_delete
+  watermark_column: AEDATTM
+  watermark_type: timestamp
+  # watermark_store omitted: defaults to table_properties on the target
+
+write:
+  mode: merge
+  match_keys:
+    - customer_id
   on_match: update
   on_no_match_target: insert
   on_no_match_source: ignore

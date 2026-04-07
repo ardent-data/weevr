@@ -1119,7 +1119,7 @@ Incremental load configuration with watermark tracking.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `mode` | `string` | no | `"full"` | Load mode: `"full"`, `"incremental_watermark"`, `"incremental_parameter"`, `"cdc"` |
-| `watermark_column` | `string` | no | `null` | Column for watermark comparison. Required for `incremental_watermark`. Must not be set for `cdc`. |
+| `watermark_column` | `string` | no | `null` | Column for watermark comparison. Required for `incremental_watermark`. May be combined with `cdc` mode when `cdc.operation_column` is set, to narrow the read window for append-only CDC history tables; rejected when `cdc.preset` is `"delta_cdf"`. |
 | `watermark_type` | `string` | no | `null` | Data type of the watermark column: `"timestamp"`, `"date"`, `"int"`, `"long"` |
 | `watermark_inclusive` | `bool` | no | `false` | Include rows equal to the last watermark value (use with merge/overwrite for idempotency) |
 | `watermark_store` | `WatermarkStoreConfig` | no | `null` | Watermark persistence backend |
@@ -1146,6 +1146,20 @@ Incremental load configuration with watermark tracking.
 Either `preset` or `operation_column` must be set (but not both). When using
 explicit mapping, at least `insert_value` or `update_value` is required.
 
+When `cdc.operation_column` is set (the explicit mapping path), `load.mode: cdc`
+may be combined with `watermark_column` and `watermark_type` to narrow the
+read window. This is the recommended pattern for append-only CDC history
+tables — for example, SAP data landed by Fabric Open Database Mirror, where
+every change row carries a change timestamp like `AEDATTM`. Without the
+watermark, weevr re-reads the full history on every run; with it, the second
+and subsequent runs only read rows past the persisted high-water mark. The
+HWM is captured from the source DataFrame *before* operation routing, so
+delete rows participate in advancing the window.
+
+The `cdc.preset: delta_cdf` path is unchanged — it relies on Delta Change
+Data Feed's commit-version tracking and rejects `watermark_column` because
+the two mechanisms are redundant.
+
 ```yaml
 load:
   mode: incremental_watermark
@@ -1160,6 +1174,22 @@ load:
   mode: cdc
   cdc:
     preset: delta_cdf
+```
+
+```yaml
+# Generic CDC composed with a watermark column. Recommended for SAP
+# Open Database Mirror history tables and similar append-only CDC sources.
+load:
+  mode: cdc
+  cdc:
+    operation_column: OPFLAG
+    insert_value: "I"
+    update_value: "U"
+    delete_value: "D"
+    on_delete: soft_delete
+  watermark_column: AEDATTM
+  watermark_type: timestamp
+  # watermark_store omitted: defaults to table_properties on the target Delta table
 ```
 
 ---
