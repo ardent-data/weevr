@@ -19,6 +19,7 @@ from weevr.model.write import WriteConfig
 from weevr.operations.readers import read_cdc_source
 from weevr.operations.writers import execute_cdc_merge
 from weevr.state.metadata_table import MetadataTableStore
+from weevr.state.table_properties import TablePropertiesStore
 
 pytestmark = pytest.mark.spark
 
@@ -714,6 +715,18 @@ class TestCdcWatermarkComposition:
         assert result1.status == "success"
         assert result1.telemetry is not None
         assert result1.telemetry.rows_read == 2
+
+        # Direct round-trip assertion: the HWM was persisted in canonical
+        # ISO form (Python str of Spark Timestamp) — not the raw source
+        # format. This locks DEC-005 independent of the second-run
+        # behavioral proof below.
+        tp_store = TablePropertiesStore(tgt)
+        state1 = tp_store.read(spark, "cdc_wm_fmt_t1")
+        assert state1 is not None
+        assert state1.last_value.startswith("2026-01-02 10:00:00")
+        assert "Z" not in state1.last_value  # source-format Z stripped
+        assert state1.watermark_column == "AEDATTM"
+        assert state1.watermark_type == "timestamp"
 
         # Append a row past the HWM and a row at the boundary that must be
         # excluded by the strict greater-than filter.
