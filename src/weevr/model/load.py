@@ -106,8 +106,12 @@ class LoadConfig(FrozenBase):
     Cross-field validation:
     - ``mode == "incremental_watermark"`` requires ``watermark_column`` to be set.
     - ``mode == "cdc"`` requires ``cdc`` config to be set.
-    - ``mode == "cdc"`` must not have ``watermark_column`` set
-      (CDF version tracking is automatic).
+    - ``mode == "cdc"`` with ``cdc.preset == "delta_cdf"`` rejects
+      ``watermark_column`` (CDF uses commit-version tracking automatically).
+    - ``mode == "cdc"`` with ``cdc.operation_column`` (generic CDC) may
+      compose with ``watermark_column`` to narrow the read window for
+      append-only CDC history tables; ``watermark_type`` is required
+      whenever ``watermark_column`` is set in cdc mode.
     """
 
     mode: Literal["full", "incremental_watermark", "incremental_parameter", "cdc"] = Field(
@@ -153,10 +157,13 @@ class LoadConfig(FrozenBase):
             raise ValueError("cdc mode requires 'cdc' config to be set")
 
         if self.mode == "cdc" and self.watermark_column:
-            raise ValueError(
-                "cdc mode must not set 'watermark_column'; "
-                "CDF version tracking is handled automatically"
-            )
+            if self.cdc is None or self.cdc.preset == "delta_cdf":
+                raise ValueError(
+                    "watermark_column is not valid with cdc preset 'delta_cdf'; "
+                    "CDF uses commit-version tracking automatically"
+                )
+            if self.watermark_type is None:
+                raise ValueError("watermark_column requires watermark_type when used with cdc mode")
 
         if self.mode != "cdc" and self.cdc:
             raise ValueError("'cdc' config is only valid when mode is 'cdc'")
