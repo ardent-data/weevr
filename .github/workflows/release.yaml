@@ -33,17 +33,6 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # The labeling step is racy against GitHub's API: when
-          # release-please-action creates a PR and immediately tries to
-          # label it, the PR's GraphQL node ID can fail to resolve, the
-          # label call returns "Could not resolve to a node with the global
-          # id", and the action exits with failure. The release PR itself
-          # is created successfully, but without its `autorelease: pending`
-          # label release-please cannot recognize the eventual merged
-          # commit as a release commit and downstream tagging silently
-          # fails. Skip the racy step entirely; the workflow does not
-          # depend on these labels.
-          skip-labeling: true
 
   build:
     needs: release
