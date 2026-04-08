@@ -3,6 +3,18 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: >-
+          Force the build/publish chain to run even when release-please did
+          not create a new release this run. Used to recover a release whose
+          downstream jobs were skipped because of an upstream label/race
+          failure. deploy-docs is intentionally NOT bypassed -- patch
+          releases get docs from the Deploy Docs workflow on the source
+          merge, not from this pipeline.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -21,10 +33,25 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # The labeling step is racy against GitHub's API: when
+          # release-please-action creates a PR and immediately tries to
+          # label it, the PR's GraphQL node ID can fail to resolve, the
+          # label call returns "Could not resolve to a node with the global
+          # id", and the action exits with failure. The release PR itself
+          # is created successfully, but without its `autorelease: pending`
+          # label release-please cannot recognize the eventual merged
+          # commit as a release commit and downstream tagging silently
+          # fails. Skip the racy step entirely; the workflow does not
+          # depend on these labels.
+          skip-labeling: true
 
   build:
     needs: release
-    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    if: >-
+      ${{
+        needs.release.outputs.releases_created == 'true' ||
+        (github.event_name == 'workflow_dispatch' && inputs.force_release)
+      }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
