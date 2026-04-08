@@ -1,6 +1,6 @@
 [project]
 name = "weevr"
-version = "1.16.1"
+version = "2.0.0"
 description = "Metadata-driven execution engine for Fabric/Spark data pipelines."
 readme = "README.md"
 license = { file = "LICENSE" }
