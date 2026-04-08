@@ -119,27 +119,52 @@ runtime parameter. A column set must have exactly one of `source` or
 
 ### column_sets.source (ColumnSetSource)
 
+A `delta` source can be addressed two ways: by **registered table alias**
+(default Spark catalog) or by **named connection plus table** (resolves
+through the lakehouse referenced by a `connections:` entry on the loom
+or weave). The two modes are mutually exclusive.
+
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | yes | -- | Source type: `"delta"` or `"yaml"` |
-| `alias` | `string` | cond. | `null` | Lakehouse table alias. Required when `type="delta"`. |
+| `alias` | `string` | cond. | `null` | Lakehouse table alias. One of `alias` or `connection` is required when `type="delta"`. Mutually exclusive with `connection`. |
 | `path` | `string` | cond. | `null` | File path. Required when `type="yaml"`. |
+| `connection` | `string` | cond. | `null` | Reference to a named connection defined at the loom or weave level. Only valid for `type="delta"`. Mutually exclusive with `alias`. |
+| `schema` | `string` | no | `null` | Schema name within the connection's lakehouse. Only valid alongside `connection`. |
+| `table` | `string` | cond. | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `from_column` | `string` | no | `"source_name"` | Column containing the original (raw) column names |
 | `to_column` | `string` | no | `"target_name"` | Column containing the target (friendly) column names |
 | `filter` | `string` | no | `null` | SQL WHERE expression applied before collecting mappings |
 
 ```yaml
+# Connection-backed Delta source — reads from a non-default lakehouse
+# referenced by a loom-level connections: entry.
+connections:
+  ref:
+    type: onelake
+    workspace: ${param.workspace_id}
+    lakehouse: ${param.ref_lakehouse_id}
+
 column_sets:
   sap_dictionary:
     source:
       type: delta
-      alias: ref.column_dictionary
+      connection: ref
+      schema: dictionary
+      table: sap_column_renames
       from_column: raw_name
       to_column: friendly_name
       filter: "system = 'SAP'"
     on_unmapped: pass_through
     on_extra: ignore
     on_failure: abort
+
+  # Alias-backed Delta source — resolves against the active Spark catalog
+  # (the attached notebook lakehouse on Fabric).
+  legacy_dictionary:
+    source:
+      type: delta
+      alias: ref.column_dictionary
 
   hr_mappings:
     source:

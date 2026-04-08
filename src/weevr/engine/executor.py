@@ -210,7 +210,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             if merged_cs_defs:
                 effective_column_set_defs = merged_cs_defs
                 effective_column_sets, _ = materialize_column_sets(
-                    spark, merged_cs_defs, resolved_params or {}
+                    spark,
+                    merged_cs_defs,
+                    resolved_params or {},
+                    connections=connections,
                 )
 
         # Run thread-level pre_steps

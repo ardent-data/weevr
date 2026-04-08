@@ -9,6 +9,7 @@ from pyspark.sql import functions as F
 
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
 from weevr.model.source import Source
 from weevr.operations.readers import read_source
 from weevr.telemetry.results import ColumnSetResult
@@ -29,6 +30,7 @@ def resolve_column_set(
     resolved_params: dict[str, Any],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> dict[str, str] | None:
     """Resolve a single column set to a from→to mapping dict.
 
@@ -45,6 +47,8 @@ def resolve_column_set(
         resolved_params: Runtime notebook parameters already resolved.
         collector: Optional span collector for telemetry.
         parent_span_id: Optional parent span ID for span hierarchy.
+        connections: Named connection declarations keyed by connection name.
+            Required when the column set's source references a connection.
 
     Returns:
         Mapping of from-column name to to-column name, or ``None`` when
@@ -62,7 +66,7 @@ def resolve_column_set(
         span.set_attribute("column_set.name", name)
 
     try:
-        result = _resolve(spark, name, column_set, resolved_params)
+        result = _resolve(spark, name, column_set, resolved_params, connections)
 
         if span:
             mappings_loaded = len(result) if result is not None else 0
@@ -90,6 +94,7 @@ def _resolve(
     name: str,
     column_set: ColumnSet,
     resolved_params: dict[str, Any],
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> dict[str, str] | None:
     """Internal resolution logic, separate from telemetry concerns."""
     if column_set.param is not None:
@@ -98,7 +103,7 @@ def _resolve(
     # Source-backed resolution
     if column_set.source is None:
         raise ExecutionError(f"Column set '{name}' has no source or param defined")
-    return _resolve_from_source(spark, name, column_set)
+    return _resolve_from_source(spark, name, column_set, connections)
 
 
 def _resolve_from_param(
@@ -143,6 +148,7 @@ def _resolve_from_source(
     spark: SparkSession,
     name: str,
     column_set: ColumnSet,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> dict[str, str] | None:
     """Resolve a column set by reading a Delta or YAML source.
 
@@ -150,6 +156,8 @@ def _resolve_from_source(
         spark: Active SparkSession.
         name: Column set name for error messages.
         column_set: Column set with ``source`` set.
+        connections: Named connection declarations forwarded to ``read_source``
+            when the column set's source references a connection.
 
     Returns:
         Resolved mapping dict, an empty dict (on_failure=warn), or
@@ -167,8 +175,16 @@ def _resolve_from_source(
     on_failure = column_set.on_failure
 
     try:
-        source = Source(type=cs.type, alias=cs.alias, path=cs.path)
-        df = read_source(spark, name, source)
+        if cs.connection is not None:
+            source = Source(
+                type=cs.type,
+                connection=cs.connection,
+                schema=cs.schema_override,
+                table=cs.table,
+            )
+        else:
+            source = Source(type=cs.type, alias=cs.alias, path=cs.path)
+        df = read_source(spark, name, source, connections=connections)
 
         if cs.filter:
             df = df.filter(F.expr(cs.filter))
@@ -176,8 +192,18 @@ def _resolve_from_source(
         df = df.select(cs.from_column, cs.to_column)
         rows = df.collect()
 
-    except (ConfigError, ExecutionError):
+    except ConfigError:
         raise
+    except ExecutionError as exc:
+        # Wrap ExecutionError from read_source with the column set name so
+        # that configs with many column sets surface triage context in the
+        # error. Honours on_failure the same way as the generic Exception
+        # branch below.
+        msg = f"Failed to resolve column set '{name}': {exc}"
+        if on_failure == "abort":
+            raise ExecutionError(msg, cause=exc, source_name=name) from exc
+        logger.warning(msg)
+        return {} if on_failure == "warn" else None
     except Exception as exc:
         msg = f"Failed to resolve column set '{name}': {exc}"
         if on_failure == "abort":
@@ -213,6 +239,7 @@ def materialize_column_sets(
     resolved_params: dict[str, Any],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> tuple[dict[str, dict[str, str]], list[ColumnSetResult]]:
     """Resolve all column sets and return them as a name→mapping dict.
 
@@ -226,6 +253,8 @@ def materialize_column_sets(
         resolved_params: Runtime notebook parameters already resolved.
         collector: Optional span collector for telemetry.
         parent_span_id: Optional parent span ID for span hierarchy.
+        connections: Named connection declarations forwarded to each column
+            set whose source references a connection.
 
     Returns:
         Tuple of (resolved mappings dict, list of ColumnSetResult).
@@ -246,6 +275,7 @@ def materialize_column_sets(
             resolved_params,
             collector=collector,
             parent_span_id=parent_span_id,
+            connections=connections,
         )
         skipped = resolved is None
         if resolved is not None:

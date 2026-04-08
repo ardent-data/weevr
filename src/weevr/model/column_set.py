@@ -39,13 +39,24 @@ class ColumnSetSource(FrozenBase):
     """Source definition for a named column set.
 
     Describes where the column mapping data lives — either a Delta table or a
-    YAML file. Delta sources reference a registered table alias; YAML sources
-    reference a file path relative to the project root.
+    YAML file. Delta sources may reference a registered table alias **or** a
+    named connection plus a table name; YAML sources reference a file path
+    relative to the project root.
 
     Attributes:
         type: Source kind — ``"delta"`` or ``"yaml"``.
-        alias: Registered table alias. Required for ``type="delta"``.
+        alias: Registered table alias. One of ``alias`` or ``connection`` is
+            required when ``type="delta"``; mutually exclusive with
+            ``connection``.
         path: File path to the YAML mapping file. Required for ``type="yaml"``.
+        connection: Reference to a named connection defined at the loom or
+            weave level. When set, the column set is read from
+            ``schema.table`` within the connection's lakehouse. Only valid
+            for ``type="delta"`` and mutually exclusive with ``alias``.
+        schema_override: Schema name within the connection's lakehouse. Only
+            valid alongside ``connection``. Accepts the YAML key ``schema``.
+        table: Table name within the connection's lakehouse. Required when
+            ``connection`` is set; not valid otherwise.
         from_column: Column name in the source that holds the incoming column
             names. Defaults to ``"source_name"``.
         to_column: Column name in the source that holds the outgoing (renamed)
@@ -58,11 +69,37 @@ class ColumnSetSource(FrozenBase):
     )
     alias: str | None = Field(
         default=None,
-        description="Registered table alias. Required when ``type`` is ``delta``.",
+        description=(
+            "Registered table alias. One of ``alias`` or ``connection`` is required "
+            "when ``type`` is ``delta``. Mutually exclusive with ``connection``."
+        ),
     )
     path: str | None = Field(
         default=None,
         description="File path to the YAML mapping file. Required when ``type`` is ``yaml``.",
+    )
+    connection: str | None = Field(
+        default=None,
+        description=(
+            "Reference to a named connection defined at the loom or weave level. "
+            "When set, the column set is read from ``schema.table`` within the "
+            "connection's lakehouse. Only valid for ``type='delta'`` and mutually "
+            "exclusive with ``alias``."
+        ),
+    )
+    schema_override: str | None = Field(
+        default=None,
+        alias="schema",
+        description=(
+            "Schema name within the connection's lakehouse. Only valid alongside ``connection``."
+        ),
+    )
+    table: str | None = Field(
+        default=None,
+        description=(
+            "Table name within the connection's lakehouse. Required when ``connection`` "
+            "is set; not valid otherwise."
+        ),
     )
     from_column: str = Field(
         default="source_name",
@@ -77,12 +114,37 @@ class ColumnSetSource(FrozenBase):
         description="SQL WHERE expression applied when reading a Delta source.",
     )
 
+    model_config = {"frozen": True, "populate_by_name": True}
+
     @model_validator(mode="after")
     def _validate_type_specific_fields(self) -> ColumnSetSource:
-        if self.type == "delta" and self.alias is None:
-            raise ValueError("'alias' is required when type is 'delta'")
-        if self.type == "yaml" and self.path is None:
-            raise ValueError("'path' is required when type is 'yaml'")
+        if self.type == "yaml":
+            if self.path is None:
+                raise ValueError("'path' is required when type is 'yaml'")
+            if self.connection is not None:
+                raise ValueError("'connection' is not valid for yaml sources")
+            if self.table is not None:
+                raise ValueError("'table' is not valid for yaml sources")
+            if self.schema_override is not None:
+                raise ValueError("'schema' is not valid for yaml sources")
+            return self
+
+        # type == "delta"
+        if self.connection is not None:
+            if self.alias is not None:
+                raise ValueError("'connection' and 'alias' are mutually exclusive")
+            if self.path is not None:
+                raise ValueError("'path' is not valid alongside 'connection'")
+            if not self.table:
+                raise ValueError("'table' is required when 'connection' is set")
+            return self
+
+        if self.table is not None:
+            raise ValueError("'table' requires 'connection' to be set")
+        if self.schema_override is not None:
+            raise ValueError("'schema' requires 'connection' to be set")
+        if self.alias is None:
+            raise ValueError("one of 'alias' or 'connection' is required when type is 'delta'")
         return self
 
 

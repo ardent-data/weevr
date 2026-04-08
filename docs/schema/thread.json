@@ -727,7 +727,7 @@
       "type": "object"
     },
     "ColumnSetSource": {
-      "description": "Source definition for a named column set.\n\nDescribes where the column mapping data lives \u2014 either a Delta table or a\nYAML file. Delta sources reference a registered table alias; YAML sources\nreference a file path relative to the project root.\n\nAttributes:\n    type: Source kind \u2014 ``\"delta\"`` or ``\"yaml\"``.\n    alias: Registered table alias. Required for ``type=\"delta\"``.\n    path: File path to the YAML mapping file. Required for ``type=\"yaml\"``.\n    from_column: Column name in the source that holds the incoming column\n        names. Defaults to ``\"source_name\"``.\n    to_column: Column name in the source that holds the outgoing (renamed)\n        column names. Defaults to ``\"target_name\"``.\n    filter: SQL WHERE expression applied when reading a Delta source.",
+      "description": "Source definition for a named column set.\n\nDescribes where the column mapping data lives \u2014 either a Delta table or a\nYAML file. Delta sources may reference a registered table alias **or** a\nnamed connection plus a table name; YAML sources reference a file path\nrelative to the project root.\n\nAttributes:\n    type: Source kind \u2014 ``\"delta\"`` or ``\"yaml\"``.\n    alias: Registered table alias. One of ``alias`` or ``connection`` is\n        required when ``type=\"delta\"``; mutually exclusive with\n        ``connection``.\n    path: File path to the YAML mapping file. Required for ``type=\"yaml\"``.\n    connection: Reference to a named connection defined at the loom or\n        weave level. When set, the column set is read from\n        ``schema.table`` within the connection's lakehouse. Only valid\n        for ``type=\"delta\"`` and mutually exclusive with ``alias``.\n    schema_override: Schema name within the connection's lakehouse. Only\n        valid alongside ``connection``. Accepts the YAML key ``schema``.\n    table: Table name within the connection's lakehouse. Required when\n        ``connection`` is set; not valid otherwise.\n    from_column: Column name in the source that holds the incoming column\n        names. Defaults to ``\"source_name\"``.\n    to_column: Column name in the source that holds the outgoing (renamed)\n        column names. Defaults to ``\"target_name\"``.\n    filter: SQL WHERE expression applied when reading a Delta source.",
       "properties": {
         "type": {
           "description": "Source kind \u2014 ``delta`` for a registered Delta table or ``yaml`` for a file.",
@@ -748,7 +748,7 @@
             }
           ],
           "default": null,
-          "description": "Registered table alias. Required when ``type`` is ``delta``.",
+          "description": "Registered table alias. One of ``alias`` or ``connection`` is required when ``type`` is ``delta``. Mutually exclusive with ``connection``.",
           "title": "Alias"
         },
         "path": {
@@ -763,6 +763,45 @@
           "default": null,
           "description": "File path to the YAML mapping file. Required when ``type`` is ``yaml``.",
           "title": "Path"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference to a named connection defined at the loom or weave level. When set, the column set is read from ``schema.table`` within the connection's lakehouse. Only valid for ``type='delta'`` and mutually exclusive with ``alias``.",
+          "title": "Connection"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Schema name within the connection's lakehouse. Only valid alongside ``connection``.",
+          "title": "Schema"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table name within the connection's lakehouse. Required when ``connection`` is set; not valid otherwise.",
+          "title": "Table"
         },
         "from_column": {
           "default": "source_name",

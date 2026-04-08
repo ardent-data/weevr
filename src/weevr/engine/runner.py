@@ -23,6 +23,7 @@ from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
 from weevr.model.column_set import ColumnSet
+from weevr.model.connection import OneLakeConnection
 from weevr.model.hooks import HookStep
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
@@ -84,6 +85,7 @@ def execute_weave(
     weave_name: str = "",
     column_set_defs: dict[str, ColumnSet] | None = None,
     pre_cached_lookups: dict[str, Any] | None = None,
+    connections: dict[str, OneLakeConnection] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -126,6 +128,9 @@ def execute_weave(
         pre_cached_lookups: Already-materialized lookup DataFrames from a
             parent scope (e.g. loom level). Seeded into the weave's cached
             lookup dict so threads can reference them without re-materializing.
+        connections: Merged loom + weave connections forwarded to
+            ``materialize_column_sets`` so connection-backed column sets can
+            resolve their lakehouse target.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -208,6 +213,7 @@ def execute_weave(
                 params or {},
                 collector=collector,
                 parent_span_id=weave_span_id,
+                connections=connections,
             )
 
         for group_idx, group in enumerate(plan.execution_order):
@@ -611,6 +617,17 @@ def execute_loom(
                 loom_cs, weave_cs, "column_set", "loom", "weave"
             )
 
+            # Merge loom + weave connections for weave-level column set
+            # materialization. Uses the same additive-update pattern as
+            # _cascade_connections in config/inheritance.py, but stops at
+            # the weave scope — thread-level connections are forwarded
+            # per-thread at the execute_thread call site.
+            merged_connections: dict[str, OneLakeConnection] = {}
+            if loom.connections:
+                merged_connections.update(loom.connections)
+            if weave.connections:
+                merged_connections.update(weave.connections)
+
             loom_vars_dict = dict(loom.variables) if loom.variables else None
             weave_vars_dict = dict(weave.variables) if weave.variables else None
             merged_variables = merge_resource_dicts(
@@ -634,6 +651,7 @@ def execute_loom(
                 weave_name=weave_name,
                 column_set_defs=merged_column_set_defs,
                 pre_cached_lookups=loom_cached_lookup_dfs or None,
+                connections=merged_connections or None,
             )
             weave_results.append(result)
 

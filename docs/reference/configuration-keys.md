@@ -623,14 +623,22 @@ Named column mapping sourced from Delta, YAML, or runtime parameters.
 
 ### ColumnSetSource
 
+A `delta` source can be addressed two ways: by registered table alias
+(default Spark catalog) or by named connection plus table (resolves
+through the lakehouse referenced by a `connections:` entry on the
+loom or weave). The two modes are mutually exclusive.
+
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | `Literal["delta", "yaml"]` | *required* | Source type |
-| `alias` | `str` | `None` | Lakehouse table alias (Delta) |
-| `path` | `str` | `None` | File path (Delta path or YAML file) |
+| `alias` | `str` | `None` | Registered table alias. One of `alias` or `connection` is required when `type="delta"`. Mutually exclusive with `connection`. |
+| `path` | `str` | `None` | File path to the YAML mapping file. Required when `type="yaml"`. |
+| `connection` | `str` | `None` | Reference to a named connection defined at the loom or weave level. Only valid for `type="delta"`. Mutually exclusive with `alias`. |
+| `schema` | `str` | `None` | Schema name within the connection's lakehouse. Only valid alongside `connection`. |
+| `table` | `str` | `None` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `from_column` | `str` | `"source_name"` | Column containing raw names |
 | `to_column` | `str` | `"target_name"` | Column containing target names |
-| `filter` | `str` | `None` | SQL WHERE expression |
+| `filter` | `str` | `None` | SQL WHERE expression applied before collecting mappings |
 
 ---
 
