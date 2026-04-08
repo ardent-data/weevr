@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/ardent-data/weevr/compare/weevr-v1.16.0...weevr-v1.16.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* **config:** load OneLake configs via Hadoop FS abstraction ([#142](https://github.com/ardent-data/weevr/issues/142)) ([a2c7621](https://github.com/ardent-data/weevr/commit/a2c7621e21f74bceaaa6380971ce682eb48c50ed))
+
 ## [1.16.0](https://github.com/ardent-data/weevr/compare/weevr-v1.15.0...weevr-v1.16.0) (2026-04-07)
 
 
