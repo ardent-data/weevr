@@ -249,3 +249,40 @@ target:
 Connections are also more maintainable when the same lakehouse is referenced
 across multiple threads: update the GUID in one place rather than in every
 file.
+
+## Column sets via connections
+
+Named column sets defined at the loom or weave level can also resolve their
+mapping table through a connection. This is the right pattern when the
+mapping data lives in a reference lakehouse that is **not** the attached
+notebook lakehouse — for example, a portable loom that runs against
+arbitrary workspaces and reads its column dictionary from a centralized
+reference lakehouse.
+
+```yaml
+connections:
+  ref:
+    type: onelake
+    workspace: "aaaaaaaa-0000-0000-0000-000000000001"
+    lakehouse: "cccccccc-0000-0000-0000-000000000003"
+
+column_sets:
+  sap_dictionary:
+    source:
+      type: delta
+      connection: ref
+      schema: dictionary
+      table: sap_column_renames
+      from_column: raw_name
+      to_column: friendly_name
+      filter: "system = 'SAP'"
+```
+
+The `connection + table` form is mutually exclusive with the `alias`
+form — the validator rejects any `ColumnSetSource` that sets both.
+When `connection` is set, `table` is required and `path` is rejected;
+`schema` is optional and selects the schema within the connection's
+lakehouse. Use `connection` whenever the mapping table is not
+guaranteed to exist in the active Spark catalog at execution time.
+The `alias` form continues to work for column sets backed by tables
+in the attached lakehouse.

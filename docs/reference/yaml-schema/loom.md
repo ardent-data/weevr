@@ -17,7 +17,7 @@ runtime settings that cascade down through weaves to threads.
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings cascaded to weaves and threads |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to weaves and threads |
-| `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. See [Weave schema: column_sets](weave.md#column_sets) for field details. |
+| `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. Column sets can read their mapping table via a loom-level `connections:` entry — see [Connections guide: Column sets via connections](../../guides/connections.md#column-sets-via-connections). See [Weave schema: column_sets](weave.md#column_sets) for field details. |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Loom-level lookup definitions. Merged with weave-level lookups (weave wins on name collision). See [Weave schema: lookups](weave.md#lookups) for field details. |
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Loom-level variable declarations. Resolved before `pre_steps` execution. |
 | `pre_steps` | `list[HookStep]` | no | `null` | Hook steps to run before any weave executes. See [Weave schema: pre_steps / post_steps](weave.md#pre_steps-post_steps-hookstep) for field details. |

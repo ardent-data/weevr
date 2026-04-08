@@ -483,3 +483,107 @@ class TestColumnSetSourceTypeSpecificValidation:
         """yaml type with only alias (no path) raises ValidationError."""
         with pytest.raises(ValidationError, match="path.*required"):
             ColumnSetSource(type="yaml", alias="some.table")
+
+
+class TestColumnSetSourceConnection:
+    """Test connection-backed ColumnSetSource (loom/weave-level connections)."""
+
+    def test_delta_with_connection_and_table_valid(self):
+        """delta + connection + table is accepted."""
+        src = ColumnSetSource(type="delta", connection="ref", table="rename_map")
+        assert src.connection == "ref"
+        assert src.table == "rename_map"
+        assert src.alias is None
+        assert src.schema_override is None
+
+    def test_delta_with_connection_schema_table_valid(self):
+        """delta + connection + schema + table is accepted."""
+        src = ColumnSetSource(
+            type="delta",
+            connection="ref",
+            schema="dictionary",  # type: ignore[call-arg]
+            table="rename_map",
+        )
+        assert src.connection == "ref"
+        assert src.schema_override == "dictionary"
+        assert src.table == "rename_map"
+
+    def test_delta_with_schema_alias_yaml_key(self):
+        """The YAML key 'schema' populates schema_override via alias."""
+        src = ColumnSetSource.model_validate(
+            {
+                "type": "delta",
+                "connection": "ref",
+                "schema": "dict",
+                "table": "rename_map",
+            }
+        )
+        assert src.schema_override == "dict"
+
+    def test_connection_and_alias_mutually_exclusive(self):
+        """connection + alias raises ValidationError."""
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            ColumnSetSource(
+                type="delta",
+                connection="ref",
+                alias="silver.col_map",
+                table="rename_map",
+            )
+
+    def test_connection_without_table_raises(self):
+        """connection without table raises ValidationError."""
+        with pytest.raises(ValidationError, match="'table' is required"):
+            ColumnSetSource(type="delta", connection="ref")
+
+    def test_table_without_connection_raises(self):
+        """table without connection raises ValidationError."""
+        with pytest.raises(ValidationError, match="'table' requires 'connection'"):
+            ColumnSetSource(type="delta", alias="silver.x", table="rename_map")
+
+    def test_schema_without_connection_raises(self):
+        """schema without connection raises ValidationError."""
+        with pytest.raises(ValidationError, match="'schema' requires 'connection'"):
+            ColumnSetSource(
+                type="delta",
+                alias="silver.x",
+                schema="dictionary",  # type: ignore[call-arg]
+            )
+
+    def test_yaml_connection_rejected(self):
+        """yaml + connection raises ValidationError."""
+        with pytest.raises(ValidationError, match="'connection' is not valid for yaml"):
+            ColumnSetSource(
+                type="yaml",
+                path="maps/cols.yaml",
+                connection="ref",
+            )
+
+    def test_yaml_table_rejected(self):
+        """yaml + table raises ValidationError."""
+        with pytest.raises(ValidationError, match="'table' is not valid for yaml"):
+            ColumnSetSource(type="yaml", path="maps/cols.yaml", table="t")
+
+    def test_yaml_schema_rejected(self):
+        """yaml + schema raises ValidationError."""
+        with pytest.raises(ValidationError, match="'schema' is not valid for yaml"):
+            ColumnSetSource(
+                type="yaml",
+                path="maps/cols.yaml",
+                schema="dict",  # type: ignore[call-arg]
+            )
+
+    def test_delta_connection_path_rejected(self):
+        """delta + connection + path raises ValidationError (extraneous path)."""
+        with pytest.raises(ValidationError, match="'path' is not valid alongside 'connection'"):
+            ColumnSetSource(
+                type="delta",
+                connection="ref",
+                table="rename_map",
+                path="stale/file.yaml",
+            )
+
+    def test_frozen_connection_field(self):
+        """connection field is immutable after construction."""
+        src = ColumnSetSource(type="delta", connection="ref", table="rename_map")
+        with pytest.raises(ValidationError):
+            src.connection = "other"  # type: ignore[misc]

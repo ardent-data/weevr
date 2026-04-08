@@ -7,6 +7,7 @@ import pytest
 from weevr.engine.column_sets import materialize_column_sets, resolve_column_set
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.column_set import ColumnSet, ColumnSetSource
+from weevr.model.connection import OneLakeConnection
 from weevr.telemetry.collector import SpanCollector
 from weevr.telemetry.span import generate_trace_id
 
@@ -101,6 +102,50 @@ class TestResolveColumnSetDeltaSource:
         assert result == {"x": "y"}
         mock_read.assert_called_once()
 
+    @patch("weevr.engine.column_sets.F.expr")
+    @patch("weevr.engine.column_sets.read_source")
+    def test_alias_path_filter_and_custom_columns_after_branch_split(self, mock_read, mock_expr):
+        """Regression guard: alias-backed column sets still honour filter and
+        custom from_column/to_column after the connection/alias branch split
+        in _resolve_from_source. Combines the three dimensions in one test so
+        the else-branch can never silently regress."""
+        mock_expr.return_value = "mock_filter_col"
+
+        filtered_df = MagicMock()
+        selected_df = MagicMock()
+        row = MagicMock()
+        row.__getitem__ = lambda self, key: "raw_a" if key == "src_col" else "friendly_a"
+        selected_df.collect.return_value = [row]
+
+        raw_df = MagicMock()
+        raw_df.filter.return_value = filtered_df
+        filtered_df.select.return_value = selected_df
+        mock_read.return_value = raw_df
+
+        spark = MagicMock()
+        cs = ColumnSet(
+            source=ColumnSetSource(
+                type="delta",
+                alias="silver.col_map",
+                from_column="src_col",
+                to_column="tgt_col",
+                filter="dataset = 'orders'",
+            )
+        )
+
+        result = resolve_column_set(spark, "cs", cs, {})
+
+        assert result == {"raw_a": "friendly_a"}
+        # Alias path built an alias-based Source (not connection-based)
+        passed_source = mock_read.call_args.args[2]
+        assert passed_source.alias == "silver.col_map"
+        assert passed_source.connection is None
+        # Filter compiled and applied before select
+        mock_expr.assert_called_once_with("dataset = 'orders'")
+        raw_df.filter.assert_called_once_with("mock_filter_col")
+        # Custom column names reach the select call
+        filtered_df.select.assert_called_once_with("src_col", "tgt_col")
+
     @patch("weevr.engine.column_sets.read_source")
     def test_custom_column_names(self, mock_read):
         """Custom from_column / to_column names are respected."""
@@ -121,6 +166,183 @@ class TestResolveColumnSetDeltaSource:
 
         assert result == {"old": "new"}
         raw_df.select.assert_called_once_with("from_col", "to_col")
+
+
+class TestResolveColumnSetConnectionSource:
+    """Tests for resolve_column_set with a connection-backed Delta source."""
+
+    def _connection(self) -> OneLakeConnection:
+        return OneLakeConnection(
+            type="onelake",
+            workspace="ws-guid",
+            lakehouse="lh-guid",
+        )
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_connection_forwarded_to_read_source(self, mock_read):
+        """Connection-backed column set passes connections dict to read_source."""
+        selected_df = MagicMock()
+        row = MagicMock()
+        row.__getitem__ = lambda self, key: "src" if key == "source_name" else "tgt"
+        selected_df.collect.return_value = [row]
+
+        raw_df = MagicMock()
+        raw_df.select.return_value = selected_df
+        mock_read.return_value = raw_df
+
+        spark = MagicMock()
+        connections = {"ref": self._connection()}
+        cs = ColumnSet(source=ColumnSetSource(type="delta", connection="ref", table="rename_map"))
+
+        result = resolve_column_set(spark, "my_cs", cs, {}, connections=connections)
+
+        assert result == {"src": "tgt"}
+        # Verify read_source got the connections kwarg with our dict
+        mock_read.assert_called_once()
+        call_kwargs = mock_read.call_args.kwargs
+        assert call_kwargs.get("connections") is connections
+        # Verify the inner Source was built with connection + table (not alias)
+        passed_source = mock_read.call_args.args[2]
+        assert passed_source.connection == "ref"
+        assert passed_source.table == "rename_map"
+        assert passed_source.alias is None
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_schema_override_forwarded(self, mock_read):
+        """schema field on the column set source is forwarded as schema_override."""
+        selected_df = MagicMock()
+        row = MagicMock()
+        row.__getitem__ = lambda self, key: "a" if key == "source_name" else "b"
+        selected_df.collect.return_value = [row]
+
+        raw_df = MagicMock()
+        raw_df.select.return_value = selected_df
+        mock_read.return_value = raw_df
+
+        spark = MagicMock()
+        connections = {"ref": self._connection()}
+        cs = ColumnSet(
+            source=ColumnSetSource.model_validate(
+                {
+                    "type": "delta",
+                    "connection": "ref",
+                    "schema": "dictionary",
+                    "table": "rename_map",
+                }
+            )
+        )
+
+        resolve_column_set(spark, "my_cs", cs, {}, connections=connections)
+
+        passed_source = mock_read.call_args.args[2]
+        assert passed_source.connection == "ref"
+        assert passed_source.schema_override == "dictionary"
+        assert passed_source.table == "rename_map"
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_missing_connection_wraps_error_with_column_set_name(self, mock_read):
+        """When read_source raises ExecutionError (e.g. undefined connection),
+        the error is re-raised with the column set name prepended so that
+        users with many column sets can identify which one failed."""
+        mock_read.side_effect = ExecutionError(
+            "Source references undefined connection 'ref'",
+            source_name="ref",
+        )
+        spark = MagicMock()
+        cs = ColumnSet(
+            source=ColumnSetSource(type="delta", connection="ref", table="rename_map"),
+            on_failure="abort",
+        )
+
+        with pytest.raises(ExecutionError) as exc_info:
+            resolve_column_set(spark, "my_cs", cs, {}, connections={})
+
+        # Column set name must appear in the surface message
+        assert "my_cs" in str(exc_info.value)
+        # Underlying connection error must still be visible
+        assert "undefined connection 'ref'" in str(exc_info.value)
+        # Chain preserved for debugging
+        assert isinstance(exc_info.value.__cause__, ExecutionError)
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_execution_error_honours_on_failure_warn(self, mock_read, caplog):
+        """ExecutionError from read_source with on_failure='warn' returns an
+        empty dict and logs the wrapped message."""
+        import logging
+
+        mock_read.side_effect = ExecutionError(
+            "Source references undefined connection 'ref'",
+            source_name="ref",
+        )
+        spark = MagicMock()
+        cs = ColumnSet(
+            source=ColumnSetSource(type="delta", connection="ref", table="rename_map"),
+            on_failure="warn",
+        )
+
+        with caplog.at_level(logging.WARNING, logger="weevr.engine.column_sets"):
+            result = resolve_column_set(spark, "my_cs", cs, {}, connections={})
+
+        assert result == {}
+        assert any("my_cs" in r.message for r in caplog.records)
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_alias_path_does_not_pass_connection_fields(self, mock_read):
+        """Alias-backed column sets continue to build a Source without connection."""
+        selected_df = MagicMock()
+        row = MagicMock()
+        row.__getitem__ = lambda self, key: "a" if key == "source_name" else "b"
+        selected_df.collect.return_value = [row]
+
+        raw_df = MagicMock()
+        raw_df.select.return_value = selected_df
+        mock_read.return_value = raw_df
+
+        spark = MagicMock()
+        cs = ColumnSet(source=ColumnSetSource(type="delta", alias="silver.col_map"))
+
+        resolve_column_set(spark, "my_cs", cs, {})
+
+        passed_source = mock_read.call_args.args[2]
+        assert passed_source.alias == "silver.col_map"
+        assert passed_source.connection is None
+        assert passed_source.table is None
+
+
+class TestMaterializeColumnSetsWithConnections:
+    """Tests for materialize_column_sets connections forwarding."""
+
+    @patch("weevr.engine.column_sets.read_source")
+    def test_connections_forwarded_to_each_resolve(self, mock_read):
+        """The connections dict reaches every column set's read_source call."""
+        selected_df = MagicMock()
+        row = MagicMock()
+        row.__getitem__ = lambda self, key: "a" if key == "source_name" else "b"
+        selected_df.collect.return_value = [row]
+
+        raw_df = MagicMock()
+        raw_df.select.return_value = selected_df
+        mock_read.return_value = raw_df
+
+        spark = MagicMock()
+        connections = {
+            "ref": OneLakeConnection(type="onelake", workspace="ws", lakehouse="lh"),
+        }
+        column_sets = {
+            "cs_a": ColumnSet(
+                source=ColumnSetSource(type="delta", connection="ref", table="map_a")
+            ),
+            "cs_b": ColumnSet(
+                source=ColumnSetSource(type="delta", connection="ref", table="map_b")
+            ),
+        }
+
+        resolved, _ = materialize_column_sets(spark, column_sets, {}, connections=connections)
+
+        assert "cs_a" in resolved and "cs_b" in resolved
+        assert mock_read.call_count == 2
+        for call in mock_read.call_args_list:
+            assert call.kwargs.get("connections") is connections
 
 
 class TestResolveColumnSetParamSource:

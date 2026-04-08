@@ -1378,6 +1378,203 @@ class TestColumnSetsCascade:
 
 
 # ---------------------------------------------------------------------------
+# Connection cascade tests (loom → weave inheritance)
+# ---------------------------------------------------------------------------
+
+
+class TestConnectionsCascade:
+    """Test that connections defined at loom level cascade to weaves and
+    reach the column set materialization site."""
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_connections_forwarded_to_weave(self, mock_exec):
+        """Loom-level connections are forwarded into execute_weave's
+        connections kwarg when the weave declares none of its own."""
+        from weevr.model.connection import OneLakeConnection
+
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "connections": {
+                    "ref": {"type": "onelake", "workspace": "ws-1", "lakehouse": "lh-1"},
+                },
+            }
+        )
+        weaves = {
+            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        call_kwargs = mock_exec.call_args.kwargs
+        forwarded = call_kwargs.get("connections")
+        assert forwarded is not None
+        assert "ref" in forwarded
+        assert isinstance(forwarded["ref"], OneLakeConnection)
+        assert forwarded["ref"].lakehouse == "lh-1"
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_and_weave_connections_merged(self, mock_exec):
+        """Distinct loom- and weave-level connections are merged additively
+        before being forwarded to execute_weave."""
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "connections": {
+                    "ref": {"type": "onelake", "workspace": "ws", "lakehouse": "ref-lh"},
+                },
+            }
+        )
+        weaves = {
+            "w1": Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "name": "w1",
+                    "threads": ["t1"],
+                    "connections": {
+                        "bronze": {"type": "onelake", "workspace": "ws", "lakehouse": "bronze-lh"},
+                    },
+                }
+            )
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        forwarded = mock_exec.call_args.kwargs.get("connections")
+        assert forwarded is not None
+        assert {"ref", "bronze"} <= set(forwarded.keys())
+        assert forwarded["ref"].lakehouse == "ref-lh"
+        assert forwarded["bronze"].lakehouse == "bronze-lh"
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_weave_connection_overrides_loom_on_collision(self, mock_exec):
+        """When loom and weave declare a connection with the same name, the
+        weave-level definition wins in the merged dict passed to
+        execute_weave."""
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "connections": {
+                    "ref": {"type": "onelake", "workspace": "ws", "lakehouse": "loom-lh"},
+                },
+            }
+        )
+        weaves = {
+            "w1": Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "name": "w1",
+                    "threads": ["t1"],
+                    "connections": {
+                        "ref": {"type": "onelake", "workspace": "ws", "lakehouse": "weave-lh"},
+                    },
+                }
+            )
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        forwarded = mock_exec.call_args.kwargs.get("connections")
+        assert forwarded is not None
+        assert forwarded["ref"].lakehouse == "weave-lh"
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_no_connections_forwarded_as_none(self, mock_exec):
+        """When neither level declares connections, execute_weave receives
+        None (not an empty dict) — matches the `merged or None` guard."""
+        mock_exec.return_value = WeaveResult(
+            status="success",
+            weave_name="w1",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=0,
+        )
+
+        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        weaves = {
+            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+        }
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert mock_exec.call_args.kwargs.get("connections") is None
+
+
+class TestExecuteWeaveConnectionsForwarding:
+    """Test that execute_weave forwards its connections kwarg to
+    materialize_column_sets for connection-backed column sets."""
+
+    @patch("weevr.engine.runner.materialize_column_sets")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_execute_weave_forwards_connections_to_materialize(
+        self, mock_exec_thread, mock_materialize
+    ):
+        """execute_weave plumbs the connections kwarg through to
+        materialize_column_sets when column_set_defs are present."""
+        from weevr.model.column_set import ColumnSet, ColumnSetSource
+        from weevr.model.connection import OneLakeConnection
+
+        mock_materialize.return_value = ({}, [])
+        mock_exec_thread.return_value = _make_result("t1", "success")
+
+        thread = _make_thread("t1")
+        threads = {"t1": thread}
+        plan = build_plan(weave_name="w1", threads=threads, thread_entries=[ThreadEntry(name="t1")])
+
+        cs_defs = {
+            "sap": ColumnSet(
+                source=ColumnSetSource(type="delta", connection="ref", table="rename_map")
+            ),
+        }
+        connections = {
+            "ref": OneLakeConnection(type="onelake", workspace="ws", lakehouse="lh"),
+        }
+
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            column_set_defs=cs_defs,
+            connections=connections,
+        )
+
+        mock_materialize.assert_called_once()
+        call_kwargs = mock_materialize.call_args.kwargs
+        assert call_kwargs.get("connections") is connections
+
+
+# ---------------------------------------------------------------------------
 # Lifecycle order tests
 # ---------------------------------------------------------------------------
 
