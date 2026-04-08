@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.2](https://github.com/ardent-data/weevr/compare/weevr-v1.16.1...weevr-v1.16.2) (2026-04-08)
+
+
+### Bug Fixes
+
+* **engine:** support connection-backed delta column sets ([#146](https://github.com/ardent-data/weevr/issues/146)) ([8c53327](https://github.com/ardent-data/weevr/commit/8c53327b7329555a95281701ceb68b7d3b1a4089))
+
 ## [1.16.1](https://github.com/ardent-data/weevr/compare/weevr-v1.16.0...weevr-v1.16.1) (2026-04-08)
 
 
