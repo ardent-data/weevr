@@ -100,21 +100,22 @@ skipped.
 1. **Initialize variables** — A `VariableContext` is created from the
    weave's `variables` block. Variables are available to hook steps via
    `${var.name}` placeholders.
-2. **Lookup materialization (external)** — External lookups
+2. **Pre-steps** — If the weave defines `pre_steps`, hook steps run
+   before any materialization. Failures with `on_failure: abort`
+   stop the weave. Pre-steps can set variables that downstream
+   materialization and threads observe.
+3. **Lookup materialization (external)** — External lookups
    (those not produced by a thread in the weave) are materialized
-   before any thread or hook step runs. Internal lookups whose
-   source is produced by a thread in group N are deferred and
-   materialized at the group N+1 boundary — after their producer
-   completes.
-3. **Column set materialization** — If the weave (or loom) defines
+   after pre-steps and before any thread runs. Internal lookups
+   whose source is produced by a thread in group N are deferred
+   and materialized at the group N+1 boundary — after their
+   producer completes.
+4. **Column set materialization** — If the weave (or loom) defines
    `column_sets`, all sets are resolved to from→to mapping dicts.
    Delta/YAML sources are read via `read_source()`; param sources
-   resolve from runtime parameters. Results are captured in
-   `WeaveTelemetry.column_set_results`.
-4. **Pre-steps** — If the weave defines `pre_steps`, hook steps
-   run before any thread executes. Failures with
-   `on_failure: abort` stop the weave. Pre-steps can read from
-   lookups materialized in step 2.
+   resolve from runtime parameters. Connection-backed column sets
+   resolve through the merged loom + weave connection dict.
+   Results are captured in `WeaveTelemetry.column_set_results`.
 5. **Thread execution** — Parallel groups are processed
    sequentially. Within each group, threads are submitted to a
    `ThreadPoolExecutor` for concurrent execution. Threads
