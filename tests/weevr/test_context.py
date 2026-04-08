@@ -43,14 +43,19 @@ class TestContextValidation:
 
     def test_direct_path_resolution(self, tmp_path: Path) -> None:
         """Direct .weevr path resolves correctly."""
+        from weevr.config.locations import LocalConfigLocation
+
         mock_spark = MagicMock(spec=SparkSession)
         project_dir = tmp_path / "myproject.weevr"
         project_dir.mkdir()
         ctx = Context(spark=mock_spark, project=str(project_dir))
-        assert ctx.project_root == project_dir
+        assert isinstance(ctx.project_root, LocalConfigLocation)
+        assert str(ctx.project_root) == str(project_dir)
 
     def test_onelake_resolution(self, tmp_path: Path) -> None:
         """Workspace + lakehouse produces ABFS path."""
+        from weevr.config.locations import RemoteConfigLocation
+
         mock_spark = MagicMock(spec=SparkSession)
         ctx = Context(
             spark=mock_spark,
@@ -59,10 +64,16 @@ class TestContextValidation:
             lakehouse="lh-id",
         )
         expected = "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
-        assert ctx.project_root == expected
+        assert isinstance(ctx.project_root, RemoteConfigLocation)
+        # Critical: double slash after the scheme is preserved (regression
+        # for the original abfss:/ bug).
+        assert str(ctx.project_root) == expected
+        assert "abfss://" in str(ctx.project_root)
 
     def test_onelake_resolution_with_weevr_suffix(self) -> None:
         """Workspace + lakehouse strips .weevr suffix to avoid double extension."""
+        from weevr.config.locations import RemoteConfigLocation
+
         mock_spark = MagicMock(spec=SparkSession)
         ctx = Context(
             spark=mock_spark,
@@ -71,23 +82,30 @@ class TestContextValidation:
             lakehouse="lh-id",
         )
         expected = "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr"
-        assert ctx.project_root == expected
+        assert isinstance(ctx.project_root, RemoteConfigLocation)
+        assert str(ctx.project_root) == expected
 
     def test_default_lakehouse_without_weevr_suffix(self) -> None:
         """Default lakehouse resolution works with simple project name."""
+        from weevr.config.locations import LocalConfigLocation
+
         mock_spark = MagicMock(spec=SparkSession)
         expected = Path("/lakehouse/default/Files/myproject.weevr")
         with patch.object(Path, "is_dir", return_value=True):
             ctx = Context(spark=mock_spark, project="myproject")
-        assert ctx.project_root == expected
+        assert isinstance(ctx.project_root, LocalConfigLocation)
+        assert str(ctx.project_root) == str(expected)
 
     def test_default_lakehouse_with_weevr_suffix(self) -> None:
         """Default lakehouse resolution strips .weevr suffix to avoid double extension."""
+        from weevr.config.locations import LocalConfigLocation
+
         mock_spark = MagicMock(spec=SparkSession)
         expected = Path("/lakehouse/default/Files/myproject.weevr")
         with patch.object(Path, "is_dir", return_value=True):
             ctx = Context(spark=mock_spark, project="myproject.weevr")
-        assert ctx.project_root == expected
+        assert isinstance(ctx.project_root, LocalConfigLocation)
+        assert str(ctx.project_root) == str(expected)
 
     def test_missing_project_raises(self) -> None:
         """Non-absolute path without workspace/lakehouse and no default raises."""
@@ -100,6 +118,74 @@ class TestContextValidation:
         mock_spark = MagicMock(spec=SparkSession)
         with pytest.raises(ConfigError, match=".weevr extension"):
             Context(spark=mock_spark, project="/path/without/extension")
+
+
+class TestRemoteConfigPathRegression:
+    """Regression tests for the abfss:// double-slash bug in Tier 2 resolution.
+
+    Before the ConfigLocation refactor, ``Context._project_root`` was an
+    ``abfss://`` string but every downstream call site funneled it through
+    ``Path()``, which collapses ``abfss://`` to ``abfss:/`` and routes the
+    read through Python's built-in ``open()``. This test pins both the
+    string preservation and the JVM-routed read path.
+    """
+
+    URI_PROJECT = (
+        "abfss://467e2424-7117-4d9e-a02b-b25ade3b3e1e@onelake.dfs.fabric.microsoft.com"
+        "/d1356ede-c76c-4abb-ae26-aaaabd74e84f/Files/spartech-data-lake.weevr"
+    )
+
+    def test_resolve_config_path_preserves_double_slash(self) -> None:
+        """_resolve_config_path on a Tier 2 Context returns a remote location.
+
+        The returned location's string form must contain ``abfss://`` (two
+        slashes), not ``abfss:/`` — the original symptom of the bug.
+        """
+        from weevr.config.locations import RemoteConfigLocation
+
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(
+            spark=mock_spark,
+            project="spartech-data-lake",
+            workspace="467e2424-7117-4d9e-a02b-b25ade3b3e1e",
+            lakehouse="d1356ede-c76c-4abb-ae26-aaaabd74e84f",
+        )
+
+        resolved = ctx._resolve_config_path("silver.loom")
+
+        assert isinstance(resolved, RemoteConfigLocation)
+        # The literal substring "abfss://" must appear — single-slash
+        # mangling would show as "abfss:/4" or similar.
+        assert "abfss://" in str(resolved)
+        assert str(resolved) == self.URI_PROJECT + "/silver.loom"
+
+    def test_load_resolved_routes_through_remote_location(self, tmp_path: Path) -> None:
+        """Tier 2 _load_resolved feeds parse_yaml a RemoteConfigLocation, not a Path.
+
+        We patch ``RemoteConfigLocation.read_text`` to return a minimal loom
+        YAML and assert the pipeline walks to the qualified-key step
+        without falling through ``open()``.
+        """
+        from weevr.config.locations import RemoteConfigLocation
+
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(
+            spark=mock_spark,
+            project="spartech-data-lake",
+            workspace="ws-id",
+            lakehouse="lh-id",
+        )
+
+        loom_yaml = "config_version: '1.0'\nname: silver\nweaves: []\n"
+
+        with (
+            patch.object(RemoteConfigLocation, "read_text", return_value=loom_yaml),
+            patch.object(RemoteConfigLocation, "exists", return_value=True),
+        ):
+            resolved = ctx._load_resolved("silver.loom")
+
+        assert resolved.config_type == "loom"
+        assert resolved.config_name == "silver"
 
 
 class TestResolveSourcePaths:

@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from pyspark.sql import SparkSession
 
 from weevr.config.inheritance import apply_inheritance
+from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
     detect_config_type_from_extension,
@@ -107,12 +108,12 @@ class Context:
         self._project_root = self._resolve_project_path(project, workspace, lakehouse)
         configure_logging(self._log_level)
 
-    @staticmethod
     def _resolve_project_path(
+        self,
         project: str | Path,
         workspace: str | None,
         lakehouse: str | None,
-    ) -> Path | str:
+    ) -> ConfigLocation:
         """Resolve the project path using three-tier resolution.
 
         Args:
@@ -121,7 +122,9 @@ class Context:
             lakehouse: Optional Fabric lakehouse ID.
 
         Returns:
-            Resolved project root path (Path for local, str for ABFS).
+            A :class:`ConfigLocation` for the project root. Tier 1 and Tier 3
+            return a :class:`LocalConfigLocation`; Tier 2 returns a
+            :class:`RemoteConfigLocation` bound to ``self._spark``.
 
         Raises:
             ConfigError: If the project cannot be resolved.
@@ -137,7 +140,7 @@ class Context:
                 raise ConfigError(f"Project directory must have .weevr extension: {project_str}")
             if not project_path.is_dir():
                 raise ConfigError(f"Project directory not found: {project_str}")
-            return project_path
+            return LocalConfigLocation(project_path)
 
         # Normalize: strip .weevr suffix if already present so Tier 1/2
         # don't produce a double extension (e.g. "my_project.weevr.weevr").
@@ -145,15 +148,16 @@ class Context:
 
         # Tier 2: OneLake qualified — workspace + lakehouse provided
         if workspace and lakehouse:
-            return (
+            uri = (
                 f"abfss://{workspace}@onelake.dfs.fabric.microsoft.com"
                 f"/{lakehouse}/Files/{base_name}.weevr"
             )
+            return RemoteConfigLocation(uri, self._spark)
 
         # Tier 1: Default lakehouse
         default_path = Path(f"/lakehouse/default/Files/{base_name}.weevr")
         if default_path.is_dir():
-            return default_path
+            return LocalConfigLocation(default_path)
 
         raise ConfigError(
             f"Project directory not found at {default_path}. "
@@ -176,8 +180,14 @@ class Context:
         return self._log_level
 
     @property
-    def project_root(self) -> Path | str:
-        """Resolved project root path."""
+    def project_root(self) -> ConfigLocation:
+        """Resolved project root as a :class:`ConfigLocation`.
+
+        Returns a :class:`LocalConfigLocation` when the project is on the
+        local filesystem (Tier 1 default lakehouse or Tier 3 direct path)
+        and a :class:`RemoteConfigLocation` when the project is qualified
+        by ``workspace`` and ``lakehouse`` (Tier 2 OneLake).
+        """
         return self._project_root
 
     # ------------------------------------------------------------------
@@ -730,19 +740,23 @@ class Context:
     # Config assembly
     # ------------------------------------------------------------------
 
-    def _resolve_config_path(self, path: str | Path) -> Path:
+    def _resolve_config_path(self, path: str | Path) -> ConfigLocation:
         """Resolve a config path relative to the project root.
 
         Args:
             path: Config file path, relative to the project root.
 
         Returns:
-            Absolute path to the config file.
+            A :class:`ConfigLocation` for the config file.
         """
         p = Path(path)
         if p.is_absolute():
-            return p
-        return Path(self._project_root) / p
+            # Absolute paths are always local. A user supplying an absolute
+            # filesystem path overrides the project root entirely — even in
+            # a Tier 2 OneLake context — because there is no sensible way
+            # to interpret a host-filesystem path against an abfss URI.
+            return LocalConfigLocation(p)
+        return self._project_root.join(str(path))
 
     def _load_resolved(self, path: str | Path) -> _ResolvedConfig:
         """Run the config pipeline and return the hydrated model with children.
@@ -756,7 +770,7 @@ class Context:
         extract a shared ``_resolve_config_to_dict`` function.
         """
         file_path = self._resolve_config_path(path)
-        project_root = Path(self._project_root)
+        project_root = self._project_root
 
         # Steps 1-3: Parse, version, type
         raw = parse_yaml(file_path)
@@ -852,11 +866,7 @@ class Context:
             resolved_with_refs["name"] = config_name
 
         # Compute qualified key for top-level config
-        try:
-            rel = file_path.resolve().relative_to(project_root.resolve())
-            resolved_with_refs["qualified_key"] = str(rel)
-        except ValueError:
-            resolved_with_refs["qualified_key"] = str(file_path)
+        resolved_with_refs["qualified_key"] = self._compute_qualified_key(file_path, project_root)
 
         # Step 8c: Resolve relative source paths against project root
         if config_type == "thread":
@@ -918,7 +928,7 @@ class Context:
 
     @staticmethod
     def _hydrate_model(
-        data: dict[str, Any], config_type: str, source_path: Path
+        data: dict[str, Any], config_type: str, source_path: ConfigLocation
     ) -> Thread | Weave | Loom:
         """Hydrate a dict into a typed domain model."""
         model_map: dict[str, type[Thread | Weave | Loom]] = {
@@ -940,8 +950,8 @@ class Context:
     def _hydrate_threads(
         thread_entries: list[Any],
         resolved_dicts: list[dict[str, Any]],
-        source_path: Path,
-        project_root: Path | str | None = None,
+        source_path: ConfigLocation,
+        project_root: ConfigLocation | Path | str | None = None,
     ) -> dict[str, Thread]:
         """Hydrate resolved thread dicts into a name->Thread mapping."""
         result: dict[str, Thread] = {}
@@ -985,17 +995,63 @@ class Context:
         return result
 
     @staticmethod
-    def _resolve_source_paths(thread_dict: dict[str, Any], project_root: Path | str) -> None:
+    def _compute_qualified_key(file_path: ConfigLocation, project_root: ConfigLocation) -> str:
+        """Return ``file_path`` expressed relative to ``project_root``.
+
+        Falls back to the absolute string when the file lies outside the
+        project root.
+        """
+        if isinstance(file_path, LocalConfigLocation) and isinstance(
+            project_root, LocalConfigLocation
+        ):
+            try:
+                rel = file_path.path.resolve().relative_to(project_root.path.resolve())
+                return str(rel)
+            except (OSError, ValueError):
+                return str(file_path)
+        if isinstance(file_path, RemoteConfigLocation) and isinstance(
+            project_root, RemoteConfigLocation
+        ):
+            file_str = str(file_path)
+            root_str = str(project_root).rstrip("/")
+            if file_str.startswith(root_str + "/"):
+                return file_str[len(root_str) + 1 :]
+            return file_str
+        return str(file_path)
+
+    @staticmethod
+    def _resolve_source_paths(
+        thread_dict: dict[str, Any],
+        project_root: ConfigLocation | Path | str,
+    ) -> None:
         """Resolve relative source file paths against the project root.
 
-        Modifies the thread config dict in place, prepending the project root
-        to any relative ``path`` values in file-based sources (csv, json,
-        parquet, excel).
+        Modifies the thread config dict in place, prepending the project
+        root to any relative ``path`` values in file-based sources (csv,
+        json, parquet, excel).
 
         Args:
             thread_dict: Thread configuration dict (pre-hydration).
-            project_root: Resolved project root (Path for local, str for ABFS).
+            project_root: Resolved project root. Accepts a
+                :class:`ConfigLocation`, :class:`pathlib.Path`, or string
+                for backward compatibility with internal callers.
         """
+        # Normalize legacy Path/str inputs into ConfigLocation form so the
+        # join logic only has one branch. Strings that look like URIs are
+        # left as plain strings — only the local Path branch needs the FUSE
+        # post-processing below.
+        if isinstance(project_root, ConfigLocation):
+            location: ConfigLocation | None = project_root
+            legacy_str_root: str | None = None
+        elif isinstance(project_root, Path):
+            location = LocalConfigLocation(project_root)
+            legacy_str_root = None
+        else:
+            # Plain string — preserve the original abfss-style concat path
+            # for callers that still hand in a raw URI string.
+            location = None
+            legacy_str_root = project_root
+
         sources = thread_dict.get("sources")
         if not sources or not isinstance(sources, dict):
             return
@@ -1008,14 +1064,19 @@ class Context:
             # Skip already-absolute paths and URIs
             if os.path.isabs(path) or "://" in path:
                 continue
-            if isinstance(project_root, Path):
-                resolved = str(project_root / path)
+
+            if location is not None:
+                joined = location.join(path)
+                resolved = str(joined)
                 # Fabric mount paths (/lakehouse/default/...) are valid for
                 # Python file I/O but not for Spark reads which bypass the
-                # FUSE mount.  Strip the mount prefix so Spark gets a
+                # FUSE mount. Strip the mount prefix so Spark gets a
                 # lakehouse-relative path (e.g. "Files/project.weevr/...").
-                if resolved.startswith("/lakehouse/default/"):
+                if isinstance(location, LocalConfigLocation) and resolved.startswith(
+                    "/lakehouse/default/"
+                ):
                     resolved = resolved[len("/lakehouse/default/") :]
                 source_cfg["path"] = resolved
             else:
-                source_cfg["path"] = f"{project_root.rstrip('/')}/{path}"
+                assert legacy_str_root is not None
+                source_cfg["path"] = f"{legacy_str_root.rstrip('/')}/{path}"

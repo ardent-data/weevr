@@ -7,6 +7,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from weevr.config.locations import ConfigLocation
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
 
@@ -326,22 +327,29 @@ def validate_params(
                 )
 
 
-def resolve_ref_path(ref: str, project_root: Path) -> Path:
-    """Resolve a path-based reference to an absolute file path.
+def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLocation:
+    """Resolve a path-based reference to a :class:`ConfigLocation`.
 
     Args:
         ref: Path-based reference with typed extension, relative to project
             root (e.g., ``'dimensions/dim_customer.thread'``).
-        project_root: Absolute path to the ``.weevr`` project directory.
+        project_root: The ``.weevr`` project directory. A bare
+            :class:`pathlib.Path` is wrapped in a
+            :class:`LocalConfigLocation` for backward compatibility.
 
     Returns:
-        Resolved absolute path to the referenced config file.
+        Resolved location for the referenced config file.
 
     Raises:
-        ReferenceResolutionError: If the referenced file does not exist.
+        ReferenceResolutionError: If the referenced file does not exist or
+            resolves outside the project root.
         ConfigError: If the reference does not have a typed extension.
     """
+    from weevr.config.locations import LocalConfigLocation
     from weevr.errors import ReferenceResolutionError
+
+    if isinstance(project_root, Path):
+        project_root = LocalConfigLocation(project_root)
 
     suffix = Path(ref).suffix.lower()
     if suffix not in TYPED_EXTENSIONS:
@@ -350,8 +358,15 @@ def resolve_ref_path(ref: str, project_root: Path) -> Path:
             file_path=ref,
         )
 
-    resolved = (project_root / ref).resolve()
-    if not resolved.is_relative_to(project_root.resolve()):
+    try:
+        resolved = project_root.join(ref)
+    except ValueError as exc:
+        raise ReferenceResolutionError(
+            f"Reference '{ref}' resolves outside project root",
+            file_path=ref,
+        ) from exc
+
+    if not resolved.is_relative_to(project_root):
         raise ReferenceResolutionError(
             f"Reference '{ref}' resolves outside project root",
             file_path=str(resolved),
@@ -367,7 +382,7 @@ def resolve_ref_path(ref: str, project_root: Path) -> Path:
 def resolve_references(
     config: dict[str, Any],
     config_type: str,
-    project_root: Path,
+    project_root: ConfigLocation | Path,
     runtime_params: dict[str, Any] | None = None,
     visited: set[str] | None = None,
 ) -> dict[str, Any]:
@@ -380,7 +395,9 @@ def resolve_references(
     Args:
         config: Config dict to resolve references in.
         config_type: Type of this config (``'weave'`` or ``'loom'``).
-        project_root: Absolute path to the ``.weevr`` project directory.
+        project_root: The ``.weevr`` project directory. A bare
+            :class:`pathlib.Path` is wrapped in a
+            :class:`LocalConfigLocation` for backward compatibility.
         runtime_params: Runtime parameters to pass to child configs.
         visited: Set of already-visited ref strings (for cycle detection).
 
@@ -393,6 +410,7 @@ def resolve_references(
             reference detected.
         ConfigError: If an inline definition is missing a ``name`` field.
     """
+    from weevr.config.locations import LocalConfigLocation
     from weevr.config.parser import (
         detect_config_type_from_extension,
         extract_config_version,
@@ -401,6 +419,9 @@ def resolve_references(
     )
     from weevr.config.validation import validate_schema
     from weevr.errors import ReferenceResolutionError
+
+    if isinstance(project_root, Path):
+        project_root = LocalConfigLocation(project_root)
 
     if visited is None:
         visited = set()
@@ -467,7 +488,7 @@ def resolve_references(
                 if isinstance(entry, dict):
                     weave_name = entry["name"]
                     convention_ref = f"{weave_name}.weave"
-                    convention_path = project_root / convention_ref
+                    convention_path = project_root.join(convention_ref)
                     if convention_path.exists():
                         if convention_ref in visited:
                             cycle = " -> ".join(visited) + f" -> {convention_ref}"

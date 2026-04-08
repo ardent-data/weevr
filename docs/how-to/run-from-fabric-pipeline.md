@@ -87,9 +87,11 @@ Call `ctx.run()` with the path to your loom config:
 result = ctx.run("nightly.loom")
 ```
 
-The path resolves relative to the notebook's working directory. In Fabric, this
-is typically the root of the attached Lakehouse's Files section. Adjust the
-path if your config files are in a subdirectory.
+The path resolves relative to the project root -- the `.weevr` directory you
+gave to `Context`. For projects loaded via `workspace=` and `lakehouse=`, the
+project root is the remote `abfss://` URI for the project directory, not the
+notebook's working directory. Use a relative subdirectory if your config
+files live below the project root (for example `nightly/full.loom`).
 
 ## Step 4 -- Handle the result
 

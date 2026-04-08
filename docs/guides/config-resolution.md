@@ -148,6 +148,7 @@ checked as post-resolution cross-cutting validations.
 | `config/validation.py` | Pre-resolution schema validation, post-resolution constraint checks |
 | `config/macros.py` | `foreach` block expansion in step lists |
 | `config/fabric.py` | Builds `${fabric.*}` context from Fabric runtime variables |
+| `config/locations.py` | Filesystem-agnostic location abstraction; routes local paths through pathlib and remote URIs through Hadoop FileSystem |
 | `config/warp.py` | Warp schema contract discovery and drift baseline resolution |
 | `config/__init__.py` | `load_config()` — orchestrates the full pipeline |
 
