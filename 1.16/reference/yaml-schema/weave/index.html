@@ -3536,6 +3536,10 @@ runtime parameter. A column set must have exactly one of <code>source</code> or
 </tbody>
 </table>
 <h3 id="column_setssource-columnsetsource">column_sets.source (ColumnSetSource)<a class="headerlink" href="#column_setssource-columnsetsource" title="Permanent link">&para;</a></h3>
+<p>A <code>delta</code> source can be addressed two ways: by <strong>registered table alias</strong>
+(default Spark catalog) or by <strong>named connection plus table</strong> (resolves
+through the lakehouse referenced by a <code>connections:</code> entry on the loom
+or weave). The two modes are mutually exclusive.</p>
 <table>
 <thead>
 <tr>
@@ -3559,7 +3563,7 @@ runtime parameter. A column set must have exactly one of <code>source</code> or
 <td><code>string</code></td>
 <td>cond.</td>
 <td><code>null</code></td>
-<td>Lakehouse table alias. Required when <code>type="delta"</code>.</td>
+<td>Lakehouse table alias. One of <code>alias</code> or <code>connection</code> is required when <code>type="delta"</code>. Mutually exclusive with <code>connection</code>.</td>
 </tr>
 <tr>
 <td><code>path</code></td>
@@ -3567,6 +3571,27 @@ runtime parameter. A column set must have exactly one of <code>source</code> or
 <td>cond.</td>
 <td><code>null</code></td>
 <td>File path. Required when <code>type="yaml"</code>.</td>
+</tr>
+<tr>
+<td><code>connection</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td><code>null</code></td>
+<td>Reference to a named connection defined at the loom or weave level. Only valid for <code>type="delta"</code>. Mutually exclusive with <code>alias</code>.</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>null</code></td>
+<td>Schema name within the connection's lakehouse. Only valid alongside <code>connection</code>.</td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td><code>null</code></td>
+<td>Table name within the connection's lakehouse. Required when <code>connection</code> is set.</td>
 </tr>
 <tr>
 <td><code>from_column</code></td>
@@ -3591,25 +3616,42 @@ runtime parameter. A column set must have exactly one of <code>source</code> or
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">column_sets</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">sap_dictionary</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref.column_dictionary</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">from_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_name</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nt">to_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">friendly_name</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">filter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;system</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;SAP&#39;&quot;</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">on_unmapped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass_through</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">on_extra</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ignore</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="nt">hr_mappings</span><span class="p">:</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mappings/hr_columns.yaml</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">  </span><span class="nt">runtime_overrides</span><span class="p">:</span>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_overrides</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Connection-backed Delta source — reads from a non-default lakehouse</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># referenced by a loom-level connections: entry.</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">ref</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${param.workspace_id}</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${param.ref_lakehouse_id}</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nt">column_sets</span><span class="p">:</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">sap_dictionary</span><span class="p">:</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dictionary</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">      </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sap_column_renames</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">      </span><span class="nt">from_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_name</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">      </span><span class="nt">to_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">friendly_name</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">      </span><span class="nt">filter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;system</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;SAP&#39;&quot;</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="nt">on_unmapped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass_through</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span><span class="nt">on_extra</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ignore</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">  </span><span class="c1"># Alias-backed Delta source — resolves against the active Spark catalog</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">  </span><span class="c1"># (the attached notebook lakehouse on Fabric).</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">  </span><span class="nt">legacy_dictionary</span><span class="p">:</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ref.column_dictionary</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">  </span><span class="nt">hr_mappings</span><span class="p">:</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mappings/hr_columns.yaml</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="w">  </span><span class="nt">runtime_overrides</span><span class="p">:</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="w">    </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">column_overrides</span>
 </code></pre></div>
 <p>Rename steps reference column sets by name:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">steps</span><span class="p">:</span>

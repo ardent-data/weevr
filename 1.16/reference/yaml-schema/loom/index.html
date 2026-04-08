@@ -3041,7 +3041,7 @@ runtime settings that cascade down through weaves to threads.</p>
 <td><code>dict[string, ColumnSet]</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. See <a href="../weave/#column_sets">Weave schema: column_sets</a> for field details.</td>
+<td>Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. Column sets can read their mapping table via a loom-level <code>connections:</code> entry — see <a href="../../../guides/connections/#column-sets-via-connections">Connections guide: Column sets via connections</a>. See <a href="../weave/#column_sets">Weave schema: column_sets</a> for field details.</td>
 </tr>
 <tr>
 <td><code>lookups</code></td>

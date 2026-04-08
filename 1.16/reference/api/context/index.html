@@ -10885,7 +10885,7 @@ and passes it through the execution tree.</p>
 
 
 <h3 id="weevr.context.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -11184,6 +11184,24 @@ thread for rename step resolution.</p>
                 <p>Already-materialized lookup DataFrames from a
 parent scope (e.g. loom level). Seeded into the weave's cached
 lookup dict so threads can reference them without re-materializing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="OneLakeConnection (weevr.model.connection.OneLakeConnection)" href="../model/#weevr.model.OneLakeConnection">OneLakeConnection</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Merged loom + weave connections forwarded to
+<code>materialize_column_sets</code> so connection-backed column sets can
+resolve their lakehouse target.</p>
               </div>
             </td>
             <td>

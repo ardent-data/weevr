@@ -4792,8 +4792,9 @@ continues; <code>"skip"</code> silently skips the rename step.</p>
 
         <p>Source definition for a named column set.</p>
 <p>Describes where the column mapping data lives — either a Delta table or a
-YAML file. Delta sources reference a registered table alias; YAML sources
-reference a file path relative to the project root.</p>
+YAML file. Delta sources may reference a registered table alias <strong>or</strong> a
+named connection plus a table name; YAML sources reference a file path
+relative to the project root.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4824,7 +4825,9 @@ reference a file path relative to the project root.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Registered table alias. Required for <code>type="delta"</code>.</p>
+                <p>Registered table alias. One of <code>alias</code> or <code>connection</code> is
+required when <code>type="delta"</code>; mutually exclusive with
+<code>connection</code>.</p>
               </div>
             </td>
           </tr>
@@ -4836,6 +4839,44 @@ reference a file path relative to the project root.</p>
             <td>
               <div class="doc-md-description">
                 <p>File path to the YAML mapping file. Required for <code>type="yaml"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ColumnSetSource.connection">connection</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Reference to a named connection defined at the loom or
+weave level. When set, the column set is read from
+<code>schema.table</code> within the connection's lakehouse. Only valid
+for <code>type="delta"</code> and mutually exclusive with <code>alias</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ColumnSetSource.schema_override">schema_override</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Schema name within the connection's lakehouse. Only
+valid alongside <code>connection</code>. Accepts the YAML key <code>schema</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ColumnSetSource.table">table</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Table name within the connection's lakehouse. Required when
+<code>connection</code> is set; not valid otherwise.</p>
               </div>
             </td>
           </tr>
