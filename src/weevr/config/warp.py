@@ -141,7 +141,10 @@ def _load_warp(path: Path) -> WarpConfig:
     Returns:
         Validated WarpConfig instance.
     """
-    raw = parse_yaml(path)
+    from weevr.config.locations import LocalConfigLocation
+
+    location = LocalConfigLocation(path)
+    raw = parse_yaml(location)
     result = validate_schema(raw, "warp")
     if not isinstance(result, WarpConfig):
         raise ConfigError(f"Expected WarpConfig from '{path}', got {type(result).__name__}")

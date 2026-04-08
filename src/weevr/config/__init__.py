@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from weevr.config.inheritance import apply_inheritance
+from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
     detect_config_type,
@@ -20,8 +21,8 @@ from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
 
-def _derive_config_name(path: Path) -> str:
-    """Derive the component name from a file path.
+def _derive_config_name(path: ConfigLocation) -> str:
+    """Derive the component name from a config location.
 
     Returns the filename stem — the filename without the typed extension.
     For example, ``dim_customer.thread`` returns ``'dim_customer'``.
@@ -30,9 +31,9 @@ def _derive_config_name(path: Path) -> str:
 
 
 def load_config(
-    path: str | Path,
+    path: str | Path | ConfigLocation,
     runtime_params: dict[str, Any] | None = None,
-    project_root: Path | None = None,
+    project_root: Path | ConfigLocation | None = None,
 ) -> Thread | Weave | Loom | dict[str, Any]:
     """Load and validate a weevr configuration file.
 
@@ -49,10 +50,14 @@ def load_config(
     10. Hydrate into typed domain model (thread, weave, loom only)
 
     Args:
-        path: Path to the config file (thread, weave, or loom).
+        path: Path or :class:`ConfigLocation` for the config file (thread,
+            weave, or loom). Local paths are wrapped automatically; remote
+            URIs must be supplied as a :class:`RemoteConfigLocation` so the
+            caller can attach a SparkSession.
         runtime_params: Optional runtime parameter overrides.
-        project_root: Path to the ``.weevr`` project directory. Required for
-            configs that reference other files.
+        project_root: The ``.weevr`` project directory. Required for configs
+            that reference other files. Accepts a :class:`ConfigLocation` or
+            a bare :class:`pathlib.Path`.
 
     Returns:
         A frozen, typed domain model instance (Thread, Weave, or Loom) for
@@ -67,7 +72,7 @@ def load_config(
         ReferenceResolutionError: Missing referenced files, circular dependencies
         ModelValidationError: Semantic validation failures during model hydration
     """
-    file_path = Path(path)
+    file_path = make_location(path)
 
     # Step 1: Parse YAML
     raw = parse_yaml(file_path)
@@ -94,7 +99,12 @@ def load_config(
     resolved = resolve_variables(config_dict, context)
 
     # Step 7: Resolve references to child configs
-    effective_root = project_root if project_root else file_path.parent
+    if project_root is None:
+        effective_root: ConfigLocation = file_path.parent
+    elif isinstance(project_root, ConfigLocation):
+        effective_root = project_root
+    else:
+        effective_root = LocalConfigLocation(Path(project_root))
     resolved_with_refs = resolve_references(
         resolved,
         config_type,
@@ -155,11 +165,26 @@ def load_config(
             resolved_with_refs["name"] = stem
 
         # Compute qualified key for standalone files
-        if project_root and ext_type is not None:
-            try:
-                rel = file_path.resolve().relative_to(project_root.resolve())
-                resolved_with_refs["qualified_key"] = str(rel)
-            except ValueError:
+        if project_root is not None and ext_type is not None:
+            if file_path.is_relative_to(effective_root):
+                # Strip the project_root prefix to produce a relative key.
+                # For local locations this matches the previous Path.resolve()
+                # / Path.relative_to behavior; for remote locations it is a
+                # normalized URI prefix strip.
+                if isinstance(file_path, LocalConfigLocation) and isinstance(
+                    effective_root, LocalConfigLocation
+                ):
+                    rel = file_path.path.resolve().relative_to(effective_root.path.resolve())
+                    resolved_with_refs["qualified_key"] = str(rel)
+                else:
+                    file_str = str(file_path)
+                    root_str = str(effective_root).rstrip("/")
+                    resolved_with_refs["qualified_key"] = (
+                        file_str[len(root_str) + 1 :]
+                        if file_str.startswith(root_str + "/")
+                        else file_str
+                    )
+            else:
                 resolved_with_refs["qualified_key"] = str(file_path)
     elif not resolved_with_refs.get("name"):
         resolved_with_refs["name"] = file_path.stem

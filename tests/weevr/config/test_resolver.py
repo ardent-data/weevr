@@ -598,7 +598,7 @@ class TestReferenceResolution:
         thread_file.parent.mkdir(parents=True)
         thread_file.write_text('config_version: "1.0"\nsources:\n  data:\n    type: delta\n')
         result = resolve_ref_path("dimensions/dim_customer.thread", tmp_path)
-        assert result == thread_file.resolve()
+        assert str(result) == str(tmp_path / "dimensions" / "dim_customer.thread")
 
     def test_resolve_ref_path_weave(self, tmp_path):
         """Resolve path-based weave reference."""
@@ -607,7 +607,7 @@ class TestReferenceResolution:
         weave_file = tmp_path / "dimensions.weave"
         weave_file.write_text('config_version: "1.0"\nthreads: []\n')
         result = resolve_ref_path("dimensions.weave", tmp_path)
-        assert result == weave_file.resolve()
+        assert str(result) == str(weave_file)
 
     def test_resolve_ref_path_missing(self, tmp_path):
         """Raise ReferenceResolutionError for missing file."""
@@ -635,6 +635,18 @@ class TestReferenceResolution:
 
         with pytest.raises(ReferenceResolutionError, match="resolves outside project root"):
             resolve_ref_path("../escape.thread", project_root)
+
+    def test_resolve_ref_path_accepts_config_location(self, tmp_path):
+        """resolve_ref_path accepts a LocalConfigLocation directly."""
+        from weevr.config.locations import LocalConfigLocation
+        from weevr.config.resolver import resolve_ref_path
+
+        thread_file = tmp_path / "dim.thread"
+        thread_file.write_text('config_version: "1.0"\n')
+        loc = LocalConfigLocation(tmp_path)
+        result = resolve_ref_path("dim.thread", loc)
+        assert isinstance(result, LocalConfigLocation)
+        assert str(result) == str(thread_file)
 
     def test_resolve_references_loom_to_weave_to_thread(self, tmp_path):
         """Resolve full hierarchy via ref entries: loom -> weave -> thread."""
