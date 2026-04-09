@@ -1574,6 +1574,191 @@ class TestExecuteWeaveConnectionsForwarding:
         assert call_kwargs.get("connections") is connections
 
 
+class TestExecuteWeaveConnectionsToLookups:
+    """Test that execute_weave forwards its connections kwarg to materialize_lookups.
+
+    Regression tests for the bug where loom-level connections were not forwarded
+    to materialize_lookups, causing LookupResolutionError for any lookup whose
+    source referenced a connection defined only at the loom level.
+    """
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_connections_forwarded_to_materialize_lookups_fallback_path(self, mock_mat, mock_exec):
+        """connections is forwarded to materialize_lookups on the fallback
+        (no lookup_schedule) upfront-materialization path."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.connection import OneLakeConnection
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"my_lookup": mock_df},
+            [LookupResult(name="my_lookup", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("t1")
+
+        lookups = {
+            "my_lookup": Lookup(
+                source=Source(type="delta", connection="silver", table="customers"),
+                materialize=True,
+            )
+        }
+        connections = {
+            "silver": OneLakeConnection(type="onelake", workspace="ws-1", lakehouse="silver-lh"),
+        }
+        threads = {"t1": _make_thread("t1")}
+        # Build plan *without* passing lookups so lookup_schedule is None,
+        # forcing the fallback upfront-materialization branch.
+        plan = build_plan("test_weave", threads, _entries("t1"))
+        assert plan.lookup_schedule is None
+
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups, connections=connections)
+
+        assert result.status == "success"
+        mock_mat.assert_called_once()
+        call_kwargs = mock_mat.call_args.kwargs
+        assert call_kwargs.get("connections") is connections, (
+            "connections must be forwarded to materialize_lookups on the fallback path"
+        )
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_connections_forwarded_to_materialize_lookups_scheduled_path(self, mock_mat, mock_exec):
+        """connections is forwarded to materialize_lookups on the scheduled
+        (_materialize_scheduled) path used when plan.lookup_schedule is set."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.connection import OneLakeConnection
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"my_lookup": mock_df},
+            [LookupResult(name="my_lookup", materialized=True, row_count=3)],
+        )
+        mock_exec.side_effect = lambda spark, thread, **kw: _make_result(thread.name)
+
+        lookups = {
+            "my_lookup": Lookup(
+                source=Source(type="delta", connection="silver", table="customers"),
+                materialize=True,
+            )
+        }
+        connections = {
+            "silver": OneLakeConnection(type="onelake", workspace="ws-1", lakehouse="silver-lh"),
+        }
+        # Thread references the lookup — plan will build a lookup_schedule
+        threads = {
+            "t1": Thread.model_validate(
+                {
+                    "name": "t1",
+                    "config_version": "1.0",
+                    "sources": {"lk": {"lookup": "my_lookup"}},
+                    "target": {"alias": "test.out"},
+                }
+            )
+        }
+        plan = build_plan("test_weave", threads, _entries("t1"), lookups=lookups)
+        assert plan.lookup_schedule is not None
+
+        result = execute_weave(_MOCK_SPARK, plan, threads, lookups=lookups, connections=connections)
+
+        assert result.status == "success"
+        mock_mat.assert_called_once()
+        call_kwargs = mock_mat.call_args.kwargs
+        assert call_kwargs.get("connections") is connections, (
+            "connections must be forwarded to materialize_lookups on the scheduled path"
+        )
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_loom_connections_cascade_to_materialize_lookups_via_execute_loom(
+        self, mock_mat, mock_exec
+    ):
+        """End-to-end: loom-level connections are merged and forwarded through
+        execute_loom → execute_weave → materialize_lookups so that lookups
+        referencing a loom-only connection can resolve without error.
+
+        This is the exact failure scenario reported in the bug ticket.
+        """
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.connection import OneLakeConnection
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"my_lookup": mock_df},
+            [LookupResult(name="my_lookup", materialized=True, row_count=7)],
+        )
+        mock_exec.side_effect = lambda spark, thread, **kw: _make_result(thread.name)
+
+        # Loom declares the 'silver' connection; neither the weave nor threads do.
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "weaves": ["pipeline"],
+                "connections": {
+                    "silver": {
+                        "type": "onelake",
+                        "workspace": "ws-prod",
+                        "lakehouse": "silver-lh",
+                    },
+                },
+            }
+        )
+
+        # Weave declares a lookup that references the loom-level connection.
+        weave_lookup = Lookup(
+            source=Source(type="delta", connection="silver", table="customers"),
+            materialize=True,
+        )
+        weave = Weave.model_validate(
+            {
+                "config_version": "1.0",
+                "name": "pipeline",
+                "lookups": {"my_lookup": weave_lookup.model_dump()},
+                "threads": ["t1"],
+            }
+        )
+        t1 = Thread.model_validate(
+            {
+                "name": "t1",
+                "config_version": "1.0",
+                "sources": {"lk": {"lookup": "my_lookup"}},
+                "target": {"alias": "gold.out"},
+            }
+        )
+
+        result = execute_loom(
+            _MOCK_SPARK,
+            loom,
+            {"pipeline": weave},
+            {"pipeline": {"t1": t1}},
+        )
+
+        assert result.status == "success"
+        # materialize_lookups must have been called with the loom-level connection
+        assert mock_mat.call_count >= 1
+        # Find the call that materialized weave-level lookups (not loom-level)
+        weave_mat_call = None
+        for call in mock_mat.call_args_list:
+            if "my_lookup" in call[0][1]:
+                weave_mat_call = call
+                break
+        assert weave_mat_call is not None, "materialize_lookups not called for weave lookup"
+        forwarded_connections = weave_mat_call.kwargs.get("connections")
+        assert forwarded_connections is not None, (
+            "connections must be forwarded to materialize_lookups — "
+            "loom-level connections were not reaching the lookup materializer"
+        )
+        assert "silver" in forwarded_connections
+        assert isinstance(forwarded_connections["silver"], OneLakeConnection)
+        assert forwarded_connections["silver"].lakehouse == "silver-lh"
+
+
 # ---------------------------------------------------------------------------
 # Lifecycle order tests
 # ---------------------------------------------------------------------------
