@@ -658,6 +658,34 @@ class TestThreadWithBlock:
             Thread.model_validate(data)
         assert "active_customers" not in caplog.text or "unused" not in caplog.text.lower()
 
+    def test_sibling_cte_from_reference_no_warning(self, caplog):
+        """CTE consumed by a sibling CTE via from: does not produce an unused warning."""
+        data = {
+            **_MINIMAL_WITH_SOURCES,
+            "with": {
+                "base_customers": {
+                    "from": "customers",
+                    "steps": [{"filter": {"expr": "active = true"}}],
+                },
+                "vip_customers": {
+                    "from": "base_customers",
+                    "steps": [{"filter": {"expr": "tier = 'VIP'"}}],
+                },
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "vip_customers",
+                        "type": "inner",
+                        "on": ["id"],
+                    }
+                }
+            ],
+        }
+        with caplog.at_level(logging.WARNING):
+            Thread.model_validate(data)
+        assert "base_customers" not in caplog.text
+
     def test_join_alias_collides_with_source_raises(self):
         """Join step alias matching a source name raises ValidationError."""
         data = {

@@ -195,7 +195,11 @@ class Thread(FrozenBase):
             available.add(cte_name)
 
         # 3. Unused CTE warning: collect all source references from join/union steps
+        #    AND sibling CTE from: references (CTE-to-CTE chaining).
         referenced: set[str] = set()
+        for sub_pipeline in self.with_.values():
+            if sub_pipeline.from_ in cte_names:
+                referenced.add(sub_pipeline.from_)
         all_step_lists = list(self.with_.values()) + [self]
         for container in all_step_lists:
             steps_list = container.steps if hasattr(container, "steps") else []

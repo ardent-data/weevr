@@ -1979,3 +1979,102 @@ class TestLoomResourceLifecycle:
         weave_idx = call_order.index("execute_weave")
         post_idx = call_order.index("hooks:post")
         assert weave_idx < post_idx
+
+
+class TestConnectionPropagation:
+    """Verify connections are forwarded to materialize_lookups."""
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_weave_upfront_lookups_receive_connections(self, mock_mat, mock_exec):
+        """Upfront materialize_lookups receives connections from execute_weave."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "ref": Lookup(
+                source=Source(type="delta", alias="ext.table"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        fake_conn = MagicMock()
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            lookups=lookups,
+            connections={"gold": fake_conn},
+        )
+
+        mock_mat.assert_called_once()
+        call_kwargs = mock_mat.call_args[1]
+        assert "connections" in call_kwargs
+        assert call_kwargs["connections"]["gold"] is fake_conn
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_weave_scheduled_lookups_receive_connections(self, mock_mat, mock_exec):
+        """Scheduled materialize_lookups receives connections from execute_weave."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        call_order: list[str] = []
+        mock_df = MagicMock()
+        mock_mat.side_effect = lambda spark, lk_dict, **kwargs: (
+            call_order.append(f"materialize:{','.join(lk_dict.keys())}"),
+            (
+                {n: mock_df for n in lk_dict},
+                [LookupResult(name=n, materialized=True, row_count=10) for n in lk_dict],
+            ),
+        )[1]
+
+        def exec_side_effect(spark, thread, **kwargs):
+            call_order.append(f"execute:{thread.name}")
+            return _make_result(thread.name)
+
+        mock_exec.side_effect = exec_side_effect
+
+        lookups = {
+            "cust": Lookup(
+                source=Source(type="delta", alias="silver.dim_customer"),
+                materialize=True,
+            )
+        }
+        threads = {
+            "A": _make_thread("A", target_alias="silver.dim_customer"),
+            "B": Thread.model_validate(
+                {
+                    "name": "B",
+                    "config_version": "1.0",
+                    "sources": {"lk_cust": {"lookup": "cust"}},
+                    "target": {"alias": "test"},
+                }
+            ),
+        }
+        plan = build_plan("test_weave", threads, _entries("A", "B"), lookups=lookups)
+
+        fake_conn = MagicMock()
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            lookups=lookups,
+            connections={"gold": fake_conn},
+        )
+
+        for call in mock_mat.call_args_list:
+            call_kwargs = call[1]
+            assert "connections" in call_kwargs
+            assert call_kwargs["connections"]["gold"] is fake_conn

@@ -693,7 +693,11 @@ class Context:
 
         for thread_name, thread in all_threads.items():
             try:
-                sources_map = read_sources(self._spark, thread.sources)
+                sources_map = read_sources(
+                    self._spark,
+                    thread.sources,
+                    connections=thread.connections,
+                )
                 for key in sources_map:
                     sources_map[key] = sources_map[key].limit(sample_rows)
 

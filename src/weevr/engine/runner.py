@@ -170,7 +170,11 @@ def execute_weave(
         if not subset:
             return
         new_cached, new_results = materialize_lookups(
-            spark, subset, collector=collector, parent_span_id=weave_span_id
+            spark,
+            subset,
+            collector=collector,
+            parent_span_id=weave_span_id,
+            connections=connections,
         )
         cached_lookup_dfs.update(new_cached)
         all_lookup_results.extend(new_results)
@@ -200,7 +204,11 @@ def execute_weave(
             _materialize_scheduled(0)
         elif lookups:
             cached_lookup_dfs, all_lookup_results = materialize_lookups(
-                spark, lookups, collector=collector, parent_span_id=weave_span_id
+                spark,
+                lookups,
+                collector=collector,
+                parent_span_id=weave_span_id,
+                connections=connections,
             )
 
         # Materialize column sets — resolve all defs into name→mapping dicts
@@ -560,12 +568,14 @@ def execute_loom(
             )
 
         # Materialize loom-level lookups (shared across all weaves)
+        loom_connections = dict(loom.connections) if loom.connections else None
         if loom.lookups:
             loom_cached_lookup_dfs, _ = materialize_lookups(
                 spark,
                 dict(loom.lookups),
                 collector=collector,
                 parent_span_id=loom_span_id,
+                connections=loom_connections,
             )
 
         for weave_entry in loom.weaves:
