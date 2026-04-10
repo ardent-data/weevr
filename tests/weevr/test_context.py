@@ -350,6 +350,122 @@ class TestFilterThreads:
         assert "No threads matched" in warnings[0]
 
 
+class TestLoadResolvedConnections:
+    """Verify that _load_resolved preserves loom-level connections through the
+    full config pipeline and hydrates them onto the Loom domain model.
+
+    Regression guard for the bug where loom.connections evaluated to None at
+    execute_loom time despite being declared in the loom YAML.  No Spark
+    required — _load_resolved only parses/validates YAML; it does not execute.
+    """
+
+    def _build_project(self, tmp_path: Path) -> Path:
+        """Scaffold a minimal .weevr project tree with loom-level connections."""
+        project = tmp_path / "proj.weevr"
+        project.mkdir()
+
+        # thread
+        (project / "threads").mkdir()
+        (project / "threads" / "dim_test.thread").write_text(
+            """\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: silver.raw_data
+target:
+  path: /tmp/output
+"""
+        )
+
+        # weave (no connections)
+        (project / "weaves").mkdir()
+        (project / "weaves" / "gold.weave").write_text(
+            """\
+config_version: "1.0"
+threads:
+  - ref: threads/dim_test.thread
+"""
+        )
+
+        # loom with connections
+        (project / "looms").mkdir()
+        (project / "looms" / "daily.loom").write_text(
+            """\
+config_version: "1.0"
+weaves:
+  - ref: weaves/gold.weave
+connections:
+  silver:
+    type: onelake
+    workspace: ws-123
+    lakehouse: lh-456
+"""
+        )
+
+        return project
+
+    def test_loom_connections_survive_load_resolved(self, tmp_path: Path) -> None:
+        """loom.connections is populated from YAML after the full _load_resolved pipeline.
+
+        Asserts that the Loom domain model returned by _load_resolved carries the
+        connections dict defined at the top of the loom YAML, verifying that no
+        pipeline stage (schema validation, variable resolution, reference resolution,
+        inheritance cascade, or Pydantic hydration) silently drops the field.
+        """
+        from unittest.mock import MagicMock
+
+        from pyspark.sql import SparkSession
+
+        from weevr.model.connection import OneLakeConnection
+
+        project = self._build_project(tmp_path)
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        resolved = ctx._load_resolved("looms/daily.loom")
+
+        from weevr.model.loom import Loom
+
+        assert isinstance(resolved.model, Loom)
+        loom = resolved.model
+
+        assert loom.connections is not None, (
+            "loom.connections must not be None after _load_resolved — "
+            "connections declared in loom YAML were silently dropped"
+        )
+        assert "silver" in loom.connections, (
+            "expected connection named 'silver' to be present in loom.connections"
+        )
+        assert isinstance(loom.connections["silver"], OneLakeConnection)
+        assert loom.connections["silver"].workspace == "ws-123"
+        assert loom.connections["silver"].lakehouse == "lh-456"
+
+    def test_weave_without_connections_has_none(self, tmp_path: Path) -> None:
+        """A weave that declares no connections has weave.connections == None.
+
+        Confirms the complementary half of the merge: the weave in the loom
+        fixture above has no connections block, so weave.connections stays None.
+        The loom connections should NOT be injected into weave.connections — they
+        are merged at execute_loom time, not during config loading.
+        """
+        from unittest.mock import MagicMock
+
+        from pyspark.sql import SparkSession
+
+        project = self._build_project(tmp_path)
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        resolved = ctx._load_resolved("looms/daily.loom")
+
+        weave = resolved.weaves.get("gold")
+        assert weave is not None, "weave 'gold' should be resolved"
+        assert weave.connections is None, (
+            "weave.connections must be None when the weave YAML has no connections block"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Integration tests — require Spark
 # ---------------------------------------------------------------------------

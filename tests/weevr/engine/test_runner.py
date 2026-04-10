@@ -2131,6 +2131,56 @@ class TestLoomResourceLifecycle:
         assert "extra" in merged
 
     @patch("weevr.engine.runner.execute_weave")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_loom_connections_forwarded_to_loom_level_materialize_lookups(
+        self, mock_mat, mock_weave_exec
+    ):
+        """Loom-level connections are forwarded to materialize_lookups when the
+        loom declares both lookups and connections.
+
+        Regression test for the bug where execute_loom called materialize_lookups
+        for loom-level lookups without passing connections, causing
+        LookupResolutionError even when loom.connections was populated.
+        """
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.connection import OneLakeConnection
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        mock_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": mock_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_weave_exec.return_value = self._weave_result()
+
+        loom_lookup = Lookup(
+            source=Source(type="delta", alias="silver.ref_table"),
+            materialize=True,
+        )
+        loom = self._make_loom(
+            lookups={"ref": loom_lookup.model_dump()},
+            connections={
+                "silver": {"type": "onelake", "workspace": "ws-1", "lakehouse": "silver-lh"}
+            },
+        )
+        weaves = {"w1": self._make_weave()}
+        threads = {"w1": {"t1": _make_thread("t1")}}
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        mock_mat.assert_called_once()
+        call_kwargs = mock_mat.call_args.kwargs
+        forwarded = call_kwargs.get("connections")
+        assert forwarded is not None, (
+            "connections must be forwarded to materialize_lookups for loom-level lookups — "
+            "loom.connections was not reaching the lookup materializer"
+        )
+        assert "silver" in forwarded
+        assert isinstance(forwarded["silver"], OneLakeConnection)
+        assert forwarded["silver"].lakehouse == "silver-lh"
+
+    @patch("weevr.engine.runner.execute_weave")
     @patch("weevr.engine.runner.run_hook_steps", return_value=[])
     def test_loom_post_steps_run_after_weave_failure(self, mock_hooks, mock_weave_exec):
         """Loom post_steps execute even when a weave fails."""

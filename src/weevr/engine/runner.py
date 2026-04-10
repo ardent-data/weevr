@@ -574,6 +574,7 @@ def execute_loom(
                 dict(loom.lookups),
                 collector=collector,
                 parent_span_id=loom_span_id,
+                connections=loom.connections if loom.connections else None,
             )
 
         for weave_entry in loom.weaves:
