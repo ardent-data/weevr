@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.3](https://github.com/ardent-data/weevr/compare/weevr-v1.16.2...weevr-v1.16.3) (2026-04-11)
+
+
+### Bug Fixes
+
+* **engine:** propagate connections to lookup materialization and fix join dup-key-drop ([#151](https://github.com/ardent-data/weevr/issues/151)) ([8cd99e7](https://github.com/ardent-data/weevr/commit/8cd99e74c17bb5fd5be84a5a82d16faccb76af84))
+
 ## [1.16.2](https://github.com/ardent-data/weevr/compare/weevr-v1.16.1...weevr-v1.16.2) (2026-04-08)
 
 
