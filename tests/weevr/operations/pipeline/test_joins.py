@@ -462,6 +462,72 @@ class TestApplyJoinColumnControl:
         assert set(result.columns) == {"id", "left_val", "right_val"}
 
 
+class TestJoinDupKeyDropWithAlias:
+    """Regression tests for alias + same-name key dup-key-drop (TD-009)."""
+
+    def test_alias_same_name_key_produces_single_column(self, spark: SparkSession) -> None:
+        """Alias with same-name key pair drops the right-side duplicate."""
+        left = spark.createDataFrame([{"id": 1, "lv": "a"}])
+        right = spark.createDataFrame([{"id": 1, "rv": "x"}])
+        params = JoinParams(
+            source="r",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            alias="r",
+        )
+        result = apply_join(left, params, {"r": right})
+        assert result.columns.count("id") == 1
+        assert result.count() == 1
+
+    def test_alias_same_name_key_with_include_exclude(self, spark: SparkSession) -> None:
+        """Include/exclude correctly filter right-side columns when alias is set."""
+        left = spark.createDataFrame([{"id": 1, "client": "A", "lv": "a"}])
+        right = spark.createDataFrame([{"id": 1, "client": "A", "rv": "x", "extra": "y"}])
+        params = JoinParams(
+            source="r",
+            type="left",
+            on=[JoinKeyPair(left="id", right="id"), JoinKeyPair(left="client", right="client")],
+            alias="r",
+            include=["rv"],
+            exclude=["id", "client"],
+        )
+        result = apply_join(left, params, {"r": right})
+        assert result.columns.count("id") == 1
+        assert result.columns.count("client") == 1
+        assert "rv" in result.columns
+        assert "extra" not in result.columns
+
+    def test_alias_same_name_key_with_rename(self, spark: SparkSession) -> None:
+        """Rename works correctly after alias dup-key-drop."""
+        left = spark.createDataFrame([{"id": 1, "lv": "a"}])
+        right = spark.createDataFrame([{"id": 1, "rv": "x"}])
+        params = JoinParams(
+            source="r",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            alias="r",
+            include=["rv"],
+            rename={"rv": "right_value"},
+        )
+        result = apply_join(left, params, {"r": right})
+        assert "right_value" in result.columns
+        assert "rv" not in result.columns
+        assert result.columns.count("id") == 1
+
+    def test_no_alias_same_name_key_still_works(self, spark: SparkSession) -> None:
+        """Without alias, same-name key dup-key-drop still works (regression guard)."""
+        left = spark.createDataFrame([{"id": 1, "lv": "a"}])
+        right = spark.createDataFrame([{"id": 1, "rv": "x"}])
+        params = JoinParams(
+            source="r",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+        )
+        result = apply_join(left, params, {"r": right})
+        assert result.columns.count("id") == 1
+        assert set(result.columns) == {"id", "lv", "rv"}
+
+
 class TestApplyUnion:
     """Tests for the union step handler."""
 

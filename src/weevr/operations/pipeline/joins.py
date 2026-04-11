@@ -46,6 +46,7 @@ def apply_join(
 
     # Capture left-side columns before join so source columns can be identified afterward.
     left_cols: set[str] = set(df.columns)
+    left_col_count = len(df.columns)
 
     if params.type == "cross":
         result = df.crossJoin(right_df)
@@ -56,11 +57,36 @@ def apply_join(
         # Column-expression joins keep both sides of matching key columns,
         # causing ambiguous references downstream. Drop the right-side
         # duplicates when the left and right key names are the same.
-        for pair in params.on:
-            if pair.left == pair.right:
-                result = result.drop(right_df[pair.right])
+        same_name_keys = {pair.right for pair in params.on if pair.left == pair.right}
+        if same_name_keys:
+            if params.alias:
+                # When alias is set, Spark's internal column IDs change so
+                # right_df[col] no longer targets the right-side column
+                # reliably. Rename all columns to unique temp names, drop
+                # the duplicates by temp name, then rename back.
+                drop_indices: set[int] = set()
+                seen: dict[str, int] = {}
+                for i, col_name in enumerate(result.columns):
+                    if col_name in same_name_keys:
+                        if col_name in seen:
+                            drop_indices.add(i)
+                        else:
+                            seen[col_name] = i
+                if drop_indices:
+                    orig_cols = result.columns
+                    temp_names = [f"__dedup_{i}__" for i in range(len(orig_cols))]
+                    result = result.toDF(*temp_names)
+                    for idx in sorted(drop_indices, reverse=True):
+                        result = result.drop(temp_names[idx])
+                    final_names = [c for i, c in enumerate(orig_cols) if i not in drop_indices]
+                    result = result.toDF(*final_names)
+            else:
+                # Without alias, DataFrame-qualified drop works correctly.
+                for pair in params.on:
+                    if pair.left == pair.right:
+                        result = result.drop(right_df[pair.right])
 
-    result = _apply_column_control(result, params, left_cols)
+    result = _apply_column_control(result, params, left_cols, left_col_count)
     return result
 
 
@@ -68,14 +94,11 @@ def _apply_column_control(
     result: DataFrame,
     params: JoinParams,
     left_cols: set[str],
+    left_col_count: int = 0,
 ) -> DataFrame:
     """Apply include/exclude/prefix/rename column control to joined source columns.
 
     Processing order (per DEC-017): dup-key-drop → include → exclude → prefix → rename.
-
-    Note: when a non-key column name exists on both sides of the join, the
-    source-column detection cannot distinguish left from right copies. Use
-    ``alias`` + ``prefix`` to disambiguate before column control in that case.
     """
     no_control = (
         params.include is None
@@ -86,8 +109,13 @@ def _apply_column_control(
     if no_control:
         return result
 
-    # Identify source (right-side) columns as those not present in the left DataFrame.
-    source_cols = [c for c in result.columns if c not in left_cols]
+    # Identify source (right-side) columns. Use the left-side column count
+    # as a positional boundary so that same-name columns surviving after
+    # dup-key-drop are correctly classified as right-side (source) columns.
+    if left_col_count > 0:
+        source_cols = list(result.columns[left_col_count:])
+    else:
+        source_cols = [c for c in result.columns if c not in left_cols]
 
     # --- include ---
     if params.include is not None:
