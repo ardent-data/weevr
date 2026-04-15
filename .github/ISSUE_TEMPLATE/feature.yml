@@ -1,7 +1,6 @@
 name: Feature request
 description: Propose an enhancement or new capability
-title: "feat: "
-labels: ["enhancement"]
+labels: ["enhancement", "status:triage"]
 body:
   - type: textarea
     id: problem
@@ -18,6 +17,14 @@ body:
       description: What do you want to happen?
     validations:
       required: true
+
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload context
+      description: What kind of pipeline are you building? (e.g., bronze→silver incremental, CDC into curated, dimension modelling)
+    validations:
+      required: false
 
   - type: textarea
     id: alternatives

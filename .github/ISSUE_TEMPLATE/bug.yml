@@ -1,7 +1,6 @@
 name: Bug report
 description: Report a defect or unexpected behavior
-title: "bug: "
-labels: ["bug"]
+labels: ["bug", "status:triage"]
 body:
   - type: textarea
     id: description
@@ -23,11 +22,40 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: config
+    attributes:
+      label: Minimal config snippet
+      description: Smallest YAML that reproduces the issue. Sanitize any secrets or paths.
+      render: yaml
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Blocks me — no workaround
+        - Workaround exists but painful
+        - Nuisance — easy to work around
+    validations:
+      required: false
+
   - type: input
     id: version
     attributes:
       label: weevr version
-      placeholder: "0.1.0"
+      placeholder: "1.16.3"
+    validations:
+      required: false
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Spark / Fabric runtime
+      description: Fabric runtime version, or local Spark version if not on Fabric.
+      placeholder: "Fabric Runtime 1.3 (Spark 3.5)"
     validations:
       required: false
 
