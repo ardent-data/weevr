@@ -1,0 +1,40 @@
+name: Set issue type from template
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  apply-type:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Map template label to issue type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+        run: |
+          set -euo pipefail
+
+          if echo "$LABELS" | grep -q '"bug"'; then
+            type="Bug"
+            strip="bug"
+          elif echo "$LABELS" | grep -q '"enhancement"'; then
+            type="Feature"
+            strip="enhancement"
+          else
+            echo "No template label matched; leaving type unset."
+            exit 0
+          fi
+
+          echo "Setting type=$type on issue #$ISSUE_NUMBER"
+          gh api -X PATCH "/repos/$REPO/issues/$ISSUE_NUMBER" -f type="$type"
+
+          if [ -n "$strip" ]; then
+            echo "Removing redundant label '$strip'"
+            gh api -X DELETE "/repos/$REPO/issues/$ISSUE_NUMBER/labels/$strip"
+          fi
