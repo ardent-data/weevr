@@ -142,12 +142,13 @@ Override with custom members:
 ```
 
 Business-key columns receive the member's `code` when the column
-is a string type. For non-string business keys (e.g. an
-`IntegerType` calendar-date key `id = YYYYMMDD`, or a `DateType`
-`as_of_date`), the column is filled with the type-appropriate
-default instead (`0` for numeric types, `1970-01-01` for dates,
-`Decimal(0)` for decimals). Composite business keys are evaluated
-per column.
+is a string type. For non-string business keys (e.g. an integer
+calendar-date key `id = YYYYMMDD`, or a date `as_of_date`), the
+column is filled with the type-appropriate default from the same
+mapping used by `fill_null mode: type_defaults` — see
+[fill_null type defaults](../reference/yaml-schema/thread.md#fill_null)
+for the full table. Composite business keys are evaluated per
+column.
 
 ## General Seed Rows
 
