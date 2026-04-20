@@ -23,8 +23,10 @@ from weevr.config.parser import (
 )
 from weevr.config.resolver import (
     build_param_context,
+    resolve_declared_params,
     resolve_references,
     resolve_variables,
+    validate_params,
 )
 from weevr.config.validation import validate_schema
 from weevr.delta import is_table_alias
@@ -798,10 +800,19 @@ class Context:
         from weevr.config.fabric import build_fabric_context
 
         fabric_ctx = build_fabric_context(self._spark)
+        declared_param_specs = config_dict.get("params")
+        resolved_declared_params = resolve_declared_params(
+            declared_param_specs,
+            self._params,
+            file_path=str(file_path),
+        )
+        # Type validation only — required-missing already raised above.
+        validate_params(declared_param_specs, resolved_declared_params)
         param_context = build_param_context(
             self._params,
-            config_dict.get("defaults") or config_dict.get("params"),
+            config_dict.get("defaults"),
             fabric_context=fabric_ctx,
+            entry_params=resolved_declared_params or None,
         )
 
         # Step 6: Variable resolution

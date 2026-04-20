@@ -15,7 +15,13 @@ from weevr.config.parser import (
     parse_yaml,
     validate_config_version,
 )
-from weevr.config.resolver import build_param_context, resolve_references, resolve_variables
+from weevr.config.resolver import (
+    build_param_context,
+    resolve_declared_params,
+    resolve_references,
+    resolve_variables,
+    validate_params,
+)
 from weevr.config.validation import validate_schema
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
@@ -90,9 +96,18 @@ def load_config(
     config_dict = validated.model_dump(exclude_unset=True)
 
     # Step 5: Build parameter context (no more param_file)
+    declared_param_specs = config_dict.get("params")
+    resolved_declared_params = resolve_declared_params(
+        declared_param_specs,
+        runtime_params,
+        file_path=str(file_path),
+    )
+    # Type validation only — required-missing already raised above.
+    validate_params(declared_param_specs, resolved_declared_params)
     context = build_param_context(
         runtime_params,
-        config_dict.get("defaults") or config_dict.get("params"),
+        config_dict.get("defaults"),
+        entry_params=resolved_declared_params or None,
     )
 
     # Step 6: Resolve variables

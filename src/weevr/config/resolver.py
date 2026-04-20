@@ -67,6 +67,79 @@ def build_param_context(
     return context
 
 
+def _spec_field(spec: Any, name: str, default: Any = None) -> Any:
+    """Read a field from either a ParamSpec instance or its model_dump dict."""
+    if hasattr(spec, name):
+        return getattr(spec, name)
+    if isinstance(spec, dict):
+        return spec.get(name, default)
+    return default
+
+
+def resolve_declared_params(
+    param_specs: dict[str, Any] | None,
+    runtime_params: dict[str, Any] | None,
+    *,
+    file_path: str | None = None,
+) -> dict[str, Any]:
+    """Resolve loom/weave-level declared ``params:`` to a flat ``{name: value}`` dict.
+
+    Precedence per declared param:
+
+    1. Value from ``runtime_params`` if supplied
+    2. ``ParamSpec.default`` if set on the spec
+    3. ``ConfigSchemaError`` if the param is required
+    4. Omitted from the result if optional with no default
+
+    The returned dict is intended to bind under the ``param.*`` namespace via
+    :func:`build_param_context`'s ``entry_params`` argument, so that
+    ``${param.x}`` expressions resolve to the layered value.
+
+    Runtime keys not declared in ``param_specs`` are ignored — declared scope
+    is the only contract honored at this layer.
+
+    Args:
+        param_specs: Mapping of declared params (``ParamSpec`` instances or
+            their ``model_dump`` dicts). ``None`` or empty returns ``{}``.
+        runtime_params: Caller-supplied values keyed by param name.
+        file_path: Optional originating config file path for error messages.
+
+    Returns:
+        Resolved ``{name: value}`` dict ready for ``entry_params``.
+
+    Raises:
+        ConfigSchemaError: A required declared param has no runtime value and
+            no spec default. The message includes the file path and param name.
+    """
+    if not param_specs:
+        return {}
+
+    runtime = runtime_params or {}
+    resolved: dict[str, Any] = {}
+    for name, spec in param_specs.items():
+        # Treat an explicit None runtime value as absent so that the declared
+        # default and required-check still apply. A literal None almost always
+        # signals an unbound notebook variable rather than an intentional null.
+        if name in runtime and runtime[name] is not None:
+            resolved[name] = runtime[name]
+            continue
+
+        default = _spec_field(spec, "default", default=None)
+        if default is not None:
+            resolved[name] = default
+            continue
+
+        required = _spec_field(spec, "required", default=True)
+        if required:
+            raise ConfigSchemaError(
+                f"Required parameter '{name}' is missing (no runtime value and no default)",
+                file_path=file_path,
+                config_key=name,
+            )
+        # Optional with no default → omit
+    return resolved
+
+
 def _warn_unused_params(
     consumed: set[str],
     context: dict[str, Any],
@@ -113,6 +186,23 @@ def _get_dotted_value(context: dict[str, Any], key: str) -> Any:
             raise KeyError(key)
 
     return value
+
+
+def _unresolved_variable_message(var_name: str, context: dict[str, Any]) -> str:
+    """Compose an unresolved-variable error message with sibling-name hints.
+
+    For ``${param.x}`` references, list the declared param names currently in
+    scope so a typo is obvious. For all other references, fall back to the
+    plain message.
+    """
+    base = f"Unresolved variable '${{{var_name}}}' with no default value"
+    if var_name.startswith("param."):
+        param_scope = context.get("param")
+        if isinstance(param_scope, dict) and param_scope:
+            available = ", ".join(sorted(param_scope.keys()))
+            return f"{base}. Available declared params: [{available}]"
+        return f"{base}. No declared params are in scope at this resolution site"
+    return base
 
 
 # Regex pattern for ${var} and ${var:-default}
@@ -171,7 +261,7 @@ def resolve_variables(
                         return default_value
                     else:
                         raise VariableResolutionError(
-                            f"Unresolved variable '${{{var_name}}}' with no default value",
+                            _unresolved_variable_message(var_name, context),
                             config_key=var_name,
                         ) from exc
             # var.* / run.* fall through to the existing sub() path below
@@ -196,7 +286,7 @@ def resolve_variables(
                     return default_value
                 else:
                     raise VariableResolutionError(
-                        f"Unresolved variable '${{{var_name}}}' with no default value",
+                        _unresolved_variable_message(var_name, context),
                         config_key=var_name,
                     ) from exc
 

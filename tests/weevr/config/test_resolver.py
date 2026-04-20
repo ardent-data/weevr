@@ -4,8 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from weevr.config.resolver import build_param_context, resolve_variables, validate_params
+from weevr.config.resolver import (
+    build_param_context,
+    resolve_declared_params,
+    resolve_variables,
+    validate_params,
+)
 from weevr.errors import ConfigSchemaError, VariableResolutionError
+from weevr.model.params import ParamSpec
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -585,6 +591,169 @@ class TestValidateParams:
     def test_empty_param_specs(self):
         """Empty param specs should not raise."""
         validate_params({}, {"env": "dev"})  # Should not raise
+
+
+class TestResolveDeclaredParams:
+    """Test loom/weave-level declared param resolution under the param.* namespace."""
+
+    def test_runtime_override_wins_over_declared_default(self):
+        """Runtime value beats the spec's declared default."""
+        specs = {
+            "workspace_id": {
+                "name": "workspace_id",
+                "type": "string",
+                "required": True,
+                "default": "default-ws",
+            }
+        }
+        result = resolve_declared_params(specs, {"workspace_id": "runtime-ws"})
+        assert result == {"workspace_id": "runtime-ws"}
+
+    def test_declared_default_used_when_runtime_omits(self):
+        """Spec default applied when runtime supplies no value."""
+        specs = {
+            "region": {
+                "name": "region",
+                "type": "string",
+                "required": False,
+                "default": "eastus",
+            }
+        }
+        result = resolve_declared_params(specs, runtime_params=None)
+        assert result == {"region": "eastus"}
+
+    def test_required_missing_raises_with_file_context(self):
+        """Required param with no default and no runtime value raises with file path."""
+        specs = {
+            "workspace_id": {
+                "name": "workspace_id",
+                "type": "string",
+                "required": True,
+            }
+        }
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            resolve_declared_params(specs, runtime_params=None, file_path="silver.loom")
+        msg = str(exc_info.value)
+        assert "workspace_id" in msg
+        assert "silver.loom" in msg
+
+    def test_optional_param_no_default_omitted(self):
+        """Non-required param with no default and no runtime value is omitted."""
+        specs = {
+            "region": {"name": "region", "type": "string", "required": False},
+        }
+        result = resolve_declared_params(specs, runtime_params=None)
+        assert "region" not in result
+
+    def test_works_with_paramspec_objects(self):
+        """Helper accepts ParamSpec instances directly (pre-dump)."""
+        specs = {
+            "workspace_id": ParamSpec(
+                name="workspace_id", type="string", required=True, default="ws-default"
+            )
+        }
+        result = resolve_declared_params(specs, runtime_params=None)
+        assert result == {"workspace_id": "ws-default"}
+
+    def test_works_with_dict_specs(self):
+        """Helper accepts model_dump'd dict specs (post-pydantic)."""
+        specs = {
+            "max_rows": {
+                "name": "max_rows",
+                "type": "int",
+                "required": False,
+                "default": 1000,
+            }
+        }
+        result = resolve_declared_params(specs, runtime_params=None)
+        assert result == {"max_rows": 1000}
+
+    def test_required_default_not_set_required_implicit_true(self):
+        """`required` defaults to True (matching ParamSpec field default)."""
+        specs = {"x": {"name": "x", "type": "string"}}  # no `required` key
+        with pytest.raises(ConfigSchemaError):
+            resolve_declared_params(specs, runtime_params=None)
+
+    def test_none_specs_returns_empty(self):
+        """None or empty specs returns empty dict."""
+        assert resolve_declared_params(None, {"x": 1}) == {}
+        assert resolve_declared_params({}, {"x": 1}) == {}
+
+    def test_only_declared_keys_consumed(self):
+        """Runtime keys not declared in specs are ignored (declared scope only)."""
+        specs = {"declared": {"name": "declared", "type": "string", "required": True}}
+        result = resolve_declared_params(
+            specs, runtime_params={"declared": "v", "extra": "ignored"}
+        )
+        assert result == {"declared": "v"}
+
+    def test_type_mismatch_via_validate_params(self):
+        """Type-mismatched runtime value is rejected by the paired validate_params call."""
+        specs = {"max_rows": {"name": "max_rows", "type": "int", "required": True}}
+        resolved = resolve_declared_params(specs, runtime_params={"max_rows": "abc"})
+        with pytest.raises(ConfigSchemaError, match="expected int"):
+            validate_params(specs, resolved)
+
+    def test_none_runtime_value_treated_as_absent(self):
+        """Runtime ``None`` value is ignored so default + required checks apply."""
+        # With a default: default is used.
+        with_default = {"region": {"name": "region", "type": "string", "default": "eastus"}}
+        result = resolve_declared_params(with_default, runtime_params={"region": None})
+        assert result == {"region": "eastus"}
+
+        # Without a default and required: raises required-missing, not type-mismatch.
+        required = {
+            "workspace_id": {
+                "name": "workspace_id",
+                "type": "string",
+                "required": True,
+            }
+        }
+        with pytest.raises(ConfigSchemaError, match="missing"):
+            resolve_declared_params(
+                required, runtime_params={"workspace_id": None}, file_path="x.loom"
+            )
+
+    def test_defaults_and_declared_params_independent(self):
+        """``defaults`` (top-level) and declared ``params`` resolve through separate paths."""
+        param_specs = {
+            "workspace_id": {
+                "name": "workspace_id",
+                "type": "string",
+                "required": True,
+            }
+        }
+        config_defaults = {"env": "dev"}
+        resolved_params = resolve_declared_params(
+            param_specs, runtime_params={"workspace_id": "ws-1"}
+        )
+        context = build_param_context(
+            runtime_params={"workspace_id": "ws-1"},
+            config_defaults=config_defaults,
+            entry_params=resolved_params,
+        )
+        config = {
+            "workspace": "${param.workspace_id}",
+            "lakehouse": "${env}",
+        }
+        result = resolve_variables(config, context)
+        assert result["workspace"] == "ws-1"
+        assert result["lakehouse"] == "dev"
+
+
+class TestUnresolvedParamHints:
+    """Improved error message for unresolved ${param.x} in same scope."""
+
+    def test_unresolved_param_lists_available_names(self):
+        """Error message lists declared param names for typo detection."""
+        # Loom declares `workspace_id`; YAML mistypes as `workspaceid`.
+        context = build_param_context(entry_params={"workspace_id": "ws-1"})
+        config = {"workspace": "${param.workspaceid}"}
+        with pytest.raises(VariableResolutionError) as exc_info:
+            resolve_variables(config, context)
+        msg = str(exc_info.value)
+        assert "param.workspaceid" in msg
+        assert "workspace_id" in msg  # the available declared name
 
 
 class TestReferenceResolution:

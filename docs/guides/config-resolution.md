@@ -81,13 +81,17 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 ### Stage 5–6: Resolve values
 
 1. **Build parameter context** — Merge runtime parameters (highest
-   priority) over ThreadEntry `params` (under the `param`
-   namespace for `${param.x}` access) over config-declared
+   priority) over the `param.*` namespace over config-declared
    defaults over fabric context (lowest priority) into a flat
-   context dictionary. The `${fabric.*}` namespace comes from
-   the fabric layer. Dotted keys like `env.lakehouse` support
-   nested access. See [Thread Templates](thread-templates.md)
-   for the `${param.x}` pattern.
+   context dictionary. The `param.*` namespace is populated from
+   either the loom/weave's own declared `params:` block (for
+   top-level loads only; child configs loaded via `ref:` do not
+   resolve their own `params:` block at this stage) or from a
+   `ThreadEntry`'s `params:` (for thread templates) — see
+   [Declared `params:` and the `${param.x}` namespace](#declared-params-and-the-paramx-namespace)
+   below and [Thread Templates](thread-templates.md). The
+   `${fabric.*}` namespace comes from the fabric layer. Dotted
+   keys like `env.lakehouse` support nested access.
 2. **Resolve variables** — Recursively walk all values in the config and
    resolve `${var}` references from the parameter context. Whole-value
    references return the native type; embedded references coerce to
@@ -234,6 +238,66 @@ a **string**, even in a whole-value position. For example,
 is missing — not the integer `100`. To use a typed default, supply
 the parameter value explicitly at runtime rather than relying on the
 inline `:-` fallback.
+
+### Declared `params:` and the `${param.x}` namespace
+
+A loom or weave that declares a `params:` block exposes each declared
+name under the `${param.x}` namespace, scoped to that file:
+
+```yaml
+# silver.loom
+config_version: "1.0"
+weaves:
+  - ref: bronze_to_silver.weave
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+  region:
+    name: region
+    type: string
+    default: eastus
+
+connections:
+  bronze:
+    type: onelake
+    workspace: "${param.workspace_id}"   # required → from runtime
+    lakehouse: "lh-${param.region}"      # default → "lh-eastus"
+```
+
+Per-param resolution precedence:
+
+1. Runtime value supplied via `Context(params=...)` or
+   `load_config(runtime_params=...)`.
+2. The `default` declared on the `ParamSpec`.
+3. `ConfigSchemaError` if the param is `required: true`.
+
+Declared params in a loom or weave are reachable as `${param.x}` only
+**within the same file's scope**, and only when the file is loaded at
+the top level (via `load_config(...)` or `Context(config=...)`). Two
+related limitations follow from this:
+
+1. **Cross-scope inheritance** — child weaves and threads do not
+   automatically inherit a parent loom's declared params; a reference
+   to `${param.x}` in a child without a local declaration raises a
+   `VariableResolutionError`.
+2. **Child-config own-scope** — a weave that declares its own
+   `params:` and is loaded as a child via a parent loom's `ref:` does
+   not have that `params:` block wired into `${param.x}` either. The
+   fix that wires declared `params:` into the `${param.x}` namespace
+   applies only to top-level loads, not to child configs resolved
+   during reference-loading.
+
+Cross-scope cascade and child-config own-scope wiring are planned
+follow-ups; until then, declare the param in each top-level scope that
+references it, or use `${var.x}` / `defaults:` for cascading values.
+
+`${param.x}` references inside a thread template instantiated via
+`ThreadEntry.params` (the `as:` + `params:` form on a weave's `threads:`
+list) are unaffected by this rule — they resolve from the entry's
+params block as before.
 
 ---
 

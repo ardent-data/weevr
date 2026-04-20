@@ -431,3 +431,297 @@ class TestLoadConfigTypedExtensions:
         assert isinstance(result, Loom)
         assert result.name == "nightly"
         assert result.qualified_key == "nightly.loom"
+
+
+class TestLoadConfigLoomDeclaredParams:
+    """Loom-level ``params:`` block is reachable as ``${param.x}`` within the same file."""
+
+    def _make_stub_weave(self, project: Path, name: str = "stub") -> None:
+        """Write a minimal ``<name>.weave`` plus the thread it references."""
+        thread_dir = project / "threads"
+        thread_dir.mkdir(exist_ok=True)
+        (thread_dir / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n"
+        )
+        (project / f"{name}.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n'
+        )
+
+    def _bug_report_loom(self, tmp_path: Path) -> Path:
+        project = tmp_path / "silver.weevr"
+        project.mkdir()
+        self._make_stub_weave(project)
+        loom_file = project / "spartech_silver.loom"
+        loom_file.write_text(
+            """
+config_version: "1.0"
+
+weaves:
+  - ref: stub.weave
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+  mirror_db_id:
+    name: mirror_db_id
+    type: string
+    required: true
+
+connections:
+  bronze:
+    type: onelake
+    workspace: "${param.workspace_id}"
+    lakehouse: "${param.mirror_db_id}"
+"""
+        )
+        return loom_file
+
+    def test_bug_report_loom_loads_with_runtime_params(self, tmp_path):
+        """Bug-report loom resolves end-to-end with runtime-supplied params."""
+        loom_file = self._bug_report_loom(tmp_path)
+        result = load_config(
+            loom_file,
+            runtime_params={
+                "workspace_id": "ws-aaaa-bbbb",
+                "mirror_db_id": "lh-1234-5678",
+            },
+            project_root=loom_file.parent,
+        )
+        assert isinstance(result, Loom)
+        assert result.connections is not None
+        bronze = result.connections["bronze"]
+        assert bronze.workspace == "ws-aaaa-bbbb"
+        assert bronze.lakehouse == "lh-1234-5678"
+
+    def test_required_loom_param_missing_raises(self, tmp_path):
+        """Required loom-declared param with no runtime value raises with file context."""
+        loom_file = self._bug_report_loom(tmp_path)
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            load_config(loom_file, runtime_params={}, project_root=loom_file.parent)
+        msg = str(exc_info.value)
+        assert "workspace_id" in msg
+        assert "spartech_silver.loom" in msg
+
+    def test_loom_declared_default_used_when_runtime_omits(self, tmp_path):
+        """Optional loom param with default falls back to default value."""
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        self._make_stub_weave(project)
+        loom_file = project / "demo.loom"
+        loom_file.write_text(
+            """
+config_version: "1.0"
+
+weaves:
+  - ref: stub.weave
+
+params:
+  region:
+    name: region
+    type: string
+    required: false
+    default: eastus
+
+connections:
+  bronze:
+    type: onelake
+    workspace: "${param.region}"
+    lakehouse: lh
+"""
+        )
+        result = load_config(loom_file, project_root=project)
+        assert isinstance(result, Loom)
+        assert result.connections is not None
+        assert result.connections["bronze"].workspace == "eastus"
+
+    def test_defaults_and_params_coexist(self, tmp_path):
+        """``defaults:`` (top-level) and ``params:`` (declared) both honored."""
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        self._make_stub_weave(project)
+        loom_file = project / "demo.loom"
+        loom_file.write_text(
+            """
+config_version: "1.0"
+
+weaves:
+  - ref: stub.weave
+
+defaults:
+  env: dev
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+
+connections:
+  bronze:
+    type: onelake
+    workspace: "${param.workspace_id}"
+    lakehouse: "${env}"
+"""
+        )
+        result = load_config(
+            loom_file,
+            runtime_params={"workspace_id": "ws-1"},
+            project_root=project,
+        )
+        assert isinstance(result, Loom)
+        assert result.connections is not None
+        bronze = result.connections["bronze"]
+        assert bronze.workspace == "ws-1"
+        assert bronze.lakehouse == "dev"
+
+    def test_param_typo_lists_available_names(self, tmp_path):
+        """Typo on ``${param.x}`` raises with available declared param names."""
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        self._make_stub_weave(project)
+        loom_file = project / "demo.loom"
+        loom_file.write_text(
+            """
+config_version: "1.0"
+
+weaves:
+  - ref: stub.weave
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+
+connections:
+  bronze:
+    type: onelake
+    workspace: "${param.workspaceid}"
+    lakehouse: lh
+"""
+        )
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(
+                loom_file,
+                runtime_params={"workspace_id": "ws-1"},
+                project_root=project,
+            )
+        msg = str(exc_info.value)
+        assert "param.workspaceid" in msg
+        assert "workspace_id" in msg
+
+    def test_loom_param_type_mismatch_raises(self, tmp_path):
+        """Runtime value of wrong declared type raises ConfigSchemaError."""
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        self._make_stub_weave(project)
+        loom_file = project / "demo.loom"
+        loom_file.write_text(
+            """
+config_version: "1.0"
+
+weaves:
+  - ref: stub.weave
+
+params:
+  max_rows:
+    name: max_rows
+    type: int
+    required: true
+
+connections:
+  bronze:
+    type: onelake
+    workspace: ws-1
+    lakehouse: lh-1
+"""
+        )
+        with pytest.raises(ConfigSchemaError, match="expected int"):
+            load_config(loom_file, runtime_params={"max_rows": "abc"}, project_root=project)
+
+
+class TestLoadConfigWeaveDeclaredParams:
+    """Weave-level ``params:`` block is reachable as ``${param.x}`` within the same file."""
+
+    def test_weave_loaded_directly_resolves_declared_params(self, tmp_path):
+        """A standalone .weave file with declared params: honors ${param.x} from runtime."""
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        thread_dir = project / "threads"
+        thread_dir.mkdir()
+        (thread_dir / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n"
+        )
+        weave_file = project / "bronze_to_silver.weave"
+        weave_file.write_text(
+            """
+config_version: "1.0"
+
+threads:
+  - ref: threads/stub.thread
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+
+connections:
+  source:
+    type: onelake
+    workspace: "${param.workspace_id}"
+    lakehouse: lh-bronze
+"""
+        )
+        result = load_config(
+            weave_file,
+            runtime_params={"workspace_id": "ws-direct"},
+            project_root=project,
+        )
+        assert isinstance(result, Weave)
+        assert result.connections is not None
+        assert result.connections["source"].workspace == "ws-direct"
+
+    def test_weave_required_param_missing_raises(self, tmp_path):
+        """Required weave-declared param missing surfaces ConfigSchemaError with file path."""
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        thread_dir = project / "threads"
+        thread_dir.mkdir()
+        (thread_dir / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n"
+        )
+        weave_file = project / "bronze_to_silver.weave"
+        weave_file.write_text(
+            """
+config_version: "1.0"
+
+threads:
+  - ref: threads/stub.thread
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+
+connections:
+  source:
+    type: onelake
+    workspace: "${param.workspace_id}"
+    lakehouse: lh-bronze
+"""
+        )
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            load_config(weave_file, runtime_params={}, project_root=project)
+        msg = str(exc_info.value)
+        assert "workspace_id" in msg
+        assert "bronze_to_silver.weave" in msg
