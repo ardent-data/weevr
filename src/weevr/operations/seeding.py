@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.types import StringType, StructType
+from pyspark.sql.types import CharType, StringType, StructType, VarcharType
 
 from weevr.delta import delta_table_exists
 from weevr.errors.exceptions import ExecutionError
@@ -211,6 +211,7 @@ def build_system_member_rows(
 
     sk_col = dimension_config.surrogate_key.name
     rows: list[dict[str, Any]] = []
+    schema_by_name = {f.name: f for f in target_df.schema.fields}
 
     for member in members:
         # Resolve type-aware defaults using the member's code
@@ -226,10 +227,15 @@ def build_system_member_rows(
         # BK columns the type default set by resolve_type_defaults
         # (e.g. 0 for Integer, date(1970,1,1) for Date) is kept — the
         # string code would fail Spark's schema coercion downstream.
-        schema_by_name = {f.name: f for f in target_df.schema.fields}
         for bk_col in dimension_config.business_key:
             field = schema_by_name.get(bk_col)
-            if field is not None and isinstance(field.dataType, StringType):
+            if field is None:
+                logger.debug(
+                    "BK column %r not found in target schema; skipping override",
+                    bk_col,
+                )
+                continue
+            if isinstance(field.dataType, (StringType, CharType, VarcharType)):
                 row[bk_col] = member.code
 
         # Set label column if configured
