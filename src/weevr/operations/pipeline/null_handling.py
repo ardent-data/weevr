@@ -2,14 +2,59 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
-from pyspark.sql import DataFrame
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql.types import DateType, DecimalType, StructField, TimestampType
 
 from weevr.model.pipeline import CoalesceParams, FillNullParams
 from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.type_defaults import resolve_type_defaults
+
+
+def _fill_literal(field: StructField, value: Any) -> Column:
+    """Build a Column expression for a fill value matching the field's type.
+
+    ``df.fillna()`` rejects ``date``, ``datetime``, and ``Decimal``
+    values, so the no-``where`` branch of :func:`apply_fill_null`
+    falls back to per-column ``withColumn`` for those types. This
+    helper constructs the right Spark column expression per type:
+    parsed ISO literal for Date/Timestamp, scale-matching cast for
+    Decimal, plain ``F.lit`` for everything else.
+
+    Temporal and Decimal values must match the target field type;
+    mismatches raise ``TypeError`` rather than silently coercing —
+    for example, a ``datetime`` override against a ``DateType``
+    column would otherwise truncate the time component invisibly.
+    ``datetime`` is checked before ``date`` because ``datetime`` is
+    a ``date`` subclass.
+    """
+    dt = field.dataType
+    if isinstance(value, datetime):
+        if not isinstance(dt, TimestampType):
+            raise TypeError(
+                f"datetime fill value for field {field.name!r} of type "
+                f"{type(dt).__name__} requires TimestampType"
+            )
+        return F.to_timestamp(F.lit(value.isoformat()))
+    if isinstance(value, date):
+        if not isinstance(dt, DateType):
+            raise TypeError(
+                f"date fill value for field {field.name!r} of type "
+                f"{type(dt).__name__} requires DateType"
+            )
+        return F.to_date(F.lit(value.isoformat()))
+    if isinstance(value, Decimal):
+        if not isinstance(dt, DecimalType):
+            raise TypeError(
+                f"Decimal fill value for field {field.name!r} of type "
+                f"{type(dt).__name__} requires DecimalType"
+            )
+        return F.lit(str(value)).cast(dt)
+    return F.lit(value)
 
 
 def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
@@ -64,7 +109,25 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
                         ).otherwise(F.col(col_name)),
                     )
             else:
-                result = result.fillna(fill_dict)
+                # df.fillna() only accepts str/int/float/bool.
+                schema_by_name = {f.name: f for f in result.schema.fields}
+                simple: dict[str, Any] = {}
+                column_wise: dict[str, Any] = {}
+                for col_name, fill_value in fill_dict.items():
+                    if isinstance(fill_value, (date, datetime, Decimal)):
+                        column_wise[col_name] = fill_value
+                    else:
+                        simple[col_name] = fill_value
+                if simple:
+                    result = result.fillna(simple)
+                for col_name, fill_value in column_wise.items():
+                    result = result.withColumn(
+                        col_name,
+                        F.when(
+                            F.col(col_name).isNull(),
+                            _fill_literal(schema_by_name[col_name], fill_value),
+                        ).otherwise(F.col(col_name)),
+                    )
             metadata["columns_filled"] = list(fill_dict.keys())
 
     # Phase 2: explicit columns (applied on top of type_defaults)
