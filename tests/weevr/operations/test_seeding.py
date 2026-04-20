@@ -1,9 +1,12 @@
 """Tests for seed execution operations."""
 
+from datetime import date
+
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
     BooleanType,
+    DateType,
     DoubleType,
     IntegerType,
     LongType,
@@ -332,6 +335,86 @@ class TestBuildSystemMemberRows:
         rows = build_system_member_rows(dim, df)
         unknown_row = next(r for r in rows if r["_sk"] == -1)
         assert unknown_row["customer_id"] == "unknown"
+
+    def test_integer_business_key_gets_type_default(self, spark: SparkSession) -> None:
+        """IntegerType BK column gets 0, not the string code (dim_calendar pattern)."""
+        dim = self._make_dim_config(
+            business_key=["calendar_id"],
+            surrogate_key={"name": "_sk", "columns": ["calendar_id"]},
+            seed_system_members=True,
+        )
+        schema = StructType(
+            [
+                StructField("calendar_id", IntegerType(), True),
+                StructField("_sk", LongType(), True),
+            ]
+        )
+        df = spark.createDataFrame([{"calendar_id": 20240601, "_sk": 1}], schema=schema)
+        rows = build_system_member_rows(dim, df)
+        assert rows[0]["calendar_id"] == 0
+        assert rows[1]["calendar_id"] == 0
+
+    def test_long_business_key_gets_type_default(self, spark: SparkSession) -> None:
+        """LongType BK column gets 0, not the string code."""
+        dim = self._make_dim_config(
+            business_key=["account_id"],
+            surrogate_key={"name": "_sk", "columns": ["account_id"]},
+            seed_system_members=True,
+        )
+        schema = StructType(
+            [
+                StructField("account_id", LongType(), True),
+                StructField("_sk", LongType(), True),
+            ]
+        )
+        df = spark.createDataFrame([{"account_id": 1_000_000, "_sk": 1}], schema=schema)
+        rows = build_system_member_rows(dim, df)
+        assert rows[0]["account_id"] == 0
+        assert rows[1]["account_id"] == 0
+
+    def test_date_business_key_gets_type_default(self, spark: SparkSession) -> None:
+        """DateType BK column gets date(1970, 1, 1), not the string code."""
+        dim = self._make_dim_config(
+            business_key=["as_of_date"],
+            surrogate_key={"name": "_sk", "columns": ["as_of_date"]},
+            seed_system_members=True,
+        )
+        schema = StructType(
+            [
+                StructField("as_of_date", DateType(), True),
+                StructField("_sk", LongType(), True),
+            ]
+        )
+        df = spark.createDataFrame([{"as_of_date": date(2024, 6, 1), "_sk": 1}], schema=schema)
+        rows = build_system_member_rows(dim, df)
+        assert rows[0]["as_of_date"] == date(1970, 1, 1)
+        assert rows[1]["as_of_date"] == date(1970, 1, 1)
+
+    def test_composite_bk_mixed_string_and_integer(self, spark: SparkSession) -> None:
+        """Composite BK: string column gets member.code, integer column gets 0."""
+        dim = self._make_dim_config(
+            business_key=["customer_id", "tenant_id"],
+            surrogate_key={"name": "_sk", "columns": ["customer_id", "tenant_id"]},
+            seed_system_members=True,
+        )
+        schema = StructType(
+            [
+                StructField("customer_id", StringType(), True),
+                StructField("tenant_id", IntegerType(), True),
+                StructField("_sk", LongType(), True),
+            ]
+        )
+        df = spark.createDataFrame(
+            [{"customer_id": "C1", "tenant_id": 42, "_sk": 1}], schema=schema
+        )
+        rows = build_system_member_rows(dim, df)
+        # String BK column receives member.code directly (lowercase);
+        # resolve_type_defaults would have returned "Unknown" (title-cased).
+        assert rows[0]["customer_id"] == "unknown"
+        assert rows[1]["customer_id"] == "not_applicable"
+        # Integer BK column keeps the type default from resolve_type_defaults.
+        assert rows[0]["tenant_id"] == 0
+        assert rows[1]["tenant_id"] == 0
 
     def test_scd_columns_set_for_track_history(self, spark: SparkSession) -> None:
         """SCD columns set when track_history is True."""
