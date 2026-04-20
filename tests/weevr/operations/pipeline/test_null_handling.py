@@ -17,7 +17,11 @@ from pyspark.sql.types import (
 )
 
 from weevr.model.pipeline import CoalesceParams, FillNullParams
-from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
+from weevr.operations.pipeline.null_handling import (
+    _fill_literal,
+    apply_coalesce,
+    apply_fill_null,
+)
 
 pytestmark = pytest.mark.spark
 
@@ -406,3 +410,63 @@ class TestFillNullTypeDefaults:
         # Every filled column must land in metadata, regardless of which
         # internal branch (fillna vs withColumn) handled it.
         assert set(result.metadata["columns_filled"]) == {"name", "amount", "event_date"}
+
+
+class TestFillLiteral:
+    """Branch-level coverage for the `_fill_literal` helper.
+
+    Complements the end-to-end tests above by exercising each helper
+    branch directly without routing through `apply_fill_null`. Each
+    test requires the spark fixture only because `F.lit(...)` needs
+    a live JVM; no DataFrame operations are executed.
+    """
+
+    def test_date_branch_returns_column(self, spark: SparkSession):
+        """Date value on DateType field produces a Column expression."""
+        from pyspark.sql import Column
+
+        field = StructField("event_date", DateType())
+        result = _fill_literal(field, date(1970, 1, 1))
+        assert isinstance(result, Column)
+
+    def test_timestamp_branch_returns_column(self, spark: SparkSession):
+        """Datetime value on TimestampType field produces a Column expression."""
+        from pyspark.sql import Column
+
+        field = StructField("event_ts", TimestampType())
+        result = _fill_literal(field, datetime(1970, 1, 1))
+        assert isinstance(result, Column)
+
+    def test_decimal_branch_casts_to_field_type(self, spark: SparkSession):
+        """Decimal value on DecimalType field casts to the field's scale."""
+        from pyspark.sql import Column
+
+        field = StructField("amount", DecimalType(10, 2))
+        result = _fill_literal(field, Decimal("19.99"))
+        assert isinstance(result, Column)
+
+    def test_fallback_branch_returns_f_lit(self, spark: SparkSession):
+        """Non-temporal, non-Decimal values go through plain F.lit."""
+        from pyspark.sql import Column
+
+        field = StructField("name", StringType())
+        result = _fill_literal(field, "Unknown")
+        assert isinstance(result, Column)
+
+    def test_datetime_for_date_field_raises(self, spark: SparkSession):
+        """A datetime value for a DateType field raises TypeError."""
+        field = StructField("birth_date", DateType())
+        with pytest.raises(TypeError, match="datetime fill value.*DateType"):
+            _fill_literal(field, datetime(2024, 6, 1, 12, 30))
+
+    def test_date_for_timestamp_field_raises(self, spark: SparkSession):
+        """A pure date value for a TimestampType field raises TypeError."""
+        field = StructField("event_ts", TimestampType())
+        with pytest.raises(TypeError, match="date fill value.*TimestampType"):
+            _fill_literal(field, date(2024, 6, 1))
+
+    def test_decimal_for_non_decimal_field_raises(self, spark: SparkSession):
+        """A Decimal value for a non-DecimalType field raises TypeError."""
+        field = StructField("amount", IntegerType())
+        with pytest.raises(TypeError, match="Decimal fill value.*IntegerType"):
+            _fill_literal(field, Decimal("1"))
