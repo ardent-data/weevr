@@ -24,13 +24,35 @@ def _fill_literal(field: StructField, value: Any) -> Column:
     helper constructs the right Spark column expression per type:
     parsed ISO literal for Date/Timestamp, scale-matching cast for
     Decimal, plain ``F.lit`` for everything else.
+
+    Temporal and Decimal values must match the target field type;
+    mismatches raise ``TypeError`` rather than silently coercing —
+    for example, a ``datetime`` override against a ``DateType``
+    column would otherwise truncate the time component invisibly.
+    ``datetime`` is checked before ``date`` because ``datetime`` is
+    a ``date`` subclass.
     """
     dt = field.dataType
-    if isinstance(dt, DateType) and isinstance(value, date):
-        return F.to_date(F.lit(value.isoformat()))
-    if isinstance(dt, TimestampType) and isinstance(value, datetime):
+    if isinstance(value, datetime):
+        if not isinstance(dt, TimestampType):
+            raise TypeError(
+                f"datetime fill value for field {field.name!r} of type "
+                f"{type(dt).__name__} requires TimestampType"
+            )
         return F.to_timestamp(F.lit(value.isoformat()))
-    if isinstance(dt, DecimalType) and isinstance(value, Decimal):
+    if isinstance(value, date):
+        if not isinstance(dt, DateType):
+            raise TypeError(
+                f"date fill value for field {field.name!r} of type "
+                f"{type(dt).__name__} requires DateType"
+            )
+        return F.to_date(F.lit(value.isoformat()))
+    if isinstance(value, Decimal):
+        if not isinstance(dt, DecimalType):
+            raise TypeError(
+                f"Decimal fill value for field {field.name!r} of type "
+                f"{type(dt).__name__} requires DecimalType"
+            )
         return F.lit(str(value)).cast(dt)
     return F.lit(value)
 
@@ -87,9 +109,7 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
                         ).otherwise(F.col(col_name)),
                     )
             else:
-                # df.fillna() only accepts str/int/float/bool. Split date,
-                # datetime, and Decimal into a per-column withColumn loop
-                # that constructs a type-matched Spark literal.
+                # df.fillna() only accepts str/int/float/bool.
                 schema_by_name = {f.name: f for f in result.schema.fields}
                 simple: dict[str, Any] = {}
                 column_wise: dict[str, Any] = {}

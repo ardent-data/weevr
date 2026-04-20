@@ -361,6 +361,30 @@ class TestFillNullTypeDefaults:
         assert rows[0].amount == Decimal("0.00")
         assert rows[1].amount is None
 
+    def test_type_defaults_datetime_override_for_date_column_raises(self, spark: SparkSession):
+        """A datetime override against a DateType column raises TypeError.
+
+        Without the explicit check, isinstance(value, date) admits the
+        datetime subclass and would silently truncate the time portion
+        via F.to_date. The helper now rejects the mismatch.
+        """
+        df = spark.createDataFrame(
+            [(1, None)],
+            schema=StructType(
+                [
+                    StructField("id", IntegerType()),
+                    StructField("birth_date", DateType()),
+                ]
+            ),
+        )
+        params = FillNullParams(
+            mode="type_defaults",
+            code="unknown",
+            overrides={"birth_date": datetime(2024, 6, 1, 12, 30)},
+        )
+        with pytest.raises(TypeError, match="datetime fill value.*DateType"):
+            apply_fill_null(df, params)
+
     def test_type_defaults_mixed_simple_and_column_wise_no_where(self, spark: SparkSession):
         """Mixed simple + column-wise types all get filled and reported in metadata."""
         df = spark.createDataFrame(
