@@ -1,8 +1,20 @@
 """Tests for null-handling pipeline step handlers — fill_null, coalesce."""
 
+from datetime import date, datetime
+from decimal import Decimal
+
 import pytest
 from pyspark.sql import SparkSession
-from pyspark.sql.types import BooleanType, IntegerType, StringType, StructField, StructType
+from pyspark.sql.types import (
+    BooleanType,
+    DateType,
+    DecimalType,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 
 from weevr.model.pipeline import CoalesceParams, FillNullParams
 from weevr.operations.pipeline.null_handling import apply_coalesce, apply_fill_null
@@ -232,3 +244,141 @@ class TestFillNullTypeDefaults:
         row = result.df.collect()[0]
         assert row.discount == 0
         assert row.region == "Unknown"
+
+    def test_type_defaults_date_no_where(self, spark: SparkSession):
+        """Null DateType column filled with epoch date (no where predicate)."""
+        df = spark.createDataFrame(
+            [(1, None), (2, date(2024, 6, 1))],
+            schema=StructType(
+                [
+                    StructField("id", IntegerType()),
+                    StructField("event_date", DateType()),
+                ]
+            ),
+        )
+        params = FillNullParams(mode="type_defaults", code="unknown")
+        result = apply_fill_null(df, params)
+        rows = {r["id"]: r["event_date"] for r in result.df.collect()}
+        assert rows[1] == date(1970, 1, 1)
+        assert rows[2] == date(2024, 6, 1)
+
+    def test_type_defaults_timestamp_no_where(self, spark: SparkSession):
+        """Null TimestampType column filled with epoch timestamp (no where)."""
+        df = spark.createDataFrame(
+            [(1, None), (2, datetime(2024, 6, 1, 12, 30))],
+            schema=StructType(
+                [
+                    StructField("id", IntegerType()),
+                    StructField("event_ts", TimestampType()),
+                ]
+            ),
+        )
+        params = FillNullParams(mode="type_defaults", code="unknown")
+        result = apply_fill_null(df, params)
+        rows = {r["id"]: r["event_ts"] for r in result.df.collect()}
+        assert rows[1] == datetime(1970, 1, 1)
+        assert rows[2] == datetime(2024, 6, 1, 12, 30)
+
+    def test_type_defaults_decimal_no_where(self, spark: SparkSession):
+        """Null DecimalType column filled with zero at the column's scale."""
+        df = spark.createDataFrame(
+            [(1, None), (2, Decimal("19.99"))],
+            schema=StructType(
+                [
+                    StructField("id", IntegerType()),
+                    StructField("amount", DecimalType(10, 2)),
+                ]
+            ),
+        )
+        params = FillNullParams(mode="type_defaults", code="unknown")
+        result = apply_fill_null(df, params)
+        rows = {r["id"]: r["amount"] for r in result.df.collect()}
+        assert rows[1] == Decimal("0.00")
+        assert rows[2] == Decimal("19.99")
+
+    def test_type_defaults_date_with_where(self, spark: SparkSession):
+        """Where predicate applies DateType fill only to matching rows."""
+        df = spark.createDataFrame(
+            [("UNKNOWN", None), ("VALID", None)],
+            schema=StructType(
+                [
+                    StructField("status", StringType()),
+                    StructField("event_date", DateType()),
+                ]
+            ),
+        )
+        params = FillNullParams(
+            mode="type_defaults",
+            code="unknown",
+            where="status = 'UNKNOWN'",
+        )
+        result = apply_fill_null(df, params)
+        rows = sorted(result.df.collect(), key=lambda r: r.status)
+        assert rows[0].status == "UNKNOWN"
+        assert rows[0].event_date == date(1970, 1, 1)
+        assert rows[1].status == "VALID"
+        assert rows[1].event_date is None
+
+    def test_type_defaults_timestamp_with_where(self, spark: SparkSession):
+        """Where predicate applies TimestampType fill only to matching rows."""
+        df = spark.createDataFrame(
+            [("UNKNOWN", None), ("VALID", None)],
+            schema=StructType(
+                [
+                    StructField("status", StringType()),
+                    StructField("event_ts", TimestampType()),
+                ]
+            ),
+        )
+        params = FillNullParams(
+            mode="type_defaults",
+            code="unknown",
+            where="status = 'UNKNOWN'",
+        )
+        result = apply_fill_null(df, params)
+        rows = sorted(result.df.collect(), key=lambda r: r.status)
+        assert rows[0].event_ts == datetime(1970, 1, 1)
+        assert rows[1].event_ts is None
+
+    def test_type_defaults_decimal_with_where(self, spark: SparkSession):
+        """Where predicate applies DecimalType fill only to matching rows."""
+        df = spark.createDataFrame(
+            [("UNKNOWN", None), ("VALID", None)],
+            schema=StructType(
+                [
+                    StructField("status", StringType()),
+                    StructField("amount", DecimalType(10, 2)),
+                ]
+            ),
+        )
+        params = FillNullParams(
+            mode="type_defaults",
+            code="unknown",
+            where="status = 'UNKNOWN'",
+        )
+        result = apply_fill_null(df, params)
+        rows = sorted(result.df.collect(), key=lambda r: r.status)
+        assert rows[0].amount == Decimal("0.00")
+        assert rows[1].amount is None
+
+    def test_type_defaults_mixed_simple_and_column_wise_no_where(self, spark: SparkSession):
+        """Mixed simple + column-wise types all get filled and reported in metadata."""
+        df = spark.createDataFrame(
+            [(None, None, None)],
+            schema=StructType(
+                [
+                    StructField("name", StringType()),
+                    StructField("amount", IntegerType()),
+                    StructField("event_date", DateType()),
+                ]
+            ),
+        )
+        params = FillNullParams(mode="type_defaults", code="unknown")
+        result = apply_fill_null(df, params)
+        row = result.df.collect()[0]
+        assert row.name == "Unknown"
+        assert row.amount == 0
+        assert row.event_date == date(1970, 1, 1)
+        # Every filled column must land in metadata, regardless of which
+        # internal branch (fillna vs withColumn) handled it.
+        assert set(result.metadata["columns_filled"]) == {"name", "amount", "event_date"}
