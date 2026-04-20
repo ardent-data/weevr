@@ -1624,6 +1624,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.config.resolve_declared_params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_declared_params
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.config.resolve_references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1639,6 +1650,17 @@
     <span class="md-ellipsis">
       
         resolve_variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.config.validate_params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_params
       
     </span>
   </a>
@@ -3773,6 +3795,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.config.resolve_declared_params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_declared_params
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.config.resolve_references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3788,6 +3821,17 @@
     <span class="md-ellipsis">
       
         resolve_variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.config.validate_params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_params
       
     </span>
   </a>
@@ -6003,6 +6047,147 @@ priority — overridden by config_defaults and runtime_params.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="weevr.config.resolve_declared_params" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_declared_params</span><span class="p">(</span><span class="n">param_specs</span><span class="p">,</span> <span class="n">runtime_params</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.config.resolve_declared_params" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve loom/weave-level declared <code>params:</code> to a flat <code>{name: value}</code> dict.</p>
+<p>Precedence per declared param:</p>
+<ol>
+<li>Value from <code>runtime_params</code> if supplied</li>
+<li><code>ParamSpec.default</code> if set on the spec</li>
+<li><code>ConfigSchemaError</code> if the param is required</li>
+<li>Omitted from the result if optional with no default</li>
+</ol>
+<p>The returned dict is intended to bind under the <code>param.*</code> namespace via
+:func:<code>build_param_context</code>'s <code>entry_params</code> argument, so that
+<code>${param.x}</code> expressions resolve to the layered value.</p>
+<p>Runtime keys not declared in <code>param_specs</code> are ignored — declared scope
+is the only contract honored at this layer.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>param_specs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Mapping of declared params (<code>ParamSpec</code> instances or
+their <code>model_dump</code> dicts). <code>None</code> or empty returns <code>{}</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>runtime_params</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Caller-supplied values keyed by param name.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>file_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional originating config file path for error messages.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resolved <code>{name: value}</code> dict ready for <code>entry_params</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConfigSchemaError (weevr.errors.ConfigSchemaError)" href="../errors/#weevr.errors.ConfigSchemaError">ConfigSchemaError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A required declared param has no runtime value and
+no spec default. The message includes the file path and param name.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="weevr.config.resolve_references" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">resolve_references</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">config_type</span><span class="p">,</span> <span class="n">project_root</span><span class="p">,</span> <span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">visited</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
@@ -6306,6 +6491,94 @@ added to the set for post-resolution unused-param analysis.</p>
             <td>
               <div class="doc-md-description">
                 <p>If variable not found and no default provided</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.config.validate_params" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_params</span><span class="p">(</span><span class="n">param_specs</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span></code>
+
+<a href="#weevr.config.validate_params" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Validate parameters against their type specifications.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>param_specs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parameter specifications from config</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>context</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Actual parameter values</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConfigSchemaError (weevr.errors.ConfigSchemaError)" href="../errors/#weevr.errors.ConfigSchemaError">ConfigSchemaError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If required params missing or type mismatches</p>
               </div>
             </td>
           </tr>
