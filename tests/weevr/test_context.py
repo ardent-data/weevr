@@ -350,6 +350,80 @@ class TestFilterThreads:
         assert "No threads matched" in warnings[0]
 
 
+class TestLoomDeclaredParamsViaContext:
+    """``Context.load()`` resolves loom-level ``${param.x}`` from runtime params."""
+
+    def _setup_loom_project(self, tmp_path: Path) -> Path:
+        project = tmp_path / "silver.weevr"
+        project.mkdir()
+        thread_dir = project / "threads"
+        thread_dir.mkdir()
+        (thread_dir / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n"
+        )
+        (project / "stub.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n'
+        )
+        loom_file = project / "spartech_silver.loom"
+        loom_file.write_text(
+            """
+config_version: "1.0"
+
+weaves:
+  - ref: stub.weave
+
+params:
+  workspace_id:
+    name: workspace_id
+    type: string
+    required: true
+  mirror_db_id:
+    name: mirror_db_id
+    type: string
+    required: true
+
+connections:
+  bronze:
+    type: onelake
+    workspace: "${param.workspace_id}"
+    lakehouse: "${param.mirror_db_id}"
+"""
+        )
+        return project
+
+    def test_context_load_resolves_loom_params(self, tmp_path: Path) -> None:
+        """Bug-report scenario via Context.load: workspace/lakehouse pulled from runtime params."""
+        project = self._setup_loom_project(tmp_path)
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(
+            spark=mock_spark,
+            project=str(project),
+            params={
+                "workspace_id": "ws-aaaa-bbbb",
+                "mirror_db_id": "lh-1234-5678",
+            },
+        )
+        loaded = ctx.load("spartech_silver.loom")
+        loom = loaded.model
+        assert loom.connections is not None  # type: ignore[union-attr]
+        bronze = loom.connections["bronze"]  # type: ignore[union-attr]
+        assert bronze.workspace == "ws-aaaa-bbbb"
+        assert bronze.lakehouse == "lh-1234-5678"
+
+    def test_context_load_required_param_missing_raises(self, tmp_path: Path) -> None:
+        """Required loom-declared param missing at Context level surfaces ConfigSchemaError."""
+        from weevr.errors import ConfigSchemaError
+
+        project = self._setup_loom_project(tmp_path)
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            ctx.load("spartech_silver.loom")
+        assert "workspace_id" in str(exc_info.value)
+
+
 # ---------------------------------------------------------------------------
 # Integration tests — require Spark
 # ---------------------------------------------------------------------------
