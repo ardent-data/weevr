@@ -3157,6 +3157,14 @@ the new value is written.</p>
 <a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Error</span>
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span><span class="nt">label_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">member_label</span>
 </code></pre></div>
+<p>Business-key columns receive the member's <code>code</code> when the column
+is a string type. For non-string business keys (e.g. an integer
+calendar-date key <code>id = YYYYMMDD</code>, or a date <code>as_of_date</code>), the
+column is filled with the type-appropriate default from the same
+mapping used by <code>fill_null mode: type_defaults</code> — see
+<a href="../../reference/yaml-schema/thread/#fill_null">fill_null type defaults</a>
+for the full table. Composite business keys are evaluated per
+column.</p>
 <h2 id="general-seed-rows">General Seed Rows<a class="headerlink" href="#general-seed-rows" title="Permanent link">&para;</a></h2>
 <p>Any target can declare seed rows:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">target</span><span class="p">:</span>
