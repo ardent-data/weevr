@@ -45,5 +45,8 @@ jobs:
       - name: Schema check
         run: uv run python scripts/generate_schema.py --check
 
+      - name: Docstring coverage
+        run: uv run interrogate src/weevr/ --fail-under 90
+
       - name: Tests (fast)
         run: uv run pytest
