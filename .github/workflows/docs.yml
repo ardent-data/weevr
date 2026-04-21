@@ -44,3 +44,6 @@ jobs:
 
       - name: Lint markdown
         run: npx markdownlint-cli2 "docs/**/*.md"
+
+      - name: Spellcheck
+        run: npx cspell "docs/**/*.md" "examples/**/*.md"
