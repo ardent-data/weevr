@@ -1,12 +1,14 @@
 """Tests for seed execution operations."""
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
     BooleanType,
     DateType,
+    DecimalType,
     DoubleType,
     IntegerType,
     LongType,
@@ -389,6 +391,24 @@ class TestBuildSystemMemberRows:
         rows = build_system_member_rows(dim, df)
         assert rows[0]["as_of_date"] == date(1970, 1, 1)
         assert rows[1]["as_of_date"] == date(1970, 1, 1)
+
+    def test_decimal_business_key_gets_type_default(self, spark: SparkSession) -> None:
+        """DecimalType BK column gets Decimal(0) at the column's scale."""
+        dim = self._make_dim_config(
+            business_key=["account_id"],
+            surrogate_key={"name": "_sk", "columns": ["account_id"]},
+            seed_system_members=True,
+        )
+        schema = StructType(
+            [
+                StructField("account_id", DecimalType(12, 2), True),
+                StructField("_sk", LongType(), True),
+            ]
+        )
+        df = spark.createDataFrame([{"account_id": Decimal("19.99"), "_sk": 1}], schema=schema)
+        rows = build_system_member_rows(dim, df)
+        assert rows[0]["account_id"] == Decimal(0)
+        assert rows[1]["account_id"] == Decimal(0)
 
     def test_composite_bk_mixed_string_and_integer(self, spark: SparkSession) -> None:
         """Composite BK: string column gets member.code, integer column gets 0."""
