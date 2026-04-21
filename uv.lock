@@ -799,7 +799,7 @@ wheels = [
 
 [[package]]
 name = "weevr"
-version = "1.16.3"
+version = "1.16.4"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },

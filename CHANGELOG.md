@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.16.4](https://github.com/ardent-data/weevr/compare/weevr-v1.16.3...weevr-v1.16.4) (2026-04-21)
+
+
+### Bug Fixes
+
+* **config:** wire loom-level declared params to ${param.x} namespace ([#159](https://github.com/ardent-data/weevr/issues/159)) ([59982b0](https://github.com/ardent-data/weevr/commit/59982b08e264b496dcfd52685094d4ba029debbf))
+* **operations:** respect business-key column type in seed_system_members ([#162](https://github.com/ardent-data/weevr/issues/162)) ([c68e8c3](https://github.com/ardent-data/weevr/commit/c68e8c33eeae85d0826ccf1b815a4399753a8116))
+* **operations:** support Date/Timestamp/Decimal in fill_null type_defaults ([#161](https://github.com/ardent-data/weevr/issues/161)) ([165bc12](https://github.com/ardent-data/weevr/commit/165bc128f5d9fd2a165b616782f03d22bc7e8e71))
+
 ## [1.16.3](https://github.com/ardent-data/weevr/compare/weevr-v1.16.2...weevr-v1.16.3) (2026-04-11)
 
 
