@@ -4,35 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "src/weevr/operations/**"
-      - "src/weevr/engine/**"
-      - "src/weevr/state/**"
-      - "src/weevr/context.py"
-      - "src/weevr/result.py"
-      - "tests/weevr/operations/**"
-      - "tests/weevr/engine/**"
-      - "tests/weevr/state/**"
-      - "tests/weevr/test_context.py"
-      - "tests/weevr/conftest.py"
-      - "tests/conftest.py"
-      - "tests/spark_helpers.py"
-      - "pyproject.toml"
   pull_request:
-    paths:
-      - "src/weevr/operations/**"
-      - "src/weevr/engine/**"
-      - "src/weevr/state/**"
-      - "src/weevr/context.py"
-      - "src/weevr/result.py"
-      - "tests/weevr/operations/**"
-      - "tests/weevr/engine/**"
-      - "tests/weevr/state/**"
-      - "tests/weevr/test_context.py"
-      - "tests/weevr/conftest.py"
-      - "tests/conftest.py"
-      - "tests/spark_helpers.py"
-      - "pyproject.toml"
 
 permissions:
   contents: read
@@ -58,5 +30,5 @@ jobs:
       - name: Sync (locked)
         run: uv sync --locked --dev
 
-      - name: Spark tests
-        run: uv run pytest -m spark
+      - name: Tests with coverage
+        run: uv run pytest -m "" --cov=src/weevr --cov-fail-under=90
