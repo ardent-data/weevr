@@ -1,0 +1,29 @@
+config_version: "1.0"
+name: lock_thread
+
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+
+steps:
+  - select:
+      columns:
+        - customer_id
+        - first_name
+
+target:
+  alias: curated.lock_thread
+  naming:
+    reserved_words:
+      strategy: rename
+      preset: ansi
+      extend:
+        - my_extra_word
+      rename_map:
+        select: selected
+        from: source
+      fallback: prefix
+
+write:
+  mode: overwrite
