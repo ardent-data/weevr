@@ -15,6 +15,15 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
+__all__ = [
+    "ANSI_RESERVED_WORDS",
+    "DAX_RESERVED_WORDS",
+    "M_RESERVED_WORDS",
+    "TSQL_RESERVED_WORDS",
+    "PRESET_REGISTRY",
+    "resolve_effective_words",
+]
+
 # ---------------------------------------------------------------------------
 # ANSI SQL reserved words (~80 words, per SQL:2016)
 # ---------------------------------------------------------------------------
