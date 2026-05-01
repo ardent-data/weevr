@@ -1239,6 +1239,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.operations._LAZY_ATTRS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _LAZY_ATTRS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.operations.AuditContext" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1436,6 +1447,17 @@
     <span class="md-ellipsis">
       
         write_target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.operations.__getattr__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __getattr__
       
     </span>
   </a>
@@ -2984,6 +3006,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.operations._LAZY_ATTRS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _LAZY_ATTRS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.operations.AuditContext" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3187,6 +3220,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#weevr.operations.__getattr__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __getattr__
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3262,6 +3306,26 @@ an operation function.</p>
   </span>
 
 <a href="#weevr.operations.__all__" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="weevr.operations._LAZY_ATTRS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_LAZY_ATTRS</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;AuditContext&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.audit&#39;</span><span class="p">,</span> <span class="s1">&#39;build_sources_json&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.audit&#39;</span><span class="p">,</span> <span class="s1">&#39;inject_audit_columns&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.audit&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_audit_columns&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.audit&#39;</span><span class="p">,</span> <span class="s1">&#39;evaluate_assertions&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.assertions&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_export_path&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.exports&#39;</span><span class="p">,</span> <span class="s1">&#39;resolve_exports&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.exports&#39;</span><span class="p">,</span> <span class="s1">&#39;write_export&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.exports&#39;</span><span class="p">,</span> <span class="s1">&#39;compute_keys&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.hashing&#39;</span><span class="p">,</span> <span class="s1">&#39;run_pipeline&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.pipeline&#39;</span><span class="p">,</span> <span class="s1">&#39;write_quarantine&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.quarantine&#39;</span><span class="p">,</span> <span class="s1">&#39;read_source&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.readers&#39;</span><span class="p">,</span> <span class="s1">&#39;read_sources&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.readers&#39;</span><span class="p">,</span> <span class="s1">&#39;ValidationOutcome&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.validation&#39;</span><span class="p">,</span> <span class="s1">&#39;validate_dataframe&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.validation&#39;</span><span class="p">,</span> <span class="s1">&#39;apply_target_mapping&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.writers&#39;</span><span class="p">,</span> <span class="s1">&#39;write_target&#39;</span><span class="p">:</span> <span class="s1">&#39;weevr.operations.writers&#39;</span><span class="p">}</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#weevr.operations._LAZY_ATTRS" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -3796,7 +3860,7 @@ substitution, then evaluated as a Spark SQL expression via <code>F.expr()</code>
 
   
       dataclass
-   (weevr.operations.audit.AuditContext)" href="#weevr.operations.AuditContext">AuditContext</a></code>
+   (weevr.config.audit_templates.AuditContext)" href="#weevr.operations.AuditContext">AuditContext</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5315,6 +5379,22 @@ Otherwise, <code>save</code> writes directly to the file path.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.operations.__getattr__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__getattr__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></code>
+
+<a href="#weevr.operations.__getattr__" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
 
 
     </div>
