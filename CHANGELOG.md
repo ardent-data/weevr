@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/ardent-data/weevr/compare/weevr-v1.16.4...weevr-v1.17.0) (2026-05-01)
+
+
+### Features
+
+* enable Spark-free imports for the validation API ([#167](https://github.com/ardent-data/weevr/issues/167)) ([3da6bf7](https://github.com/ardent-data/weevr/commit/3da6bf7a9f24571ee7b6320b952a4b848c79bf20))
+
 ## [1.16.4](https://github.com/ardent-data/weevr/compare/weevr-v1.16.3...weevr-v1.16.4) (2026-04-21)
 
 
