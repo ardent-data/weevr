@@ -74,7 +74,6 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures" / "r001_phase_a" / "lock_threa
 _TDD_LOCK_REASON = "Phase A lock — turns green as later tasks land; xfail removed per task"
 
 
-@pytest.mark.xfail(reason=_TDD_LOCK_REASON, strict=False)
 def test_import_weevr_without_pyspark() -> None:
     """``import weevr`` must succeed with PySpark blocked."""
     with _block_pyspark():
@@ -90,7 +89,6 @@ def test_import_load_config_without_pyspark() -> None:
         assert hasattr(config_pkg, "load_config")
 
 
-@pytest.mark.xfail(reason=_TDD_LOCK_REASON, strict=False)
 def test_import_thread_model_without_pyspark() -> None:
     """``from weevr.model.thread import Thread`` must succeed with PySpark blocked."""
     with _block_pyspark():
