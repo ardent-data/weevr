@@ -71,9 +71,6 @@ def _block_pyspark() -> Iterator[None]:
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "r001_phase_a" / "lock_thread.thread"
 
 
-_TDD_LOCK_REASON = "Phase A lock — turns green as later tasks land; xfail removed per task"
-
-
 def test_import_weevr_without_pyspark() -> None:
     """``import weevr`` must succeed with PySpark blocked."""
     with _block_pyspark():
@@ -95,7 +92,6 @@ def test_import_thread_model_without_pyspark() -> None:
         assert hasattr(thread_module, "Thread")
 
 
-@pytest.mark.xfail(reason=_TDD_LOCK_REASON, strict=False)
 def test_import_reserved_words_shim_without_pyspark() -> None:
     """The ``operations.reserved_words`` shim path must resolve without PySpark.
 
@@ -108,7 +104,6 @@ def test_import_reserved_words_shim_without_pyspark() -> None:
         assert hasattr(rw, "resolve_effective_words")
 
 
-@pytest.mark.xfail(reason=_TDD_LOCK_REASON, strict=False)
 def test_load_config_without_pyspark() -> None:
     """``load_config`` on a thread fixture with rename strategy succeeds.
 
