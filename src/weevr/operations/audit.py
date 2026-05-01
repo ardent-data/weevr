@@ -18,6 +18,11 @@ from collections.abc import Mapping
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+# The star import re-exports the canonical audit-template surface so
+# back-compat consumers of ``weevr.operations.audit`` keep working.
+# The explicit re-import below names the symbols this module itself
+# uses (in ``inject_audit_columns``) so static analyzers resolve them
+# directly rather than through the wildcard.
 from weevr.config.audit_templates import *  # noqa: F401,F403
 from weevr.config.audit_templates import (
     AuditContext,

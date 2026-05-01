@@ -26,10 +26,9 @@ class _PysparkBlocker(MetaPathFinder):
     def find_spec(
         self,
         fullname: str,
-        path: object = None,
-        target: object = None,
+        _path: object = None,
+        _target: object = None,
     ) -> ModuleSpec | None:
-        del path, target
         if fullname == "pyspark" or fullname.startswith("pyspark."):
             raise ImportError(f"PySpark import blocked by lock test: {fullname!r}")
         return None
