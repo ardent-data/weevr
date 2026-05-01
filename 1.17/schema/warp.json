@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "WarpColumn": {
+      "description": "A single column declared in a warp schema contract.\n\nDefines the expected name, type, nullability, and optional default\nfor a target table column.",
+      "properties": {
+        "name": {
+          "description": "Column name as it appears in the target table.",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Spark SQL type string (e.g. 'bigint', 'string', 'decimal(18,2)').",
+          "title": "Type",
+          "type": "string"
+        },
+        "nullable": {
+          "default": true,
+          "description": "Whether the column allows null values.",
+          "title": "Nullable",
+          "type": "boolean"
+        },
+        "default": {
+          "default": null,
+          "description": "Default value for warp-only column append. None means null.",
+          "title": "Default"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable column description for documentation.",
+          "title": "Description"
+        },
+        "discovered": {
+          "default": false,
+          "description": "Marker for columns added by adaptive drift detection. Remove this flag to signal intentional curation.",
+          "title": "Discovered",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "WarpColumn",
+      "type": "object"
+    },
+    "WarpKeys": {
+      "description": "Key declarations for a warp schema contract.\n\nDocumentation metadata identifying surrogate and business keys.\nNot enforced at runtime \u2014 used for plan/explain output and\ndownstream tooling.",
+      "properties": {
+        "surrogate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the surrogate key column.",
+          "title": "Surrogate"
+        },
+        "business": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Names of the business key columns.",
+          "title": "Business"
+        }
+      },
+      "title": "WarpKeys",
+      "type": "object"
+    }
+  },
+  "description": "Typed configuration for a .warp file declaring a target table schema.\n\nA warp defines the intended shape of a target table: which columns\nshould exist, their types, nullability, and optional defaults.\nCross-field validators ensure column name uniqueness and key\nreference integrity.",
+  "properties": {
+    "config_version": {
+      "description": "Schema version for the warp file (e.g. '1.0').",
+      "title": "Config Version",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Human-readable description of the warp contract.",
+      "title": "Description"
+    },
+    "columns": {
+      "description": "Ordered list of column declarations for the target table.",
+      "items": {
+        "$ref": "#/$defs/WarpColumn"
+      },
+      "minItems": 1,
+      "title": "Columns",
+      "type": "array"
+    },
+    "keys": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WarpKeys"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Key declarations (surrogate, business) for documentation."
+    },
+    "auto_generated": {
+      "default": false,
+      "description": "Marker indicating this warp was auto-generated from pipeline output.",
+      "title": "Auto Generated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "config_version",
+    "columns"
+  ],
+  "title": "WarpConfig",
+  "type": "object"
+}
