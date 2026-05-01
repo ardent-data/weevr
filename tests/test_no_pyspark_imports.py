@@ -81,7 +81,6 @@ def test_import_weevr_without_pyspark() -> None:
         assert weevr is not None
 
 
-@pytest.mark.xfail(reason=_TDD_LOCK_REASON, strict=False)
 def test_import_load_config_without_pyspark() -> None:
     """``from weevr.config import load_config`` must succeed with PySpark blocked."""
     with _block_pyspark():
