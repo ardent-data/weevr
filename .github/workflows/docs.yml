@@ -6,8 +6,10 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - "examples/**"
-      - "src/weevr/**"
+      - "packages/weevr-core/src/weevr/**"
+      - "packages/weevr/src/weevr/**"
       - "pyproject.toml"
+      - "packages/*/pyproject.toml"
       - "CONTRIBUTING.md"
     branches:
       - main

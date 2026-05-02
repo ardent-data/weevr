@@ -56,8 +56,8 @@ jobs:
           version: "0.9.28"
           enable-cache: true
 
-      - name: Build package
-        run: uv build
+      - name: Build packages (weevr + weevr-core)
+        run: uv build --all-packages
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

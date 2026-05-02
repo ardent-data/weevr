@@ -11,6 +11,19 @@
           "path": "uv.lock",
           "type": "toml",
           "jsonpath": "$.package[?(@.name.value=='weevr')].version"
+        },
+        {
+          "path": "uv.lock",
+          "type": "toml",
+          "jsonpath": "$.package[?(@.name.value=='weevr-core')].version"
+        },
+        {
+          "path": "packages/weevr/pyproject.toml",
+          "type": "generic"
+        },
+        {
+          "path": "packages/weevr-core/pyproject.toml",
+          "type": "generic"
         }
       ]
     }

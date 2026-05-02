@@ -31,4 +31,4 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Tests with coverage
-        run: uv run pytest -m "" --cov=src/weevr --cov-fail-under=90
+        run: uv run pytest -m "" --cov=weevr --cov-fail-under=90

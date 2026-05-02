@@ -100,7 +100,7 @@ def main() -> None:
         else:
             print(
                 "\nJSON schemas are out of date. This usually means a model "
-                "file under src/weevr/model/ was changed without regenerating "
+                "file under packages/weevr/src/weevr/model/ was changed without regenerating "
                 "the schemas.\n\n"
                 "To fix, run locally:\n\n"
                 "    uv run python scripts/generate_schema.py\n\n"
