@@ -44,6 +44,7 @@ def __getattr__(name: str) -> object:
 # same pattern is mirrored in every federated sub-package's __init__.py
 # (weevr.config, weevr.engine, weevr.telemetry).
 def _extend_namespace_path() -> None:
+    """Append sibling weevr/ directories on sys.path to ``__path__``."""
     import os.path as osp
     import sys
 

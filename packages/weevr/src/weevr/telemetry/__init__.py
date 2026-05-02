@@ -10,6 +10,7 @@
 # the broader rationale; the same helper is mirrored in every
 # federated sub-package's __init__.py.
 def _extend_namespace_path() -> None:
+    """Append sibling weevr.telemetry/ directories on sys.path to ``__path__``."""
     import os.path as osp
     import sys
 

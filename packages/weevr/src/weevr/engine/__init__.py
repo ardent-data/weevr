@@ -10,6 +10,7 @@
 # helper pattern is mirrored in every federated sub-package's
 # __init__.py — see weevr/__init__.py for context.
 def _extend_namespace_path() -> None:
+    """Append sibling weevr.engine/ directories on sys.path to ``__path__``."""
     import os.path as osp
     import sys
 

@@ -234,6 +234,7 @@ def load_config(
 # site-packages/weevr/config/ directory and the loop is a no-op. The
 # basename(p) == "src" gate scopes the scan to src-layout package roots.
 def _extend_namespace_path() -> None:
+    """Append sibling weevr.config/ directories on sys.path to ``__path__``."""
     import os.path as osp
     import sys
 
