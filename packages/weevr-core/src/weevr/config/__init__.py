@@ -222,3 +222,29 @@ def load_config(
 
     # params config type returns a plain dict
     return resolved_with_refs
+
+
+# Federated namespace: weevr.config splits across two wheels — pure
+# parser/resolver/validation/inheritance modules in weevr-core (which
+# ships this __init__.py) and Spark-bound config helpers (fabric.py,
+# paths.py) contributed by the weevr engine wheel. In editable workspace
+# installs each wheel's src/ is a separate sys.path entry, so we extend
+# __path__ to pull engine-side contributions into the import-time view.
+# In a real install both wheels' files merge into a single
+# site-packages/weevr/config/ directory and the loop is a no-op. The
+# basename(p) == "src" gate scopes the scan to src-layout package roots.
+def _extend_namespace_path() -> None:
+    import os.path as osp
+    import sys
+
+    components = __name__.split(".")
+    for entry in sys.path:
+        if not entry or osp.basename(entry) != "src":
+            continue
+        candidate = osp.join(entry, *components)
+        if osp.isdir(candidate) and candidate not in __path__:
+            __path__.append(candidate)
+
+
+_extend_namespace_path()
+del _extend_namespace_path
