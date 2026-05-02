@@ -1,58 +1,13 @@
-[project]
-name = "weevr"
-version = "1.17.0"
-description = "Metadata-driven execution engine for Fabric/Spark data pipelines."
-readme = "README.md"
-license = { file = "LICENSE" }
-authors = [
-    { name = "Pierre LaFromboise", email = "44212292+DataInsightPro@users.noreply.github.com" }
-]
-requires-python = ">=3.11,<3.12"
-keywords = ["spark", "pyspark", "fabric", "etl", "data-pipeline", "yaml", "configuration", "delta-lake"]
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Database",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed",
-]
-dependencies = [
-    "pydantic>=2.0,<3.0",
-    "pyyaml>=6.0,<7.0",
-]
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[project.urls]
-Documentation = "https://ardent-data.github.io/weevr/"
-Repository = "https://github.com/ardent-data/weevr"
-Issues = "https://github.com/ardent-data/weevr/issues"
-Changelog = "https://github.com/ardent-data/weevr/blob/main/CHANGELOG.md"
-
-[build-system]
-requires = ["uv_build>=0.9.28,<0.10.0"]
-build-backend = "uv_build"
-
-[dependency-groups]
-dev = [
-    "delta-spark>=3.2.0,<3.3.0",
-    "interrogate>=1.7.0",
-    "mike>=2.1.3,<3",
-    "mkdocs-d2-plugin>=1.0.0,<2",
-    "mkdocs-material>=9.7.3,<10",
-    "mkdocstrings[python]>=1.0.3,<2",
-    "pyright>=1.1.408",
-    "pyspark>=3.5.0,<3.6.0",
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.15.0",
-]
+[tool.uv.sources]
+weevr-core = { workspace = true }
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["src", "tests"]
+src = ["packages/weevr-core/src", "packages/weevr/src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "D"]
@@ -75,8 +30,9 @@ indent-style = "space"
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
 
-include = ["src", "tests"]
+include = ["packages/weevr-core/src", "packages/weevr/src", "tests"]
 exclude = ["**/__pycache__", ".venv", ".git", ".github"]
+extraPaths = ["packages/weevr-core/src", "packages/weevr/src"]
 
 venvPath = "."
 venv = ".venv"
@@ -89,6 +45,7 @@ testpaths = ["tests"]
 addopts = "-q -m 'not spark'"
 markers = [
     "spark: marks tests that require PySpark and Delta Lake (deselected by default)",
+    "install_smoke: builds wheels and installs into isolated venvs (deselected by default)",
 ]
 
 [tool.interrogate]

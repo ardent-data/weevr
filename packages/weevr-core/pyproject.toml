@@ -1,0 +1,39 @@
+[project]
+name = "weevr-core"
+version = "1.17.0" # x-release-please-version
+description = "Pure-Python validation, planner, and telemetry contracts for weevr."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Pierre LaFromboise", email = "44212292+DataInsightPro@users.noreply.github.com" }
+]
+requires-python = ">=3.11,<3.12"
+keywords = ["spark", "pyspark", "fabric", "etl", "data-pipeline", "yaml", "configuration", "delta-lake"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "pyyaml>=6.0,<7.0",
+]
+
+[project.urls]
+Documentation = "https://ardent-data.github.io/weevr/"
+Repository = "https://github.com/ardent-data/weevr"
+Issues = "https://github.com/ardent-data/weevr/issues"
+Changelog = "https://github.com/ardent-data/weevr/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["uv_build>=0.10.0,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "weevr"
+namespace = true
