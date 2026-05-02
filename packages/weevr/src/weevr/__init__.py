@@ -8,17 +8,27 @@ if TYPE_CHECKING:
 
 __all__ = ["Context", "ExecutionMode", "LoadedConfig", "RunResult"]
 
+# Map each public attribute to the submodule that defines it. Lazy access
+# preserves Phase A's no-pyspark contract: importing weevr does not load
+# weevr.context (and therefore PySpark) unless one of these attributes is
+# actually accessed. The map is checked against __all__ by
+# tests/weevr/test_lazy_init_consistency.py to keep the two in sync.
+_LAZY_ATTRS: dict[str, str] = {
+    "Context": "weevr.context",
+    "ExecutionMode": "weevr.result",
+    "LoadedConfig": "weevr.result",
+    "RunResult": "weevr.result",
+}
+
 
 def __getattr__(name: str) -> object:
-    if name == "Context":
-        from weevr.context import Context
+    module_path = _LAZY_ATTRS.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
 
-        return Context
-    if name in {"ExecutionMode", "LoadedConfig", "RunResult"}:
-        from weevr import result
-
-        return getattr(result, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = importlib.import_module(module_path)
+    return getattr(module, name)
 
 
 # Federated namespace: weevr ships across two wheels (weevr-core for
@@ -32,8 +42,7 @@ def __getattr__(name: str) -> object:
 # roots so unrelated sys.path entries (test fixtures, scripts, …) do
 # not get mistaken for additional weevr namespace contributions. The
 # same pattern is mirrored in every federated sub-package's __init__.py
-# (weevr.config today; weevr.engine and weevr.telemetry once their
-# pure-Python submodules relocate to weevr-core).
+# (weevr.config, weevr.engine, weevr.telemetry).
 def _extend_namespace_path() -> None:
     import os.path as osp
     import sys
