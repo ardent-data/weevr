@@ -57,7 +57,12 @@ def _merge_dir(src_dirs: list[Path], dest: Path) -> None:
     for name, file_src in files.items():
         target = dest / name
         if not target.exists():
-            target.symlink_to(file_src.resolve())
+            try:
+                target.symlink_to(file_src.resolve())
+            except OSError as exc:
+                raise OSError(
+                    f"mkdocs_merge_weevr: failed to symlink {file_src} -> {target}: {exc}"
+                ) from exc
     for name, dirs in sub_dirs.items():
         _merge_dir(dirs, dest / name)
 
