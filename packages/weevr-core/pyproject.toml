@@ -9,7 +9,7 @@ authors = [
     { name = "Pierre LaFromboise", email = "44212292+DataInsightPro@users.noreply.github.com" }
 ]
 requires-python = ">=3.11,<3.12"
-keywords = ["spark", "pyspark", "fabric", "etl", "data-pipeline", "yaml", "configuration", "delta-lake"]
+keywords = ["weevr", "pydantic", "fabric", "etl", "data-pipeline", "yaml", "configuration"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
