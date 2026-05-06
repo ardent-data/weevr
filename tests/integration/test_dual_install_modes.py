@@ -124,6 +124,20 @@ def _run_imports(python: Path, statements: list[str], *, expect_ok: bool) -> Non
 
 @pytest.fixture(scope="module")
 def wheels(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    # When WEEVR_SMOKE_DIST is set (the release workflow exports the
+    # build job's dist/ directory), reuse those wheels so the smoke
+    # test exercises the exact artifacts the publish step will upload.
+    # Otherwise build a fresh pair into a temp directory.
+    prebuilt = os.environ.get("WEEVR_SMOKE_DIST")
+    if prebuilt:
+        dist = Path(prebuilt).resolve()
+        if not dist.is_dir():
+            raise RuntimeError(
+                f"WEEVR_SMOKE_DIST={prebuilt!r} does not point to an existing directory"
+            )
+        engine = next(dist.glob("weevr-*.whl"))
+        core = next(dist.glob("weevr_core-*.whl"))
+        return engine, core
     dist = tmp_path_factory.mktemp("dist")
     return _build_wheels(dist)
 

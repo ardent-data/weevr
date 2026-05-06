@@ -63,6 +63,8 @@ jobs:
         run: uv build --all-packages
 
       - name: Dual-install smoke test
+        env:
+          WEEVR_SMOKE_DIST: ./dist
         run: uv run pytest -m install_smoke -v
 
       - name: Upload build artifacts
