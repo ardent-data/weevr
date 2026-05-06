@@ -81,3 +81,6 @@ ignore-init-module = false
 ignore-module = false
 ignore-private = true
 ignore-semiprivate = true
+
+[tool.coverage.run]
+source = ["packages/weevr/src", "packages/weevr-core/src"]
