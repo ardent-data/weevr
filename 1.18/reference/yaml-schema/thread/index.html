@@ -406,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../release-notes/1.16/" class="md-tabs__link">
+        <a href="../../../release-notes/1.18/" class="md-tabs__link">
           
   
   
@@ -2842,6 +2842,62 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.18/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.18
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/1.17/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.17
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -5355,32 +5411,35 @@ first, then explicit columns override.</p>
 <td><code>list[string]</code></td>
 <td>no</td>
 <td>all</td>
-<td>Glob patterns restricting which columns are filled</td>
+<td>Glob patterns restricting which columns are filled. Only valid when <code>mode</code> is set.</td>
 </tr>
 <tr>
 <td><code>exclude</code></td>
 <td><code>list[string]</code></td>
 <td>no</td>
 <td>none</td>
-<td>Glob patterns excluding columns from fill</td>
+<td>Glob patterns excluding columns from fill. Only valid when <code>mode</code> is set.</td>
 </tr>
 <tr>
 <td><code>overrides</code></td>
 <td><code>dict[string, any]</code></td>
 <td>no</td>
 <td>--</td>
-<td>Per-column overrides for type-based defaults</td>
+<td>Per-column overrides for type-based defaults. Only valid when <code>mode</code> is set.</td>
 </tr>
 <tr>
 <td><code>where</code></td>
 <td><code>string</code></td>
 <td>no</td>
 <td>--</td>
-<td>Spark SQL predicate for conditional fill</td>
+<td>Spark SQL predicate for conditional fill. Only valid when <code>mode</code> is set.</td>
 </tr>
 </tbody>
 </table>
-<p>At least one of <code>columns</code> or <code>mode</code> must be set.</p>
+<p>At least one of <code>columns</code> or <code>mode</code> must be set. The <code>code</code>, <code>include</code>,
+<code>exclude</code>, <code>overrides</code>, and <code>where</code> keys all require <code>mode</code> to be set;
+supplying any of them in the explicit-columns-only form raises a
+<code>ConfigSchemaError</code>.</p>
 <p><strong>Explicit columns:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fill_null</span><span class="p">:</span>
 <a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
@@ -6003,14 +6062,19 @@ hydration. Not a step type itself — expanded by the config preprocessor.</p>
 </tr>
 </tbody>
 </table>
+<p>The <code>foreach</code> preprocessor substitutes the bound variable into nested
+step bodies as bare <code>{name}</code> placeholders (no <code>$</code>). At expansion time
+each occurrence of <code>{&lt;as&gt;}</code> in a string is replaced with the current
+iteration value; the substituted strings are then passed to the normal
+step model.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="nt">steps</span><span class="p">:</span>
 <a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">foreach</span><span class="p">:</span>
 <a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="w">      </span><span class="nt">values</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">revenue</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">cost</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">margin</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="w">      </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">col</span>
 <a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="w">      </span><span class="nt">steps</span><span class="p">:</span>
 <a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">derive</span><span class="p">:</span>
-<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${col}_rounded&quot;</span>
-<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">            </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;round(${col},</span><span class="nv"> </span><span class="s">2)&quot;</span>
+<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="w">            </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">              </span><span class="s">&quot;{col}_rounded&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;round({col},</span><span class="nv"> </span><span class="s">2)&quot;</span>
 </code></pre></div>
 <hr />
 <h2 id="target">target<a class="headerlink" href="#target" title="Permanent link">&para;</a></h2>
@@ -6373,7 +6437,7 @@ for detailed examples.</p>
 <td><code>list[SystemMember]</code></td>
 <td>no</td>
 <td>defaults</td>
-<td>Custom sentinel rows (sk, code, label). Defaults: -1/unknown, -2/not_applicable</td>
+<td>Custom sentinel rows (<code>sk</code>, <code>code</code>, <code>label</code>). <code>sk</code> must be a negative integer. Defaults: -1/unknown, -2/not_applicable</td>
 </tr>
 <tr>
 <td><code>label_column</code></td>
@@ -7150,10 +7214,10 @@ expression against the DataFrame before it is written.</p>
 </tr>
 <tr>
 <td><code>sentinels</code></td>
-<td><code>dict</code></td>
+<td><code>dict[string, SentinelGroup]</code></td>
 <td>cond.</td>
 <td><code>null</code></td>
-<td>Named sentinel groups for <code>fk_sentinel_rate</code> (dict-of-int or dict-of-dict)</td>
+<td>Named sentinel groups for <code>fk_sentinel_rate</code>. Each value is either a raw integer sentinel, a system-member code string (e.g. <code>"invalid"</code>), or a <code>{value, max_rate}</code> dict.</td>
 </tr>
 <tr>
 <td><code>max_rate</code></td>

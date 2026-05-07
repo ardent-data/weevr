@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.18/release-notes/1.9/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.18/release-notes/1.18/">
       
       
-        <link rel="prev" href="../1.10/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.8/">
+        <link rel="next" href="../1.17/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.9 - weevr</title>
+        <title>1.18 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v19" class="md-skip">
+        <a href="#release-notes-v118" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.9
+              1.18
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.18/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -2138,10 +2138,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.18/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.18
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2157,6 +2184,148 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-wheels-one-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two wheels, one namespace
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two wheels, one namespace">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-moved-to-weevr-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What moved to weevr-core
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-stayed-in-weevr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stayed in weevr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#federated-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated namespaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-new-install-personas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two new install personas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two new install personas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pip-install-weevr-existing-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip install weevr (existing users)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pip-install-weevr-core-new-in-118" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip install weevr-core (new in 1.18)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-and-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI and tooling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backwards-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backwards compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2390,37 +2559,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.9
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.9/" class="md-nav__link">
         
   
   
@@ -2436,131 +2578,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#reserved-word-presets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reserved Word Presets
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Reserved Word Presets">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Background
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#built-in-presets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Built-in Presets
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#composition-rules" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Composition Rules
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#table-name-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Table Name Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Observability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Public Exports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2880,22 +2897,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#reserved-word-presets" class="md-nav__link">
+  <a href="#two-wheels-one-namespace" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reserved Word Presets
+        Two wheels, one namespace
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Reserved Word Presets">
+    <nav class="md-nav" aria-label="Two wheels, one namespace">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
+  <a href="#what-moved-to-weevr-core" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Background
+        What moved to weevr-core
       
     </span>
   </a>
@@ -2903,10 +2920,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
+  <a href="#what-stayed-in-weevr" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration
+        What stayed in weevr
       
     </span>
   </a>
@@ -2914,32 +2931,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#built-in-presets" class="md-nav__link">
+  <a href="#federated-namespaces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Built-in Presets
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#composition-rules" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Composition Rules
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#table-name-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Table Name Protection
+        Federated namespaces
       
     </span>
   </a>
@@ -2952,10 +2947,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
+  <a href="#two-new-install-personas" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Observability
+        Two new install personas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two new install personas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pip-install-weevr-existing-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip install weevr (existing users)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pip-install-weevr-core-new-in-118" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pip install weevr-core (new in 1.18)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-and-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI and tooling
       
     </span>
   </a>
@@ -2963,10 +2997,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
+  <a href="#backwards-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New Public Exports
+        Backwards compatibility
       
     </span>
   </a>
@@ -2974,10 +3008,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
+  <a href="#whats-next" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compatibility
+        What's next
       
     </span>
   </a>
@@ -3004,133 +3038,172 @@
   
 
 
-<h1 id="release-notes-v19">Release Notes — v1.9<a class="headerlink" href="#release-notes-v19" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>This release adds <strong>reserved word presets</strong> — named, curated word
-lists for DAX, M language (Power Query), and T-SQL that protect
-column and table names from conflicts when Delta tables are
-consumed by Power BI semantic models, Power Query dataflows, or
-Fabric SQL analytics endpoints.</p>
+<h1 id="release-notes-v118">Release Notes — v1.18<a class="headerlink" href="#release-notes-v118" title="Permanent link">&para;</a></h1>
+<p><strong>Release date:</strong> May 2026</p>
+<p>This release ships the most significant structural change since v1.0:
+weevr is now distributed as <strong>two PyPI wheels</strong> sharing a single
+<code>weevr</code> namespace. <code>pip install weevr</code> continues to install the
+complete Spark engine; a new <code>pip install weevr-core</code> makes the
+pure-Python validation, planner, and telemetry-contract surface
+available without PySpark. Both wheels publish to PyPI in lockstep at
+the same version on every release. Existing users see no behavior
+change.</p>
 <hr />
-<h2 id="reserved-word-presets">Reserved Word Presets<a class="headerlink" href="#reserved-word-presets" title="Permanent link">&para;</a></h2>
-<h3 id="background">Background<a class="headerlink" href="#background" title="Permanent link">&para;</a></h3>
-<p>v1.8 introduced reserved word protection with a single ANSI SQL
-word list. v1.9 extends this into a <strong>preset system</strong> where each
-query language context has its own curated word set. Presets are
-self-contained and combinable.</p>
-<h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
-<p>Select presets with the new <code>preset</code> field on <code>reserved_words</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">naming</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">reserved_words</span><span class="p">:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">preset</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">powerbi</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;_&quot;</span>
-</code></pre></div>
-<p>A single string or a list is accepted:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Multi-engine protection:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">reserved_words</span><span class="p">:</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">preset</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ansi</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">dax</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tsql</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">extend</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">fiscal_year</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">by</span><span class="p p-Indicator">]</span>
-</code></pre></div>
-<h3 id="built-in-presets">Built-in Presets<a class="headerlink" href="#built-in-presets" title="Permanent link">&para;</a></h3>
+<h2 id="two-wheels-one-namespace">Two wheels, one namespace<a class="headerlink" href="#two-wheels-one-namespace" title="Permanent link">&para;</a></h2>
+<p>Source now lives under <code>packages/</code>, declared as a uv workspace at the
+repository root. Two wheels build from that workspace:</p>
 <table>
 <thead>
 <tr>
-<th>Preset</th>
-<th>Words</th>
-<th>Description</th>
+<th>Wheel</th>
+<th>Concern</th>
+<th>Depends on</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>ansi</code></td>
-<td>~80</td>
-<td>ANSI SQL reserved keywords (existing default)</td>
+<td><code>weevr-core</code></td>
+<td>Pure-Python validation, planner, telemetry contracts. Installable without PySpark.</td>
+<td><code>pydantic</code>, <code>pyyaml</code></td>
 </tr>
 <tr>
-<td><code>dax</code></td>
-<td>~28</td>
-<td>DAX reserved words for Power BI semantic models</td>
-</tr>
-<tr>
-<td><code>m</code></td>
-<td>~21</td>
-<td>M language (Power Query) reserved words</td>
-</tr>
-<tr>
-<td><code>powerbi</code></td>
-<td>~45</td>
-<td>Convenience alias — expands to <code>dax</code> + <code>m</code></td>
-</tr>
-<tr>
-<td><code>tsql</code></td>
-<td>~156</td>
-<td>T-SQL reserved keywords for SQL endpoints</td>
+<td><code>weevr</code></td>
+<td>Spark engine, runtime helpers, OneLake/Fabric integration.</td>
+<td><code>weevr-core</code> (same version)</td>
 </tr>
 </tbody>
 </table>
-<h3 id="composition-rules">Composition Rules<a class="headerlink" href="#composition-rules" title="Permanent link">&para;</a></h3>
+<p>The split is <em>physical, not semantic</em>. No public API renames, no
+signature changes, no behavior tweaks. Every existing import path
+that worked under <code>pip install weevr</code> keeps working unchanged. The
+work that landed under v1.17 (PEP 562 lazy <code>Context</code>, pure-helper
+extractions, the no-PySpark lock test) was the prerequisite that made
+this split safe.</p>
+<h3 id="what-moved-to-weevr-core">What moved to <code>weevr-core</code><a class="headerlink" href="#what-moved-to-weevr-core" title="Permanent link">&para;</a></h3>
+<p>Pure-Python modules whose concern could sensibly exist outside an
+engine run — schemas, config resolvers, the planner graph, telemetry
+contract types — now ship from <code>weevr-core</code>:</p>
 <ul>
-<li><strong>Default when omitted:</strong> <code>ansi</code> (backwards compatible with v1.8)</li>
-<li><strong>Explicit replaces default:</strong> specifying any preset replaces
-  the implicit ANSI default. To include ANSI alongside others,
-  list it explicitly: <code>preset: [ansi, dax]</code></li>
-<li><strong>Self-contained:</strong> each preset includes all words needed for
-  that language context, including any ANSI overlaps.
-  <code>preset: [tsql]</code> alone gives full T-SQL protection.</li>
-<li><strong>Union composition:</strong> multiple presets are merged via set union</li>
-<li><strong>extend/exclude compose on top:</strong> project-specific words add to
-  or remove from the resolved preset union</li>
+<li><code>weevr.model.*</code> — every Pydantic model.</li>
+<li><code>weevr.errors.*</code> — the full exception hierarchy.</li>
+<li>The pure half of <code>weevr.config</code>: <code>parser</code>, <code>resolver</code>, <code>validation</code>,
+  <code>inheritance</code>, <code>locations</code>, <code>macros</code>, <code>warp</code>, <code>audit_templates</code>,
+  <code>duration</code>.</li>
+<li>The contract types in <code>weevr.telemetry</code>: <code>results</code>, <code>span</code>, <code>trace</code>,
+  <code>events</code>.</li>
+<li><code>weevr.engine.planner</code> and <code>weevr.engine.formatting</code> (DAG
+  construction and pure-Python formatters used by result rendering).</li>
+<li>Root-level <code>weevr.result</code>, <code>weevr.duration</code>, <code>weevr.reserved_words</code>.</li>
 </ul>
-<h3 id="table-name-protection">Table Name Protection<a class="headerlink" href="#table-name-protection" title="Permanent link">&para;</a></h3>
-<p>Reserved word protection now applies to <strong>both column names and
-the target table name</strong>. Previously, only column names were
-checked. Table names matching a reserved word are handled per
-the configured strategy (prefix, quote, or error).</p>
-<hr />
-<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<h3 id="what-stayed-in-weevr">What stayed in <code>weevr</code><a class="headerlink" href="#what-stayed-in-weevr" title="Permanent link">&para;</a></h3>
+<p>Anything that orchestrates execution, touches Spark, talks to the
+Fabric runtime, or coordinates state — <code>weevr.context</code>,
+<code>weevr.engine.executor</code>/<code>runner</code>/<code>cache_manager</code>/<code>display</code>/<code>hooks</code>/
+<code>lookups</code>/<code>conditions</code>/<code>column_sets</code>/<code>resources</code>/<code>result</code>/<code>variables</code>,
+<code>weevr.operations.*</code>, <code>weevr.state.*</code>, <code>weevr.telemetry.collector</code>/
+<code>logging</code>, and the two Spark-bound config helpers
+<code>weevr.config.fabric</code> / <code>weevr.config.paths</code>.</p>
+<h3 id="federated-namespaces">Federated namespaces<a class="headerlink" href="#federated-namespaces" title="Permanent link">&para;</a></h3>
+<p>Three sub-packages now ship files from both wheels: <code>weevr.config</code>
+(core ships <code>__init__.py</code> + pure helpers; engine adds <code>fabric.py</code> and
+<code>paths.py</code>), <code>weevr.engine</code> (engine ships <code>__init__.py</code> + Spark-bound
+modules; core adds <code>planner.py</code> and <code>formatting.py</code>), and
+<code>weevr.telemetry</code> (engine ships <code>__init__.py</code> + runtime helpers; core
+adds the contract types). The top-level <code>weevr.__init__.py</code> stays in
+the engine wheel.</p>
+<p>In a normal <code>pip install</code> both wheels' files merge into one
+<code>site-packages/weevr/</code> directory and Python's import machinery
+resolves through the single owning <code>__init__.py</code>. In editable
+workspace installs each wheel's <code>src/</code> is a separate <code>sys.path</code>
+entry, so federated <code>__init__.py</code> files extend <code>__path__</code> to pull the
+sibling wheel's contributions back into the namespace.</p>
+<h2 id="two-new-install-personas">Two new install personas<a class="headerlink" href="#two-new-install-personas" title="Permanent link">&para;</a></h2>
+<h3 id="pip-install-weevr-existing-users"><code>pip install weevr</code> (existing users)<a class="headerlink" href="#pip-install-weevr-existing-users" title="Permanent link">&para;</a></h3>
+<p>Behavior is unchanged. The engine wheel declares <code>weevr-core</code> as a
+same-version runtime dependency, so the resolver always installs both
+wheels in one shot. Every existing import resolves identically:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Context</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.model.thread</span><span class="w"> </span><span class="kn">import</span> <span class="n">Thread</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.engine.planner</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_plan</span>
+</code></pre></div>
+<h3 id="pip-install-weevr-core-new-in-118"><code>pip install weevr-core</code> (new in 1.18)<a class="headerlink" href="#pip-install-weevr-core-new-in-118" title="Permanent link">&para;</a></h3>
+<p>Installs only the pure-Python distribution. The validation API,
+Pydantic models, planner graph, and telemetry contracts all import
+without PySpark on <code>sys.path</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>       <span class="c1"># works</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.model.thread</span><span class="w"> </span><span class="kn">import</span> <span class="n">Thread</span>       <span class="c1"># works</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.engine.planner</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_plan</span> <span class="c1"># works (pure-Python)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Context</span>                   <span class="c1"># ImportError — engine wheel not installed</span>
+</code></pre></div>
+<p>This is the persona that unblocks <code>weevr-cli</code>, native docs
+generation, stored-run summary rendering, and any other tool that
+needs to read or validate <code>.weevr/</code> projects without paying for
+Spark.</p>
+<p>Restricted-network Fabric installs that upload wheels manually now
+need to upload both files; see the
+<a href="../../guides/fabric-runtime/">Fabric runtime guide</a> for the updated
+example.</p>
+<h2 id="ci-and-tooling">CI and tooling<a class="headerlink" href="#ci-and-tooling" title="Permanent link">&para;</a></h2>
 <ul>
-<li>DEBUG log: resolved preset names and effective word count</li>
-<li>DEBUG log: individual table name reserved word matches</li>
+<li>Both wheels build from the workspace root via <code>uv build
+  --all-packages</code> and publish through one <code>pypa/gh-action-pypi-publish</code>
+  step. release-please bumps the version line in both
+  <code>pyproject.toml</code> files (and both <code>uv.lock</code> entries) atomically on
+  every release PR. The first lockstep release (this one) is the
+  empirical confirmation.</li>
+<li>A new integration suite at
+  <code>tests/integration/test_dual_install_modes.py</code> (gated by the
+  <code>install_smoke</code> marker) builds both wheels, installs them into
+  isolated venvs, and asserts that the documented import paths
+  resolve in core-only and full modes — wired into the release
+  workflow as a pre-publish gate via the <code>WEEVR_SMOKE_DIST</code> env var,
+  so the smoke test exercises the same artifacts the publish step
+  uploads.</li>
+<li><code>tests/weevr/test_lazy_init_consistency.py</code> keeps the PEP 562 lazy
+  modules' <code>_LAZY_ATTRS</code> map in sync with their <code>__all__</code>.</li>
+<li>mkdocstrings reads from a deep-merged tree at <code>.docs-merged/</code>
+  (assembled by <code>scripts/mkdocs_merge_weevr.py</code> at config time) so
+  reference pages span both src roots.</li>
+<li><code>pyright</code> config downgrades <code>reportMissingImports</code> and
+  <code>reportAttributeAccessIssue</code> for the federated cross-wheel imports
+  it cannot merge; runtime resolution remains locked by the
+  full pytest suite.</li>
 </ul>
-<h2 id="new-public-exports">New Public Exports<a class="headerlink" href="#new-public-exports" title="Permanent link">&para;</a></h2>
-<p>From <code>weevr.model</code>:</p>
+<h2 id="backwards-compatibility">Backwards compatibility<a class="headerlink" href="#backwards-compatibility" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>ReservedWordPreset</code> — StrEnum of built-in preset names</li>
+<li><code>pip install weevr</code> behavior is identical for existing users — the
+  install pulls both wheels, every import path resolves unchanged,
+  no behavior or signature changes.</li>
+<li><code>git log --follow</code> is preserved on every relocated file (Phase B
+  was pure <code>git mv</code> — no content edits on moves).</li>
+<li>No new credentials, no new session-state mutation, no new YAML
+  fields. The 1.17 lazy-Context contract is preserved exactly; the
+  four PEP 562 lazy attributes (<code>Context</code>, <code>RunResult</code>,
+  <code>ExecutionMode</code>, <code>LoadedConfig</code>) still resolve to the same
+  underlying objects.</li>
 </ul>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. The <code>preset</code> field defaults to <code>None</code>,
-preserving the existing ANSI SQL behavior for all configurations
-that do not specify a preset.</p>
-<table>
-<thead>
-<tr>
-<th>Component</th>
-<th>Version</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Python</td>
-<td>3.11</td>
-</tr>
-<tr>
-<td>PySpark</td>
-<td>3.5.x</td>
-</tr>
-<tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
-</tr>
-</tbody>
-</table>
+<h2 id="whats-next">What's next<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
+<p>The new core-only persona is the foundation; consumer adoption is
+the follow-on work:</p>
+<ul>
+<li><code>weevr-cli</code> migrates from hand-written JSON Schemas to
+  <code>from weevr.config import load_config</code> (separate topic, not part
+  of v1.18). Validation will widen to include cross-field validators,
+  filename-stem matching, and the full inheritance cascade that the
+  CLI's schemas could not previously express.</li>
+<li>Native project documentation generation (per-weave DAG, thread
+  lineage, target contracts) becomes possible without Spark — the
+  planner and warp-discovery surfaces that this feature needs all
+  ship from <code>weevr-core</code>.</li>
+<li>Stored-run summary rendering (reading serialized telemetry
+  outside the originating notebook) becomes possible on the
+  <code>weevr.telemetry.results</code>/<code>span</code>/<code>trace</code>/<code>events</code> contract types
+  shipped from core.</li>
+</ul>
+<p>None of these features ship in 1.18; the wheel split simply removes
+the install-time blocker that prevented them.</p>
 
 
 

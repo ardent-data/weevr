@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://ardent-data.github.io/weevr/1.18/release-notes/1.16/">
       
       
-        <link rel="prev" href="../../contributing/">
+        <link rel="prev" href="../1.17/">
       
       
         <link rel="next" href="../1.15/">
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../1.18/" class="md-tabs__link">
           
   
   
@@ -2138,6 +2138,62 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../1.18/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.18
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../1.17/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.17
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -3053,7 +3109,7 @@ diagnostic workflow.</p>
 <h2 id="internal-changes">Internal changes<a class="headerlink" href="#internal-changes" title="Permanent link">&para;</a></h2>
 <ul>
 <li>New module-private <code>_typed_watermark_col(column, type, format)</code>
-  helper in <code>src/weevr/operations/readers.py</code> that returns a bare
+  helper in <code>packages/weevr/src/weevr/operations/readers.py</code> that returns a bare
   <code>F.col</code> when no format is set, wraps in <code>to_timestamp</code> for
   <code>timestamp</code> type, wraps in <code>to_date</code> for <code>date</code> type, and raises
   <code>ValueError</code> for any other type as a defensive guard.</li>
@@ -3065,7 +3121,7 @@ diagnostic workflow.</p>
   <code>read_cdc_source</code> thread <code>load_config.watermark_format</code> through
   to both the filter and the HWM aggregate. The CDF preset branch
   was intentionally left untouched.</li>
-<li><code>src/weevr/engine/executor.py</code> was <strong>not</strong> modified — both reader
+<li><code>packages/weevr/src/weevr/engine/executor.py</code> was <strong>not</strong> modified — both reader
   functions already took <code>load_config</code>, so the new field flows
   through implicitly.</li>
 </ul>

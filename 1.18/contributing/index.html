@@ -16,7 +16,7 @@
         <link rel="prev" href="../faq/">
       
       
-        <link rel="next" href="../release-notes/1.16/">
+        <link rel="next" href="../release-notes/1.18/">
       
       
         
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../release-notes/1.16/" class="md-tabs__link">
+        <a href="../release-notes/1.18/" class="md-tabs__link">
           
   
   
@@ -2498,6 +2498,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../release-notes/1.18/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.18
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/1.17/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.17
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../release-notes/1.16/" class="md-nav__link">
         
   
@@ -3405,9 +3461,12 @@ must have type annotations.</p>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest
 </code></pre></div>
-<p>Tests live in <code>tests/weevr/</code> and mirror the <code>src/weevr/</code> structure.
-Tests marked with <code>@pytest.mark.spark</code> are excluded by default (they
-require PySpark and Delta Lake). Run them explicitly with:</p>
+<p>Tests live in <code>tests/weevr/</code> and mirror the source layout under
+<code>packages/weevr/src/weevr/</code> and <code>packages/weevr-core/src/weevr/</code> (both
+wheels share the <code>weevr</code> namespace package; tests stay flat under
+<code>tests/weevr/</code>). Tests marked with <code>@pytest.mark.spark</code> are excluded
+by default (they require PySpark and Delta Lake). Run them explicitly
+with:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>spark
 </code></pre></div>
 <p>For verbose output and coverage:</p>
@@ -3639,7 +3698,7 @@ changes.</p>
 </tr>
 <tr>
 <td>Docstring coverage</td>
-<td><code>uv run interrogate</code></td>
+<td><code>uv run interrogate packages/weevr-core/src/weevr/ packages/weevr/src/weevr/ --fail-under 90</code></td>
 </tr>
 <tr>
 <td>DCO sign-off</td>
@@ -3649,15 +3708,32 @@ changes.</p>
 </table>
 <p>All checks must pass before a PR can be merged.</p>
 <h2 id="project-structure">Project structure<a class="headerlink" href="#project-structure" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>src/weevr/                -- Library source (src layout)
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>tests/weevr/              -- Tests (mirrors src structure)
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>docs/                     -- Documentation source (MkDocs)
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>.github/                  -- Workflows, templates, CODEOWNERS
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>mkdocs.yml               -- MkDocs configuration
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>pyproject.toml            -- Project metadata and tool configs
+<p>weevr ships as two PyPI distributions sharing the <code>weevr</code> namespace
+package, declared as a uv workspace at the repository root.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>packages/
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>  weevr-core/             -- Pure-Python validation, planner, telemetry contracts
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    src/weevr/            -- Namespace contributions (no shared __init__.py)
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    pyproject.toml        -- name = &quot;weevr-core&quot;
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  weevr/                  -- Spark engine and runtime helpers
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    src/weevr/            -- Namespace contributions, owns weevr/__init__.py
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    pyproject.toml        -- name = &quot;weevr&quot;; depends on weevr-core
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>tests/weevr/              -- Tests (flat; mirrors both packages&#39; src layouts)
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>docs/                     -- Documentation source (MkDocs)
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>.github/                  -- Workflows, templates, CODEOWNERS
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>mkdocs.yml                -- MkDocs configuration
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>pyproject.toml            -- Workspace declaration + per-tool config
 </code></pre></div>
-<p>Test files mirror the source layout. If you add <code>src/weevr/config/macros.py</code>,
-the corresponding test file goes in <code>tests/weevr/config/test_macros.py</code>.</p>
+<p>The decision rule for new modules: a module belongs in <code>weevr-core</code>
+<em>only if its concern could sensibly exist outside an engine run</em>
+(schemas, config resolvers, the planner graph, telemetry contract
+types). Anything that orchestrates execution, touches Spark, talks to
+the Fabric runtime, or coordinates state lives in the engine wheel.</p>
+<p>Test files mirror the source layout. If you add
+<code>packages/weevr-core/src/weevr/config/macros.py</code>, the corresponding
+test file goes in <code>tests/weevr/config/test_macros.py</code>. See the
+<a href="https://github.com/ardent-data/weevr/blob/main/CONTRIBUTING.md#workspace-layout">workspace layout section in <code>CONTRIBUTING.md</code></a>
+for the full federated-namespace rules and the
+<code>install_smoke</code>-marked dual-install lock test.</p>
 <h2 id="getting-help">Getting help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Open an <a href="https://github.com/ardent-data/weevr/issues">issue</a> for bug
