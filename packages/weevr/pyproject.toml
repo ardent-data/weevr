@@ -1,6 +1,6 @@
 [project]
 name = "weevr"
-version = "1.17.0" # x-release-please-version
+version = "1.18.0" # x-release-please-version
 description = "Metadata-driven execution engine for Fabric/Spark data pipelines."
 readme = "README.md"
 license = "Apache-2.0"
@@ -20,7 +20,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "weevr-core==1.17.0", # x-release-please-version
+    "weevr-core==1.18.0", # x-release-please-version
     "pydantic>=2.0,<3.0",
     "pyyaml>=6.0,<7.0",
 ]

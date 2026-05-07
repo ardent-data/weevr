@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/ardent-data/weevr/compare/weevr-v1.17.0...weevr-v1.18.0) (2026-05-07)
+
+
+### Features
+
+* split into weevr-core and weevr workspace wheels ([#169](https://github.com/ardent-data/weevr/issues/169)) ([d2485e0](https://github.com/ardent-data/weevr/commit/d2485e03694170b0e7f5acfbb030d7ebc7ba8115))
+
 ## [1.17.0](https://github.com/ardent-data/weevr/compare/weevr-v1.16.4...weevr-v1.17.0) (2026-05-01)
 
 
