@@ -548,12 +548,15 @@ first, then explicit columns override.
 | `columns` | `dict[string, any]` | cond. | -- | Map of column name to fill value |
 | `mode` | `string` | cond. | -- | Set to `"type_defaults"` for schema-driven fills |
 | `code` | `string` | cond. | -- | Semantic code: `"unknown"`, `"not_applicable"`, or `"invalid"`. Required when `mode` is set. |
-| `include` | `list[string]` | no | all | Glob patterns restricting which columns are filled |
-| `exclude` | `list[string]` | no | none | Glob patterns excluding columns from fill |
-| `overrides` | `dict[string, any]` | no | -- | Per-column overrides for type-based defaults |
-| `where` | `string` | no | -- | Spark SQL predicate for conditional fill |
+| `include` | `list[string]` | no | all | Glob patterns restricting which columns are filled. Only valid when `mode` is set. |
+| `exclude` | `list[string]` | no | none | Glob patterns excluding columns from fill. Only valid when `mode` is set. |
+| `overrides` | `dict[string, any]` | no | -- | Per-column overrides for type-based defaults. Only valid when `mode` is set. |
+| `where` | `string` | no | -- | Spark SQL predicate for conditional fill. Only valid when `mode` is set. |
 
-At least one of `columns` or `mode` must be set.
+At least one of `columns` or `mode` must be set. The `code`, `include`,
+`exclude`, `overrides`, and `where` keys all require `mode` to be set;
+supplying any of them in the explicit-columns-only form raises a
+`ConfigSchemaError`.
 
 **Explicit columns:**
 
@@ -838,6 +841,12 @@ hydration. Not a step type itself — expanded by the config preprocessor.
 | `as` | `string` | yes | -- | Variable name bound to each item during expansion |
 | `steps` | `list[Step]` | yes | -- | Step template repeated for each value |
 
+The `foreach` preprocessor substitutes the bound variable into nested
+step bodies as bare `{name}` placeholders (no `$`). At expansion time
+each occurrence of `{<as>}` in a string is replaced with the current
+iteration value; the substituted strings are then passed to the normal
+step model.
+
 ```yaml
 steps:
   - foreach:
@@ -845,8 +854,8 @@ steps:
       as: col
       steps:
         - derive:
-            name: "${col}_rounded"
-            expr: "round(${col}, 2)"
+            columns:
+              "{col}_rounded": "round({col}, 2)"
 ```
 
 ---
@@ -937,7 +946,7 @@ for detailed examples.
 | `columns` | `ScdColumnConfig` | no | defaults | SCD column names: `valid_from` (`_valid_from`), `valid_to` (`_valid_to`), `is_current` (`_is_current`) |
 | `dates` | `ScdDateConfig` | no | defaults | SCD boundary dates: `min` (`1970-01-01`), `max` (`9999-12-31`) |
 | `seed_system_members` | `bool` | no | `false` | Insert Kimball sentinel rows on first write |
-| `system_members` | `list[SystemMember]` | no | defaults | Custom sentinel rows (sk, code, label). Defaults: -1/unknown, -2/not_applicable |
+| `system_members` | `list[SystemMember]` | no | defaults | Custom sentinel rows (`sk`, `code`, `label`). `sk` must be a negative integer. Defaults: -1/unknown, -2/not_applicable |
 | `label_column` | `string` | no | `null` | Column for system member labels |
 | `history_filter` | `bool` | no | `true` | Filter target reads to `is_current = true` |
 
@@ -1251,7 +1260,7 @@ Post-execution assertions evaluated against the target dataset after writing.
 | `expression` | `SparkExpr` | no | `null` | Spark SQL expression for `expression` assertions |
 | `column` | `string` | cond. | `null` | Single column for `fk_sentinel_rate` (mutually exclusive with `columns`) |
 | `sentinel` | `int` or `string` | cond. | `null` | Single sentinel value for `fk_sentinel_rate` (mutually exclusive with `sentinels`) |
-| `sentinels` | `dict` | cond. | `null` | Named sentinel groups for `fk_sentinel_rate` (dict-of-int or dict-of-dict) |
+| `sentinels` | `dict[string, SentinelGroup]` | cond. | `null` | Named sentinel groups for `fk_sentinel_rate`. Each value is either a raw integer sentinel, a system-member code string (e.g. `"invalid"`), or a `{value, max_rate}` dict. |
 | `max_rate` | `float` | no | `null` | Maximum sentinel rate threshold for `fk_sentinel_rate` |
 | `message` | `string` | no | `null` | Custom failure message for `fk_sentinel_rate` |
 

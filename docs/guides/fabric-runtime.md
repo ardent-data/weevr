@@ -47,14 +47,20 @@ your **Fabric Environment** via the workspace portal:
 
 ### Option 2 -- wheel upload
 
-If your workspace has restricted network access, download the `.whl` file
-from PyPI and upload it to a Lakehouse Files area:
+If your workspace has restricted network access, download both the
+`weevr` and `weevr-core` `.whl` files from PyPI and upload them to a
+Lakehouse Files area. Both wheels are required because `weevr` declares
+`weevr-core` as a same-version runtime dependency:
 
 ```python
-%pip install /lakehouse/default/Files/libs/weevr-0.7.4-py3-none-any.whl
+%pip install \
+    /lakehouse/default/Files/libs/weevr-1.18.0-py3-none-any.whl \
+    /lakehouse/default/Files/libs/weevr_core-1.18.0-py3-none-any.whl
 ```
 
-Replace the version number with the actual wheel filename.
+Replace the version numbers with the actual wheel filenames; both
+wheels publish to PyPI in lockstep at the same version on every
+release.
 
 ### Option 3 -- inline package in a Spark Job Definition
 

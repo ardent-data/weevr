@@ -64,9 +64,12 @@ must have type annotations.
 uv run pytest
 ```
 
-Tests live in `tests/weevr/` and mirror the `src/weevr/` structure.
-Tests marked with `@pytest.mark.spark` are excluded by default (they
-require PySpark and Delta Lake). Run them explicitly with:
+Tests live in `tests/weevr/` and mirror the source layout under
+`packages/weevr/src/weevr/` and `packages/weevr-core/src/weevr/` (both
+wheels share the `weevr` namespace package; tests stay flat under
+`tests/weevr/`). Tests marked with `@pytest.mark.spark` are excluded
+by default (they require PySpark and Delta Lake). Run them explicitly
+with:
 
 ```bash
 uv run pytest -m spark
@@ -285,24 +288,43 @@ All pull requests run the following checks in GitHub Actions:
 | Format              | `uv run ruff format --check .` |
 | Type check          | `uv run pyright .` |
 | Tests               | `uv run pytest` |
-| Docstring coverage  | `uv run interrogate` |
+| Docstring coverage  | `uv run interrogate packages/weevr-core/src/weevr/ packages/weevr/src/weevr/ --fail-under 90` |
 | DCO sign-off        | GitHub App check |
 
 All checks must pass before a PR can be merged.
 
 ## Project structure
 
+weevr ships as two PyPI distributions sharing the `weevr` namespace
+package, declared as a uv workspace at the repository root.
+
 ```text
-src/weevr/                -- Library source (src layout)
-tests/weevr/              -- Tests (mirrors src structure)
+packages/
+  weevr-core/             -- Pure-Python validation, planner, telemetry contracts
+    src/weevr/            -- Namespace contributions (no shared __init__.py)
+    pyproject.toml        -- name = "weevr-core"
+  weevr/                  -- Spark engine and runtime helpers
+    src/weevr/            -- Namespace contributions, owns weevr/__init__.py
+    pyproject.toml        -- name = "weevr"; depends on weevr-core
+tests/weevr/              -- Tests (flat; mirrors both packages' src layouts)
 docs/                     -- Documentation source (MkDocs)
 .github/                  -- Workflows, templates, CODEOWNERS
-mkdocs.yml               -- MkDocs configuration
-pyproject.toml            -- Project metadata and tool configs
+mkdocs.yml                -- MkDocs configuration
+pyproject.toml            -- Workspace declaration + per-tool config
 ```
 
-Test files mirror the source layout. If you add `src/weevr/config/macros.py`,
-the corresponding test file goes in `tests/weevr/config/test_macros.py`.
+The decision rule for new modules: a module belongs in `weevr-core`
+*only if its concern could sensibly exist outside an engine run*
+(schemas, config resolvers, the planner graph, telemetry contract
+types). Anything that orchestrates execution, touches Spark, talks to
+the Fabric runtime, or coordinates state lives in the engine wheel.
+
+Test files mirror the source layout. If you add
+`packages/weevr-core/src/weevr/config/macros.py`, the corresponding
+test file goes in `tests/weevr/config/test_macros.py`. See the
+[workspace layout section in `CONTRIBUTING.md`](https://github.com/ardent-data/weevr/blob/main/CONTRIBUTING.md#workspace-layout)
+for the full federated-namespace rules and the
+`install_smoke`-marked dual-install lock test.
 
 ## Getting help
 
