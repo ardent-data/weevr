@@ -1,6 +1,6 @@
 [project]
 name = "weevr-core"
-version = "1.17.0" # x-release-please-version
+version = "1.18.0" # x-release-please-version
 description = "Pure-Python validation, planner, and telemetry contracts for weevr."
 readme = "README.md"
 license = "Apache-2.0"
