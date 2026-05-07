@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = "==3.11.*"
 
+[manifest]
+members = [
+    "weevr",
+    "weevr-core",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -800,10 +806,11 @@ wheels = [
 [[package]]
 name = "weevr"
 version = "1.17.0"
-source = { editable = "." }
+source = { editable = "packages/weevr" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "weevr-core" },
 ]
 
 [package.dev-dependencies]
@@ -825,6 +832,7 @@ dev = [
 requires-dist = [
     { name = "pydantic", specifier = ">=2.0,<3.0" },
     { name = "pyyaml", specifier = ">=6.0,<7.0" },
+    { name = "weevr-core", editable = "packages/weevr-core" },
 ]
 
 [package.metadata.requires-dev]
@@ -840,6 +848,21 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "ruff", specifier = ">=0.15.0" },
+]
+
+[[package]]
+name = "weevr-core"
+version = "1.17.0"
+source = { editable = "packages/weevr-core" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.0,<3.0" },
+    { name = "pyyaml", specifier = ">=6.0,<7.0" },
 ]
 
 [[package]]

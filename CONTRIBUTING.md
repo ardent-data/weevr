@@ -2,6 +2,53 @@
 
 Thanks for contributing to **weevr**. This repository is intentionally scaffold-first and design-driven.
 
+## Workspace layout
+
+weevr ships as two PyPI distributions sharing the `weevr` namespace
+package. Source lives under `packages/`, declared as a uv workspace
+(`[tool.uv.workspace]` in the root `pyproject.toml`).
+
+| Wheel | Source path | Concern |
+|---|---|---|
+| `weevr-core` | `packages/weevr-core/src/weevr/` | Pure-Python validation, planner, and telemetry contracts. Installable without PySpark. |
+| `weevr` | `packages/weevr/src/weevr/` | Spark engine, runtime helpers, OneLake/Fabric integration. Depends on `weevr-core` at the same version. |
+
+**Where does a new module belong?** A module belongs in `weevr-core`
+*only if its concern could sensibly exist outside an engine run* —
+schemas, config resolvers, the planner graph, the telemetry contract
+types. Anything that orchestrates execution, touches Spark, talks to
+the Fabric runtime, or coordinates state lives in the engine wheel.
+The principle is stricter than "is it pure Python?" and looser than
+"does a named consumer import it today?": ask whether a well-reasoned
+future non-engine consumer (CLI, docs generator, run-summary renderer)
+would have a reason to care.
+
+Two sub-packages are *federated* across both wheels — submodule files
+co-locate at install time but ship from different wheels:
+
+* `weevr.engine` — engine ships `__init__.py` plus the Spark-bound
+  modules (executor, runner, cache, display, hooks, lookups, conditions,
+  column sets, resources, result, variables); core contributes
+  `planner.py` and `formatting.py`.
+* `weevr.telemetry` — engine ships `__init__.py` plus the runtime
+  helpers (`collector.py`, `logging.py`); core contributes the contract
+  types (`results.py`, `span.py`, `trace.py`, `events.py`).
+
+`weevr.config` is also federated, but the other way around: weevr-core
+ships `__init__.py` and every pure helper, while engine contributes the
+two Spark-bound submodules `fabric.py` and `paths.py`. **Each
+`__init__.py` is shipped by exactly one wheel** to avoid install-time
+file conflicts.
+
+In editable workspace installs each wheel's `src/` is a separate
+`sys.path` entry, so federated `__init__.py` files extend `__path__`
+to merge the other wheel's contributions back into the namespace.
+`tests/weevr/test_lazy_init_consistency.py` keeps the PEP 562 lazy
+modules' `_LAZY_ATTRS` map in sync with their `__all__`, and
+`tests/integration/test_dual_install_modes.py` (gated by the
+`install_smoke` marker) is the lock that exercises both
+`pip install weevr` and `pip install weevr-core` in isolated venvs.
+
 ## Development prerequisites
 
 * **Python**: 3.11.x (aligned with Microsoft Fabric Runtime 1.3)
@@ -55,8 +102,9 @@ uv run pytest
 
 ### JSON schema check
 
-If your changes touch any model files under `src/weevr/model/`,
-you must regenerate the JSON schema files before committing:
+If your changes touch any model files under
+`packages/weevr-core/src/weevr/model/`, you must regenerate the JSON
+schema files before committing:
 
 ```bash
 uv run python scripts/generate_schema.py
@@ -84,7 +132,7 @@ uv run mkdocs build --strict
 ### Docstring coverage
 
 ```bash
-uv run interrogate src/weevr/ --fail-under 90
+uv run interrogate packages/weevr-core/src/weevr/ packages/weevr/src/weevr/ --fail-under 90
 ```
 
 All checks run in CI use the same commands and are pinned to the same Python version.

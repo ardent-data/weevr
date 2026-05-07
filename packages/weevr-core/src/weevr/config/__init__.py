@@ -222,3 +222,44 @@ def load_config(
 
     # params config type returns a plain dict
     return resolved_with_refs
+
+
+# Federated namespace: weevr.config splits across two wheels — pure
+# parser/resolver/validation/inheritance modules in weevr-core (which
+# ships this __init__.py) and Spark-bound config helpers (fabric.py,
+# paths.py) contributed by the weevr engine wheel. In editable workspace
+# installs each wheel's src/ is a separate sys.path entry, so we extend
+# __path__ to pull engine-side contributions into the import-time view.
+# In a real install both wheels' files merge into a single
+# site-packages/weevr/config/ directory and the loop is a no-op. The
+# basename(p) == "src" gate scopes the scan to src-layout package roots.
+def _extend_namespace_path() -> None:
+    """Append sibling weevr.config/ directories on sys.path to ``__path__``."""
+    import os.path as osp
+    import sys
+
+    components = __name__.split(".")
+    src_entries_seen = 0
+    candidates_added = 0
+    for entry in sys.path:
+        if not entry or osp.basename(entry) != "src":
+            continue
+        src_entries_seen += 1
+        candidate = osp.join(entry, *components)
+        if osp.isdir(candidate) and candidate not in __path__:
+            __path__.append(candidate)
+            candidates_added += 1
+    if src_entries_seen > 0 and candidates_added == 0:
+        import warnings
+
+        warnings.warn(
+            f"weevr federated namespace {__name__!r}: no sibling "
+            "contributor found on sys.path. If this is an editable "
+            "workspace install, run `uv sync --dev` from the repo root "
+            "to install both wheels.",
+            stacklevel=2,
+        )
+
+
+_extend_namespace_path()
+del _extend_namespace_path

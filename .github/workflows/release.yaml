@@ -56,8 +56,16 @@ jobs:
           version: "0.9.28"
           enable-cache: true
 
-      - name: Build package
-        run: uv build
+      - name: Sync (locked)
+        run: uv sync --locked --dev
+
+      - name: Build packages (weevr + weevr-core)
+        run: uv build --all-packages
+
+      - name: Dual-install smoke test
+        env:
+          WEEVR_SMOKE_DIST: ./dist
+        run: uv run pytest -m install_smoke -v
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

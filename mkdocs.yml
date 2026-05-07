@@ -1,3 +1,6 @@
+hooks:
+  - scripts/mkdocs_merge_weevr.py
+
 site_name: weevr
 site_description: Configuration-driven execution framework for Spark in Microsoft Fabric
 site_url: https://ardent-data.github.io/weevr/
@@ -36,6 +39,12 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          # The mkdocs hook scripts/mkdocs_merge_weevr.py materializes
+          # a merged weevr/ source tree at .docs-merged/ at build time;
+          # mkdocstrings' griffe resolver cannot stitch the federated
+          # weevr / weevr-core split together on its own.
+          paths:
+            - .docs-merged
           options:
             docstring_style: google
             show_source: false

@@ -7,7 +7,8 @@ on:
     paths:
       - "docs/**"
       - "mkdocs.yml"
-      - "src/weevr/**"
+      - "packages/weevr-core/src/weevr/**"
+      - "packages/weevr/src/weevr/**"
       - "CONTRIBUTING.md"
 
 permissions:
