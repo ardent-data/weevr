@@ -2312,6 +2312,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1181-patch-2026-05-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.18.1 patch (2026-05-27)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#whats-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3008,6 +3019,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#1181-patch-2026-05-27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.18.1 patch (2026-05-27)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#whats-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3184,6 +3206,23 @@ example.</p>
   <code>ExecutionMode</code>, <code>LoadedConfig</code>) still resolve to the same
   underlying objects.</li>
 </ul>
+<h2 id="1181-patch-2026-05-27">1.18.1 patch (2026-05-27)<a class="headerlink" href="#1181-patch-2026-05-27" title="Permanent link">&para;</a></h2>
+<p>A defect surfaced in v1.18.0 affecting the new core-only install
+persona: <code>ReservedWordConfig(strategy="rename", ...)</code> raised
+<code>ImportError</code> when the engine wheel was absent. The
+<code>ReservedWordConfig</code> validator performed a function-local import
+through the engine-wheel back-compat shim
+<code>weevr.operations.reserved_words</code> instead of the canonical core
+module <code>weevr.reserved_words</code>. Both modules export the same
+<code>resolve_effective_words</code> symbol, so installs that had both wheels
+were unaffected — the failure mode was silent until a
+<code>weevr-core</code>-only caller exercised the rename strategy.</p>
+<p>v1.18.1 swaps the import to the canonical core path, restoring the
+core/engine layer-direction invariant that the workspace split was
+designed to enforce. A regression test lock now exercises the
+rename-strategy validator under an in-process <code>weevr.operations</code>
+import blocker so the violation cannot silently return. No API
+change; no behavior change for installs with both wheels.</p>
 <h2 id="whats-next">What's next<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
 <p>The new core-only persona is the foundation; consumer adoption is
 the follow-on work:</p>
