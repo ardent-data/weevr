@@ -331,7 +331,7 @@ class ReservedWordConfig(FrozenBase):
             raise ValueError("rename_map must be provided and non-empty when strategy is 'rename'")
         # Warn if rename_map values are themselves reserved words
         if self.rename_map and self.strategy == "rename":
-            from weevr.operations.reserved_words import resolve_effective_words
+            from weevr.reserved_words import resolve_effective_words
 
             effective = resolve_effective_words(self)
             reserved_values = [v for v in self.rename_map.values() if v.lower() in effective]
