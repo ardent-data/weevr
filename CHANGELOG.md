@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/ardent-data/weevr/compare/weevr-v1.18.0...weevr-v1.18.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **model:** support ReservedWordConfig rename in core-only installs ([#174](https://github.com/ardent-data/weevr/issues/174)) ([4e178b0](https://github.com/ardent-data/weevr/commit/4e178b0c526ad9e723d613e1222a42ae120f5315))
+
 ## [1.18.0](https://github.com/ardent-data/weevr/compare/weevr-v1.17.0...weevr-v1.18.0) (2026-05-07)
 
 
