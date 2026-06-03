@@ -29,10 +29,16 @@
         "source=${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | bash && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
+    // After install.sh, flip the in-process auto-updater on (the native
+    // installer ships with it disabled by default).
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
 
-    // Keep the venv current on every container start (not just first create).
-    "postStartCommand": "uv sync",
+    // Keep the venv current and the claude CLI fresh on every container start
+    // (in-process auto-updater handles between-session refreshes; this is the
+    // belt-and-suspenders check at start). The trailing find prunes any
+    // version binary that is not the current symlink target — each one is
+    // ~250 MB and the native installer never cleans them up.
+    "postStartCommand": "uv sync; claude update 2>/dev/null || true; TARGET=\"$(readlink -f /home/vscode/.local/bin/claude 2>/dev/null)\"; [ -n \"$TARGET\" ] && find /home/vscode/.local/share/claude/versions -maxdepth 1 -type f ! -path \"$TARGET\" -delete 2>/dev/null || true",
 
     "remoteEnv": {
         "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv",
