@@ -1,7 +1,21 @@
 {
     "name": "weevr",
 
-    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+
+    // Skip the login-shell env probe. Our login shell auto-attaches zellij, which
+    // blocks the probe until it times out (~10s) on every container start.
+    "userEnvProbe": "none",
+
+    // Rootless podman maps the host user to container root by default, so host
+    // bind mounts (the ~/.config/gh, ~/.claude, ~/.codex shares below) appear
+    // owned by an unmapped UID and vscode (UID 1000) can't write to them. keep-id
+    // maps the host UID straight through, so those dirs land owned by vscode.
+    "runArgs": [
+        "--userns=keep-id"
+    ],
 
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {},
@@ -25,13 +39,18 @@
         "source=${localEnv:USERPROFILE}/.config/gh,target=/home/vscode/.config/gh,type=bind,consistency=cached",
         // Claude Code: share host's ~/.claude (global auth/config, not project .claude/).
         "source=${localEnv:USERPROFILE}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+        // Overlay a container-local volume on the installer's staging dir. The
+        // native installer streams its ~250 MB binary into ~/.claude/downloads;
+        // writing that through the host bind mount fails under rootless podman
+        // (curl: (23) error on write). Keep the staging write on the VM's FS.
+        "source=weevr-claude-downloads,target=/home/vscode/.claude/downloads,type=volume",
         // Codex CLI: share host's ~/.codex so auth.json and config.toml persist across rebuilds.
         "source=${localEnv:USERPROFILE}/.codex,target=/home/vscode/.codex,type=bind,consistency=cached"
     ],
 
     // After install.sh, flip the in-process auto-updater on (the native
     // installer ships with it disabled by default).
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && sudo chown vscode:vscode /home/vscode/.claude/downloads && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
 
     // Keep the venv current and the claude CLI fresh on every container start
     // (in-process auto-updater handles between-session refreshes; this is the

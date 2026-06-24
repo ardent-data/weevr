@@ -221,3 +221,6 @@ __marimo__/
 # on every mkdocs build to give mkdocstrings a single canonical weevr
 # package; the federated weevr-core / weevr split confuses griffe).
 .docs-merged/
+
+# Local Spark/Delta smoke-test output (emulates the Fabric Lakehouse Files area)
+/Files/
