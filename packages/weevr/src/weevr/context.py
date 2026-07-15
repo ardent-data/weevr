@@ -90,7 +90,7 @@ class Context:
         project: str | Path,
         *,
         params: dict[str, Any] | None = None,
-        log_level: str = "standard",
+        log_level: str | None = None,
         workspace: str | None = None,
         lakehouse: str | None = None,
     ) -> None:
@@ -98,11 +98,20 @@ class Context:
         if not isinstance(spark, SparkSession):
             raise TypeError(f"'spark' must be a SparkSession, got {type(spark).__name__}")
 
-        try:
-            resolved_level = LogLevel(log_level)
-        except ValueError:
-            valid = ", ".join(f"'{v.value}'" for v in LogLevel)
-            raise ValueError(f"Invalid log_level '{log_level}'. Must be one of: {valid}") from None
+        # An explicit argument is a runtime override that beats YAML
+        # execution blocks. When omitted, STANDARD applies provisionally
+        # and the effective YAML level (if any) takes over at run()/load().
+        self._explicit_log_level = log_level is not None
+        if log_level is None:
+            resolved_level = LogLevel.STANDARD
+        else:
+            try:
+                resolved_level = LogLevel(log_level)
+            except ValueError:
+                valid = ", ".join(f"'{v.value}'" for v in LogLevel)
+                raise ValueError(
+                    f"Invalid log_level '{log_level}'. Must be one of: {valid}"
+                ) from None
 
         self._spark = spark
         self._params = params
@@ -211,6 +220,7 @@ class Context:
             A :class:`LoadedConfig` wrapping the hydrated model.
         """
         resolved = self._load_resolved(path)
+        self._apply_effective_log_level(resolved)
         return LoadedConfig(
             model=resolved.model,
             config_type=resolved.config_type,
@@ -218,6 +228,24 @@ class Context:
             threads=resolved.threads or None,
             weaves=resolved.weaves or None,
         )
+
+    def _apply_effective_log_level(self, resolved: _ResolvedConfig) -> None:
+        """Apply the effective YAML log level.
+
+        No-op when an explicit ``Context(log_level=...)`` argument is in
+        force. The source is the top-level ``execution:`` block on a Loom or
+        Weave config. Thread-scoped execution settings are not applied
+        (uniformly unapplied in v1.x).
+        """
+        if self._explicit_log_level:
+            return
+        block = None
+        if resolved.config_type in ("loom", "weave"):
+            block = getattr(resolved.model, "execution", None)
+        effective = resolve_effective_execution(None, block).log_level
+        if effective != self._log_level:
+            self._log_level = effective
+            configure_logging(effective)
 
     def run(
         self,
@@ -256,6 +284,10 @@ class Context:
 
         start_ns = time.monotonic_ns()
         resolved = self._load_resolved(path)
+
+        # Single application point for the effective YAML log level —
+        # before mode dispatch, so all four modes behave identically.
+        self._apply_effective_log_level(resolved)
 
         try:
             if resolved_mode is ExecutionMode.EXECUTE:
@@ -419,8 +451,16 @@ class Context:
                 warnings=all_warnings,
             )
 
+        # Baseline for per-weave log-level overrides; None suppresses YAML
+        # levels entirely (explicit Context argument in force).
+        baseline_level = None if self._explicit_log_level else self._log_level
         engine_result = execute_loom(
-            self._spark, model, filtered_weaves, filtered_threads, params=self._params
+            self._spark,
+            model,
+            filtered_weaves,
+            filtered_threads,
+            params=self._params,
+            log_level=baseline_level,
         )
         result = RunResult(
             status=engine_result.status,

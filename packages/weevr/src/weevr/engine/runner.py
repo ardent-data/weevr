@@ -24,7 +24,7 @@ from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
 from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
-from weevr.model.execution import ExecutionConfig, resolve_effective_execution
+from weevr.model.execution import ExecutionConfig, LogLevel, resolve_effective_execution
 from weevr.model.hooks import HookStep
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
@@ -32,6 +32,7 @@ from weevr.model.thread import Thread
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, Weave
 from weevr.telemetry.collector import SpanCollector
+from weevr.telemetry.logging import configure_logging
 from weevr.telemetry.results import (
     ColumnSetResult,
     LoomTelemetry,
@@ -559,6 +560,7 @@ def execute_loom(
     weaves: dict[str, Weave],
     threads: dict[str, dict[str, Thread]],
     params: dict[str, Any] | None = None,
+    log_level: LogLevel | None = None,
 ) -> LoomResult:
     """Execute weaves sequentially in declared order.
 
@@ -573,6 +575,11 @@ def execute_loom(
         weaves: Mapping of weave name to :class:`~weevr.model.weave.Weave` config.
         threads: Nested mapping of ``weave_name → thread_name → Thread`` config.
         params: Parameters for condition evaluation at weave and thread levels.
+        log_level: The run's baseline log level. When set, a weave whose
+            effective level differs is applied at that weave's start and
+            restored afterward (weaves execute sequentially, so this is
+            race-free). When None, YAML log levels are suppressed — the
+            caller gave an explicit runtime override.
 
     Returns:
         :class:`~weevr.engine.result.LoomResult` with aggregate status and
@@ -689,26 +696,37 @@ def execute_loom(
             # of the loom and weave top-level execution blocks.
             effective_execution = resolve_effective_execution(loom.execution, weave.execution)
 
-            result = execute_weave(
-                spark,
-                plan,
-                weave_threads,
-                collector=collector,
-                parent_span_id=loom_span_id,
-                thread_conditions=thread_conditions if thread_conditions else None,
-                params=params,
-                weave_span_label=weave.qualified_key or weave_name,
-                pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
-                post_steps=list(weave.post_steps) if weave.post_steps else None,
-                lookups=weave_lookups,
-                variables=merged_variables,
-                loom_name=loom.name,
-                weave_name=weave_name,
-                column_set_defs=merged_column_set_defs,
-                pre_cached_lookups=loom_cached_lookup_dfs or None,
-                connections=merged_connections or None,
-                execution=effective_execution,
-            )
+            # Per-weave log-level override, restored in the finally so the
+            # baseline survives weave failures. Suppressed entirely when the
+            # caller passed no baseline (explicit runtime override in force).
+            weave_level = effective_execution.log_level
+            override_level = log_level is not None and weave_level != log_level
+            if override_level:
+                configure_logging(weave_level)
+            try:
+                result = execute_weave(
+                    spark,
+                    plan,
+                    weave_threads,
+                    collector=collector,
+                    parent_span_id=loom_span_id,
+                    thread_conditions=thread_conditions if thread_conditions else None,
+                    params=params,
+                    weave_span_label=weave.qualified_key or weave_name,
+                    pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
+                    post_steps=list(weave.post_steps) if weave.post_steps else None,
+                    lookups=weave_lookups,
+                    variables=merged_variables,
+                    loom_name=loom.name,
+                    weave_name=weave_name,
+                    column_set_defs=merged_column_set_defs,
+                    pre_cached_lookups=loom_cached_lookup_dfs or None,
+                    connections=merged_connections or None,
+                    execution=effective_execution,
+                )
+            finally:
+                if override_level and log_level is not None:
+                    configure_logging(log_level)
             weave_results.append(result)
 
             if result.status == "failure":

@@ -842,3 +842,125 @@ threads:
         output = spark.read.format("delta").load(tgt)
         assert "new_col" in output.columns
         assert "old_col" not in output.columns
+
+
+# ---------------------------------------------------------------------------
+# Execution log-level wiring — argument > effective YAML > standard
+# ---------------------------------------------------------------------------
+
+
+class TestLogLevelWiring:
+    """YAML log_level application with Context-argument precedence."""
+
+    def _project(
+        self,
+        tmp_path: Path,
+        weave_execution: str = "",
+        loom_execution: str = "",
+        thread_execution: str = "",
+    ) -> Path:
+        project = tmp_path / "levels.weevr"
+        project.mkdir()
+        (project / "threads").mkdir()
+        (project / "threads" / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n" + thread_execution
+        )
+        (project / "stub.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n' + weave_execution
+        )
+        (project / "stub.loom").write_text(
+            'config_version: "1.0"\nweaves:\n  - ref: stub.weave\n' + loom_execution
+        )
+        return project
+
+    def _ctx(self, project: Path, **kwargs) -> Context:
+        mock_spark = MagicMock(spec=SparkSession)
+        return Context(spark=mock_spark, project=str(project), **kwargs)
+
+    @staticmethod
+    def _patch_modes(monkeypatch, ctx: Context, seen_levels: list) -> None:
+        """Stub all four mode handlers, recording the applied level on entry."""
+        from weevr.model.execution import LogLevel as LL
+
+        def _stub(*args, **kwargs):
+            seen_levels.append(ctx.log_level)
+            return RunResult(
+                status="success",
+                mode=ExecutionMode.EXECUTE,
+                config_type="weave",
+                config_name="stub",
+            )
+
+        assert isinstance(ctx.log_level, LL)
+        monkeypatch.setattr(ctx, "_run_execute", _stub)
+        monkeypatch.setattr(ctx, "_run_validate", _stub)
+        monkeypatch.setattr(ctx, "_run_plan", _stub)
+        monkeypatch.setattr(ctx, "_run_preview", _stub)
+
+    def test_omitted_argument_is_provisional_standard(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path)
+        ctx = self._ctx(project)
+        assert ctx.log_level.value == "standard"
+
+    def test_invalid_argument_still_raises(self) -> None:
+        mock_spark = MagicMock(spec=SparkSession)
+        with pytest.raises(ValueError, match="log_level"):
+            Context(spark=mock_spark, project="dummy", log_level="nope")
+
+    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    def test_yaml_applies_in_every_mode(self, tmp_path: Path, monkeypatch, mode: str) -> None:
+        """Effective YAML level is applied before mode dispatch, all modes."""
+        project = self._project(tmp_path, weave_execution="execution:\n  log_level: minimal\n")
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.weave", mode=mode)
+
+        assert [lv.value for lv in seen] == ["minimal"]
+        assert ctx.log_level.value == "minimal"
+
+    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    def test_argument_beats_yaml(self, tmp_path: Path, monkeypatch, mode: str) -> None:
+        project = self._project(tmp_path, weave_execution="execution:\n  log_level: minimal\n")
+        ctx = self._ctx(project, log_level="verbose")
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.weave", mode=mode)
+
+        assert [lv.value for lv in seen] == ["verbose"]
+        assert ctx.log_level.value == "verbose"
+
+    def test_default_when_neither(self, tmp_path: Path, monkeypatch) -> None:
+        project = self._project(tmp_path)
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.weave", mode="validate")
+
+        assert [lv.value for lv in seen] == ["standard"]
+
+    def test_loom_yaml_level_applies(self, tmp_path: Path, monkeypatch) -> None:
+        project = self._project(tmp_path, loom_execution="execution:\n  log_level: debug\n")
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.loom", mode="validate")
+
+        assert [lv.value for lv in seen] == ["debug"]
+
+    def test_thread_scoped_yaml_never_applies(self, tmp_path: Path, monkeypatch) -> None:
+        """Standalone thread runs: argument > standard only (DEC-003)."""
+        project = self._project(tmp_path, thread_execution="execution:\n  log_level: minimal\n")
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("threads/stub.thread", mode="validate")
+
+        assert [lv.value for lv in seen] == ["standard"]

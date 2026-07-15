@@ -582,6 +582,84 @@ class TestParallelismCap:
 
 
 # ---------------------------------------------------------------------------
+# Per-weave log-level apply/restore during loom runs
+# ---------------------------------------------------------------------------
+
+
+class TestLoomLogLevelOverride:
+    def _loom_fixtures(self, weave_execution: dict | None, thread_fails: bool = False):
+        loom = Loom.model_validate({"name": "nightly", "config_version": "1.0", "weaves": ["w1"]})
+        weave_data: dict[str, Any] = {
+            "config_version": "1.0",
+            "name": "w1",
+            "threads": ["A"],
+        }
+        if weave_execution is not None:
+            weave_data["execution"] = weave_execution
+        weaves = {"w1": Weave.model_validate(weave_data)}
+        threads = {"w1": {"A": _make_thread("A")}}
+        return loom, weaves, threads
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_level_applied_and_restored(self, mock_exec, mock_log):
+        """A weave whose effective level differs from the baseline is
+        applied at weave start and restored after."""
+        from weevr.model.execution import LogLevel
+
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures({"log_level": "debug"})
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads, log_level=LogLevel.STANDARD)
+
+        applied = [c.args[0] for c in mock_log.call_args_list]
+        assert applied == [LogLevel.DEBUG, LogLevel.STANDARD]
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_restored_when_weave_fails(self, mock_exec, mock_log):
+        """Restore runs on the failure path too (finally)."""
+        from weevr.model.execution import LogLevel
+
+        def _fail(spark, thread, **kwargs):
+            raise ExecutionError("boom", thread_name=thread.name)
+
+        mock_exec.side_effect = _fail
+        loom, weaves, threads = self._loom_fixtures({"log_level": "verbose"})
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads, log_level=LogLevel.STANDARD)
+
+        assert result.status == "failure"
+        applied = [c.args[0] for c in mock_log.call_args_list]
+        assert applied == [LogLevel.VERBOSE, LogLevel.STANDARD]
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_no_switch_when_levels_match(self, mock_exec, mock_log):
+        """No reconfiguration churn when the weave matches the baseline."""
+        from weevr.model.execution import LogLevel
+
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures(None)
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads, log_level=LogLevel.STANDARD)
+
+        assert mock_log.call_args_list == []
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_yaml_suppressed_when_baseline_absent(self, mock_exec, mock_log):
+        """log_level=None (explicit Context argument given) → YAML levels
+        never applied by the loom."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures({"log_level": "debug"})
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert mock_log.call_args_list == []
+
+
+# ---------------------------------------------------------------------------
 # Telemetry tests — weave and loom
 # ---------------------------------------------------------------------------
 
