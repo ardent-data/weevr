@@ -20,6 +20,7 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 
 from weevr.errors import ConfigSchemaError
+from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
 from weevr.model.warp import WarpConfig
 
@@ -376,8 +377,6 @@ def collect_trace_composition_warnings(
     Returns:
         Warning strings, one per weave with an ineffective ``trace: true``.
     """
-    from weevr.model.execution import resolve_effective_execution
-
     if resolve_effective_execution(None, loom_execution).trace:
         return []
 

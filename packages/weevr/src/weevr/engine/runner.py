@@ -457,6 +457,8 @@ def execute_weave(
                     "execution.max_parallel_threads", max_parallel_threads
                 )
             if group_thread_counts:
+                # Comma-joined string ("3,2") — span attributes only take
+                # scalars, so consumers must split before parsing.
                 weave_span_builder.set_attribute(
                     "execution.group_thread_counts",
                     ",".join(str(c) for c in group_thread_counts),
