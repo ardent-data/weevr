@@ -5937,7 +5937,9 @@ thread for rename step resolution.</p>
               <div class="doc-md-description">
                 <p>Already-materialized lookup DataFrames from a
 parent scope (e.g. loom level). Seeded into the weave's cached
-lookup dict so threads can reference them without re-materializing.</p>
+lookup dict so threads can reference them without re-materializing.
+The parent scope owns their lifecycle — weave cleanup never
+unpersists them.</p>
               </div>
             </td>
             <td>
