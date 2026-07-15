@@ -1950,6 +1950,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Sentinel Values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sentinel-advisory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sentinel Advisory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2871,6 +2888,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Sentinel Values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sentinel-advisory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sentinel Advisory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2945,7 +2979,8 @@ exist in the output DataFrame after transforms. Missing columns
 raise an execution error with a clear message.</p>
 <p>This catches configuration drift early — if a column is renamed
 or dropped upstream, the fact validation fails before any data
-is written.</p>
+is written. The existence check inspects only the schema, so it
+adds no compute cost to the run.</p>
 <h2 id="sentinel-values">Sentinel Values<a class="headerlink" href="#sentinel-values" title="Permanent link">&para;</a></h2>
 <p>Declare sentinel value conventions used by your FK columns:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">fact</span><span class="p">:</span>
@@ -2979,6 +3014,28 @@ is written.</p>
 <p>These values align with the sentinel defaults used by the
 <a href="../resolve/"><code>resolve</code> step</a>. The resolve step assigns these
 sentinel SKs when FK lookups fail or BKs are incomplete.</p>
+<h3 id="sentinel-advisory">Sentinel Advisory<a class="headerlink" href="#sentinel-advisory" title="Permanent link">&para;</a></h3>
+<p>After a successful write, the engine checks each FK column for
+the declared sentinel values and logs a warning for any column
+that contains none. A fact whose FKs never carry sentinels
+usually means the resolve step is not wired up for that column,
+or lookup failures are being silently dropped upstream.</p>
+<p>The advisory is:</p>
+<ul>
+<li><strong>Exact</strong> — every row is considered, not a sample. Columns
+  with many distinct values cannot produce false warnings.</li>
+<li><strong>Post-write</strong> — evaluated against the written Delta table,
+  where column statistics make the scan cheap. All FK columns
+  are checked in a single pass, so cost does not grow with the
+  number of foreign keys.</li>
+<li><strong>Advisory only</strong> — it never blocks or fails the run. Only
+  the pre-write existence check is enforcing.</li>
+</ul>
+<p>Because the check reads the written table, it sees the table's
+full contents: on <code>append</code> or <code>merge</code> targets, sentinels present
+in historical rows satisfy the check even if the current run
+added none. FK columns that are renamed or excluded by target
+column mapping are skipped.</p>
 <h2 id="relationship-to-dimension-targets">Relationship to Dimension Targets<a class="headerlink" href="#relationship-to-dimension-targets" title="Permanent link">&para;</a></h2>
 <p><code>dimension:</code> and <code>fact:</code> are mutually exclusive on a single
 target. A thread produces either a dimension or a fact table.</p>
