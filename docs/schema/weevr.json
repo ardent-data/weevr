@@ -1349,7 +1349,7 @@
         "type": "object"
       },
       "ExecutionConfig": {
-        "description": "Runtime execution settings that cascade through loom/weave/thread.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.",
+        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).",
         "properties": {
           "log_level": {
             "$ref": "#/$defs/LogLevel",
@@ -1361,6 +1361,20 @@
             "description": "Whether to collect execution spans for telemetry.",
             "title": "Trace",
             "type": "boolean"
+          },
+          "max_parallel_threads": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum threads executing concurrently within a weave's parallel group. Unset means unbounded.",
+            "title": "Max Parallel Threads"
           }
         },
         "title": "ExecutionConfig",
@@ -5309,7 +5323,7 @@
         "type": "object"
       },
       "ExecutionConfig": {
-        "description": "Runtime execution settings that cascade through loom/weave/thread.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.",
+        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).",
         "properties": {
           "log_level": {
             "$ref": "#/$defs/LogLevel",
@@ -5321,6 +5335,20 @@
             "description": "Whether to collect execution spans for telemetry.",
             "title": "Trace",
             "type": "boolean"
+          },
+          "max_parallel_threads": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum threads executing concurrently within a weave's parallel group. Unset means unbounded.",
+            "title": "Max Parallel Threads"
           }
         },
         "title": "ExecutionConfig",
@@ -6809,7 +6837,7 @@
         "type": "object"
       },
       "ExecutionConfig": {
-        "description": "Runtime execution settings that cascade through loom/weave/thread.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.",
+        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).",
         "properties": {
           "log_level": {
             "$ref": "#/$defs/LogLevel",
@@ -6821,6 +6849,20 @@
             "description": "Whether to collect execution spans for telemetry.",
             "title": "Trace",
             "type": "boolean"
+          },
+          "max_parallel_threads": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum threads executing concurrently within a weave's parallel group. Unset means unbounded.",
+            "title": "Max Parallel Threads"
           }
         },
         "title": "ExecutionConfig",
