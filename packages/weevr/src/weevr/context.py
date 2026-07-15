@@ -391,7 +391,13 @@ class Context:
             from weevr.telemetry.collector import SpanCollector
             from weevr.telemetry.span import generate_trace_id
 
-            weave_collector = SpanCollector(generate_trace_id())
+            # The weave's effective trace gates collector creation for
+            # standalone weave runs. (Standalone thread runs always trace —
+            # thread-scoped execution settings are unapplied in v1.x.)
+            standalone_execution = resolve_effective_execution(None, model.execution)
+            weave_collector = (
+                SpanCollector(generate_trace_id()) if standalone_execution.trace else None
+            )
 
             engine_result = execute_weave(
                 self._spark,
@@ -406,7 +412,7 @@ class Context:
                 variables=dict(model.variables) if model.variables else None,
                 column_set_defs=dict(model.column_sets) if model.column_sets else None,
                 connections=dict(model.connections) if model.connections else None,
-                execution=resolve_effective_execution(None, model.execution),
+                execution=standalone_execution,
             )
             if engine_result.status not in ("success", "failure", "partial"):
                 raise ExecutionError(f"Unexpected weave execution status: '{engine_result.status}'")

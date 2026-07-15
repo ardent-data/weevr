@@ -588,12 +588,20 @@ def execute_loom(
     start_ns = time.monotonic_ns()
     weave_results: list[WeaveResult] = []
 
-    # Create root collector and loom span
-    trace_id = generate_trace_id()
-    collector = SpanCollector(trace_id)
+    # Create root collector and loom span — unless the loom's effective
+    # trace is off, in which case the whole run executes collector-free
+    # and LoomResult.telemetry is None. A weave cannot re-enable tracing
+    # under a traceless loom (no root collector to attach to).
+    loom_trace = resolve_effective_execution(None, loom.execution).trace
     loom_span_label = loom.qualified_key or loom.name
-    loom_span_builder = collector.start_span(f"loom:{loom_span_label}")
-    loom_span_id = loom_span_builder.span_id
+    collector: SpanCollector | None = None
+    loom_span_builder = None
+    loom_span_id = None
+    if loom_trace:
+        trace_id = generate_trace_id()
+        collector = SpanCollector(trace_id)
+        loom_span_builder = collector.start_span(f"loom:{loom_span_label}")
+        loom_span_id = loom_span_builder.span_id
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
@@ -708,7 +716,9 @@ def execute_loom(
                     spark,
                     plan,
                     weave_threads,
-                    collector=collector,
+                    # A weave with effective trace: false runs collector-free;
+                    # its nodes are absent from the telemetry tree.
+                    collector=collector if effective_execution.trace else None,
                     parent_span_id=loom_span_id,
                     thread_conditions=thread_conditions if thread_conditions else None,
                     params=params,
@@ -754,16 +764,17 @@ def execute_loom(
         raise
     finally:
         cleanup_lookups(loom_cached_lookup_dfs)
-        if _loom_raised:
-            _loom_span_status = SpanStatus.ERROR
-        else:
-            _loom_statuses = {r.status for r in weave_results}
-            if _loom_statuses <= {"success", "skipped"}:
-                _loom_span_status = SpanStatus.OK
-            else:
+        if loom_span_builder is not None and collector is not None:
+            if _loom_raised:
                 _loom_span_status = SpanStatus.ERROR
-        loom_span = loom_span_builder.finish(status=_loom_span_status)
-        collector.add_span(loom_span)
+            else:
+                _loom_statuses = {r.status for r in weave_results}
+                if _loom_statuses <= {"success", "skipped"}:
+                    _loom_span_status = SpanStatus.OK
+                else:
+                    _loom_span_status = SpanStatus.ERROR
+            loom_span = loom_span_builder.finish(status=_loom_span_status)
+            collector.add_span(loom_span)
 
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
@@ -776,10 +787,12 @@ def execute_loom(
     else:
         loom_status = "failure"
 
-    # Build loom telemetry
-    loom_telemetry = _build_loom_telemetry(
-        loom_span_label, weave_results, collector, resolved_params=params
-    )
+    # Build loom telemetry (None for a traceless run)
+    loom_telemetry = None
+    if collector is not None:
+        loom_telemetry = _build_loom_telemetry(
+            loom_span_label, weave_results, collector, resolved_params=params
+        )
 
     logger.debug(
         "Loom '%s' complete — status=%s, duration=%dms",

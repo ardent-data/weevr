@@ -964,3 +964,89 @@ class TestLogLevelWiring:
         ctx.run("threads/stub.thread", mode="validate")
 
         assert [lv.value for lv in seen] == ["standard"]
+
+
+# ---------------------------------------------------------------------------
+# Trace gating — standalone weave and thread runs
+# ---------------------------------------------------------------------------
+
+
+class TestStandaloneTraceGating:
+    def _project(
+        self, tmp_path: Path, weave_execution: str = "", thread_execution: str = ""
+    ) -> Path:
+        project = tmp_path / "tracing.weevr"
+        project.mkdir()
+        (project / "threads").mkdir()
+        (project / "threads" / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n" + thread_execution
+        )
+        (project / "stub.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n' + weave_execution
+        )
+        return project
+
+    def _weave_result(self):
+        from weevr.engine.result import WeaveResult
+
+        return WeaveResult(
+            status="success",
+            weave_name="stub",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=1,
+        )
+
+    def _thread_result(self):
+        from weevr.engine.result import ThreadResult
+
+        return ThreadResult(
+            status="success",
+            thread_name="stub",
+            rows_written=0,
+            write_mode="overwrite",
+            target_path="/data/out",
+        )
+
+    @patch("weevr.context.execute_weave")
+    def test_standalone_weave_trace_false_creates_no_collector(
+        self, mock_weave, tmp_path: Path
+    ) -> None:
+        project = self._project(tmp_path, weave_execution="execution:\n  trace: false\n")
+        mock_weave.return_value = self._weave_result()
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        result = ctx.run("stub.weave")
+
+        assert result.status == "success"
+        assert result.telemetry is None
+        assert mock_weave.call_args.kwargs["collector"] is None
+
+    @patch("weevr.context.execute_weave")
+    def test_standalone_weave_traces_by_default(self, mock_weave, tmp_path: Path) -> None:
+        project = self._project(tmp_path)
+        mock_weave.return_value = self._weave_result()
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        result = ctx.run("stub.weave")
+
+        assert result.status == "success"
+        assert mock_weave.call_args.kwargs["collector"] is not None
+
+    @patch("weevr.context.execute_thread")
+    def test_standalone_thread_always_traces(self, mock_thread, tmp_path: Path) -> None:
+        """Thread-scoped execution is unapplied — even trace: false in the
+        thread's own block never suppresses the collector (DEC-003)."""
+        project = self._project(tmp_path, thread_execution="execution:\n  trace: false\n")
+        mock_thread.return_value = self._thread_result()
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        result = ctx.run("threads/stub.thread")
+
+        assert result.status == "success"
+        assert mock_thread.call_args.kwargs["collector"] is not None

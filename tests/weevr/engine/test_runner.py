@@ -660,6 +660,95 @@ class TestLoomLogLevelOverride:
 
 
 # ---------------------------------------------------------------------------
+# Trace gating
+# ---------------------------------------------------------------------------
+
+
+class TestTraceGating:
+    def _loom_fixtures(
+        self,
+        loom_execution: dict | None = None,
+        weave_execution: dict | None = None,
+    ):
+        loom_data: dict[str, Any] = {
+            "name": "nightly",
+            "config_version": "1.0",
+            "weaves": ["w1"],
+        }
+        if loom_execution is not None:
+            loom_data["execution"] = loom_execution
+        loom = Loom.model_validate(loom_data)
+        weave_data: dict[str, Any] = {
+            "config_version": "1.0",
+            "name": "w1",
+            "threads": ["A"],
+        }
+        if weave_execution is not None:
+            weave_data["execution"] = weave_execution
+        weaves = {"w1": Weave.model_validate(weave_data)}
+        threads = {"w1": {"A": _make_thread("A")}}
+        return loom, weaves, threads
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_trace_false_yields_no_telemetry(self, mock_exec):
+        """Effective trace: false at loom scope → no collector, telemetry None."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures(loom_execution={"trace": False})
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert len(result.weave_results) == 1
+        assert result.weave_results[0].status == "success"
+        assert result.telemetry is None
+        assert result.weave_results[0].telemetry is None
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_trace_default_keeps_telemetry(self, mock_exec):
+        """Default (trace unset) → telemetry populated as today."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures()
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.telemetry is not None
+        assert result.weave_results[0].telemetry is not None
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_trace_false_under_tracing_loom(self, mock_exec):
+        """Weave-level trace: false narrows: that weave's nodes are absent
+        while loom telemetry remains."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures(weave_execution={"trace": False})
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.weave_results[0].telemetry is None
+        assert "w1" not in result.telemetry.weave_telemetry
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_trace_false_still_runs_hooks(self, mock_exec):
+        """A traceless loom still executes pre/post hook steps."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom = Loom.model_validate(
+            {
+                "name": "nightly",
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "execution": {"trace": False},
+                "pre_steps": [{"type": "log_message", "message": "starting"}],
+            }
+        )
+        _, weaves, threads = self._loom_fixtures()
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+
+
+# ---------------------------------------------------------------------------
 # Telemetry tests — weave and loom
 # ---------------------------------------------------------------------------
 
