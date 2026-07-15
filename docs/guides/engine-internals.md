@@ -219,7 +219,9 @@ write -> finalize
 10. Resolve the target write path
 11. Apply target column mapping
 12. Inject audit columns (bypasses mapping mode; applied for all write modes)
-13. Write to the Delta target (standard write or CDC merge routing)
+13. Write to the Delta target (standard write or CDC merge routing).
+    For fact targets, the sentinel advisory then runs against the
+    written table in a single pass (warnings only — never blocking)
 14. Persist watermark or CDC state
 15. Run post-write assertions
 16. Write exports (secondary outputs, if configured)

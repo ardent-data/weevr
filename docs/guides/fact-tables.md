@@ -24,7 +24,8 @@ raise an execution error with a clear message.
 
 This catches configuration drift early — if a column is renamed
 or dropped upstream, the fact validation fails before any data
-is written.
+is written. The existence check inspects only the schema, so it
+adds no compute cost to the run.
 
 ## Sentinel Values
 
@@ -48,6 +49,31 @@ Defaults:
 These values align with the sentinel defaults used by the
 [`resolve` step](resolve.md). The resolve step assigns these
 sentinel SKs when FK lookups fail or BKs are incomplete.
+
+### Sentinel Advisory
+
+After a successful write, the engine checks each FK column for
+the declared sentinel values and logs a warning for any column
+that contains none. A fact whose FKs never carry sentinels
+usually means the resolve step is not wired up for that column,
+or lookup failures are being silently dropped upstream.
+
+The advisory is:
+
+- **Exact** — every row is considered, not a sample. Columns
+  with many distinct values cannot produce false warnings.
+- **Post-write** — evaluated against the written Delta table,
+  where column statistics make the scan cheap. All FK columns
+  are checked in a single pass, so cost does not grow with the
+  number of foreign keys.
+- **Advisory only** — it never blocks or fails the run. Only
+  the pre-write existence check is enforcing.
+
+Because the check reads the written table, it sees the table's
+full contents: on `append` or `merge` targets, sentinels present
+in historical rows satisfy the check even if the current run
+added none. FK columns that are renamed or excluded by target
+column mapping are skipped.
 
 ## Relationship to Dimension Targets
 
