@@ -160,11 +160,12 @@ def execute_weave(
 
     # Initialize hook lifecycle components
     variable_ctx = VariableContext(variables)
-    # Loom-seeded caches are owned by the parent scope: the weave may consume
-    # them but must not unpersist them. Ownership is tracked by object identity
-    # so a weave lookup that shadows a loom lookup by name is still released.
-    loom_seeded: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
-    cached_lookup_dfs: dict[str, Any] = dict(loom_seeded)
+    # Pre-cached lookups are owned by the parent scope (e.g. the loom): the
+    # weave may consume them but must not unpersist them. Ownership is tracked
+    # by object identity so a weave lookup that shadows a parent lookup by
+    # name is still released.
+    parent_seeded: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
+    cached_lookup_dfs: dict[str, Any] = dict(parent_seeded)
     all_hook_results: list[HookResult] = []
     all_lookup_results: list[LookupResult] = []
 
@@ -424,7 +425,14 @@ def execute_weave(
         raise
     finally:
         cache.cleanup()
-        cleanup_lookups({k: v for k, v in cached_lookup_dfs.items() if loom_seeded.get(k) is not v})
+        weave_owned = {k: v for k, v in cached_lookup_dfs.items() if parent_seeded.get(k) is not v}
+        if len(weave_owned) != len(cached_lookup_dfs):
+            logger.debug(
+                "Weave '%s' — %d parent-owned lookup(s) excluded from cleanup",
+                plan.weave_name,
+                len(cached_lookup_dfs) - len(weave_owned),
+            )
+        cleanup_lookups(weave_owned)
         if weave_span_builder is not None and collector is not None:
             if _weave_raised:
                 _span_status = SpanStatus.ERROR

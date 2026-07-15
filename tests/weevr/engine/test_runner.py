@@ -1324,6 +1324,49 @@ class TestLoomSeededLookupOwnership:
         cleaned = mock_cleanup.call_args[0][0]
         assert cleaned == {"weave_ref": weave_df}
 
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    def test_seeded_lookups_survive_weave_exception(self, mock_cleanup, mock_exec):
+        """Seeded entries stay excluded from cleanup when the weave raises.
+
+        The exclusion filter lives in the finally block, so it must hold on
+        the exception path (e.g. a pre-hook failure), not just on success.
+        """
+        from weevr.errors.exceptions import HookError
+        from weevr.model.hooks import QualityGateStep
+
+        loom_df = MagicMock()
+        pre = [
+            QualityGateStep(
+                type="quality_gate",
+                check="table_exists",
+                source="db.missing",
+            )
+        ]
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        import contextlib
+
+        with (
+            patch(
+                "weevr.engine.runner.run_hook_steps",
+                side_effect=HookError("gate failed"),
+            ),
+            contextlib.suppress(HookError),
+        ):
+            execute_weave(
+                _MOCK_SPARK,
+                plan,
+                threads,
+                pre_steps=pre,
+                pre_cached_lookups={"loom_ref": loom_df},
+            )
+
+        mock_exec.assert_not_called()
+        mock_cleanup.assert_called_once_with({})
+        loom_df.unpersist.assert_not_called()
+
 
 class TestWeaveVariableIntegration:
     """Test variable context in execute_weave."""
