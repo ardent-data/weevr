@@ -128,6 +128,8 @@ def execute_weave(
         pre_cached_lookups: Already-materialized lookup DataFrames from a
             parent scope (e.g. loom level). Seeded into the weave's cached
             lookup dict so threads can reference them without re-materializing.
+            The parent scope owns their lifecycle — weave cleanup never
+            unpersists them.
         connections: Merged loom + weave connections forwarded to
             ``materialize_column_sets`` so connection-backed column sets can
             resolve their lakehouse target.
@@ -158,7 +160,11 @@ def execute_weave(
 
     # Initialize hook lifecycle components
     variable_ctx = VariableContext(variables)
-    cached_lookup_dfs: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
+    # Loom-seeded caches are owned by the parent scope: the weave may consume
+    # them but must not unpersist them. Ownership is tracked by object identity
+    # so a weave lookup that shadows a loom lookup by name is still released.
+    loom_seeded: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
+    cached_lookup_dfs: dict[str, Any] = dict(loom_seeded)
     all_hook_results: list[HookResult] = []
     all_lookup_results: list[LookupResult] = []
 
@@ -203,13 +209,14 @@ def execute_weave(
             # Materialize only lookups scheduled at group 0 (external / pre-thread)
             _materialize_scheduled(0)
         elif lookups:
-            cached_lookup_dfs, all_lookup_results = materialize_lookups(
+            new_cached, all_lookup_results = materialize_lookups(
                 spark,
                 lookups,
                 collector=collector,
                 parent_span_id=weave_span_id,
                 connections=connections,
             )
+            cached_lookup_dfs.update(new_cached)
 
         # Materialize column sets — resolve all defs into name→mapping dicts
         resolved_column_sets: dict[str, dict[str, str]] | None = None
@@ -417,7 +424,7 @@ def execute_weave(
         raise
     finally:
         cache.cleanup()
-        cleanup_lookups(cached_lookup_dfs)
+        cleanup_lookups({k: v for k, v in cached_lookup_dfs.items() if loom_seeded.get(k) is not v})
         if weave_span_builder is not None and collector is not None:
             if _weave_raised:
                 _span_status = SpanStatus.ERROR
