@@ -59,7 +59,12 @@ def enforce_warp(
     engine_set = set(engine_columns or [])
     warp_only_set = set(warp_only_columns or [])
     df_fields = {field.name: field for field in df.schema.fields}
-    findings: list[dict[str, str]] = []
+
+    # Findings are buffered per column so the batched nullable probe can
+    # slot its results back in declaration order, interleaved with the
+    # schema-side findings exactly as the per-column loop would emit them.
+    column_slots: list[list[dict[str, str]]] = []
+    null_check_slots: list[tuple[str, list[dict[str, str]]]] = []
 
     for col in warp.columns:
         # Skip engine-managed columns
@@ -70,8 +75,11 @@ def enforce_warp(
         if col.name in warp_only_set:
             continue
 
+        slot: list[dict[str, str]] = []
+        column_slots.append(slot)
+
         if col.name not in df_fields:
-            findings.append(
+            slot.append(
                 {
                     "type": "missing_column",
                     "column": col.name,
@@ -87,7 +95,7 @@ def enforce_warp(
         expected_type = col.type.lower()
         actual_type = df_field.dataType.simpleString().lower()
         if expected_type != actual_type:
-            findings.append(
+            slot.append(
                 {
                     "type": "type_mismatch",
                     "column": col.name,
@@ -96,18 +104,31 @@ def enforce_warp(
                 }
             )
 
-        # Nullable check: if warp says non-nullable, verify no nulls
+        # Nullable check candidates: probed together below, one action
         if not col.nullable:
-            null_count = df.where(F.col(col.name).isNull()).limit(1).count()
-            if null_count > 0:
-                findings.append(
+            null_check_slots.append((col.name, slot))
+
+    # Single aggregation pass for all non-nullable columns. max(isNull)
+    # yields True when any null exists, False when none do, and NULL on
+    # an empty DataFrame — only True is a violation.
+    if null_check_slots:
+        exprs = [
+            F.max(F.col(name).isNull()).alias(name)
+            for name in dict.fromkeys(name for name, _ in null_check_slots)
+        ]
+        null_row = df.agg(*exprs).collect()[0]
+        for name, slot in null_check_slots:
+            if null_row[name]:
+                slot.append(
                     {
                         "type": "nullable_violation",
-                        "column": col.name,
+                        "column": name,
                         "expected": "non-nullable",
                         "actual": "contains nulls",
                     }
                 )
+
+    findings: list[dict[str, str]] = [f for slot in column_slots for f in slot]
 
     if findings and mode == "enforce":
         summary = ", ".join(f"{f['column']} ({f['type']})" for f in findings[:3])

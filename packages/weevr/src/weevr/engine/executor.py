@@ -11,6 +11,7 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.delta import read_delta
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.hooks import run_hook_steps
 from weevr.engine.lookups import cleanup_lookups, materialize_lookups, resolve_thread_lookups
@@ -36,7 +37,7 @@ from weevr.operations.audit import AuditContext, build_sources_json, inject_audi
 from weevr.operations.dimension import DimensionMergeBuilder, execute_dimension_merge
 from weevr.operations.drift import handle_drift
 from weevr.operations.exports import resolve_exports, write_export
-from weevr.operations.fact import validate_fact_target
+from weevr.operations.fact import check_fact_sentinels, validate_fact_schema
 from weevr.operations.hashing import compute_dimension_keys, compute_keys
 from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import run_pipeline
@@ -489,13 +490,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     thread, weave_name, loom_name, run_timestamp, run_id
                 )
 
-            # Step 10b — validate fact target (if fact mode)
+            # Step 10b — validate fact target schema (if fact mode).
+            # Schema-only, no Spark actions; the sentinel advisory runs
+            # post-write against the written table (step 13b).
             if fact_config is not None:
-                fact_diags = validate_fact_target(df, fact_config)
-                for diag in fact_diags:
-                    if diag.startswith("ERROR:"):
-                        raise ExecutionError(diag)
-                    logger.warning(diag)
+                fact_diags = validate_fact_schema(df, fact_config)
+                if fact_diags:
+                    raise ExecutionError(fact_diags[0])
 
             # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
@@ -591,6 +592,22 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 with contextlib.suppress(Exception):
                     output_sample = df.limit(10).toPandas().to_dict("records")
                 rows_written = write_target(spark, df, thread.target, thread.write, target_path)
+
+            # Step 13b — post-write fact sentinel advisory. Runs against
+            # the written table, where columnar stats make per-column
+            # scans cheap. Advisory only: failures never block the run.
+            if fact_config is not None and target_path:
+                try:
+                    written_df = read_delta(spark, target_path)
+                    # Return value intentionally unused: the check logs its
+                    # own WARNs, and advisory diagnostics are not stored.
+                    check_fact_sentinels(written_df, fact_config)
+                except Exception:
+                    logger.debug(
+                        "Post-write fact sentinel advisory failed for thread '%s'",
+                        thread.name,
+                        exc_info=True,
+                    )
 
             # Auto-generate warp after successful write (all paths)
             if thread.target.warp_mode == "auto":

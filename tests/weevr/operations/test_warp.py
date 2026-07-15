@@ -150,6 +150,106 @@ class TestEnforceWarp:
         with pytest.raises(WarpEnforcementError):
             enforce_warp(df, warp, "enforce")
 
+    def test_nullable_probe_single_action(
+        self, spark: SparkSession, spark_action_counter: dict[str, int]
+    ):
+        """Multiple non-nullable columns are probed in one Spark action."""
+        df = spark.createDataFrame(
+            [(1, 10, None), (2, None, None)],
+            schema=T.StructType(
+                [
+                    T.StructField("id", T.LongType(), True),
+                    T.StructField("name", T.LongType(), True),
+                    T.StructField("code", T.LongType(), True),
+                ]
+            ),
+        )
+        warp = self._make_warp(
+            [
+                {"name": "id", "type": "bigint", "nullable": False},
+                {"name": "name", "type": "bigint", "nullable": False},
+                {"name": "code", "type": "bigint", "nullable": False},
+            ]
+        )
+        findings = enforce_warp(df, warp, "warn")
+        violations = {f["column"] for f in findings if f["type"] == "nullable_violation"}
+        assert violations == {"name", "code"}
+        assert spark_action_counter["total"] == 1
+
+    def test_no_non_nullable_columns_zero_actions(
+        self, spark: SparkSession, spark_action_counter: dict[str, int]
+    ):
+        """Nullable-only warps trigger no Spark actions at all."""
+        df = spark.createDataFrame(
+            [(1, "a")],
+            schema=T.StructType(
+                [
+                    T.StructField("id", T.LongType(), True),
+                    T.StructField("name", T.StringType(), True),
+                ]
+            ),
+        )
+        warp = self._make_warp(
+            [
+                {"name": "id", "type": "bigint"},
+                {"name": "name", "type": "string"},
+            ]
+        )
+        findings = enforce_warp(df, warp, "enforce")
+        assert findings == []
+        assert spark_action_counter["total"] == 0
+
+    def test_missing_non_nullable_column_zero_actions(
+        self, spark: SparkSession, spark_action_counter: dict[str, int]
+    ):
+        """A missing non-nullable column is reported schema-side, no probe."""
+        df = spark.createDataFrame([(1,)], ["id"])
+        warp = self._make_warp(
+            [
+                {"name": "id", "type": "bigint"},
+                {"name": "gone", "type": "bigint", "nullable": False},
+            ]
+        )
+        findings = enforce_warp(df, warp, "warn")
+        assert [f["type"] for f in findings] == ["missing_column"]
+        assert spark_action_counter["total"] == 0
+
+    def test_empty_dataframe_no_nullable_violation(self, spark: SparkSession):
+        """An empty DataFrame has no nulls to violate non-nullable columns."""
+        df = spark.createDataFrame(
+            [],
+            schema=T.StructType([T.StructField("id", T.LongType(), True)]),
+        )
+        warp = self._make_warp([{"name": "id", "type": "bigint", "nullable": False}])
+        findings = enforce_warp(df, warp, "enforce")
+        assert findings == []
+
+    def test_finding_order_interleaved_per_column(self, spark: SparkSession):
+        """Findings keep per-column order: each column's schema finding
+        precedes its nullable finding, in warp declaration order."""
+        df = spark.createDataFrame(
+            [(None, None)],
+            schema=T.StructType(
+                [
+                    T.StructField("a", T.StringType(), True),
+                    T.StructField("b", T.StringType(), True),
+                ]
+            ),
+        )
+        warp = self._make_warp(
+            [
+                {"name": "a", "type": "bigint", "nullable": False},
+                {"name": "b", "type": "bigint", "nullable": False},
+            ]
+        )
+        findings = enforce_warp(df, warp, "warn")
+        assert [(f["column"], f["type"]) for f in findings] == [
+            ("a", "type_mismatch"),
+            ("a", "nullable_violation"),
+            ("b", "type_mismatch"),
+            ("b", "nullable_violation"),
+        ]
+
 
 # ---------------------------------------------------------------------------
 # append_warp_only_columns (Task 12)
