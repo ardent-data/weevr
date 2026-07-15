@@ -1050,3 +1050,88 @@ class TestStandaloneTraceGating:
 
         assert result.status == "success"
         assert mock_thread.call_args.kwargs["collector"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Execution-scope warnings at config resolution
+# ---------------------------------------------------------------------------
+
+
+class TestExecutionScopeWarnings:
+    def _project(
+        self,
+        tmp_path: Path,
+        loom_extra: str = "",
+        weave_extra: str = "",
+        thread_extra: str = "",
+    ) -> Path:
+        project = tmp_path / "warnings.weevr"
+        project.mkdir()
+        (project / "threads").mkdir()
+        (project / "threads" / "stub.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n" + thread_extra
+        )
+        (project / "stub.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n' + weave_extra
+        )
+        (project / "stub.loom").write_text(
+            'config_version: "1.0"\nweaves:\n  - ref: stub.weave\n' + loom_extra
+        )
+        return project
+
+    def _run_validate(self, project: Path, path: str, caplog) -> list[str]:
+        import logging
+
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+        with caplog.at_level(logging.WARNING, logger="weevr.context"):
+            ctx.run(path, mode="validate")
+        return [r.message for r in caplog.records if r.message.startswith("WARN:")]
+
+    def test_defaults_execution_warns_once(self, tmp_path: Path, caplog) -> None:
+        project = self._project(
+            tmp_path, loom_extra="defaults:\n  execution:\n    log_level: debug\n"
+        )
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        scoped = [w for w in warnings if "defaults.execution" in w]
+        assert len(scoped) == 1
+        assert "log_level" in scoped[0]
+
+    def test_authored_thread_block_warns(self, tmp_path: Path, caplog) -> None:
+        project = self._project(tmp_path, thread_extra="execution:\n  log_level: minimal\n")
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        assert any("stub" in w and "execution block" in w for w in warnings)
+
+    def test_trace_true_under_traceless_loom_warns(self, tmp_path: Path, caplog) -> None:
+        project = self._project(
+            tmp_path,
+            loom_extra="execution:\n  trace: false\n",
+            weave_extra="execution:\n  trace: true\n",
+        )
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        assert any("trace: true" in w and "stub" in w for w in warnings)
+
+    def test_clean_project_warns_nothing(self, tmp_path: Path, caplog) -> None:
+        project = self._project(tmp_path)
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        assert warnings == []
+
+    def test_execute_mode_also_warns(self, tmp_path: Path, caplog) -> None:
+        import logging
+
+        project = self._project(tmp_path, loom_extra="defaults:\n  execution:\n    trace: false\n")
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+        with (
+            patch("weevr.context.execute_loom") as mock_loom,
+            caplog.at_level(logging.WARNING, logger="weevr.context"),
+        ):
+            from weevr.engine.result import LoomResult
+
+            mock_loom.return_value = LoomResult(
+                status="success", loom_name="stub", weave_results=[], duration_ms=1
+            )
+            ctx.run("stub.loom", mode="execute")
+        assert any("defaults.execution" in r.message for r in caplog.records)

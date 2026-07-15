@@ -28,7 +28,11 @@ from weevr.config.resolver import (
     resolve_variables,
     validate_params,
 )
-from weevr.config.validation import validate_schema
+from weevr.config.validation import (
+    collect_execution_scope_warnings,
+    collect_trace_composition_warnings,
+    validate_schema,
+)
 from weevr.delta import is_table_alias
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
@@ -877,7 +881,12 @@ class Context:
         # Step 7: Resolve child references
         resolved_with_refs = resolve_references(resolved, config_type, project_root, self._params)
 
-        # Step 8: Apply inheritance cascade
+        # Step 8: Apply inheritance cascade. Execution-scope warnings are
+        # collected first, against the PRE-cascade thread dicts — after the
+        # cascade an authored execution block is indistinguishable from one
+        # injected by defaults.execution.
+        execution_warnings = self._collect_execution_warnings(config_type, resolved_with_refs)
+
         if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
             loom_defaults = resolved_with_refs.get("defaults")
             loom_audit_templates = resolved_with_refs.get("audit_templates")
@@ -981,6 +990,19 @@ class Context:
                 )
                 threads[weave_name] = thread_map
 
+        # Trace composition needs hydrated models (model_fields_set): a
+        # weave's explicit trace: true under a traceless loom is a no-op.
+        if config_type == "loom" and isinstance(model, Loom):
+            execution_warnings.extend(
+                collect_trace_composition_warnings(
+                    model.execution,
+                    {name: w.execution for name, w in weaves.items()},
+                )
+            )
+
+        for warning in execution_warnings:
+            logger.warning(warning)
+
         return _ResolvedConfig(
             config_type=config_type,
             config_name=config_name,
@@ -988,6 +1010,28 @@ class Context:
             weaves=weaves,
             threads=threads,
         )
+
+    @staticmethod
+    def _collect_execution_warnings(config_type: str, resolved: dict[str, Any]) -> list[str]:
+        """Gather thread-scope execution warnings from pre-cascade dicts."""
+        defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
+        pre_cascade_threads: list[dict[str, Any]] = []
+
+        if config_type == "loom":
+            loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
+            defaults_by_scope.append((loom_label, resolved.get("defaults")))
+            for i, weave in enumerate(resolved.get("_resolved_weaves", [])):
+                weave_label = f"weave '{weave.get('name') or f'#{i}'}'"
+                defaults_by_scope.append((weave_label, weave.get("defaults")))
+                pre_cascade_threads.extend(weave.get("_resolved_threads", []))
+        elif config_type == "weave":
+            weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
+            defaults_by_scope.append((weave_label, resolved.get("defaults")))
+            pre_cascade_threads.extend(resolved.get("_resolved_threads", []))
+        else:  # standalone thread
+            pre_cascade_threads.append(resolved)
+
+        return collect_execution_scope_warnings(defaults_by_scope, pre_cascade_threads)
 
     @staticmethod
     def _hydrate_model(
