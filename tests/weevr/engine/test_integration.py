@@ -2,6 +2,7 @@
 
 import csv
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from spark_helpers import create_delta_table
 from weevr.config import load_config
 from weevr.engine import ThreadResult, execute_thread
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.fact import FactConfig
 from weevr.model.keys import KeyConfig
 from weevr.model.pipeline import (
     DedupParams,
@@ -574,6 +576,105 @@ class TestWriteModes:
         written = spark.read.format("delta").load(tgt)
         assert written.count() == 1
         assert written.collect()[0]["id"] == 1
+
+
+class TestFactValidation:
+    """Fact validation: blocking existence pre-write, sentinel advisory post-write."""
+
+    def _fact_thread(
+        self,
+        name: str,
+        src: str,
+        tgt: str,
+        foreign_keys: list[str],
+        *,
+        write: WriteConfig | None = None,
+        target: Target | None = None,
+    ) -> Thread:
+        return _thread(
+            name,
+            src,
+            tgt,
+            target=target or Target(path=tgt, fact=FactConfig(foreign_keys=foreign_keys)),
+            write=write,
+        )
+
+    def test_missing_fk_column_aborts_before_write(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A missing FK column raises ExecutionError and nothing is written."""
+        src = tmp_delta_path("fact_err_src")
+        tgt = tmp_delta_path("fact_err_tgt")
+        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+
+        thread = self._fact_thread("fact_err", src, tgt, ["sk_customer", "sk_product"])
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_thread(spark, thread)
+
+        assert "sk_product" in str(exc_info.value)
+        assert not (Path(tgt) / "_delta_log").exists()
+
+    def test_sentinel_advisory_warns_after_successful_write(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        """A sentinel-free fact still writes; the advisory WARN fires post-write."""
+        src = tmp_delta_path("fact_warn_src")
+        tgt = tmp_delta_path("fact_warn_tgt")
+        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+
+        thread = self._fact_thread("fact_warn", src, tgt, ["sk_customer"])
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.fact"):
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 1
+        assert any("contains no sentinel values" in r.message for r in caplog.records)
+
+    def test_advisory_evaluates_written_table_not_pipeline_frame(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        """Appending sentinel-free rows onto history that has sentinels → no WARN.
+
+        The advisory reads the written table; the in-flight DataFrame alone
+        (no sentinels) would have WARNed under pre-write checking.
+        """
+        src = tmp_delta_path("fact_hist_src")
+        tgt = tmp_delta_path("fact_hist_tgt")
+        create_delta_table(spark, tgt, [{"sk_customer": -1, "amount": 0}])
+        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+
+        thread = self._fact_thread(
+            "fact_hist", src, tgt, ["sk_customer"], write=WriteConfig(mode="append")
+        )
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.fact"):
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert not any("contains no sentinel values" in r.message for r in caplog.records)
+
+    def test_advisory_skips_fk_dropped_by_mapping(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        """An FK dropped by explicit mapping is absent post-write — the run
+        still succeeds and no advisory fires for it."""
+        src = tmp_delta_path("fact_map_src")
+        tgt = tmp_delta_path("fact_map_tgt")
+        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+
+        target = Target(
+            path=tgt,
+            mapping_mode="explicit",
+            columns={"amount": ColumnMapping()},
+            fact=FactConfig(foreign_keys=["sk_customer"]),
+        )
+        thread = self._fact_thread("fact_map", src, tgt, ["sk_customer"], target=target)
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.fact"):
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        written = spark.read.format("delta").load(tgt)
+        assert "sk_customer" not in written.columns
+        assert not any("contains no sentinel values" in r.message for r in caplog.records)
 
 
 class TestErrorWrapping:
