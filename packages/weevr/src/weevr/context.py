@@ -40,7 +40,7 @@ from weevr.errors import (
     ModelValidationError,
     VariableResolutionError,
 )
-from weevr.model.execution import LogLevel
+from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
@@ -374,6 +374,7 @@ class Context:
                 variables=dict(model.variables) if model.variables else None,
                 column_set_defs=dict(model.column_sets) if model.column_sets else None,
                 connections=dict(model.connections) if model.connections else None,
+                execution=resolve_effective_execution(None, model.execution),
             )
             if engine_result.status not in ("success", "failure", "partial"):
                 raise ExecutionError(f"Unexpected weave execution status: '{engine_result.status}'")

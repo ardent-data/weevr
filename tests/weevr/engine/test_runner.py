@@ -4,6 +4,7 @@ All tests are fast (no Spark required). execute_thread is patched to return
 controlled ThreadResult objects, allowing pure logic testing.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from weevr.engine.planner import build_plan
 from weevr.engine.result import ThreadResult, WeaveResult
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.execution import ExecutionConfig
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
@@ -442,6 +444,141 @@ class TestLoomRunner:
         result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
         assert isinstance(result.duration_ms, int)
         assert result.duration_ms >= 0
+
+
+# ---------------------------------------------------------------------------
+# Parallelism cap
+# ---------------------------------------------------------------------------
+
+
+class TestParallelismCap:
+    def _tracking_side_effect(self):
+        """Return (side_effect, state) tracking peak concurrent executions."""
+        import threading
+        import time
+
+        state = {"active": 0, "peak": 0}
+        lock = threading.Lock()
+
+        def side_effect(spark, thread, **kwargs):
+            with lock:
+                state["active"] += 1
+                state["peak"] = max(state["peak"], state["active"])
+            time.sleep(0.05)
+            with lock:
+                state["active"] -= 1
+            return _make_result(thread.name)
+
+        return side_effect, state
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_cap_bounds_group_concurrency(self, mock_exec):
+        """Effective cap 3 over a 6-thread group → at most 3 in flight."""
+        side_effect, state = self._tracking_side_effect()
+        mock_exec.side_effect = side_effect
+        threads = {n: _make_thread(n) for n in "ABCDEF"}
+        plan = build_plan("capped", threads, _entries(*threads))
+
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            execution=ExecutionConfig(max_parallel_threads=3),
+        )
+
+        assert result.status == "success"
+        assert len(result.thread_results) == 6
+        assert state["peak"] <= 3
+
+    @patch("weevr.engine.runner.ThreadPoolExecutor", wraps=ThreadPoolExecutor)
+    @patch("weevr.engine.runner.execute_thread")
+    def test_unset_cap_preserves_pool_sizing(self, mock_exec, mock_pool):
+        """No cap anywhere → pool sized to the full group (today's behavior)."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {n: _make_thread(n) for n in "ABCD"}
+        plan = build_plan("uncapped", threads, _entries(*threads))
+
+        result = execute_weave(_MOCK_SPARK, plan, threads)
+
+        assert result.status == "success"
+        assert mock_pool.call_args_list[0].kwargs["max_workers"] == 4
+
+    @patch("weevr.engine.runner.ThreadPoolExecutor", wraps=ThreadPoolExecutor)
+    @patch("weevr.engine.runner.execute_thread")
+    def test_cap_larger_than_group_uses_group_size(self, mock_exec, mock_pool):
+        """Cap 8 over a 2-thread group → pool sized to the group, not the cap."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {n: _make_thread(n) for n in "AB"}
+        plan = build_plan("wide_cap", threads, _entries(*threads))
+
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            execution=ExecutionConfig(max_parallel_threads=8),
+        )
+
+        assert result.status == "success"
+        assert mock_pool.call_args_list[0].kwargs["max_workers"] == 2
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_cap_applies_to_weave_groups(self, mock_exec):
+        """A loom-level cap bounds a weave group even when the weave
+        declares a logging-only execution block (field-level merge)."""
+        side_effect, state = self._tracking_side_effect()
+        mock_exec.side_effect = side_effect
+
+        loom = Loom.model_validate(
+            {
+                "name": "nightly",
+                "config_version": "1.0",
+                "weaves": ["facts"],
+                "execution": {"max_parallel_threads": 2},
+            }
+        )
+        weaves = {
+            "facts": Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "name": "facts",
+                    "threads": ["A", "B", "C", "D"],
+                    "execution": {"log_level": "verbose"},
+                }
+            )
+        }
+        threads = {"facts": {n: _make_thread(n) for n in "ABCD"}}
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert len(result.weave_results[0].thread_results) == 4
+        assert state["peak"] <= 2
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_cap_attributes_on_weave_span(self, mock_exec):
+        """Weave span records the effective cap and per-group thread counts."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {n: _make_thread(n) for n in "ABC"}
+        plan = build_plan("attr_weave", threads, _entries(*threads))
+
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        collector = SpanCollector(generate_trace_id())
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            collector=collector,
+            execution=ExecutionConfig(max_parallel_threads=2),
+        )
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.span is not None
+        attrs = result.telemetry.span.attributes
+        assert attrs["execution.max_parallel_threads"] == 2
+        assert attrs["execution.group_thread_counts"] == "3"
 
 
 # ---------------------------------------------------------------------------

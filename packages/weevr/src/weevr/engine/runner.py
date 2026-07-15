@@ -24,6 +24,7 @@ from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
 from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
+from weevr.model.execution import ExecutionConfig, resolve_effective_execution
 from weevr.model.hooks import HookStep
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
@@ -86,6 +87,7 @@ def execute_weave(
     column_set_defs: dict[str, ColumnSet] | None = None,
     pre_cached_lookups: dict[str, Any] | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
+    execution: ExecutionConfig | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -133,6 +135,10 @@ def execute_weave(
         connections: Merged loom + weave connections forwarded to
             ``materialize_column_sets`` so connection-backed column sets can
             resolve their lakehouse target.
+        execution: Effective execution settings for this weave (already
+            merged by the caller — see ``resolve_effective_execution``).
+            ``max_parallel_threads`` caps each group's pool; unset means
+            the pool is sized to the group.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -145,6 +151,8 @@ def execute_weave(
     cache = CacheManager(plan.cache_targets, plan.dependents)
     aborted = False
     _weave_raised = False
+    max_parallel_threads = execution.max_parallel_threads if execution is not None else None
+    group_thread_counts: list[int] = []
 
     # Create weave span if collector is active
     weave_span_builder = None
@@ -292,7 +300,16 @@ def execute_weave(
             # Per-thread collectors for isolation during concurrent execution
             thread_collectors: dict[str, SpanCollector] = {}
 
-            with ThreadPoolExecutor(max_workers=len(to_run)) as executor:
+            # Cap the group's pool when an effective max_parallel_threads is
+            # set; groups still execute sequentially either way.
+            group_size = len(to_run)
+            if max_parallel_threads is not None:
+                pool_size = min(max_parallel_threads, group_size)
+            else:
+                pool_size = group_size
+            group_thread_counts.append(group_size)
+
+            with ThreadPoolExecutor(max_workers=pool_size) as executor:
                 for name in to_run:
                     thread_states[name] = "running"
                     if collector is not None:
@@ -434,6 +451,15 @@ def execute_weave(
             )
         cleanup_lookups(weave_owned)
         if weave_span_builder is not None and collector is not None:
+            if max_parallel_threads is not None:
+                weave_span_builder.set_attribute(
+                    "execution.max_parallel_threads", max_parallel_threads
+                )
+            if group_thread_counts:
+                weave_span_builder.set_attribute(
+                    "execution.group_thread_counts",
+                    ",".join(str(c) for c in group_thread_counts),
+                )
             if _weave_raised:
                 _span_status = SpanStatus.ERROR
             else:
@@ -659,6 +685,10 @@ def execute_loom(
                 loom_vars_dict, weave_vars_dict, "variable", "loom", "weave"
             )
 
+            # Effective execution settings for this weave: field-level merge
+            # of the loom and weave top-level execution blocks.
+            effective_execution = resolve_effective_execution(loom.execution, weave.execution)
+
             result = execute_weave(
                 spark,
                 plan,
@@ -677,6 +707,7 @@ def execute_loom(
                 column_set_defs=merged_column_set_defs,
                 pre_cached_lookups=loom_cached_lookup_dfs or None,
                 connections=merged_connections or None,
+                execution=effective_execution,
             )
             weave_results.append(result)
 
