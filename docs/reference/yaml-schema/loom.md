@@ -15,7 +15,7 @@ runtime settings that cascade down through weaves to threads.
 | `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
-| `execution` | `ExecutionConfig` | no | `null` | Runtime settings cascaded to weaves and threads |
+| `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`. Merges field-level with weave blocks (weave-set fields win). See the [Execution Settings guide](../../guides/execution-settings.md). |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to weaves and threads |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets cascaded to weaves. Weave-level definitions with the same name override loom-level definitions. Column sets can read their mapping table via a loom-level `connections:` entry — see [Connections guide: Column sets via connections](../../guides/connections.md#column-sets-via-connections). See [Weave schema: column_sets](weave.md#column_sets) for field details. |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Loom-level lookup definitions. Merged with weave-level lookups (weave wins on name collision). See [Weave schema: lookups](weave.md#lookups) for field details. |
@@ -115,7 +115,7 @@ post_steps:
 
 ## Configuration cascade
 
-Defaults and execution settings flow downward through the hierarchy:
+Defaults flow downward through the hierarchy:
 
 ```text
 Loom defaults
@@ -124,6 +124,11 @@ Loom defaults
 ```
 
 The most specific level always wins.
+
+The top-level `execution:` block is the exception: it is not part of
+`defaults`, loom and weave blocks merge field-level (an explicitly set
+weave field wins), and it never applies at thread scope. See the
+[Execution Settings guide](../../guides/execution-settings.md).
 
 ---
 
@@ -141,8 +146,6 @@ weaves:
   - ref: publish_marts.weave
 
 defaults:
-  execution:
-    log_level: standard
   write:
     mode: overwrite
 

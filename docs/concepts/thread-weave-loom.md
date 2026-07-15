@@ -160,8 +160,8 @@ weaves:
 defaults:
   write:
     mode: merge
-  execution:
-    log_level: standard
+execution:
+  log_level: standard
 params:
   run_date:
     type: date
@@ -196,9 +196,14 @@ merged.
 !!! tip "Inheritance reduces repetition"
 
     Define common patterns once at the loom level (write modes, audit
-    columns, execution settings) and override only where a thread differs.
-    Most threads need very little thread-level configuration when inheritance
-    is used effectively.
+    columns) and override only where a thread differs. Most threads need
+    very little thread-level configuration when inheritance is used
+    effectively.
+
+    The top-level `execution:` block is the exception: declared on the
+    loom or weave only, merged field-level between the two, and never
+    applied at thread scope. See
+    [Execution Settings](../guides/execution-settings.md).
 
 ### Example
 

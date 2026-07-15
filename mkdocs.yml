@@ -88,6 +88,7 @@ nav:
       - Fabric Runtime: guides/fabric-runtime.md
       - Connections: guides/connections.md
       - Observability: guides/observability.md
+      - Execution Settings: guides/execution-settings.md
       - Engine Internals: guides/engine-internals.md
       - Config Resolution: guides/config-resolution.md
       - Telemetry Architecture: guides/telemetry-architecture.md

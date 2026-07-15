@@ -121,7 +121,7 @@ The top-level configuration unit for a single data pipeline.
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
 | `defaults` | `dict[str, Any]` | `None` | Inherited defaults |
 | `failure` | `FailureConfig` | `None` | Failure handling policy |
-| `execution` | `ExecutionConfig` | `None` | Runtime settings |
+| `execution` | `ExecutionConfig` | `None` | Declared but not applied at thread scope (warned) |
 | `cache` | `bool` | `None` | Cache DataFrame before writing |
 | `exports` | `list[Export]` | `None` | Secondary output destinations |
 | `lookups` | `dict[str, Lookup]` | `None` | Thread-level lookup definitions |
@@ -378,12 +378,16 @@ Post-execution assertions on the target dataset.
 
 ## ExecutionConfig
 
-Runtime settings that cascade through loom/weave/thread.
+Runtime settings, declared on the top-level `execution:` block of a loom
+or weave. Loom and weave blocks merge field-level (explicitly set weave
+fields win). Thread-scoped declarations are not applied. See the
+[Execution Settings guide](../guides/execution-settings.md).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `log_level` | `"minimal" \| "standard" \| "verbose" \| "debug"` | `"standard"` | Logging verbosity |
-| `trace` | `bool` | `True` | Collect execution spans |
+| `log_level` | `"minimal" \| "standard" \| "verbose" \| "debug"` | `"standard"` | Logging verbosity. An explicit `Context(log_level=...)` argument takes precedence. |
+| `trace` | `bool` | `True` | Collect execution spans. `false` at loom scope disables telemetry for the run; at weave scope, omits that weave's nodes. |
+| `max_parallel_threads` | `int >= 1` | `None` | Cap on concurrently executing threads per weave group. Unset means unbounded. |
 
 ---
 
@@ -536,7 +540,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `post_steps` | `list[HookStep]` | `None` | Hook steps run after threads |
 | `defaults` | `dict[str, Any]` | `None` | Default values cascaded to threads |
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
-| `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded to threads |
+| `execution` | `ExecutionConfig` | `None` | Runtime settings; field-level merge with the loom block |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets for bulk rename |
 | `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to threads |
@@ -570,7 +574,7 @@ Deployment unit grouping one or more weaves.
 | `weaves` | `list[WeaveEntry]` | *required* | Weave references |
 | `defaults` | `dict[str, Any]` | `None` | Default values cascaded to weaves and threads |
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
-| `execution` | `ExecutionConfig` | `None` | Runtime settings cascaded down |
+| `execution` | `ExecutionConfig` | `None` | Runtime settings; weave blocks override field-level |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded down |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets cascaded to weaves |
 | `lookups` | `dict[str, Lookup]` | `None` | Loom-level lookup definitions cascaded to weaves |

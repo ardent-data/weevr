@@ -63,17 +63,20 @@ ctx = Context(spark, "my-project.weevr", log_level="verbose")
 result = ctx.run("nightly.loom")
 ```
 
-You can also set it in YAML execution settings on a loom or weave, and it
-cascades through configuration inheritance:
+You can also set it in the top-level `execution:` block of a loom or
+weave:
 
 ```yaml
 # nightly.loom
-defaults:
-  execution:
-    log_level: standard
+execution:
+  log_level: standard
 ```
 
 The `Context` constructor value takes precedence over YAML settings.
+Loom and weave blocks merge field-level; `defaults.execution` lands at
+thread scope, where execution settings are not applied. See
+[Execution Settings](execution-settings.md) for the full precedence and
+merge rules.
 
 ## Execution spans
 

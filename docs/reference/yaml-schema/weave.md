@@ -20,7 +20,7 @@ runtime settings.
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps executed after all threads complete |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
-| `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) cascaded to threads |
+| `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`. Explicitly set fields override the loom's. See the [Execution Settings guide](../../guides/execution-settings.md). |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to threads |
 | `audit_templates` | `dict[string, AuditTemplate]` | no | `null` | Named audit column templates cascaded to all threads in this weave. Thread-level definitions override weave-level definitions with the same name. A flat `dict[string, string]` shorthand is also accepted. See [Audit Templates guide](../../guides/audit-templates.md). |
 | `connections` | `dict[string, OneLakeConnection]` | no | `null` | Named connection definitions cascaded to threads. Thread-level connections with the same name override weave-level. See [Connections guide](../../guides/connections.md). |
@@ -297,12 +297,16 @@ variables:
 
 ## execution (ExecutionConfig)
 
-Cascades to all threads within the weave. Thread-level settings override these.
+Merges field-level with the loom's block — an explicitly set weave field
+wins, otherwise the loom's value applies. Thread-level `execution:`
+blocks are declared but not applied. See the
+[Execution Settings guide](../../guides/execution-settings.md).
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `log_level` | `string` | no | `"standard"` | Logging verbosity: `"minimal"`, `"standard"`, `"verbose"`, `"debug"` |
 | `trace` | `bool` | no | `true` | Collect execution spans for telemetry |
+| `max_parallel_threads` | `int` | no | unset | Cap on concurrently executing threads per group (`>= 1`); unset means unbounded |
 
 ---
 
