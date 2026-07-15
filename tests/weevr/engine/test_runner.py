@@ -1180,6 +1180,194 @@ class TestDeferredLookupMaterialization:
         assert "cust" in call_log[1]["lookups"]
 
 
+class TestLoomSeededLookupOwnership:
+    """Weave cleanup must not evict lookups seeded from the loom scope.
+
+    Loom-level materialized lookups are shared across all weaves via
+    pre_cached_lookups; only the loom's own cleanup may unpersist them.
+    A weave unpersists only what it materialized itself.
+    """
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_weave_cleanup_excludes_loom_seeded_lookups(self, mock_mat, mock_cleanup, mock_exec):
+        """Loom-seeded entries are excluded from the weave's cleanup call."""
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        loom_df = MagicMock()
+        weave_df = MagicMock()
+        mock_mat.return_value = (
+            {"weave_ref": weave_df},
+            [LookupResult(name="weave_ref", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "weave_ref": Lookup(
+                source=Source(type="delta", alias="gold.other"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"), lookups=lookups)
+
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            lookups=lookups,
+            pre_cached_lookups={"loom_ref": loom_df},
+        )
+
+        mock_cleanup.assert_called_once()
+        cleaned = mock_cleanup.call_args[0][0]
+        assert cleaned == {"weave_ref": weave_df}
+        loom_df.unpersist.assert_not_called()
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_weave_cleanup_includes_shadowing_weave_lookup(self, mock_mat, mock_cleanup, mock_exec):
+        """A weave lookup that shadows a loom lookup by name is still cleaned up.
+
+        The weave's own DataFrame replaces the seeded entry in the cache dict;
+        exclusion is by object identity, not by name, so the weave-materialized
+        DataFrame must not leak.
+        """
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        loom_df = MagicMock()
+        weave_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": weave_df},
+            [LookupResult(name="ref", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "ref": Lookup(
+                source=Source(type="delta", alias="gold.other"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"), lookups=lookups)
+
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            lookups=lookups,
+            pre_cached_lookups={"ref": loom_df},
+        )
+
+        mock_cleanup.assert_called_once()
+        cleaned = mock_cleanup.call_args[0][0]
+        assert cleaned == {"ref": weave_df}
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_upfront_materialization_preserves_seeded_lookups(
+        self, mock_mat, mock_cleanup, mock_exec
+    ):
+        """The no-schedule fallback merges into the seeded cache, not over it.
+
+        When the plan carries no lookup_schedule, upfront materialization must
+        keep loom-seeded entries available to threads and still exclude them
+        from the weave's cleanup.
+        """
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        loom_df = MagicMock()
+        weave_df = MagicMock()
+        mock_mat.return_value = (
+            {"weave_ref": weave_df},
+            [LookupResult(name="weave_ref", materialized=True, row_count=5)],
+        )
+        mock_exec.return_value = _make_result("A")
+
+        lookups = {
+            "weave_ref": Lookup(
+                source=Source(type="delta", alias="gold.other"),
+                materialize=True,
+            )
+        }
+        threads = {"A": _make_thread("A")}
+        # Plan built without lookups — no lookup_schedule, upfront fallback path
+        plan = build_plan("test_weave", threads, _entries("A"))
+        assert plan.lookup_schedule is None
+
+        execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            lookups=lookups,
+            pre_cached_lookups={"loom_ref": loom_df},
+        )
+
+        # Threads see both the seeded and the weave-materialized lookups
+        thread_cached = mock_exec.call_args.kwargs.get("cached_lookups")
+        assert thread_cached is not None
+        assert thread_cached.get("loom_ref") is loom_df
+        assert thread_cached.get("weave_ref") is weave_df
+
+        # Cleanup releases only the weave-materialized entry
+        mock_cleanup.assert_called_once()
+        cleaned = mock_cleanup.call_args[0][0]
+        assert cleaned == {"weave_ref": weave_df}
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    def test_seeded_lookups_survive_weave_exception(self, mock_cleanup, mock_exec):
+        """Seeded entries stay excluded from cleanup when the weave raises.
+
+        The exclusion filter lives in the finally block, so it must hold on
+        the exception path (e.g. a pre-hook failure), not just on success.
+        """
+        from weevr.errors.exceptions import HookError
+        from weevr.model.hooks import QualityGateStep
+
+        loom_df = MagicMock()
+        pre = [
+            QualityGateStep(
+                type="quality_gate",
+                check="table_exists",
+                source="db.missing",
+            )
+        ]
+        threads = {"A": _make_thread("A")}
+        plan = build_plan("test_weave", threads, _entries("A"))
+
+        import contextlib
+
+        with (
+            patch(
+                "weevr.engine.runner.run_hook_steps",
+                side_effect=HookError("gate failed"),
+            ),
+            contextlib.suppress(HookError),
+        ):
+            execute_weave(
+                _MOCK_SPARK,
+                plan,
+                threads,
+                pre_steps=pre,
+                pre_cached_lookups={"loom_ref": loom_df},
+            )
+
+        mock_exec.assert_not_called()
+        mock_cleanup.assert_called_once_with({})
+        loom_df.unpersist.assert_not_called()
+
+
 class TestWeaveVariableIntegration:
     """Test variable context in execute_weave."""
 
@@ -1843,6 +2031,48 @@ class TestLoomResourceLifecycle:
         assert pre_cached is not None
         assert "ref" in pre_cached
         assert pre_cached["ref"] is mock_df
+
+    @patch("weevr.engine.runner.execute_thread")
+    @patch("weevr.engine.runner.cleanup_lookups")
+    @patch("weevr.engine.runner.materialize_lookups")
+    def test_loom_lookups_survive_weave_completion(self, mock_mat, mock_cleanup, mock_exec):
+        """A loom lookup outlives each weave; only loom cleanup releases it.
+
+        Regression for the multi-weave case: weave 1's cleanup used to
+        unpersist the shared loom cache, forcing weaves 2..N to recompute.
+        """
+        from weevr.engine.lookups import LookupResult
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        loom_df = MagicMock()
+        mock_mat.return_value = (
+            {"ref": loom_df},
+            [LookupResult(name="ref", materialized=True, row_count=10)],
+        )
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+
+        loom_lookup = Lookup(
+            source=Source(type="delta", alias="gold.ref"),
+            materialize=True,
+        )
+        loom = self._make_loom(weaves=["w1", "w2"], lookups={"ref": loom_lookup.model_dump()})
+        weaves = {"w1": self._make_weave("w1"), "w2": self._make_weave("w2")}
+        threads = {
+            "w1": {"t1": _make_thread("t1")},
+            "w2": {"t1": _make_thread("t1")},
+        }
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        # Both weaves ran with real execute_weave, so cleanup fires per weave
+        # plus once at loom end. The loom lookup appears only in the final call.
+        assert mock_cleanup.call_count == 3
+        weave_cleanups = [c.args[0] for c in mock_cleanup.call_args_list[:2]]
+        assert all("ref" not in cleaned for cleaned in weave_cleanups)
+        loom_cleanup = mock_cleanup.call_args_list[2].args[0]
+        assert loom_cleanup == {"ref": loom_df}
 
     @patch("weevr.engine.runner.execute_weave")
     def test_loom_variables_cascade_into_weave(self, mock_weave_exec):
