@@ -183,6 +183,39 @@ class TestCheckFactSentinels:
         diagnostics = check_fact_sentinels(df, fact_config)
         assert len(diagnostics) == 1
 
+    def test_duplicate_fk_names_single_action(
+        self, spark: SparkSession, spark_action_counter: dict[str, int]
+    ):
+        """Duplicate FK names are deduplicated in the aggregation.
+
+        FactConfig does not enforce FK uniqueness, so a duplicated name
+        must not produce ambiguous aggregation aliases. Diagnostics keep
+        one entry per declared FK, matching the old per-column loop.
+        """
+        schema = StructType([StructField("sk_customer", IntegerType(), True)])
+        df = spark.createDataFrame([(1,), (2,)], schema)
+        fact_config = FactConfig(foreign_keys=["sk_customer", "sk_customer"])
+        diagnostics = check_fact_sentinels(df, fact_config)
+        assert len(diagnostics) == 2
+        assert all("sk_customer" in d for d in diagnostics)
+        assert spark_action_counter["total"] == 1
+
+    def test_aggregation_failure_swallowed_as_advisory(self, spark: SparkSession, monkeypatch):
+        """A failing sentinel aggregation returns no diagnostics and
+        raises nothing — the check is advisory only."""
+        from pyspark.sql import DataFrame
+
+        schema = StructType([StructField("sk_customer", IntegerType(), True)])
+        df = spark.createDataFrame([(1,)], schema)
+
+        def _boom(self, *args, **kwargs):
+            raise RuntimeError("aggregation failed")
+
+        monkeypatch.setattr(DataFrame, "agg", _boom)
+        fact_config = FactConfig(foreign_keys=["sk_customer"])
+        diagnostics = check_fact_sentinels(df, fact_config)
+        assert diagnostics == []
+
     def test_absent_fk_columns_skipped(
         self, spark: SparkSession, spark_action_counter: dict[str, int]
     ):
