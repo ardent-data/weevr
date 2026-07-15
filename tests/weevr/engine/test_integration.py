@@ -652,6 +652,59 @@ class TestFactValidation:
         assert result.status == "success"
         assert not any("contains no sentinel values" in r.message for r in caplog.records)
 
+    def test_sentinel_advisory_fires_for_alias_target(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        """The post-write advisory reads table-alias targets via the
+        metastore, not just filesystem paths."""
+        src = tmp_delta_path("fact_alias_src")
+        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        alias = "fact_alias_advisory_tgt"
+
+        try:
+            spark.sql(f"CREATE TABLE {alias} (sk_customer BIGINT, amount BIGINT) USING delta")
+            target = Target(alias=alias, fact=FactConfig(foreign_keys=["sk_customer"]))
+            thread = self._fact_thread(
+                "fact_alias",
+                src,
+                alias,
+                ["sk_customer"],
+                write=WriteConfig(mode="append"),
+                target=target,
+            )
+            with caplog.at_level(logging.WARNING, logger="weevr.operations.fact"):
+                result = execute_thread(spark, thread)
+
+            assert result.status == "success"
+            assert spark.read.format("delta").table(alias).count() == 1
+            assert any("contains no sentinel values" in r.message for r in caplog.records)
+        finally:
+            spark.sql(f"DROP TABLE IF EXISTS {alias}")
+
+    def test_advisory_read_failure_never_fails_run(
+        self, spark: SparkSession, tmp_delta_path, caplog, monkeypatch
+    ) -> None:
+        """A failing post-write table read degrades to a debug log; the
+        run still succeeds."""
+        import weevr.engine.executor as executor_mod
+
+        src = tmp_delta_path("fact_boom_src")
+        tgt = tmp_delta_path("fact_boom_tgt")
+        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+
+        def _unreadable(*args, **kwargs):
+            raise RuntimeError("table unreadable")
+
+        monkeypatch.setattr(executor_mod, "read_delta", _unreadable)
+
+        thread = self._fact_thread("fact_boom", src, tgt, ["sk_customer"])
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.fact"):
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 1
+        assert not any("contains no sentinel values" in r.message for r in caplog.records)
+
     def test_advisory_skips_fk_dropped_by_mapping(
         self, spark: SparkSession, tmp_delta_path, caplog
     ) -> None:

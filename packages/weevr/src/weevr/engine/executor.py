@@ -11,6 +11,7 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.delta import read_delta
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.hooks import run_hook_steps
 from weevr.engine.lookups import cleanup_lookups, materialize_lookups, resolve_thread_lookups
@@ -597,7 +598,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # scans cheap. Advisory only: failures never block the run.
             if fact_config is not None and target_path:
                 try:
-                    written_df = spark.read.format("delta").load(target_path)
+                    written_df = read_delta(spark, target_path)
+                    # Return value intentionally unused: the check logs its
+                    # own WARNs, and advisory diagnostics are not stored.
                     check_fact_sentinels(written_df, fact_config)
                 except Exception:
                     logger.debug(
