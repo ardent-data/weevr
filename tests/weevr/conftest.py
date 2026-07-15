@@ -44,6 +44,39 @@ def spark() -> Generator[SparkSession, None, None]:
 
 
 @pytest.fixture()
+def spark_action_counter(monkeypatch) -> dict[str, int]:
+    """Count Spark actions triggered through DataFrame methods.
+
+    Wraps every DataFrame method that launches a job (collect, count,
+    first, take, toPandas) and counts outermost invocations only —
+    first() delegates to take() which delegates to collect(), and the
+    depth guard keeps that chain from counting as three actions.
+
+    Returns a dict whose "total" key holds the running action count.
+    """
+    from pyspark.sql import DataFrame
+
+    state = {"total": 0, "_depth": 0}
+
+    def _make_wrapper(original):
+        def wrapper(self, *args, **kwargs):
+            state["_depth"] += 1
+            if state["_depth"] == 1:
+                state["total"] += 1
+            try:
+                return original(self, *args, **kwargs)
+            finally:
+                state["_depth"] -= 1
+
+        return wrapper
+
+    for method_name in ("collect", "count", "first", "take", "toPandas"):
+        monkeypatch.setattr(DataFrame, method_name, _make_wrapper(getattr(DataFrame, method_name)))
+
+    return state
+
+
+@pytest.fixture()
 def tmp_delta_path(tmp_path: Path):
     """Function-scoped factory for isolated Delta table paths.
 
