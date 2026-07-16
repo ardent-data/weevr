@@ -50,6 +50,49 @@ class TestValidateIncrementalConfig:
         diags = validate_incremental_config(config)
         assert any("ERROR" in d and "cdc" in d and "merge" in d for d in diags)
 
+    def test_incremental_watermark_with_explicit_overwrite_errors(self):
+        """incremental_watermark with write.mode=overwrite produces error."""
+        config = {
+            "load": {"mode": "incremental_watermark", "watermark_column": "updated_at"},
+            "write": {"mode": "overwrite"},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert any("ERROR" in d and "incremental_watermark" in d for d in diags)
+
+    def test_incremental_watermark_with_defaulted_overwrite_errors(self):
+        """incremental_watermark with no write block (defaulted overwrite) produces error."""
+        config = {
+            "load": {"mode": "incremental_watermark", "watermark_column": "updated_at"},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert any("ERROR" in d and "incremental_watermark" in d for d in diags)
+
+    def test_incremental_watermark_with_append_no_error(self):
+        """incremental_watermark with write.mode=append produces no error."""
+        config = {
+            "load": {"mode": "incremental_watermark", "watermark_column": "updated_at"},
+            "write": {"mode": "append"},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert not any("ERROR" in d for d in diags)
+
+    def test_incremental_watermark_with_merge_no_error(self):
+        """incremental_watermark with write.mode=merge produces no error."""
+        config = {
+            "load": {"mode": "incremental_watermark", "watermark_column": "updated_at"},
+            "write": {"mode": "merge", "match_keys": ["id"]},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert not any("ERROR" in d for d in diags)
+
     def test_watermark_inclusive_with_append_warns(self):
         """watermark_inclusive=True with append produces warning."""
         config = {

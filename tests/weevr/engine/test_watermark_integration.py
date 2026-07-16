@@ -4,11 +4,12 @@ from typing import Literal
 from unittest.mock import MagicMock, patch
 
 import pytest
+from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
 from weevr.engine.executor import execute_thread
-from weevr.errors.exceptions import StateError
+from weevr.errors.exceptions import ExecutionError, StateError
 from weevr.model.load import LoadConfig, WatermarkStoreConfig
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -28,7 +29,7 @@ def _make_watermark_thread(
     watermark_column: str = "ts",
     watermark_type: str = "int",
     watermark_inclusive: bool = False,
-    write_mode: Literal["overwrite", "append", "merge"] = "overwrite",
+    write_mode: Literal["overwrite", "append", "merge"] = "append",
 ) -> Thread:
     """Build a thread with incremental_watermark load config."""
     return Thread(
@@ -117,13 +118,13 @@ class TestWatermarkSecondRun:
         new_data = spark.createDataFrame([{"id": 3, "ts": 30}, {"id": 4, "ts": 40}])
         new_data.write.format("delta").mode("append").save(src)
 
-        # Second run: should only process ts > 20
+        # Second run: should only process ts > 20, appending to prior rows
         result = execute_thread(spark, thread)
 
         assert result.rows_written == 2
         written = spark.read.format("delta").load(tgt)
         ids = sorted([r["id"] for r in written.collect()])
-        assert ids == [3, 4]
+        assert ids == [1, 2, 3, 4]
 
     def test_second_run_telemetry_not_first_run(self, spark: SparkSession, tmp_delta_path) -> None:
         """Second run telemetry reports watermark_first_run=False."""
@@ -192,11 +193,13 @@ class TestWatermarkInclusive:
         thread = _make_watermark_thread("t1", src, tgt, wm, watermark_inclusive=True)
         execute_thread(spark, thread)
 
-        # Re-run without adding new data — HWM=20, filter ts >= 20 → 1 row
+        # Re-run without adding new data — HWM=20, filter ts >= 20 → 1 row,
+        # appended alongside the first run's boundary row (the duplicate the
+        # inclusive+append WARN exists to call out)
         result = execute_thread(spark, thread)
         assert result.rows_written == 1
         written = spark.read.format("delta").load(tgt)
-        assert written.collect()[0]["ts"] == 20
+        assert sorted(r["ts"] for r in written.collect()) == [10, 20, 20]
 
 
 class TestWatermarkHwmFromSource:
@@ -230,7 +233,7 @@ class TestWatermarkHwmFromSource:
             sources={"main": Source(type="delta", alias=src)},
             steps=[FilterStep(filter=FilterParams(expr=SparkExpr("keep = true")))],
             target=Target(path=tgt),
-            write=WriteConfig(mode="overwrite"),
+            write=WriteConfig(mode="append"),
             load=LoadConfig(
                 mode="incremental_watermark",
                 watermark_column="ts",
@@ -252,6 +255,25 @@ class TestWatermarkHwmFromSource:
         state = store.read(spark, "t1")
         assert state is not None
         assert state.last_value == "30"
+
+
+class TestWatermarkOverwriteRejected:
+    """incremental_watermark + overwrite fails fast at executor entry."""
+
+    def test_overwrite_write_mode_raises_before_any_write(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """The destructive combination raises ExecutionError; no target is created."""
+        src = tmp_delta_path("wm_ow_src")
+        tgt = tmp_delta_path("wm_ow_tgt")
+        wm = tmp_delta_path("wm_ow_store")
+        create_delta_table(spark, src, [{"id": 1, "ts": 10}])
+
+        thread = _make_watermark_thread("t1", src, tgt, wm, write_mode="overwrite")
+        with pytest.raises(ExecutionError, match="incremental_watermark"):
+            execute_thread(spark, thread)
+
+        assert not DeltaTable.isDeltaTable(spark, tgt)
 
 
 class TestWatermarkPersistenceFailure:
