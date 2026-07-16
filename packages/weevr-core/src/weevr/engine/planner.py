@@ -143,6 +143,41 @@ def _build_explicit_index(
     return explicit_index
 
 
+def _upstream_closure(start: str, explicit_index: dict[str, list[str]]) -> set[str]:
+    """Return every thread reachable upstream from ``start`` via explicit deps."""
+    seen: set[str] = set()
+    stack = list(explicit_index.get(start, []))
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(explicit_index.get(node, []))
+    return seen
+
+
+def _resolve_writer_chain(
+    writers: list[str],
+    explicit_index: dict[str, list[str]],
+) -> str | None:
+    """Return the last writer if explicit dependencies totally order ``writers``.
+
+    Writers are totally ordered when every pair is comparable via the
+    transitive explicit-dependency relation (possibly through intermediate
+    threads) and exactly one writer sits downstream of all the others.
+    Returns ``None`` when the writers are not totally ordered.
+    """
+    closures = {w: _upstream_closure(w, explicit_index) for w in writers}
+    for i, a in enumerate(writers):
+        for b in writers[i + 1 :]:
+            if a not in closures[b] and b not in closures[a]:
+                return None
+    terminals = [w for w in writers if all(o in closures[w] for o in writers if o != w)]
+    if len(terminals) != 1:
+        return None
+    return terminals[0]
+
+
 def _build_target_index(
     threads: dict[str, Thread],
     explicit_index: dict[str, list[str]] | None = None,
@@ -153,14 +188,17 @@ def _build_target_index(
     Used by the dependency graph builder and lookup dependency inference to
     identify which thread produces a given data path.
 
-    A target written by two or more threads is rejected: the planner would
-    otherwise place the writers in one parallel group and race concurrent
-    writes against a single table.
+    A target written by two or more threads is rejected unless explicit
+    dependencies totally order the writers: unordered writers would land in
+    one parallel group and race concurrent writes against a single table.
+    For an ordered writer chain, the target resolves to the last writer, so
+    downstream consumers run after the target's final state exists.
 
     Args:
         threads: Mapping of thread name to Thread config.
         explicit_index: Explicit dependency index, used to check whether
             same-target writers are serialized by declared dependencies.
+            ``None`` means no explicit ordering exists.
         weave_name: Weave name for error messages.
 
     Returns:
@@ -168,7 +206,7 @@ def _build_target_index(
 
     Raises:
         ConfigError: If two or more threads write the same target without
-            explicit dependencies ordering them.
+            explicit dependencies totally ordering them.
     """
     writers_by_path: dict[str, list[str]] = {}
     for name, thread in threads.items():
@@ -180,7 +218,9 @@ def _build_target_index(
     for path, writers in writers_by_path.items():
         if len(writers) == 1:
             target_index[path] = writers[0]
-        else:
+            continue
+        last_writer = _resolve_writer_chain(writers, explicit_index or {})
+        if last_writer is None:
             names = ", ".join(f"'{n}'" for n in sorted(writers))
             in_weave = f" in weave '{weave_name}'" if weave_name else ""
             raise ConfigError(
@@ -189,6 +229,7 @@ def _build_target_index(
                 f"corrupt data. Declare explicit dependencies to serialize the "
                 f"writers, or give each thread its own target."
             )
+        target_index[path] = last_writer
     return target_index
 
 

@@ -640,6 +640,94 @@ class TestDuplicateTargets:
         plan = build_plan("w", threads, _entries("A", "B"))
         assert plan.execution_order == [["A"], ["B"]]
 
+    def test_explicitly_ordered_pair_allowed(self):
+        """An explicit dependency serializing the writers makes the plan legal."""
+        threads = {
+            "load_jan": _make_thread("load_jan", target_alias="sales.monthly"),
+            "load_feb": _make_thread("load_feb", target_alias="sales.monthly"),
+        }
+        entries = [ThreadEntry(name="load_jan"), _entry_with_deps("load_feb", ["load_jan"])]
+        plan = build_plan("w", threads, entries)
+        assert plan.execution_order == [["load_jan"], ["load_feb"]]
+
+    def test_consumer_depends_on_last_writer(self):
+        """A downstream consumer of the shared target depends on the chain tail."""
+        threads = {
+            "load_jan": _make_thread("load_jan", target_alias="sales.monthly"),
+            "load_feb": _make_thread("load_feb", target_alias="sales.monthly"),
+            "report": _make_thread("report", source_aliases=["sales.monthly"]),
+        }
+        entries = [
+            ThreadEntry(name="load_jan"),
+            _entry_with_deps("load_feb", ["load_jan"]),
+            ThreadEntry(name="report"),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.inferred_dependencies["report"] == ["load_feb"]
+        assert plan.execution_order == [["load_jan"], ["load_feb"], ["report"]]
+
+    def test_three_writer_chain_allowed(self):
+        """A three-writer chain via explicit deps plans with the tail as producer."""
+        threads = {
+            "A": _make_thread("A", target_alias="dup_x"),
+            "B": _make_thread("B", target_alias="dup_x"),
+            "C": _make_thread("C", target_alias="dup_x"),
+            "reader": _make_thread("reader", source_aliases=["dup_x"]),
+        }
+        entries = [
+            ThreadEntry(name="A"),
+            _entry_with_deps("B", ["A"]),
+            _entry_with_deps("C", ["B"]),
+            ThreadEntry(name="reader"),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.inferred_dependencies["reader"] == ["C"]
+        assert plan.execution_order == [["A"], ["B"], ["C"], ["reader"]]
+
+    def test_chain_through_intermediate_thread_allowed(self):
+        """Ordering may pass transitively through a thread that writes elsewhere."""
+        threads = {
+            "A": _make_thread("A", target_alias="dup_x"),
+            "X": _make_thread("X", target_alias="out_x"),
+            "B": _make_thread("B", target_alias="dup_x"),
+        }
+        entries = [
+            ThreadEntry(name="A"),
+            _entry_with_deps("X", ["A"]),
+            _entry_with_deps("B", ["X"]),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.execution_order == [["A"], ["X"], ["B"]]
+
+    def test_partial_order_still_raises(self):
+        """Ordering only some of the writers is not enough — all must be chained."""
+        threads = {
+            "A": _make_thread("A", target_alias="dup_x"),
+            "B": _make_thread("B", target_alias="dup_x"),
+            "C": _make_thread("C", target_alias="dup_x"),
+        }
+        entries = [
+            ThreadEntry(name="A"),
+            _entry_with_deps("B", ["A"]),
+            ThreadEntry(name="C"),
+        ]
+        with pytest.raises(ConfigError) as exc_info:
+            build_plan("w", threads, entries)
+        message = str(exc_info.value)
+        assert "A" in message and "B" in message and "C" in message
+
+    def test_lookup_producer_resolves_to_last_writer(self):
+        """A lookup sourced from a duplicated target names the chain tail."""
+        threads = {
+            "load_jan": _make_thread("load_jan", target_alias="sales.monthly"),
+            "load_feb": _make_thread("load_feb", target_alias="sales.monthly"),
+        }
+        entries = [ThreadEntry(name="load_jan"), _entry_with_deps("load_feb", ["load_jan"])]
+        lookups = {"monthly": _make_lookup("sales.monthly")}
+        plan = build_plan("w", threads, entries, lookups=lookups)
+        assert plan.lookup_producers is not None
+        assert plan.lookup_producers["monthly"] == "load_feb"
+
 
 class TestExecutionPlanDisplay:
     """Tests for dag() and _repr_html_() on ExecutionPlan."""
