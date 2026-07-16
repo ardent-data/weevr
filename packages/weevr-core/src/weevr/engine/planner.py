@@ -180,13 +180,13 @@ def _resolve_writer_chain(
 
 def _build_target_index(
     threads: dict[str, Thread],
-    explicit_index: dict[str, list[str]] | None = None,
-    weave_name: str = "",
+    explicit_index: dict[str, list[str]],
+    weave_name: str,
 ) -> dict[str, str]:
     """Build a mapping of normalized target path to producing thread name.
 
-    Used by the dependency graph builder and lookup dependency inference to
-    identify which thread produces a given data path.
+    Used by thread and lookup dependency inference to identify which thread
+    produces a given data path.
 
     A target written by two or more threads is rejected unless explicit
     dependencies totally order the writers: unordered writers would land in
@@ -198,7 +198,6 @@ def _build_target_index(
         threads: Mapping of thread name to Thread config.
         explicit_index: Explicit dependency index, used to check whether
             same-target writers are serialized by declared dependencies.
-            ``None`` means no explicit ordering exists.
         weave_name: Weave name for error messages.
 
     Returns:
@@ -219,15 +218,15 @@ def _build_target_index(
         if len(writers) == 1:
             target_index[path] = writers[0]
             continue
-        last_writer = _resolve_writer_chain(writers, explicit_index or {})
+        last_writer = _resolve_writer_chain(writers, explicit_index)
         if last_writer is None:
             names = ", ".join(f"'{n}'" for n in sorted(writers))
-            in_weave = f" in weave '{weave_name}'" if weave_name else ""
             raise ConfigError(
-                f"Threads {names} all write target '{path}'{in_weave} but are not "
-                f"ordered by explicit dependencies — concurrent writes to one target "
-                f"corrupt data. Declare explicit dependencies to serialize the "
-                f"writers, or give each thread its own target."
+                f"Threads {names} all write target '{path}' in weave "
+                f"'{weave_name}' but are not ordered by explicit dependencies, "
+                f"so concurrent writes would corrupt the target. Declare "
+                f"explicit dependencies to serialize the writers, or give each "
+                f"thread its own target."
             )
         target_index[path] = last_writer
     return target_index
