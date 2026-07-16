@@ -343,19 +343,30 @@ load:
     insert_value: "I"
     update_value: "U"
     delete_value: "D"
-  # Optional: compose with a watermark column to narrow reads on
-  # append-only history tables (see below).
-  # watermark_column: updated_at
-  # watermark_type: timestamp
+  # Required for update/delete mappings: the column that orders
+  # same-key changes.
+  watermark_column: updated_at
+  watermark_type: timestamp
 ```
 
-The explicit path may be combined with `watermark_column` and
-`watermark_type` to narrow the read window for append-only CDC history
+An explicit mapping that declares `update_value` or `delete_value` must
+also declare `watermark_column` — it is the ordering signal that decides
+which change wins when one key changes more than once in a window.
+Insert-only mappings (event feeds) have no same-key collisions and need
+no watermark. The `delta_cdf` preset orders by commit version natively
+and rejects `watermark_column`.
+
+The watermark also narrows the read window for append-only CDC history
 tables — for example, SAP data landed by Fabric Open Database Mirror,
 where every change row carries a change timestamp like `AEDATTM`. Without
-the watermark, weevr re-reads the full history on every run. The
-`delta_cdf` preset tracks progress via commit versions and rejects
-`watermark_column`.
+it, weevr would re-read the full history on every run.
+
+Before merging, weevr reduces each change window to the latest state per
+key: the `delta_cdf` preset orders changes by commit version; explicit
+mappings order by the watermark column. Ties at the same position resolve
+by operation precedence — a delete outranks an update, which outranks an
+insert — so a key that changes many times between runs merges cleanly to
+its final state.
 
 ### String-typed watermark columns (`watermark_format`)
 
@@ -415,8 +426,9 @@ no functional benefit and would defeat file skipping.
 | Full snapshot refresh | `full` | `overwrite` |
 | Accumulating event log | `incremental_watermark` | `append` |
 | Dimension table with updates | `full` or `incremental_watermark` | `merge` |
-| CDC from upstream system | `cdc` | `merge` |
-| CDC from append-only history table | `cdc` + `watermark_column` | `merge` |
+| CDC from upstream system | `cdc` + `watermark_column` | `merge` |
+| CDC insert-only event feed | `cdc` (insert mapping only) | `merge` |
+| CDC via Delta Change Data Feed | `cdc` (`preset: delta_cdf`) | `merge` |
 | Externally bounded batch | `incremental_parameter` | `append` or `merge` |
 
 ## Next steps
