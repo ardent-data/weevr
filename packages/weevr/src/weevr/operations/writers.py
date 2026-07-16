@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
@@ -243,6 +244,35 @@ def resolve_cdc_columns(cdc_config: CdcConfig) -> dict[str, str | None]:
     }
 
 
+def _reduce_to_latest_per_key(
+    df: DataFrame,
+    match_keys: list[str],
+    op_col: str,
+    op_precedence: list[str],
+    ordering_cols: list[Column],
+) -> DataFrame:
+    """Reduce a CDC change window to one row per key: the latest state.
+
+    Rows are ranked per match-key group by the ordering columns (descending),
+    with the operation type as the final tiebreaker — later entries in
+    ``op_precedence`` outrank earlier ones (e.g. a delete outranks an update
+    from the same commit). Rows whose ordering and operation all tie are
+    indistinguishable; an arbitrary representative is kept.
+    """
+    precedence: Column = F.lit(0)
+    for rank, value in enumerate(op_precedence, start=1):
+        precedence = F.when(F.col(op_col) == value, F.lit(rank)).otherwise(precedence)
+
+    window = Window.partitionBy(*match_keys).orderBy(
+        *[c.desc() for c in ordering_cols], precedence.desc()
+    )
+    return (
+        df.withColumn("__cdc_rn__", F.row_number().over(window))
+        .filter(F.col("__cdc_rn__") == 1)
+        .drop("__cdc_rn__")
+    )
+
+
 def execute_cdc_merge(
     spark: SparkSession,
     df: DataFrame,
@@ -295,6 +325,26 @@ def execute_cdc_merge(
     recognized_ops = [v for v in (insert_val, update_val, delete_val) if v]
     if recognized_ops:
         df = df.filter(F.col(op_col).isin(recognized_ops))
+
+    # Reduce the window to the latest state per key — Delta MERGE rejects
+    # multiple source rows matching one target row, and a key changing more
+    # than once per window is the normal CDF/OLTP case. Operation precedence
+    # (insert < update < delete) breaks same-position ties: the terminal
+    # state wins.
+    op_precedence = [v for v in (insert_val, update_val, delete_val) if v]
+    if cdc_config.preset == "delta_cdf":
+        if "_commit_version" not in df.columns:
+            raise ExecutionError(
+                "Delta CDF merge requires the '_commit_version' column to order "
+                "same-key changes; do not drop CDF metadata columns in pipeline steps"
+            )
+        df = _reduce_to_latest_per_key(
+            df,
+            write_config.match_keys,
+            op_col,
+            op_precedence,
+            [F.col("_commit_version")],
+        )
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
     target_exists = delta_table_exists(spark, target_path)

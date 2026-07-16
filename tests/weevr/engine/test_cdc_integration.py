@@ -390,6 +390,173 @@ class TestCdcDeltaCdf:
         assert rows[1] == "Alice"  # unchanged
 
 
+class TestCdcMultiChangeWindowCdf:
+    """CDF windows with multiple changes per key reduce to final state."""
+
+    @staticmethod
+    def _enable_cdf(spark: SparkSession, path: str) -> None:
+        spark.sql(
+            f"ALTER TABLE delta.`{path}` SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')"
+        )
+
+    def test_two_updates_one_key_merge_to_final_state(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Two updates to one key between runs merge cleanly to the later state."""
+        src = tmp_delta_path("cdf_mc_src")
+        tgt = tmp_delta_path("cdf_mc_tgt")
+
+        create_delta_table(spark, src, [{"id": 1, "name": "Alice"}])
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+        self._enable_cdf(spark, src)
+
+        initial_version = (
+            DeltaTable.forPath(spark, src).history(1).select("version").collect()[0]["version"]
+        )
+
+        dt = DeltaTable.forPath(spark, src)
+        dt.update(condition="id = 1", set={"name": "'Bea'"})
+        dt.update(condition="id = 1", set={"name": "'Cara'"})
+
+        source = Source(type="delta", alias=src)
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        cdf_df, _ = read_cdc_source(spark, source, cdc_config, last_version=initial_version)
+
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        counts = execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        assert counts["updates"] == 1
+        result = spark.read.format("delta").load(tgt)
+        rows = {r["id"]: r["name"] for r in result.collect()}
+        assert rows[1] == "Cara"
+
+    def test_update_then_delete_removes_row(self, spark: SparkSession, tmp_delta_path) -> None:
+        """An update followed by a delete in one window removes the row."""
+        tgt = tmp_delta_path("cdf_ud_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
+
+        cdf_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Bea", "_change_type": "update_postimage", "_commit_version": 5},
+                {"id": 1, "name": "Bea", "_change_type": "delete", "_commit_version": 6},
+            ]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        result = spark.read.format("delta").load(tgt)
+        ids = {r["id"] for r in result.collect()}
+        assert ids == {2}
+
+    def test_insert_update_delete_nets_absent(self, spark: SparkSession, tmp_delta_path) -> None:
+        """insert + update + delete for one key in one window nets to no row."""
+        tgt = tmp_delta_path("cdf_iud_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+
+        cdf_df = spark.createDataFrame(
+            [
+                {"id": 9, "name": "New", "_change_type": "insert", "_commit_version": 5},
+                {
+                    "id": 9,
+                    "name": "Newer",
+                    "_change_type": "update_postimage",
+                    "_commit_version": 6,
+                },
+                {"id": 9, "name": "Newer", "_change_type": "delete", "_commit_version": 7},
+            ]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        result = spark.read.format("delta").load(tgt)
+        ids = {r["id"] for r in result.collect()}
+        assert ids == {1}
+
+    def test_same_commit_tie_delete_wins(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Within one commit version, delete outranks update_postimage."""
+        tgt = tmp_delta_path("cdf_tie_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+
+        cdf_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Bea", "_change_type": "update_postimage", "_commit_version": 5},
+                {"id": 1, "name": "Bea", "_change_type": "delete", "_commit_version": 5},
+            ]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        result = spark.read.format("delta").load(tgt)
+        assert result.count() == 0
+
+    def test_first_write_reduces_to_one_row_per_key(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """First write of a multi-change window creates one row per key at final state."""
+        tgt = tmp_delta_path("cdf_fw_tgt")
+
+        cdf_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "A", "_change_type": "insert", "_commit_version": 1},
+                {"id": 1, "name": "B", "_change_type": "update_postimage", "_commit_version": 2},
+                {"id": 2, "name": "X", "_change_type": "insert", "_commit_version": 1},
+                {"id": 2, "name": "X", "_change_type": "delete", "_commit_version": 2},
+            ]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        result = spark.read.format("delta").load(tgt)
+        rows = {r["id"]: r["name"] for r in result.collect()}
+        assert rows == {1: "B"}
+
+    def test_counts_reflect_reduced_window(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Counts report the applied (reduced) operations, not raw window rows."""
+        tgt = tmp_delta_path("cdf_cnt_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+
+        cdf_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Bea", "_change_type": "update_postimage", "_commit_version": 5},
+                {"id": 1, "name": "Cara", "_change_type": "update_postimage", "_commit_version": 6},
+            ]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        counts = execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        assert counts["updates"] == 1
+        result = spark.read.format("delta").load(tgt)
+        assert result.collect()[0]["name"] == "Cara"
+
+    def test_missing_commit_version_raises_clear_error(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A CDF frame without _commit_version fails with a named error."""
+        from weevr.errors.exceptions import ExecutionError
+
+        tgt = tmp_delta_path("cdf_nocv_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+
+        cdf_df = spark.createDataFrame(
+            [{"id": 1, "name": "Bea", "_change_type": "update_postimage"}]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        with pytest.raises(ExecutionError, match="_commit_version"):
+            execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+
 class TestCdcWatermarkComposition:
     """End-to-end tests for generic CDC composed with watermark filter.
 
