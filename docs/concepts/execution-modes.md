@@ -278,11 +278,19 @@ load:
   mode: incremental_watermark
   watermark_column: modified_date
   watermark_type: timestamp
+
+write:
+  mode: append
 ```
 
 On the first run, all rows are read (no prior watermark exists). On
 subsequent runs, only rows where `modified_date` exceeds the stored
 watermark are read.
+
+Watermark loads require an explicit `write.mode` of `append` or `merge`.
+The default (`overwrite`) is rejected at validation time: each run would
+replace the whole target with only the incremental slice, silently
+discarding all previously loaded history.
 
 The watermark is persisted in a configurable state store -- either as a
 Delta table property on the target or in a dedicated metadata table.
