@@ -563,7 +563,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 with contextlib.suppress(Exception):
                     output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
-                cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
+                cdc_counts = execute_cdc_merge(
+                    spark, df, target_path, cdc_write, thread.load.cdc, load_config=thread.load
+                )
                 rows_written = sum(cdc_counts.values())
 
             else:

@@ -302,6 +302,132 @@ class TestCdcInsertOnly:
         assert result.count() == 2
 
 
+class TestCdcMultiChangeWindowGeneric:
+    """Generic CDC windows with multiple changes per key reduce by watermark order."""
+
+    @staticmethod
+    def _config() -> tuple[CdcConfig, WriteConfig, LoadConfig]:
+        cdc_config = CdcConfig(
+            operation_column="op",
+            insert_value="I",
+            update_value="U",
+            delete_value="D",
+            on_delete="hard_delete",
+        )
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        load_config = LoadConfig(
+            mode="cdc",
+            cdc=cdc_config,
+            watermark_column="seq",
+            watermark_type="int",
+        )
+        return cdc_config, write_config, load_config
+
+    def test_reverse_order_updates_latest_watermark_wins(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """The row with the greater watermark wins regardless of DataFrame order."""
+        tgt = tmp_delta_path("gen_mc_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Cara", "op": "U", "seq": 2},
+                {"id": 1, "name": "Bea", "op": "U", "seq": 1},
+            ]
+        )
+        cdc_config, write_config, load_config = self._config()
+
+        counts = execute_cdc_merge(
+            spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+        )
+
+        assert counts["updates"] == 1
+        result = spark.read.format("delta").load(tgt)
+        assert result.collect()[0]["name"] == "Cara"
+
+    def test_delete_first_in_frame_still_terminal(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """update then delete (by watermark) removes the row even when the
+        delete row appears first in the DataFrame."""
+        tgt = tmp_delta_path("gen_ud_tgt")
+        create_delta_table(
+            spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}, {"id": 2, "name": "Bob", "seq": 0}]
+        )
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Bea", "op": "D", "seq": 2},
+                {"id": 1, "name": "Bea", "op": "U", "seq": 1},
+            ]
+        )
+        cdc_config, write_config, load_config = self._config()
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        result = spark.read.format("delta").load(tgt)
+        assert {r["id"] for r in result.collect()} == {2}
+
+    def test_watermark_tie_delete_wins(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Equal watermark values resolve by op precedence: delete is terminal."""
+        tgt = tmp_delta_path("gen_tie_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Bea", "op": "U", "seq": 5},
+                {"id": 1, "name": "Bea", "op": "D", "seq": 5},
+            ]
+        )
+        cdc_config, write_config, load_config = self._config()
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        result = spark.read.format("delta").load(tgt)
+        assert result.count() == 0
+
+    def test_first_write_reduces_to_one_row_per_key(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """First write of a multi-change window creates one row per key at final state."""
+        tgt = tmp_delta_path("gen_fw_tgt")
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "A", "op": "I", "seq": 1},
+                {"id": 1, "name": "B", "op": "U", "seq": 2},
+            ]
+        )
+        cdc_config, write_config, load_config = self._config()
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        result = spark.read.format("delta").load(tgt)
+        rows = {r["id"]: r["name"] for r in result.collect()}
+        assert rows == {1: "B"}
+
+    def test_insert_only_feed_not_reduced(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Without an ordering column, insert-only feeds keep appending every event."""
+        tgt = tmp_delta_path("gen_insonly_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "val": "a"}])
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 2, "val": "b", "op": "I"},
+                {"id": 2, "val": "b2", "op": "I"},
+            ]
+        )
+        cdc_config = CdcConfig(operation_column="op", insert_value="I")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        counts = execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config)
+
+        assert counts["inserts"] == 2
+        result = spark.read.format("delta").load(tgt)
+        assert result.count() == 3
+
+
 class TestCdcDeltaCdf:
     """CDC with Delta Change Data Feed preset."""
 

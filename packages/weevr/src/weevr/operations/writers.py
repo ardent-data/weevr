@@ -8,9 +8,10 @@ from pyspark.sql.window import Window
 
 from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
-from weevr.model.load import CdcConfig
+from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
+from weevr.operations.readers import typed_watermark_col
 
 
 def quote_identifier(name: str) -> str:
@@ -279,11 +280,19 @@ def execute_cdc_merge(
     target_path: str,
     write_config: WriteConfig,
     cdc_config: CdcConfig,
+    *,
+    load_config: LoadConfig | None = None,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
     Rows are classified by the ``operation_column`` and merged against
     the target table using the ``match_keys`` from ``write_config``.
+
+    Before counting and merging, the change window is reduced to the
+    latest state per key: the CDF preset orders by ``_commit_version``;
+    generic CDC orders by the watermark column carried on ``load_config``.
+    A generic mapping without a watermark column (insert-only feeds) is
+    not reduced — every row is treated as an event.
 
     Args:
         spark: Active SparkSession.
@@ -291,6 +300,8 @@ def execute_cdc_merge(
         target_path: Path to the Delta target table.
         write_config: Write configuration (must be merge mode with match_keys).
         cdc_config: CDC configuration (preset or explicit mapping).
+        load_config: Thread-level load configuration; supplies the
+            watermark ordering for generic CDC reduction.
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -344,6 +355,23 @@ def execute_cdc_merge(
             op_col,
             op_precedence,
             [F.col("_commit_version")],
+        )
+    elif (
+        load_config is not None
+        and load_config.watermark_column is not None
+        and load_config.watermark_type is not None
+    ):
+        ordering = typed_watermark_col(
+            load_config.watermark_column,
+            load_config.watermark_type,
+            load_config.watermark_format,
+        )
+        df = _reduce_to_latest_per_key(
+            df,
+            write_config.match_keys,
+            op_col,
+            op_precedence,
+            [ordering],
         )
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
