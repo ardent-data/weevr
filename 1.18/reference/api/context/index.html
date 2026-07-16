@@ -11328,8 +11328,9 @@ computed.</p>
             <td>
               <div class="doc-md-description">
                 <p>If a circular dependency is detected (with cycle path in
-the message), or if an explicit dependency references a thread that
-does not exist in <code>threads</code>.</p>
+the message), if an explicit dependency references a thread that
+does not exist in <code>threads</code>, or if two or more threads write the
+same target without explicit dependencies ordering them.</p>
               </div>
             </td>
           </tr>
