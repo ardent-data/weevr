@@ -681,6 +681,26 @@ class TestValidateMode:
         assert result.status == "success"
         assert result.validation_errors is None
 
+    def test_validate_duplicate_target_threads(self, spark: SparkSession, tmp_path: Path) -> None:
+        """Two unordered threads writing one target fail validation, not execution."""
+        src = str(tmp_path / "src_dup")
+        tgt = str(tmp_path / "tgt_dup")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "load_jan", src, tgt)
+        _create_thread_yaml(project, "load_feb", src, tgt)
+        weave_yaml = _create_weave_yaml(project, "vdup", ["load_jan", "load_feb"])
+        ctx = Context(spark=spark, project=project)
+        result = ctx.run(weave_yaml, mode="validate")
+
+        assert result.status == "failure"
+        assert result.validation_errors is not None
+        assert any(
+            "load_jan" in e and "load_feb" in e and "DAG validation failed" in e
+            for e in result.validation_errors
+        )
+
     def test_validate_missing_source(self, spark: SparkSession, tmp_path: Path) -> None:
         tgt = str(tmp_path / "tgt_miss")
         yaml_path = _create_thread_yaml(tmp_path, "vmiss", "/nonexistent/path", tgt)
