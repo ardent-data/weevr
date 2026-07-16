@@ -111,54 +111,24 @@ def _extract_source_paths(thread: Thread) -> set[str]:
     return paths
 
 
-def _build_target_index(threads: dict[str, Thread]) -> dict[str, str]:
-    """Build a mapping of normalized target path to thread name.
-
-    Used by the dependency graph builder and lookup dependency inference to
-    identify which thread produces a given data path.
-
-    Args:
-        threads: Mapping of thread name to Thread config.
-
-    Returns:
-        A dict mapping normalized target path to the producing thread's name.
-    """
-    target_index: dict[str, str] = {}
-    for name, thread in threads.items():
-        path = _extract_target_path(thread)
-        if path is not None:
-            target_index[path] = name
-    return target_index
-
-
-def _build_dependency_graph(
+def _build_explicit_index(
     threads: dict[str, Thread],
     thread_entries: list[ThreadEntry],
-    target_index: dict[str, str] | None = None,
-) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
-    """Build inferred and explicit dependency dicts.
-
-    For each thread, auto-infers an edge when another thread's target path
-    appears in this thread's source paths. Also merges explicit dependencies
-    declared on ThreadEntry objects.
+) -> dict[str, list[str]]:
+    """Build the explicit dependency index from ThreadEntry declarations.
 
     Args:
         threads: Mapping of thread name to Thread config.
         thread_entries: Ordered thread entries from the weave config.
-        target_index: Pre-built target path index. Built internally when ``None``.
 
     Returns:
-        A ``(inferred_deps, explicit_deps)`` tuple where each is a
-        ``dict[thread_name, list[upstream_thread_name]]``.
+        A dict mapping each thread name to its explicitly declared upstream
+        thread names (empty list when none are declared).
 
     Raises:
         ConfigError: If a thread referenced in explicit dependencies does not
             exist in the ``threads`` dict.
     """
-    if target_index is None:
-        target_index = _build_target_index(threads)
-
-    # Build explicit deps index from ThreadEntry list
     explicit_index: dict[str, list[str]] = {name: [] for name in threads}
     for entry in thread_entries:
         effective_name = entry.as_ or entry.name or (Path(entry.ref).stem if entry.ref else "")
@@ -170,8 +140,114 @@ def _build_dependency_graph(
                         f"but '{dep}' is not defined in the weave"
                     )
             explicit_index[effective_name] = list(entry.dependencies)
+    return explicit_index
 
-    # Infer dependencies from path matching
+
+def _upstream_closure(start: str, explicit_index: dict[str, list[str]]) -> set[str]:
+    """Return every thread reachable upstream from ``start`` via explicit deps."""
+    seen: set[str] = set()
+    stack = list(explicit_index.get(start, []))
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(explicit_index.get(node, []))
+    return seen
+
+
+def _resolve_writer_chain(
+    writers: list[str],
+    explicit_index: dict[str, list[str]],
+) -> str | None:
+    """Return the last writer if explicit dependencies totally order ``writers``.
+
+    Writers are totally ordered when every pair is comparable via the
+    transitive explicit-dependency relation (possibly through intermediate
+    threads) and exactly one writer sits downstream of all the others.
+    Returns ``None`` when the writers are not totally ordered.
+    """
+    closures = {w: _upstream_closure(w, explicit_index) for w in writers}
+    for i, a in enumerate(writers):
+        for b in writers[i + 1 :]:
+            if a not in closures[b] and b not in closures[a]:
+                return None
+    terminals = [w for w in writers if all(o in closures[w] for o in writers if o != w)]
+    if len(terminals) != 1:
+        return None
+    return terminals[0]
+
+
+def _build_target_index(
+    threads: dict[str, Thread],
+    explicit_index: dict[str, list[str]],
+    weave_name: str,
+) -> dict[str, str]:
+    """Build a mapping of normalized target path to producing thread name.
+
+    Used by thread and lookup dependency inference to identify which thread
+    produces a given data path.
+
+    A target written by two or more threads is rejected unless explicit
+    dependencies totally order the writers: unordered writers would land in
+    one parallel group and race concurrent writes against a single table.
+    For an ordered writer chain, the target resolves to the last writer, so
+    downstream consumers run after the target's final state exists.
+
+    Args:
+        threads: Mapping of thread name to Thread config.
+        explicit_index: Explicit dependency index, used to check whether
+            same-target writers are serialized by declared dependencies.
+        weave_name: Weave name for error messages.
+
+    Returns:
+        A dict mapping normalized target path to the producing thread's name.
+
+    Raises:
+        ConfigError: If two or more threads write the same target without
+            explicit dependencies totally ordering them.
+    """
+    writers_by_path: dict[str, list[str]] = {}
+    for name, thread in threads.items():
+        path = _extract_target_path(thread)
+        if path is not None:
+            writers_by_path.setdefault(path, []).append(name)
+
+    target_index: dict[str, str] = {}
+    for path, writers in writers_by_path.items():
+        if len(writers) == 1:
+            target_index[path] = writers[0]
+            continue
+        last_writer = _resolve_writer_chain(writers, explicit_index)
+        if last_writer is None:
+            names = ", ".join(f"'{n}'" for n in sorted(writers))
+            raise ConfigError(
+                f"Threads {names} all write target '{path}' in weave "
+                f"'{weave_name}' but are not ordered by explicit dependencies, "
+                f"so concurrent writes would corrupt the target. Declare "
+                f"explicit dependencies to serialize the writers, or give each "
+                f"thread its own target."
+            )
+        target_index[path] = last_writer
+    return target_index
+
+
+def _infer_dependencies(
+    threads: dict[str, Thread],
+    target_index: dict[str, str],
+) -> dict[str, list[str]]:
+    """Build the inferred dependency dict from source/target path matching.
+
+    For each thread, auto-infers an edge when another thread's target path
+    appears in this thread's source paths.
+
+    Args:
+        threads: Mapping of thread name to Thread config.
+        target_index: Pre-built target path index.
+
+    Returns:
+        A ``dict[thread_name, list[upstream_thread_name]]`` of inferred edges.
+    """
     inferred: dict[str, list[str]] = {name: [] for name in threads}
     for name, thread in threads.items():
         source_paths = _extract_source_paths(thread)
@@ -179,8 +255,7 @@ def _build_dependency_graph(
             producer = target_index.get(src_path)
             if producer is not None and producer != name and producer not in inferred[name]:
                 inferred[name].append(producer)
-
-    return inferred, explicit_index
+    return inferred
 
 
 def _merge_dependencies(
@@ -450,16 +525,21 @@ def build_plan(
 
     Raises:
         ConfigError: If a circular dependency is detected (with cycle path in
-            the message), or if an explicit dependency references a thread that
-            does not exist in ``threads``.
+            the message), if an explicit dependency references a thread that
+            does not exist in ``threads``, or if two or more threads write the
+            same target without explicit dependencies ordering them.
     """
     thread_names = list(threads.keys())
 
-    # 0. Build shared target index
-    target_index = _build_target_index(threads)
+    # 0. Build the explicit dependency index first — the target index needs it
+    #    to decide whether same-target writers are serialized.
+    explicit = _build_explicit_index(threads, thread_entries)
 
-    # 1. Build inferred and explicit dependency graphs
-    inferred, explicit = _build_dependency_graph(threads, thread_entries, target_index)
+    # 0b. Build shared target index (rejects unordered duplicate targets)
+    target_index = _build_target_index(threads, explicit, weave_name)
+
+    # 1. Infer data-based dependencies from source/target path matching
+    inferred = _infer_dependencies(threads, target_index)
 
     # 1b. Infer lookup-mediated dependencies when lookups are provided
     lookup_deps: dict[str, list[str]] | None = None

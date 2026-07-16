@@ -65,18 +65,24 @@ execute -> aggregate: results + telemetry
 
 The planner builds a DAG from thread configurations:
 
-1. **Infer dependencies** — If thread B reads from thread A's target path, B
+1. **Check target ownership** — Each target may have only one writing thread,
+   unless explicit dependencies fully serialize the writers into a chain.
+   Unordered threads sharing a target are rejected with a `ConfigError` naming
+   the target and every writer — running them concurrently would corrupt the
+   table. For an ordered chain, downstream consumers depend on the *last*
+   writer, so they always see the target's final state.
+2. **Infer dependencies** — If thread B reads from thread A's target path, B
    depends on A. This happens automatically by matching source paths/aliases
    to target paths/aliases across all threads.
-2. **Merge explicit dependencies** — Weave entries can declare additional
+3. **Merge explicit dependencies** — Weave entries can declare additional
    dependencies that are not data-based (e.g., ordering constraints).
-3. **Detect cycles** — DFS with three-color marking (white/gray/black) finds
+4. **Detect cycles** — DFS with three-color marking (white/gray/black) finds
    back edges. If a cycle exists, execution fails immediately with a clear
    error showing the cycle path.
-4. **Topological sort** — Kahn's algorithm produces a sequence of parallel
+5. **Topological sort** — Kahn's algorithm produces a sequence of parallel
    groups. Threads within a group have no mutual dependencies and can run
    concurrently.
-5. **Analyze cache targets** — Threads with two or more downstream dependents
+6. **Analyze cache targets** — Threads with two or more downstream dependents
    are flagged for caching, unless the thread explicitly sets `cache: false`.
    Setting `cache: true` is a no-op — it only prevents `cache: false`
    suppression but does not force caching for threads with fewer than two
