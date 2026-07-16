@@ -2154,6 +2154,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.collect_execution_scope_warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        collect_execution_scope_warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.collect_trace_composition_warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        collect_trace_composition_warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.validate_schema" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2213,6 +2235,17 @@
     <span class="md-ellipsis">
       
         execute_weave
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.resolve_effective_execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_effective_execution
       
     </span>
   </a>
@@ -3188,6 +3221,34 @@
     
   
     Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
   
 
     
@@ -5294,6 +5355,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.collect_execution_scope_warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        collect_execution_scope_warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.collect_trace_composition_warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        collect_trace_composition_warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.validate_schema" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5353,6 +5436,17 @@
     <span class="md-ellipsis">
       
         execute_weave
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.resolve_effective_execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_effective_execution
       
     </span>
   </a>
@@ -8667,7 +8761,7 @@ and execution configuration. Provides <code>run()</code> for execution and
                 <code>log_level</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="str">str</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8676,7 +8770,7 @@ and execution configuration. Provides <code>run()</code> for execution and
               </div>
             </td>
             <td>
-                  <code>&#39;standard&#39;</code>
+                  <code>None</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -8831,7 +8925,7 @@ by <code>workspace</code> and <code>lakehouse</code> (Tier 2 OneLake).</p>
 
 
 <h4 id="weevr.context.Context.__init__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="s1">&#39;standard&#39;</span><span class="p">,</span> <span class="n">workspace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lakehouse</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">workspace</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lakehouse</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.Context.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
 
@@ -10437,6 +10531,193 @@ added to the set for post-resolution unused-param analysis.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="weevr.context.collect_execution_scope_warnings" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">collect_execution_scope_warnings</span><span class="p">(</span><span class="n">defaults_by_scope</span><span class="p">,</span> <span class="n">threads</span><span class="p">)</span></code>
+
+<a href="#weevr.context.collect_execution_scope_warnings" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Collect warnings for execution settings that will not apply.</p>
+<p>Thread-scoped <code>execution:</code> blocks are declared but uniformly not
+applied in v1.x, whether authored on the thread or arrived via a
+<code>defaults.execution</code> cascade. Warnings are deduplicated per origin:
+one per scope whose <code>defaults</code> carries an <code>execution</code> block, and
+one per thread that authored its own block.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>defaults_by_scope</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(scope label, defaults dict)</code> pairs for each
+enclosing scope (e.g. <code>("loom 'nightly'", {...})</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>threads</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Raw thread config dicts <em>before</em> the inheritance cascade,
+so an <code>execution</code> key means the thread authored it.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Warning strings, one per distinct origin.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.collect_trace_composition_warnings" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">collect_trace_composition_warnings</span><span class="p">(</span><span class="n">loom_execution</span><span class="p">,</span> <span class="n">weave_executions</span><span class="p">)</span></code>
+
+<a href="#weevr.context.collect_trace_composition_warnings" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Warn when a weave's explicit <code>trace: true</code> cannot re-enable tracing.</p>
+<p>The root span collector exists (or not) for the whole run: under a loom
+whose effective <code>trace</code> is false there is nothing for a weave to
+attach to, so an explicit <code>trace: true</code> on the weave is a no-op.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>loom_execution</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The loom's hydrated <code>ExecutionConfig</code> (or None).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>weave_executions</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Hydrated weave <code>ExecutionConfig</code> (or None) by
+weave name.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Warning strings, one per weave with an ineffective <code>trace: true</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="weevr.context.validate_schema" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">validate_schema</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">config_type</span><span class="p">)</span></code>
 
@@ -11064,7 +11345,7 @@ does not exist in <code>threads</code>.</p>
 
 
 <h3 id="weevr.context.execute_loom" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_loom</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">loom</span><span class="p">,</span> <span class="n">weaves</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_loom</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">loom</span><span class="p">,</span> <span class="n">weaves</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_loom" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -11169,6 +11450,26 @@ and passes it through the execution tree.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>log_level</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LogLevel (weevr.model.execution.LogLevel)" href="#weevr.context.LogLevel">LogLevel</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The run's baseline log level. When set, a weave whose
+effective level differs is applied at that weave's start and
+restored afterward (weaves execute sequentially, so this is
+race-free). When None, YAML log levels are suppressed — the
+caller gave an explicit runtime override.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -11214,7 +11515,7 @@ and passes it through the execution tree.</p>
 
 
 <h3 id="weevr.context.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execution</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -11539,6 +11840,25 @@ resolve their lakehouse target.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>execution</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionConfig (weevr.model.execution.ExecutionConfig)" href="../model/#weevr.model.ExecutionConfig">ExecutionConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Effective execution settings for this weave (already
+merged by the caller — see <code>resolve_effective_execution</code>).
+<code>max_parallel_threads</code> caps each group's pool; unset means
+the pool is sized to the group.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -11569,6 +11889,101 @@ resolve their lakehouse target.</p>
             <td>
               <div class="doc-md-description">
                 <p>per-thread results.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.resolve_effective_execution" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_effective_execution</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">child</span><span class="p">)</span></code>
+
+<a href="#weevr.context.resolve_effective_execution" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the effective execution settings for a child scope.</p>
+<p>Merges field-level: a field the child explicitly set wins, otherwise
+a field the parent explicitly set, otherwise the field default.
+Explicitness is read from Pydantic's <code>model_fields_set</code> — required
+because <code>log_level</code> and <code>trace</code> have non-None defaults, so
+explicit-vs-default is only knowable on hydrated instances.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>parent</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionConfig (weevr.model.execution.ExecutionConfig)" href="../model/#weevr.model.ExecutionConfig">ExecutionConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The enclosing scope's <code>execution:</code> block (e.g. Loom),
+or None when absent.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>child</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionConfig (weevr.model.execution.ExecutionConfig)" href="../model/#weevr.model.ExecutionConfig">ExecutionConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The narrower scope's <code>execution:</code> block (e.g. Weave),
+or None when absent.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionConfig (weevr.model.execution.ExecutionConfig)" href="../model/#weevr.model.ExecutionConfig">ExecutionConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new ExecutionConfig holding the effective field values.</p>
               </div>
             </td>
           </tr>

@@ -1966,6 +1966,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/engine-internals/" class="md-nav__link">
         
   
@@ -3330,7 +3358,7 @@ runtime settings.</p>
 <td><code>ExecutionConfig</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Runtime settings (logging, tracing) cascaded to threads</td>
+<td>Runtime settings: <code>log_level</code>, <code>trace</code>, <code>max_parallel_threads</code>. Explicitly set fields override the loom's. See the <a href="../../../guides/execution-settings/">Execution Settings guide</a>.</td>
 </tr>
 <tr>
 <td><code>naming</code></td>
@@ -3983,7 +4011,10 @@ config as <code>${var.name}</code>.</p>
 </code></pre></div>
 <hr />
 <h2 id="execution-executionconfig">execution (ExecutionConfig)<a class="headerlink" href="#execution-executionconfig" title="Permanent link">&para;</a></h2>
-<p>Cascades to all threads within the weave. Thread-level settings override these.</p>
+<p>Merges field-level with the loom's block — an explicitly set weave field
+wins, otherwise the loom's value applies. Thread-level <code>execution:</code>
+blocks are declared but not applied. See the
+<a href="../../../guides/execution-settings/">Execution Settings guide</a>.</p>
 <table>
 <thead>
 <tr>
@@ -4008,6 +4039,13 @@ config as <code>${var.name}</code>.</p>
 <td>no</td>
 <td><code>true</code></td>
 <td>Collect execution spans for telemetry</td>
+</tr>
+<tr>
+<td><code>max_parallel_threads</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>unset</td>
+<td>Cap on concurrently executing threads per group (<code>&gt;= 1</code>); unset means unbounded</td>
 </tr>
 </tbody>
 </table>

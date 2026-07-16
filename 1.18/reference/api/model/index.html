@@ -2586,6 +2586,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/engine-internals/" class="md-nav__link">
         
   
@@ -5472,7 +5500,12 @@ return type; <code>string</code> casts to StringType.</p>
 
 
 
-        <p>Runtime execution settings that cascade through loom/weave/thread.</p>
+        <p>Runtime execution settings declared on the top-level <code>execution:</code> block.</p>
+<p>Canonical declaration sites are the top-level <code>execution:</code> field on
+Loom and Weave. The effective settings for a weave execution merge
+field-level (see :func:<code>resolve_effective_execution</code>) rather than
+replacing whole-block. Thread-scoped execution settings are declared
+but not applied in v1.x.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -5504,6 +5537,19 @@ return type; <code>string</code> casts to StringType.</p>
             <td>
               <div class="doc-md-description">
                 <p>Whether to collect execution spans for telemetry.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.model.ExecutionConfig.max_parallel_threads">max_parallel_threads</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Upper bound on concurrently executing
+threads within a weave's parallel group. Unset means
+unbounded (pool sized to the group).</p>
               </div>
             </td>
           </tr>

@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.18/guides/resolve/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.18/guides/execution-settings/">
       
       
-        <link rel="prev" href="../fact-tables/">
+        <link rel="prev" href="../observability/">
       
       
-        <link rel="next" href="../sub-pipelines/">
+        <link rel="next" href="../engine-internals/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Resolve Step - weevr</title>
+        <title>Execution Settings - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#resolve-step-fk-resolution" class="md-skip">
+        <a href="#execution-settings" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Resolve Step
+              Execution Settings
             
           </span>
         </div>
@@ -1689,10 +1689,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../execution-settings/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1708,6 +1735,92 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-loom-and-weave-blocks-combine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How loom and weave blocks combine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thread-parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread parallelism
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#log-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log level
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tracing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thread-scoped-execution-is-not-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread-scoped execution is not applied
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1913,37 +2026,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Resolve Step
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../resolve/" class="md-nav__link">
         
   
   
@@ -1959,197 +2045,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-resolve" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why resolve?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#single-fk-resolve" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Single FK resolve
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sentinel-values" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sentinel values
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scd2-resolution-effective-block" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SCD2 resolution — effective block
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="SCD2 resolution — effective block">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-flag" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current flag
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#date-range" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Date range
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-predicate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where predicate
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#include-columns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Include columns
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#normalization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Normalization
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dropping-source-columns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dropping source columns
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#duplicate-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Duplicate handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#batch-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Batch mode
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#on_failure-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_failure handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#fk_sentinel_rate-assertion" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        fk_sentinel_rate assertion
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resolution-statistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resolution statistics
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2974,10 +2869,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-resolve" class="md-nav__link">
+  <a href="#fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why resolve?
+        Fields
       
     </span>
   </a>
@@ -2985,10 +2880,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#single-fk-resolve" class="md-nav__link">
+  <a href="#how-loom-and-weave-blocks-combine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Single FK resolve
+        How loom and weave blocks combine
       
     </span>
   </a>
@@ -2996,10 +2891,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sentinel-values" class="md-nav__link">
+  <a href="#thread-parallelism" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sentinel values
+        Thread parallelism
       
     </span>
   </a>
@@ -3007,49 +2902,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scd2-resolution-effective-block" class="md-nav__link">
+  <a href="#log-level" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SCD2 resolution — effective block
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="SCD2 resolution — effective block">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-flag" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current flag
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#date-range" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Date range
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-predicate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where predicate
+        Log level
       
     </span>
   </a>
@@ -3057,10 +2913,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#include-columns" class="md-nav__link">
+  <a href="#tracing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Include columns
+        Tracing
       
     </span>
   </a>
@@ -3068,76 +2924,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#normalization" class="md-nav__link">
+  <a href="#thread-scoped-execution-is-not-applied" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Normalization
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dropping-source-columns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dropping source columns
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#duplicate-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Duplicate handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#batch-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Batch mode
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#on_failure-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        on_failure handling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#fk_sentinel_rate-assertion" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        fk_sentinel_rate assertion
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resolution-statistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resolution statistics
+        Thread-scoped execution is not applied
       
     </span>
   </a>
@@ -3164,242 +2954,115 @@
   
 
 
-<h1 id="resolve-step-fk-resolution">Resolve Step — FK Resolution<a class="headerlink" href="#resolve-step-fk-resolution" title="Permanent link">&para;</a></h1>
-<p>The <code>resolve</code> step encapsulates the complete foreign key
-resolution pattern: validate business key completeness, join
-to a dimension lookup, assign sentinel values for invalid and
-unknown BKs, handle SCD2 point-in-time narrowing, and
-optionally include extra columns from the lookup.</p>
-<h2 id="why-resolve">Why resolve?<a class="headerlink" href="#why-resolve" title="Permanent link">&para;</a></h2>
-<p>Without <code>resolve</code>, FK resolution requires chaining <code>join</code> +
-<code>derive</code> + <code>filter</code> + <code>coalesce</code> steps — verbose, error-prone,
-and lacking standardized sentinel handling. The <code>resolve</code> step
-replaces that entire chain with one declarative block.</p>
-<p><strong>Value over manual steps:</strong></p>
-<ol>
-<li>Sentinel assignment replaces join + coalesce + case_when</li>
-<li>BK completeness check (null/blank detection) is automatic</li>
-<li>Single output column — no cleanup of extra join columns</li>
-<li>Batch mode — 8 FKs in one block vs 8 join chains</li>
-<li>Lookup integration — references lookups by name</li>
-<li><code>fk_sentinel_rate</code> assertion — purpose-built FK quality gate</li>
-</ol>
-<h2 id="single-fk-resolve">Single FK resolve<a class="headerlink" href="#single-fk-resolve" title="Permanent link">&para;</a></h2>
-<p>The simplest form maps a source column to a lookup business key
-and produces a surrogate key column:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
+<h1 id="execution-settings">Execution Settings<a class="headerlink" href="#execution-settings" title="Permanent link">&para;</a></h1>
+<p>The <code>execution:</code> block controls runtime behavior — logging verbosity,
+telemetry collection, and thread parallelism. It is declared at the
+<strong>top level</strong> of a loom or weave file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># nightly.loom</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">max_parallel_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w">   </span><span class="c1"># capacity-wide default</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># facts.weave — inherits the cap, overrides logging only</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verbose</span>
 </code></pre></div>
-<p><code>match</code> supports three sugar forms:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># String — single column, same name both sides</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">natural_id</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Equivalent to: { natural_id: natural_id }</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># List — multiple columns, same names</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">mandt</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">plant</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Equivalent to: { mandt: mandt, plant: plant }</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># Dict — explicit mapping (different column names)</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nt">match</span><span class="p">:</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">plant_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">natural_id</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region_code</span>
-</code></pre></div>
-<h2 id="sentinel-values">Sentinel values<a class="headerlink" href="#sentinel-values" title="Permanent link">&para;</a></h2>
-<p>Rows with incomplete or unmatched BKs receive sentinel values
-instead of nulls:</p>
+<h2 id="fields">Fields<a class="headerlink" href="#fields" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Scenario</th>
+<th>Field</th>
+<th>Type</th>
 <th>Default</th>
-<th>Config field</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Null/blank source column</td>
-<td><code>-4</code></td>
-<td><code>on_invalid</code></td>
+<td><code>log_level</code></td>
+<td><code>minimal</code> | <code>standard</code> | <code>verbose</code> | <code>debug</code></td>
+<td><code>standard</code></td>
+<td>Logging verbosity for execution output</td>
 </tr>
 <tr>
-<td>No match in lookup</td>
-<td><code>-1</code></td>
-<td><code>on_unknown</code></td>
+<td><code>trace</code></td>
+<td><code>bool</code></td>
+<td><code>true</code></td>
+<td>Whether execution spans are collected for telemetry</td>
+</tr>
+<tr>
+<td><code>max_parallel_threads</code></td>
+<td><code>int &gt;= 1</code></td>
+<td>unset</td>
+<td>Upper bound on concurrently executing threads within a weave's parallel group; unset means unbounded</td>
 </tr>
 </tbody>
 </table>
-<p>These align with system member codes from dimension seeding.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">on_invalid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">on_unknown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<h2 id="how-loom-and-weave-blocks-combine">How loom and weave blocks combine<a class="headerlink" href="#how-loom-and-weave-blocks-combine" title="Permanent link">&para;</a></h2>
+<p>The effective settings for each weave merge <strong>field-level</strong>: a field the
+weave explicitly sets wins; otherwise the loom's value applies; otherwise
+the default. In the example above, the <code>facts</code> weave runs with
+<code>log_level: verbose</code> <em>and</em> the loom's cap of 3 — declaring a
+logging-only block does not drop an inherited capacity cap.</p>
+<p>This is a deliberate exception to the usual cascade rule where value
+blocks replace whole-value. The <code>execution:</code> block is the only top-level
+block that merges per field.</p>
+<h2 id="thread-parallelism">Thread parallelism<a class="headerlink" href="#thread-parallelism" title="Permanent link">&para;</a></h2>
+<p>Threads inside a weave execute in dependency-ordered groups; threads
+within a group run concurrently. By default each group's worker pool is
+sized to the group, so six independent facts contend for the same Spark
+executors at once. <code>max_parallel_threads</code> bounds that concurrency:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">max_parallel_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
 </code></pre></div>
-<h2 id="scd2-resolution-effective-block">SCD2 resolution — effective block<a class="headerlink" href="#scd2-resolution-effective-block" title="Permanent link">&para;</a></h2>
-<p>For slowly changing dimensions, the <code>effective</code> block narrows
-the lookup to the correct version of each record.</p>
-<h3 id="current-flag">Current flag<a class="headerlink" href="#current-flag" title="Permanent link">&para;</a></h3>
-<p>Filter to the active record using a boolean or coded column:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product_id</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product_code</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">effective</span><span class="p">:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="nt">current</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_current</span>
-</code></pre></div>
-<p>Custom value (e.g. <code>"Y"</code> instead of <code>true</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">effective</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">current</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_current</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Y&quot;</span>
-</code></pre></div>
-<h3 id="date-range">Date range<a class="headerlink" href="#date-range" title="Permanent link">&para;</a></h3>
-<p>Half-open interval <code>[from, to)</code> checked against a fact date
-column. Null <code>to</code> matches as the current record:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product_id</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product_code</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nt">effective</span><span class="p">:</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="nt">date_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_date</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">effective_from</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">      </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">effective_to</span>
-</code></pre></div>
-<h2 id="where-predicate">Where predicate<a class="headerlink" href="#where-predicate" title="Permanent link">&para;</a></h2>
-<p>General SQL filter applied to the lookup before joining:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="nt">where</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;region</span><span class="nv"> </span><span class="s">=</span><span class="nv"> </span><span class="s">&#39;EMEA&#39;&quot;</span>
-</code></pre></div>
-<p><code>effective</code> and <code>where</code> compose with AND semantics — both
-filters apply when present together.</p>
-<h2 id="include-columns">Include columns<a class="headerlink" href="#include-columns" title="Permanent link">&para;</a></h2>
-<p>Bring additional columns from the lookup into the fact:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">include</span><span class="p">:</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">description</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">category</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">include_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;plant_&quot;</span>
-</code></pre></div>
-<p><code>include</code> supports list (keep names), dict (rename), or
-string sugar (single column). <code>include_prefix</code> prepends a
-string to all included column names.</p>
-<h2 id="normalization">Normalization<a class="headerlink" href="#normalization" title="Permanent link">&para;</a></h2>
-<p>Normalize both source and lookup BK columns before joining:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nt">normalize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">trim_lower</span>
-</code></pre></div>
-<p>Available presets: <code>trim_lower</code>, <code>trim_upper</code>, <code>trim</code>, <code>none</code>.</p>
-<h2 id="dropping-source-columns">Dropping source columns<a class="headerlink" href="#dropping-source-columns" title="Permanent link">&para;</a></h2>
-<p>After resolution, the original BK source columns can be dropped:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nt">drop_source_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</code></pre></div>
-<p>Defaults to <code>false</code>. In batch mode, source columns are dropped
-only after all FKs complete — preventing mid-batch failures
-when the same source column is used by multiple resolutions.</p>
-<h2 id="duplicate-handling">Duplicate handling<a class="headerlink" href="#duplicate-handling" title="Permanent link">&para;</a></h2>
-<p>When multiple lookup rows match a single fact row:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">on_duplicate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">    </span><span class="c1"># default — log warning, take first</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">on_duplicate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span><span class="w">   </span><span class="c1"># raise an exception</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nt">on_duplicate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">first</span><span class="w">   </span><span class="c1"># take first silently</span>
-</code></pre></div>
-<h2 id="batch-mode">Batch mode<a class="headerlink" href="#batch-mode" title="Permanent link">&para;</a></h2>
-<p>Resolve multiple FKs in one step with shared defaults:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="nt">pk</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">id</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">on_invalid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">on_unknown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">batch</span><span class="p">:</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">        </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_plant</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">        </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_code</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">        </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_customer</span>
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">        </span><span class="nt">match</span><span class="p">:</span>
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">          </span><span class="nt">customer_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">natural_id</span>
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">        </span><span class="nt">normalize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">trim_lower</span>
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product_id</span>
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">        </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dim_product</span>
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">        </span><span class="nt">match</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product_code</span>
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">        </span><span class="nt">effective</span><span class="p">:</span>
-<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">          </span><span class="nt">current</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">is_current</span>
-</code></pre></div>
-<p>Shared defaults (<code>pk</code>, <code>on_invalid</code>, etc.) apply to all items.
-Item-level values override the shared default. When
-<code>drop_source_columns: true</code>, source columns are dropped only
-after all FKs complete.</p>
-<h2 id="on_failure-handling">on_failure handling<a class="headerlink" href="#on_failure-handling" title="Permanent link">&para;</a></h2>
-<p>Control behavior when a lookup cannot be found (single mode):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abort</span><span class="w">   </span><span class="c1"># default — fail the thread</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">    </span><span class="c1"># assign on_unknown to all rows, continue</span>
-</code></pre></div>
-<p>In batch mode, a missing lookup always aborts regardless of
-<code>on_failure</code>.</p>
-<h2 id="fk_sentinel_rate-assertion">fk_sentinel_rate assertion<a class="headerlink" href="#fk_sentinel_rate-assertion" title="Permanent link">&para;</a></h2>
-<p>Post-write assertion that checks FK sentinel rates:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">assertions</span><span class="p">:</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="c1"># Single column, single sentinel</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fk_sentinel_rate</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">sentinel</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="nt">max_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.05</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;plant</span><span class="nv"> </span><span class="s">FK</span><span class="nv"> </span><span class="s">invalid</span><span class="nv"> </span><span class="s">rate</span><span class="nv"> </span><span class="s">exceeded&quot;</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">  </span><span class="c1"># Named sentinel groups with per-group rates</span>
-<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fk_sentinel_rate</span>
-<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">    </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plant_id</span>
-<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">    </span><span class="nt">sentinels</span><span class="p">:</span>
-<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">      </span><span class="nt">invalid</span><span class="p">:</span>
-<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
-<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">        </span><span class="nt">max_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.02</span>
-<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="w">      </span><span class="nt">unknown</span><span class="p">:</span>
-<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
-<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">        </span><span class="nt">max_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.10</span>
-<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="w">    </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;plant</span><span class="nv"> </span><span class="s">FK</span><span class="nv"> </span><span class="s">quality</span><span class="nv"> </span><span class="s">check&quot;</span>
-<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>
-<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="w">  </span><span class="c1"># Multiple columns, shared config</span>
-<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fk_sentinel_rate</span>
-<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">plant_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customer_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">product_id</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="w">    </span><span class="nt">sentinels</span><span class="p">:</span>
-<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a><span class="w">      </span><span class="nt">invalid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-4</span>
-<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a><span class="w">      </span><span class="nt">unknown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
-<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a><span class="w">    </span><span class="nt">max_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.10</span>
-</code></pre></div>
-<h2 id="resolution-statistics">Resolution statistics<a class="headerlink" href="#resolution-statistics" title="Permanent link">&para;</a></h2>
-<p>Each resolve step records per-FK statistics in the step
-result metadata:</p>
+<p>With a cap of 3, a six-thread group never has more than three threads in
+flight. Groups still execute sequentially, and dependency ordering and
+failure routing are unchanged. Size the cap to your Fabric capacity — a
+good starting point is the number of concurrent Spark jobs your pool
+serves without queueing.</p>
+<p>When tracing is on, the weave span records the effective cap and the
+per-group thread counts, so a capped run is identifiable in <code>RunResult</code>
+telemetry.</p>
+<h2 id="log-level">Log level<a class="headerlink" href="#log-level" title="Permanent link">&para;</a></h2>
+<p>Precedence, highest first:</p>
+<ol>
+<li>An explicit <code>Context(log_level=...)</code> argument — a runtime override
+   that beats any YAML setting for the whole run.</li>
+<li>The effective YAML value from the loom/weave <code>execution:</code> block.</li>
+<li>The default, <code>standard</code>.</li>
+</ol>
+<p>The effective level applies in every mode (<code>execute</code>, <code>validate</code>,
+<code>plan</code>, <code>preview</code>). During a loom run, a weave whose effective level
+differs from the loom's is applied for that weave and restored
+afterward — including when the weave fails.</p>
+<h2 id="tracing">Tracing<a class="headerlink" href="#tracing" title="Permanent link">&para;</a></h2>
+<p><code>trace: false</code> suppresses telemetry at the scope that declares it:</p>
 <ul>
-<li><code>total</code> — total fact rows processed</li>
-<li><code>matched</code> — rows with a successful FK match</li>
-<li><code>unknown</code> — rows assigned <code>on_unknown</code> sentinel</li>
-<li><code>invalid</code> — rows assigned <code>on_invalid</code> sentinel</li>
-<li><code>duplicates</code> — rows with multiple matches (before dedup)</li>
-<li><code>match_rate</code> — percentage of matched rows</li>
+<li><strong>Loom scope</strong> — no telemetry is collected for the run;
+  <code>RunResult.telemetry</code> is <code>None</code>.</li>
+<li><strong>Weave scope</strong> (under a tracing loom) — that weave's nodes are absent
+  from the telemetry tree; other weaves are unaffected.</li>
+<li><strong>Standalone weave run</strong> — the weave's own block gates collection.</li>
 </ul>
+<p>Tracing composes one-directionally: a weave can turn tracing <em>off</em> under
+a tracing loom, but <code>trace: true</code> on a weave cannot re-enable it under a
+loom whose effective <code>trace</code> is false — there is no root collector to
+attach to. Config validation warns when a weave declares an ineffective
+<code>trace: true</code>.</p>
+<p>Standalone thread runs always trace.</p>
+<h2 id="thread-scoped-execution-is-not-applied">Thread-scoped execution is not applied<a class="headerlink" href="#thread-scoped-execution-is-not-applied" title="Permanent link">&para;</a></h2>
+<p><code>execution:</code> on a <em>thread</em> — whether authored in the thread file or
+arrived via a <code>defaults.execution</code> block — is declared but <strong>not
+applied</strong> in v1.x, in any invocation shape. Within a weave the cap is a
+group property, and per-thread logging or tracing under parallel
+execution would race on global state.</p>
+<p><code>defaults.execution</code> is therefore not a recognized declaration site: it
+cascades to thread scope, where execution settings do not apply. A run
+whose configs declare either form logs a warning at start naming the
+unapplied fields and pointing at the top-level block:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>WARN: loom &#39;nightly&#39; declares defaults.execution (log_level) — thread-scoped
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>execution settings are not applied. Move them to the top-level execution
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>block on the loom or weave.
+</code></pre></div>
 
 
 

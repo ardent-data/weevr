@@ -2401,6 +2401,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/engine-internals/" class="md-nav__link">
         
   
@@ -4238,7 +4266,7 @@ target. This page documents every key accepted inside a thread YAML file.</p>
 <td><code>ExecutionConfig</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Runtime settings (logging, tracing)</td>
+<td>Declared but <strong>not applied</strong> at thread scope (a run-start warning names the unapplied fields). Declare execution settings on the loom or weave top level instead.</td>
 </tr>
 <tr>
 <td><code>cache</code></td>
@@ -7289,8 +7317,10 @@ in a weave when this thread fails.</p>
 </code></pre></div>
 <hr />
 <h2 id="execution">execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<p>Runtime execution settings. These cascade from loom to weave to thread, with
-the most specific level winning.</p>
+<p>Declared but <strong>not applied</strong> at thread scope in v1.x — a run-start
+warning names the unapplied fields. Declare execution settings on the
+loom or weave top level instead. See the
+<a href="../../../guides/execution-settings/">Execution Settings guide</a>.</p>
 <table>
 <thead>
 <tr>
@@ -7315,6 +7345,13 @@ the most specific level winning.</p>
 <td>no</td>
 <td><code>true</code></td>
 <td>Collect execution spans for telemetry</td>
+</tr>
+<tr>
+<td><code>max_parallel_threads</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>unset</td>
+<td>Cap on concurrently executing threads per group (<code>&gt;= 1</code>)</td>
 </tr>
 </tbody>
 </table>
@@ -7602,11 +7639,7 @@ examples, schema overrides, and migration patterns.</p>
 <a id="__codelineno-54-71" name="__codelineno-54-71" href="#__codelineno-54-71"></a><span class="nt">failure</span><span class="p">:</span>
 <a id="__codelineno-54-72" name="__codelineno-54-72" href="#__codelineno-54-72"></a><span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_downstream</span>
 <a id="__codelineno-54-73" name="__codelineno-54-73" href="#__codelineno-54-73"></a>
-<a id="__codelineno-54-74" name="__codelineno-54-74" href="#__codelineno-54-74"></a><span class="nt">execution</span><span class="p">:</span>
-<a id="__codelineno-54-75" name="__codelineno-54-75" href="#__codelineno-54-75"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">standard</span>
-<a id="__codelineno-54-76" name="__codelineno-54-76" href="#__codelineno-54-76"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-54-77" name="__codelineno-54-77" href="#__codelineno-54-77"></a>
-<a id="__codelineno-54-78" name="__codelineno-54-78" href="#__codelineno-54-78"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">curated</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-54-74" name="__codelineno-54-74" href="#__codelineno-54-74"></a><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">curated</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 
 

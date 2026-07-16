@@ -2087,6 +2087,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/engine-internals/" class="md-nav__link">
         
   
@@ -5489,7 +5517,7 @@ does not exist in <code>threads</code>.</p>
 
 
 <h3 id="weevr.engine.execute_loom" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_loom</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">loom</span><span class="p">,</span> <span class="n">weaves</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_loom</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">loom</span><span class="p">,</span> <span class="n">weaves</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.engine.execute_loom" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5594,6 +5622,26 @@ and passes it through the execution tree.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>log_level</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LogLevel (weevr.model.execution.LogLevel)" href="../context/#weevr.context.LogLevel">LogLevel</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The run's baseline log level. When set, a weave whose
+effective level differs is applied at that weave's start and
+restored afterward (weaves execute sequentially, so this is
+race-free). When None, YAML log levels are suppressed — the
+caller gave an explicit runtime override.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -5639,7 +5687,7 @@ and passes it through the execution tree.</p>
 
 
 <h3 id="weevr.engine.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execution</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.engine.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5958,6 +6006,25 @@ unpersists them.</p>
                 <p>Merged loom + weave connections forwarded to
 <code>materialize_column_sets</code> so connection-backed column sets can
 resolve their lakehouse target.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>execution</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ExecutionConfig (weevr.model.execution.ExecutionConfig)" href="../model/#weevr.model.ExecutionConfig">ExecutionConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Effective execution settings for this weave (already
+merged by the caller — see <code>resolve_effective_execution</code>).
+<code>max_parallel_threads</code> caps each group's pool; unset means
+the pool is sized to the group.</p>
               </div>
             </td>
             <td>
