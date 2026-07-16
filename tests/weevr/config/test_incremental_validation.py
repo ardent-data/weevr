@@ -59,7 +59,10 @@ class TestValidateIncrementalConfig:
             "target": {"alias": "out"},
         }
         diags = validate_incremental_config(config)
-        assert any("ERROR" in d and "incremental_watermark" in d for d in diags)
+        errors = [d for d in diags if "ERROR" in d and "incremental_watermark" in d]
+        assert errors
+        # Explicitly configured overwrite must not be blamed on the default
+        assert all("(the default)" not in d for d in errors)
 
     def test_incremental_watermark_with_defaulted_overwrite_errors(self):
         """incremental_watermark with no write block (defaulted overwrite) produces error."""
@@ -69,7 +72,9 @@ class TestValidateIncrementalConfig:
             "target": {"alias": "out"},
         }
         diags = validate_incremental_config(config)
-        assert any("ERROR" in d and "incremental_watermark" in d for d in diags)
+        assert any(
+            "ERROR" in d and "incremental_watermark" in d and "(the default)" in d for d in diags
+        )
 
     def test_incremental_watermark_with_append_no_error(self):
         """incremental_watermark with write.mode=append produces no error."""

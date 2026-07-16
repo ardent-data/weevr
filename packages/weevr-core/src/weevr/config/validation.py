@@ -188,11 +188,10 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
         diagnostics.append(f"ERROR: cdc mode requires write.mode='merge', got '{write_mode}'")
 
     if mode == "incremental_watermark" and write_mode == "overwrite":
+        provenance = "" if "mode" in write else " (the default)"
         diagnostics.append(
             "ERROR: incremental_watermark mode requires write.mode='append' or "
-            "'merge', got 'overwrite' (the default): each run would overwrite "
-            "the target with only the incremental slice, permanently losing "
-            "prior history"
+            f"'merge', got 'overwrite'{provenance}"
         )
 
     if load.get("watermark_inclusive") and write_mode == "append":
