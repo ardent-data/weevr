@@ -155,6 +155,9 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
     - ``incremental_parameter`` mode should reference at least one ``${param.*}``
       variable in steps or sources (WARN if missing).
     - ``cdc`` mode requires ``write.mode: merge`` (ERROR if not).
+    - ``incremental_watermark`` mode with an effective ``write.mode: overwrite``
+      (explicit or defaulted) would replace the target with each incremental
+      slice (ERROR).
     - ``watermark_inclusive=True`` with ``write.mode: append`` is risky (WARN).
     """
     diagnostics: list[str] = []
@@ -183,6 +186,13 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
 
     if mode == "cdc" and write_mode != "merge":
         diagnostics.append(f"ERROR: cdc mode requires write.mode='merge', got '{write_mode}'")
+
+    if mode == "incremental_watermark" and write_mode == "overwrite":
+        provenance = "" if "mode" in write else " (the default)"
+        diagnostics.append(
+            "ERROR: incremental_watermark mode requires write.mode='append' or "
+            f"'merge', got 'overwrite'{provenance}"
+        )
 
     if load.get("watermark_inclusive") and write_mode == "append":
         diagnostics.append(

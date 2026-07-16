@@ -112,12 +112,17 @@ load:
   mode: incremental_watermark
   watermark_column: modified_date
   watermark_type: timestamp
+
+write:
+  mode: append
 ```
 
 On the first run, all rows are read. On subsequent runs, weevr reads only
 rows where the watermark column exceeds the stored high-water mark. The
 watermark state is persisted either as a Delta table property or in a
-dedicated metadata table.
+dedicated metadata table. An explicit `write.mode` of `append` or `merge`
+is required — the `overwrite` default fails validation because it would
+replace the target with each incremental slice.
 
 Supported watermark types: `timestamp`, `date`, `int`, `long`.
 
