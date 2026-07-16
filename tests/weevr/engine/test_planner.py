@@ -572,6 +572,75 @@ class TestLookupDependencyInference:
         assert plan.execution_order == [["A"], ["B"]]
 
 
+# ---------------------------------------------------------------------------
+# Duplicate-target detection tests
+# ---------------------------------------------------------------------------
+
+
+class TestDuplicateTargets:
+    """Two threads writing the same target must never race (GH #183)."""
+
+    def test_unordered_duplicate_alias_raises(self):
+        """Two no-dependency threads with the same target alias are rejected."""
+        threads = {
+            "load_jan": _make_thread("load_jan", target_alias="sales.monthly"),
+            "load_feb": _make_thread("load_feb", target_alias="sales.monthly"),
+        }
+        with pytest.raises(ConfigError, match=r"load_feb.*load_jan"):
+            build_plan("w", threads, _entries("load_jan", "load_feb"))
+
+    def test_error_names_target_weave_and_remediation(self):
+        """The error message carries the shared target, weave name, and guidance."""
+        threads = {
+            "load_jan": _make_thread("load_jan", target_alias="sales.monthly"),
+            "load_feb": _make_thread("load_feb", target_alias="sales.monthly"),
+        }
+        with pytest.raises(ConfigError) as exc_info:
+            build_plan("nightly", threads, _entries("load_jan", "load_feb"))
+        message = str(exc_info.value)
+        assert "sales.monthly" in message
+        assert "nightly" in message
+        assert "explicit dependencies" in message
+
+    def test_alias_vs_path_duplicate_raises(self):
+        """A target alias on one thread and an identical path on another collide."""
+        path_only_target = Thread.model_validate(
+            {
+                "name": "B",
+                "config_version": "1.0",
+                "sources": {"_default": {"type": "delta", "alias": "_default_src"}},
+                "target": {"path": "sales.monthly"},
+            }
+        )
+        threads = {
+            "A": _make_thread("A", target_alias="sales.monthly"),
+            "B": path_only_target,
+        }
+        with pytest.raises(ConfigError, match="sales.monthly"):
+            build_plan("w", threads, _entries("A", "B"))
+
+    def test_three_unordered_writers_all_named(self):
+        """Every writer of the shared target appears in the error message."""
+        threads = {
+            "A": _make_thread("A", target_alias="dup_x"),
+            "B": _make_thread("B", target_alias="dup_x"),
+            "C": _make_thread("C", target_alias="dup_x"),
+        }
+        with pytest.raises(ConfigError) as exc_info:
+            build_plan("w", threads, _entries("A", "B", "C"))
+        message = str(exc_info.value)
+        assert "A" in message and "B" in message and "C" in message
+
+    def test_distinct_targets_unaffected(self):
+        """Weaves without duplicate targets plan exactly as before."""
+        threads = {
+            "A": _make_thread("A", target_alias="out_a"),
+            "B": _make_thread("B", source_aliases=["out_a"], target_alias="out_b"),
+        }
+        plan = build_plan("w", threads, _entries("A", "B"))
+        assert plan.execution_order == [["A"], ["B"]]
+
+
 class TestExecutionPlanDisplay:
     """Tests for dag() and _repr_html_() on ExecutionPlan."""
 
