@@ -155,6 +155,10 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
     - ``incremental_parameter`` mode should reference at least one ``${param.*}``
       variable in steps or sources (WARN if missing).
     - ``cdc`` mode requires ``write.mode: merge`` (ERROR if not).
+    - ``cdc`` mode with an explicit mapping declaring ``update_value`` or
+      ``delete_value`` requires ``watermark_column`` — same-key changes have
+      no defined order without it (ERROR). Insert-only mappings and the
+      ``delta_cdf`` preset are exempt.
     - ``incremental_watermark`` mode with an effective ``write.mode: overwrite``
       (explicit or defaulted) would replace the target with each incremental
       slice (ERROR).
@@ -186,6 +190,16 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
 
     if mode == "cdc" and write_mode != "merge":
         diagnostics.append(f"ERROR: cdc mode requires write.mode='merge', got '{write_mode}'")
+
+    if mode == "cdc":
+        cdc = load.get("cdc") or {}
+        is_generic = cdc.get("operation_column") is not None
+        has_collision_ops = cdc.get("update_value") or cdc.get("delete_value")
+        if is_generic and has_collision_ops and not load.get("watermark_column"):
+            diagnostics.append(
+                "ERROR: cdc mode with update_value/delete_value requires "
+                "load.watermark_column to order same-key changes"
+            )
 
     if mode == "incremental_watermark" and write_mode == "overwrite":
         provenance = "" if "mode" in write else " (the default)"

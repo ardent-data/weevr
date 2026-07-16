@@ -98,6 +98,75 @@ class TestValidateIncrementalConfig:
         diags = validate_incremental_config(config)
         assert not any("ERROR" in d for d in diags)
 
+    def test_cdc_update_value_without_watermark_errors(self):
+        """Generic CDC with update_value but no watermark_column produces error."""
+        config = {
+            "load": {
+                "mode": "cdc",
+                "cdc": {"operation_column": "op", "insert_value": "I", "update_value": "U"},
+            },
+            "write": {"mode": "merge", "match_keys": ["id"]},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert any("ERROR" in d and "watermark_column" in d for d in diags)
+
+    def test_cdc_delete_value_without_watermark_errors(self):
+        """Generic CDC with delete_value but no watermark_column produces error."""
+        config = {
+            "load": {
+                "mode": "cdc",
+                "cdc": {"operation_column": "op", "insert_value": "I", "delete_value": "D"},
+            },
+            "write": {"mode": "merge", "match_keys": ["id"]},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert any("ERROR" in d and "watermark_column" in d for d in diags)
+
+    def test_cdc_insert_only_without_watermark_no_error(self):
+        """Insert-only generic CDC needs no ordering column."""
+        config = {
+            "load": {
+                "mode": "cdc",
+                "cdc": {"operation_column": "op", "insert_value": "I"},
+            },
+            "write": {"mode": "merge", "match_keys": ["id"]},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert not any("ERROR" in d and "watermark_column" in d for d in diags)
+
+    def test_cdc_update_value_with_watermark_no_error(self):
+        """Generic CDC with update_value and a watermark_column passes."""
+        config = {
+            "load": {
+                "mode": "cdc",
+                "watermark_column": "updated_at",
+                "watermark_type": "timestamp",
+                "cdc": {"operation_column": "op", "insert_value": "I", "update_value": "U"},
+            },
+            "write": {"mode": "merge", "match_keys": ["id"]},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert not any("ERROR" in d and "watermark_column" in d for d in diags)
+
+    def test_cdc_cdf_preset_without_watermark_no_error(self):
+        """The delta_cdf preset orders by commit version; no watermark needed."""
+        config = {
+            "load": {"mode": "cdc", "cdc": {"preset": "delta_cdf"}},
+            "write": {"mode": "merge", "match_keys": ["id"]},
+            "sources": {"src": {"type": "delta", "alias": "t"}},
+            "target": {"alias": "out"},
+        }
+        diags = validate_incremental_config(config)
+        assert not any("ERROR" in d and "watermark_column" in d for d in diags)
+
     def test_watermark_inclusive_with_append_warns(self):
         """watermark_inclusive=True with append produces warning."""
         config = {
