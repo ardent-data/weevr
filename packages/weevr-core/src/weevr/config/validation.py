@@ -20,6 +20,7 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 
 from weevr.errors import ConfigSchemaError
+from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
 from weevr.model.warp import WarpConfig
 
@@ -310,3 +311,81 @@ def validate_resolve_lookups(
                 )
 
     return diagnostics
+
+
+def collect_execution_scope_warnings(
+    defaults_by_scope: list[tuple[str, dict[str, Any] | None]],
+    threads: list[dict[str, Any]],
+) -> list[str]:
+    """Collect warnings for execution settings that will not apply.
+
+    Thread-scoped ``execution:`` blocks are declared but uniformly not
+    applied in v1.x, whether authored on the thread or arrived via a
+    ``defaults.execution`` cascade. Warnings are deduplicated per origin:
+    one per scope whose ``defaults`` carries an ``execution`` block, and
+    one per thread that authored its own block.
+
+    Args:
+        defaults_by_scope: ``(scope label, defaults dict)`` pairs for each
+            enclosing scope (e.g. ``("loom 'nightly'", {...})``).
+        threads: Raw thread config dicts *before* the inheritance cascade,
+            so an ``execution`` key means the thread authored it.
+
+    Returns:
+        Warning strings, one per distinct origin.
+    """
+    warnings: list[str] = []
+
+    for scope_label, defaults in defaults_by_scope:
+        if defaults and isinstance(defaults.get("execution"), dict):
+            fields = ", ".join(sorted(defaults["execution"]))
+            warnings.append(
+                f"WARN: {scope_label} declares defaults.execution ({fields}) — "
+                f"thread-scoped execution settings are not applied. Move them "
+                f"to the top-level execution block on the loom or weave."
+            )
+
+    for i, thread in enumerate(threads):
+        execution = thread.get("execution")
+        if isinstance(execution, dict) and execution:
+            name = thread.get("name") or f"#{i}"
+            fields = ", ".join(sorted(execution))
+            warnings.append(
+                f"WARN: thread '{name}' declares an execution block ({fields}) — "
+                f"thread-scoped execution settings are not applied. Move them "
+                f"to the top-level execution block on the loom or weave."
+            )
+
+    return warnings
+
+
+def collect_trace_composition_warnings(
+    loom_execution: Any,
+    weave_executions: dict[str, Any],
+) -> list[str]:
+    """Warn when a weave's explicit ``trace: true`` cannot re-enable tracing.
+
+    The root span collector exists (or not) for the whole run: under a loom
+    whose effective ``trace`` is false there is nothing for a weave to
+    attach to, so an explicit ``trace: true`` on the weave is a no-op.
+
+    Args:
+        loom_execution: The loom's hydrated ``ExecutionConfig`` (or None).
+        weave_executions: Hydrated weave ``ExecutionConfig`` (or None) by
+            weave name.
+
+    Returns:
+        Warning strings, one per weave with an ineffective ``trace: true``.
+    """
+    if resolve_effective_execution(None, loom_execution).trace:
+        return []
+
+    warnings: list[str] = []
+    for weave_name, execution in weave_executions.items():
+        if execution is not None and "trace" in execution.model_fields_set and execution.trace:
+            warnings.append(
+                f"WARN: weave '{weave_name}' sets trace: true, but the loom's "
+                f"effective trace is false — tracing cannot be re-enabled "
+                f"per-weave and no telemetry will be collected."
+            )
+    return warnings

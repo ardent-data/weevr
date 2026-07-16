@@ -24,6 +24,7 @@ from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
 from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
+from weevr.model.execution import ExecutionConfig, LogLevel, resolve_effective_execution
 from weevr.model.hooks import HookStep
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
@@ -31,6 +32,7 @@ from weevr.model.thread import Thread
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, Weave
 from weevr.telemetry.collector import SpanCollector
+from weevr.telemetry.logging import configure_logging
 from weevr.telemetry.results import (
     ColumnSetResult,
     LoomTelemetry,
@@ -86,6 +88,7 @@ def execute_weave(
     column_set_defs: dict[str, ColumnSet] | None = None,
     pre_cached_lookups: dict[str, Any] | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
+    execution: ExecutionConfig | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -133,6 +136,10 @@ def execute_weave(
         connections: Merged loom + weave connections forwarded to
             ``materialize_column_sets`` so connection-backed column sets can
             resolve their lakehouse target.
+        execution: Effective execution settings for this weave (already
+            merged by the caller — see ``resolve_effective_execution``).
+            ``max_parallel_threads`` caps each group's pool; unset means
+            the pool is sized to the group.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -145,6 +152,8 @@ def execute_weave(
     cache = CacheManager(plan.cache_targets, plan.dependents)
     aborted = False
     _weave_raised = False
+    max_parallel_threads = execution.max_parallel_threads if execution is not None else None
+    group_thread_counts: list[int] = []
 
     # Create weave span if collector is active
     weave_span_builder = None
@@ -292,7 +301,16 @@ def execute_weave(
             # Per-thread collectors for isolation during concurrent execution
             thread_collectors: dict[str, SpanCollector] = {}
 
-            with ThreadPoolExecutor(max_workers=len(to_run)) as executor:
+            # Cap the group's pool when an effective max_parallel_threads is
+            # set; groups still execute sequentially either way.
+            group_size = len(to_run)
+            if max_parallel_threads is not None:
+                pool_size = min(max_parallel_threads, group_size)
+            else:
+                pool_size = group_size
+            group_thread_counts.append(group_size)
+
+            with ThreadPoolExecutor(max_workers=pool_size) as executor:
                 for name in to_run:
                     thread_states[name] = "running"
                     if collector is not None:
@@ -434,6 +452,17 @@ def execute_weave(
             )
         cleanup_lookups(weave_owned)
         if weave_span_builder is not None and collector is not None:
+            if max_parallel_threads is not None:
+                weave_span_builder.set_attribute(
+                    "execution.max_parallel_threads", max_parallel_threads
+                )
+            if group_thread_counts:
+                # Comma-joined string ("3,2") — span attributes only take
+                # scalars, so consumers must split before parsing.
+                weave_span_builder.set_attribute(
+                    "execution.group_thread_counts",
+                    ",".join(str(c) for c in group_thread_counts),
+                )
             if _weave_raised:
                 _span_status = SpanStatus.ERROR
             else:
@@ -533,6 +562,7 @@ def execute_loom(
     weaves: dict[str, Weave],
     threads: dict[str, dict[str, Thread]],
     params: dict[str, Any] | None = None,
+    log_level: LogLevel | None = None,
 ) -> LoomResult:
     """Execute weaves sequentially in declared order.
 
@@ -547,6 +577,11 @@ def execute_loom(
         weaves: Mapping of weave name to :class:`~weevr.model.weave.Weave` config.
         threads: Nested mapping of ``weave_name → thread_name → Thread`` config.
         params: Parameters for condition evaluation at weave and thread levels.
+        log_level: The run's baseline log level. When set, a weave whose
+            effective level differs is applied at that weave's start and
+            restored afterward (weaves execute sequentially, so this is
+            race-free). When None, YAML log levels are suppressed — the
+            caller gave an explicit runtime override.
 
     Returns:
         :class:`~weevr.engine.result.LoomResult` with aggregate status and
@@ -555,12 +590,20 @@ def execute_loom(
     start_ns = time.monotonic_ns()
     weave_results: list[WeaveResult] = []
 
-    # Create root collector and loom span
-    trace_id = generate_trace_id()
-    collector = SpanCollector(trace_id)
+    # Create root collector and loom span — unless the loom's effective
+    # trace is off, in which case the whole run executes collector-free
+    # and LoomResult.telemetry is None. A weave cannot re-enable tracing
+    # under a traceless loom (no root collector to attach to).
+    loom_trace = resolve_effective_execution(None, loom.execution).trace
     loom_span_label = loom.qualified_key or loom.name
-    loom_span_builder = collector.start_span(f"loom:{loom_span_label}")
-    loom_span_id = loom_span_builder.span_id
+    collector: SpanCollector | None = None
+    loom_span_builder = None
+    loom_span_id = None
+    if loom_trace:
+        trace_id = generate_trace_id()
+        collector = SpanCollector(trace_id)
+        loom_span_builder = collector.start_span(f"loom:{loom_span_label}")
+        loom_span_id = loom_span_builder.span_id
 
     logger.debug("Starting loom '%s' — %d weaves", loom.name, len(loom.weaves))
 
@@ -659,25 +702,43 @@ def execute_loom(
                 loom_vars_dict, weave_vars_dict, "variable", "loom", "weave"
             )
 
-            result = execute_weave(
-                spark,
-                plan,
-                weave_threads,
-                collector=collector,
-                parent_span_id=loom_span_id,
-                thread_conditions=thread_conditions if thread_conditions else None,
-                params=params,
-                weave_span_label=weave.qualified_key or weave_name,
-                pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
-                post_steps=list(weave.post_steps) if weave.post_steps else None,
-                lookups=weave_lookups,
-                variables=merged_variables,
-                loom_name=loom.name,
-                weave_name=weave_name,
-                column_set_defs=merged_column_set_defs,
-                pre_cached_lookups=loom_cached_lookup_dfs or None,
-                connections=merged_connections or None,
-            )
+            # Effective execution settings for this weave: field-level merge
+            # of the loom and weave top-level execution blocks.
+            effective_execution = resolve_effective_execution(loom.execution, weave.execution)
+
+            # Per-weave log-level override, restored in the finally so the
+            # baseline survives weave failures. Suppressed entirely when the
+            # caller passed no baseline (explicit runtime override in force).
+            weave_level = effective_execution.log_level
+            override_level = log_level is not None and weave_level != log_level
+            if override_level:
+                configure_logging(weave_level)
+            try:
+                result = execute_weave(
+                    spark,
+                    plan,
+                    weave_threads,
+                    # A weave with effective trace: false runs collector-free;
+                    # its nodes are absent from the telemetry tree.
+                    collector=collector if effective_execution.trace else None,
+                    parent_span_id=loom_span_id,
+                    thread_conditions=thread_conditions if thread_conditions else None,
+                    params=params,
+                    weave_span_label=weave.qualified_key or weave_name,
+                    pre_steps=list(weave.pre_steps) if weave.pre_steps else None,
+                    post_steps=list(weave.post_steps) if weave.post_steps else None,
+                    lookups=weave_lookups,
+                    variables=merged_variables,
+                    loom_name=loom.name,
+                    weave_name=weave_name,
+                    column_set_defs=merged_column_set_defs,
+                    pre_cached_lookups=loom_cached_lookup_dfs or None,
+                    connections=merged_connections or None,
+                    execution=effective_execution,
+                )
+            finally:
+                if override_level and log_level is not None:
+                    configure_logging(log_level)
             weave_results.append(result)
 
             if result.status == "failure":
@@ -705,16 +766,17 @@ def execute_loom(
         raise
     finally:
         cleanup_lookups(loom_cached_lookup_dfs)
-        if _loom_raised:
-            _loom_span_status = SpanStatus.ERROR
-        else:
-            _loom_statuses = {r.status for r in weave_results}
-            if _loom_statuses <= {"success", "skipped"}:
-                _loom_span_status = SpanStatus.OK
-            else:
+        if loom_span_builder is not None and collector is not None:
+            if _loom_raised:
                 _loom_span_status = SpanStatus.ERROR
-        loom_span = loom_span_builder.finish(status=_loom_span_status)
-        collector.add_span(loom_span)
+            else:
+                _loom_statuses = {r.status for r in weave_results}
+                if _loom_statuses <= {"success", "skipped"}:
+                    _loom_span_status = SpanStatus.OK
+                else:
+                    _loom_span_status = SpanStatus.ERROR
+            loom_span = loom_span_builder.finish(status=_loom_span_status)
+            collector.add_span(loom_span)
 
     duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
 
@@ -727,10 +789,12 @@ def execute_loom(
     else:
         loom_status = "failure"
 
-    # Build loom telemetry
-    loom_telemetry = _build_loom_telemetry(
-        loom_span_label, weave_results, collector, resolved_params=params
-    )
+    # Build loom telemetry (None for a traceless run)
+    loom_telemetry = None
+    if collector is not None:
+        loom_telemetry = _build_loom_telemetry(
+            loom_span_label, weave_results, collector, resolved_params=params
+        )
 
     logger.debug(
         "Loom '%s' complete — status=%s, duration=%dms",

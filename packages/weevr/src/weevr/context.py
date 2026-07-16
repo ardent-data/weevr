@@ -28,7 +28,11 @@ from weevr.config.resolver import (
     resolve_variables,
     validate_params,
 )
-from weevr.config.validation import validate_schema
+from weevr.config.validation import (
+    collect_execution_scope_warnings,
+    collect_trace_composition_warnings,
+    validate_schema,
+)
 from weevr.delta import is_table_alias
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
@@ -40,7 +44,7 @@ from weevr.errors import (
     ModelValidationError,
     VariableResolutionError,
 )
-from weevr.model.execution import LogLevel
+from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
@@ -90,7 +94,7 @@ class Context:
         project: str | Path,
         *,
         params: dict[str, Any] | None = None,
-        log_level: str = "standard",
+        log_level: str | None = None,
         workspace: str | None = None,
         lakehouse: str | None = None,
     ) -> None:
@@ -98,11 +102,20 @@ class Context:
         if not isinstance(spark, SparkSession):
             raise TypeError(f"'spark' must be a SparkSession, got {type(spark).__name__}")
 
-        try:
-            resolved_level = LogLevel(log_level)
-        except ValueError:
-            valid = ", ".join(f"'{v.value}'" for v in LogLevel)
-            raise ValueError(f"Invalid log_level '{log_level}'. Must be one of: {valid}") from None
+        # An explicit argument is a runtime override that beats YAML
+        # execution blocks. When omitted, STANDARD applies provisionally
+        # and the effective YAML level (if any) takes over at run()/load().
+        self._explicit_log_level = log_level is not None
+        if log_level is None:
+            resolved_level = LogLevel.STANDARD
+        else:
+            try:
+                resolved_level = LogLevel(log_level)
+            except ValueError:
+                valid = ", ".join(f"'{v.value}'" for v in LogLevel)
+                raise ValueError(
+                    f"Invalid log_level '{log_level}'. Must be one of: {valid}"
+                ) from None
 
         self._spark = spark
         self._params = params
@@ -211,6 +224,7 @@ class Context:
             A :class:`LoadedConfig` wrapping the hydrated model.
         """
         resolved = self._load_resolved(path)
+        self._apply_effective_log_level(resolved)
         return LoadedConfig(
             model=resolved.model,
             config_type=resolved.config_type,
@@ -218,6 +232,24 @@ class Context:
             threads=resolved.threads or None,
             weaves=resolved.weaves or None,
         )
+
+    def _apply_effective_log_level(self, resolved: _ResolvedConfig) -> None:
+        """Apply the effective YAML log level.
+
+        No-op when an explicit ``Context(log_level=...)`` argument is in
+        force. The source is the top-level ``execution:`` block on a Loom or
+        Weave config. Thread-scoped execution settings are not applied
+        (uniformly unapplied in v1.x).
+        """
+        if self._explicit_log_level:
+            return
+        block = None
+        if resolved.config_type in ("loom", "weave"):
+            block = getattr(resolved.model, "execution", None)
+        effective = resolve_effective_execution(None, block).log_level
+        if effective != self._log_level:
+            self._log_level = effective
+            configure_logging(effective)
 
     def run(
         self,
@@ -256,6 +288,10 @@ class Context:
 
         start_ns = time.monotonic_ns()
         resolved = self._load_resolved(path)
+
+        # Single application point for the effective YAML log level —
+        # before mode dispatch, so all four modes behave identically.
+        self._apply_effective_log_level(resolved)
 
         try:
             if resolved_mode is ExecutionMode.EXECUTE:
@@ -359,7 +395,13 @@ class Context:
             from weevr.telemetry.collector import SpanCollector
             from weevr.telemetry.span import generate_trace_id
 
-            weave_collector = SpanCollector(generate_trace_id())
+            # The weave's effective trace gates collector creation for
+            # standalone weave runs. (Standalone thread runs always trace —
+            # thread-scoped execution settings are unapplied in v1.x.)
+            standalone_execution = resolve_effective_execution(None, model.execution)
+            weave_collector = (
+                SpanCollector(generate_trace_id()) if standalone_execution.trace else None
+            )
 
             engine_result = execute_weave(
                 self._spark,
@@ -374,6 +416,7 @@ class Context:
                 variables=dict(model.variables) if model.variables else None,
                 column_set_defs=dict(model.column_sets) if model.column_sets else None,
                 connections=dict(model.connections) if model.connections else None,
+                execution=standalone_execution,
             )
             if engine_result.status not in ("success", "failure", "partial"):
                 raise ExecutionError(f"Unexpected weave execution status: '{engine_result.status}'")
@@ -418,8 +461,16 @@ class Context:
                 warnings=all_warnings,
             )
 
+        # Baseline for per-weave log-level overrides; None suppresses YAML
+        # levels entirely (explicit Context argument in force).
+        baseline_level = None if self._explicit_log_level else self._log_level
         engine_result = execute_loom(
-            self._spark, model, filtered_weaves, filtered_threads, params=self._params
+            self._spark,
+            model,
+            filtered_weaves,
+            filtered_threads,
+            params=self._params,
+            log_level=baseline_level,
         )
         result = RunResult(
             status=engine_result.status,
@@ -830,7 +881,12 @@ class Context:
         # Step 7: Resolve child references
         resolved_with_refs = resolve_references(resolved, config_type, project_root, self._params)
 
-        # Step 8: Apply inheritance cascade
+        # Step 8: Apply inheritance cascade. Execution-scope warnings are
+        # collected first, against the PRE-cascade thread dicts — after the
+        # cascade an authored execution block is indistinguishable from one
+        # injected by defaults.execution.
+        execution_warnings = self._collect_execution_warnings(config_type, resolved_with_refs)
+
         if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
             loom_defaults = resolved_with_refs.get("defaults")
             loom_audit_templates = resolved_with_refs.get("audit_templates")
@@ -934,6 +990,19 @@ class Context:
                 )
                 threads[weave_name] = thread_map
 
+        # Trace composition needs hydrated models (model_fields_set): a
+        # weave's explicit trace: true under a traceless loom is a no-op.
+        if config_type == "loom" and isinstance(model, Loom):
+            execution_warnings.extend(
+                collect_trace_composition_warnings(
+                    model.execution,
+                    {name: w.execution for name, w in weaves.items()},
+                )
+            )
+
+        for warning in execution_warnings:
+            logger.warning(warning)
+
         return _ResolvedConfig(
             config_type=config_type,
             config_name=config_name,
@@ -941,6 +1010,28 @@ class Context:
             weaves=weaves,
             threads=threads,
         )
+
+    @staticmethod
+    def _collect_execution_warnings(config_type: str, resolved: dict[str, Any]) -> list[str]:
+        """Gather thread-scope execution warnings from pre-cascade dicts."""
+        defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
+        pre_cascade_threads: list[dict[str, Any]] = []
+
+        if config_type == "loom":
+            loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
+            defaults_by_scope.append((loom_label, resolved.get("defaults")))
+            for i, weave in enumerate(resolved.get("_resolved_weaves", [])):
+                weave_label = f"weave '{weave.get('name') or f'#{i}'}'"
+                defaults_by_scope.append((weave_label, weave.get("defaults")))
+                pre_cascade_threads.extend(weave.get("_resolved_threads", []))
+        elif config_type == "weave":
+            weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
+            defaults_by_scope.append((weave_label, resolved.get("defaults")))
+            pre_cascade_threads.extend(resolved.get("_resolved_threads", []))
+        else:  # standalone thread
+            pre_cascade_threads.append(resolved)
+
+        return collect_execution_scope_warnings(defaults_by_scope, pre_cascade_threads)
 
     @staticmethod
     def _hydrate_model(

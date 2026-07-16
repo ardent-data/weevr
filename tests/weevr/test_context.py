@@ -842,3 +842,304 @@ threads:
         output = spark.read.format("delta").load(tgt)
         assert "new_col" in output.columns
         assert "old_col" not in output.columns
+
+
+# ---------------------------------------------------------------------------
+# Execution log-level wiring — argument > effective YAML > standard
+# ---------------------------------------------------------------------------
+
+
+def _stub_execution_project(
+    tmp_path: Path,
+    *,
+    loom_extra: str = "",
+    weave_extra: str = "",
+    thread_extra: str = "",
+) -> Path:
+    """Minimal thread/weave/loom project for execution-settings tests."""
+    project = tmp_path / "stub.weevr"
+    project.mkdir()
+    (project / "threads").mkdir()
+    (project / "threads" / "stub.thread").write_text(
+        'config_version: "1.0"\n'
+        "sources:\n  data:\n    type: delta\n    alias: raw\n"
+        "target:\n  alias: out\n" + thread_extra
+    )
+    (project / "stub.weave").write_text(
+        'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n' + weave_extra
+    )
+    (project / "stub.loom").write_text(
+        'config_version: "1.0"\nweaves:\n  - ref: stub.weave\n' + loom_extra
+    )
+    return project
+
+
+class TestLogLevelWiring:
+    """YAML log_level application with Context-argument precedence."""
+
+    def _ctx(self, project: Path, **kwargs) -> Context:
+        mock_spark = MagicMock(spec=SparkSession)
+        return Context(spark=mock_spark, project=str(project), **kwargs)
+
+    @staticmethod
+    def _patch_modes(monkeypatch, ctx: Context, seen_levels: list) -> None:
+        """Stub all four mode handlers, recording the applied level on entry."""
+        from weevr.model.execution import LogLevel as LL
+
+        def _stub(*args, **kwargs):
+            seen_levels.append(ctx.log_level)
+            return RunResult(
+                status="success",
+                mode=ExecutionMode.EXECUTE,
+                config_type="weave",
+                config_name="stub",
+            )
+
+        assert isinstance(ctx.log_level, LL)
+        monkeypatch.setattr(ctx, "_run_execute", _stub)
+        monkeypatch.setattr(ctx, "_run_validate", _stub)
+        monkeypatch.setattr(ctx, "_run_plan", _stub)
+        monkeypatch.setattr(ctx, "_run_preview", _stub)
+
+    def test_omitted_argument_is_provisional_standard(self, tmp_path: Path) -> None:
+        project = _stub_execution_project(tmp_path)
+        ctx = self._ctx(project)
+        assert ctx.log_level.value == "standard"
+
+    def test_invalid_argument_still_raises(self) -> None:
+        mock_spark = MagicMock(spec=SparkSession)
+        with pytest.raises(ValueError, match="log_level"):
+            Context(spark=mock_spark, project="dummy", log_level="nope")
+
+    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    def test_yaml_applies_in_every_mode(self, tmp_path: Path, monkeypatch, mode: str) -> None:
+        """Effective YAML level is applied before mode dispatch, all modes."""
+        project = _stub_execution_project(
+            tmp_path, weave_extra="execution:\n  log_level: minimal\n"
+        )
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.weave", mode=mode)
+
+        assert [lv.value for lv in seen] == ["minimal"]
+        assert ctx.log_level.value == "minimal"
+
+    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    def test_argument_beats_yaml(self, tmp_path: Path, monkeypatch, mode: str) -> None:
+        project = _stub_execution_project(
+            tmp_path, weave_extra="execution:\n  log_level: minimal\n"
+        )
+        ctx = self._ctx(project, log_level="verbose")
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.weave", mode=mode)
+
+        assert [lv.value for lv in seen] == ["verbose"]
+        assert ctx.log_level.value == "verbose"
+
+    def test_default_when_neither(self, tmp_path: Path, monkeypatch) -> None:
+        project = _stub_execution_project(tmp_path)
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.weave", mode="validate")
+
+        assert [lv.value for lv in seen] == ["standard"]
+
+    def test_loom_yaml_level_applies(self, tmp_path: Path, monkeypatch) -> None:
+        project = _stub_execution_project(tmp_path, loom_extra="execution:\n  log_level: debug\n")
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("stub.loom", mode="validate")
+
+        assert [lv.value for lv in seen] == ["debug"]
+
+    def test_thread_scoped_yaml_never_applies(self, tmp_path: Path, monkeypatch) -> None:
+        """Standalone thread runs: argument > standard only (DEC-003)."""
+        project = _stub_execution_project(
+            tmp_path, thread_extra="execution:\n  log_level: minimal\n"
+        )
+        ctx = self._ctx(project)
+        seen: list = []
+        self._patch_modes(monkeypatch, ctx, seen)
+
+        ctx.run("threads/stub.thread", mode="validate")
+
+        assert [lv.value for lv in seen] == ["standard"]
+
+    def test_load_applies_effective_level(self, tmp_path: Path) -> None:
+        """load() applies the effective YAML level, same as run()."""
+        project = _stub_execution_project(
+            tmp_path, weave_extra="execution:\n  log_level: minimal\n"
+        )
+        ctx = self._ctx(project)
+
+        ctx.load("stub.weave")
+
+        assert ctx.log_level.value == "minimal"
+
+    def test_load_argument_still_beats_yaml(self, tmp_path: Path) -> None:
+        project = _stub_execution_project(
+            tmp_path, weave_extra="execution:\n  log_level: minimal\n"
+        )
+        ctx = self._ctx(project, log_level="verbose")
+
+        ctx.load("stub.weave")
+
+        assert ctx.log_level.value == "verbose"
+
+
+# ---------------------------------------------------------------------------
+# Trace gating — standalone weave and thread runs
+# ---------------------------------------------------------------------------
+
+
+class TestStandaloneTraceGating:
+    def _weave_result(self):
+        from weevr.engine.result import WeaveResult
+
+        return WeaveResult(
+            status="success",
+            weave_name="stub",
+            thread_results=[],
+            threads_skipped=[],
+            duration_ms=1,
+        )
+
+    def _thread_result(self):
+        from weevr.engine.result import ThreadResult
+
+        return ThreadResult(
+            status="success",
+            thread_name="stub",
+            rows_written=0,
+            write_mode="overwrite",
+            target_path="/data/out",
+        )
+
+    @patch("weevr.context.execute_weave")
+    def test_standalone_weave_trace_false_creates_no_collector(
+        self, mock_weave, tmp_path: Path
+    ) -> None:
+        project = _stub_execution_project(tmp_path, weave_extra="execution:\n  trace: false\n")
+        mock_weave.return_value = self._weave_result()
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        result = ctx.run("stub.weave")
+
+        assert result.status == "success"
+        assert result.telemetry is None
+        assert mock_weave.call_args.kwargs["collector"] is None
+
+    @patch("weevr.context.execute_weave")
+    def test_standalone_weave_traces_by_default(self, mock_weave, tmp_path: Path) -> None:
+        project = _stub_execution_project(tmp_path)
+        mock_weave.return_value = self._weave_result()
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        result = ctx.run("stub.weave")
+
+        assert result.status == "success"
+        assert mock_weave.call_args.kwargs["collector"] is not None
+
+    @patch("weevr.context.execute_thread")
+    def test_standalone_thread_always_traces(self, mock_thread, tmp_path: Path) -> None:
+        """Thread-scoped execution is unapplied — even trace: false in the
+        thread's own block never suppresses the collector (DEC-003)."""
+        project = _stub_execution_project(tmp_path, thread_extra="execution:\n  trace: false\n")
+        mock_thread.return_value = self._thread_result()
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+
+        result = ctx.run("threads/stub.thread")
+
+        assert result.status == "success"
+        assert mock_thread.call_args.kwargs["collector"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Execution-scope warnings at config resolution
+# ---------------------------------------------------------------------------
+
+
+class TestExecutionScopeWarnings:
+    def _run_validate(self, project: Path, path: str, caplog) -> list[str]:
+        import logging
+
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+        with caplog.at_level(logging.WARNING, logger="weevr.context"):
+            ctx.run(path, mode="validate")
+        return [r.message for r in caplog.records if r.message.startswith("WARN:")]
+
+    def test_defaults_execution_warns_once(self, tmp_path: Path, caplog) -> None:
+        project = _stub_execution_project(
+            tmp_path, loom_extra="defaults:\n  execution:\n    log_level: debug\n"
+        )
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        scoped = [w for w in warnings if "defaults.execution" in w]
+        assert len(scoped) == 1
+        assert "log_level" in scoped[0]
+
+    def test_authored_thread_block_warns(self, tmp_path: Path, caplog) -> None:
+        project = _stub_execution_project(
+            tmp_path, thread_extra="execution:\n  log_level: minimal\n"
+        )
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        assert any("stub" in w and "execution block" in w for w in warnings)
+
+    def test_trace_true_under_traceless_loom_warns(self, tmp_path: Path, caplog) -> None:
+        project = _stub_execution_project(
+            tmp_path,
+            loom_extra="execution:\n  trace: false\n",
+            weave_extra="execution:\n  trace: true\n",
+        )
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        assert any("trace: true" in w and "stub" in w for w in warnings)
+
+    def test_clean_project_warns_nothing(self, tmp_path: Path, caplog) -> None:
+        project = _stub_execution_project(tmp_path)
+        warnings = self._run_validate(project, "stub.loom", caplog)
+        assert warnings == []
+
+    def test_execute_mode_also_warns(self, tmp_path: Path, caplog) -> None:
+        import logging
+
+        project = _stub_execution_project(
+            tmp_path, loom_extra="defaults:\n  execution:\n    trace: false\n"
+        )
+        mock_spark = MagicMock(spec=SparkSession)
+        ctx = Context(spark=mock_spark, project=str(project))
+        with (
+            patch("weevr.context.execute_loom") as mock_loom,
+            caplog.at_level(logging.WARNING, logger="weevr.context"),
+        ):
+            from weevr.engine.result import LoomResult
+
+            mock_loom.return_value = LoomResult(
+                status="success", loom_name="stub", weave_results=[], duration_ms=1
+            )
+            ctx.run("stub.loom", mode="execute")
+        assert any("defaults.execution" in r.message for r in caplog.records)
+
+    def test_standalone_weave_run_warns_for_authored_thread_block(
+        self, tmp_path: Path, caplog
+    ) -> None:
+        project = _stub_execution_project(tmp_path, thread_extra="execution:\n  trace: false\n")
+        warnings = self._run_validate(project, "stub.weave", caplog)
+        assert any("execution block" in w and "trace" in w for w in warnings)
+
+    def test_standalone_thread_run_warns_for_own_block(self, tmp_path: Path, caplog) -> None:
+        project = _stub_execution_project(
+            tmp_path, thread_extra="execution:\n  log_level: minimal\n"
+        )
+        warnings = self._run_validate(project, "threads/stub.thread", caplog)
+        assert any("execution block" in w and "log_level" in w for w in warnings)

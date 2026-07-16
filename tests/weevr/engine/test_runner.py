@@ -4,6 +4,7 @@ All tests are fast (no Spark required). execute_thread is patched to return
 controlled ThreadResult objects, allowing pure logic testing.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from weevr.engine.planner import build_plan
 from weevr.engine.result import ThreadResult, WeaveResult
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors.exceptions import ExecutionError
+from weevr.model.execution import ExecutionConfig
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
@@ -442,6 +444,308 @@ class TestLoomRunner:
         result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
         assert isinstance(result.duration_ms, int)
         assert result.duration_ms >= 0
+
+
+# ---------------------------------------------------------------------------
+# Parallelism cap
+# ---------------------------------------------------------------------------
+
+
+class TestParallelismCap:
+    def _tracking_side_effect(self):
+        """Return (side_effect, state) tracking peak concurrent executions."""
+        import threading
+        import time
+
+        state = {"active": 0, "peak": 0}
+        lock = threading.Lock()
+
+        def side_effect(spark, thread, **kwargs):
+            with lock:
+                state["active"] += 1
+                state["peak"] = max(state["peak"], state["active"])
+            time.sleep(0.05)
+            with lock:
+                state["active"] -= 1
+            return _make_result(thread.name)
+
+        return side_effect, state
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_cap_bounds_group_concurrency(self, mock_exec):
+        """Effective cap 3 over a 6-thread group → at most 3 in flight."""
+        side_effect, state = self._tracking_side_effect()
+        mock_exec.side_effect = side_effect
+        threads = {n: _make_thread(n) for n in "ABCDEF"}
+        plan = build_plan("capped", threads, _entries(*threads))
+
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            execution=ExecutionConfig(max_parallel_threads=3),
+        )
+
+        assert result.status == "success"
+        assert len(result.thread_results) == 6
+        assert state["peak"] <= 3
+
+    @patch("weevr.engine.runner.ThreadPoolExecutor", wraps=ThreadPoolExecutor)
+    @patch("weevr.engine.runner.execute_thread")
+    def test_unset_cap_preserves_pool_sizing(self, mock_exec, mock_pool):
+        """No cap anywhere → pool sized to the full group (today's behavior)."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {n: _make_thread(n) for n in "ABCD"}
+        plan = build_plan("uncapped", threads, _entries(*threads))
+
+        result = execute_weave(_MOCK_SPARK, plan, threads)
+
+        assert result.status == "success"
+        assert mock_pool.call_args_list[0].kwargs["max_workers"] == 4
+
+    @patch("weevr.engine.runner.ThreadPoolExecutor", wraps=ThreadPoolExecutor)
+    @patch("weevr.engine.runner.execute_thread")
+    def test_cap_larger_than_group_uses_group_size(self, mock_exec, mock_pool):
+        """Cap 8 over a 2-thread group → pool sized to the group, not the cap."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {n: _make_thread(n) for n in "AB"}
+        plan = build_plan("wide_cap", threads, _entries(*threads))
+
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            execution=ExecutionConfig(max_parallel_threads=8),
+        )
+
+        assert result.status == "success"
+        assert mock_pool.call_args_list[0].kwargs["max_workers"] == 2
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_cap_applies_to_weave_groups(self, mock_exec):
+        """A loom-level cap bounds a weave group even when the weave
+        declares a logging-only execution block (field-level merge)."""
+        side_effect, state = self._tracking_side_effect()
+        mock_exec.side_effect = side_effect
+
+        loom = Loom.model_validate(
+            {
+                "name": "nightly",
+                "config_version": "1.0",
+                "weaves": ["facts"],
+                "execution": {"max_parallel_threads": 2},
+            }
+        )
+        weaves = {
+            "facts": Weave.model_validate(
+                {
+                    "config_version": "1.0",
+                    "name": "facts",
+                    "threads": ["A", "B", "C", "D"],
+                    "execution": {"log_level": "verbose"},
+                }
+            )
+        }
+        threads = {"facts": {n: _make_thread(n) for n in "ABCD"}}
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert len(result.weave_results[0].thread_results) == 4
+        assert state["peak"] <= 2
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_cap_attributes_on_weave_span(self, mock_exec):
+        """Weave span records the effective cap and per-group thread counts."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        threads = {n: _make_thread(n) for n in "ABC"}
+        plan = build_plan("attr_weave", threads, _entries(*threads))
+
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import generate_trace_id
+
+        collector = SpanCollector(generate_trace_id())
+        result = execute_weave(
+            _MOCK_SPARK,
+            plan,
+            threads,
+            collector=collector,
+            execution=ExecutionConfig(max_parallel_threads=2),
+        )
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.span is not None
+        attrs = result.telemetry.span.attributes
+        assert attrs["execution.max_parallel_threads"] == 2
+        assert attrs["execution.group_thread_counts"] == "3"
+
+
+# ---------------------------------------------------------------------------
+# Per-weave log-level apply/restore during loom runs
+# ---------------------------------------------------------------------------
+
+
+class TestLoomLogLevelOverride:
+    def _loom_fixtures(self, weave_execution: dict | None, thread_fails: bool = False):
+        loom = Loom.model_validate({"name": "nightly", "config_version": "1.0", "weaves": ["w1"]})
+        weave_data: dict[str, Any] = {
+            "config_version": "1.0",
+            "name": "w1",
+            "threads": ["A"],
+        }
+        if weave_execution is not None:
+            weave_data["execution"] = weave_execution
+        weaves = {"w1": Weave.model_validate(weave_data)}
+        threads = {"w1": {"A": _make_thread("A")}}
+        return loom, weaves, threads
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_level_applied_and_restored(self, mock_exec, mock_log):
+        """A weave whose effective level differs from the baseline is
+        applied at weave start and restored after."""
+        from weevr.model.execution import LogLevel
+
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures({"log_level": "debug"})
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads, log_level=LogLevel.STANDARD)
+
+        applied = [c.args[0] for c in mock_log.call_args_list]
+        assert applied == [LogLevel.DEBUG, LogLevel.STANDARD]
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_restored_when_weave_fails(self, mock_exec, mock_log):
+        """Restore runs on the failure path too (finally)."""
+        from weevr.model.execution import LogLevel
+
+        def _fail(spark, thread, **kwargs):
+            raise ExecutionError("boom", thread_name=thread.name)
+
+        mock_exec.side_effect = _fail
+        loom, weaves, threads = self._loom_fixtures({"log_level": "verbose"})
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads, log_level=LogLevel.STANDARD)
+
+        assert result.status == "failure"
+        applied = [c.args[0] for c in mock_log.call_args_list]
+        assert applied == [LogLevel.VERBOSE, LogLevel.STANDARD]
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_no_switch_when_levels_match(self, mock_exec, mock_log):
+        """No reconfiguration churn when the weave matches the baseline."""
+        from weevr.model.execution import LogLevel
+
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures(None)
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads, log_level=LogLevel.STANDARD)
+
+        assert mock_log.call_args_list == []
+
+    @patch("weevr.engine.runner.configure_logging")
+    @patch("weevr.engine.runner.execute_thread")
+    def test_yaml_suppressed_when_baseline_absent(self, mock_exec, mock_log):
+        """log_level=None (explicit Context argument given) → YAML levels
+        never applied by the loom."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures({"log_level": "debug"})
+
+        execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert mock_log.call_args_list == []
+
+
+# ---------------------------------------------------------------------------
+# Trace gating
+# ---------------------------------------------------------------------------
+
+
+class TestTraceGating:
+    def _loom_fixtures(
+        self,
+        loom_execution: dict | None = None,
+        weave_execution: dict | None = None,
+    ):
+        loom_data: dict[str, Any] = {
+            "name": "nightly",
+            "config_version": "1.0",
+            "weaves": ["w1"],
+        }
+        if loom_execution is not None:
+            loom_data["execution"] = loom_execution
+        loom = Loom.model_validate(loom_data)
+        weave_data: dict[str, Any] = {
+            "config_version": "1.0",
+            "name": "w1",
+            "threads": ["A"],
+        }
+        if weave_execution is not None:
+            weave_data["execution"] = weave_execution
+        weaves = {"w1": Weave.model_validate(weave_data)}
+        threads = {"w1": {"A": _make_thread("A")}}
+        return loom, weaves, threads
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_trace_false_yields_no_telemetry(self, mock_exec):
+        """Effective trace: false at loom scope → no collector, telemetry None."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures(loom_execution={"trace": False})
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert len(result.weave_results) == 1
+        assert result.weave_results[0].status == "success"
+        assert result.telemetry is None
+        assert result.weave_results[0].telemetry is None
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_trace_default_keeps_telemetry(self, mock_exec):
+        """Default (trace unset) → telemetry populated as today."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures()
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.telemetry is not None
+        assert result.weave_results[0].telemetry is not None
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_trace_false_under_tracing_loom(self, mock_exec):
+        """Weave-level trace: false narrows: that weave's nodes are absent
+        while loom telemetry remains."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom, weaves, threads = self._loom_fixtures(weave_execution={"trace": False})
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.weave_results[0].telemetry is None
+        assert "w1" not in result.telemetry.weave_telemetry
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_loom_trace_false_still_runs_hooks(self, mock_exec):
+        """A traceless loom still executes pre/post hook steps."""
+        mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
+        loom = Loom.model_validate(
+            {
+                "name": "nightly",
+                "config_version": "1.0",
+                "weaves": ["w1"],
+                "execution": {"trace": False},
+                "pre_steps": [{"type": "log_message", "message": "starting"}],
+            }
+        )
+        _, weaves, threads = self._loom_fixtures()
+
+        result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
+
+        assert result.status == "success"
 
 
 # ---------------------------------------------------------------------------

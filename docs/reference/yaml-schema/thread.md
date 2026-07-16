@@ -29,7 +29,7 @@ Threads can be used as **parameterized templates** via `as` and `params` on
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations |
 | `defaults` | `dict[string, any]` | no | `null` | Default values inherited by nested structures |
 | `failure` | `FailureConfig` | no | `null` | Per-thread failure handling policy |
-| `execution` | `ExecutionConfig` | no | `null` | Runtime settings (logging, tracing) |
+| `execution` | `ExecutionConfig` | no | `null` | Declared but **not applied** at thread scope (a run-start warning names the unapplied fields). Declare execution settings on the loom or weave top level instead. |
 | `cache` | `bool` | no | `null` | Whether to cache the final DataFrame before writing |
 | `exports` | `list[Export]` | no | `null` | Secondary output destinations. See [Exports guide](../../guides/exports.md). |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Thread-level lookup definitions. Merged with weave-level lookups (thread wins on name collision). |
@@ -1311,13 +1311,16 @@ failure:
 
 ## execution
 
-Runtime execution settings. These cascade from loom to weave to thread, with
-the most specific level winning.
+Declared but **not applied** at thread scope in v1.x — a run-start
+warning names the unapplied fields. Declare execution settings on the
+loom or weave top level instead. See the
+[Execution Settings guide](../../guides/execution-settings.md).
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `log_level` | `string` | no | `"standard"` | Logging verbosity: `"minimal"`, `"standard"`, `"verbose"`, `"debug"` |
 | `trace` | `bool` | no | `true` | Collect execution spans for telemetry |
+| `max_parallel_threads` | `int` | no | unset | Cap on concurrently executing threads per group (`>= 1`) |
 
 ```yaml
 execution:
@@ -1568,10 +1571,6 @@ assertions:
 
 failure:
   on_failure: skip_downstream
-
-execution:
-  log_level: standard
-  trace: true
 
 tags: [orders, curated]
 ```
