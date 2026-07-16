@@ -79,7 +79,7 @@ preview_phase -> preview_stop: {style.stroke-dash: 3; style.stroke: "#6A1B9A"}
 | Mode | What happens | Result contains |
 |------|-------------|-----------------|
 | `execute` | Full execution: read, transform, write (default) | Status, row counts, telemetry |
-| `validate` | Parse config, resolve references, check DAG — no data touched | `validation_errors` list |
+| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets) — no data touched | `validation_errors` list |
 | `plan` | Build the execution plan and return it without running | `execution_plan` list, `summary()` with cache markers, `explain()` for detailed breakdown |
 | `preview` | Run transforms against sampled data, skip writes | `preview_data` DataFrames |
 
