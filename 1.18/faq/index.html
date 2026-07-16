@@ -3245,11 +3245,16 @@ watermark column and type on the thread's load block:</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">watermark_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">modified_date</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">watermark_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nt">write</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append</span>
 </code></pre></div>
 <p>On the first run, all rows are read. On subsequent runs, weevr reads only
 rows where the watermark column exceeds the stored high-water mark. The
 watermark state is persisted either as a Delta table property or in a
-dedicated metadata table.</p>
+dedicated metadata table. An explicit <code>write.mode</code> of <code>append</code> or <code>merge</code>
+is required — the <code>overwrite</code> default fails validation because it would
+replace the target with each incremental slice.</p>
 <p>Supported watermark types: <code>timestamp</code>, <code>date</code>, <code>int</code>, <code>long</code>.</p>
 <hr />
 <h2 id="can-i-mix-python-code-with-yaml-configuration">Can I mix Python code with YAML configuration?<a class="headerlink" href="#can-i-mix-python-code-with-yaml-configuration" title="Permanent link">&para;</a></h2>
