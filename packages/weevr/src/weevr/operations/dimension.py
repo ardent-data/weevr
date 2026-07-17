@@ -214,8 +214,7 @@ def execute_dimension_merge(
     For versioned dimensions (track_history=True), executes a staged
     close-and-insert pattern:
 
-    1. Read current target rows (filtered by ``is_current`` when
-       ``history_filter`` is True).
+    1. Read current target rows (always filtered by ``is_current``).
     2. Join source to target on business key.
     3. Compare change detection hashes per group.
     4. Build MERGE clauses: close changed rows (set valid_to, is_current),
@@ -276,12 +275,13 @@ def _execute_versioned_merge(
             if group.on_change == "version":
                 version_hash_cols.append(col_name)
 
-    # Read current target rows
+    # Read current target rows. Detection must always operate on current
+    # rows only — comparing against closed versions would produce one
+    # duplicate new-version row per historical version.
     target_snap = spark.read.format("delta").load(target_path)
-    if config.history_filter:
-        target_snap = target_snap.filter(
-            F.col(scd.is_current) == True  # noqa: E712
-        )
+    target_snap = target_snap.filter(
+        F.col(scd.is_current) == True  # noqa: E712
+    )
 
     # Join source to target on BK to detect changes
     join_cond = [source_df[c].eqNullSafe(target_snap[c]) for c in bk_cols]

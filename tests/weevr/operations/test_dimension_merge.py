@@ -231,6 +231,47 @@ class TestVersionedLifecycle:
         assert v2["_prev_name"] == "Alicia"
         assert v3["_prev_name"] is None
 
+    def test_history_filter_false_matches_default_outcome(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_lifecycle_nofilter")
+        dim = _make_dim(
+            track_history=True,
+            history_filter=False,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        self._run_three_writes(spark, path, dim)
+
+        rows = spark.read.format("delta").load(path).orderBy("_valid_from").collect()
+        # history_filter must not change merge semantics: one row per
+        # version, exactly one current — no duplicate current rows
+        assert len(rows) == 3
+        assert [r["_is_current"] for r in rows] == [False, False, True]
+        assert [r["_valid_to"] for r in rows] == ["2026-02-01", "2026-03-01", "9999-12-31"]
+
+    def test_history_filter_false_idempotent_rerun(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_lifecycle_nofilter_rerun")
+        dim = _make_dim(
+            track_history=True,
+            history_filter=False,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        self._run_three_writes(spark, path, dim)
+        # Rerun the latest state unchanged — must be a no-op
+        self._write(spark, path, dim, [{"customer_id": "C1", "name": "Alize"}], "2026-04-01")
+
+        target = spark.read.format("delta").load(path)
+        assert target.count() == 3
+        current = target.filter(F.col("_is_current") == True)  # noqa: E712
+        assert current.count() == 1
+        assert current.collect()[0]["_valid_to"] == "9999-12-31"
+
 
 @pytest.mark.spark
 class TestNewEntity:
