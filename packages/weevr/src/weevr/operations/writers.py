@@ -245,6 +245,21 @@ def resolve_cdc_columns(cdc_config: CdcConfig) -> dict[str, str | None]:
     }
 
 
+def _require_non_null_ordering(df: DataFrame, ordering: Column, column_name: str) -> None:
+    """Raise when the CDC ordering column is NULL anywhere in the change window.
+
+    A NULL (or, for formatted watermarks, unparseable) ordering value cannot
+    be placed in the change sequence — ranking it silently as oldest or
+    newest risks keeping a stale row, so the merge fails fast instead.
+    """
+    if df.filter(ordering.isNull()).limit(1).count() > 0:
+        raise ExecutionError(
+            f"CDC ordering column '{column_name}' contains NULL (or unparseable) "
+            f"values in the change window; every change row must carry a valid "
+            f"ordering value"
+        )
+
+
 def _reduce_to_latest_per_key(
     df: DataFrame,
     match_keys: list[str],
@@ -258,7 +273,9 @@ def _reduce_to_latest_per_key(
     with the operation type as the final tiebreaker — later entries in
     ``op_precedence`` outrank earlier ones (e.g. a delete outranks an update
     from the same commit). Rows whose ordering and operation all tie are
-    indistinguishable; an arbitrary representative is kept.
+    indistinguishable; an arbitrary representative is kept. Callers must
+    reject NULL ordering values first (``_require_non_null_ordering``) —
+    an unordered change row cannot be ranked safely.
     """
     precedence: Column = F.lit(0)
     for rank, value in enumerate(op_precedence, start=1):
@@ -349,6 +366,7 @@ def execute_cdc_merge(
                 "Delta CDF merge requires the '_commit_version' column to order "
                 "same-key changes; do not drop CDF metadata columns in pipeline steps"
             )
+        _require_non_null_ordering(df, F.col("_commit_version"), "_commit_version")
         df = _reduce_to_latest_per_key(
             df,
             write_config.match_keys,
@@ -366,6 +384,7 @@ def execute_cdc_merge(
             load_config.watermark_type,
             load_config.watermark_format,
         )
+        _require_non_null_ordering(df, ordering, load_config.watermark_column)
         df = _reduce_to_latest_per_key(
             df,
             write_config.match_keys,
@@ -378,13 +397,16 @@ def execute_cdc_merge(
     target_exists = delta_table_exists(spark, target_path)
 
     try:
-        # Count operations
+        # Count operations in a single pass over the (reduced) window
+        op_counts: dict[str, int] = {
+            row[0]: row[1] for row in df.groupBy(F.col(op_col)).count().collect()
+        }
         if insert_val:
-            counts["inserts"] = df.filter(F.col(op_col) == insert_val).count()
+            counts["inserts"] = op_counts.get(insert_val, 0)
         if update_val:
-            counts["updates"] = df.filter(F.col(op_col) == update_val).count()
+            counts["updates"] = op_counts.get(update_val, 0)
         if delete_val:
-            counts["deletes"] = df.filter(F.col(op_col) == delete_val).count()
+            counts["deletes"] = op_counts.get(delete_val, 0)
 
         if not target_exists:
             # First CDC write — insert all non-delete rows

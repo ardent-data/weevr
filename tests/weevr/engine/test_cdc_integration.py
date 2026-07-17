@@ -407,6 +407,98 @@ class TestCdcMultiChangeWindowGeneric:
         rows = {r["id"]: r["name"] for r in result.collect()}
         assert rows == {1: "B"}
 
+    def test_null_watermark_row_raises(self, spark: SparkSession, tmp_delta_path) -> None:
+        """A NULL ordering value in the window fails loudly instead of mis-ranking."""
+        from weevr.errors.exceptions import ExecutionError
+
+        tgt = tmp_delta_path("gen_null_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+
+        cdc_df = spark.createDataFrame(
+            [(1, "Bea", "U", 1), (1, "Cara", "U", None)],
+            "id INT, name STRING, op STRING, seq INT",
+        )
+        cdc_config, write_config, load_config = self._config()
+
+        with pytest.raises(ExecutionError, match="seq"):
+            execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+    def test_composite_match_keys_reduce_independently(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Reduction partitions by the full composite key, not a prefix of it."""
+        tgt = tmp_delta_path("gen_comp_tgt")
+        create_delta_table(
+            spark,
+            tgt,
+            [
+                {"id": 1, "region": "east", "name": "A", "seq": 0},
+                {"id": 1, "region": "west", "name": "B", "seq": 0},
+            ],
+        )
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "region": "east", "name": "A2", "op": "U", "seq": 2},
+                {"id": 1, "region": "east", "name": "A1", "op": "U", "seq": 1},
+                {"id": 1, "region": "west", "name": "B1", "op": "U", "seq": 1},
+            ]
+        )
+        cdc_config = CdcConfig(
+            operation_column="op",
+            insert_value="I",
+            update_value="U",
+            delete_value="D",
+            on_delete="hard_delete",
+        )
+        write_config = WriteConfig(mode="merge", match_keys=["id", "region"])
+        load_config = LoadConfig(
+            mode="cdc", cdc=cdc_config, watermark_column="seq", watermark_type="int"
+        )
+
+        counts = execute_cdc_merge(
+            spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+        )
+
+        assert counts["updates"] == 2
+        result = spark.read.format("delta").load(tgt)
+        rows = {(r["id"], r["region"]): r["name"] for r in result.collect()}
+        assert rows == {(1, "east"): "A2", (1, "west"): "B1"}
+
+    def test_formatted_watermark_orders_multi_change_window(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A string watermark with watermark_format orders same-key changes correctly."""
+        tgt = tmp_delta_path("gen_fmt_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "chg_dt": "20260101"}])
+
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Cara", "op": "U", "chg_dt": "20260302"},
+                {"id": 1, "name": "Bea", "op": "U", "chg_dt": "20260301"},
+            ]
+        )
+        cdc_config = CdcConfig(
+            operation_column="op",
+            insert_value="I",
+            update_value="U",
+            delete_value="D",
+            on_delete="hard_delete",
+        )
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        load_config = LoadConfig(
+            mode="cdc",
+            cdc=cdc_config,
+            watermark_column="chg_dt",
+            watermark_type="date",
+            watermark_format="yyyyMMdd",
+        )
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        result = spark.read.format("delta").load(tgt)
+        assert result.collect()[0]["name"] == "Cara"
+
     def test_insert_only_feed_not_reduced(self, spark: SparkSession, tmp_delta_path) -> None:
         """Without an ordering column, insert-only feeds keep appending every event."""
         tgt = tmp_delta_path("gen_insonly_tgt")
@@ -663,6 +755,25 @@ class TestCdcMultiChangeWindowCdf:
         assert counts["updates"] == 1
         result = spark.read.format("delta").load(tgt)
         assert result.collect()[0]["name"] == "Cara"
+
+    def test_null_commit_version_raises_clear_error(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A NULL _commit_version value fails loudly instead of mis-ranking."""
+        from weevr.errors.exceptions import ExecutionError
+
+        tgt = tmp_delta_path("cdf_nullcv_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+
+        cdf_df = spark.createDataFrame(
+            [(1, "Bea", "update_postimage", 5), (1, "Cara", "update_postimage", None)],
+            "id INT, name STRING, _change_type STRING, _commit_version INT",
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        with pytest.raises(ExecutionError, match="_commit_version"):
+            execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
 
     def test_missing_commit_version_raises_clear_error(
         self, spark: SparkSession, tmp_delta_path
