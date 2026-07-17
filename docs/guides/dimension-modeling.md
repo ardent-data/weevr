@@ -239,13 +239,11 @@ Forbidden fields when `dimension:` is present:
 
 ## Performance
 
-For large dimensions, the engine filters target reads to
-`is_current = true` by default. Disable with:
-
-```yaml
-dimension:
-  history_filter: false
-```
+Versioned merges always read the target filtered to
+`is_current = true`: change detection and row closing operate on
+current rows only, so history depth never affects merge cost. The
+`history_filter` key is accepted for configuration compatibility
+but has no effect.
 
 Z-ordering on business key columns is recommended for
 dimensions with 100M+ entities.
