@@ -316,11 +316,14 @@ def _execute_versioned_merge(
     merged_source = source_tagged.unionByName(new_version_tagged)
 
     # Build merge condition: match on BK AND marker=False
-    # (so new-version rows never match existing target rows)
+    # (so new-version rows never match existing target rows).
+    # Scope to the current row so the close clause never touches rows
+    # already closed by earlier merges.
     merge_parts = [
         f"target.{quote_identifier(c)} <=> source.{quote_identifier(c)}" for c in bk_cols
     ]
     merge_parts.append(f"source.{quote_identifier(marker)} = false")
+    merge_parts.append(f"target.{quote_identifier(scd.is_current)} = true")
     merge_cond = " AND ".join(merge_parts)
 
     delta_table = resolve_delta_table(spark, target_path)
