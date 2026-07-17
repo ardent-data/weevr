@@ -368,6 +368,10 @@ by operation precedence — a delete outranks an update, which outranks an
 insert — so a key that changes many times between runs merges cleanly to
 its final state.
 
+A change row whose ordering value is NULL (or unparseable under
+`watermark_format`) fails the merge with a clear error: a change that
+cannot be placed in the sequence cannot be merged safely.
+
 ### String-typed watermark columns (`watermark_format`)
 
 When a source lands the watermark column as a string rather than a native
