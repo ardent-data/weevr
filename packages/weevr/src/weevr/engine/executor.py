@@ -1006,6 +1006,7 @@ def _validate_incremental(thread: Thread, load_mode: str) -> None:
 
     load_raw: dict[str, object] = {"mode": load_mode}
     if thread.load is not None:
+        load_raw["watermark_inclusive"] = thread.load.watermark_inclusive
         if thread.load.watermark_column is not None:
             load_raw["watermark_column"] = thread.load.watermark_column
         if thread.load.cdc is not None:
