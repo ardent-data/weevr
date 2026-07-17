@@ -23,17 +23,17 @@ class TestCdcTelemetry:
         tgt = tmp_delta_path("cdc_tel_tgt")
         wm = tmp_delta_path("cdc_tel_store")
 
-        # Create source with CDC change flags
+        # Create source with CDC change flags and an ordering column
         create_delta_table(
             spark,
             src,
             [
-                {"id": 1, "name": "Alice", "op": "I"},
-                {"id": 2, "name": "Bobby", "op": "U"},
+                {"id": 1, "name": "Alice", "op": "I", "seq": 1},
+                {"id": 2, "name": "Bobby", "op": "U", "seq": 2},
             ],
         )
         # Pre-create target so merge works
-        create_delta_table(spark, tgt, [{"id": 2, "name": "Bob"}])
+        create_delta_table(spark, tgt, [{"id": 2, "name": "Bob", "seq": 0}])
 
         thread = Thread(
             name="cdc_tel",
@@ -49,6 +49,8 @@ class TestCdcTelemetry:
                     insert_value="I",
                     update_value="U",
                 ),
+                watermark_column="seq",
+                watermark_type="int",
                 watermark_store=WatermarkStoreConfig(
                     type="metadata_table",
                     table_path=wm,

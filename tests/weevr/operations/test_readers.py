@@ -15,12 +15,12 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
 from weevr.operations.readers import (
-    _typed_watermark_col,
     build_watermark_filter,
     read_cdc_source,
     read_source,
     read_source_incremental,
     read_sources,
+    typed_watermark_col,
 )
 from weevr.state.watermark import WatermarkState
 
@@ -1037,21 +1037,21 @@ class TestReadCdcSourceGenericWatermark:
 
 
 class TestTypedWatermarkCol:
-    """Unit tests for the ``_typed_watermark_col`` helper."""
+    """Unit tests for the ``typed_watermark_col`` helper."""
 
     def test_passthrough_when_format_is_none(self, spark: SparkSession) -> None:
-        col = _typed_watermark_col("AEDATTM", "timestamp", None)
+        col = typed_watermark_col("AEDATTM", "timestamp", None)
         # Bare column reference — no parse wrapper.
         assert str(col) == str(F.col("AEDATTM"))
 
     def test_wraps_in_to_timestamp_for_timestamp_type(self, spark: SparkSession) -> None:
-        col = _typed_watermark_col("AEDATTM", "timestamp", "yyyy-MM-dd HH:mm:ss.SSSSSX")
+        col = typed_watermark_col("AEDATTM", "timestamp", "yyyy-MM-dd HH:mm:ss.SSSSSX")
         rendered = str(col)
         assert "to_timestamp(" in rendered
         assert "AEDATTM" in rendered
 
     def test_wraps_in_to_date_for_date_type(self, spark: SparkSession) -> None:
-        col = _typed_watermark_col("event_date", "date", "yyyyMMdd")
+        col = typed_watermark_col("event_date", "date", "yyyyMMdd")
         rendered = str(col)
         assert "to_date(" in rendered
         assert "event_date" in rendered
@@ -1065,7 +1065,7 @@ class TestTypedWatermarkCol:
         route to ``to_date``.
         """
         with pytest.raises(ValueError, match="watermark_format is only valid"):
-            _typed_watermark_col("col", bad_type, "yyyy-MM-dd")
+            typed_watermark_col("col", bad_type, "yyyy-MM-dd")
 
 
 class TestBuildWatermarkFilter:

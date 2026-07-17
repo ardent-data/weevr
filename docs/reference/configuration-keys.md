@@ -275,7 +275,7 @@ Incremental load mode and watermark tracking.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | `"full" \| "incremental_watermark" \| "incremental_parameter" \| "cdc"` | `"full"` | Load strategy |
-| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; optional for `cdc` mode when `cdc.operation_column` is set (rejected when `cdc.preset` is `"delta_cdf"`). |
+| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; required for generic `cdc` mappings that declare `update_value` or `delete_value` (orders same-key changes; insert-only mappings exempt); rejected when `cdc.preset` is `"delta_cdf"`. |
 | `watermark_type` | `"timestamp" \| "date" \| "int" \| "long"` | `None` | Watermark column data type. Required whenever `watermark_column` is set. |
 | `watermark_inclusive` | `bool` | `False` | Include rows equal to last watermark |
 | `watermark_store` | `WatermarkStoreConfig` | `None` | Watermark persistence backend |

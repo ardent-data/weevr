@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.window import Window
 
 from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
-from weevr.model.load import CdcConfig
+from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
+from weevr.operations.readers import typed_watermark_col
 
 
 def quote_identifier(name: str) -> str:
@@ -243,17 +245,71 @@ def resolve_cdc_columns(cdc_config: CdcConfig) -> dict[str, str | None]:
     }
 
 
+def _require_non_null_ordering(df: DataFrame, ordering: Column, column_name: str) -> None:
+    """Raise when the CDC ordering column is NULL anywhere in the change window.
+
+    A NULL (or, for formatted watermarks, unparseable) ordering value cannot
+    be placed in the change sequence — ranking it silently as oldest or
+    newest risks keeping a stale row, so the merge fails fast instead.
+    """
+    if df.filter(ordering.isNull()).limit(1).count() > 0:
+        raise ExecutionError(
+            f"CDC ordering column '{column_name}' contains NULL (or unparseable) "
+            f"values in the change window; every change row must carry a valid "
+            f"ordering value"
+        )
+
+
+def _reduce_to_latest_per_key(
+    df: DataFrame,
+    match_keys: list[str],
+    op_col: str,
+    op_precedence: list[str],
+    ordering_cols: list[Column],
+) -> DataFrame:
+    """Reduce a CDC change window to one row per key: the latest state.
+
+    Rows are ranked per match-key group by the ordering columns (descending),
+    with the operation type as the final tiebreaker — later entries in
+    ``op_precedence`` outrank earlier ones (e.g. a delete outranks an update
+    from the same commit). Rows whose ordering and operation all tie are
+    indistinguishable; an arbitrary representative is kept. Callers must
+    reject NULL ordering values first (``_require_non_null_ordering``) —
+    an unordered change row cannot be ranked safely.
+    """
+    precedence: Column = F.lit(0)
+    for rank, value in enumerate(op_precedence, start=1):
+        precedence = F.when(F.col(op_col) == value, F.lit(rank)).otherwise(precedence)
+
+    window = Window.partitionBy(*match_keys).orderBy(
+        *[c.desc() for c in ordering_cols], precedence.desc()
+    )
+    return (
+        df.withColumn("__cdc_rn__", F.row_number().over(window))
+        .filter(F.col("__cdc_rn__") == 1)
+        .drop("__cdc_rn__")
+    )
+
+
 def execute_cdc_merge(
     spark: SparkSession,
     df: DataFrame,
     target_path: str,
     write_config: WriteConfig,
     cdc_config: CdcConfig,
+    *,
+    load_config: LoadConfig | None = None,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
     Rows are classified by the ``operation_column`` and merged against
     the target table using the ``match_keys`` from ``write_config``.
+
+    Before counting and merging, the change window is reduced to the
+    latest state per key: the CDF preset orders by ``_commit_version``;
+    generic CDC orders by the watermark column carried on ``load_config``.
+    A generic mapping without a watermark column (insert-only feeds) is
+    not reduced — every row is treated as an event.
 
     Args:
         spark: Active SparkSession.
@@ -261,6 +317,8 @@ def execute_cdc_merge(
         target_path: Path to the Delta target table.
         write_config: Write configuration (must be merge mode with match_keys).
         cdc_config: CDC configuration (preset or explicit mapping).
+        load_config: Thread-level load configuration; supplies the
+            watermark ordering for generic CDC reduction.
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -296,17 +354,59 @@ def execute_cdc_merge(
     if recognized_ops:
         df = df.filter(F.col(op_col).isin(recognized_ops))
 
+    # Reduce the window to the latest state per key — Delta MERGE rejects
+    # multiple source rows matching one target row, and a key changing more
+    # than once per window is the normal CDF/OLTP case. Operation precedence
+    # (insert < update < delete) breaks same-position ties: the terminal
+    # state wins.
+    op_precedence = [v for v in (insert_val, update_val, delete_val) if v]
+    if cdc_config.preset == "delta_cdf":
+        if "_commit_version" not in df.columns:
+            raise ExecutionError(
+                "Delta CDF merge requires the '_commit_version' column to order "
+                "same-key changes; do not drop CDF metadata columns in pipeline steps"
+            )
+        _require_non_null_ordering(df, F.col("_commit_version"), "_commit_version")
+        df = _reduce_to_latest_per_key(
+            df,
+            write_config.match_keys,
+            op_col,
+            op_precedence,
+            [F.col("_commit_version")],
+        )
+    elif (
+        load_config is not None
+        and load_config.watermark_column is not None
+        and load_config.watermark_type is not None
+    ):
+        ordering = typed_watermark_col(
+            load_config.watermark_column,
+            load_config.watermark_type,
+            load_config.watermark_format,
+        )
+        _require_non_null_ordering(df, ordering, load_config.watermark_column)
+        df = _reduce_to_latest_per_key(
+            df,
+            write_config.match_keys,
+            op_col,
+            op_precedence,
+            [ordering],
+        )
+
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
     target_exists = delta_table_exists(spark, target_path)
 
     try:
-        # Count operations
+        # Count operations in a single pass over the (reduced) window
+        op_counts: dict[str, int] = {
+            row[0]: row[1] for row in df.groupBy(F.col(op_col)).count().collect()
+        }
         if insert_val:
-            counts["inserts"] = df.filter(F.col(op_col) == insert_val).count()
+            counts["inserts"] = op_counts.get(insert_val, 0)
         if update_val:
-            counts["updates"] = df.filter(F.col(op_col) == update_val).count()
+            counts["updates"] = op_counts.get(update_val, 0)
         if delete_val:
-            counts["deletes"] = df.filter(F.col(op_col) == delete_val).count()
+            counts["deletes"] = op_counts.get(delete_val, 0)
 
         if not target_exists:
             # First CDC write — insert all non-delete rows

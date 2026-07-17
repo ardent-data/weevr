@@ -563,7 +563,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 with contextlib.suppress(Exception):
                     output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
-                cdc_counts = execute_cdc_merge(spark, df, target_path, cdc_write, thread.load.cdc)
+                cdc_counts = execute_cdc_merge(
+                    spark, df, target_path, cdc_write, thread.load.cdc, load_config=thread.load
+                )
                 rows_written = sum(cdc_counts.values())
 
             else:
@@ -1002,7 +1004,14 @@ def _validate_incremental(thread: Thread, load_mode: str) -> None:
     """Run cross-cutting incremental config validation at executor entry."""
     from weevr.config.validation import validate_incremental_config
 
-    raw = {"load": {"mode": load_mode}}
+    load_raw: dict[str, object] = {"mode": load_mode}
+    if thread.load is not None:
+        load_raw["watermark_inclusive"] = thread.load.watermark_inclusive
+        if thread.load.watermark_column is not None:
+            load_raw["watermark_column"] = thread.load.watermark_column
+        if thread.load.cdc is not None:
+            load_raw["cdc"] = thread.load.cdc.model_dump()
+    raw: dict[str, object] = {"load": load_raw}
     if thread.write is not None:
         raw["write"] = {"mode": thread.write.mode}
     diagnostics = validate_incremental_config(raw)

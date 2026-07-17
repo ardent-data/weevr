@@ -205,7 +205,7 @@ def _parse_order_col(order_by: str):  # type: ignore[return]
     return col.desc() if direction == "DESC" else col.asc()
 
 
-def _typed_watermark_col(
+def typed_watermark_col(
     watermark_column: str,
     watermark_type: str | None,
     watermark_format: str | None,
@@ -255,7 +255,7 @@ def build_watermark_filter(
     Returns:
         A Spark Column expression suitable for ``df.filter()``.
     """
-    typed = _typed_watermark_col(watermark_column, watermark_type, watermark_format)
+    typed = typed_watermark_col(watermark_column, watermark_type, watermark_format)
     if watermark_type in ("timestamp", "date"):
         lit_val = F.lit(last_value).cast(watermark_type)
     elif watermark_type == "long":
@@ -312,7 +312,7 @@ def read_source_incremental(
     # Capture HWM before dedup (from filtered source)
     new_hwm: str | None = None
     if load_config.watermark_column is not None:
-        typed = _typed_watermark_col(
+        typed = typed_watermark_col(
             load_config.watermark_column,
             load_config.watermark_type,
             load_config.watermark_format,
@@ -420,7 +420,7 @@ def read_cdc_source(
     # so D rows still advance the window (DEC-003).
     new_hwm: str | None = None
     if load_config is not None and load_config.watermark_column is not None:
-        typed = _typed_watermark_col(
+        typed = typed_watermark_col(
             load_config.watermark_column,
             load_config.watermark_type,
             load_config.watermark_format,
