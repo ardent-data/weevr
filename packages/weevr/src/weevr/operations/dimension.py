@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import reduce
+from typing import Any
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -435,10 +436,10 @@ def _execute_standard_merge(
 
 
 def _apply_not_matched_by_source(
-    merger: object,  # DeltaMergeBuilder — avoid import
+    merger: Any,  # DeltaMergeBuilder — avoid import
     builder: DimensionMergeBuilder,
     scope_condition: str | None = None,
-) -> object:
+) -> Any:
     """Apply on_no_match_source clauses with system member exclusion.
 
     DeltaMergeBuilder is immutable — each ``when*`` call returns a new
@@ -460,9 +461,12 @@ def _apply_not_matched_by_source(
         conditions.append(scope_condition)
     if system_member_sks:
         # Compare as strings: the SK column is a hex string under the default
-        # sha256 algorithm (seeds store sentinel SKs as "-1"/"-2" there), and
-        # a bare `string_col != -1` null-compares in Spark, silently protecting
-        # every row. Casting the column covers integer SK columns identically.
+        # sha256 algorithm (seeds store system-member SKs as "-1"/"-2" there),
+        # and a bare `string_col != -1` null-compares in Spark, silently
+        # protecting every row. Casting the column covers integer SK columns
+        # identically. A NULL SK would also null-compare and be protected —
+        # safe only because engine-generated SKs are never null
+        # (hashing._build_concat_expr coalesces nulls before hashing).
         conditions.append(
             " AND ".join(
                 f"CAST(target.{quote_identifier(sk_col)} AS STRING) != '{v}'"
@@ -472,13 +476,13 @@ def _apply_not_matched_by_source(
 
     if write_config.on_no_match_source == "delete":
         condition = " AND ".join(conditions) if conditions else None
-        merger = merger.whenNotMatchedBySourceDelete(condition=condition)  # type: ignore[attr-defined]
+        merger = merger.whenNotMatchedBySourceDelete(condition=condition)
     elif write_config.on_no_match_source == "soft_delete":
         sd_col = write_config.soft_delete_column
         sd_val = write_config.soft_delete_value
         if sd_col:
             condition = " AND ".join(conditions) if conditions else None
-            merger = merger.whenNotMatchedBySourceUpdate(  # type: ignore[attr-defined]
+            merger = merger.whenNotMatchedBySourceUpdate(
                 condition=condition, set={sd_col: F.lit(sd_val)}
             )
     return merger

@@ -31,6 +31,11 @@ def _prepare_source(spark, rows, dim_config, run_ts="2026-01-01"):
     return df
 
 
+def _write_overrides(**kwargs):  # type: ignore[no-untyped-def]
+    base = {"mode": "merge", "match_keys": ["customer_id"]}
+    return WriteConfig(**{**base, **kwargs})
+
+
 @pytest.mark.spark
 class TestFirstWrite:
     """First-write behavior: all rows inserted."""
@@ -464,16 +469,11 @@ class TestAdditionalKeys:
 class TestNoMatchSourceStandard:
     """on_no_match_source delete/soft_delete on the standard (Type 1) path."""
 
-    @staticmethod
-    def _overrides(**kwargs):  # type: ignore[no-untyped-def]
-        base = {"mode": "merge", "match_keys": ["customer_id"]}
-        return WriteConfig(**{**base, **kwargs})
-
     def test_delete_removes_absent_entity(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("dim_nms_delete")
         dim = _make_dim()
         builder = DimensionMergeBuilder(
-            dim, write_overrides=self._overrides(on_no_match_source="delete")
+            dim, write_overrides=_write_overrides(on_no_match_source="delete")
         )
 
         rows = [
@@ -496,7 +496,7 @@ class TestNoMatchSourceStandard:
         dim = _make_dim()
         builder = DimensionMergeBuilder(
             dim,
-            write_overrides=self._overrides(
+            write_overrides=_write_overrides(
                 on_no_match_source="soft_delete", soft_delete_column="deleted"
             ),
         )
@@ -534,7 +534,7 @@ class TestNoMatchSourceStandard:
             ],
         )
         builder = DimensionMergeBuilder(
-            dim, write_overrides=self._overrides(on_no_match_source="delete")
+            dim, write_overrides=_write_overrides(on_no_match_source="delete")
         )
 
         rows = [{"customer_id": "C1", "name": "Alice"}]
@@ -583,11 +583,6 @@ class TestNoMatchSourceVersioned:
     """delete/soft_delete on the SCD2 path act on current rows only."""
 
     @staticmethod
-    def _overrides(**kwargs):  # type: ignore[no-untyped-def]
-        base = {"mode": "merge", "match_keys": ["customer_id"]}
-        return WriteConfig(**{**base, **kwargs})
-
-    @staticmethod
     def _dim(**extra):  # type: ignore[no-untyped-def]
         return _make_dim(
             track_history=True,
@@ -617,7 +612,7 @@ class TestNoMatchSourceVersioned:
         path = tmp_delta_path("dim_nms_v_delete")
         dim = self._dim()
         builder = DimensionMergeBuilder(
-            dim, write_overrides=self._overrides(on_no_match_source="delete")
+            dim, write_overrides=_write_overrides(on_no_match_source="delete")
         )
         self._seed_history(spark, path, dim, builder)
 
@@ -648,7 +643,7 @@ class TestNoMatchSourceVersioned:
         dim = self._dim()
         builder = DimensionMergeBuilder(
             dim,
-            write_overrides=self._overrides(
+            write_overrides=_write_overrides(
                 on_no_match_source="soft_delete", soft_delete_column="deleted"
             ),
         )
@@ -687,7 +682,7 @@ class TestNoMatchSourceVersioned:
             ],
         )
         builder = DimensionMergeBuilder(
-            dim, write_overrides=self._overrides(on_no_match_source="delete")
+            dim, write_overrides=_write_overrides(on_no_match_source="delete")
         )
         self._seed_history(spark, path, dim, builder)
 
@@ -716,3 +711,102 @@ class TestNoMatchSourceVersioned:
         assert "__unknown__" in remaining
         assert "C2" not in remaining
         assert "C1" in remaining
+
+
+@pytest.mark.spark
+class TestNoMatchSourceSystemMemberSoftDelete:
+    """soft_delete never stamps system-member rows on either merge path."""
+
+    def test_standard_path_flag_untouched(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_nms_soft_sysmember")
+        dim = _make_dim(
+            seed_system_members=True,
+            system_members=[  # type: ignore[arg-type]
+                {"sk": -1, "code": "UNKNOWN", "label": "Unknown"},
+            ],
+        )
+        builder = DimensionMergeBuilder(
+            dim,
+            write_overrides=_write_overrides(
+                on_no_match_source="soft_delete", soft_delete_column="deleted"
+            ),
+        )
+
+        rows = [{"customer_id": "C1", "name": "Alice", "deleted": False}]
+        src1 = _prepare_source(spark, rows, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        sk_type = dict(src1.dtypes)["_sk"]
+        sentinel = _prepare_source(
+            spark,
+            [{"customer_id": "__unknown__", "name": "Unknown", "deleted": False}],
+            dim,
+            "2026-01-01",
+        ).withColumn("_sk", F.lit(-1).cast(sk_type))
+        sentinel.write.format("delta").mode("append").save(path)
+
+        # Neither C1 nor the system member is in the new source
+        src2 = _prepare_source(
+            spark, [{"customer_id": "C9", "name": "Nadia", "deleted": False}], dim, "2026-01-02"
+        )
+        execute_dimension_merge(spark, src2, builder, path, "2026-01-02")
+
+        flags = {
+            r["customer_id"]: r["deleted"] for r in spark.read.format("delta").load(path).collect()
+        }
+        assert flags["__unknown__"] is False  # system member never stamped
+        assert flags["C1"] is True
+        assert flags["C9"] is False
+
+    def test_versioned_path_current_row_flag_untouched(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_nms_v_soft_sysmember")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+            seed_system_members=True,
+            system_members=[  # type: ignore[arg-type]
+                {"sk": -1, "code": "UNKNOWN", "label": "Unknown"},
+            ],
+        )
+        builder = DimensionMergeBuilder(
+            dim,
+            write_overrides=_write_overrides(
+                on_no_match_source="soft_delete", soft_delete_column="deleted"
+            ),
+        )
+
+        rows = [
+            {"customer_id": "C1", "name": "Alice", "deleted": False},
+            {"customer_id": "C2", "name": "Bob", "deleted": False},
+        ]
+        src1 = _prepare_source(spark, rows, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        sk_type = dict(src1.dtypes)["_sk"]
+        sentinel = _prepare_source(
+            spark,
+            [{"customer_id": "__unknown__", "name": "Unknown", "deleted": False}],
+            dim,
+            "2026-01-01",
+        ).withColumn("_sk", F.lit(-1).cast(sk_type))
+        sentinel.write.format("delta").mode("append").save(path)
+
+        # C2 and the system member both vanish from the source; only C2
+        # (a plain entity's current row) may be stamped
+        src2 = _prepare_source(
+            spark, [{"customer_id": "C1", "name": "Alice", "deleted": False}], dim, "2026-02-01"
+        )
+        execute_dimension_merge(spark, src2, builder, path, "2026-02-01")
+
+        current = {
+            r["customer_id"]: r["deleted"]
+            for r in spark.read.format("delta").load(path).collect()
+            if r["_is_current"]
+        }
+        assert current["__unknown__"] is False  # system member's current row never stamped
+        assert current["C2"] is True
+        assert current["C1"] is False
