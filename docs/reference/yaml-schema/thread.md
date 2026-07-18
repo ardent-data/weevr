@@ -948,7 +948,7 @@ for detailed examples.
 | `seed_system_members` | `bool` | no | `false` | Insert Kimball sentinel rows on first write |
 | `system_members` | `list[SystemMember]` | no | defaults | Custom sentinel rows (`sk`, `code`, `label`). `sk` must be a negative integer. Defaults: -1/unknown, -2/not_applicable |
 | `label_column` | `string` | no | `null` | Column for system member labels |
-| `history_filter` | `bool` | no | `true` | Filter target reads to `is_current = true` |
+| `history_filter` | `bool` | no | `true` | No effect; merges always scope to current rows |
 
 **dimension.surrogate_key:**
 

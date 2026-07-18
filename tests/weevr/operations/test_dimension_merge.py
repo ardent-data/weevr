@@ -121,6 +121,181 @@ class TestVersioning:
 
 
 @pytest.mark.spark
+class TestVersionedLifecycle:
+    """Three-plus-version lifecycles: merges never touch closed rows.
+
+    Every scenario runs at least 3 writes because the close clause defect
+    only becomes visible from the 3rd version on — with 2 writes there is
+    no closed history row for a later merge to corrupt.
+    """
+
+    @staticmethod
+    def _write(spark, path, dim, rows, run_ts):  # type: ignore[no-untyped-def]
+        source = _prepare_source(spark, rows, dim, run_ts)
+        builder = DimensionMergeBuilder(dim)
+        execute_dimension_merge(spark, source, builder, path, run_ts)
+
+    def _run_three_writes(self, spark, path, dim):  # type: ignore[no-untyped-def]
+        for name, ts in [
+            ("Alice", "2026-01-01"),
+            ("Alicia", "2026-02-01"),
+            ("Alize", "2026-03-01"),
+        ]:
+            self._write(spark, path, dim, [{"customer_id": "C1", "name": name}], ts)
+
+    def test_third_version_leaves_closed_rows_untouched(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_lifecycle")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        self._write(spark, path, dim, [{"customer_id": "C1", "name": "Alice"}], "2026-01-01")
+        self._write(spark, path, dim, [{"customer_id": "C1", "name": "Alicia"}], "2026-02-01")
+        v1_after_write2 = spark.read.format("delta").load(path).orderBy("_valid_from").collect()[0]
+        self._write(spark, path, dim, [{"customer_id": "C1", "name": "Alize"}], "2026-03-01")
+
+        rows = spark.read.format("delta").load(path).orderBy("_valid_from").collect()
+        assert len(rows) == 3
+        v1, v2, v3 = rows
+        # The closed v1 row must be exactly what write 2 left behind —
+        # write 3 may not touch it in any column
+        assert v1.asDict() == v1_after_write2.asDict()
+        assert [r["_is_current"] for r in rows] == [False, False, True]
+        # Closed rows keep the valid_to stamped when they were closed
+        assert v1["_valid_to"] == "2026-02-01"
+        assert v2["_valid_to"] == "2026-03-01"
+        # Contiguous, non-overlapping validity intervals
+        assert v1["_valid_to"] == v2["_valid_from"]
+        assert v2["_valid_to"] == v3["_valid_from"]
+
+    def test_overwrite_columns_on_closed_rows_stable(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_lifecycle_overwrite")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+                "contact": {"columns": ["email"], "on_change": "overwrite"},
+            },
+        )
+        for name, email, ts in [
+            ("Alice", "a1@x.com", "2026-01-01"),
+            ("Alicia", "a2@x.com", "2026-02-01"),
+            ("Alize", "a3@x.com", "2026-03-01"),
+        ]:
+            self._write(spark, path, dim, [{"customer_id": "C1", "name": name, "email": email}], ts)
+
+        rows = spark.read.format("delta").load(path).orderBy("_valid_from").collect()
+        assert len(rows) == 3
+        v1, v2, v3 = rows
+        # Overwrite values on closed rows come from the write that closed
+        # them and are never re-stamped by later merges
+        assert v1["email"] == "a2@x.com"
+        assert v2["email"] == "a3@x.com"
+        assert v3["email"] == "a3@x.com"
+
+    def test_previous_columns_captured_only_on_closing_row(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_lifecycle_prev")
+        dim = _make_dim(
+            track_history=True,
+            previous_columns={"_prev_name": "name"},
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        schema = StructType(
+            [
+                StructField("customer_id", StringType()),
+                StructField("name", StringType()),
+                StructField("_prev_name", StringType()),
+            ]
+        )
+        builder = DimensionMergeBuilder(dim)
+        for name, ts in [
+            ("Alice", "2026-01-01"),
+            ("Alicia", "2026-02-01"),
+            ("Alize", "2026-03-01"),
+        ]:
+            src = spark.createDataFrame(
+                [{"customer_id": "C1", "name": name, "_prev_name": None}], schema=schema
+            )
+            src = compute_dimension_keys(src, dim)
+            src = builder.inject_scd_columns(src, ts)
+            execute_dimension_merge(spark, src, builder, path, ts)
+
+        rows = spark.read.format("delta").load(path).orderBy("_valid_from").collect()
+        assert len(rows) == 3
+        v1, v2, v3 = rows
+        assert v1["_prev_name"] == "Alice"
+        assert v2["_prev_name"] == "Alicia"
+        assert v3["_prev_name"] is None
+
+    def test_history_filter_false_matches_default_outcome(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        change_detection = {"names": {"columns": ["name"], "on_change": "version"}}
+        default_path = tmp_delta_path("dim_lifecycle_default")
+        nofilter_path = tmp_delta_path("dim_lifecycle_nofilter")
+        default_dim = _make_dim(
+            track_history=True,
+            change_detection=change_detection,  # type: ignore[arg-type]
+        )
+        nofilter_dim = _make_dim(
+            track_history=True,
+            history_filter=False,
+            change_detection=change_detection,  # type: ignore[arg-type]
+        )
+        self._run_three_writes(spark, default_path, default_dim)
+        self._run_three_writes(spark, nofilter_path, nofilter_dim)
+
+        scd_cols = ["customer_id", "name", "_sk", "_valid_from", "_valid_to", "_is_current"]
+
+        def read_scd_rows(path):  # type: ignore[no-untyped-def]
+            rows = spark.read.format("delta").load(path).orderBy("_valid_from").collect()
+            return [{c: r[c] for c in scd_cols} for r in rows]
+
+        nofilter_rows = read_scd_rows(nofilter_path)
+        # history_filter must not change merge semantics: the lifecycle
+        # outcome matches the default config row-for-row on SCD columns
+        assert nofilter_rows == read_scd_rows(default_path)
+        assert len(nofilter_rows) == 3
+        assert [r["_is_current"] for r in nofilter_rows] == [False, False, True]
+        assert [r["_valid_to"] for r in nofilter_rows] == ["2026-02-01", "2026-03-01", "9999-12-31"]
+        # _sk is a business-key hash shared by every version; the RC5
+        # fan-out precondition is multiple current rows on that one key,
+        # ruled out by the single True above
+        assert len({r["_sk"] for r in nofilter_rows}) == 1
+
+    def test_history_filter_false_idempotent_rerun(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_lifecycle_nofilter_rerun")
+        dim = _make_dim(
+            track_history=True,
+            history_filter=False,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        self._run_three_writes(spark, path, dim)
+        # Rerun the latest state unchanged — must be a no-op
+        self._write(spark, path, dim, [{"customer_id": "C1", "name": "Alize"}], "2026-04-01")
+
+        target = spark.read.format("delta").load(path)
+        assert target.count() == 3
+        current = target.filter(F.col("_is_current") == True)  # noqa: E712
+        assert current.count() == 1
+        assert current.collect()[0]["_valid_to"] == "9999-12-31"
+
+
+@pytest.mark.spark
 class TestNewEntity:
     """New entity (unmatched source) is inserted."""
 
@@ -221,9 +396,18 @@ class TestPreviousColumns:
 
 @pytest.mark.spark
 class TestHistoryFilter:
-    """history_filter toggle."""
+    """history_filter is accepted but inert.
 
-    def test_history_filter_false_reads_all(self, spark: SparkSession, tmp_delta_path) -> None:
+    Detection and the close clause always operate on current rows; the
+    flag is retained for configuration compatibility only. This guards
+    the config surface: setting it must neither fail validation nor
+    change versioning. Merge-semantics parity across the flag's values
+    is covered by TestVersionedLifecycle.
+    """
+
+    def test_flag_accepted_and_versioning_unchanged(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
         path = tmp_delta_path("dim_no_filter")
         dim = _make_dim(
             track_history=True,
@@ -238,12 +422,13 @@ class TestHistoryFilter:
         src1 = _prepare_source(spark, [{"customer_id": "C1", "name": "Alice"}], dim, "2026-01-01")
         execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
 
-        # Merge still works with history_filter=False
+        # Second run — normal close-and-insert versioning
         src2 = _prepare_source(spark, [{"customer_id": "C1", "name": "Alicia"}], dim, "2026-02-01")
         execute_dimension_merge(spark, src2, builder, path, "2026-02-01")
 
         target = spark.read.format("delta").load(path)
-        assert target.count() >= 2  # Has history rows
+        assert target.count() == 2
+        assert target.filter(F.col("_is_current") == True).count() == 1  # noqa: E712
 
 
 @pytest.mark.spark

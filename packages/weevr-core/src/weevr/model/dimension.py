@@ -238,8 +238,8 @@ class DimensionConfig(FrozenBase):
             rows during the first load.
         system_members: Reserved sentinel rows with negative SK values.
         label_column: Optional column name for a human-readable row label.
-        history_filter: When ``True`` (default), the engine exposes a filtered
-            view that returns only current rows.
+        history_filter: Accepted for configuration compatibility; has no
+            effect. Versioned merges always operate on current rows.
     """
 
     business_key: list[str] = Field(
@@ -301,8 +301,8 @@ class DimensionConfig(FrozenBase):
     history_filter: bool = Field(
         default=True,
         description=(
-            "When ``True`` (default), the engine exposes a filtered view returning only "
-            "current rows."
+            "Accepted for configuration compatibility; has no effect. Versioned merges "
+            "always operate on current rows."
         ),
     )
 
