@@ -6,6 +6,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import StringType, StructField, StructType
 
 from weevr.model.dimension import DimensionConfig
+from weevr.model.write import WriteConfig
 from weevr.operations.dimension import (
     DimensionMergeBuilder,
     execute_dimension_merge,
@@ -457,3 +458,121 @@ class TestAdditionalKeys:
         target = spark.read.format("delta").load(path)
         assert "_version_sk" in target.columns
         assert "_sk" in target.columns
+
+
+@pytest.mark.spark
+class TestNoMatchSourceStandard:
+    """on_no_match_source delete/soft_delete on the standard (Type 1) path."""
+
+    @staticmethod
+    def _overrides(**kwargs):  # type: ignore[no-untyped-def]
+        base = {"mode": "merge", "match_keys": ["customer_id"]}
+        return WriteConfig(**{**base, **kwargs})
+
+    def test_delete_removes_absent_entity(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_nms_delete")
+        dim = _make_dim()
+        builder = DimensionMergeBuilder(
+            dim, write_overrides=self._overrides(on_no_match_source="delete")
+        )
+
+        rows = [
+            {"customer_id": "C1", "name": "Alice"},
+            {"customer_id": "C2", "name": "Bob"},
+        ]
+        src1 = _prepare_source(spark, rows, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        # C2 disappears from the source — declared delete must remove it
+        src2 = _prepare_source(spark, rows[:1], dim, "2026-01-02")
+        execute_dimension_merge(spark, src2, builder, path, "2026-01-02")
+
+        target = spark.read.format("delta").load(path)
+        remaining = {r["customer_id"] for r in target.collect()}
+        assert remaining == {"C1"}
+
+    def test_soft_delete_flags_absent_entity(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_nms_soft")
+        dim = _make_dim()
+        builder = DimensionMergeBuilder(
+            dim,
+            write_overrides=self._overrides(
+                on_no_match_source="soft_delete", soft_delete_column="deleted"
+            ),
+        )
+
+        rows = [
+            {"customer_id": "C1", "name": "Alice", "deleted": False},
+            {"customer_id": "C2", "name": "Bob", "deleted": False},
+        ]
+        src1 = _prepare_source(spark, rows, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        src2 = _prepare_source(spark, rows[:1], dim, "2026-01-02")
+        execute_dimension_merge(spark, src2, builder, path, "2026-01-02")
+
+        target = spark.read.format("delta").load(path)
+        flags = {r["customer_id"]: r["deleted"] for r in target.collect()}
+        assert flags == {"C1": False, "C2": True}
+
+    @pytest.mark.parametrize("algorithm", ["sha256", "xxhash64"])
+    def test_system_member_rows_survive(
+        self, spark: SparkSession, tmp_delta_path, algorithm: str
+    ) -> None:
+        # sha256 → string SK (the default); xxhash64 → integer SK. The
+        # exclusion must protect sentinels and still delete plain rows on both.
+        path = tmp_delta_path(f"dim_nms_sysmember_{algorithm}")
+        dim = _make_dim(
+            surrogate_key={  # type: ignore[arg-type]
+                "name": "_sk",
+                "columns": ["customer_id"],
+                "algorithm": algorithm,
+            },
+            seed_system_members=True,
+            system_members=[  # type: ignore[arg-type]
+                {"sk": -1, "code": "UNKNOWN", "label": "Unknown"},
+            ],
+        )
+        builder = DimensionMergeBuilder(
+            dim, write_overrides=self._overrides(on_no_match_source="delete")
+        )
+
+        rows = [{"customer_id": "C1", "name": "Alice"}]
+        src1 = _prepare_source(spark, rows, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        # Seed a sentinel row the way execute_seeds would: same schema, SK = -1
+        sk_type = dict(src1.dtypes)["_sk"]
+        sentinel = _prepare_source(
+            spark, [{"customer_id": "__unknown__", "name": "Unknown"}], dim, "2026-01-01"
+        ).withColumn("_sk", F.lit(-1).cast(sk_type))
+        sentinel.write.format("delta").mode("append").save(path)
+
+        # Neither the sentinel nor C1 is in the new source; only C1 may be deleted
+        src2 = _prepare_source(spark, [{"customer_id": "C9", "name": "Nadia"}], dim, "2026-01-02")
+        execute_dimension_merge(spark, src2, builder, path, "2026-01-02")
+
+        target = spark.read.format("delta").load(path)
+        remaining = {r["customer_id"] for r in target.collect()}
+        assert "__unknown__" in remaining
+        assert "C1" not in remaining
+        assert "C9" in remaining
+
+    def test_ignore_default_remains_noop(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_nms_ignore")
+        dim = _make_dim()
+        builder = DimensionMergeBuilder(dim)
+
+        rows = [
+            {"customer_id": "C1", "name": "Alice"},
+            {"customer_id": "C2", "name": "Bob"},
+        ]
+        src1 = _prepare_source(spark, rows, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        src2 = _prepare_source(spark, rows[:1], dim, "2026-01-02")
+        execute_dimension_merge(spark, src2, builder, path, "2026-01-02")
+
+        target = spark.read.format("delta").load(path)
+        remaining = {r["customer_id"] for r in target.collect()}
+        assert remaining == {"C1", "C2"}

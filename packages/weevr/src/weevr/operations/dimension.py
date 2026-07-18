@@ -356,7 +356,7 @@ def _execute_versioned_merge(
     merger = merger.whenNotMatchedInsert(values=insert_cols)
 
     # Handle on_no_match_source
-    _apply_not_matched_by_source(merger, builder)
+    merger = _apply_not_matched_by_source(merger, builder)
 
     merger.execute()
     return result
@@ -420,7 +420,7 @@ def _execute_standard_merge(
         merger = merger.whenMatchedUpdate(condition=change_cond, set=update_set)
 
     merger = merger.whenNotMatchedInsertAll()
-    _apply_not_matched_by_source(merger, builder)
+    merger = _apply_not_matched_by_source(merger, builder)
     merger.execute()
 
     return result
@@ -429,29 +429,38 @@ def _execute_standard_merge(
 def _apply_not_matched_by_source(
     merger: object,  # DeltaMergeBuilder — avoid import
     builder: DimensionMergeBuilder,
-) -> None:
-    """Apply on_no_match_source clauses with system member exclusion."""
+) -> object:
+    """Apply on_no_match_source clauses with system member exclusion.
+
+    DeltaMergeBuilder is immutable — each ``when*`` call returns a new
+    builder, so the result must be returned and reassigned by the caller.
+    """
     write_config = builder.build_write_config()
     sk_col = builder.config.surrogate_key.name
     system_member_sks = builder.get_system_member_sk_values()
 
-    if write_config.on_no_match_source == "delete":
-        if system_member_sks:
-            exclusion = " AND ".join(
-                f"target.{quote_identifier(sk_col)} != {v}" for v in system_member_sks
+    conditions: list[str] = []
+    if system_member_sks:
+        # Compare as strings: the SK column is a hex string under the default
+        # sha256 algorithm (seeds store sentinel SKs as "-1"/"-2" there), and
+        # a bare `string_col != -1` null-compares in Spark, silently protecting
+        # every row. Casting the column covers integer SK columns identically.
+        conditions.append(
+            " AND ".join(
+                f"CAST(target.{quote_identifier(sk_col)} AS STRING) != '{v}'"
+                for v in system_member_sks
             )
-            merger.whenNotMatchedBySourceDelete(condition=exclusion)  # type: ignore[union-attr]
-        else:
-            merger.whenNotMatchedBySourceDelete()  # type: ignore[union-attr]
+        )
+
+    if write_config.on_no_match_source == "delete":
+        condition = " AND ".join(conditions) if conditions else None
+        merger = merger.whenNotMatchedBySourceDelete(condition=condition)  # type: ignore[attr-defined]
     elif write_config.on_no_match_source == "soft_delete":
         sd_col = write_config.soft_delete_column
         sd_val = write_config.soft_delete_value
         if sd_col:
-            condition = None
-            if system_member_sks:
-                condition = " AND ".join(
-                    f"target.{quote_identifier(sk_col)} != {v}" for v in system_member_sks
-                )
-            merger.whenNotMatchedBySourceUpdate(  # type: ignore[union-attr]
+            condition = " AND ".join(conditions) if conditions else None
+            merger = merger.whenNotMatchedBySourceUpdate(  # type: ignore[attr-defined]
                 condition=condition, set={sd_col: F.lit(sd_val)}
             )
+    return merger
