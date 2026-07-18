@@ -355,8 +355,16 @@ def _execute_versioned_merge(
     insert_cols = {c: F.col(f"source.{quote_identifier(c)}") for c in source_df.columns}
     merger = merger.whenNotMatchedInsert(values=insert_cols)
 
-    # Handle on_no_match_source
-    merger = _apply_not_matched_by_source(merger, builder)
+    # Handle on_no_match_source. The MERGE condition scopes matching to
+    # current rows, so closed history rows always land in the
+    # not-matched-by-source set — the clauses must be scoped to the current
+    # row or delete would erase history and soft_delete would re-stamp
+    # closed rows on every merge.
+    merger = _apply_not_matched_by_source(
+        merger,
+        builder,
+        scope_condition=f"target.{quote_identifier(scd.is_current)} = true",
+    )
 
     merger.execute()
     return result
@@ -429,17 +437,27 @@ def _execute_standard_merge(
 def _apply_not_matched_by_source(
     merger: object,  # DeltaMergeBuilder — avoid import
     builder: DimensionMergeBuilder,
+    scope_condition: str | None = None,
 ) -> object:
     """Apply on_no_match_source clauses with system member exclusion.
 
     DeltaMergeBuilder is immutable — each ``when*`` call returns a new
     builder, so the result must be returned and reassigned by the caller.
+
+    Args:
+        merger: The Delta merge builder under construction.
+        builder: Dimension merge builder providing write config and SK values.
+        scope_condition: Extra SQL predicate ANDed onto the clause condition.
+            The versioned path passes an ``is_current`` scope; the standard
+            path (one row per entity, no history to protect) passes none.
     """
     write_config = builder.build_write_config()
     sk_col = builder.config.surrogate_key.name
     system_member_sks = builder.get_system_member_sk_values()
 
     conditions: list[str] = []
+    if scope_condition:
+        conditions.append(scope_condition)
     if system_member_sks:
         # Compare as strings: the SK column is a hex string under the default
         # sha256 algorithm (seeds store sentinel SKs as "-1"/"-2" there), and

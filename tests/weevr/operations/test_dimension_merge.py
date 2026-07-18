@@ -576,3 +576,143 @@ class TestNoMatchSourceStandard:
         target = spark.read.format("delta").load(path)
         remaining = {r["customer_id"] for r in target.collect()}
         assert remaining == {"C1", "C2"}
+
+
+@pytest.mark.spark
+class TestNoMatchSourceVersioned:
+    """delete/soft_delete on the SCD2 path act on current rows only."""
+
+    @staticmethod
+    def _overrides(**kwargs):  # type: ignore[no-untyped-def]
+        base = {"mode": "merge", "match_keys": ["customer_id"]}
+        return WriteConfig(**{**base, **kwargs})
+
+    @staticmethod
+    def _dim(**extra):  # type: ignore[no-untyped-def]
+        return _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+            **extra,
+        )
+
+    def _seed_history(self, spark, path, dim, builder):  # type: ignore[no-untyped-def]
+        """Two writes: C1 gains a closed v1 + current v2; C2 stays single-version."""
+        rows1 = [
+            {"customer_id": "C1", "name": "Alice", "deleted": False},
+            {"customer_id": "C2", "name": "Bob", "deleted": False},
+        ]
+        src1 = _prepare_source(spark, rows1, dim, "2026-01-01")
+        execute_dimension_merge(spark, src1, builder, path, "2026-01-01")
+
+        rows2 = [
+            {"customer_id": "C1", "name": "Alicia", "deleted": False},
+            {"customer_id": "C2", "name": "Bob", "deleted": False},
+        ]
+        src2 = _prepare_source(spark, rows2, dim, "2026-02-01")
+        execute_dimension_merge(spark, src2, builder, path, "2026-02-01")
+
+    def test_delete_spares_closed_history_rows(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_nms_v_delete")
+        dim = self._dim()
+        builder = DimensionMergeBuilder(
+            dim, write_overrides=self._overrides(on_no_match_source="delete")
+        )
+        self._seed_history(spark, path, dim, builder)
+
+        # C2 disappears; C1 continues unchanged
+        src3 = _prepare_source(
+            spark, [{"customer_id": "C1", "name": "Alicia", "deleted": False}], dim, "2026-03-01"
+        )
+        execute_dimension_merge(spark, src3, builder, path, "2026-03-01")
+
+        target = spark.read.format("delta").load(path).collect()
+        by_key = {}
+        for r in target:
+            by_key.setdefault(r["customer_id"], []).append(r)
+
+        # C2's current row is gone entirely
+        assert "C2" not in by_key
+        # C1's closed v1 AND current v2 both survive
+        c1_current = [r for r in by_key["C1"] if r["_is_current"]]
+        c1_closed = [r for r in by_key["C1"] if not r["_is_current"]]
+        assert len(c1_current) == 1
+        assert len(c1_closed) == 1
+        assert c1_closed[0]["name"] == "Alice"
+
+    def test_soft_delete_stamps_current_only_and_is_idempotent(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_nms_v_soft")
+        dim = self._dim()
+        builder = DimensionMergeBuilder(
+            dim,
+            write_overrides=self._overrides(
+                on_no_match_source="soft_delete", soft_delete_column="deleted"
+            ),
+        )
+        self._seed_history(spark, path, dim, builder)
+
+        def _merge_without_c2(run_ts: str) -> None:
+            src = _prepare_source(
+                spark,
+                [{"customer_id": "C1", "name": "Alicia", "deleted": False}],
+                dim,
+                run_ts,
+            )
+            execute_dimension_merge(spark, src, builder, path, run_ts)
+
+        _merge_without_c2("2026-03-01")
+        _merge_without_c2("2026-04-01")  # rerun: closed rows must not be re-stamped
+
+        target = spark.read.format("delta").load(path).collect()
+        by_row = {(r["customer_id"], bool(r["_is_current"])): r for r in target}
+
+        # C2's current row is stamped
+        assert by_row[("C2", True)]["deleted"] is True
+        # C1's closed row keeps its original flag across both merges
+        assert by_row[("C1", False)]["deleted"] is False
+        # C1's current row untouched
+        assert by_row[("C1", True)]["deleted"] is False
+
+    def test_system_member_current_row_survives_delete(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("dim_nms_v_sysmember")
+        dim = self._dim(
+            seed_system_members=True,
+            system_members=[  # type: ignore[arg-type]
+                {"sk": -1, "code": "UNKNOWN", "label": "Unknown"},
+            ],
+        )
+        builder = DimensionMergeBuilder(
+            dim, write_overrides=self._overrides(on_no_match_source="delete")
+        )
+        self._seed_history(spark, path, dim, builder)
+
+        src1 = _prepare_source(
+            spark,
+            [{"customer_id": "C1", "name": "Alicia", "deleted": False}],
+            dim,
+            "2026-02-15",
+        )
+        sk_type = dict(src1.dtypes)["_sk"]
+        sentinel = _prepare_source(
+            spark,
+            [{"customer_id": "__unknown__", "name": "Unknown", "deleted": False}],
+            dim,
+            "2026-01-01",
+        ).withColumn("_sk", F.lit(-1).cast(sk_type))
+        sentinel.write.format("delta").mode("append").save(path)
+
+        src3 = _prepare_source(
+            spark, [{"customer_id": "C1", "name": "Alicia", "deleted": False}], dim, "2026-03-01"
+        )
+        execute_dimension_merge(spark, src3, builder, path, "2026-03-01")
+
+        remaining = {r["customer_id"] for r in spark.read.format("delta").load(path).collect()}
+        # Sentinel (current, sk=-1) survives; C2 (current, no source match) is gone
+        assert "__unknown__" in remaining
+        assert "C2" not in remaining
+        assert "C1" in remaining
