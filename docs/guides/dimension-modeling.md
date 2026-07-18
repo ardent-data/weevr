@@ -219,6 +219,12 @@ write:
   soft_delete_value: true  # default; boolean
 ```
 
+On versioned dimensions (`track_history: true`), `delete` and `soft_delete`
+apply to the **current row only**. Closed history rows are never deleted and
+never re-stamped — an entity that disappears from the source keeps its full
+version history; only its current row is removed or flagged. Seeded system
+members are always excluded from both actions.
+
 Forbidden fields when `dimension:` is present:
 
 - `write.match_keys` — derived from `business_key`
