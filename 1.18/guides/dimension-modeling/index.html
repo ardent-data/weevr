@@ -3342,11 +3342,11 @@ column.</p>
 </tbody>
 </table>
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
-<p>For large dimensions, the engine filters target reads to
-<code>is_current = true</code> by default. Disable with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">dimension</span><span class="p">:</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">history_filter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-</code></pre></div>
+<p>Versioned merges always read the target filtered to
+<code>is_current = true</code>: change detection and row closing operate on
+current rows only, so history depth never affects merge cost. The
+<code>history_filter</code> key is accepted for configuration compatibility
+but has no effect.</p>
 <p>Z-ordering on business key columns is recommended for
 dimensions with 100M+ entities.</p>
 
