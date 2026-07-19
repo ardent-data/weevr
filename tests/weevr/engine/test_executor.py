@@ -1798,3 +1798,48 @@ class TestWithBlockColumnControlIntegration:
         assert "subgroup_desc" in cols
         assert "description" not in cols
         assert "level" not in cols
+
+
+class TestCteObservationScoping:
+    """CTE observations merge into the thread registry under unique scopes."""
+
+    def test_same_named_map_steps_in_cte_and_main_never_collide(self, spark: SparkSession) -> None:
+        from weevr.engine.executor import _resolve_with_block
+        from weevr.operations.pipeline import ObservationRegistry, run_pipeline
+
+        orders = spark.createDataFrame(
+            [{"id": 1, "code": "A"}, {"id": 2, "code": "X"}, {"id": 3, "code": "A"}]
+        )
+        sources_map = {"orders": orders}
+        map_step = {"map": {"column": "code", "values": {"A": "alpha"}, "unmapped": "validate"}}
+
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1",
+                "sources": {"orders": {"type": "delta", "alias": "/fake/path"}},
+                "steps": [map_step],
+                "target": {"path": "/fake/target"},
+                "with": {"prepped": {"from": "orders", "steps": [map_step]}},
+            }
+        )
+
+        registry = ObservationRegistry(scope="main")
+        enriched = _resolve_with_block(thread, sources_map, observations=registry)
+
+        df = run_pipeline(
+            enriched["prepped"],
+            thread.steps,
+            enriched,
+            observations=registry,
+        )
+        df.collect()
+
+        stats = registry.harvest()
+        # One key per scope: the CTE's map and the main pipeline's map both
+        # observe a column named 'code' without colliding
+        assert set(stats) == {"prepped.map.code", "main.map.code"}
+        assert stats["prepped.map.code"]["unmapped_count"] == 1  # 'X'
+        # The CTE already rewrote A→alpha, so every row ('alpha','X','alpha')
+        # is unmapped for the main step's A→alpha mapping
+        assert stats["main.map.code"]["unmapped_count"] == 3

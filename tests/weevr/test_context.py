@@ -1163,3 +1163,114 @@ class TestExecutionScopeWarnings:
         )
         warnings = self._run_validate(project, "threads/stub.thread", caplog)
         assert any("execution block" in w and "log_level" in w for w in warnings)
+
+
+@pytest.mark.spark
+class TestPreviewStepStats:
+    """Preview harvests sample-scoped step statistics into metadata."""
+
+    def test_preview_map_stats_sample_scoped(self, spark: SparkSession, tmp_path: Path) -> None:
+        # Uses a validate-mode map step: preview does not materialize
+        # lookups (pre-existing limitation), so resolve steps cannot run
+        # there — map stats exercise the same harvest path.
+        src = str(tmp_path / "src_pstats")
+        tgt = str(tmp_path / "tgt_pstats")
+        spark.createDataFrame(
+            [{"id": i, "code": "A" if i % 2 == 0 else "X"} for i in range(40)]
+        ).write.format("delta").save(src)
+
+        thread_dir = tmp_path / "threads"
+        thread_dir.mkdir(parents=True, exist_ok=True)
+        yaml_path = thread_dir / "pstats.thread"
+        yaml_path.write_text(
+            f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{src}"
+steps:
+  - map:
+      column: code
+      values:
+        A: alpha
+      unmapped: validate
+target:
+  path: "{tgt}"
+write:
+  mode: overwrite
+"""
+        )
+        pytest.importorskip("pandas")  # the sampling action needs pandas
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview", sample_rows=10)
+
+        assert result.status == "success", result.warnings
+        meta = result._preview_metadata or {}
+        stats = meta.get("pstats", {}).get("step_stats", {})
+        assert "main.map.code" in stats
+        # Sample-scoped: the count reflects the 10-row sample, not the
+        # 40-row source (which holds 20 unmapped rows)
+        assert 0 < stats["main.map.code"]["unmapped_count"] <= 10
+
+    def test_preview_without_stat_steps_has_no_key(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        src = str(tmp_path / "src_pnostats")
+        tgt = str(tmp_path / "tgt_pnostats")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "pnostats", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        meta = result._preview_metadata or {}
+        assert "step_stats" not in meta.get("pnostats", {})
+
+    def test_preview_harvest_degrades_when_sampling_fails(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # No sampling action means unfulfilled observations: the harvest is
+        # skipped, the preview stays intact, and the thread is never demoted
+        # to errors.
+        from pyspark.sql import DataFrame
+
+        def _boom(self):  # type: ignore[no-untyped-def]
+            raise RuntimeError("sampling unavailable")
+
+        monkeypatch.setattr(DataFrame, "toPandas", _boom)
+
+        src = str(tmp_path / "src_pdeg")
+        tgt = str(tmp_path / "tgt_pdeg")
+        spark.createDataFrame([{"id": 1, "code": "X"}]).write.format("delta").save(src)
+        thread_dir = tmp_path / "threads"
+        thread_dir.mkdir(parents=True, exist_ok=True)
+        yaml_path = thread_dir / "pdeg.thread"
+        yaml_path.write_text(
+            f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{src}"
+steps:
+  - map:
+      column: code
+      values:
+        A: alpha
+      unmapped: validate
+target:
+  path: "{tgt}"
+write:
+  mode: overwrite
+"""
+        )
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success", result.warnings
+        meta = (result._preview_metadata or {}).get("pdeg", {})
+        assert "samples" not in meta
+        assert "step_stats" not in meta
+        assert result.preview_data is not None and "pdeg" in result.preview_data

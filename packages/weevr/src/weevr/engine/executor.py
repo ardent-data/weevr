@@ -420,6 +420,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map = read_sources(spark, normal_sources, connections=connections)
                 sources_map.update(lookup_dfs)
 
+            # Step statistics attach as Observations (harvested after the
+            # write); CTE sub-pipelines contribute under their own scopes.
+            obs_registry = ObservationRegistry(scope="main")
+
             # Resolve with: block CTEs before the primary DataFrame is set
             if thread.with_:
                 sources_map = _resolve_with_block(
@@ -427,15 +431,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     sources_map,
                     collector=collector if span_builder else None,
                     parent_span_id=span_builder.span_id if span_builder else None,
+                    observations=obs_registry,
+                    lookup_meta=lookup_meta,
                 )
 
             # Step 5 — primary DataFrame is the first declared source
             df = next(iter(sources_map.values()))
             rows_read = df.count()
 
-            # Step 6 — run pipeline steps. Step statistics attach as
-            # Observations and are harvested after the write.
-            obs_registry = ObservationRegistry(scope="main")
+            # Step 6 — run pipeline steps
             df = run_pipeline(
                 df,
                 thread.steps,
@@ -862,6 +866,8 @@ def _resolve_with_block(
     sources_map: dict[str, Any],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    observations: ObservationRegistry | None = None,
+    lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> dict[str, Any]:
     """Resolve with: block CTEs, registering each result in the source registry.
 
@@ -877,6 +883,9 @@ def _resolve_with_block(
         sources_map: Current source registry (sources + lookup DataFrames).
         collector: Optional span collector for telemetry.
         parent_span_id: Parent span ID to link CTE spans into the thread span.
+        observations: Thread-level registry; each CTE's observations attach
+            under its own scope and merge in for plan-wide unique names.
+        lookup_meta: Materialization-time lookup facts for resolve steps.
 
     Returns:
         An enriched copy of ``sources_map`` with each CTE result registered
@@ -895,7 +904,16 @@ def _resolve_with_block(
                 f"Available: {sorted(enriched)}"
             )
         cte_df = enriched[cte.from_]
-        cte_df = run_pipeline(cte_df, cte.steps, enriched)
+        cte_registry = ObservationRegistry(scope=cte_name) if observations is not None else None
+        cte_df = run_pipeline(
+            cte_df,
+            cte.steps,
+            enriched,
+            observations=cte_registry,
+            lookup_meta=lookup_meta,
+        )
+        if observations is not None and cte_registry is not None:
+            observations.merge(cte_registry)
         row_count = cte_df.count()
         enriched[cte_name] = cte_df
 
