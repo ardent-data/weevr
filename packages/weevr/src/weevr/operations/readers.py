@@ -61,6 +61,17 @@ def read_source(
         ) from exc
 
 
+def apply_source_dedup(df: DataFrame, source: Source) -> DataFrame:
+    """Apply a source's dedup configuration to an already-read DataFrame.
+
+    Registry-served snapshots go through the same post-read semantics a
+    direct :func:`read_source` would apply.
+    """
+    if source.dedup is not None:
+        return _apply_dedup(df, source.dedup)
+    return df
+
+
 def read_sources(
     spark: SparkSession,
     sources: dict[str, Source],

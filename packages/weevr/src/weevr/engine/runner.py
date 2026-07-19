@@ -25,6 +25,7 @@ from weevr.engine.lookups import (
 from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+from weevr.engine.target_identity import resolve_target_identity
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import HookError
 from weevr.model.column_set import ColumnSet
@@ -340,6 +341,7 @@ def execute_weave(
                                 capture_samples=(
                                     execution.capture_samples if execution is not None else False
                                 ),
+                                cache_registry=cache,
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
@@ -363,6 +365,7 @@ def execute_weave(
                                 capture_samples=(
                                     execution.capture_samples if execution is not None else False
                                 ),
+                                cache_registry=cache,
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
@@ -385,11 +388,24 @@ def execute_weave(
                         if name in thread_collectors and collector is not None:
                             collector.merge(thread_collectors[name])
 
-                        # Persist cache if this thread is a cache target
+                        # Persist cache if this thread is a cache target.
+                        # Identity covers alias, path, AND connection forms —
+                        # connection-declared cache targets previously never
+                        # persisted (identity was `alias or path` only)
                         if cache.is_cache_target(name):
-                            target_path = threads[name].target.alias or threads[name].target.path
+                            tgt = threads[name].target
+                            identity = resolve_target_identity(
+                                spark,
+                                alias=tgt.alias,
+                                path=tgt.path,
+                                connection=tgt.connection,
+                                table=tgt.table,
+                                schema_override=tgt.schema_override,
+                                connections=threads[name].connections,
+                            )
+                            target_path = tgt.alias or tgt.path or identity
                             if target_path:
-                                cache.persist(name, spark, target_path)
+                                cache.persist(name, spark, target_path, identity=identity)
 
                         # Notify cache manager so it can unpersist when all consumers done
                         cache.notify_complete(name)

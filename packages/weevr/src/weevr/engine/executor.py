@@ -14,6 +14,7 @@ from pyspark.sql import Observation, SparkSession
 from pyspark.sql import functions as F
 
 from weevr.delta import read_delta
+from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.hooks import run_hook_steps
 from weevr.engine.lookups import (
@@ -24,6 +25,7 @@ from weevr.engine.lookups import (
 )
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
+from weevr.engine.target_identity import resolve_target_identity
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import (
     DataValidationError,
@@ -51,11 +53,11 @@ from weevr.operations.pipeline import LookupMeta, ObservationRegistry, run_pipel
 from weevr.operations.pipeline._observations import read_observation
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
+    apply_source_dedup,
     compute_generic_cdc_hwm,
     read_cdc_source,
     read_source,
     read_source_incremental,
-    read_sources,
 )
 from weevr.operations.seeding import build_system_member_rows, execute_seeds
 from weevr.operations.target_handle import TargetHandle
@@ -90,6 +92,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     connections: dict[str, OneLakeConnection] | None = None,
     lookup_meta: dict[str, LookupMeta] | None = None,
     capture_samples: bool = False,
+    cache_registry: CacheManager | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -148,6 +151,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         capture_samples: Whether to capture 10-row output/quarantine
             samples for display (effective ``execution.capture_samples``).
             Off by default — sampling re-executes the pipeline lineage.
+        cache_registry: Weave-level cache registry; Delta-backed sources
+            whose canonical identity matches a registered producer are
+            served the post-write snapshot instead of a storage read.
+            A miss falls back to a direct read.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -443,9 +450,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         )
                 sources_map.update(lookup_dfs)
             else:
-                # Full mode or incremental_parameter — read non-lookup sources normally
+                # Full mode or incremental_parameter — read non-lookup
+                # sources, serving registered cache snapshots when the
+                # source's identity matches a same-run producer
                 normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
-                sources_map = read_sources(spark, normal_sources, connections=connections)
+                sources_map = {
+                    alias_name: _read_source_via_registry(
+                        spark, alias_name, src, connections, cache_registry
+                    )
+                    for alias_name, src in normal_sources.items()
+                }
                 sources_map.update(lookup_dfs)
 
             # Step statistics attach as Observations (harvested after the
@@ -1210,6 +1224,38 @@ def _validate_cdc_write_config(thread: Thread) -> WriteConfig:
             thread_name=thread.name,
         )
     return thread.write
+
+
+def _read_source_via_registry(
+    spark: SparkSession,
+    alias_name: str,
+    source: Any,
+    connections: dict[str, OneLakeConnection] | None,
+    cache_registry: CacheManager | None,
+) -> Any:
+    """Serve a source from the weave cache registry, or read it directly.
+
+    Registry consultation is strictly the thread-target read path (the
+    lookup lane has its own materialization); a hit hands back the
+    producer's post-write snapshot with the source's own dedup applied —
+    identical to what a direct read would see absent interleaved writers,
+    which plan-time validation already rejects within a run.
+    """
+    if cache_registry is not None and (source.type == "delta" or source.connection):
+        identity = resolve_target_identity(
+            spark,
+            alias=source.alias,
+            path=source.path,
+            connection=source.connection,
+            table=source.table,
+            schema_override=source.schema_override,
+            connections=connections,
+        )
+        hit = cache_registry.get(identity)
+        if hit is not None:
+            logger.debug("Source '%s' served from cache registry", alias_name)
+            return apply_source_dedup(hit, source)
+    return read_source(spark, alias_name, source, connections=connections)
 
 
 def _build_telemetry(

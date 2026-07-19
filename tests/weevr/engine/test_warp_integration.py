@@ -60,8 +60,8 @@ class TestDefaultBehavior:
         thread = _make_thread(target_alias=path)
 
         source_df = spark.read.format("delta").load(path + "_src")
-        with patch("weevr.engine.executor.read_sources") as mock_read:
-            mock_read.return_value = {"src": source_df}
+        with patch("weevr.engine.executor.read_source") as mock_read:
+            mock_read.side_effect = lambda *a, **k: source_df
             result = execute_thread(spark, thread)
 
         assert result.status == "success"
@@ -74,8 +74,8 @@ class TestDefaultBehavior:
         path = tmp_delta_path("no_auto_discover")
         thread = _make_thread(target_alias=path)
         source_df = spark.createDataFrame([(1,)], ["id"])
-        with patch("weevr.engine.executor.read_sources") as mock_read:
-            mock_read.return_value = {"src": source_df}
+        with patch("weevr.engine.executor.read_source") as mock_read:
+            mock_read.side_effect = lambda *a, **k: source_df
             result = execute_thread(spark, thread)
         assert result.status == "success"
         assert result.warp_findings is None
@@ -93,8 +93,8 @@ class TestWarpEnforcementIntegration:
             warp_enforcement="warn",
         )
         source_df = spark.createDataFrame([(1, "Alice")], ["id", "name"])
-        with patch("weevr.engine.executor.read_sources") as mock_read:
-            mock_read.return_value = {"src": source_df}
+        with patch("weevr.engine.executor.read_source") as mock_read:
+            mock_read.side_effect = lambda *a, **k: source_df
             result = execute_thread(spark, thread)
         assert result.status == "success"
 
@@ -111,8 +111,8 @@ class TestDriftDetectionIntegration:
             schema_drift="lenient",
         )
         source_df = spark.createDataFrame([(1, "Alice", "extra")], ["id", "name", "new_col"])
-        with patch("weevr.engine.executor.read_sources") as mock_read:
-            mock_read.return_value = {"src": source_df}
+        with patch("weevr.engine.executor.read_source") as mock_read:
+            mock_read.side_effect = lambda *a, **k: source_df
             result = execute_thread(spark, thread)
         assert result.status == "success"
         output_df = spark.read.format("delta").load(path)
@@ -153,8 +153,8 @@ class TestDriftDetectionIntegration:
         )
         # Source has extra column not declared in warp
         source_df = spark.createDataFrame([(2, "Bob", "extra")], ["id", "name", "new_col"])
-        with patch("weevr.engine.executor.read_sources") as mock_read:
-            mock_read.return_value = {"src": source_df}
+        with patch("weevr.engine.executor.read_source") as mock_read:
+            mock_read.side_effect = lambda *a, **k: source_df
             with pytest.raises(SchemaDriftError) as exc_info:
                 execute_thread(spark, thread)
             assert exc_info.value.thread_name == "test_thread"
@@ -194,8 +194,8 @@ class TestDriftDetectionIntegration:
             warp_path.open("w"),
         )
         source_df = spark.createDataFrame([(2, "Bob", "extra")], ["id", "name", "new_col"])
-        with patch("weevr.engine.executor.read_sources") as mock_read:
-            mock_read.return_value = {"src": source_df}
+        with patch("weevr.engine.executor.read_source") as mock_read:
+            mock_read.side_effect = lambda *a, **k: source_df
             result = execute_thread(spark, thread)
         assert result.status == "success"
         assert result.drift_report is not None
