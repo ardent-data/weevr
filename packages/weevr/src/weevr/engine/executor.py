@@ -256,24 +256,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             target_path = thread.target.alias or thread.target.path
             if target_path is None and thread.target.connection:
                 conn_name = thread.target.connection
-                if not connections or conn_name not in connections:
-                    raise ExecutionError(
-                        f"Target references undefined connection '{conn_name}'",
-                        thread_name=thread.name,
-                    )
-                from weevr.config.paths import build_onelake_path
+                from weevr.config.paths import resolve_connection_path
 
-                conn = connections[conn_name]
-                if thread.target.table is None:
-                    raise ExecutionError(
-                        "Target connection requires 'table'",
-                        thread_name=thread.name,
+                try:
+                    target_path = resolve_connection_path(
+                        conn_name,
+                        thread.target.table,
+                        thread.target.schema_override,
+                        connections,
                     )
-                target_path = build_onelake_path(
-                    conn,
-                    thread.target.schema_override,
-                    thread.target.table,
-                )
+                except ValueError as exc:
+                    raise ExecutionError(
+                        f"Target connection resolution failed: {exc}",
+                        thread_name=thread.name,
+                    ) from exc
                 logger.debug(
                     "Thread '%s': resolved target connection '%s' → %s",
                     thread.name,

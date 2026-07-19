@@ -37,6 +37,30 @@ def build_onelake_path(
     return f"{base}/{table}"
 
 
+def resolve_connection_path(
+    connection_name: str,
+    table: str | None,
+    schema_override: str | None,
+    connections: dict[str, OneLakeConnection] | None,
+) -> str:
+    """Resolve a connection+table declaration to its abfss:// path.
+
+    The one shared implementation of connection resolution — the executor
+    (targets), the readers (sources), and the target-identity resolver all
+    call it instead of duplicating the lookup-and-build sequence.
+
+    Raises:
+        ValueError: If the connection is undeclared or ``table`` is absent.
+            Callers wrap this in their own error types with call-site
+            context (thread name, source alias).
+    """
+    if not connections or connection_name not in connections:
+        raise ValueError(f"undefined connection '{connection_name}'")
+    if table is None:
+        raise ValueError(f"connection '{connection_name}' requires 'table'")
+    return build_onelake_path(connections[connection_name], schema_override, table)
+
+
 def resolve_fuse_path(path: str, spark: SparkSession) -> str:
     """Translate a FUSE mount path to its abfss:// equivalent.
 
