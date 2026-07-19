@@ -1817,6 +1817,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#output-samples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output samples
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2934,6 +2945,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#output-samples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output samples
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2994,6 +3016,12 @@ telemetry collection, and thread parallelism. It is declared at the
 <td><code>int &gt;= 1</code></td>
 <td>unset</td>
 <td>Upper bound on concurrently executing threads within a weave's parallel group; unset means unbounded</td>
+</tr>
+<tr>
+<td><code>capture_samples</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>Capture 10-row output/quarantine samples at write time for display. Preview always samples regardless.</td>
 </tr>
 </tbody>
 </table>
@@ -3063,6 +3091,16 @@ unapplied fields and pointing at the top-level block:</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>execution settings are not applied. Move them to the top-level execution
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>block on the loom or weave.
 </code></pre></div>
+<h2 id="output-samples">Output samples<a class="headerlink" href="#output-samples" title="Permanent link">&para;</a></h2>
+<p>Sample capture re-executes the working DataFrame's lineage, so it is
+off by default. Enable it per loom or weave:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">capture_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>When disabled, result rendering shows a hint in place of the sample
+table. Preview mode always captures samples — previewing is what it is
+for. Like every <code>execution:</code> field, thread-scoped declarations are
+accepted but not applied in v1.x and produce a run-start warning.</p>
 
 
 

@@ -5236,7 +5236,7 @@ with pass/fail per rule, then routed based on severity:
 
 
 <h3 id="weevr.operations.apply_target_mapping" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">apply_target_mapping</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">spark</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">apply_target_mapping</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">spark</span><span class="p">,</span> <span class="n">handle</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.apply_target_mapping" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5313,6 +5313,23 @@ Then the column set is narrowed according to the mapping mode:</p>
                 <em>required</em>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>handle</code>
+            </td>
+            <td>
+                  <code><span title="weevr.operations.target_handle.TargetHandle">TargetHandle</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-resolved target handle; when absent the function
+self-resolves existence (operations stay independently usable).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -5348,7 +5365,7 @@ Then the column set is narrowed according to the mapping mode:</p>
 
 
 <h3 id="weevr.operations.write_target" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">write_target</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">write_config</span><span class="p">,</span> <span class="n">target_path</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">write_target</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">write_config</span><span class="p">,</span> <span class="n">target_path</span><span class="p">,</span> <span class="n">handle</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.write_target" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5450,6 +5467,23 @@ Otherwise, <code>save</code> writes directly to the file path.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>handle</code>
+            </td>
+            <td>
+                  <code><span title="weevr.operations.target_handle.TargetHandle">TargetHandle</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-resolved target handle; when absent the function
+self-resolves existence (operations stay independently usable).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
