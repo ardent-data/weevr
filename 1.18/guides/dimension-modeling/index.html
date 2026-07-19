@@ -3302,6 +3302,11 @@ column.</p>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">soft_delete_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_is_deleted</span>
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">soft_delete_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># default; boolean</span>
 </code></pre></div>
+<p>On versioned dimensions (<code>track_history: true</code>), <code>delete</code> and <code>soft_delete</code>
+apply to the <strong>current row only</strong>. Closed history rows are never deleted and
+never re-stamped — an entity that disappears from the source keeps its full
+version history; only its current row is removed or flagged. Seeded system
+members are always excluded from both actions.</p>
 <p>Forbidden fields when <code>dimension:</code> is present:</p>
 <ul>
 <li><code>write.match_keys</code> — derived from <code>business_key</code></li>
