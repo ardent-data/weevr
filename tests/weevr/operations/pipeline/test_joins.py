@@ -609,3 +609,44 @@ class TestApplyUnion:
 
         with pytest.raises(ValidationError, match="sources must not be empty"):
             UnionParams(sources=[], mode="by_name")
+
+
+class TestJoinMutationBatching:
+    """Join column controls collapse to single plan mutations."""
+
+    def test_include_exclude_prefix_use_batched_calls(
+        self, spark: SparkSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from pyspark.sql import DataFrame
+
+        calls = {"withColumnRenamed": 0, "drop": 0}
+        orig_rename = DataFrame.withColumnRenamed
+        orig_drop = DataFrame.drop
+
+        def _spy_rename(self, *a, **k):  # type: ignore[no-untyped-def]
+            calls["withColumnRenamed"] += 1
+            return orig_rename(self, *a, **k)
+
+        def _spy_drop(self, *a, **k):  # type: ignore[no-untyped-def]
+            calls["drop"] += 1
+            return orig_drop(self, *a, **k)
+
+        monkeypatch.setattr(DataFrame, "withColumnRenamed", _spy_rename)
+        monkeypatch.setattr(DataFrame, "drop", _spy_drop)
+
+        left = spark.createDataFrame([{"id": 1, "lv": "a"}])
+        right = spark.createDataFrame([{"id": 1, "rv1": "x", "rv2": "y", "rv3": "z"}])
+        params = JoinParams(
+            source="r",
+            type="inner",
+            on=[JoinKeyPair(left="id", right="id")],
+            include=["rv1", "rv2"],
+            exclude=["rv2"],
+            prefix="r_",
+        )
+        result = apply_join(left, params, {"r": right})
+        assert set(result.columns) >= {"id", "lv", "r_rv1"}
+        # Per-column loops would call once per column; the batched calls
+        # are bounded by the number of CONTROL STAGES, not columns
+        assert calls["withColumnRenamed"] == 0  # withColumnsRenamed used
+        assert calls["drop"] <= 3  # dedup + include + exclude, one each

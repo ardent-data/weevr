@@ -230,22 +230,33 @@ class TestTemplateBatching:
         plan = str(jdf.queryExecution().optimizedPlan())
         assert plan.count("Project") <= 2
 
-    def test_sibling_template_falls_back_byte_identical(self, spark: SparkSession) -> None:
-        # The template names 'b', a matched sibling — sequential chaining is
-        # the OBSERVABLE semantic: when 'b' processes first, 'a' reads the
-        # MODIFIED b. The scan must preserve exactly that.
+    def test_sibling_template_falls_back_order_discriminating(self, spark: SparkSession) -> None:
+        # The template names 'a', the FIRST processed column: sequentially,
+        # 'b' reads the already-MODIFIED a ("11"); batched, it would read
+        # the pre-batch a ("1"). The assertion fails if the scan ever lets
+        # this template batch — a genuinely discriminating lock.
         df = spark.createDataFrame([{"a": "1", "b": "2"}])
-        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, b)")
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, a)")
         result = apply_string_ops(df, params)
         row = result.collect()[0]
-        # Sequential order (dict order a, b): a = a+b = "12"; b = b+b = "22"
-        assert row["a"] == "12"
-        assert row["b"] == "22"
+        assert row["a"] == "11"  # a = a + a
+        assert row["b"] == "211"  # b + MODIFIED a; batched would give "21"
 
     def test_case_variant_sibling_falls_back(self, spark: SparkSession) -> None:
         df = spark.createDataFrame([{"a": "1", "b": "2"}])
-        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, B)")
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, A)")
         result = apply_string_ops(df, params)
         row = result.collect()[0]
-        assert row["a"] == "12"  # same sequential outcome — case is no escape
-        assert row["b"] == "22"
+        assert row["a"] == "11"
+        assert row["b"] == "211"  # same discriminating outcome — case is no escape
+
+    def test_literal_backtick_template_falls_back_discriminating(self, spark: SparkSession) -> None:
+        # The reviewer's reproduction, end-to-end: backticks inside string
+        # literals surrounding a real reference to the first-processed
+        # column — must take the sequential path
+        df = spark.createDataFrame([{"a": "1", "b": "2"}])
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, 'x`', a, '`y')")
+        result = apply_string_ops(df, params)
+        row = result.collect()[0]
+        assert row["a"] == "1x`1`y"
+        assert row["b"] == "2x`1x`1`y`y"  # sequential: reads MODIFIED a

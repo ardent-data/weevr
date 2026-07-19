@@ -88,6 +88,11 @@ def validate_dataframe(
         except Exception:
             unapplied.append((i, rule))
     if tag_exprs:
+        # Unlike the other batched sites, this ADDS columns rather than
+        # replacing in place. Safe for a different reason: the __vr_* tags
+        # are always dropped (or excluded from the quarantine projection)
+        # before any external exposure, so their insertion order can never
+        # be observed.
         tagged = tagged.withColumns(tag_exprs)
 
     # Step 2: Compute validation results in a single aggregation

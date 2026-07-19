@@ -76,8 +76,7 @@ def apply_join(
                     orig_cols = result.columns
                     temp_names = [f"__dedup_{i}__" for i in range(len(orig_cols))]
                     result = result.toDF(*temp_names)
-                    for idx in sorted(drop_indices, reverse=True):
-                        result = result.drop(temp_names[idx])
+                    result = result.drop(*[temp_names[idx] for idx in drop_indices])
                     final_names = [c for i, c in enumerate(orig_cols) if i not in drop_indices]
                     result = result.toDF(*final_names)
             else:

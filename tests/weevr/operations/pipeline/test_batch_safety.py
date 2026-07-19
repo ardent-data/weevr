@@ -35,3 +35,33 @@ class TestReferencesAnyColumn:
 
     def test_escaped_backtick_in_quoted_name(self):
         assert references_any_column("f(`we``ird`)", ["we`ird"]) is True
+
+
+class TestStringLiteralAwareness:
+    """Backticks inside string literals can never swallow a reference."""
+
+    def test_reviewer_reproduction_backticks_in_literals(self):
+        # The reproduced false negative: two incidental backticks inside
+        # single-quoted literals, a REAL sibling reference between them
+        expr = "concat({col}, 'it`s ', a, ' end`ing')"
+        assert references_any_column(expr, ["a", "b"]) is True
+
+    def test_double_quoted_literal_backtick(self):
+        assert references_any_column('concat({col}, "x`y", a)', ["a"]) is True
+
+    def test_reference_inside_literal_not_flagged(self):
+        # 'a' appears only INSIDE a string literal — not a reference
+        assert references_any_column("concat({col}, 'a')", ["a"]) is False
+
+    def test_doubled_quote_escape_handled(self):
+        assert references_any_column("concat({col}, 'it''s', a)", ["a"]) is True
+        assert references_any_column("concat({col}, 'it''s a')", ["a"]) is False
+
+    def test_backslash_escape_handled(self):
+        assert references_any_column("concat({col}, 'it\\'s', a)", ["a"]) is True
+
+    def test_unterminated_quote_is_conservative(self):
+        # Malformed input: the scanner refuses to certify — everything is
+        # a reference (sequential fallback, Spark reports the real error)
+        assert references_any_column("concat({col}, 'oops", ["zzz"]) is True
+        assert references_any_column("f(`broken", ["zzz"]) is True
