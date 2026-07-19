@@ -11,6 +11,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, DecimalType, StructField, TimestampType
 
 from weevr.model.pipeline import CoalesceParams, FillNullParams
+from weevr.operations.pipeline._batch_safety import references_any_column
 from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.type_defaults import resolve_type_defaults
 
@@ -98,16 +99,23 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
                 fill_dict.pop(col_name, None)
         if fill_dict:
             if params.where is not None:
-                # Conditional fill: per-column when(condition & isNull, fill)
+                # Conditional fill. The shared user `where` may itself name a
+                # filled column — batching would then read pre-batch values
+                # where the sequential loop read already-filled ones, so any
+                # possible reference falls back to today's per-column loop
                 condition = F.expr(params.where)
-                for col_name, fill_value in fill_dict.items():
-                    result = result.withColumn(
-                        col_name,
-                        F.when(
-                            condition & F.col(col_name).isNull(),
-                            F.lit(fill_value),
-                        ).otherwise(F.col(col_name)),
-                    )
+                fill_exprs = {
+                    col_name: F.when(
+                        condition & F.col(col_name).isNull(),
+                        F.lit(fill_value),
+                    ).otherwise(F.col(col_name))
+                    for col_name, fill_value in fill_dict.items()
+                }
+                if references_any_column(params.where, fill_dict.keys()):
+                    for col_name, fill_expr in fill_exprs.items():
+                        result = result.withColumn(col_name, fill_expr)
+                else:
+                    result = result.withColumns(fill_exprs)
             else:
                 # df.fillna() only accepts str/int/float/bool.
                 schema_by_name = {f.name: f for f in result.schema.fields}
@@ -120,13 +128,17 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
                         simple[col_name] = fill_value
                 if simple:
                     result = result.fillna(simple)
-                for col_name, fill_value in column_wise.items():
-                    result = result.withColumn(
-                        col_name,
-                        F.when(
-                            F.col(col_name).isNull(),
-                            _fill_literal(schema_by_name[col_name], fill_value),
-                        ).otherwise(F.col(col_name)),
+                if column_wise:
+                    # Each expression references only its own column —
+                    # batching is semantics-identical by construction
+                    result = result.withColumns(
+                        {
+                            col_name: F.when(
+                                F.col(col_name).isNull(),
+                                _fill_literal(schema_by_name[col_name], fill_value),
+                            ).otherwise(F.col(col_name))
+                            for col_name, fill_value in column_wise.items()
+                        }
                     )
             metadata["columns_filled"] = list(fill_dict.keys())
 
