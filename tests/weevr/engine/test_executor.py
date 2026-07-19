@@ -2204,7 +2204,7 @@ class TestFindingsRegression:
         # persist — the finally block releases every boundary
         from pyspark.sql import DataFrame
 
-        import weevr.engine.executor as executor_mod
+        from weevr.engine import executor as executor_mod
 
         unpersists: list[int] = []
         original_unpersist = DataFrame.unpersist
