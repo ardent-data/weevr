@@ -127,8 +127,8 @@ def _apply_column_control(
         else:
             surviving = [c for c in source_cols if any(fnmatch(c, pat) for pat in params.include)]
         to_drop = [c for c in source_cols if c not in surviving]
-        for col in to_drop:
-            result = result.drop(col)
+        if to_drop:
+            result = result.drop(*to_drop)
         source_cols = surviving
     else:
         surviving = list(source_cols)
@@ -136,15 +136,14 @@ def _apply_column_control(
     # --- exclude ---
     if params.exclude:
         excluded = [c for c in source_cols if any(fnmatch(c, pat) for pat in params.exclude)]
-        for col in excluded:
-            result = result.drop(col)
+        if excluded:
+            result = result.drop(*excluded)
         source_cols = [c for c in source_cols if c not in excluded]
 
     # --- prefix ---
     if params.prefix:
         rename_map: dict[str, str] = {c: f"{params.prefix}{c}" for c in source_cols}
-        for old, new in rename_map.items():
-            result = result.withColumnRenamed(old, new)
+        result = result.withColumnsRenamed(rename_map)
         source_cols = [rename_map[c] for c in source_cols]
 
     # --- rename ---
@@ -161,8 +160,7 @@ def _apply_column_control(
                 raise ExecutionError(
                     f"Join rename: target name '{new_name}' collides with a left-side column."
                 )
-        for old_name, new_name in params.rename.items():
-            result = result.withColumnRenamed(old_name, new_name)
+        result = result.withColumnsRenamed(dict(params.rename))
 
     return result
 
