@@ -18,6 +18,7 @@ from weevr.engine.executor import execute_thread
 from weevr.engine.hooks import HookResult, run_hook_steps
 from weevr.engine.lookups import (
     LookupResult,
+    UniqueKeyMemo,
     build_lookup_meta,
     cleanup_lookups,
     materialize_lookups,
@@ -160,6 +161,7 @@ def execute_weave(
     thread_results: list[ThreadResult] = []
     threads_skipped: list[str] = []
     cache = CacheManager(plan.cache_targets, plan.dependents)
+    uk_memo = UniqueKeyMemo()
     aborted = False
     _weave_raised = False
     max_parallel_threads = execution.max_parallel_threads if execution is not None else None
@@ -342,6 +344,7 @@ def execute_weave(
                                     execution.capture_samples if execution is not None else False
                                 ),
                                 cache_registry=cache,
+                                uk_memo=uk_memo,
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
@@ -366,6 +369,7 @@ def execute_weave(
                                     execution.capture_samples if execution is not None else False
                                 ),
                                 cache_registry=cache,
+                                uk_memo=uk_memo,
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,

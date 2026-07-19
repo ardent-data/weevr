@@ -18,6 +18,7 @@ from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.hooks import run_hook_steps
 from weevr.engine.lookups import (
+    UniqueKeyMemo,
     build_lookup_meta,
     cleanup_lookups,
     materialize_lookups,
@@ -93,6 +94,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     lookup_meta: dict[str, LookupMeta] | None = None,
     capture_samples: bool = False,
     cache_registry: CacheManager | None = None,
+    uk_memo: UniqueKeyMemo | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -155,6 +157,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             whose canonical identity matches a registered producer are
             served the post-write snapshot instead of a storage read.
             A miss falls back to a direct read.
+        uk_memo: Per-weave validate-exactly-once memo for non-materialized
+            ``unique_key`` lookups.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -350,6 +354,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     effective_cached_lookups or {},
                     spark,
                     connections=connections,
+                    uk_memo=uk_memo,
                 )
 
             # --- Step 4: Read sources ---
