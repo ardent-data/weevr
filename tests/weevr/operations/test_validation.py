@@ -174,3 +174,29 @@ class TestValidationOutcome:
     def test_slots(self):
         """ValidationOutcome uses __slots__ for memory efficiency."""
         assert hasattr(ValidationOutcome, "__slots__")
+
+
+@pytest.mark.spark
+class TestTagBatching:
+    """Rule tags apply in one mutation; per-rule failure granularity kept."""
+
+    def test_invalid_rule_isolated_and_valid_rules_batched(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        df = spark.createDataFrame([{"v": 5}, {"v": -1}])
+        rules = [
+            ValidationRule(name="ok1", rule="v >= 0", severity="error"),
+            ValidationRule(name="broken", rule="nonsense_fn(v)", severity="error"),
+            ValidationRule(name="ok2", rule="v < 100", severity="error"),
+        ]
+        start = spark_action_counter["total"]
+        outcome = validate_dataframe(df, rules)
+        probes_and_agg = spark_action_counter["total"] - start
+        # The per-rule analysis probes fire no actions; only the results
+        # aggregation (pre-existing single pass) does
+        assert probes_and_agg <= 1
+
+        by_name = {r.rule_name: r for r in outcome.validation_results}
+        assert by_name["broken"].applied is False
+        assert by_name["ok1"].applied is not False
+        assert by_name["ok2"].applied is not False

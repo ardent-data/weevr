@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from functools import reduce
 
-from pyspark.sql import DataFrame
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from weevr.model.validation import ValidationRule
@@ -72,16 +72,23 @@ def validate_dataframe(
     applied: list[tuple[int, str, ValidationRule]] = []
     unapplied: list[tuple[int, ValidationRule]] = []
 
+    # Probe each rule's expression individually (driver-side analysis via a
+    # no-action select — same construction the application uses), then apply
+    # every valid rule in ONE plan mutation. Preserves per-rule
+    # applied=False granularity without a per-rule analyzer pass on the
+    # growing plan.
+    tag_exprs: dict[str, Column] = {}
     for i, rule in enumerate(rules):
         col_name = f"__vr_{i}"
+        expr = F.coalesce(F.expr(str(rule.rule)).cast("boolean"), F.lit(False))
         try:
-            tagged = tagged.withColumn(
-                col_name,
-                F.coalesce(F.expr(str(rule.rule)).cast("boolean"), F.lit(False)),
-            )
+            tagged.select(expr)  # analysis only — no job
+            tag_exprs[col_name] = expr
             applied.append((i, col_name, rule))
         except Exception:
             unapplied.append((i, rule))
+    if tag_exprs:
+        tagged = tagged.withColumns(tag_exprs)
 
     # Step 2: Compute validation results in a single aggregation
     validation_results = _compute_results(tagged, applied, unapplied)
@@ -184,7 +191,5 @@ def _drop_tag_columns(
     applied: list[tuple[int, str, ValidationRule]],
 ) -> DataFrame:
     """Remove temporary validation tag columns from a DataFrame."""
-    result = tagged
-    for _, col_name, _ in applied:
-        result = result.drop(col_name)
-    return result
+    tags = [col_name for _, col_name, _ in applied]
+    return tagged.drop(*tags) if tags else tagged
