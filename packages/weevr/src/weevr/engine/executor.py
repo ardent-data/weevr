@@ -14,7 +14,12 @@ from pyspark.sql import SparkSession
 from weevr.delta import read_delta
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.hooks import run_hook_steps
-from weevr.engine.lookups import cleanup_lookups, materialize_lookups, resolve_thread_lookups
+from weevr.engine.lookups import (
+    build_lookup_meta,
+    cleanup_lookups,
+    materialize_lookups,
+    resolve_thread_lookups,
+)
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
 from weevr.engine.variables import VariableContext
@@ -40,7 +45,7 @@ from weevr.operations.exports import resolve_exports, write_export
 from weevr.operations.fact import check_fact_sentinels, validate_fact_schema
 from weevr.operations.hashing import compute_dimension_keys, compute_keys
 from weevr.operations.naming import normalize_columns
-from weevr.operations.pipeline import run_pipeline
+from weevr.operations.pipeline import LookupMeta, ObservationRegistry, run_pipeline
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
     read_cdc_source,
@@ -78,6 +83,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     column_sets: dict[str, dict[str, str]] | None = None,
     column_set_defs: dict[str, ColumnSet] | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
+    lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -131,6 +137,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             When provided, source reads, lookup materialization, target path
             resolution, and export writes use connection-based paths where
             configured.
+        lookup_meta: Materialization-time lookup facts inherited from the
+            weave/loom scope; thread-level facts merge on top.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -190,7 +198,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     try:  # noqa: PLR0912 — outer try/finally for thread-level lookup cleanup
         # Materialize thread-level lookups and merge with weave-level
         if thread.lookups:
-            thread_cached_lookups, _ = materialize_lookups(
+            thread_cached_lookups, thread_lookup_results = materialize_lookups(
                 spark, thread.lookups, connections=connections
             )
             all_cached: dict[str, Any] = {}
@@ -198,6 +206,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 all_cached.update(cached_lookups)
             all_cached.update(thread_cached_lookups)  # thread wins
             effective_cached_lookups = all_cached or None
+            # Thread-scoped materialization facts join the inherited map so
+            # resolve steps can reuse unique-key outcomes at every scope
+            lookup_meta = build_lookup_meta(thread_lookup_results, base=lookup_meta)
             # Merge lookup definitions so resolve_thread_lookups sees both
             effective_weave_lookups = merge_resource_dicts(
                 weave_lookups, thread.lookups, "lookup", "weave", "thread"
@@ -409,6 +420,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map = read_sources(spark, normal_sources, connections=connections)
                 sources_map.update(lookup_dfs)
 
+            # Step statistics attach as Observations (harvested after the
+            # write); CTE sub-pipelines contribute under their own scopes.
+            obs_registry = ObservationRegistry(scope="main")
+
             # Resolve with: block CTEs before the primary DataFrame is set
             if thread.with_:
                 sources_map = _resolve_with_block(
@@ -416,6 +431,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     sources_map,
                     collector=collector if span_builder else None,
                     parent_span_id=span_builder.span_id if span_builder else None,
+                    observations=obs_registry,
+                    lookup_meta=lookup_meta,
                 )
 
             # Step 5 — primary DataFrame is the first declared source
@@ -430,9 +447,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 effective_column_sets,
                 effective_column_set_defs,
                 lookups=lookup_dfs or None,
+                observations=obs_registry,
+                lookup_meta=lookup_meta,
             )
 
-            # Capture intermediate row count for waterfall visualization
+            # Capture intermediate row count for waterfall visualization.
+            # This count is also the FIRST action over the pipeline plan:
+            # Spark observations are fixed by the first completed execution,
+            # so the step statistics harvested later carry the values from
+            # this full-scale execution — removing or reordering this count
+            # changes which action fixes them.
             rows_after_transforms = df.count()
 
             # Step 7 — run validation rules
@@ -721,6 +745,10 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 if quarantine_sample:
                     samples["quarantine"] = quarantine_sample
 
+            # Harvest step observations — fulfilled by the write (or the
+            # last action that executed the plan). Best-effort by design.
+            step_stats = obs_registry.harvest() or None
+
             telemetry = _build_telemetry(
                 span_builder,
                 validation_results,
@@ -729,6 +757,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 rows_written,
                 rows_quarantined,
                 collector=collector,
+                step_stats=step_stats,
                 load_mode=load_mode,
                 watermark_column=thread.load.watermark_column if thread.load else None,
                 watermark_previous_value=prior_state.last_value if prior_state else None,
@@ -842,6 +871,8 @@ def _resolve_with_block(
     sources_map: dict[str, Any],
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
+    observations: ObservationRegistry | None = None,
+    lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> dict[str, Any]:
     """Resolve with: block CTEs, registering each result in the source registry.
 
@@ -857,6 +888,9 @@ def _resolve_with_block(
         sources_map: Current source registry (sources + lookup DataFrames).
         collector: Optional span collector for telemetry.
         parent_span_id: Parent span ID to link CTE spans into the thread span.
+        observations: Thread-level registry; each CTE's observations attach
+            under its own scope and merge in for plan-wide unique names.
+        lookup_meta: Materialization-time lookup facts for resolve steps.
 
     Returns:
         An enriched copy of ``sources_map`` with each CTE result registered
@@ -875,7 +909,16 @@ def _resolve_with_block(
                 f"Available: {sorted(enriched)}"
             )
         cte_df = enriched[cte.from_]
-        cte_df = run_pipeline(cte_df, cte.steps, enriched)
+        cte_registry = ObservationRegistry(scope=cte_name) if observations is not None else None
+        cte_df = run_pipeline(
+            cte_df,
+            cte.steps,
+            enriched,
+            observations=cte_registry,
+            lookup_meta=lookup_meta,
+        )
+        if observations is not None and cte_registry is not None:
+            observations.merge(cte_registry)
         row_count = cte_df.count()
         enriched[cte_name] = cte_df
 
@@ -1068,6 +1111,7 @@ def _build_telemetry(
     drift_columns: list[str] | None = None,
     drift_mode: str | None = None,
     drift_action_taken: str | None = None,
+    step_stats: dict[str, dict[str, Any]] | None = None,
 ) -> ThreadTelemetry:
     """Build ThreadTelemetry and finalize the span if a builder is active."""
     if span_builder is not None:
@@ -1111,4 +1155,5 @@ def _build_telemetry(
         drift_columns=drift_columns or [],
         drift_mode=drift_mode,
         drift_action_taken=drift_action_taken,
+        step_stats=step_stats,
     )

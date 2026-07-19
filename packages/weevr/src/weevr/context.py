@@ -730,7 +730,7 @@ class Context:
         import contextlib
 
         from weevr.operations.hashing import compute_keys
-        from weevr.operations.pipeline import run_pipeline
+        from weevr.operations.pipeline import ObservationRegistry, run_pipeline
         from weevr.operations.readers import read_sources
         from weevr.operations.validation import validate_dataframe
         from weevr.operations.writers import apply_target_mapping
@@ -755,7 +755,8 @@ class Context:
                     sources_map[key] = sources_map[key].limit(sample_rows)
 
                 df = next(iter(sources_map.values()))
-                df = run_pipeline(df, thread.steps, sources_map)
+                obs_registry = ObservationRegistry(scope="main")
+                df = run_pipeline(df, thread.steps, sources_map, observations=obs_registry)
 
                 if thread.validations:
                     outcome = validate_dataframe(df, thread.validations)
@@ -774,6 +775,23 @@ class Context:
                 }
                 with contextlib.suppress(Exception):
                     meta["samples"] = {"output": df.limit(10).toPandas().to_dict("records")}
+                # Harvest step stats after the sampling action fulfilled the
+                # observations. Sample-scoped by construction (no write in
+                # preview). Deliberately OUTSIDE the samples suppress with
+                # its own guard: a harvest failure warns and degrades — it
+                # must never demote the thread to errors. Skipped entirely
+                # when the sample capture failed: no action executed the
+                # plan, so every observation would just time out.
+                if "samples" in meta:
+                    try:
+                        step_stats = obs_registry.harvest()
+                        if step_stats:
+                            meta["step_stats"] = step_stats
+                    except Exception:
+                        logger.warning(
+                            "Preview step-statistics harvest failed for thread '%s'",
+                            thread_name,
+                        )
                 preview_metadata[thread_name] = meta
             except Exception as exc:
                 errors.append(f"Preview failed for thread '{thread_name}': {exc}")

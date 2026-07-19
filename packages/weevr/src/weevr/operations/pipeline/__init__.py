@@ -35,6 +35,8 @@ from weevr.model.pipeline import (
     UnpivotStep,
     WindowStep,
 )
+from weevr.operations.pipeline._lookup_meta import LookupMeta
+from weevr.operations.pipeline._observations import ObservationRegistry
 from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.analytical import (
     apply_aggregate,
@@ -60,7 +62,7 @@ from weevr.operations.pipeline.transforms import (
 )
 from weevr.operations.pipeline.value_mapping import apply_map
 
-__all__ = ["StepResult", "run_pipeline"]
+__all__ = ["LookupMeta", "ObservationRegistry", "StepResult", "run_pipeline"]
 
 _logger = logging.getLogger(__name__)
 
@@ -95,7 +97,6 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
     # Transform step extensions
     ConcatStep: lambda df, step, _src: apply_concat(df, step.concat),
-    MapStep: lambda df, step, _src: apply_map(df, step.map),
     FormatStep: lambda df, step, _src: apply_format(df, step.format),
 }
 
@@ -107,6 +108,8 @@ def run_pipeline(
     column_sets: dict[str, dict[str, str]] | None = None,
     column_set_defs: dict[str, ColumnSet] | None = None,
     lookups: dict[str, DataFrame] | None = None,
+    observations: ObservationRegistry | None = None,
+    lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> DataFrame:
     """Execute a sequence of pipeline steps against a working DataFrame.
 
@@ -128,6 +131,13 @@ def run_pipeline(
             that reference a column set.
         lookups: Cached lookup DataFrames keyed by name. Required for
             resolve steps that reference named lookups.
+        observations: Registry for lazily observed step statistics. When
+            provided, stat-producing handlers attach Observations instead
+            of running eager aggregations; the caller harvests after its
+            terminal action.
+        lookup_meta: Materialization-time lookup facts keyed by lookup
+            name; resolve steps reuse unique-key outcomes to skip their
+            duplicate pre-check when valid.
 
     Returns:
         Final DataFrame after all steps have been applied.
@@ -155,7 +165,13 @@ def run_pipeline(
         resolve_lookups = lookups or {}
         params = step.resolve
         if params.batch is not None:
-            return apply_resolve_batch(result, params, resolve_lookups)
+            return apply_resolve_batch(
+                result,
+                params,
+                resolve_lookups,
+                observations=observations,
+                lookup_meta=lookup_meta,
+            )
         # Single mode — look up the named lookup DataFrame
         lookup_name = params.lookup
         if lookup_name is None:
@@ -173,6 +189,24 @@ def run_pipeline(
                     params.on_unknown,
                 )
                 fallback_df = result.withColumn(params.name, F.lit(params.on_unknown))
+                if observations is not None:
+                    # Total arrives with the terminal action; every row is
+                    # unknown by construction, the rest of the stats are
+                    # zeros derived from it.
+                    obs = observations.create(
+                        step="resolve",
+                        name=params.name,
+                        derive=lambda v: {
+                            "total": int(v.get("total") or 0),
+                            "matched": 0,
+                            "unknown": int(v.get("total") or 0),
+                            "invalid": 0,
+                            "duplicates": 0,
+                            "match_rate": 0.0,
+                        },
+                    )
+                    fallback_df = fallback_df.observe(obs, F.count(F.lit(1)).alias("total"))
+                    return StepResult(fallback_df, metadata={})
                 total = fallback_df.count()
                 return StepResult(
                     fallback_df,
@@ -192,7 +226,13 @@ def run_pipeline(
             raise ExecutionError(
                 f"Lookup '{lookup_name}' not found for resolve step '{params.name}'",
             )
-        return apply_resolve(result, params, lookup_df)
+        return apply_resolve(
+            result,
+            params,
+            lookup_df,
+            observations=observations,
+            lookup_meta=(lookup_meta or {}).get(lookup_name),
+        )
 
     result = df
     for i, step in enumerate(steps):
@@ -202,6 +242,9 @@ def run_pipeline(
                 result = step_result.df
             elif isinstance(step, ResolveStep):
                 step_result = _dispatch_resolve(result, step)
+                result = step_result.df
+            elif isinstance(step, MapStep):
+                step_result = apply_map(result, step.map, observations=observations)
                 result = step_result.df
             else:
                 handler = _STEP_HANDLERS.get(type(step))

@@ -90,3 +90,37 @@ def tmp_delta_path(tmp_path: Path):
         return str(table_path)
 
     return _make_path
+
+
+@pytest.fixture()
+def job_counter(spark: SparkSession):
+    """Count Spark jobs executed inside a ``with`` block.
+
+    Uses the status tracker's known-job-id set, so it counts real JVM
+    jobs — including those launched without a Python-side action call
+    (writes, merges, observation-fulfilling actions). Complements
+    ``spark_action_counter``, which counts only DataFrame API calls.
+
+    Usage::
+
+        with job_counter() as jc:
+            df.write.format("delta").save(path)
+        assert jc.jobs == expected
+    """
+
+    class _JobCount:
+        def __enter__(self):
+            tracker = spark.sparkContext.statusTracker()
+            self._before = set(tracker.getJobIdsForGroup(None))
+            return self
+
+        def __exit__(self, *exc: object) -> bool:
+            tracker = spark.sparkContext.statusTracker()
+            self._after = set(tracker.getJobIdsForGroup(None))
+            return False
+
+        @property
+        def jobs(self) -> int:
+            return len(self._after - self._before)
+
+    return _JobCount

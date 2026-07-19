@@ -8,10 +8,16 @@ import pyspark.sql.functions as F
 from pyspark.sql import Column, DataFrame
 
 from weevr.model.pipeline import MapParams
+from weevr.operations.pipeline._observations import ObservationRegistry
 from weevr.operations.pipeline._result import StepResult
 
 
-def apply_map(df: DataFrame, params: MapParams) -> StepResult:
+def apply_map(
+    df: DataFrame,
+    params: MapParams,
+    *,
+    observations: ObservationRegistry | None = None,
+) -> StepResult:
     """Map discrete values in a column using a lookup dict.
 
     Null handling cascade: on_null (if set) → default (if set) → NULL
@@ -21,6 +27,8 @@ def apply_map(df: DataFrame, params: MapParams) -> StepResult:
     Args:
         df: Input DataFrame.
         params: Map parameters.
+        observations: When provided, validate-mode unmapped counts attach
+            as an Observation instead of an eager count.
 
     Returns:
         StepResult with mapped column (and optional flag column for
@@ -79,7 +87,20 @@ def apply_map(df: DataFrame, params: MapParams) -> StepResult:
     result = df.withColumn(target_col, expr)
 
     if params.unmapped == "validate":
-        unmapped_count = result.filter(F.col(flag_col_name)).count()
-        metadata["unmapped_count"] = unmapped_count
+        if observations is not None:
+            # Observed lazily: the terminal action computes the count as a
+            # byproduct; nothing rides StepResult.metadata.
+            obs = observations.create(
+                step="map",
+                name=target_col,
+                derive=lambda v: {"unmapped_count": int(v.get("unmapped") or 0)},
+            )
+            result = result.observe(
+                obs,
+                F.sum(F.when(F.col(flag_col_name), 1).otherwise(0)).alias("unmapped"),
+            )
+        else:
+            unmapped_count = result.filter(F.col(flag_col_name)).count()
+            metadata["unmapped_count"] = unmapped_count
 
     return StepResult(result, metadata)

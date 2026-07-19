@@ -1,5 +1,7 @@
 """Tests for resolve step handler — FK resolution via lookup join."""
 
+from typing import Any
+
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
@@ -866,3 +868,475 @@ class TestResolveEdgeCases:
         )
         with pytest.raises(ExecutionError, match="[Cc]ollid"):
             apply_resolve(fact, params, dim)
+
+
+# ---------------------------------------------------------------------------
+# Observed (lazy) statistics
+# ---------------------------------------------------------------------------
+
+
+class TestObservedResolveStats:
+    """Observation-mode stats match the eager values exactly."""
+
+    @staticmethod
+    def _mixed_fact(spark: SparkSession):
+        # A matches, X is unknown, null/blank are invalid
+        return spark.createDataFrame(
+            [("A",), ("A",), ("X",), (None,), ("",)],
+            _fact_schema("nid"),
+        )
+
+    @staticmethod
+    def _params() -> ResolveParams:
+        return ResolveParams(name="fk", lookup="dim", match={"nid": "natural_id"}, pk="id")
+
+    def test_parity_with_eager_stats(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import ObservationRegistry
+
+        fact = self._mixed_fact(spark)
+        dim = _dim_df(spark)
+
+        eager = apply_resolve(fact, self._params(), dim)
+        eager_stats = eager.metadata["resolve_stats"]["fk"]
+
+        registry = ObservationRegistry(scope="main")
+        observed = apply_resolve(fact, self._params(), dim, observations=registry)
+        assert observed.metadata == {}  # stats no longer ride StepResult
+
+        observed.df.collect()  # the terminal action fulfills the observation
+        stats = registry.harvest()
+        assert stats["main.resolve.fk"] == eager_stats
+
+    def test_parity_when_plan_executes_twice(self, spark: SparkSession) -> None:
+        # A pre-write action on the same plan must not corrupt the values —
+        # the observed node is fixed, so both executions yield the same row.
+        from weevr.operations.pipeline import ObservationRegistry
+
+        fact = self._mixed_fact(spark)
+        dim = _dim_df(spark)
+
+        registry = ObservationRegistry(scope="main")
+        observed = apply_resolve(fact, self._params(), dim, observations=registry)
+        observed.df.count()  # first execution (e.g. rows_after_transforms)
+        observed.df.collect()  # second execution (e.g. the write)
+
+        stats = registry.harvest()
+        assert stats["main.resolve.fk"]["total"] == 5
+        assert stats["main.resolve.fk"]["matched"] == 2
+        assert stats["main.resolve.fk"]["unknown"] == 1
+        assert stats["main.resolve.fk"]["invalid"] == 2
+
+    def test_harvest_without_action_degrades(self, spark: SparkSession) -> None:
+        # No action ever executes the plan: harvest logs and yields absent
+        # stats, never raises. Uses a tiny frame so the timeout path is not
+        # exercised — the observation is simply unfulfilled.
+        from weevr.operations.pipeline import ObservationRegistry, _observations
+
+        registry = ObservationRegistry(scope="main")
+        fact = self._mixed_fact(spark)
+        dim = _dim_df(spark)
+        apply_resolve(fact, self._params(), dim, observations=registry)
+
+        original = _observations._HARVEST_TIMEOUT_S
+        _observations._HARVEST_TIMEOUT_S = 0.5
+        try:
+            stats = registry.harvest()
+        finally:
+            _observations._HARVEST_TIMEOUT_S = original
+        assert stats == {}
+
+    def test_unique_names_for_duplicate_steps(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import ObservationRegistry
+
+        registry = ObservationRegistry(scope="main")
+        fact = self._mixed_fact(spark)
+        dim = _dim_df(spark)
+
+        first = apply_resolve(fact, self._params(), dim, observations=registry)
+        second = apply_resolve(first.df.drop("fk"), self._params(), dim, observations=registry)
+        second.df.collect()
+
+        stats = registry.harvest()
+        # Same step/name registered twice: both harvested under distinct keys
+        assert set(stats) == {"main.resolve.fk", "main.resolve.fk_1"}
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-gate semantics matrix (equivalence lock)
+# ---------------------------------------------------------------------------
+
+
+class TestDuplicateGateSemantics:
+    """Locks on_duplicate outcomes across clean/dup-key/effective cases.
+
+    Written green against the eager fact-side gate; the lookup-side
+    pre-check rework must keep every outcome identical.
+    """
+
+    @staticmethod
+    def _dup_dim(spark: SparkSession):
+        # 'A' unique, 'B' duplicated lookup-side
+        return spark.createDataFrame(
+            [(1, "A"), (2, "B"), (3, "B")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                ]
+            ),
+        )
+
+    @staticmethod
+    def _params(on_duplicate: str) -> ResolveParams:
+        return ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            on_duplicate=on_duplicate,  # type: ignore[arg-type]
+        )
+
+    @pytest.mark.parametrize("mode", ["error", "warn", "first"])
+    def test_clean_lookup_never_triggers(self, spark: SparkSession, mode: str) -> None:
+        fact = spark.createDataFrame([("A",), ("C",)], _fact_schema("bk"))
+        result = apply_resolve(fact, self._params(mode), _dim_df(spark))
+        by_bk = {r["bk"]: r["fk"] for r in result.df.collect()}
+        assert by_bk == {"A": 1, "C": 3}
+
+    def test_error_fires_only_on_actual_fact_match(self, spark: SparkSession) -> None:
+        # The lookup carries duplicated 'B' keys, but no fact row references
+        # 'B' — error must NOT fire; 'A' resolves normally.
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        result = apply_resolve(fact, self._params("error"), self._dup_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 1
+        assert rows[0]["fk"] == 1
+
+    def test_error_fires_on_matched_duplicate(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("B",)], _fact_schema("bk"))
+        with pytest.raises(Exception, match="[Dd]uplicate"):
+            apply_resolve(fact, self._params("error"), self._dup_dim(spark))
+
+    def test_warn_takes_first_and_keeps_row_count(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("A",), ("B",)], _fact_schema("bk"))
+        result = apply_resolve(fact, self._params("warn"), self._dup_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 2
+        by_bk = {r["bk"]: r["fk"] for r in rows}
+        assert by_bk["A"] == 1
+        assert by_bk["B"] == 2  # asc_nulls_last: lowest pk wins
+
+    def test_first_silent_on_matched_duplicate(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("B",), ("B",)], _fact_schema("bk"))
+        result = apply_resolve(fact, self._params("first"), self._dup_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 2
+        assert all(r["fk"] == 2 for r in rows)
+
+    def test_effective_date_multi_version_unchanged(self, spark: SparkSession) -> None:
+        # A BK legitimately carries two date-ranged versions; a fact date
+        # inside one range resolves to that version without dup handling.
+        from weevr.model.pipeline import EffectiveConfig
+
+        dim = spark.createDataFrame(
+            [
+                (1, "A", "2026-01-01", "2026-02-01"),
+                (2, "A", "2026-02-01", None),
+            ],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("vf", StringType(), False),
+                    StructField("vt", StringType(), True),
+                ]
+            ),
+        )
+        fact = spark.createDataFrame(
+            [("A", "2026-01-15"), ("A", "2026-03-01")],
+            _fact_schema("bk", "event_date"),
+        )
+        params = ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            on_duplicate="error",
+            effective=EffectiveConfig(date_column="event_date", **{"from": "vf", "to": "vt"}),
+        )
+        result = apply_resolve(fact, params, dim)
+        by_date = {r["event_date"]: r["fk"] for r in result.df.collect()}
+        assert by_date == {"2026-01-15": 1, "2026-03-01": 2}
+
+
+# ---------------------------------------------------------------------------
+# Duplicate-gate path selection and unique-key reuse
+# ---------------------------------------------------------------------------
+
+
+class TestDuplicateGatePathSelection:
+    """Clean lookups skip the window; reuse skips even the pre-check."""
+
+    @staticmethod
+    def _params(**kwargs) -> ResolveParams:  # type: ignore[no-untyped-def]
+        base = {"name": "fk", "lookup": "dim", "match": {"bk": "natural_id"}, "pk": "id"}
+        return ResolveParams(**{**base, **kwargs})
+
+    @staticmethod
+    def _analyzed_plan(df: Any) -> str:
+        return str(df._jdf.queryExecution().analyzed())
+
+    def test_clean_lookup_plan_has_no_window(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        result = apply_resolve(fact, self._params(), _dim_df(spark))
+        assert "row_number" not in self._analyzed_plan(result.df)
+
+    def test_dup_lookup_plan_keeps_window(self, spark: SparkSession) -> None:
+        dup_dim = spark.createDataFrame(
+            [(1, "A"), (2, "A")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                ]
+            ),
+        )
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        result = apply_resolve(fact, self._params(on_duplicate="first"), dup_dim)
+        assert "row_number" in self._analyzed_plan(result.df)
+
+    def test_valid_reuse_skips_precheck(self, spark: SparkSession, spark_action_counter) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        meta = LookupMeta(
+            key_columns=("natural_id",), unique_key_checked=True, unique_key_passed=True
+        )
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        registry = ObservationRegistry(scope="main")
+
+        start = spark_action_counter["total"]
+        apply_resolve(fact, self._params(), _dim_df(spark), observations=registry, lookup_meta=meta)
+        # Reuse + observed stats: the resolve step itself fires ZERO actions
+        assert spark_action_counter["total"] - start == 0
+
+    def test_normalize_invalidates_reuse(self, spark: SparkSession, spark_action_counter) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        meta = LookupMeta(
+            key_columns=("natural_id",), unique_key_checked=True, unique_key_passed=True
+        )
+        fact = spark.createDataFrame([("a",)], _fact_schema("bk"))
+        registry = ObservationRegistry(scope="main")
+
+        start = spark_action_counter["total"]
+        apply_resolve(
+            fact,
+            self._params(normalize="trim_lower"),
+            _dim_df(spark),
+            observations=registry,
+            lookup_meta=meta,
+        )
+        # trim_lower can merge distinct keys post-check — the pre-check must run
+        assert spark_action_counter["total"] - start == 1
+
+    def test_key_mismatch_invalidates_reuse(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        meta = LookupMeta(key_columns=("id",), unique_key_checked=True, unique_key_passed=True)
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        registry = ObservationRegistry(scope="main")
+
+        start = spark_action_counter["total"]
+        apply_resolve(fact, self._params(), _dim_df(spark), observations=registry, lookup_meta=meta)
+        # Declared unique key covers different columns than this join
+        assert spark_action_counter["total"] - start == 1
+
+
+# ---------------------------------------------------------------------------
+# Broadcast hint policy
+# ---------------------------------------------------------------------------
+
+
+class TestBroadcastPolicy:
+    """Hint present for declared/known-small; absent for unknown size."""
+
+    @staticmethod
+    def _params() -> ResolveParams:
+        return ResolveParams(name="fk", lookup="dim", match={"bk": "natural_id"}, pk="id")
+
+    @staticmethod
+    def _analyzed_plan(df: Any) -> str:
+        return str(df._jdf.queryExecution().analyzed())
+
+    def _resolve_with_meta(self, spark: SparkSession, meta):  # type: ignore[no-untyped-def]
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        return apply_resolve(fact, self._params(), _dim_df(spark), lookup_meta=meta)
+
+    def test_declared_broadcast_hints(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta(broadcast_declared=True))
+        assert "broadcast" in self._analyzed_plan(result.df).lower()
+
+    def test_known_small_hints(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta(size_in_bytes=1024))
+        assert "broadcast" in self._analyzed_plan(result.df).lower()
+
+    def test_unknown_size_defers_to_aqe(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta())
+        assert "broadcast" not in self._analyzed_plan(result.df).lower()
+
+    def test_large_size_defers_to_aqe(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta(size_in_bytes=1 << 40))
+        assert "broadcast" not in self._analyzed_plan(result.df).lower()
+
+    def test_results_identical_with_hint(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        fact = spark.createDataFrame([("A",), ("C",), (None,)], _fact_schema("bk"))
+        plain = apply_resolve(fact, self._params(), _dim_df(spark))
+        hinted = apply_resolve(
+            fact, self._params(), _dim_df(spark), lookup_meta=LookupMeta(size_in_bytes=1)
+        )
+        assert sorted(map(str, plain.df.collect())) == sorted(map(str, hinted.df.collect()))
+
+
+class TestObservedMapAndFallbackStats:
+    """Map validate-mode and missing-lookup fallback stats go lazy."""
+
+    def test_map_unmapped_count_parity(self, spark: SparkSession, spark_action_counter) -> None:
+        from weevr.model.pipeline import MapParams
+        from weevr.operations.pipeline import ObservationRegistry
+        from weevr.operations.pipeline.value_mapping import apply_map
+
+        df = spark.createDataFrame([("A",), ("B",), ("Z",), (None,)], _fact_schema("code"))
+        params = MapParams(column="code", values={"A": "1", "B": "2"}, unmapped="validate")
+
+        eager = apply_map(df, params)
+        assert eager.metadata["unmapped_count"] == 1  # Z; nulls excluded
+
+        registry = ObservationRegistry(scope="main")
+        start = spark_action_counter["total"]
+        observed = apply_map(df, params, observations=registry)
+        assert spark_action_counter["total"] - start == 0  # no eager action
+        assert "unmapped_count" not in observed.metadata
+
+        observed.df.collect()
+        stats = registry.harvest()
+        assert stats["main.map.code"]["unmapped_count"] == 1
+
+    def test_missing_lookup_fallback_count_observed(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.model.pipeline import ResolveStep
+        from weevr.operations.pipeline import ObservationRegistry, run_pipeline
+
+        df = spark.createDataFrame([("A",), ("B",)], _fact_schema("bk"))
+        step = ResolveStep(
+            resolve=ResolveParams(
+                name="fk",
+                lookup="missing_dim",
+                match={"bk": "natural_id"},
+                pk="id",
+                on_failure="warn",
+            )
+        )
+        registry = ObservationRegistry(scope="main")
+        start = spark_action_counter["total"]
+        out = run_pipeline(df, [step], {}, observations=registry)
+        assert spark_action_counter["total"] - start == 0  # fallback no longer counts
+
+        out.collect()
+        stats = registry.harvest()
+        assert stats["main.resolve.fk"] == {
+            "total": 2,
+            "matched": 0,
+            "unknown": 2,
+            "invalid": 0,
+            "duplicates": 0,
+            "match_rate": 0.0,
+        }
+
+
+class TestDuplicateGateEffectiveDateModes:
+    """warn/first on the effective-date axis (path unconditionally legacy)."""
+
+    @staticmethod
+    def _overlapping_dim(spark: SparkSession):
+        # Overlapping validity ranges for 'A': a fact date inside the overlap
+        # matches both versions — genuine duplicates on the range join
+        return spark.createDataFrame(
+            [
+                (1, "A", "2026-01-01", "2026-03-01"),
+                (2, "A", "2026-02-01", None),
+            ],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("vf", StringType(), False),
+                    StructField("vt", StringType(), True),
+                ]
+            ),
+        )
+
+    def _params(self, mode: str) -> ResolveParams:
+        from weevr.model.pipeline import EffectiveConfig
+
+        return ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            on_duplicate=mode,  # type: ignore[arg-type]
+            effective=EffectiveConfig(date_column="event_date", **{"from": "vf", "to": "vt"}),
+        )
+
+    def test_warn_takes_first_in_overlap(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("A", "2026-02-15")], _fact_schema("bk", "event_date"))
+        result = apply_resolve(fact, self._params("warn"), self._overlapping_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 1
+        assert rows[0]["fk"] == 1  # asc_nulls_last: lowest pk wins
+
+    def test_first_silent_in_overlap(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("A", "2026-02-15")], _fact_schema("bk", "event_date"))
+        result = apply_resolve(fact, self._params("first"), self._overlapping_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 1
+        assert rows[0]["fk"] == 1
+
+
+class TestReuseKeyOrderInsensitivity:
+    def test_reordered_composite_key_still_reuses(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        dim = spark.createDataFrame(
+            [(1, "A", "X"), (2, "B", "Y")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("k1", StringType(), False),
+                    StructField("k2", StringType(), False),
+                ]
+            ),
+        )
+        fact = spark.createDataFrame([("A", "X")], _fact_schema("c1", "c2"))
+        params = ResolveParams(name="fk", lookup="dim", match={"c1": "k1", "c2": "k2"}, pk="id")
+        # Declared key order reversed relative to the match values
+        meta = LookupMeta(key_columns=("k2", "k1"), unique_key_checked=True, unique_key_passed=True)
+        registry = ObservationRegistry(scope="main")
+
+        start = spark_action_counter["total"]
+        apply_resolve(fact, params, dim, observations=registry, lookup_meta=meta)
+        assert spark_action_counter["total"] - start == 0  # reuse held despite order
