@@ -528,6 +528,34 @@ class TestJoinDupKeyDropWithAlias:
         assert set(result.columns) == {"id", "lv", "rv"}
 
 
+class TestNoAliasDupKeyDropDirection:
+    """The non-alias dup-key drop removes the right-side key, provably."""
+
+    def test_no_alias_same_name_key_preserves_left_side(self, spark: SparkSession) -> None:
+        """Non-alias dup-key-drop removes the right-side id, not the left-side.
+
+        Left has id=1, right has id=2 — no match, so a left-outer join
+        populates the left row with nulls on the right side. If the
+        surviving id column came from the right it would be null; from the
+        left it is 1. Locks the drop-by-expression-id direction the
+        non-alias path relies on.
+        """
+        left = spark.createDataFrame([{"id": 1, "lv": "a"}])
+        right = spark.createDataFrame([{"id": 2, "rv": "x"}])
+        params = JoinParams(
+            source="r",
+            type="left",
+            on=[JoinKeyPair(left="id", right="id")],
+        )
+        result = apply_join(left, params, {"r": right})
+        rows = result.collect()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["id"] == 1  # left-side survived; right would be None
+        assert row["rv"] is None
+        assert row["lv"] == "a"
+
+
 class TestApplyUnion:
     """Tests for the union step handler."""
 
