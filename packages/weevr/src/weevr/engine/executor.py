@@ -9,7 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pyspark.sql import SparkSession
+from pyspark.sql import Observation, SparkSession
+from pyspark.sql import functions as F
 
 from weevr.delta import read_delta
 from weevr.engine.column_sets import materialize_column_sets
@@ -46,6 +47,7 @@ from weevr.operations.fact import check_fact_sentinels, validate_fact_schema
 from weevr.operations.hashing import compute_dimension_keys, compute_keys
 from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import LookupMeta, ObservationRegistry, run_pipeline
+from weevr.operations.pipeline._observations import read_observation
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
     read_cdc_source,
@@ -396,8 +398,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     thread.load.cdc.preset == "delta_cdf"
                     and "_commit_version" in primary_df.columns
                 ):
-                    from pyspark.sql import functions as F
-
                     max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
                     if max_row and max_row[0]["mv"] is not None:
                         new_hwm = str(max_row[0]["mv"])
@@ -436,6 +436,19 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # write); CTE sub-pipelines contribute under their own scopes.
             obs_registry = ObservationRegistry(scope="main")
 
+            # Merge-terminal paths (dimension, CDC, merge write mode) fix
+            # observations with ZERO rows — the merge's internal execution
+            # fires observed nodes without flowing source rows through them
+            # (locked in test_merge_observation_semantics). Those paths keep
+            # eager counts, which double as the action that fixes the step
+            # observations with true full-scale values. Single-pass write
+            # paths (overwrite/append) go fully lazy.
+            merge_terminal = (
+                thread.target.dimension is not None
+                or load_mode == "cdc"
+                or (thread.write is not None and thread.write.mode == "merge")
+            )
+
             # Resolve with: block CTEs before the primary DataFrame is set
             if thread.with_:
                 sources_map = _resolve_with_block(
@@ -449,7 +462,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             # Step 5 — primary DataFrame is the first declared source
             df = next(iter(sources_map.values()))
-            rows_read = df.count()
+            rows_read_obs: Observation | None = None
+            if merge_terminal:
+                rows_read = df.count()
+            else:
+                rows_read_obs = Observation()
+                df = df.observe(rows_read_obs, F.count(F.lit(1)).alias("n"))
 
             # Step 6 — run pipeline steps
             df = run_pipeline(
@@ -463,13 +481,17 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 lookup_meta=lookup_meta,
             )
 
-            # Capture intermediate row count for waterfall visualization.
-            # This count is also the FIRST action over the pipeline plan:
-            # Spark observations are fixed by the first completed execution,
-            # so the step statistics harvested later carry the values from
-            # this full-scale execution — removing or reordering this count
-            # changes which action fixes them.
-            rows_after_transforms = df.count()
+            # Intermediate row count for waterfall visualization. On
+            # merge-terminal paths this eager count is ALSO the first action
+            # over the plan — the one that fixes every observation with true
+            # full-scale values before the merge can zero-fire them. On
+            # single-pass paths it becomes an observation fixed by the write.
+            rows_after_transforms_obs: Observation | None = None
+            if merge_terminal:
+                rows_after_transforms = df.count()
+            else:
+                rows_after_transforms_obs = Observation()
+                df = df.observe(rows_after_transforms_obs, F.count(F.lit(1)).alias("n"))
 
             # Step 7 — run validation rules
             if thread.validations:
@@ -776,8 +798,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     samples["quarantine"] = quarantine_sample
 
             # Harvest step observations — fulfilled by the write (or the
-            # last action that executed the plan). Best-effort by design.
+            # first action that executed the plan). Best-effort by design.
             step_stats = obs_registry.harvest() or None
+            if rows_read_obs is not None:
+                rr = read_observation(rows_read_obs)
+                rows_read = int(rr["n"]) if rr and rr.get("n") is not None else 0
+            if rows_after_transforms_obs is not None:
+                rat = read_observation(rows_after_transforms_obs)
+                rows_after_transforms = int(rat["n"]) if rat and rat.get("n") is not None else 0
 
             telemetry = _build_telemetry(
                 span_builder,
@@ -949,11 +977,12 @@ def _resolve_with_block(
         )
         if observations is not None and cte_registry is not None:
             observations.merge(cte_registry)
-        row_count = cte_df.count()
         enriched[cte_name] = cte_df
 
         if cte_builder is not None:
-            cte_builder.set_attribute("row_count", row_count)
+            # Collector-gated: the count exists only for the CTE span
+            # attribute — collector-less runs pay no CTE action at all
+            cte_builder.set_attribute("row_count", cte_df.count())
             cte_builder.set_attribute("from", cte.from_)
             cte_builder.set_attribute("step_count", len(cte.steps))
             span = cte_builder.finish()

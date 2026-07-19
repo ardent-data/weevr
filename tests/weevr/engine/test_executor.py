@@ -810,7 +810,7 @@ class TestExecuteThreadConnections:
 
         captured_paths: list[str] = []
 
-        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg):
+        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None):
             captured_paths.append(path_arg)
             return df_arg.count()
 
@@ -850,7 +850,7 @@ class TestExecuteThreadConnections:
 
         captured_paths: list[str] = []
 
-        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg):
+        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None):
             captured_paths.append(path_arg)
             return df_arg.count()
 
@@ -1997,3 +1997,63 @@ class TestTargetHandle:
         assert target.count() == 2  # seed row + data row (append saw table exists)
         target_probes = [p for p in probe_spy if p == tgt]
         assert len(target_probes) == 2  # pre-seed probe + post-refresh probe
+
+
+@pytest.mark.spark
+class TestLazyExecutorCounts:
+    """rows_read/rows_after_transforms via observations on single-pass paths."""
+
+    def test_overwrite_path_counts_parity_zero_actions(
+        self, spark: SparkSession, tmp_delta_path, spark_action_counter
+    ) -> None:
+        src = tmp_delta_path("lc_src")
+        tgt = tmp_delta_path("lc_tgt")
+        spark.createDataFrame([{"id": i} for i in range(7)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "lazy_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"filter": {"expr": "id < 5"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        start = spark_action_counter["total"]
+        result = execute_thread(spark, thread)
+        actions = spark_action_counter["total"] - start
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.rows_read == 7
+        assert result.telemetry.rows_after_transforms == 5
+        assert result.rows_written == 5
+        # No count()/collect() actions beyond write_target's remaining
+        # eager rows count (removed by the commit-metrics task)
+        assert actions == 1
+
+    def test_merge_path_keeps_eager_counts(self, spark: SparkSession, tmp_delta_path) -> None:
+        # Merge-terminal threads keep true values — the eager count is the
+        # observation-fixing action, never the merge's zero-fire
+        src = tmp_delta_path("lc_m_src")
+        tgt = tmp_delta_path("lc_m_tgt")
+        spark.createDataFrame([{"id": 1, "v": "a"}, {"id": 2, "v": "b"}]).write.format(
+            "delta"
+        ).save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "lazy_m_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.rows_read == 2
+        assert result.telemetry.rows_after_transforms == 2
