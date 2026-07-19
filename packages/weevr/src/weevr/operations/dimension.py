@@ -7,11 +7,13 @@ target configuration.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass
 from functools import reduce
 from typing import Any
 
+from pyspark import StorageLevel
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
@@ -286,6 +288,11 @@ def _execute_versioned_merge(
     scd = config.columns
     bk_cols = config.business_key
 
+    # The MERGE's unioned source embeds this lineage twice (directly and
+    # via the new-version derivation); persist so it computes once.
+    # Released in the finally below.
+    source_df = source_df.persist(StorageLevel.MEMORY_AND_DISK)
+
     # Identify version-group hash columns
     version_hash_cols: list[str] = []
     if config.change_detection:
@@ -386,7 +393,11 @@ def _execute_versioned_merge(
     )
 
     pre_version = handle.current_version() if handle is not None else None
-    merger.execute()
+    try:
+        merger.execute()
+    finally:
+        with contextlib.suppress(Exception):
+            source_df.unpersist()
     if handle is not None:
         handle.mark_exists()
     return _populate_merge_result(result, handle, pre_version, versioned=True)

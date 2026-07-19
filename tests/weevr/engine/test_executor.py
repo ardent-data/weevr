@@ -2056,3 +2056,92 @@ class TestLazyExecutorCounts:
         assert result.telemetry is not None
         assert result.telemetry.rows_read == 2
         assert result.telemetry.rows_after_transforms == 2
+
+
+@pytest.mark.spark
+class TestPersistBoundaries:
+    """Exports and quarantine reuse one compute; unpersist always runs."""
+
+    @pytest.fixture()
+    def unpersist_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+        """Count DataFrame.unpersist calls (Delta internals cache RDDs of
+        their own, so asserting on the global persistent-RDD registry is
+        noise — the release INVOCATION is the engine's contract)."""
+        from pyspark.sql import DataFrame
+
+        calls: list[int] = []
+        original = DataFrame.unpersist
+
+        def _spy(inner_self, blocking=False):  # type: ignore[no-untyped-def]
+            calls.append(1)
+            return original(inner_self, blocking)
+
+        monkeypatch.setattr(DataFrame, "unpersist", _spy)
+        return calls
+
+    def test_exports_share_one_compute_and_unpersist(
+        self, spark: SparkSession, tmp_delta_path, unpersist_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("pb_src")
+        tgt = tmp_delta_path("pb_tgt")
+        exp1 = tmp_delta_path("pb_exp1")
+        exp2 = tmp_delta_path("pb_exp2")
+        spark.createDataFrame([{"id": i} for i in range(4)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "pb_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "exports": [
+                    {"name": "e1", "type": "delta", "path": exp1},
+                    {"name": "e2", "type": "delta", "path": exp2},
+                ],
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+
+        # Both exports carry this run's output
+        assert spark.read.format("delta").load(exp1).count() == 4
+        assert spark.read.format("delta").load(exp2).count() == 4
+        assert len(unpersist_spy) >= 1  # working-df persist released in finally
+
+    def test_all_clean_run_leaves_quarantine_untouched(
+        self, spark: SparkSession, tmp_delta_path, unpersist_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("pb_q_src")
+        tgt = tmp_delta_path("pb_q_tgt")
+        spark.createDataFrame([{"id": 1, "v": 5}, {"id": 2, "v": -1}]).write.format("delta").save(
+            src
+        )
+
+        cfg = {
+            "name": "pb_q_t",
+            "config_version": "1",
+            "sources": {"main": {"type": "delta", "alias": src}},
+            "steps": [],
+            "target": {"path": tgt},
+            "write": {"mode": "overwrite"},
+            "validations": [{"rule": "v >= 0", "severity": "error", "name": "v_nonneg"}],
+        }
+        result = execute_thread(spark, Thread.model_validate(cfg))
+        assert result.status == "success", result.error
+        assert result.telemetry is not None and result.telemetry.rows_quarantined == 1
+        q = spark.read.format("delta").load(tgt + "_quarantine")
+        assert q.count() == 1
+
+        # All-clean second run against a clean source: prior quarantine
+        # rows remain untouched
+        src2 = tmp_delta_path("pb_q_src2")
+        spark.createDataFrame([{"id": 3, "v": 7}]).write.format("delta").save(src2)
+        cfg2 = dict(cfg)
+        cfg2["sources"] = {"main": {"type": "delta", "alias": src2}}
+        unpersist_spy.clear()
+        result2 = execute_thread(spark, Thread.model_validate(cfg2))
+        assert result2.status == "success"
+        assert spark.read.format("delta").load(tgt + "_quarantine").count() == 1
+        assert len(unpersist_spy) >= 1  # quarantine persist released in finally

@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pyspark import StorageLevel
 from pyspark.sql import Observation, SparkSession
 from pyspark.sql import functions as F
 
@@ -196,6 +197,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     thread_variable_ctx = _build_thread_variable_context(thread)
     thread_cached_lookups: dict[str, Any] = {}
     cdc_window_df: Any = None
+    working_df_persisted: Any = None
+    quarantine_df_persisted: Any = None
 
     # Compute effective resources by merging weave-level with thread-level
     effective_cached_lookups = cached_lookups
@@ -397,8 +400,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # op-code counts, and the merge itself all execute this
                 # lineage — window-scale, cached once, released in the
                 # thread's finally block
-                from pyspark import StorageLevel
-
                 primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
                 cdc_window_df = primary_df
 
@@ -512,13 +513,19 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         f"Fatal validation failure in thread '{thread.name}'",
                     )
 
-                # Write quarantine rows if present
+                # Write quarantine rows if present. The union computes once:
+                # persist, count from cache, write only when rows exist (an
+                # all-clean run leaves the prior quarantine table untouched),
+                # sample from cache. Released in finally.
                 if outcome.quarantine_df is not None:
-                    rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
+                    quarantine_df_persisted = outcome.quarantine_df.persist(
+                        StorageLevel.MEMORY_AND_DISK
+                    )
+                    rows_quarantined = write_quarantine(spark, quarantine_df_persisted, target_path)
                     if capture_samples:
                         with contextlib.suppress(Exception):
                             quarantine_sample = (
-                                outcome.quarantine_df.limit(10).toPandas().to_dict("records")
+                                quarantine_df_persisted.limit(10).toPandas().to_dict("records")
                             )
 
                 # Continue with clean_df
@@ -586,6 +593,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     spark=spark,
                     target_path=target_path,
                 )
+                # Exports reuse one compute of the working DataFrame: the
+                # persist anchors here — after warp/drift, before the
+                # branch-specific write — the point common to all branches
+                # (the CDC branch deliberately skips target mapping, so
+                # mapping is not a valid anchor). Released in finally.
+                if thread.exports:
+                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
+                    working_df_persisted = df
 
                 # Seed phase (before merge)
                 if seed_config is not None or dim_config.seed_system_members:
@@ -642,6 +657,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     spark=spark,
                     target_path=target_path,
                 )
+                # Exports reuse one compute of the working DataFrame: the
+                # persist anchors here — after warp/drift, before the
+                # branch-specific write — the point common to all branches
+                # (the CDC branch deliberately skips target mapping, so
+                # mapping is not a valid anchor). Released in finally.
+                if thread.exports:
+                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
+                    working_df_persisted = df
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
                 if capture_samples:
@@ -676,6 +699,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     spark=spark,
                     target_path=target_path,
                 )
+                # Exports reuse one compute of the working DataFrame: the
+                # persist anchors here — after warp/drift, before the
+                # branch-specific write — the point common to all branches
+                # (the CDC branch deliberately skips target mapping, so
+                # mapping is not a valid anchor). Released in finally.
+                if thread.exports:
+                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
+                    working_df_persisted = df
 
                 # General seed phase (non-dimension)
                 if seed_config is not None:
@@ -944,6 +975,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         if cdc_window_df is not None:
             with contextlib.suppress(Exception):
                 cdc_window_df.unpersist()
+        if working_df_persisted is not None:
+            with contextlib.suppress(Exception):
+                working_df_persisted.unpersist()
+        if quarantine_df_persisted is not None:
+            with contextlib.suppress(Exception):
+                quarantine_df_persisted.unpersist()
 
 
 def _resolve_with_block(
