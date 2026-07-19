@@ -1155,3 +1155,44 @@ class TestCdcWatermarkComposition:
         target_ids = {r["id"] for r in spark.read.format("delta").load(tgt).collect()}
         assert 4 in target_ids
         assert 2 not in target_ids
+
+
+@pytest.mark.spark
+class TestCdcWindowBoundedness:
+    """The persisted change window pins data-derived semantics."""
+
+    def test_persisted_window_ignores_mid_run_commits(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        # The watermark version must derive from rows actually read. The
+        # CDF read is lazy, so a commit landing mid-run would otherwise
+        # widen the window on re-execution — the executor persists and
+        # materializes the window before any later action, pinning it.
+        from pyspark import StorageLevel
+        from pyspark.sql import functions as F
+
+        src = tmp_delta_path("cdcw_src")
+        spark.sql("SET spark.databricks.delta.properties.defaults.enableChangeDataFeed=true")
+        try:
+            spark.createDataFrame([{"id": 1, "v": "a"}]).write.format("delta").save(src)
+            spark.createDataFrame([{"id": 2, "v": "b"}]).write.format("delta").mode("append").save(
+                src
+            )  # v1
+
+            source = Source(type="delta", alias=src)
+            window_df, _ = read_cdc_source(
+                spark, source, CdcConfig(preset="delta_cdf"), last_version=0
+            )
+            window_df = window_df.persist(StorageLevel.MEMORY_AND_DISK)
+            window_df.count()  # materialize — the executor's eager count does this
+
+            # Mid-run commit AFTER the window materialized
+            spark.createDataFrame([{"id": 3, "v": "c"}]).write.format("delta").mode("append").save(
+                src
+            )  # v2
+
+            window_max = window_df.agg(F.max("_commit_version")).collect()[0][0]
+            assert int(window_max) == 1  # pinned window, not log-latest (2)
+            window_df.unpersist()
+        finally:
+            spark.sql("RESET spark.databricks.delta.properties.defaults.enableChangeDataFeed")

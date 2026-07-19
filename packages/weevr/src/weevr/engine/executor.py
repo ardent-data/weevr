@@ -195,6 +195,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     # --- Thread-level resource lifecycle ---
     thread_variable_ctx = _build_thread_variable_context(thread)
     thread_cached_lookups: dict[str, Any] = {}
+    cdc_window_df: Any = None
 
     # Compute effective resources by merging weave-level with thread-level
     effective_cached_lookups = cached_lookups
@@ -392,6 +393,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     prior_state=prior_state,
                     connections=connections,
                 )
+                # Persist the change window: the version capture, the
+                # op-code counts, and the merge itself all execute this
+                # lineage — window-scale, cached once, released in the
+                # thread's finally block
+                from pyspark import StorageLevel
+
+                primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
+                cdc_window_df = primary_df
 
                 # Capture new CDF version if Delta CDF
                 if (
@@ -932,6 +941,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         # Cleanup thread-level lookups only; weave-level cleanup is the caller's job
         if thread_cached_lookups:
             cleanup_lookups(thread_cached_lookups)
+        if cdc_window_df is not None:
+            with contextlib.suppress(Exception):
+                cdc_window_df.unpersist()
 
 
 def _resolve_with_block(
