@@ -98,6 +98,8 @@ def execute_weave(
     connections: dict[str, OneLakeConnection] | None = None,
     execution: ExecutionConfig | None = None,
     pre_lookup_meta: dict[str, LookupMeta] | None = None,
+    pre_resolved_column_sets: dict[str, dict[str, str]] | None = None,
+    pre_column_set_results: list[ColumnSetResult] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -151,6 +153,12 @@ def execute_weave(
             the pool is sized to the group.
         pre_lookup_meta: Materialization-time lookup facts from the parent
             scope (loom), merged under weave-level facts at dispatch.
+        pre_resolved_column_sets: Loom-level column sets already resolved
+            once at loom start (the ``pre_cached_lookups`` analogue —
+            overridden keys excluded by the caller so weave precedence
+            re-resolves them). Merged under weave-level resolutions.
+        pre_column_set_results: Resolution results for the pre-resolved
+            sets, carried into weave telemetry for value parity.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -241,17 +249,30 @@ def execute_weave(
             cached_lookup_dfs.update(new_cached)
 
         # Materialize column sets — resolve all defs into name→mapping dicts
-        resolved_column_sets: dict[str, dict[str, str]] | None = None
-        all_column_set_results: list[ColumnSetResult] = []
+        # Loom-resolved mappings arrive pre-resolved; only defs the parent
+        # did not settle (weave-declared sets and weave overrides of loom
+        # sets) materialize here — one resolution per def per scope lifetime
+        resolved_column_sets: dict[str, dict[str, str]] | None = (
+            dict(pre_resolved_column_sets) if pre_resolved_column_sets else None
+        )
+        all_column_set_results: list[ColumnSetResult] = list(pre_column_set_results or [])
         if column_set_defs:
-            resolved_column_sets, all_column_set_results = materialize_column_sets(
-                spark,
-                column_set_defs,
-                params or {},
-                collector=collector,
-                parent_span_id=weave_span_id,
-                connections=connections,
-            )
+            to_materialize = {
+                k: v
+                for k, v in column_set_defs.items()
+                if k not in (pre_resolved_column_sets or {})
+            }
+            if to_materialize:
+                weave_resolved, weave_cs_results = materialize_column_sets(
+                    spark,
+                    to_materialize,
+                    params or {},
+                    collector=collector,
+                    parent_span_id=weave_span_id,
+                    connections=connections,
+                )
+                resolved_column_sets = {**(resolved_column_sets or {}), **weave_resolved}
+                all_column_set_results.extend(weave_cs_results)
 
         for group_idx, group in enumerate(plan.execution_order):
             # Materialize lookups whose producers completed in prior groups.
@@ -668,6 +689,21 @@ def execute_loom(
                 parent_span_id=loom_span_id,
             )
 
+        # Resolve loom-level column sets ONCE (shared across all weaves);
+        # per-weave passes hand down the resolved mappings, excluding keys
+        # a weave overrides so precedence still re-resolves those
+        loom_resolved_cs: dict[str, dict[str, str]] = {}
+        loom_cs_results: list[ColumnSetResult] = []
+        if loom.column_sets:
+            loom_resolved_cs, loom_cs_results = materialize_column_sets(
+                spark,
+                dict(loom.column_sets),
+                params or {},
+                collector=collector,
+                parent_span_id=loom_span_id,
+                connections=dict(loom.connections) if loom.connections else None,
+            )
+
         # Materialize loom-level lookups (shared across all weaves)
         loom_lookup_results: list[LookupResult] = []
         loom_connections = dict(loom.connections) if loom.connections else None
@@ -777,6 +813,14 @@ def execute_loom(
                     weave_name=weave_name,
                     column_set_defs=merged_column_set_defs,
                     pre_lookup_meta=build_lookup_meta(loom_lookup_results) or None,
+                    pre_resolved_column_sets={
+                        k: v for k, v in loom_resolved_cs.items() if k not in (weave_cs or {})
+                    }
+                    or None,
+                    pre_column_set_results=[
+                        r for r in loom_cs_results if r.name not in (weave_cs or {})
+                    ]
+                    or None,
                     pre_cached_lookups=loom_cached_lookup_dfs or None,
                     connections=merged_connections or None,
                     execution=effective_execution,

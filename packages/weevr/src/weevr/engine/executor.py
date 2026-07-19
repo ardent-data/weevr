@@ -237,19 +237,23 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 weave_lookups, thread.lookups, "lookup", "weave", "thread"
             )
 
-        # Merge thread-level column_sets with weave-level (thread wins)
+        # Merge thread-level column_sets with weave-level (thread wins).
+        # Only the THREAD's defs materialize here — the weave's mappings
+        # arrive already resolved and merge as plain dicts, so a weave set
+        # resolves once per weave regardless of thread count
         if thread.column_sets:
             merged_cs_defs = merge_resource_dicts(
                 column_set_defs, thread.column_sets, "column_set", "weave", "thread"
             )
             if merged_cs_defs:
                 effective_column_set_defs = merged_cs_defs
-                effective_column_sets, _ = materialize_column_sets(
-                    spark,
-                    merged_cs_defs,
-                    resolved_params or {},
-                    connections=connections,
-                )
+            thread_resolved_cs, _ = materialize_column_sets(
+                spark,
+                dict(thread.column_sets),
+                resolved_params or {},
+                connections=connections,
+            )
+            effective_column_sets = {**(column_sets or {}), **thread_resolved_cs}
 
         # Run thread-level pre_steps
         if thread.pre_steps:
