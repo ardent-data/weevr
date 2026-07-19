@@ -60,7 +60,9 @@ class TestResolveActionBudget:
         after_first = spark_action_counter["total"]
 
         df = apply_resolve(df, _params("fk_1"), lookup).df
-        df = apply_resolve(df, _params("fk_2"), lookup).df
+        # Final result deliberately unconsumed — the chain exists to count
+        # the eager actions its construction fires, never to execute
+        apply_resolve(df, _params("fk_2"), lookup)
         after_third = spark_action_counter["total"]
 
         assert after_first - start == EAGER_ACTIONS_PER_RESOLVE
@@ -88,7 +90,7 @@ class TestResolveActionBudgetObserved:
 
         start = spark_action_counter["total"]
         df = apply_resolve(df, _params("fk_0"), lookup, observations=registry).df
-        df = apply_resolve(df, _params("fk_1"), lookup, observations=registry).df
+        apply_resolve(df, _params("fk_1"), lookup, observations=registry)
         after = spark_action_counter["total"]
 
         assert (after - start) / 2 == self.EAGER_ACTIONS_PER_RESOLVE_OBSERVED
@@ -105,7 +107,7 @@ class TestResolveActionBudgetObserved:
 
         start = spark_action_counter["total"]
         df = apply_resolve(df, _params("fk_0"), lookup, observations=registry, lookup_meta=meta).df
-        df = apply_resolve(df, _params("fk_1"), lookup, observations=registry, lookup_meta=meta).df
+        apply_resolve(df, _params("fk_1"), lookup, observations=registry, lookup_meta=meta)
         assert spark_action_counter["total"] - start == 0
 
 
