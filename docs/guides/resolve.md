@@ -276,8 +276,8 @@ assertions:
 
 ## Resolution statistics
 
-Each resolve step records per-FK statistics in the step
-result metadata:
+Each resolve step records per-FK statistics, surfaced on thread
+telemetry after the write (`step_stats`, engine-internal):
 
 - `total` — total fact rows processed
 - `matched` — rows with a successful FK match
@@ -285,3 +285,13 @@ result metadata:
 - `invalid` — rows assigned `on_invalid` sentinel
 - `duplicates` — rows with multiple matches (before dedup)
 - `match_rate` — percentage of matched rows
+
+The statistics are computed as a byproduct of the write — resolve
+steps no longer execute extra Spark jobs per step, so deep resolve
+chains no longer pay a per-step recompute of the full pipeline.
+Duplicate handling is likewise decided by a dimension-sized check
+against the lookup side: when the lookup's join keys are
+duplicate-free (the common case), the per-row duplicate machinery
+is skipped entirely. `on_duplicate` outcomes are unchanged —
+`error` still fires only when a fact row actually matches a
+duplicated key, before the write.

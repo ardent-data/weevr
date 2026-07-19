@@ -276,6 +276,15 @@ depends on what was executed:
   successfully persisted after write
 - **watermark_first_run** -- Whether this is the first run with
   no prior watermark state
+- **step_stats** -- Per-step pipeline statistics (resolve match
+  rates, validate-mode map counts), keyed `<scope>.<step>.<name>`.
+  Collected as a byproduct of the write rather than by extra Spark
+  jobs, and harvested best-effort: a failed harvest logs a warning
+  and leaves the field absent, never failing the thread. This field
+  is engine-internal — its key set and value shapes are unstable
+  and may change without notice. In preview mode the values are
+  sample-scoped (they reflect the sampled rows, not the full
+  source), and are present only when sample capture succeeded.
 
 ### Weave telemetry fields
 
