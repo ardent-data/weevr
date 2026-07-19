@@ -375,12 +375,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     connections=connections,
                 )
 
-                # Read secondary sources normally (skip lookup-resolved ones)
+                # Secondary sources (the primary keeps its filtered read —
+                # snapshot semantics don't apply to it) consult the cache
+                # registry like any full-mode source
                 sources_map = {primary_alias: primary_df}
                 for alias, source in thread.sources.items():
                     if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = read_source(
-                            spark, alias, source, connections=connections
+                        sources_map[alias] = _read_source_via_registry(
+                            spark, alias, source, connections, cache_registry
                         )
                 sources_map.update(lookup_dfs)
 
@@ -450,12 +452,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         prior_state is not None,
                     )
 
-                # Read secondary sources normally (skip lookup-resolved ones)
+                # Secondary sources (the primary keeps its filtered read —
+                # snapshot semantics don't apply to it) consult the cache
+                # registry like any full-mode source
                 sources_map = {primary_alias: primary_df}
                 for alias, source in thread.sources.items():
                     if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = read_source(
-                            spark, alias, source, connections=connections
+                        sources_map[alias] = _read_source_via_registry(
+                            spark, alias, source, connections, cache_registry
                         )
                 sources_map.update(lookup_dfs)
             else:
@@ -1247,8 +1251,12 @@ def _read_source_via_registry(
     Registry consultation is strictly the thread-target read path (the
     lookup lane has its own materialization); a hit hands back the
     producer's post-write snapshot with the source's own dedup applied —
-    identical to what a direct read would see absent interleaved writers,
-    which plan-time validation already rejects within a run.
+    identical to what a direct read would see absent interleaved writers.
+    Plan-time validation rejects unordered same-target writers across
+    alias, path, AND connection declaration forms; the one residual is
+    FUSE-vs-abfss notation for the same table, which plan time cannot
+    unify (no session) — such pairs miss the registry rather than hit it
+    wrongly, and their scheduling blindness predates the registry.
     """
     if cache_registry is not None and (source.type == "delta" or source.connection):
         identity = resolve_target_identity(

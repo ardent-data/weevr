@@ -1,5 +1,6 @@
 """Tests for lookup materializer."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,6 +8,7 @@ from pyspark.sql import SparkSession
 
 from weevr.engine.lookups import (
     LookupResult,
+    UniqueKeyMemo,
     _apply_narrow_pipeline,
     _check_unique_key,
     _validate_columns,
@@ -645,7 +647,6 @@ class TestSingleReadMaterialization:
         # The check must run against the CACHE: spy on _check_unique_key's
         # input — after the fix it receives a persisted frame
         from weevr.engine import lookups as lookups_mod
-        from weevr.model.lookup import Lookup
 
         path = tmp_delta_path("srm_dim")
         spark.createDataFrame([{"code": "A", "sk": 1}, {"code": "B", "sk": 2}]).write.format(
@@ -681,9 +682,6 @@ class TestSingleReadMaterialization:
     def test_broadcast_strategy_persists_and_hints(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        from typing import Any
-
-        from weevr.model.lookup import Lookup
 
         path = tmp_delta_path("srm_bc")
         spark.createDataFrame([{"code": "A", "sk": 1}]).write.format("delta").save(path)
@@ -708,8 +706,6 @@ class TestSingleReadMaterialization:
             cleanup_lookups(cached)
 
     def test_on_demand_path_never_persists(self, spark: SparkSession, tmp_delta_path) -> None:
-        from weevr.model.lookup import Lookup
-        from weevr.model.source import Source
 
         path = tmp_delta_path("srm_od")
         spark.createDataFrame([{"code": "A", "sk": 1}]).write.format("delta").save(path)
@@ -764,8 +760,6 @@ class TestUniqueKeyMemo:
     ) -> None:
         from concurrent.futures import ThreadPoolExecutor as PoolExecutor
 
-        from weevr.engine.lookups import UniqueKeyMemo
-
         path = tmp_delta_path("ukm_dim")
         spark.createDataFrame([{"code": "A", "sk": 1}, {"code": "B", "sk": 2}]).write.format(
             "delta"
@@ -787,8 +781,6 @@ class TestUniqueKeyMemo:
     def test_memoized_abort_raises_for_every_consumer(
         self, spark: SparkSession, tmp_delta_path, check_spy: list[str]
     ) -> None:
-        from weevr.engine.lookups import UniqueKeyMemo
-
         path = tmp_delta_path("ukm_dup")
         spark.createDataFrame([{"code": "A", "sk": 1}, {"code": "A", "sk": 2}]).write.format(
             "delta"
@@ -809,8 +801,6 @@ class TestUniqueKeyMemo:
     def test_warn_outcome_memoized(
         self, spark: SparkSession, tmp_delta_path, check_spy: list[str]
     ) -> None:
-        from weevr.engine.lookups import UniqueKeyMemo
-
         path = tmp_delta_path("ukm_warn")
         spark.createDataFrame([{"code": "A", "sk": 1}, {"code": "A", "sk": 2}]).write.format(
             "delta"
@@ -828,8 +818,6 @@ class TestUniqueKeyMemo:
     def test_fresh_memo_revalidates_next_weave(
         self, spark: SparkSession, tmp_delta_path, check_spy: list[str]
     ) -> None:
-        from weevr.engine.lookups import UniqueKeyMemo
-
         path = tmp_delta_path("ukm_scope")
         spark.createDataFrame([{"code": "A", "sk": 1}]).write.format("delta").save(path)
 

@@ -137,7 +137,9 @@ class UniqueKeyMemo:
                     raise
             outcome = self._outcomes[name]
         if isinstance(outcome, Exception):
-            raise outcome
+            # A fresh exception per consumer: re-raising one instance from
+            # several threads mutates its traceback concurrently
+            raise LookupResolutionError(str(outcome)) from outcome
 
 
 def build_lookup_meta(

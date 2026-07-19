@@ -26,9 +26,10 @@ class TestIdentityEquality:
             assert by_alias is not None and by_path is not None
             # Alias resolves to the catalog location; both keys name one table
             assert by_alias.rstrip("/").endswith(by_path.rsplit("/", 1)[-1])
-            assert by_alias == resolve_target_identity(spark, alias="TID_ALIAS") or (
-                by_alias == by_path
-            )
+            # Case-variant references to the SAME table meet on one key
+            # (the metastore is case-insensitive, so both resolve to the
+            # same location)
+            assert by_alias == resolve_target_identity(spark, alias="TID_ALIAS")
         finally:
             spark.sql("DROP TABLE IF EXISTS tid_alias")
 
@@ -50,3 +51,14 @@ class TestIdentityEquality:
     def test_unresolvable_returns_none(self, spark: SparkSession) -> None:
         assert resolve_target_identity(spark, connection="ghost", table="t") is None
         assert resolve_target_identity(spark) is None
+
+
+class TestFallbackNamespace:
+    def test_unresolved_alias_fallback_cannot_collide_with_locations(
+        self, spark: SparkSession
+    ) -> None:
+        # No such table: the fallback key carries the alias: namespace so it
+        # can never equal any location-derived key
+        ident = resolve_target_identity(spark, alias="ghost.schema_table")
+        assert ident == "alias:ghost.schema_table"
+        assert not ident.startswith("/") and "://" not in ident

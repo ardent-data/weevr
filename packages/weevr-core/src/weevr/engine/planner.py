@@ -6,6 +6,7 @@ from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from weevr.config.onelake import resolve_connection_path
 from weevr.errors.exceptions import ConfigError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
@@ -91,23 +92,57 @@ def _normalize_path(path: str) -> str:
 def _extract_target_path(thread: Thread) -> str | None:
     """Return the resolved target path for a thread, normalized.
 
-    Prefers ``target.alias`` over ``target.path`` to match executor behaviour.
-    Returns ``None`` if neither is set.
+    Prefers ``target.alias`` over ``target.path`` to match executor
+    behaviour; connection+table declarations resolve to their abfss://
+    path so connection-form writers participate in dependency inference
+    and the same-target conflict guard exactly like path-form writers.
+    Returns ``None`` if nothing resolves.
     """
     raw = thread.target.alias or thread.target.path
+    if raw is None and thread.target.connection:
+        try:
+            raw = resolve_connection_path(
+                thread.target.connection,
+                thread.target.table,
+                thread.target.schema_override,
+                thread.connections,
+            )
+        except ValueError:
+            return None
     if raw is None:
         return None
     return _normalize_path(raw)
 
 
 def _extract_source_paths(thread: Thread) -> set[str]:
-    """Return all normalized source paths/aliases declared on a thread."""
+    """Return all normalized source paths/aliases declared on a thread.
+
+    Connection-declared sources resolve to their abfss:// path (matching
+    the target side), so a connection-form reader of a connection-form
+    writer's table gets a dependency edge. FUSE-vs-abfss notation for the
+    same table cannot be unified here (needs a live session) — a known
+    plan-time limitation.
+    """
     paths: set[str] = set()
     for source in thread.sources.values():
         if source.alias is not None:
             paths.add(_normalize_path(source.alias))
         if source.path is not None:
             paths.add(_normalize_path(source.path))
+        if source.connection is not None:
+            try:
+                paths.add(
+                    _normalize_path(
+                        resolve_connection_path(
+                            source.connection,
+                            source.table,
+                            source.schema_override,
+                            thread.connections,
+                        )
+                    )
+                )
+            except ValueError:
+                continue
     return paths
 
 

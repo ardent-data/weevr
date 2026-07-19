@@ -7,58 +7,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
-from weevr.model.connection import OneLakeConnection
+from weevr.config.onelake import (  # noqa: F401 — re-exported for compatibility
+    build_onelake_path,
+    resolve_connection_path,
+)
+from weevr.model.connection import OneLakeConnection  # noqa: F401
 
 _ONELAKE_HOST = "onelake.dfs.fabric.microsoft.com"
 _FUSE_PREFIX = "/lakehouse/"
-
-
-def build_onelake_path(
-    connection: OneLakeConnection,
-    schema: str | None,
-    table: str,
-) -> str:
-    """Build an abfss:// path from connection properties.
-
-    Args:
-        connection: OneLake connection declaration with workspace and lakehouse
-            identifiers.
-        schema: Schema name to use. When provided, takes precedence over
-            ``connection.default_schema``.
-        table: Table name to append to the path.
-
-    Returns:
-        A fully-qualified ``abfss://`` URI for the given table.
-    """
-    effective_schema = schema or connection.default_schema
-    base = f"abfss://{connection.workspace}@{_ONELAKE_HOST}/{connection.lakehouse}/Tables"
-    if effective_schema:
-        return f"{base}/{effective_schema}/{table}"
-    return f"{base}/{table}"
-
-
-def resolve_connection_path(
-    connection_name: str,
-    table: str | None,
-    schema_override: str | None,
-    connections: dict[str, OneLakeConnection] | None,
-) -> str:
-    """Resolve a connection+table declaration to its abfss:// path.
-
-    The one shared implementation of connection resolution — the executor
-    (targets), the readers (sources), and the target-identity resolver all
-    call it instead of duplicating the lookup-and-build sequence.
-
-    Raises:
-        ValueError: If the connection is undeclared or ``table`` is absent.
-            Callers wrap this in their own error types with call-site
-            context (thread name, source alias).
-    """
-    if not connections or connection_name not in connections:
-        raise ValueError(f"undefined connection '{connection_name}'")
-    if table is None:
-        raise ValueError(f"connection '{connection_name}' requires 'table'")
-    return build_onelake_path(connections[connection_name], schema_override, table)
 
 
 def resolve_fuse_path(path: str, spark: SparkSession) -> str:

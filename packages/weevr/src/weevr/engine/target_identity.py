@@ -9,9 +9,14 @@ This resolver normalizes each form to one canonical string:
   today).
 - metastore alias (``schema.table``) → the table's storage location from
   the catalog — a driver-side metadata query, no Spark jobs. Falls back
-  to the lowercased alias when the location cannot be read; alias-form
-  producers and consumers still meet on that fallback key.
+  to a namespaced lowercased-alias key (``alias:…``) when the location
+  cannot be read; alias-form producers and consumers still meet on that
+  fallback key, and it can never collide with a location-derived key.
 - filesystem path → FUSE-translated, trailing-slash-normalized.
+  Normalization is deliberately shallow — equivalent hand-authored
+  spellings (double slashes, ``..`` segments, case variants on
+  case-insensitive filesystems) are distinct keys; a mismatch costs a
+  cache miss, never a wrong hit.
 
 Consumers treat any resolution failure as "no identity": a cache miss,
 never an error.
@@ -35,9 +40,16 @@ def _normalize_path(path: str, spark: SparkSession) -> str:
 
 
 def _alias_location(alias: str, spark: SparkSession) -> str | None:
-    """Storage location of a metastore table, or None when unreadable."""
+    """Storage location of a metastore table, or None when unreadable.
+
+    Uses the parameterized DeltaTable API rather than interpolated SQL —
+    the alias is config-supplied text and must never be spliced into a
+    statement.
+    """
     try:
-        rows = spark.sql(f"DESCRIBE DETAIL {alias}").select("location").collect()
+        from delta.tables import DeltaTable
+
+        rows = DeltaTable.forName(spark, alias).detail().select("location").collect()
         if rows and rows[0][0]:
             return str(rows[0][0])
     except Exception:
@@ -71,5 +83,8 @@ def resolve_target_identity(
         return None
     if is_table_alias(ref):
         location = _alias_location(ref, spark)
-        return _normalize_path(location, spark) if location else ref.lower()
+        # The fallback lives in its own key namespace: an unresolved alias
+        # must never collide with a location-derived key (two DIFFERENT
+        # tables whose aliases differ only by case would otherwise merge)
+        return _normalize_path(location, spark) if location else f"alias:{ref.lower()}"
     return _normalize_path(ref, spark)
