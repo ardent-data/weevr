@@ -810,3 +810,110 @@ class TestNoMatchSourceSystemMemberSoftDelete:
         assert current["__unknown__"] is False  # system member's current row never stamped
         assert current["C2"] is True
         assert current["C1"] is False
+
+
+@pytest.mark.spark
+class TestMergeResultMetrics:
+    """DimensionMergeResult populated from split commit-metric keys."""
+
+    @staticmethod
+    def _merge(spark, path, dim, rows, ts, overrides=None):  # type: ignore[no-untyped-def]
+        from weevr.operations.target_handle import TargetHandle
+
+        source = _prepare_source(spark, rows, dim, ts)
+        builder = DimensionMergeBuilder(dim, write_overrides=overrides)
+        handle = TargetHandle(spark, path)
+        return execute_dimension_merge(spark, source, builder, path, ts, handle=handle)
+
+    def test_versioned_split_consistent_with_table_state(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("mm_versioned")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        r1 = self._merge(
+            spark,
+            path,
+            dim,
+            [
+                {"customer_id": "C1", "name": "Alice"},
+                {"customer_id": "C2", "name": "Bob"},
+            ],
+            "2026-01-01",
+        )
+        assert r1.rows_inserted == 2  # first write via commit metrics
+
+        # C1 changes (close + new version), C3 arrives (new entity)
+        r2 = self._merge(
+            spark,
+            path,
+            dim,
+            [
+                {"customer_id": "C1", "name": "Alicia"},
+                {"customer_id": "C2", "name": "Bob"},
+                {"customer_id": "C3", "name": "Cara"},
+            ],
+            "2026-02-01",
+        )
+        assert r2.rows_versioned == 1  # C1 closed
+        assert r2.rows_inserted == 1  # C3 only — new-version insert excluded
+        assert r2.rows_deleted == 0
+        # Consistency with observed table state
+        target = spark.read.format("delta").load(path).collect()
+        assert len(target) == 4  # C1 v1+v2, C2, C3
+
+    def test_versioned_soft_delete_lands_in_rows_deleted(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        # track_history + on_no_match_source: soft_delete — the split keys
+        # keep the soft-delete clause out of rows_versioned
+        path = tmp_delta_path("mm_soft")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "names": {"columns": ["name"], "on_change": "version"},
+            },
+        )
+        overrides = _write_overrides(on_no_match_source="soft_delete", soft_delete_column="deleted")
+        rows = [
+            {"customer_id": "C1", "name": "Alice", "deleted": False},
+            {"customer_id": "C2", "name": "Bob", "deleted": False},
+        ]
+        self._merge(spark, path, dim, rows, "2026-01-01", overrides)
+
+        # C2 vanishes; C1 unchanged → soft-delete stamp is the only update
+        r2 = self._merge(spark, path, dim, rows[:1], "2026-02-01", overrides)
+        assert r2.rows_versioned == 0  # stamp must NOT count as a close
+        assert r2.rows_deleted == 1  # C2's current row stamped
+        assert r2.rows_inserted == 0
+
+    def test_standard_overwrite_split(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("mm_standard")
+        dim = _make_dim()
+        self._merge(
+            spark,
+            path,
+            dim,
+            [
+                {"customer_id": "C1", "name": "Alice"},
+                {"customer_id": "C2", "name": "Bob"},
+            ],
+            "2026-01-01",
+        )
+        r2 = self._merge(
+            spark,
+            path,
+            dim,
+            [
+                {"customer_id": "C1", "name": "Alicia"},
+                {"customer_id": "C3", "name": "Cara"},
+            ],
+            "2026-02-01",
+        )
+        assert r2.rows_overwritten == 1  # C1 updated in place
+        assert r2.rows_inserted == 1  # C3
+        assert r2.rows_deleted == 0

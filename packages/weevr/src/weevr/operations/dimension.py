@@ -255,9 +255,13 @@ def execute_dimension_merge(
         return result
 
     if config.track_history and builder.has_version_groups():
-        return _execute_versioned_merge(spark, source_df, builder, target_path, run_timestamp)
+        return _execute_versioned_merge(
+            spark, source_df, builder, target_path, run_timestamp, handle=handle
+        )
 
-    return _execute_standard_merge(spark, source_df, builder, target_path, run_timestamp)
+    return _execute_standard_merge(
+        spark, source_df, builder, target_path, run_timestamp, handle=handle
+    )
 
 
 def _execute_versioned_merge(
@@ -266,6 +270,7 @@ def _execute_versioned_merge(
     builder: DimensionMergeBuilder,
     target_path: str,
     run_timestamp: str,
+    handle: TargetHandle | None = None,
 ) -> DimensionMergeResult:
     """SCD Type 2 staged merge: pre-join to identify changes, then MERGE.
 
@@ -380,8 +385,11 @@ def _execute_versioned_merge(
         scope_condition=f"target.{quote_identifier(scd.is_current)} = true",
     )
 
+    pre_version = handle.current_version() if handle is not None else None
     merger.execute()
-    return result
+    if handle is not None:
+        handle.mark_exists()
+    return _populate_merge_result(result, handle, pre_version, versioned=True)
 
 
 def _execute_standard_merge(
@@ -390,6 +398,7 @@ def _execute_standard_merge(
     builder: DimensionMergeBuilder,
     target_path: str,
     run_timestamp: str,
+    handle: TargetHandle | None = None,
 ) -> DimensionMergeResult:
     """Standard merge for non-versioned dimensions (Type 1)."""
     config = builder.config
@@ -443,8 +452,48 @@ def _execute_standard_merge(
 
     merger = merger.whenNotMatchedInsertAll()
     merger = _apply_not_matched_by_source(merger, builder)
+    pre_version = handle.current_version() if handle is not None else None
     merger.execute()
+    if handle is not None:
+        handle.mark_exists()
+    return _populate_merge_result(result, handle, pre_version, versioned=False)
 
+
+def _populate_merge_result(
+    result: DimensionMergeResult,
+    handle: TargetHandle | None,
+    pre_version: int | None,
+    *,
+    versioned: bool,
+) -> DimensionMergeResult:
+    """Fill merge metrics from the commit's split update keys.
+
+    Uses the split keys only — the ``numTargetRowsUpdated`` aggregate
+    conflates the close/overwrite clause with the soft-delete clause
+    (``whenNotMatchedBySourceUpdate``) and must never feed the split.
+    On the versioned path, one close corresponds to exactly one
+    new-version insert (single current row per entity), so new-entity
+    inserts are total inserts minus closes. ``rows_unchanged`` stays
+    absent by decision — no Delta metric expresses it. Metrics absent or
+    guard-rejected: warn and leave zeros, never a corrupted number.
+    """
+    if handle is None:
+        return result
+    metrics = handle.commit_metrics_after(pre_version)
+    if metrics is None or "numTargetRowsMatchedUpdated" not in metrics:
+        logger.warning("Dimension merge metrics unavailable; counts reported as zero")
+        return result
+    matched_updated = int(metrics.get("numTargetRowsMatchedUpdated", 0))
+    inserted = int(metrics.get("numTargetRowsInserted", 0))
+    deleted = int(metrics.get("numTargetRowsDeleted", 0))
+    nmbs_updated = int(metrics.get("numTargetRowsNotMatchedBySourceUpdated", 0))
+    if versioned:
+        result.rows_versioned = matched_updated
+        result.rows_inserted = inserted - matched_updated
+    else:
+        result.rows_overwritten = matched_updated
+        result.rows_inserted = inserted
+    result.rows_deleted = deleted + nmbs_updated
     return result
 
 
