@@ -1913,3 +1913,87 @@ class TestCaptureSamplesGate:
         result = execute_thread(spark, self._thread(src, tgt))
         html_out = _render_execute_thread_detail(result, result.telemetry, None)
         assert "capture_samples" in html_out  # the hint names the switch
+
+
+@pytest.mark.spark
+class TestTargetHandle:
+    """One existence resolution per thread; refresh after own commits."""
+
+    @pytest.fixture()
+    def probe_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        """Count real existence probes across every consuming module."""
+        from weevr import delta as delta_mod
+
+        calls: list[str] = []
+        original = delta_mod.delta_table_exists
+
+        def _spy(spark, path):  # type: ignore[no-untyped-def]
+            calls.append(path)
+            return original(spark, path)
+
+        # Patch the source module (the handle reads it) and each module
+        # holding a direct reference from `from weevr.delta import ...`
+        import weevr.operations.dimension as dim_mod
+        import weevr.operations.seeding as seed_mod
+        import weevr.operations.writers as writers_mod
+
+        monkeypatch.setattr(delta_mod, "delta_table_exists", _spy)
+        monkeypatch.setattr(writers_mod, "delta_table_exists", _spy)
+        monkeypatch.setattr(seed_mod, "delta_table_exists", _spy)
+        monkeypatch.setattr(dim_mod, "delta_table_exists", _spy)
+        return calls
+
+    def test_standard_path_probes_once(
+        self, spark: SparkSession, tmp_delta_path, probe_spy: list[str]
+    ) -> None:
+        src = tmp_delta_path("th_src")
+        tgt = tmp_delta_path("th_tgt")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "handle_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        target_probes = [p for p in probe_spy if p == tgt]
+        assert len(target_probes) == 1  # one resolution, cached thereafter
+
+    def test_seed_commit_refreshes_existence(
+        self, spark: SparkSession, tmp_delta_path, probe_spy: list[str]
+    ) -> None:
+        # first_write seeds fire on a fresh table (probe: absent), then the
+        # seed commit refreshes the handle so the write path re-observes
+        # (probe: present) — exactly today's two independent-probe outcomes,
+        # through one mechanism
+        src = tmp_delta_path("th_seed_src")
+        tgt = tmp_delta_path("th_seed_tgt")
+        spark.createDataFrame([{"id": 1, "name": "x"}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "handle_seed_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {
+                    "path": tgt,
+                    "seed": {"on": "first_write", "rows": [{"id": -1, "name": "seed"}]},
+                },
+                "write": {"mode": "append"},
+            }
+        )
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success", result.error
+        target = spark.read.format("delta").load(tgt)
+        assert target.count() == 2  # seed row + data row (append saw table exists)
+        target_probes = [p for p in probe_spy if p == tgt]
+        assert len(target_probes) == 2  # pre-seed probe + post-refresh probe

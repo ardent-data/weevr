@@ -54,6 +54,7 @@ from weevr.operations.readers import (
     read_sources,
 )
 from weevr.operations.seeding import build_system_member_rows, execute_seeds
+from weevr.operations.target_handle import TargetHandle
 from weevr.operations.validation import validate_dataframe
 from weevr.operations.warp import (
     append_warp_only_columns,
@@ -279,6 +280,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     thread_name=thread.name,
                 )
 
+            # One existence/identity resolution per thread. Refreshed after
+            # every engine-internal commit (warp pre-init, seeds) so
+            # downstream consumers observe post-commit state exactly as
+            # their previous independent probes did.
+            target_handle = TargetHandle(spark, target_path)
+
             # --- Warp resolution ---
             resolved_warp = None
             warp_findings: list[dict[str, str]] = []
@@ -309,6 +316,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 engine_col_names = list((thread.target.audit_columns or {}).keys())
                 effective_warp = build_effective_warp(resolved_warp.columns, [], engine_col_names)
                 pre_initialize_table(spark, target_path, effective_warp)
+                target_handle.refresh()
 
             # --- Watermark/CDC state loading ---
             if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
@@ -532,7 +540,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
-                df = apply_target_mapping(df, thread.target, spark)
+                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
                 if audit_columns and audit_ctx is not None:
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
@@ -561,13 +569,18 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                             on=seed_config.on if seed_config else "first_write",
                             rows=all_seed_rows,
                         )
-                        execute_seeds(spark, combined_seed, target_path, target_schema)
+                        execute_seeds(
+                            spark, combined_seed, target_path, target_schema, handle=target_handle
+                        )
+                        target_handle.refresh()
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
                 if capture_samples:
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
-                execute_dimension_merge(spark, df, dim_builder, target_path, run_timestamp)
+                execute_dimension_merge(
+                    spark, df, dim_builder, target_path, run_timestamp, handle=target_handle
+                )
                 rows_written = df.count()
 
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
@@ -595,13 +608,19 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
                 cdc_counts = execute_cdc_merge(
-                    spark, df, target_path, cdc_write, thread.load.cdc, load_config=thread.load
+                    spark,
+                    df,
+                    target_path,
+                    cdc_write,
+                    thread.load.cdc,
+                    load_config=thread.load,
+                    handle=target_handle,
                 )
                 rows_written = sum(cdc_counts.values())
 
             else:
                 # Standard write path
-                df = apply_target_mapping(df, thread.target, spark)
+                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
                 if audit_columns and audit_ctx is not None:
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
@@ -619,13 +638,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
                 # General seed phase (non-dimension)
                 if seed_config is not None:
-                    execute_seeds(spark, seed_config, target_path, df.schema)
+                    execute_seeds(spark, seed_config, target_path, df.schema, handle=target_handle)
+                    target_handle.refresh()
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
                 if capture_samples:
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
-                rows_written = write_target(spark, df, thread.target, thread.write, target_path)
+                rows_written = write_target(
+                    spark, df, thread.target, thread.write, target_path, handle=target_handle
+                )
 
             # Step 13b — post-write fact sentinel advisory. Runs against
             # the written table, where columnar stats make per-column

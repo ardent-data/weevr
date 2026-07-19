@@ -18,6 +18,7 @@ from pyspark.sql import functions as F
 from weevr.delta import delta_table_exists, resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
+from weevr.operations.target_handle import TargetHandle
 from weevr.operations.writers import quote_identifier
 
 logger = logging.getLogger(__name__)
@@ -205,6 +206,7 @@ def execute_dimension_merge(
     builder: DimensionMergeBuilder,
     target_path: str,
     run_timestamp: str,
+    handle: TargetHandle | None = None,
 ) -> DimensionMergeResult:
     """Execute the staged dimension merge against a Delta target.
 
@@ -229,13 +231,19 @@ def execute_dimension_merge(
         target_path: Path to the Delta target table.
         run_timestamp: ISO timestamp for SCD valid_from values.
 
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
+
     Returns:
         DimensionMergeResult with row-level metrics.
     """
     config = builder.config
     result = DimensionMergeResult()
 
-    if not delta_table_exists(spark, target_path):
+    target_present = (
+        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
+    )
+    if not target_present:
         # First write — insert all rows directly
         result.rows_inserted = source_df.count()
         source_df.write.format("delta").save(target_path)

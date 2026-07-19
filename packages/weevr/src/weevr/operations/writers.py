@@ -12,6 +12,7 @@ from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import typed_watermark_col
+from weevr.operations.target_handle import TargetHandle
 
 
 def quote_identifier(name: str) -> str:
@@ -23,7 +24,12 @@ def quote_identifier(name: str) -> str:
     return f"`{name.replace('`', '``')}`"
 
 
-def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> DataFrame:
+def apply_target_mapping(
+    df: DataFrame,
+    target: Target,
+    spark: SparkSession,
+    handle: TargetHandle | None = None,
+) -> DataFrame:
     """Apply target column mapping to shape the DataFrame for writing.
 
     Column-level transformations (expr, type, default, drop) are applied first.
@@ -38,6 +44,9 @@ def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> 
         df: Input DataFrame.
         target: Target configuration including mapping mode and column specs.
         spark: Active SparkSession (used to probe existing target schema).
+
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
 
     Returns:
         DataFrame shaped for writing to the target.
@@ -64,7 +73,12 @@ def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> 
     # Narrow column set according to mapping mode.
     if target.mapping_mode == "auto":
         target_path = target.alias or target.path
-        if target_path and delta_table_exists(spark, target_path):
+        target_present = (
+            handle.exists()
+            if handle is not None and target_path == handle.path
+            else bool(target_path) and delta_table_exists(spark, target_path)
+        )
+        if target_path and target_present:
             if is_table_alias(target_path):
                 existing_cols = spark.read.format("delta").table(target_path).columns
             else:
@@ -91,6 +105,7 @@ def write_target(
     target: Target,
     write_config: WriteConfig | None,
     target_path: str,
+    handle: TargetHandle | None = None,
 ) -> int:
     """Write a DataFrame to a Delta table.
 
@@ -105,6 +120,9 @@ def write_target(
         write_config: Write mode and merge parameters. Defaults to overwrite when None.
         target_path: Table alias or physical path for the Delta table.
 
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
+
     Returns:
         Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
 
@@ -114,7 +132,9 @@ def write_target(
     mode = write_config.mode if write_config else "overwrite"
     partition_cols = target.partition_by or []
     use_table_api = is_table_alias(target_path)
-    target_exists = delta_table_exists(spark, target_path)
+    target_exists = (
+        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
+    )
 
     try:
         row_count = df.count()
@@ -299,6 +319,7 @@ def execute_cdc_merge(
     cdc_config: CdcConfig,
     *,
     load_config: LoadConfig | None = None,
+    handle: TargetHandle | None = None,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
@@ -319,6 +340,9 @@ def execute_cdc_merge(
         cdc_config: CDC configuration (preset or explicit mapping).
         load_config: Thread-level load configuration; supplies the
             watermark ordering for generic CDC reduction.
+
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -394,7 +418,9 @@ def execute_cdc_merge(
         )
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
-    target_exists = delta_table_exists(spark, target_path)
+    target_exists = (
+        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
+    )
 
     try:
         # Count operations in a single pass over the (reduced) window

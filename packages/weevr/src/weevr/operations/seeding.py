@@ -14,6 +14,7 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.dimension import DimensionConfig, SystemMemberConfig
 from weevr.model.seed import SeedConfig
 from weevr.operations.pipeline.type_defaults import resolve_type_defaults
+from weevr.operations.target_handle import TargetHandle
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,12 @@ def _table_row_count(spark: SparkSession, path: str) -> int:
     return spark.read.format("delta").load(path).count()
 
 
-def check_seed_trigger(spark: SparkSession, table_path: str, seed_config: SeedConfig) -> bool:
+def check_seed_trigger(
+    spark: SparkSession,
+    table_path: str,
+    seed_config: SeedConfig,
+    handle: TargetHandle | None = None,
+) -> bool:
     """Evaluate whether the seed trigger condition is satisfied.
 
     For ``first_write``, the trigger fires when no Delta table exists at
@@ -60,10 +66,13 @@ def check_seed_trigger(spark: SparkSession, table_path: str, seed_config: SeedCo
         table_path: Filesystem path to the target Delta table.
         seed_config: Seed configuration carrying the ``on`` condition.
 
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
+
     Returns:
         ``True`` when seeds should be inserted, ``False`` otherwise.
     """
-    exists = delta_table_exists(spark, table_path)
+    exists = handle.exists() if handle is not None else delta_table_exists(spark, table_path)
 
     if seed_config.on == "first_write":
         return not exists
@@ -128,6 +137,7 @@ def execute_seeds(
     seed_config: SeedConfig,
     table_path: str,
     target_schema: StructType,
+    handle: TargetHandle | None = None,
 ) -> SeedResult:
     """Check the seed trigger and insert rows when the condition is satisfied.
 
@@ -140,10 +150,13 @@ def execute_seeds(
         table_path: Filesystem path to the target Delta table.
         target_schema: Schema that seed rows should conform to.
 
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
+
     Returns:
         :class:`SeedResult` describing the outcome.
     """
-    triggered = check_seed_trigger(spark, table_path, seed_config)
+    triggered = check_seed_trigger(spark, table_path, seed_config, handle=handle)
 
     if not triggered:
         return SeedResult(
@@ -156,7 +169,7 @@ def execute_seeds(
     seed_df = build_seed_dataframe(spark, seed_config.rows, target_schema)
     rows_inserted = len(seed_config.rows)
 
-    table_exists = delta_table_exists(spark, table_path)
+    table_exists = handle.exists() if handle is not None else delta_table_exists(spark, table_path)
     if table_exists:
         seed_df.write.format("delta").mode("append").save(table_path)
     else:
