@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import reduce
+from typing import Any
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -355,8 +356,16 @@ def _execute_versioned_merge(
     insert_cols = {c: F.col(f"source.{quote_identifier(c)}") for c in source_df.columns}
     merger = merger.whenNotMatchedInsert(values=insert_cols)
 
-    # Handle on_no_match_source
-    _apply_not_matched_by_source(merger, builder)
+    # Handle on_no_match_source. The MERGE condition scopes matching to
+    # current rows, so closed history rows always land in the
+    # not-matched-by-source set — the clauses must be scoped to the current
+    # row or delete would erase history and soft_delete would re-stamp
+    # closed rows on every merge.
+    merger = _apply_not_matched_by_source(
+        merger,
+        builder,
+        scope_condition=f"target.{quote_identifier(scd.is_current)} = true",
+    )
 
     merger.execute()
     return result
@@ -420,38 +429,60 @@ def _execute_standard_merge(
         merger = merger.whenMatchedUpdate(condition=change_cond, set=update_set)
 
     merger = merger.whenNotMatchedInsertAll()
-    _apply_not_matched_by_source(merger, builder)
+    merger = _apply_not_matched_by_source(merger, builder)
     merger.execute()
 
     return result
 
 
 def _apply_not_matched_by_source(
-    merger: object,  # DeltaMergeBuilder — avoid import
+    merger: Any,  # DeltaMergeBuilder — avoid import
     builder: DimensionMergeBuilder,
-) -> None:
-    """Apply on_no_match_source clauses with system member exclusion."""
+    scope_condition: str | None = None,
+) -> Any:
+    """Apply on_no_match_source clauses with system member exclusion.
+
+    DeltaMergeBuilder is immutable — each ``when*`` call returns a new
+    builder, so the result must be returned and reassigned by the caller.
+
+    Args:
+        merger: The Delta merge builder under construction.
+        builder: Dimension merge builder providing write config and SK values.
+        scope_condition: Extra SQL predicate ANDed onto the clause condition.
+            The versioned path passes an ``is_current`` scope; the standard
+            path (one row per entity, no history to protect) passes none.
+    """
     write_config = builder.build_write_config()
     sk_col = builder.config.surrogate_key.name
     system_member_sks = builder.get_system_member_sk_values()
 
-    if write_config.on_no_match_source == "delete":
-        if system_member_sks:
-            exclusion = " AND ".join(
-                f"target.{quote_identifier(sk_col)} != {v}" for v in system_member_sks
+    conditions: list[str] = []
+    if scope_condition:
+        conditions.append(scope_condition)
+    if system_member_sks:
+        # Compare as strings: the SK column is a hex string under the default
+        # sha256 algorithm (seeds store system-member SKs as "-1"/"-2" there),
+        # and a bare `string_col != -1` null-compares in Spark, silently
+        # protecting every row. Casting the column covers integer SK columns
+        # identically. A NULL SK would also null-compare and be protected —
+        # safe only because engine-generated SKs are never null
+        # (hashing._build_concat_expr coalesces nulls before hashing).
+        conditions.append(
+            " AND ".join(
+                f"CAST(target.{quote_identifier(sk_col)} AS STRING) != '{v}'"
+                for v in system_member_sks
             )
-            merger.whenNotMatchedBySourceDelete(condition=exclusion)  # type: ignore[union-attr]
-        else:
-            merger.whenNotMatchedBySourceDelete()  # type: ignore[union-attr]
+        )
+
+    if write_config.on_no_match_source == "delete":
+        condition = " AND ".join(conditions) if conditions else None
+        merger = merger.whenNotMatchedBySourceDelete(condition=condition)
     elif write_config.on_no_match_source == "soft_delete":
         sd_col = write_config.soft_delete_column
         sd_val = write_config.soft_delete_value
         if sd_col:
-            condition = None
-            if system_member_sks:
-                condition = " AND ".join(
-                    f"target.{quote_identifier(sk_col)} != {v}" for v in system_member_sks
-                )
-            merger.whenNotMatchedBySourceUpdate(  # type: ignore[union-attr]
+            condition = " AND ".join(conditions) if conditions else None
+            merger = merger.whenNotMatchedBySourceUpdate(
                 condition=condition, set={sd_col: F.lit(sd_val)}
             )
+    return merger
