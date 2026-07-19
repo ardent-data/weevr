@@ -16,7 +16,12 @@ from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
 from weevr.engine.executor import execute_thread
 from weevr.engine.hooks import HookResult, run_hook_steps
-from weevr.engine.lookups import LookupResult, cleanup_lookups, materialize_lookups
+from weevr.engine.lookups import (
+    LookupResult,
+    build_lookup_meta,
+    cleanup_lookups,
+    materialize_lookups,
+)
 from weevr.engine.planner import ExecutionPlan, build_plan
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
@@ -31,6 +36,7 @@ from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, Weave
+from weevr.operations.pipeline._lookup_meta import LookupMeta
 from weevr.telemetry.collector import SpanCollector
 from weevr.telemetry.logging import configure_logging
 from weevr.telemetry.results import (
@@ -89,6 +95,7 @@ def execute_weave(
     pre_cached_lookups: dict[str, Any] | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
     execution: ExecutionConfig | None = None,
+    pre_lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -140,6 +147,8 @@ def execute_weave(
             merged by the caller — see ``resolve_effective_execution``).
             ``max_parallel_threads`` caps each group's pool; unset means
             the pool is sized to the group.
+        pre_lookup_meta: Materialization-time lookup facts from the parent
+            scope (loom), merged under weave-level facts at dispatch.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -324,6 +333,10 @@ def execute_weave(
                                 collector=tc,
                                 parent_span_id=weave_span_id,
                                 cached_lookups=cached_lookup_dfs or None,
+                                lookup_meta=build_lookup_meta(
+                                    all_lookup_results, base=pre_lookup_meta
+                                )
+                                or None,
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
@@ -340,6 +353,10 @@ def execute_weave(
                                 spark,
                                 threads[name],
                                 cached_lookups=cached_lookup_dfs or None,
+                                lookup_meta=build_lookup_meta(
+                                    all_lookup_results, base=pre_lookup_meta
+                                )
+                                or None,
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
@@ -626,9 +643,10 @@ def execute_loom(
             )
 
         # Materialize loom-level lookups (shared across all weaves)
+        loom_lookup_results: list[LookupResult] = []
         loom_connections = dict(loom.connections) if loom.connections else None
         if loom.lookups:
-            loom_cached_lookup_dfs, _ = materialize_lookups(
+            loom_cached_lookup_dfs, loom_lookup_results = materialize_lookups(
                 spark,
                 dict(loom.lookups),
                 collector=collector,
@@ -732,6 +750,7 @@ def execute_loom(
                     loom_name=loom.name,
                     weave_name=weave_name,
                     column_set_defs=merged_column_set_defs,
+                    pre_lookup_meta=build_lookup_meta(loom_lookup_results) or None,
                     pre_cached_lookups=loom_cached_lookup_dfs or None,
                     connections=merged_connections or None,
                     execution=effective_execution,

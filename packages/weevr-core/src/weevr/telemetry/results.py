@@ -97,6 +97,9 @@ class ThreadTelemetry(FrozenBase):
             DataFrame for this thread.
         export_results: Per-export write results, one per export configured
             on the thread.
+        step_stats: Per-step pipeline statistics harvested after the write,
+            keyed ``<scope>.<step>.<name>``. Engine-internal — the key set
+            and value shapes are unstable and may change without notice.
     """
 
     span: ExecutionSpan
@@ -125,6 +128,7 @@ class ThreadTelemetry(FrozenBase):
     drift_columns: list[str] = []
     drift_mode: str | None = None
     drift_action_taken: str | None = None
+    step_stats: dict[str, dict[str, Any]] | None = None
 
 
 class ColumnSetResult(FrozenBase):

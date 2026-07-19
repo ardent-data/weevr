@@ -35,6 +35,8 @@ from weevr.model.pipeline import (
     UnpivotStep,
     WindowStep,
 )
+from weevr.operations.pipeline._lookup_meta import LookupMeta
+from weevr.operations.pipeline._observations import ObservationRegistry
 from weevr.operations.pipeline._result import StepResult
 from weevr.operations.pipeline.analytical import (
     apply_aggregate,
@@ -60,7 +62,7 @@ from weevr.operations.pipeline.transforms import (
 )
 from weevr.operations.pipeline.value_mapping import apply_map
 
-__all__ = ["StepResult", "run_pipeline"]
+__all__ = ["LookupMeta", "ObservationRegistry", "StepResult", "run_pipeline"]
 
 _logger = logging.getLogger(__name__)
 
@@ -107,6 +109,8 @@ def run_pipeline(
     column_sets: dict[str, dict[str, str]] | None = None,
     column_set_defs: dict[str, ColumnSet] | None = None,
     lookups: dict[str, DataFrame] | None = None,
+    observations: ObservationRegistry | None = None,
+    lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> DataFrame:
     """Execute a sequence of pipeline steps against a working DataFrame.
 
@@ -128,6 +132,13 @@ def run_pipeline(
             that reference a column set.
         lookups: Cached lookup DataFrames keyed by name. Required for
             resolve steps that reference named lookups.
+        observations: Registry for lazily observed step statistics. When
+            provided, stat-producing handlers attach Observations instead
+            of running eager aggregations; the caller harvests after its
+            terminal action.
+        lookup_meta: Materialization-time lookup facts keyed by lookup
+            name; resolve steps reuse unique-key outcomes to skip their
+            duplicate pre-check when valid.
 
     Returns:
         Final DataFrame after all steps have been applied.
@@ -155,7 +166,13 @@ def run_pipeline(
         resolve_lookups = lookups or {}
         params = step.resolve
         if params.batch is not None:
-            return apply_resolve_batch(result, params, resolve_lookups)
+            return apply_resolve_batch(
+                result,
+                params,
+                resolve_lookups,
+                observations=observations,
+                lookup_meta=lookup_meta,
+            )
         # Single mode — look up the named lookup DataFrame
         lookup_name = params.lookup
         if lookup_name is None:
@@ -192,7 +209,13 @@ def run_pipeline(
             raise ExecutionError(
                 f"Lookup '{lookup_name}' not found for resolve step '{params.name}'",
             )
-        return apply_resolve(result, params, lookup_df)
+        return apply_resolve(
+            result,
+            params,
+            lookup_df,
+            observations=observations,
+            lookup_meta=(lookup_meta or {}).get(lookup_name),
+        )
 
     result = df
     for i, step in enumerate(steps):

@@ -64,3 +64,44 @@ class TestResolveActionBudget:
         assert after_first - start == EAGER_ACTIONS_PER_RESOLVE
         marginal = (after_third - after_first) / 2
         assert marginal == EAGER_ACTIONS_PER_RESOLVE
+
+
+@pytest.mark.spark
+class TestResolveActionBudgetObserved:
+    """With a registry, the stats aggregation disappears from the chain."""
+
+    # The stats aggregation is observed; the remaining action is the
+    # dim-scale lookup pre-check (bounded, permitted). With a reusable
+    # unique-key outcome even that disappears — see the zero-action test.
+    EAGER_ACTIONS_PER_RESOLVE_OBSERVED = 1
+
+    def test_marginal_actions_with_registry(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.operations.pipeline import ObservationRegistry
+
+        lookup = _lookup(spark)
+        registry = ObservationRegistry(scope="main")
+        df = _fact(spark)
+
+        start = spark_action_counter["total"]
+        df = apply_resolve(df, _params("fk_0"), lookup, observations=registry).df
+        df = apply_resolve(df, _params("fk_1"), lookup, observations=registry).df
+        after = spark_action_counter["total"]
+
+        assert (after - start) / 2 == self.EAGER_ACTIONS_PER_RESOLVE_OBSERVED
+
+    def test_zero_actions_with_uniqueness_reuse(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        lookup = _lookup(spark)
+        meta = LookupMeta(key_columns=("code",), unique_key_checked=True, unique_key_passed=True)
+        registry = ObservationRegistry(scope="main")
+        df = _fact(spark)
+
+        start = spark_action_counter["total"]
+        df = apply_resolve(df, _params("fk_0"), lookup, observations=registry, lookup_meta=meta).df
+        df = apply_resolve(df, _params("fk_1"), lookup, observations=registry, lookup_meta=meta).df
+        assert spark_action_counter["total"] - start == 0

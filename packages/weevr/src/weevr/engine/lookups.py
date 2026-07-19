@@ -14,6 +14,7 @@ from weevr.model.base import FrozenBase
 from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
+from weevr.operations.pipeline._lookup_meta import LookupMeta
 from weevr.operations.readers import read_source
 from weevr.telemetry.span import SpanStatus
 
@@ -51,6 +52,31 @@ class LookupResult(FrozenBase):
     filter_applied: bool = False
     unique_key_checked: bool = False
     unique_key_passed: bool | None = None
+
+
+def build_lookup_meta(
+    results: list[LookupResult],
+    base: dict[str, LookupMeta] | None = None,
+) -> dict[str, LookupMeta]:
+    """Reduce materialization results to per-lookup facts for resolve steps.
+
+    Args:
+        results: Materialization results to convert, keyed into the map by
+            lookup name (later entries win on collision).
+        base: Facts inherited from a parent scope (e.g. loom-level), copied
+            first so scope precedence matches the cached-DataFrame maps.
+
+    Returns:
+        Mapping of lookup name to reduced facts.
+    """
+    meta: dict[str, LookupMeta] = dict(base or {})
+    for r in results:
+        meta[r.name] = LookupMeta(
+            key_columns=tuple(r.key_columns) if r.key_columns else None,
+            unique_key_checked=r.unique_key_checked,
+            unique_key_passed=r.unique_key_passed,
+        )
+    return meta
 
 
 def _validate_columns(df: DataFrame, columns: list[str], lookup_name: str) -> None:

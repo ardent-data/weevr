@@ -17,6 +17,8 @@ from pyspark.sql.window import Window
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import ResolveParams
+from weevr.operations.pipeline._lookup_meta import LookupMeta
+from weevr.operations.pipeline._observations import ObservationRegistry
 from weevr.operations.pipeline._result import StepResult
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ def apply_resolve(
     lookup_df: DataFrame,
     *,
     _drop_source_columns: bool | None = None,
+    observations: ObservationRegistry | None = None,
+    lookup_meta: LookupMeta | None = None,
 ) -> StepResult:
     """Resolve foreign keys by joining fact rows to a lookup dimension.
 
@@ -53,10 +57,18 @@ def apply_resolve(
         lookup_df: Lookup (dimension) DataFrame.
         _drop_source_columns: Override for drop behavior (used by batch
             mode to defer drops until after all FKs complete).
+        observations: When provided, resolution statistics are attached
+            as an Observation (computed by the terminal action, no extra
+            Spark jobs) instead of an eager aggregation, and the eager
+            stats disappear from ``StepResult.metadata``.
+        lookup_meta: Materialization-time facts about the lookup. When
+            the lookup's unique-key check already proved the join keys
+            duplicate-free (and the reuse is valid for this resolve),
+            the duplicate gate skips even its lookup-side pre-check.
 
     Returns:
         StepResult with the resolved FK column added and metadata
-        containing per-FK resolution statistics.
+        containing per-FK resolution statistics (eager mode only).
     """
     if params.match is None:
         raise ExecutionError("match is required for resolve")
@@ -119,7 +131,7 @@ def apply_resolve(
     # Step 3: Build join condition
     # ---------------------------------------------------------------
     join_cols_src = [norm_source_map.get(sc, sc) for sc in source_cols]
-    join_cols_lkp = [norm_lookup_map.get(lc, lc) for lc in lookup_bk_cols]
+    join_cols_lkp: list[str] = [norm_lookup_map.get(lc) or lc for lc in lookup_bk_cols]
     join_cond: Column = F.lit(True)
     for src_c, lkp_c in zip(join_cols_src, join_cols_lkp, strict=True):
         join_cond = join_cond & (F.col(f"__fact__.{src_c}") == F.col(f"__lkp__.{lkp_c}"))
@@ -135,38 +147,67 @@ def apply_resolve(
         join_cond = join_cond & (F.col(to_col).isNull() | (F.col(date_col) < F.col(to_col)))
 
     # ---------------------------------------------------------------
-    # Step 4: Left join with row ID for duplicate detection
+    # Step 4: Duplicate gate. For plain business-key resolves, decide
+    # lookup-side whether duplicates are possible at all: a dim-sized
+    # pre-check (or the reused materialization-time unique-key outcome)
+    # proves the common case clean and skips the row-id column, the
+    # window, and the fact-side duplicate count entirely. Any duplicate
+    # keys fall back to the exact fact-side path so on_duplicate
+    # semantics — error only when a fact row actually matches a
+    # duplicated key, before the write — are byte-identical. Resolves
+    # with an ``effective`` block keep the fact-side path
+    # unconditionally (a BK legitimately carries multiple versions).
     # ---------------------------------------------------------------
     pk_col = f"__lkp__.{params.pk}"
-    dup_marker = "__resolve_dup_rn__"
-    row_id = "__resolve_row_id__"
-    df_with_id = df.withColumn(row_id, F.monotonically_increasing_id())
-    fact_aliased = df_with_id.alias("__fact__")
     lkp_aliased = lookup_df.alias("__lkp__")
-    joined = fact_aliased.join(lkp_aliased, join_cond, "left")
 
-    window = Window.partitionBy(F.col(f"__fact__.{row_id}")).orderBy(F.col(pk_col).asc_nulls_last())
-    joined = joined.withColumn(dup_marker, F.row_number().over(window))
+    plain_bk = params.effective is None
+    if plain_bk:
+        if _uniqueness_reusable(lookup_meta, lookup_bk_cols, params.normalize):
+            need_dup_window = False
+        else:
+            need_dup_window = _has_duplicate_join_keys(lookup_df, join_cols_lkp)
+    else:
+        need_dup_window = True
 
-    # Count duplicates before filtering
-    dup_count = joined.filter(F.col(dup_marker) > 1).count()
+    if need_dup_window:
+        dup_marker = "__resolve_dup_rn__"
+        row_id = "__resolve_row_id__"
+        fact_base = df.withColumn(row_id, F.monotonically_increasing_id())
+        fact_aliased = fact_base.alias("__fact__")
+        joined = fact_aliased.join(lkp_aliased, join_cond, "left")
 
-    if dup_count > 0:
-        if params.on_duplicate == "error":
-            raise ExecutionError(
-                f"Duplicate matches found during resolve of '{params.name}': "
-                f"{dup_count} extra match(es). Use on_duplicate='warn' or "
-                f"'first' to handle duplicates."
-            )
-        if params.on_duplicate == "warn":
-            logger.warning(
-                "Resolve '%s': %d duplicate match(es) found; taking first match per row.",
-                params.name,
-                dup_count,
-            )
+        window = Window.partitionBy(F.col(f"__fact__.{row_id}")).orderBy(
+            F.col(pk_col).asc_nulls_last()
+        )
+        joined = joined.withColumn(dup_marker, F.row_number().over(window))
 
-    # Keep only first match per fact row
-    joined = joined.filter(F.col(dup_marker) == 1)
+        # Count duplicates before filtering
+        dup_count = joined.filter(F.col(dup_marker) > 1).count()
+
+        if dup_count > 0:
+            if params.on_duplicate == "error":
+                raise ExecutionError(
+                    f"Duplicate matches found during resolve of '{params.name}': "
+                    f"{dup_count} extra match(es). Use on_duplicate='warn' or "
+                    f"'first' to handle duplicates."
+                )
+            if params.on_duplicate == "warn":
+                logger.warning(
+                    "Resolve '%s': %d duplicate match(es) found; taking first match per row.",
+                    params.name,
+                    dup_count,
+                )
+
+        # Keep only first match per fact row
+        joined = joined.filter(F.col(dup_marker) == 1)
+    else:
+        # Duplicates provably impossible: a plain left join yields at most
+        # one match per fact row — no row id, no window, no dup count.
+        fact_base = df
+        fact_aliased = fact_base.alias("__fact__")
+        joined = fact_aliased.join(lkp_aliased, join_cond, "left")
+        dup_count = 0
 
     # ---------------------------------------------------------------
     # Step 6: Resolve FK value — match, unknown, invalid
@@ -195,7 +236,7 @@ def apply_resolve(
             include_renames = {c: c for c in params.include}
 
         prefix = params.include_prefix or ""
-        existing_cols = set(df_with_id.columns)
+        existing_cols = set(fact_base.columns)
         for src_name, tgt_name in include_renames.items():
             final_name = f"{prefix}{tgt_name}"
             if final_name in existing_cols:
@@ -216,7 +257,7 @@ def apply_resolve(
     # Step 8: Select final columns
     # ---------------------------------------------------------------
     # Keep all fact columns (minus internal ones) + resolved + includes
-    fact_cols = [c for c in df_with_id.columns if not c.startswith("__resolve_")]
+    fact_cols = [c for c in fact_base.columns if not c.startswith("__resolve_")]
     # Remove the invalid flag column
     fact_cols = [c for c in fact_cols if c != invalid_flag]
 
@@ -232,9 +273,10 @@ def apply_resolve(
 
     result_df = joined.select(*select_exprs)
 
-    # Drop internal row_id
-    if row_id in result_df.columns:
-        result_df = result_df.drop(row_id)
+    # Drop internal row_id (window path only; the name never survives
+    # the clean path)
+    if "__resolve_row_id__" in result_df.columns:
+        result_df = result_df.drop("__resolve_row_id__")
 
     # ---------------------------------------------------------------
     # Step 9: Drop source columns if requested
@@ -243,39 +285,88 @@ def apply_resolve(
         result_df = result_df.drop(*source_cols)
 
     # ---------------------------------------------------------------
-    # Step 10: Compute resolution stats (single aggregation pass)
+    # Step 10: Resolution stats — observed lazily when a registry is
+    # provided (fulfilled by the terminal action, zero extra jobs);
+    # computed eagerly otherwise so the function stays independently
+    # usable outside the engine.
     # ---------------------------------------------------------------
     fk_col = F.col(params.name)
-    agg_row = result_df.agg(
-        F.count("*").alias("total"),
+    stat_exprs = (
+        F.count(F.lit(1)).alias("total"),
         F.sum(F.when(fk_col == F.lit(params.on_invalid), 1).otherwise(0)).alias("invalid"),
         F.sum(F.when(fk_col == F.lit(params.on_unknown), 1).otherwise(0)).alias("unknown"),
-    ).collect()[0]
+    )
 
-    total = int(agg_row["total"] or 0)
-    invalid_count = int(agg_row["invalid"] or 0)
-    unknown_count = int(agg_row["unknown"] or 0)
-    matched_count = total - invalid_count - unknown_count
+    if observations is not None:
+        obs = observations.create(
+            step="resolve",
+            name=params.name,
+            extras={"duplicates": dup_count},
+            derive=_finalize_resolve_stats,
+        )
+        result_df = result_df.observe(obs, *stat_exprs)
+        return StepResult(result_df, metadata={})
 
-    stats: dict[str, Any] = {
-        "total": total,
-        "matched": matched_count,
-        "unknown": unknown_count,
-        "invalid": invalid_count,
-        "duplicates": dup_count,
-        "match_rate": round(matched_count / total * 100, 2) if total > 0 else 0.0,
-    }
-
+    agg_row = result_df.agg(*stat_exprs).collect()[0]
+    stats = _finalize_resolve_stats({**agg_row.asDict(), "duplicates": dup_count})
     return StepResult(
         result_df,
         metadata={"resolve_stats": {params.name: stats}},
     )
 
 
+def _uniqueness_reusable(
+    meta: LookupMeta | None,
+    join_key_columns: list[str],
+    normalize: str | None,
+) -> bool:
+    """Whether a materialization-time unique-key outcome proves this join clean.
+
+    Valid only when the declared unique-key columns equal this resolve's
+    match-target columns AND no normalization applies — normalization can
+    merge two distinct keys (``trim_lower`` collapses ``"A"``/``"a"``)
+    after the check ran, so a passed check proves nothing post-normalize.
+    Row-removing filters (``where``, current-flag) cannot create
+    duplicates and never invalidate the reuse.
+    """
+    if meta is None or not meta.unique_key_checked or meta.unique_key_passed is not True:
+        return False
+    if normalize is not None and normalize != "none":
+        return False
+    return meta.key_columns is not None and list(meta.key_columns) == join_key_columns
+
+
+def _has_duplicate_join_keys(lookup_df: DataFrame, join_columns: list[str]) -> bool:
+    """Dim-sized pre-check: does any join-key group hold more than one row?"""
+    counted = lookup_df.groupBy(*[F.col(c) for c in join_columns]).agg(
+        F.count(F.lit(1)).alias("__resolve_precheck_cnt__")
+    )
+    return counted.filter(F.col("__resolve_precheck_cnt__") > 1).limit(1).count() > 0
+
+
+def _finalize_resolve_stats(values: dict[str, Any]) -> dict[str, Any]:
+    """Derive the published resolve stats from raw aggregate values."""
+    total = int(values.get("total") or 0)
+    invalid_count = int(values.get("invalid") or 0)
+    unknown_count = int(values.get("unknown") or 0)
+    matched_count = total - invalid_count - unknown_count
+    return {
+        "total": total,
+        "matched": matched_count,
+        "unknown": unknown_count,
+        "invalid": invalid_count,
+        "duplicates": int(values.get("duplicates") or 0),
+        "match_rate": round(matched_count / total * 100, 2) if total > 0 else 0.0,
+    }
+
+
 def apply_resolve_batch(
     df: DataFrame,
     params: ResolveParams,
     lookups: dict[str, DataFrame],
+    *,
+    observations: ObservationRegistry | None = None,
+    lookup_meta: dict[str, LookupMeta] | None = None,
 ) -> StepResult:
     """Resolve multiple FKs in batch mode.
 
@@ -287,6 +378,10 @@ def apply_resolve_batch(
         df: Fact DataFrame.
         params: Resolve parameters with batch items.
         lookups: Dict mapping lookup names to DataFrames.
+        observations: Passed through to each item's resolve; see
+            :func:`apply_resolve`.
+        lookup_meta: Materialization facts keyed by lookup name; each
+            item receives its own lookup's entry.
 
     Returns:
         StepResult with all FK columns added and aggregated metadata.
@@ -330,7 +425,14 @@ def apply_resolve_batch(
             where=item.where,
         )
 
-        step_result = apply_resolve(result_df, item_params, lookup_df, _drop_source_columns=False)
+        step_result = apply_resolve(
+            result_df,
+            item_params,
+            lookup_df,
+            _drop_source_columns=False,
+            observations=observations,
+            lookup_meta=(lookup_meta or {}).get(lookup_name),
+        )
         result_df = step_result.df
 
         # Collect per-item stats
