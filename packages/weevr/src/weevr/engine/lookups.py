@@ -183,6 +183,8 @@ def _apply_narrow_pipeline(
     df: DataFrame,
     lookup: Lookup,
     name: str,
+    *,
+    run_unique_check: bool = True,
 ) -> tuple[DataFrame, bool, bool, bool | None]:
     """Apply filter, projection, and unique-key check to a lookup DataFrame.
 
@@ -193,6 +195,10 @@ def _apply_narrow_pipeline(
         df: Raw DataFrame from source read.
         lookup: Lookup definition with optional narrow fields.
         name: Lookup name for error messages.
+        run_unique_check: The materialized path passes False and runs the
+            check itself AGAINST THE CACHE after persisting — checking here
+            would read the source once for the check and again for the
+            cache fill. The on-demand path keeps the inline check.
 
     Returns:
         Tuple of (narrowed DataFrame, filter_applied, unique_key_checked,
@@ -220,7 +226,7 @@ def _apply_narrow_pipeline(
         _validate_columns(df, lookup.key, name)
 
     # 3. Unique-key check
-    if lookup.unique_key:
+    if lookup.unique_key and run_unique_check:
         if lookup.key is None:
             raise LookupResolutionError(f"Lookup '{name}': 'unique_key' requires 'key' to be set")
         unique_key_checked = True
@@ -270,18 +276,36 @@ def materialize_lookups(
             df = read_source(spark, name, lookup.source, connections=connections)
             source_size = _delta_source_size(spark, lookup.source, connections)
 
-            # Apply narrow pipeline (filter → project → unique_key)
-            df, filter_applied, uk_checked, uk_passed = _apply_narrow_pipeline(df, lookup, name)
+            # Narrow first (filter → project), check LATER against the
+            # cache: persist-before-check means the source is read exactly
+            # once — the warming count fills the cache and the unique-key
+            # check reuses it
+            df, filter_applied, _, _ = _apply_narrow_pipeline(
+                df, lookup, name, run_unique_check=False
+            )
+
+            from pyspark import StorageLevel
 
             if lookup.strategy == "broadcast":
+                # Persist AND hint — they compose: the warming count fills
+                # the cache, consuming joins build their broadcast exchange
+                # from cache instead of re-reading the source per join.
+                # Hint before persist so unpersist targets the cached plan.
                 df = F.broadcast(df)
-            else:
-                from pyspark import StorageLevel
+            df.persist(StorageLevel.MEMORY_AND_DISK)
 
-                df.persist(StorageLevel.MEMORY_AND_DISK)
-
-            # Trigger materialization and get count
+            # Trigger materialization and get count — the single source read
             row_count = df.count()
+
+            uk_checked = False
+            uk_passed: bool | None = None
+            if lookup.unique_key:
+                if lookup.key is None:
+                    raise LookupResolutionError(
+                        f"Lookup '{name}': 'unique_key' requires 'key' to be set"
+                    )
+                uk_checked = True
+                uk_passed = _check_unique_key(df, lookup.key, name, lookup.on_failure)
 
             cached[name] = df
             elapsed_ms = (time.monotonic() - start) * 1000

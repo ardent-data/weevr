@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pyspark.sql import SparkSession
 
 from weevr.engine.lookups import (
     LookupResult,
@@ -632,3 +633,97 @@ class TestConnectionPassthrough:
         mock_read.assert_called_once()
         _, kwargs = mock_read.call_args
         assert kwargs.get("connections") is None
+
+
+@pytest.mark.spark
+class TestSingleReadMaterialization:
+    """Materialized lookups read their source exactly once end-to-end."""
+
+    def test_unique_key_lookup_single_source_read(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The check must run against the CACHE: spy on _check_unique_key's
+        # input — after the fix it receives a persisted frame
+        from weevr.engine import lookups as lookups_mod
+        from weevr.model.lookup import Lookup
+
+        path = tmp_delta_path("srm_dim")
+        spark.createDataFrame([{"code": "A", "sk": 1}, {"code": "B", "sk": 2}]).write.format(
+            "delta"
+        ).save(path)
+
+        checked_persisted: list[bool] = []
+        original = lookups_mod._check_unique_key
+
+        def _spy(df, key_columns, name, on_failure):  # type: ignore[no-untyped-def]
+            checked_persisted.append(df.storageLevel.useMemory or df.storageLevel.useDisk)
+            return original(df, key_columns, name, on_failure)
+
+        monkeypatch.setattr(lookups_mod, "_check_unique_key", _spy)
+
+        lookup = Lookup.model_validate(
+            {
+                "source": {"type": "delta", "alias": path},
+                "materialize": True,
+                "key": ["code"],
+                "unique_key": True,
+            }
+        )
+        cached, results = materialize_lookups(spark, {"dim": lookup})
+        try:
+            assert checked_persisted == [True]  # check ran on the cached frame
+            assert results[0].unique_key_checked is True
+            assert results[0].unique_key_passed is True
+            assert results[0].row_count == 2
+        finally:
+            cleanup_lookups(cached)
+
+    def test_broadcast_strategy_persists_and_hints(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        from typing import Any
+
+        from weevr.model.lookup import Lookup
+
+        path = tmp_delta_path("srm_bc")
+        spark.createDataFrame([{"code": "A", "sk": 1}]).write.format("delta").save(path)
+
+        lookup = Lookup.model_validate(
+            {
+                "source": {"type": "delta", "alias": path},
+                "materialize": True,
+                "strategy": "broadcast",
+            }
+        )
+        cached, results = materialize_lookups(spark, {"dim": lookup})
+        try:
+            df = cached["dim"]
+            # Persisted (cache-resident)…
+            assert df.storageLevel.useMemory or df.storageLevel.useDisk
+            # …AND hinted — the two compose
+            jdf: Any = df._jdf
+            assert "broadcast" in str(jdf.queryExecution().analyzed()).lower()
+            assert results[0].strategy == "broadcast"
+        finally:
+            cleanup_lookups(cached)
+
+    def test_on_demand_path_never_persists(self, spark: SparkSession, tmp_delta_path) -> None:
+        from weevr.model.lookup import Lookup
+        from weevr.model.source import Source
+
+        path = tmp_delta_path("srm_od")
+        spark.createDataFrame([{"code": "A", "sk": 1}]).write.format("delta").save(path)
+
+        lookup = Lookup.model_validate(
+            {
+                "source": {"type": "delta", "alias": path},
+                "materialize": False,
+                "key": ["code"],
+                "unique_key": True,
+            }
+        )
+        sources = {"dim_src": Source(lookup="dim")}
+        resolved = resolve_thread_lookups(sources, {"dim": lookup}, {}, spark)
+        df = resolved["dim_src"]
+        # Single-use path: no persist, no orphaned cache entries
+        assert not (df.storageLevel.useMemory or df.storageLevel.useDisk)
