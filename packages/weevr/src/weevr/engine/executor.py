@@ -600,10 +600,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 if capture_samples:
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
-                execute_dimension_merge(
+                was_first_write = not target_handle.exists()
+                merge_result = execute_dimension_merge(
                     spark, df, dim_builder, target_path, run_timestamp, handle=target_handle
                 )
-                rows_written = df.count()
+                # Input-rows semantic without a third full-scale action:
+                # transforms after the eager rows_after_transforms count are
+                # column-only, so write-input rows = that count minus the
+                # quarantined rows (both already known). First writes report
+                # the commit's own numOutputRows instead.
+                rows_written = (
+                    merge_result.rows_inserted
+                    if was_first_write
+                    else rows_after_transforms - rows_quarantined
+                )
 
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
                 # CDC merge routing (no dimension) — skip target column

@@ -628,3 +628,88 @@ class TestWriteTargetMerge:
         assert rows[1]["is_deleted"] is None
         # id=2 orphan → soft_delete_value (True)
         assert rows[2]["is_deleted"] is True
+
+
+@pytest.mark.spark
+class TestCommitMetricsCounts:
+    """Write counts come from guarded commit metrics on single-pass paths."""
+
+    @pytest.fixture()
+    def count_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+        """Count DataFrame.count() calls — the eager pattern being removed.
+
+        The generic action counter also sees the driver-side
+        ``history(1).collect()`` metadata reads, which are the design's
+        accepted (log-scale) cost; this spy isolates fact-scale counts.
+        """
+        from pyspark.sql import DataFrame
+
+        calls: list[int] = []
+        original = DataFrame.count
+
+        def _spy(inner_self):  # type: ignore[no-untyped-def]
+            calls.append(1)
+            return original(inner_self)
+
+        monkeypatch.setattr(DataFrame, "count", _spy)
+        return calls
+
+    def test_overwrite_and_append_counts_parity(
+        self, spark: SparkSession, tmp_delta_path, count_spy: list[int]
+    ) -> None:
+        from weevr.model.target import Target
+        from weevr.model.write import WriteConfig
+
+        path = tmp_delta_path("cm_tgt")
+        target = Target(path=path)
+        df3 = spark.createDataFrame([{"id": i} for i in range(3)])
+        df2 = spark.createDataFrame([{"id": i} for i in range(2)])
+
+        n1 = write_target(spark, df3, target, WriteConfig(mode="overwrite"), path)
+        n2 = write_target(spark, df2, target, WriteConfig(mode="append"), path)
+        assert count_spy == []  # no eager data counts
+
+        assert n1 == 3
+        assert n2 == 2
+        assert spark.read.format("delta").load(path).count() == 5
+
+    def test_foreign_commit_degrades_to_zero_with_warning(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("cm_guard")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(path)  # v0
+        handle = TargetHandle(spark, path)
+        pre = handle.current_version()
+        assert pre == 0
+
+        # Two commits land after capture: the engine's own would be v1;
+        # a foreign writer pushes latest to v2
+        spark.createDataFrame([{"id": 2}]).write.format("delta").mode("append").save(path)
+        spark.createDataFrame([{"id": 3}]).write.format("delta").mode("append").save(path)
+
+        metrics = handle.commit_metrics_after(pre)
+        assert metrics is None  # degrade, never misattribute
+        assert any("foreign commit" in r.message for r in caplog.records)
+
+    def test_dimension_first_write_count_from_metrics(
+        self, spark: SparkSession, tmp_delta_path, count_spy: list[int]
+    ) -> None:
+        from weevr.model.dimension import DimensionConfig
+        from weevr.operations.dimension import DimensionMergeBuilder, execute_dimension_merge
+        from weevr.operations.hashing import compute_dimension_keys
+
+        path = tmp_delta_path("cm_dim_first")
+        dim = DimensionConfig(
+            business_key=["k"],
+            surrogate_key={"name": "_sk", "columns": ["k"]},  # type: ignore[arg-type]
+        )
+        src = spark.createDataFrame([{"k": "A", "v": 1}, {"k": "B", "v": 2}])
+        src = compute_dimension_keys(src, dim)
+        builder = DimensionMergeBuilder(dim)
+
+        result = execute_dimension_merge(spark, src, builder, path, "2026-01-01")
+        assert count_spy == []  # pre-count gone
+
+        assert result.rows_inserted == 2

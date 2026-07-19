@@ -1932,15 +1932,14 @@ class TestTargetHandle:
             return original(spark, path)
 
         # Patch the source module (the handle reads it) and each module
-        # holding a direct reference from `from weevr.delta import ...`
-        import weevr.operations.dimension as dim_mod
+        # still holding a direct reference from `from weevr.delta import ...`
+        # (dimension.py probes exclusively through the handle now)
         import weevr.operations.seeding as seed_mod
         import weevr.operations.writers as writers_mod
 
         monkeypatch.setattr(delta_mod, "delta_table_exists", _spy)
         monkeypatch.setattr(writers_mod, "delta_table_exists", _spy)
         monkeypatch.setattr(seed_mod, "delta_table_exists", _spy)
-        monkeypatch.setattr(dim_mod, "delta_table_exists", _spy)
         return calls
 
     def test_standard_path_probes_once(

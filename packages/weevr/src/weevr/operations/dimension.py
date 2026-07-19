@@ -15,7 +15,7 @@ from typing import Any
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-from weevr.delta import delta_table_exists, resolve_delta_table
+from weevr.delta import resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
 from weevr.operations.target_handle import TargetHandle
@@ -240,13 +240,18 @@ def execute_dimension_merge(
     config = builder.config
     result = DimensionMergeResult()
 
-    target_present = (
-        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
-    )
-    if not target_present:
-        # First write — insert all rows directly
-        result.rows_inserted = source_df.count()
+    if handle is None:
+        handle = TargetHandle(spark, target_path)
+    if not handle.exists():
+        # First write — insert all rows directly; the count comes from the
+        # write's own commit metrics (guarded), not a pre-count
         source_df.write.format("delta").save(target_path)
+        metrics = handle.commit_metrics_after(None)
+        if metrics is not None and "numOutputRows" in metrics:
+            result.rows_inserted = int(metrics["numOutputRows"])
+        else:
+            logger.warning("First-write row count unavailable for '%s'; reporting 0", target_path)
+        handle.mark_exists()
         return result
 
     if config.track_history and builder.has_version_groups():

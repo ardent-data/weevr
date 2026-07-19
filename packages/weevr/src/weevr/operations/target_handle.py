@@ -56,3 +56,44 @@ class TargetHandle:
         existence is monotonic within a run.
         """
         self._exists = True
+
+    def current_version(self) -> int | None:
+        """The target's latest Delta commit version, or None when absent.
+
+        A driver-side log read — no Spark jobs. Captured immediately
+        before a counted write so the engine's own earlier commits to the
+        same target (warp pre-init, seeds) are already included.
+        """
+        try:
+            table = _delta.resolve_delta_table(self._spark, self.path)
+            row = table.history(1).select("version").collect()
+            return int(row[0][0]) if row else None
+        except Exception:
+            return None
+
+    def commit_metrics_after(self, pre_version: int | None) -> dict[str, str] | None:
+        """Operation metrics of the commit that followed ``pre_version``.
+
+        Accepts the latest commit ONLY when its version is exactly
+        ``pre_version + 1`` (or 0 for a fresh table) — a foreign commit
+        landing between the engine's write and this read makes the
+        version jump, and the metrics are then reported absent rather
+        than misattributed. Degrade, never misattribute.
+        """
+        expected = 0 if pre_version is None else pre_version + 1
+        try:
+            table = _delta.resolve_delta_table(self._spark, self.path)
+            row = table.history(1).select("version", "operationMetrics").collect()[0]
+        except Exception:
+            logger.warning("Commit metrics unavailable for '%s'", self.path)
+            return None
+        if int(row[0]) != expected:
+            logger.warning(
+                "Commit metrics for '%s' skipped: expected version %d, found %d "
+                "(foreign commit interleaved)",
+                self.path,
+                expected,
+                int(row[0]),
+            )
+            return None
+        return dict(row[1])

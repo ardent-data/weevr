@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
@@ -13,6 +15,8 @@ from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import typed_watermark_col
 from weevr.operations.target_handle import TargetHandle
+
+logger = logging.getLogger(__name__)
 
 
 def quote_identifier(name: str) -> str:
@@ -132,12 +136,17 @@ def write_target(
     mode = write_config.mode if write_config else "overwrite"
     partition_cols = target.partition_by or []
     use_table_api = is_table_alias(target_path)
-    target_exists = (
-        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
-    )
+    if handle is None:
+        handle = TargetHandle(spark, target_path)
+    target_exists = handle.exists()
 
     try:
-        row_count = df.count()
+        # Merge keeps an eager input count — merge metrics express outcome
+        # rows, not the input-rows semantic this function returns, and the
+        # merge action cannot fulfill observations (it zero-fires them).
+        # Single-pass modes count from the write's own commit metrics.
+        row_count = df.count() if mode == "merge" and target_exists else -1
+        pre_version = handle.current_version() if row_count == -1 and target_exists else None
 
         if mode == "overwrite" or not target_exists:
             # First write (any mode) and overwrite: write as overwrite to create/replace table.
@@ -176,6 +185,19 @@ def write_target(
                 raise ExecutionError("merge mode requires 'match_keys' to be set")
             _execute_merge(spark, df, write_config, target_path)
 
+        if row_count == -1:
+            # Single-pass write: the commit's own numOutputRows, guarded
+            # against foreign commits. Absent-with-warning on any miss.
+            metrics = handle.commit_metrics_after(pre_version)
+            if metrics is not None and "numOutputRows" in metrics:
+                row_count = int(metrics["numOutputRows"])
+            else:
+                logger.warning(
+                    "Rows-written count unavailable for '%s'; reporting 0",
+                    target_path,
+                )
+                row_count = 0
+        handle.mark_exists()
         return row_count
 
     except ExecutionError:
