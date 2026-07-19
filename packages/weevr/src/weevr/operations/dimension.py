@@ -7,17 +7,20 @@ target configuration.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass
 from functools import reduce
 from typing import Any
 
+from pyspark import StorageLevel
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-from weevr.delta import delta_table_exists, resolve_delta_table
+from weevr.delta import resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
+from weevr.operations.target_handle import TargetHandle
 from weevr.operations.writers import quote_identifier
 
 logger = logging.getLogger(__name__)
@@ -205,6 +208,7 @@ def execute_dimension_merge(
     builder: DimensionMergeBuilder,
     target_path: str,
     run_timestamp: str,
+    handle: TargetHandle | None = None,
 ) -> DimensionMergeResult:
     """Execute the staged dimension merge against a Delta target.
 
@@ -229,22 +233,37 @@ def execute_dimension_merge(
         target_path: Path to the Delta target table.
         run_timestamp: ISO timestamp for SCD valid_from values.
 
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
+
     Returns:
         DimensionMergeResult with row-level metrics.
     """
     config = builder.config
     result = DimensionMergeResult()
 
-    if not delta_table_exists(spark, target_path):
-        # First write — insert all rows directly
-        result.rows_inserted = source_df.count()
+    if handle is None:
+        handle = TargetHandle(spark, target_path)
+    if not handle.exists():
+        # First write — insert all rows directly; the count comes from the
+        # write's own commit metrics (guarded), not a pre-count
         source_df.write.format("delta").save(target_path)
+        metrics = handle.commit_metrics_after(None)
+        if metrics is not None and "numOutputRows" in metrics:
+            result.rows_inserted = int(metrics["numOutputRows"])
+        else:
+            logger.warning("First-write row count unavailable for '%s'; reporting 0", target_path)
+        handle.mark_exists()
         return result
 
     if config.track_history and builder.has_version_groups():
-        return _execute_versioned_merge(spark, source_df, builder, target_path, run_timestamp)
+        return _execute_versioned_merge(
+            spark, source_df, builder, target_path, run_timestamp, handle=handle
+        )
 
-    return _execute_standard_merge(spark, source_df, builder, target_path, run_timestamp)
+    return _execute_standard_merge(
+        spark, source_df, builder, target_path, run_timestamp, handle=handle
+    )
 
 
 def _execute_versioned_merge(
@@ -253,6 +272,7 @@ def _execute_versioned_merge(
     builder: DimensionMergeBuilder,
     target_path: str,
     run_timestamp: str,
+    handle: TargetHandle | None = None,
 ) -> DimensionMergeResult:
     """SCD Type 2 staged merge: pre-join to identify changes, then MERGE.
 
@@ -267,6 +287,11 @@ def _execute_versioned_merge(
     result = DimensionMergeResult()
     scd = config.columns
     bk_cols = config.business_key
+
+    # The MERGE's unioned source embeds this lineage twice (directly and
+    # via the new-version derivation); persist so it computes once.
+    # Released in the finally below.
+    source_df = source_df.persist(StorageLevel.MEMORY_AND_DISK)
 
     # Identify version-group hash columns
     version_hash_cols: list[str] = []
@@ -367,8 +392,15 @@ def _execute_versioned_merge(
         scope_condition=f"target.{quote_identifier(scd.is_current)} = true",
     )
 
-    merger.execute()
-    return result
+    pre_version = handle.current_version() if handle is not None else None
+    try:
+        merger.execute()
+    finally:
+        with contextlib.suppress(Exception):
+            source_df.unpersist()
+    if handle is not None:
+        handle.mark_exists()
+    return _populate_merge_result(result, handle, pre_version, versioned=True)
 
 
 def _execute_standard_merge(
@@ -377,6 +409,7 @@ def _execute_standard_merge(
     builder: DimensionMergeBuilder,
     target_path: str,
     run_timestamp: str,
+    handle: TargetHandle | None = None,
 ) -> DimensionMergeResult:
     """Standard merge for non-versioned dimensions (Type 1)."""
     config = builder.config
@@ -430,8 +463,51 @@ def _execute_standard_merge(
 
     merger = merger.whenNotMatchedInsertAll()
     merger = _apply_not_matched_by_source(merger, builder)
+    pre_version = handle.current_version() if handle is not None else None
     merger.execute()
+    if handle is not None:
+        handle.mark_exists()
+    return _populate_merge_result(result, handle, pre_version, versioned=False)
 
+
+def _populate_merge_result(
+    result: DimensionMergeResult,
+    handle: TargetHandle | None,
+    pre_version: int | None,
+    *,
+    versioned: bool,
+) -> DimensionMergeResult:
+    """Fill merge metrics from the commit's split update keys.
+
+    Uses the split keys only — the ``numTargetRowsUpdated`` aggregate
+    conflates the close/overwrite clause with the soft-delete clause
+    (``whenNotMatchedBySourceUpdate``) and must never feed the split.
+    On the versioned path, one close corresponds to exactly one
+    new-version insert (single current row per entity), so new-entity
+    inserts are total inserts minus closes. ``rows_unchanged`` stays
+    absent by decision — no Delta metric expresses it. Metrics absent or
+    guard-rejected: warn and leave zeros, never a corrupted number.
+    """
+    if handle is None:
+        return result
+    metrics = handle.commit_metrics_after(pre_version)
+    if metrics is None or "numTargetRowsMatchedUpdated" not in metrics:
+        logger.warning(
+            "Dimension merge metrics unavailable for '%s'; counts reported as zero",
+            handle.path,
+        )
+        return result
+    matched_updated = int(metrics.get("numTargetRowsMatchedUpdated", 0))
+    inserted = int(metrics.get("numTargetRowsInserted", 0))
+    deleted = int(metrics.get("numTargetRowsDeleted", 0))
+    nmbs_updated = int(metrics.get("numTargetRowsNotMatchedBySourceUpdated", 0))
+    if versioned:
+        result.rows_versioned = matched_updated
+        result.rows_inserted = inserted - matched_updated
+    else:
+        result.rows_overwritten = matched_updated
+        result.rows_inserted = inserted
+    result.rows_deleted = deleted + nmbs_updated
     return result
 
 

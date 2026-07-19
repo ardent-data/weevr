@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
@@ -12,6 +14,9 @@ from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import typed_watermark_col
+from weevr.operations.target_handle import TargetHandle
+
+logger = logging.getLogger(__name__)
 
 
 def quote_identifier(name: str) -> str:
@@ -23,7 +28,12 @@ def quote_identifier(name: str) -> str:
     return f"`{name.replace('`', '``')}`"
 
 
-def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> DataFrame:
+def apply_target_mapping(
+    df: DataFrame,
+    target: Target,
+    spark: SparkSession,
+    handle: TargetHandle | None = None,
+) -> DataFrame:
     """Apply target column mapping to shape the DataFrame for writing.
 
     Column-level transformations (expr, type, default, drop) are applied first.
@@ -38,6 +48,9 @@ def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> 
         df: Input DataFrame.
         target: Target configuration including mapping mode and column specs.
         spark: Active SparkSession (used to probe existing target schema).
+
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
 
     Returns:
         DataFrame shaped for writing to the target.
@@ -64,7 +77,12 @@ def apply_target_mapping(df: DataFrame, target: Target, spark: SparkSession) -> 
     # Narrow column set according to mapping mode.
     if target.mapping_mode == "auto":
         target_path = target.alias or target.path
-        if target_path and delta_table_exists(spark, target_path):
+        target_present = (
+            handle.exists()
+            if handle is not None and target_path == handle.path
+            else bool(target_path) and delta_table_exists(spark, target_path)
+        )
+        if target_path and target_present:
             if is_table_alias(target_path):
                 existing_cols = spark.read.format("delta").table(target_path).columns
             else:
@@ -91,6 +109,7 @@ def write_target(
     target: Target,
     write_config: WriteConfig | None,
     target_path: str,
+    handle: TargetHandle | None = None,
 ) -> int:
     """Write a DataFrame to a Delta table.
 
@@ -105,6 +124,9 @@ def write_target(
         write_config: Write mode and merge parameters. Defaults to overwrite when None.
         target_path: Table alias or physical path for the Delta table.
 
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
+
     Returns:
         Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
 
@@ -114,10 +136,17 @@ def write_target(
     mode = write_config.mode if write_config else "overwrite"
     partition_cols = target.partition_by or []
     use_table_api = is_table_alias(target_path)
-    target_exists = delta_table_exists(spark, target_path)
+    if handle is None:
+        handle = TargetHandle(spark, target_path)
+    target_exists = handle.exists()
 
     try:
-        row_count = df.count()
+        # Merge keeps an eager input count — merge metrics express outcome
+        # rows, not the input-rows semantic this function returns, and the
+        # merge action cannot fulfill observations (it zero-fires them).
+        # Single-pass modes count from the write's own commit metrics.
+        row_count = df.count() if mode == "merge" and target_exists else -1
+        pre_version = handle.current_version() if row_count == -1 and target_exists else None
 
         if mode == "overwrite" or not target_exists:
             # First write (any mode) and overwrite: write as overwrite to create/replace table.
@@ -156,6 +185,19 @@ def write_target(
                 raise ExecutionError("merge mode requires 'match_keys' to be set")
             _execute_merge(spark, df, write_config, target_path)
 
+        if row_count == -1:
+            # Single-pass write: the commit's own numOutputRows, guarded
+            # against foreign commits. Absent-with-warning on any miss.
+            metrics = handle.commit_metrics_after(pre_version)
+            if metrics is not None and "numOutputRows" in metrics:
+                row_count = int(metrics["numOutputRows"])
+            else:
+                logger.warning(
+                    "Rows-written count unavailable for '%s'; reporting 0",
+                    target_path,
+                )
+                row_count = 0
+        handle.mark_exists()
         return row_count
 
     except ExecutionError:
@@ -299,6 +341,7 @@ def execute_cdc_merge(
     cdc_config: CdcConfig,
     *,
     load_config: LoadConfig | None = None,
+    handle: TargetHandle | None = None,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
@@ -319,6 +362,9 @@ def execute_cdc_merge(
         cdc_config: CDC configuration (preset or explicit mapping).
         load_config: Thread-level load configuration; supplies the
             watermark ordering for generic CDC reduction.
+
+        handle: Pre-resolved target handle; when absent the function
+            self-resolves existence (operations stay independently usable).
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -394,7 +440,9 @@ def execute_cdc_merge(
         )
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
-    target_exists = delta_table_exists(spark, target_path)
+    target_exists = (
+        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
+    )
 
     try:
         # Count operations in a single pass over the (reduced) window
@@ -425,6 +473,8 @@ def execute_cdc_merge(
                 cdc_writer.saveAsTable(target_path)
             else:
                 cdc_writer.save(target_path)
+            if handle is not None:
+                handle.mark_exists()
             return counts
 
         delta_table = resolve_delta_table(spark, target_path)
@@ -489,6 +539,8 @@ def execute_cdc_merge(
             )
 
         merger.execute()
+        if handle is not None:
+            handle.mark_exists()
         return counts
 
     except ExecutionError:

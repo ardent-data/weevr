@@ -147,3 +147,197 @@ class TestSingleSourceScan:
         with job_counter() as jc_terminal:
             df.collect()
         assert jc_terminal.jobs > 0  # exactly one action executed the chain
+
+
+@pytest.mark.spark
+class TestThreadActionBudget:
+    """The headline invariant: a gate-free thread pays the write, only.
+
+    "Fact-scale eager action" here means the Python-side patterns the
+    boundary work removed — DataFrame.count()/toPandas() on working
+    lineage. Driver-side commit-log reads (history(1).collect()) are the
+    design's accepted metadata cost and are not counted.
+    """
+
+    @pytest.fixture()
+    def eager_spies(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
+        from pyspark.sql import DataFrame
+
+        spies: dict[str, list[int]] = {"count": [], "toPandas": []}
+        orig_count = DataFrame.count
+        orig_topandas = DataFrame.toPandas
+
+        def _count(inner_self):  # type: ignore[no-untyped-def]
+            spies["count"].append(1)
+            return orig_count(inner_self)
+
+        def _topandas(inner_self):  # type: ignore[no-untyped-def]
+            spies["toPandas"].append(1)
+            return orig_topandas(inner_self)
+
+        monkeypatch.setattr(DataFrame, "count", _count)
+        monkeypatch.setattr(DataFrame, "toPandas", _topandas)
+        return spies
+
+    def test_gate_free_thread_zero_eager_actions(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+
+        src = tmp_delta_path("budget_gate_src")
+        tgt = tmp_delta_path("budget_gate_tgt")
+        spark.createDataFrame([{"id": i} for i in range(6)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "budget_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"filter": {"expr": "id < 4"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success", result.error
+        # No validations, no warp, no exports, samples off → the write is
+        # the only fact-scale execution; telemetry still arrives
+        assert eager_spies["count"] == []
+        assert eager_spies["toPandas"] == []
+        assert result.telemetry is not None
+        assert result.telemetry.rows_read == 6
+        assert result.telemetry.rows_after_transforms == 4
+        assert result.rows_written == 4
+
+    def test_exports_add_no_eager_actions(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+
+        src = tmp_delta_path("budget_exp_src")
+        tgt = tmp_delta_path("budget_exp_tgt")
+        exp = tmp_delta_path("budget_exp_out")
+        spark.createDataFrame([{"id": i} for i in range(3)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "budget_exp_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "exports": [{"name": "e1", "type": "delta", "path": exp}],
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+        assert eager_spies["count"] == []  # export rides the persisted frame
+        assert spark.read.format("delta").load(exp).count() == 3
+
+
+@pytest.mark.spark
+class TestFeatureEnableMatrix:
+    """Each observability feature adds only its bounded, enumerated cost."""
+
+    @pytest.fixture()
+    def eager_spies(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
+        from pyspark.sql import DataFrame
+
+        spies: dict[str, list[int]] = {"count": [], "toPandas": []}
+        orig_count = DataFrame.count
+        orig_topandas = DataFrame.toPandas
+
+        def _count(inner_self):  # type: ignore[no-untyped-def]
+            spies["count"].append(1)
+            return orig_count(inner_self)
+
+        def _topandas(inner_self):  # type: ignore[no-untyped-def]
+            spies["toPandas"].append(1)
+            return orig_topandas(inner_self)
+
+        monkeypatch.setattr(DataFrame, "count", _count)
+        monkeypatch.setattr(DataFrame, "toPandas", _topandas)
+        return spies
+
+    @staticmethod
+    def _base_cfg(src: str, tgt: str) -> dict:
+        return {
+            "name": "matrix_t",
+            "config_version": "1",
+            "sources": {"main": {"type": "delta", "alias": src}},
+            "steps": [],
+            "target": {"path": tgt},
+            "write": {"mode": "overwrite"},
+        }
+
+    def test_samples_on_adds_only_sampling_attempts(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+
+        src = tmp_delta_path("mx_s_src")
+        tgt = tmp_delta_path("mx_s_tgt")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        execute_thread(spark, Thread.model_validate(self._base_cfg(src, tgt)), capture_samples=True)
+        assert eager_spies["count"] == []  # samples add sampling only
+        assert 1 <= len(eager_spies["toPandas"]) <= 2  # output (+quarantine) samples
+
+    def test_cte_collector_adds_one_count_per_cte(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+        from weevr.telemetry.collector import SpanCollector
+
+        src = tmp_delta_path("mx_c_src")
+        tgt = tmp_delta_path("mx_c_tgt")
+        spark.createDataFrame([{"id": 1, "amount": 50}]).write.format("delta").save(src)
+
+        cfg = self._base_cfg(src, tgt)
+        cfg["with"] = {"prepped": {"from": "main", "steps": [{"filter": {"expr": "amount > 0"}}]}}
+        cfg["steps"] = []
+        cfg["sources"] = {"main": {"type": "delta", "alias": src}}
+
+        execute_thread(spark, Thread.model_validate(cfg), collector=SpanCollector(trace_id="t"))
+        # Exactly the one collector-gated CTE count; without a collector the
+        # gate-free lock elsewhere proves zero
+        assert eager_spies["count"] == [1]
+
+    def test_cdc_thread_actions_bounded(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+
+        src = tmp_delta_path("mx_cdc_src")
+        tgt = tmp_delta_path("mx_cdc_tgt")
+        spark.createDataFrame(
+            [
+                {"id": 1, "v": "a", "op": "I", "seq": 1},
+                {"id": 2, "v": "b", "op": "I", "seq": 2},
+            ]
+        ).write.format("delta").save(src)
+
+        cfg = self._base_cfg(src, tgt)
+        cfg["name"] = "mx_cdc_t"
+        cfg["write"] = {"mode": "merge", "match_keys": ["id"]}
+        cfg["load"] = {
+            "mode": "cdc",
+            "watermark_column": "seq",
+            "watermark_type": "long",
+            "watermark_store": {"kind": "delta", "path": tgt + "_wm"},
+            "cdc": {"operation_column": "op", "insert_value": "I"},
+        }
+        result = execute_thread(spark, Thread.model_validate(cfg))
+        assert result.status == "success", result.error
+        # Enumerated, all window-scale against the persisted change window:
+        # rows_read + rows_after_transforms (merge-terminal eager pair) +
+        # the ordering-column null guard on explicit mappings. Nothing
+        # grows with feature count.
+        assert len(eager_spies["count"]) == 3

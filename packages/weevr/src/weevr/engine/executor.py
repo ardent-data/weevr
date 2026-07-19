@@ -9,7 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pyspark.sql import SparkSession
+from pyspark import StorageLevel
+from pyspark.sql import Observation, SparkSession
+from pyspark.sql import functions as F
 
 from weevr.delta import read_delta
 from weevr.engine.column_sets import materialize_column_sets
@@ -46,14 +48,17 @@ from weevr.operations.fact import check_fact_sentinels, validate_fact_schema
 from weevr.operations.hashing import compute_dimension_keys, compute_keys
 from weevr.operations.naming import normalize_columns
 from weevr.operations.pipeline import LookupMeta, ObservationRegistry, run_pipeline
+from weevr.operations.pipeline._observations import read_observation
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
+    compute_generic_cdc_hwm,
     read_cdc_source,
     read_source,
     read_source_incremental,
     read_sources,
 )
 from weevr.operations.seeding import build_system_member_rows, execute_seeds
+from weevr.operations.target_handle import TargetHandle
 from weevr.operations.validation import validate_dataframe
 from weevr.operations.warp import (
     append_warp_only_columns,
@@ -84,6 +89,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     column_set_defs: dict[str, ColumnSet] | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
     lookup_meta: dict[str, LookupMeta] | None = None,
+    capture_samples: bool = False,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -139,6 +145,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             configured.
         lookup_meta: Materialization-time lookup facts inherited from the
             weave/loom scope; thread-level facts merge on top.
+        capture_samples: Whether to capture 10-row output/quarantine
+            samples for display (effective ``execution.capture_samples``).
+            Off by default — sampling re-executes the pipeline lineage.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -188,6 +197,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     # --- Thread-level resource lifecycle ---
     thread_variable_ctx = _build_thread_variable_context(thread)
     thread_cached_lookups: dict[str, Any] = {}
+    cdc_window_df: Any = None
+    working_df_persisted: Any = None
+    quarantine_df_persisted: Any = None
 
     # Compute effective resources by merging weave-level with thread-level
     effective_cached_lookups = cached_lookups
@@ -275,6 +287,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     thread_name=thread.name,
                 )
 
+            # One existence/identity resolution per thread. Refreshed after
+            # every engine-internal commit (warp pre-init, seeds) so
+            # downstream consumers observe post-commit state exactly as
+            # their previous independent probes did.
+            target_handle = TargetHandle(spark, target_path)
+
             # --- Warp resolution ---
             resolved_warp = None
             warp_findings: list[dict[str, str]] = []
@@ -305,6 +323,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 engine_col_names = list((thread.target.audit_columns or {}).keys())
                 effective_warp = build_effective_warp(resolved_warp.columns, [], engine_col_names)
                 pre_initialize_table(spark, target_path, effective_warp)
+                target_handle.refresh()
 
             # --- Watermark/CDC state loading ---
             if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
@@ -377,15 +396,28 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     load_config=thread.load,
                     prior_state=prior_state,
                     connections=connections,
+                    compute_hwm=False,
                 )
+                # Persist the change window: the version capture, the
+                # op-code counts, and the merge itself all execute this
+                # lineage — window-scale, cached once, released in the
+                # thread's finally block
+                primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
+                cdc_window_df = primary_df
+                # Generic-preset HWM computes AGAINST the persisted window,
+                # sharing one lineage with the op counts and the merge — the
+                # captured value and the applied rows cannot diverge. (The
+                # old in-read capture ran on a separate execution: a commit
+                # between it and the merge silently decoupled persisted
+                # state from applied state.)
+                if thread.load.cdc.preset != "delta_cdf":
+                    cdc_new_hwm = compute_generic_cdc_hwm(primary_df, thread.load)
 
                 # Capture new CDF version if Delta CDF
                 if (
                     thread.load.cdc.preset == "delta_cdf"
                     and "_commit_version" in primary_df.columns
                 ):
-                    from pyspark.sql import functions as F
-
                     max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
                     if max_row and max_row[0]["mv"] is not None:
                         new_hwm = str(max_row[0]["mv"])
@@ -424,6 +456,19 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # write); CTE sub-pipelines contribute under their own scopes.
             obs_registry = ObservationRegistry(scope="main")
 
+            # Merge-terminal paths (dimension, CDC, merge write mode) fix
+            # observations with ZERO rows — the merge's internal execution
+            # fires observed nodes without flowing source rows through them
+            # (locked in test_merge_observation_semantics). Those paths keep
+            # eager counts, which double as the action that fixes the step
+            # observations with true full-scale values. Single-pass write
+            # paths (overwrite/append) go fully lazy.
+            merge_terminal = (
+                thread.target.dimension is not None
+                or load_mode == "cdc"
+                or (thread.write is not None and thread.write.mode == "merge")
+            )
+
             # Resolve with: block CTEs before the primary DataFrame is set
             if thread.with_:
                 sources_map = _resolve_with_block(
@@ -437,7 +482,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             # Step 5 — primary DataFrame is the first declared source
             df = next(iter(sources_map.values()))
-            rows_read = df.count()
+            rows_read_obs: Observation | None = None
+            if merge_terminal:
+                rows_read = df.count()
+            else:
+                rows_read_obs = Observation()
+                df = df.observe(rows_read_obs, F.count(F.lit(1)).alias("n"))
 
             # Step 6 — run pipeline steps
             df = run_pipeline(
@@ -451,13 +501,17 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 lookup_meta=lookup_meta,
             )
 
-            # Capture intermediate row count for waterfall visualization.
-            # This count is also the FIRST action over the pipeline plan:
-            # Spark observations are fixed by the first completed execution,
-            # so the step statistics harvested later carry the values from
-            # this full-scale execution — removing or reordering this count
-            # changes which action fixes them.
-            rows_after_transforms = df.count()
+            # Intermediate row count for waterfall visualization. On
+            # merge-terminal paths this eager count is ALSO the first action
+            # over the plan — the one that fixes every observation with true
+            # full-scale values before the merge can zero-fire them. On
+            # single-pass paths it becomes an observation fixed by the write.
+            rows_after_transforms_obs: Observation | None = None
+            if merge_terminal:
+                rows_after_transforms = df.count()
+            else:
+                rows_after_transforms_obs = Observation()
+                df = df.observe(rows_after_transforms_obs, F.count(F.lit(1)).alias("n"))
 
             # Step 7 — run validation rules
             if thread.validations:
@@ -469,13 +523,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         f"Fatal validation failure in thread '{thread.name}'",
                     )
 
-                # Write quarantine rows if present
+                # Write quarantine rows if present. The union computes once:
+                # persist, count from cache, write only when rows exist (an
+                # all-clean run leaves the prior quarantine table untouched),
+                # sample from cache. Released in finally.
                 if outcome.quarantine_df is not None:
-                    rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
-                    with contextlib.suppress(Exception):
-                        quarantine_sample = (
-                            outcome.quarantine_df.limit(10).toPandas().to_dict("records")
-                        )
+                    quarantine_df_persisted = outcome.quarantine_df.persist(
+                        StorageLevel.MEMORY_AND_DISK
+                    )
+                    rows_quarantined = write_quarantine(spark, quarantine_df_persisted, target_path)
+                    if capture_samples:
+                        with contextlib.suppress(Exception):
+                            quarantine_sample = (
+                                quarantine_df_persisted.limit(10).toPandas().to_dict("records")
+                            )
 
                 # Continue with clean_df
                 df = outcome.clean_df
@@ -527,7 +588,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
-                df = apply_target_mapping(df, thread.target, spark)
+                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
                 if audit_columns and audit_ctx is not None:
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
@@ -542,6 +603,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     spark=spark,
                     target_path=target_path,
                 )
+                # Exports reuse one compute of the working DataFrame: the
+                # persist anchors here — after warp/drift, before the
+                # branch-specific write — the point common to all branches
+                # (the CDC branch deliberately skips target mapping, so
+                # mapping is not a valid anchor). Released in finally.
+                if thread.exports:
+                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
+                    working_df_persisted = df
 
                 # Seed phase (before merge)
                 if seed_config is not None or dim_config.seed_system_members:
@@ -556,13 +625,33 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                             on=seed_config.on if seed_config else "first_write",
                             rows=all_seed_rows,
                         )
-                        execute_seeds(spark, combined_seed, target_path, target_schema)
+                        execute_seeds(
+                            spark, combined_seed, target_path, target_schema, handle=target_handle
+                        )
+                        target_handle.refresh()
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
-                execute_dimension_merge(spark, df, dim_builder, target_path, run_timestamp)
-                rows_written = df.count()
+                if capture_samples:
+                    with contextlib.suppress(Exception):
+                        output_sample = df.limit(10).toPandas().to_dict("records")
+                was_first_write = not target_handle.exists()
+                merge_result = execute_dimension_merge(
+                    spark, df, dim_builder, target_path, run_timestamp, handle=target_handle
+                )
+                # Input-rows semantic. Quarantine-free merges need no new
+                # action: transforms after the eager rows_after_transforms
+                # count are column-only, so write-input rows equal it. With
+                # quarantined rows the subtraction would lie — quarantine
+                # frames are exploded one row per FAILED RULE, so a source
+                # row failing two rules subtracts twice — and the input df
+                # must be counted directly (exact beats cheap here). First
+                # writes report the commit's own numOutputRows.
+                if was_first_write:
+                    rows_written = merge_result.rows_inserted
+                elif rows_quarantined:
+                    rows_written = df.count()
+                else:
+                    rows_written = rows_after_transforms
 
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
                 # CDC merge routing (no dimension) — skip target column
@@ -582,19 +671,34 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     spark=spark,
                     target_path=target_path,
                 )
+                # Exports reuse one compute of the working DataFrame: the
+                # persist anchors here — after warp/drift, before the
+                # branch-specific write — the point common to all branches
+                # (the CDC branch deliberately skips target mapping, so
+                # mapping is not a valid anchor). Released in finally.
+                if thread.exports:
+                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
+                    working_df_persisted = df
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
+                if capture_samples:
+                    with contextlib.suppress(Exception):
+                        output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
                 cdc_counts = execute_cdc_merge(
-                    spark, df, target_path, cdc_write, thread.load.cdc, load_config=thread.load
+                    spark,
+                    df,
+                    target_path,
+                    cdc_write,
+                    thread.load.cdc,
+                    load_config=thread.load,
+                    handle=target_handle,
                 )
                 rows_written = sum(cdc_counts.values())
 
             else:
                 # Standard write path
-                df = apply_target_mapping(df, thread.target, spark)
+                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
                 if audit_columns and audit_ctx is not None:
                     df = inject_audit_columns(df, audit_columns, audit_ctx)
                     audit_columns_applied = list(audit_columns)
@@ -609,15 +713,27 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     spark=spark,
                     target_path=target_path,
                 )
+                # Exports reuse one compute of the working DataFrame: the
+                # persist anchors here — after warp/drift, before the
+                # branch-specific write — the point common to all branches
+                # (the CDC branch deliberately skips target mapping, so
+                # mapping is not a valid anchor). Released in finally.
+                if thread.exports:
+                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
+                    working_df_persisted = df
 
                 # General seed phase (non-dimension)
                 if seed_config is not None:
-                    execute_seeds(spark, seed_config, target_path, df.schema)
+                    execute_seeds(spark, seed_config, target_path, df.schema, handle=target_handle)
+                    target_handle.refresh()
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
-                rows_written = write_target(spark, df, thread.target, thread.write, target_path)
+                if capture_samples:
+                    with contextlib.suppress(Exception):
+                        output_sample = df.limit(10).toPandas().to_dict("records")
+                rows_written = write_target(
+                    spark, df, thread.target, thread.write, target_path, handle=target_handle
+                )
 
             # Step 13b — post-write fact sentinel advisory. Runs against
             # the written table, where columnar stats make per-column
@@ -746,8 +862,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     samples["quarantine"] = quarantine_sample
 
             # Harvest step observations — fulfilled by the write (or the
-            # last action that executed the plan). Best-effort by design.
+            # first action that executed the plan). Best-effort by design.
             step_stats = obs_registry.harvest() or None
+            if rows_read_obs is not None:
+                rr = read_observation(rows_read_obs)
+                rows_read = int(rr["n"]) if rr and rr.get("n") is not None else 0
+            if rows_after_transforms_obs is not None:
+                rat = read_observation(rows_after_transforms_obs)
+                rows_after_transforms = int(rat["n"]) if rat and rat.get("n") is not None else 0
 
             telemetry = _build_telemetry(
                 span_builder,
@@ -864,6 +986,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         # Cleanup thread-level lookups only; weave-level cleanup is the caller's job
         if thread_cached_lookups:
             cleanup_lookups(thread_cached_lookups)
+        if cdc_window_df is not None:
+            with contextlib.suppress(Exception):
+                cdc_window_df.unpersist()
+        if working_df_persisted is not None:
+            with contextlib.suppress(Exception):
+                working_df_persisted.unpersist()
+        if quarantine_df_persisted is not None:
+            with contextlib.suppress(Exception):
+                quarantine_df_persisted.unpersist()
 
 
 def _resolve_with_block(
@@ -919,11 +1050,12 @@ def _resolve_with_block(
         )
         if observations is not None and cte_registry is not None:
             observations.merge(cte_registry)
-        row_count = cte_df.count()
         enriched[cte_name] = cte_df
 
         if cte_builder is not None:
-            cte_builder.set_attribute("row_count", row_count)
+            # Collector-gated: the count exists only for the CTE span
+            # attribute — collector-less runs pay no CTE action at all
+            cte_builder.set_attribute("row_count", cte_df.count())
             cte_builder.set_attribute("from", cte.from_)
             cte_builder.set_attribute("step_count", len(cte.steps))
             span = cte_builder.finish()

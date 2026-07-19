@@ -388,6 +388,7 @@ fields win). Thread-scoped declarations are not applied. See the
 | `log_level` | `"minimal" \| "standard" \| "verbose" \| "debug"` | `"standard"` | Logging verbosity. An explicit `Context(log_level=...)` argument takes precedence. |
 | `trace` | `bool` | `True` | Collect execution spans. `false` at loom scope disables telemetry for the run; at weave scope, omits that weave's nodes. |
 | `max_parallel_threads` | `int >= 1` | `None` | Cap on concurrently executing threads per weave group. Unset means unbounded. |
+| `capture_samples` | `bool` | `false` | Capture 10-row output samples at write time. Preview always samples. |
 
 ---
 

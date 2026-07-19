@@ -2955,7 +2955,14 @@ def _render_execute_thread_detail(
     parts.append(_render_schema_table(getattr(tr, "output_schema", None)))
 
     # Data sample (output)
-    parts.append(_render_sample_table(getattr(tr, "samples", None), "output"))
+    samples_out = getattr(tr, "samples", None)
+    if samples_out and "output" in samples_out:
+        parts.append(_render_sample_table(samples_out, "output"))
+    else:
+        parts.append(
+            f'<p style="{_S_NONE}">Samples not captured — enable '
+            "<code>execution.capture_samples</code> to include output rows.</p>"
+        )
 
     # Quarantine sample
     parts.append(

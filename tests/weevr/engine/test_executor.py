@@ -810,7 +810,7 @@ class TestExecuteThreadConnections:
 
         captured_paths: list[str] = []
 
-        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg):
+        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None):
             captured_paths.append(path_arg)
             return df_arg.count()
 
@@ -850,7 +850,7 @@ class TestExecuteThreadConnections:
 
         captured_paths: list[str] = []
 
-        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg):
+        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None):
             captured_paths.append(path_arg)
             return df_arg.count()
 
@@ -1843,3 +1843,400 @@ class TestCteObservationScoping:
         # The CTE already rewrote A→alpha, so every row ('alpha','X','alpha')
         # is unmapped for the main step's A→alpha mapping
         assert stats["main.map.code"]["unmapped_count"] == 3
+
+
+@pytest.mark.spark
+class TestCaptureSamplesGate:
+    """Samples are opt-in: off fires no sampling, on attempts it."""
+
+    @staticmethod
+    def _thread(src: str, tgt: str) -> Thread:
+        return Thread.model_validate(
+            {
+                "name": "sample_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+
+    @pytest.fixture()
+    def topandas_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+        from pyspark.sql import DataFrame
+
+        calls: list[int] = []
+        original = DataFrame.toPandas
+
+        def _spy(self):  # type: ignore[no-untyped-def]
+            calls.append(1)
+            return original(self)
+
+        monkeypatch.setattr(DataFrame, "toPandas", _spy)
+        return calls
+
+    def test_off_by_default_no_sampling(
+        self, spark: SparkSession, tmp_delta_path, topandas_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("cs_src_off")
+        tgt = tmp_delta_path("cs_tgt_off")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        result = execute_thread(spark, self._thread(src, tgt))
+
+        assert result.status == "success"
+        assert topandas_spy == []  # zero sampling attempts
+        assert result.samples is None or "output" not in (result.samples or {})
+
+    def test_on_attempts_sampling(
+        self, spark: SparkSession, tmp_delta_path, topandas_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("cs_src_on")
+        tgt = tmp_delta_path("cs_tgt_on")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        result = execute_thread(spark, self._thread(src, tgt), capture_samples=True)
+
+        assert result.status == "success"
+        # The attempt is what the flag governs; content requires pandas
+        # (present on Fabric, optional in dev) and stays suppressed-on-error
+        assert len(topandas_spy) >= 1
+
+    def test_display_hint_when_samples_absent(self, spark: SparkSession, tmp_delta_path) -> None:
+        src = tmp_delta_path("cs_src_hint")
+        tgt = tmp_delta_path("cs_tgt_hint")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        from weevr.engine.display import _render_execute_thread_detail
+
+        result = execute_thread(spark, self._thread(src, tgt))
+        html_out = _render_execute_thread_detail(result, result.telemetry, None)
+        assert "capture_samples" in html_out  # the hint names the switch
+
+
+@pytest.mark.spark
+class TestTargetHandle:
+    """One existence resolution per thread; refresh after own commits."""
+
+    @pytest.fixture()
+    def probe_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        """Count real existence probes across every consuming module."""
+        from weevr import delta as delta_mod
+
+        calls: list[str] = []
+        original = delta_mod.delta_table_exists
+
+        def _spy(spark, path):  # type: ignore[no-untyped-def]
+            calls.append(path)
+            return original(spark, path)
+
+        # Patch the source module (the handle reads it) and each module
+        # still holding a direct reference from `from weevr.delta import ...`
+        # (dimension.py probes exclusively through the handle now)
+        import weevr.operations.seeding as seed_mod
+        import weevr.operations.writers as writers_mod
+
+        monkeypatch.setattr(delta_mod, "delta_table_exists", _spy)
+        monkeypatch.setattr(writers_mod, "delta_table_exists", _spy)
+        monkeypatch.setattr(seed_mod, "delta_table_exists", _spy)
+        return calls
+
+    def test_standard_path_probes_once(
+        self, spark: SparkSession, tmp_delta_path, probe_spy: list[str]
+    ) -> None:
+        src = tmp_delta_path("th_src")
+        tgt = tmp_delta_path("th_tgt")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "handle_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        target_probes = [p for p in probe_spy if p == tgt]
+        assert len(target_probes) == 1  # one resolution, cached thereafter
+
+    def test_seed_commit_refreshes_existence(
+        self, spark: SparkSession, tmp_delta_path, probe_spy: list[str]
+    ) -> None:
+        # first_write seeds fire on a fresh table (probe: absent), then the
+        # seed commit refreshes the handle so the write path re-observes
+        # (probe: present) — exactly today's two independent-probe outcomes,
+        # through one mechanism
+        src = tmp_delta_path("th_seed_src")
+        tgt = tmp_delta_path("th_seed_tgt")
+        spark.createDataFrame([{"id": 1, "name": "x"}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "handle_seed_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {
+                    "path": tgt,
+                    "seed": {"on": "first_write", "rows": [{"id": -1, "name": "seed"}]},
+                },
+                "write": {"mode": "append"},
+            }
+        )
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success", result.error
+        target = spark.read.format("delta").load(tgt)
+        assert target.count() == 2  # seed row + data row (append saw table exists)
+        target_probes = [p for p in probe_spy if p == tgt]
+        assert len(target_probes) == 2  # pre-seed probe + post-refresh probe
+
+
+@pytest.mark.spark
+class TestLazyExecutorCounts:
+    """rows_read/rows_after_transforms via observations on single-pass paths."""
+
+    def test_overwrite_path_counts_parity_zero_actions(
+        self, spark: SparkSession, tmp_delta_path, spark_action_counter
+    ) -> None:
+        src = tmp_delta_path("lc_src")
+        tgt = tmp_delta_path("lc_tgt")
+        spark.createDataFrame([{"id": i} for i in range(7)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "lazy_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"filter": {"expr": "id < 5"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        start = spark_action_counter["total"]
+        result = execute_thread(spark, thread)
+        actions = spark_action_counter["total"] - start
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.rows_read == 7
+        assert result.telemetry.rows_after_transforms == 5
+        assert result.rows_written == 5
+        # No count()/collect() actions beyond write_target's remaining
+        # eager rows count (removed by the commit-metrics task)
+        assert actions == 1
+
+    def test_merge_path_keeps_eager_counts(self, spark: SparkSession, tmp_delta_path) -> None:
+        # Merge-terminal threads keep true values — the eager count is the
+        # observation-fixing action, never the merge's zero-fire
+        src = tmp_delta_path("lc_m_src")
+        tgt = tmp_delta_path("lc_m_tgt")
+        spark.createDataFrame([{"id": 1, "v": "a"}, {"id": 2, "v": "b"}]).write.format(
+            "delta"
+        ).save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "lazy_m_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert result.telemetry.rows_read == 2
+        assert result.telemetry.rows_after_transforms == 2
+
+
+@pytest.mark.spark
+class TestPersistBoundaries:
+    """Exports and quarantine reuse one compute; unpersist always runs."""
+
+    @pytest.fixture()
+    def unpersist_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+        """Count DataFrame.unpersist calls (Delta internals cache RDDs of
+        their own, so asserting on the global persistent-RDD registry is
+        noise — the release INVOCATION is the engine's contract)."""
+        from pyspark.sql import DataFrame
+
+        calls: list[int] = []
+        original = DataFrame.unpersist
+
+        def _spy(inner_self, blocking=False):  # type: ignore[no-untyped-def]
+            calls.append(1)
+            return original(inner_self, blocking)
+
+        monkeypatch.setattr(DataFrame, "unpersist", _spy)
+        return calls
+
+    def test_exports_share_one_compute_and_unpersist(
+        self, spark: SparkSession, tmp_delta_path, unpersist_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("pb_src")
+        tgt = tmp_delta_path("pb_tgt")
+        exp1 = tmp_delta_path("pb_exp1")
+        exp2 = tmp_delta_path("pb_exp2")
+        spark.createDataFrame([{"id": i} for i in range(4)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "pb_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "exports": [
+                    {"name": "e1", "type": "delta", "path": exp1},
+                    {"name": "e2", "type": "delta", "path": exp2},
+                ],
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+
+        # Both exports carry this run's output
+        assert spark.read.format("delta").load(exp1).count() == 4
+        assert spark.read.format("delta").load(exp2).count() == 4
+        assert len(unpersist_spy) >= 1  # working-df persist released in finally
+
+    def test_all_clean_run_leaves_quarantine_untouched(
+        self, spark: SparkSession, tmp_delta_path, unpersist_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("pb_q_src")
+        tgt = tmp_delta_path("pb_q_tgt")
+        spark.createDataFrame([{"id": 1, "v": 5}, {"id": 2, "v": -1}]).write.format("delta").save(
+            src
+        )
+
+        cfg = {
+            "name": "pb_q_t",
+            "config_version": "1",
+            "sources": {"main": {"type": "delta", "alias": src}},
+            "steps": [],
+            "target": {"path": tgt},
+            "write": {"mode": "overwrite"},
+            "validations": [{"rule": "v >= 0", "severity": "error", "name": "v_nonneg"}],
+        }
+        result = execute_thread(spark, Thread.model_validate(cfg))
+        assert result.status == "success", result.error
+        assert result.telemetry is not None and result.telemetry.rows_quarantined == 1
+        q = spark.read.format("delta").load(tgt + "_quarantine")
+        assert q.count() == 1
+
+        # All-clean second run against a clean source: prior quarantine
+        # rows remain untouched
+        src2 = tmp_delta_path("pb_q_src2")
+        spark.createDataFrame([{"id": 3, "v": 7}]).write.format("delta").save(src2)
+        cfg2 = dict(cfg)
+        cfg2["sources"] = {"main": {"type": "delta", "alias": src2}}
+        unpersist_spy.clear()
+        result2 = execute_thread(spark, Thread.model_validate(cfg2))
+        assert result2.status == "success"
+        assert spark.read.format("delta").load(tgt + "_quarantine").count() == 1
+        assert len(unpersist_spy) >= 1  # quarantine persist released in finally
+
+
+@pytest.mark.spark
+class TestFindingsRegression:
+    """Locks for the review-round fixes."""
+
+    def test_dimension_rows_written_with_multi_rule_quarantine(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        # One row fails TWO error rules → quarantine explodes to 2 rows;
+        # rows_written must still count write-input rows (2), not
+        # rows_after_transforms − exploded (3 − 2 = 1)
+        src = tmp_delta_path("fr_dim_src")
+        tgt = tmp_delta_path("fr_dim_tgt")
+        spark.createDataFrame(
+            [
+                {"customer_id": "C1", "v": 5, "w": 5},
+                {"customer_id": "C2", "v": 5, "w": 5},
+                {"customer_id": "C3", "v": -1, "w": -1},
+            ]
+        ).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "fr_dim_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {
+                    "path": tgt,
+                    "dimension": {
+                        "business_key": ["customer_id"],
+                        "surrogate_key": {"name": "_sk", "columns": ["customer_id"]},
+                    },
+                },
+                "validations": [
+                    {"rule": "v >= 0", "severity": "error", "name": "v_ok"},
+                    {"rule": "w >= 0", "severity": "error", "name": "w_ok"},
+                ],
+            }
+        )
+        # First run creates the table; second run exercises the merge path
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+        result2 = execute_thread(spark, thread)
+        assert result2.status == "success", result2.error
+
+        telem = result2.telemetry
+        assert telem is not None
+        assert telem.rows_quarantined == 2  # exploded per rule (existing semantic)
+        assert result2.rows_written == 2  # C1, C2 — never 1
+
+    def test_failing_write_still_unpersists(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The B-007 lesson: a failure mid-write must not leak the export
+        # persist — the finally block releases every boundary
+        from pyspark.sql import DataFrame
+
+        from weevr.engine import executor as executor_mod
+
+        unpersists: list[int] = []
+        original_unpersist = DataFrame.unpersist
+
+        def _unpersist_spy(inner_self, blocking=False):  # type: ignore[no-untyped-def]
+            unpersists.append(1)
+            return original_unpersist(inner_self, blocking)
+
+        def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("write exploded")
+
+        monkeypatch.setattr(DataFrame, "unpersist", _unpersist_spy)
+        monkeypatch.setattr(executor_mod, "write_target", _boom)
+
+        src = tmp_delta_path("fr_fail_src")
+        tgt = tmp_delta_path("fr_fail_tgt")
+        exp = tmp_delta_path("fr_fail_exp")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "fr_fail_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "exports": [{"name": "e1", "type": "delta", "path": exp}],
+            }
+        )
+        from weevr.errors.exceptions import ExecutionError
+
+        with pytest.raises(ExecutionError, match="write exploded"):
+            execute_thread(spark, thread)
+        assert len(unpersists) >= 1  # the export persist was released

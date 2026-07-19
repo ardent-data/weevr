@@ -337,6 +337,25 @@ def read_source_incremental(
     return df, new_hwm
 
 
+def compute_generic_cdc_hwm(df: DataFrame, load_config: LoadConfig) -> str | None:
+    """High-water mark of a generic CDC change window: max of the typed column.
+
+    Window-scale. Run this against the PERSISTED window when one exists so
+    the captured value matches the rows every later action processes.
+    """
+    if load_config.watermark_column is None:
+        return None
+    typed = typed_watermark_col(
+        load_config.watermark_column,
+        load_config.watermark_type,
+        load_config.watermark_format,
+    )
+    hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
+    if hwm_row and hwm_row[0]["hwm"] is not None:
+        return str(hwm_row[0]["hwm"])
+    return None
+
+
 def read_cdc_source(
     spark: SparkSession,
     source: Source,
@@ -346,6 +365,7 @@ def read_cdc_source(
     load_config: LoadConfig | None = None,
     prior_state: WatermarkState | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
+    compute_hwm: bool = True,
 ) -> tuple[DataFrame, str | None]:
     """Read a CDC source, optionally narrowed by a watermark filter.
 
@@ -380,6 +400,9 @@ def read_cdc_source(
             a ``watermark_column``.
         connections: Named connection declarations forwarded to the
             read.
+        compute_hwm: When False the generic-preset HWM aggregation is
+            skipped; the caller recomputes via :func:`compute_generic_cdc_hwm`
+            against its persisted window.
 
     Returns:
         Tuple of ``(DataFrame, new_hwm_value)``. ``new_hwm_value`` is
@@ -417,17 +440,13 @@ def read_cdc_source(
         df = df.filter(filter_expr)
 
     # Capture HWM from the filtered DataFrame *before* operation routing
-    # so D rows still advance the window (DEC-003).
+    # so D rows still advance the window (DEC-003). Callers that persist
+    # the window pass compute_hwm=False and recompute from the pinned
+    # frame instead — this read is lazy, so a value captured here could
+    # otherwise diverge from the rows a later action actually processes.
     new_hwm: str | None = None
-    if load_config is not None and load_config.watermark_column is not None:
-        typed = typed_watermark_col(
-            load_config.watermark_column,
-            load_config.watermark_type,
-            load_config.watermark_format,
-        )
-        hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
-        if hwm_row and hwm_row[0]["hwm"] is not None:
-            new_hwm = str(hwm_row[0]["hwm"])
+    if compute_hwm and load_config is not None and load_config.watermark_column is not None:
+        new_hwm = compute_generic_cdc_hwm(df, load_config)
 
         if load_config.watermark_format is not None:
             logger.debug(

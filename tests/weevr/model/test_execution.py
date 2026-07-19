@@ -141,3 +141,21 @@ class TestResolveEffectiveExecution:
         assert eff.max_parallel_threads == 2
         assert eff.log_level == LogLevel.DEBUG
         assert eff.trace is True
+
+
+class TestCaptureSamples:
+    """capture_samples participates in the field-level effective merge."""
+
+    def test_default_is_off(self):
+        assert ExecutionConfig().capture_samples is False
+
+    def test_loom_setting_inherited_by_weave(self):
+        loom = ExecutionConfig(capture_samples=True)
+        eff = resolve_effective_execution(loom, ExecutionConfig())
+        assert eff.capture_samples is True
+
+    def test_weave_override_wins(self):
+        loom = ExecutionConfig(capture_samples=True)
+        weave = ExecutionConfig(capture_samples=False)
+        eff = resolve_effective_execution(loom, weave)
+        assert eff.capture_samples is False

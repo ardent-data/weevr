@@ -54,6 +54,18 @@ def _get_with_timeout(observation: Observation, timeout: float) -> dict[str, Any
     return result[0]
 
 
+def read_observation(observation: Observation) -> dict[str, Any] | None:
+    """Best-effort read of one observation's values.
+
+    Same posture as registry harvest: timeout-guarded, never raises —
+    an unfulfilled observation yields None.
+    """
+    try:
+        return _get_with_timeout(observation, _HARVEST_TIMEOUT_S)
+    except Exception:
+        return None
+
+
 @dataclass
 class _Entry:
     key: str

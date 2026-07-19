@@ -257,7 +257,16 @@ depends on what was executed:
 `ThreadTelemetry` is the most detailed telemetry object. It includes:
 
 - **span** -- The thread's execution span
-- **rows_read**, **rows_written**, **rows_quarantined** -- Row counts
+- **rows_read**, **rows_written**, **rows_quarantined** -- Row counts.
+  On single-pass write paths, `rows_read` and `rows_written` are
+  computed as byproducts of the write itself (query observations and
+  Delta commit metrics) rather than by separate Spark jobs; a
+  quarantine count runs only when validation actually quarantined
+  rows, against the cached quarantine frame. When a commit-metrics
+  read fails or a concurrent writer commits between the write and the
+  read, the count degrades to zero with a logged warning — a wrong
+  number is never reported. Merge-based paths (dimensions, CDC, merge
+  write mode) retain direct counts.
 - **validation_results** -- Per-rule pass/fail counts and severity
 - **assertion_results** -- Post-write assertion outcomes
 - **load_mode** -- The load mode used (full, incremental, CDC)
@@ -285,6 +294,26 @@ depends on what was executed:
   and may change without notice. In preview mode the values are
   sample-scoped (they reflect the sampled rows, not the full
   source), and are present only when sample capture succeeded.
+
+### Dimension merge metrics
+
+Dimension writes report merge outcomes derived from the Delta commit's
+split update keys — never the conflated `numTargetRowsUpdated`
+aggregate, which folds soft-delete stamps into the same number as
+version closes:
+
+- `rows_versioned` — current rows closed (a new version was inserted)
+- `rows_inserted` — genuinely new entities (new-version inserts are
+  excluded arithmetically)
+- `rows_deleted` — hard deletes plus soft-delete stamps from
+  `on_no_match_source`
+
+`rows_unchanged` is intentionally absent: no Delta metric expresses it
+(`numTargetRowsCopied` is a file-rewrite artifact, not a logical
+count), and deriving it arithmetically risks a wrong number under
+quarantine and seeding edge cases. When metrics cannot be read — or a
+concurrent writer's commit makes attribution unsafe — the fields stay
+zero and a warning is logged.
 
 ### Weave telemetry fields
 
