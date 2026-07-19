@@ -10850,7 +10850,7 @@ File paths contain slashes or URI schemes (<code>://</code>).</p>
 
 
 <h3 id="weevr.context.execute_thread" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookup_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">capture_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_thread</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">thread</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolved_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookup_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">capture_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">cache_registry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">uk_memo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_thread" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -11132,6 +11132,42 @@ Off by default — sampling re-executes the pipeline lineage.</p>
             </td>
             <td>
                   <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cache_registry</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="CacheManager (weevr.engine.cache_manager.CacheManager)" href="../engine/#weevr.engine.CacheManager">CacheManager</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weave-level cache registry; Delta-backed sources
+whose canonical identity matches a registered producer are
+served the post-write snapshot instead of a storage read.
+A miss falls back to a direct read.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>uk_memo</code>
+            </td>
+            <td>
+                  <code><span title="weevr.engine.lookups.UniqueKeyMemo">UniqueKeyMemo</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-weave validate-exactly-once memo for non-materialized
+<code>unique_key</code> lookups.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -11551,7 +11587,7 @@ caller gave an explicit runtime override.</p>
 
 
 <h3 id="weevr.context.execute_weave" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_lookup_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">execute_weave</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">thread_conditions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">weave_span_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">post_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">loom_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">weave_name</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_cached_lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_lookup_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_resolved_column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pre_column_set_results</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.context.execute_weave" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -11906,6 +11942,42 @@ the pool is sized to the group.</p>
               <div class="doc-md-description">
                 <p>Materialization-time lookup facts from the parent
 scope (loom), merged under weave-level facts at dispatch.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>pre_resolved_column_sets</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loom-level column sets already resolved
+once at loom start (the <code>pre_cached_lookups</code> analogue —
+overridden keys excluded by the caller so weave precedence
+re-resolves them). Merged under weave-level resolutions.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>pre_column_set_results</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="weevr.telemetry.results.ColumnSetResult">ColumnSetResult</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resolution results for the pre-resolved
+sets, carried into weave telemetry for value parity.</p>
               </div>
             </td>
             <td>
