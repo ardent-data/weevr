@@ -1207,3 +1207,60 @@ class TestBroadcastPolicy:
             fact, self._params(), _dim_df(spark), lookup_meta=LookupMeta(size_in_bytes=1)
         )
         assert sorted(map(str, plain.df.collect())) == sorted(map(str, hinted.df.collect()))
+
+
+class TestObservedMapAndFallbackStats:
+    """Map validate-mode and missing-lookup fallback stats go lazy."""
+
+    def test_map_unmapped_count_parity(self, spark: SparkSession, spark_action_counter) -> None:
+        from weevr.model.pipeline import MapParams
+        from weevr.operations.pipeline import ObservationRegistry
+        from weevr.operations.pipeline.value_mapping import apply_map
+
+        df = spark.createDataFrame([("A",), ("B",), ("Z",), (None,)], _fact_schema("code"))
+        params = MapParams(column="code", values={"A": "1", "B": "2"}, unmapped="validate")
+
+        eager = apply_map(df, params)
+        assert eager.metadata["unmapped_count"] == 1  # Z; nulls excluded
+
+        registry = ObservationRegistry(scope="main")
+        start = spark_action_counter["total"]
+        observed = apply_map(df, params, observations=registry)
+        assert spark_action_counter["total"] - start == 0  # no eager action
+        assert "unmapped_count" not in observed.metadata
+
+        observed.df.collect()
+        stats = registry.harvest()
+        assert stats["main.map.code"]["unmapped_count"] == 1
+
+    def test_missing_lookup_fallback_count_observed(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.model.pipeline import ResolveStep
+        from weevr.operations.pipeline import ObservationRegistry, run_pipeline
+
+        df = spark.createDataFrame([("A",), ("B",)], _fact_schema("bk"))
+        step = ResolveStep(
+            resolve=ResolveParams(
+                name="fk",
+                lookup="missing_dim",
+                match={"bk": "natural_id"},
+                pk="id",
+                on_failure="warn",
+            )
+        )
+        registry = ObservationRegistry(scope="main")
+        start = spark_action_counter["total"]
+        out = run_pipeline(df, [step], {}, observations=registry)
+        assert spark_action_counter["total"] - start == 0  # fallback no longer counts
+
+        out.collect()
+        stats = registry.harvest()
+        assert stats["main.resolve.fk"] == {
+            "total": 2,
+            "matched": 0,
+            "unknown": 2,
+            "invalid": 0,
+            "duplicates": 0,
+            "match_rate": 0.0,
+        }

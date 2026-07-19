@@ -97,7 +97,6 @@ _STEP_HANDLERS: dict[type, StepHandler] = {
     DateOpsStep: lambda df, step, _src: StepResult(apply_date_ops(df, step.date_ops)),
     # Transform step extensions
     ConcatStep: lambda df, step, _src: apply_concat(df, step.concat),
-    MapStep: lambda df, step, _src: apply_map(df, step.map),
     FormatStep: lambda df, step, _src: apply_format(df, step.format),
 }
 
@@ -190,6 +189,24 @@ def run_pipeline(
                     params.on_unknown,
                 )
                 fallback_df = result.withColumn(params.name, F.lit(params.on_unknown))
+                if observations is not None:
+                    # Total arrives with the terminal action; every row is
+                    # unknown by construction, the rest of the stats are
+                    # zeros derived from it.
+                    obs = observations.create(
+                        step="resolve",
+                        name=params.name,
+                        derive=lambda v: {
+                            "total": int(v.get("total") or 0),
+                            "matched": 0,
+                            "unknown": int(v.get("total") or 0),
+                            "invalid": 0,
+                            "duplicates": 0,
+                            "match_rate": 0.0,
+                        },
+                    )
+                    fallback_df = fallback_df.observe(obs, F.count(F.lit(1)).alias("total"))
+                    return StepResult(fallback_df, metadata={})
                 total = fallback_df.count()
                 return StepResult(
                     fallback_df,
@@ -225,6 +242,9 @@ def run_pipeline(
                 result = step_result.df
             elif isinstance(step, ResolveStep):
                 step_result = _dispatch_resolve(result, step)
+                result = step_result.df
+            elif isinstance(step, MapStep):
+                step_result = apply_map(result, step.map, observations=observations)
                 result = step_result.df
             else:
                 handler = _STEP_HANDLERS.get(type(step))
