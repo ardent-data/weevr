@@ -23,9 +23,12 @@ class LookupMeta:
         unique_key_passed: The check's outcome, when it ran.
         size_in_bytes: Delta snapshot size of the lookup's source table,
             when known — evidence for the broadcast hint policy.
+        broadcast_declared: Whether the user declared ``strategy:
+            broadcast`` on a materialized lookup.
     """
 
     key_columns: tuple[str, ...] | None = None
     unique_key_checked: bool = False
     unique_key_passed: bool | None = None
     size_in_bytes: int | None = None
+    broadcast_declared: bool = False

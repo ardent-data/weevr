@@ -159,6 +159,8 @@ def apply_resolve(
     # unconditionally (a BK legitimately carries multiple versions).
     # ---------------------------------------------------------------
     pk_col = f"__lkp__.{params.pk}"
+    if _should_broadcast(lookup_meta, df.sparkSession):
+        lookup_df = F.broadcast(lookup_df)
     lkp_aliased = lookup_df.alias("__lkp__")
 
     plain_bk = params.effective is None
@@ -313,6 +315,45 @@ def apply_resolve(
         result_df,
         metadata={"resolve_stats": {params.name: stats}},
     )
+
+
+def _parse_size_bytes(value: str) -> int | None:
+    """Parse Spark's byte-valued threshold strings (``10485760b``, ``10m``)."""
+    v = value.strip().lower()
+    multipliers = {"k": 1024, "m": 1024**2, "g": 1024**3}
+    try:
+        if v.endswith("b"):
+            v = v[:-1]
+        if v and v[-1] in multipliers:
+            return int(v[:-1]) * multipliers[v[-1]]
+        return int(v)
+    except ValueError:
+        return None
+
+
+def _should_broadcast(meta: LookupMeta | None, spark: Any) -> bool:
+    """Broadcast policy: declared strategy, or size confidently known small.
+
+    The size clause compares the source table's Delta snapshot bytes — a
+    conservative upper bound for the narrowed lookup — against
+    ``spark.sql.autoBroadcastJoinThreshold``. No evidence, disabled
+    threshold, or unparsable configuration means no hint: AQE decides.
+    Never forces an unknown-size lookup onto the driver.
+    """
+    if meta is None:
+        return False
+    if meta.broadcast_declared:
+        return True
+    if meta.size_in_bytes is None:
+        return False
+    try:
+        raw = spark.conf.get("spark.sql.autoBroadcastJoinThreshold", "10485760b")
+    except Exception:
+        return False
+    threshold = _parse_size_bytes(raw or "")
+    if threshold is None or threshold <= 0:
+        return False
+    return meta.size_in_bytes <= threshold
 
 
 def _uniqueness_reusable(

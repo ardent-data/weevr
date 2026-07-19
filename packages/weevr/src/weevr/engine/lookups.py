@@ -40,6 +40,8 @@ class LookupResult(FrozenBase):
         filter_applied: Whether a filter expression was applied.
         unique_key_checked: Whether a unique-key check was performed.
         unique_key_passed: Result of the unique-key check, if performed.
+        source_size_bytes: Delta snapshot size of the source table, when
+            resolvable — evidence for the broadcast hint policy.
     """
 
     name: str
@@ -52,6 +54,49 @@ class LookupResult(FrozenBase):
     filter_applied: bool = False
     unique_key_checked: bool = False
     unique_key_passed: bool | None = None
+    source_size_bytes: int | None = None
+
+
+def _delta_source_size(
+    spark: SparkSession,
+    source: Source,
+    connections: dict[str, OneLakeConnection] | None,
+) -> int | None:
+    """Best-effort Delta snapshot size for a lookup source, in bytes.
+
+    A driver-side Delta log read — no Spark jobs. Returns None for
+    non-Delta sources or any resolution failure; absence of evidence
+    simply means no size-based broadcast hint.
+    """
+    try:
+        from delta.tables import DeltaTable
+
+        if source.connection:
+            if not connections or source.connection not in connections:
+                return None
+            from weevr.config.paths import build_onelake_path
+
+            conn = connections[source.connection]
+            if source.table is None:
+                return None
+            location = build_onelake_path(conn, source.schema_override, source.table)
+            table = DeltaTable.forPath(spark, location)
+        elif source.type == "delta" and source.alias is not None:
+            from weevr.config.paths import resolve_fuse_path
+            from weevr.delta import is_table_alias
+
+            if is_table_alias(source.alias):
+                table = DeltaTable.forName(spark, source.alias)
+            else:
+                table = DeltaTable.forPath(spark, resolve_fuse_path(source.alias, spark))
+        else:
+            return None
+        detail = table.detail().collect()[0]
+        size = detail["sizeInBytes"]
+        return int(size) if size is not None else None
+    except Exception:
+        logger.debug("Could not resolve Delta size for lookup source", exc_info=True)
+        return None
 
 
 def build_lookup_meta(
@@ -75,6 +120,8 @@ def build_lookup_meta(
             key_columns=tuple(r.key_columns) if r.key_columns else None,
             unique_key_checked=r.unique_key_checked,
             unique_key_passed=r.unique_key_passed,
+            size_in_bytes=r.source_size_bytes,
+            broadcast_declared=r.materialized and r.strategy == "broadcast",
         )
     return meta
 
@@ -221,6 +268,7 @@ def materialize_lookups(
         start = time.monotonic()
         try:
             df = read_source(spark, name, lookup.source, connections=connections)
+            source_size = _delta_source_size(spark, lookup.source, connections)
 
             # Apply narrow pipeline (filter → project → unique_key)
             df, filter_applied, uk_checked, uk_passed = _apply_narrow_pipeline(df, lookup, name)
@@ -250,6 +298,7 @@ def materialize_lookups(
                     filter_applied=filter_applied,
                     unique_key_checked=uk_checked,
                     unique_key_passed=uk_passed,
+                    source_size_bytes=source_size,
                 )
             )
 

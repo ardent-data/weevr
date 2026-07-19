@@ -1152,3 +1152,58 @@ class TestDuplicateGatePathSelection:
         apply_resolve(fact, self._params(), _dim_df(spark), observations=registry, lookup_meta=meta)
         # Declared unique key covers different columns than this join
         assert spark_action_counter["total"] - start == 1
+
+
+# ---------------------------------------------------------------------------
+# Broadcast hint policy
+# ---------------------------------------------------------------------------
+
+
+class TestBroadcastPolicy:
+    """Hint present for declared/known-small; absent for unknown size."""
+
+    @staticmethod
+    def _params() -> ResolveParams:
+        return ResolveParams(name="fk", lookup="dim", match={"bk": "natural_id"}, pk="id")
+
+    @staticmethod
+    def _analyzed_plan(df: Any) -> str:
+        return str(df._jdf.queryExecution().analyzed())
+
+    def _resolve_with_meta(self, spark: SparkSession, meta):  # type: ignore[no-untyped-def]
+        fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
+        return apply_resolve(fact, self._params(), _dim_df(spark), lookup_meta=meta)
+
+    def test_declared_broadcast_hints(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta(broadcast_declared=True))
+        assert "broadcast" in self._analyzed_plan(result.df).lower()
+
+    def test_known_small_hints(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta(size_in_bytes=1024))
+        assert "broadcast" in self._analyzed_plan(result.df).lower()
+
+    def test_unknown_size_defers_to_aqe(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta())
+        assert "broadcast" not in self._analyzed_plan(result.df).lower()
+
+    def test_large_size_defers_to_aqe(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        result = self._resolve_with_meta(spark, LookupMeta(size_in_bytes=1 << 40))
+        assert "broadcast" not in self._analyzed_plan(result.df).lower()
+
+    def test_results_identical_with_hint(self, spark: SparkSession) -> None:
+        from weevr.operations.pipeline import LookupMeta
+
+        fact = spark.createDataFrame([("A",), ("C",), (None,)], _fact_schema("bk"))
+        plain = apply_resolve(fact, self._params(), _dim_df(spark))
+        hinted = apply_resolve(
+            fact, self._params(), _dim_df(spark), lookup_meta=LookupMeta(size_in_bytes=1)
+        )
+        assert sorted(map(str, plain.df.collect())) == sorted(map(str, hinted.df.collect()))
