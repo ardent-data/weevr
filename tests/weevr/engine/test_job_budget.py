@@ -147,3 +147,93 @@ class TestSingleSourceScan:
         with job_counter() as jc_terminal:
             df.collect()
         assert jc_terminal.jobs > 0  # exactly one action executed the chain
+
+
+@pytest.mark.spark
+class TestThreadActionBudget:
+    """The headline invariant: a gate-free thread pays the write, only.
+
+    "Fact-scale eager action" here means the Python-side patterns the
+    boundary work removed — DataFrame.count()/toPandas() on working
+    lineage. Driver-side commit-log reads (history(1).collect()) are the
+    design's accepted metadata cost and are not counted.
+    """
+
+    @pytest.fixture()
+    def eager_spies(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
+        from pyspark.sql import DataFrame
+
+        spies: dict[str, list[int]] = {"count": [], "toPandas": []}
+        orig_count = DataFrame.count
+        orig_topandas = DataFrame.toPandas
+
+        def _count(inner_self):  # type: ignore[no-untyped-def]
+            spies["count"].append(1)
+            return orig_count(inner_self)
+
+        def _topandas(inner_self):  # type: ignore[no-untyped-def]
+            spies["toPandas"].append(1)
+            return orig_topandas(inner_self)
+
+        monkeypatch.setattr(DataFrame, "count", _count)
+        monkeypatch.setattr(DataFrame, "toPandas", _topandas)
+        return spies
+
+    def test_gate_free_thread_zero_eager_actions(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+
+        src = tmp_delta_path("budget_gate_src")
+        tgt = tmp_delta_path("budget_gate_tgt")
+        spark.createDataFrame([{"id": i} for i in range(6)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "budget_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"filter": {"expr": "id < 4"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success", result.error
+        # No validations, no warp, no exports, samples off → the write is
+        # the only fact-scale execution; telemetry still arrives
+        assert eager_spies["count"] == []
+        assert eager_spies["toPandas"] == []
+        assert result.telemetry is not None
+        assert result.telemetry.rows_read == 6
+        assert result.telemetry.rows_after_transforms == 4
+        assert result.rows_written == 4
+
+    def test_exports_add_no_eager_actions(
+        self, spark: SparkSession, tmp_delta_path, eager_spies: dict[str, list[int]]
+    ) -> None:
+        from weevr.engine import execute_thread
+        from weevr.model.thread import Thread
+
+        src = tmp_delta_path("budget_exp_src")
+        tgt = tmp_delta_path("budget_exp_tgt")
+        exp = tmp_delta_path("budget_exp_out")
+        spark.createDataFrame([{"id": i} for i in range(3)]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "budget_exp_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "exports": [{"name": "e1", "type": "delta", "path": exp}],
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+        assert eager_spies["count"] == []  # export rides the persisted frame
+        assert spark.read.format("delta").load(exp).count() == 3
