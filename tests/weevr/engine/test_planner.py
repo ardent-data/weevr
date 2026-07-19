@@ -770,3 +770,78 @@ class TestExecutionPlanDisplay:
         # Thread names appear in the HTML
         assert ">a<" in html_out
         assert ">b<" in html_out
+
+
+class TestConnectionFormIdentity:
+    """Connection-declared targets/sources join dependency + conflict analysis."""
+
+    _CONN = {
+        "lake": {
+            "type": "onelake",
+            "workspace": "ws-guid",
+            "lakehouse": "lh-guid",
+        }
+    }
+
+    def _producer(self) -> Thread:
+        return Thread.model_validate(
+            {
+                "name": "producer",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
+                "steps": [],
+                "target": {"connection": "lake", "table": "shared_dim"},
+                "connections": self._CONN,
+            }
+        )
+
+    def test_connection_reader_depends_on_connection_writer(self):
+        consumer = Thread.model_validate(
+            {
+                "name": "consumer",
+                "config_version": "1.0",
+                "sources": {"main": {"connection": "lake", "table": "shared_dim"}},
+                "steps": [],
+                "target": {"path": "/tmp/out"},
+                "connections": self._CONN,
+            }
+        )
+        threads = {"producer": self._producer(), "consumer": consumer}
+        plan = build_plan("w", threads, _entries("producer", "consumer"))
+        assert "producer" in plan.dependencies["consumer"]
+        # Sequential groups: the reader never shares a group with its writer
+        producer_group = next(i for i, g in enumerate(plan.execution_order) if "producer" in g)
+        consumer_group = next(i for i, g in enumerate(plan.execution_order) if "consumer" in g)
+        assert consumer_group > producer_group
+
+    def test_two_connection_writers_same_table_rejected(self):
+        writer_b = Thread.model_validate(
+            {
+                "name": "writer_b",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": "raw.other"}},
+                "steps": [],
+                "target": {"connection": "lake", "table": "shared_dim"},
+                "connections": self._CONN,
+            }
+        )
+        threads = {"producer": self._producer(), "writer_b": writer_b}
+        with pytest.raises(ConfigError):
+            build_plan("w", threads, _entries("producer", "writer_b"))
+
+    def test_path_reader_of_connection_writer_gets_edge(self):
+        # A consumer declaring the literal abfss URI meets the connection
+        # writer on the same normalized identity
+        abfss = "abfss://ws-guid@onelake.dfs.fabric.microsoft.com/lh-guid/Tables/shared_dim"
+        consumer = Thread.model_validate(
+            {
+                "name": "consumer",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": abfss}},
+                "steps": [],
+                "target": {"path": "/tmp/out2"},
+            }
+        )
+        threads = {"producer": self._producer(), "consumer": consumer}
+        plan = build_plan("w", threads, _entries("producer", "consumer"))
+        assert "producer" in plan.dependencies["consumer"]

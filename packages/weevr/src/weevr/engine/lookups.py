@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
@@ -99,6 +100,48 @@ def _delta_source_size(
         return None
 
 
+class UniqueKeyMemo:
+    """Validate-exactly-once memo for non-materialized lookups, per weave.
+
+    ``materialize: false`` keeps the user's per-thread re-read, but the
+    unique-key validation memoizes by lookup name: the first consumer
+    validates, the rest reuse the outcome — including a failure outcome.
+    Same-group threads run concurrently, so the check-and-set holds a
+    lock for the duration of the winner's validation; losers block on it
+    and then observe the settled outcome (a warn is logged once, an abort
+    raises consistently for every consumer).
+    """
+
+    def __init__(self) -> None:
+        """Create an empty memo (one per weave execution)."""
+        self._lock = threading.Lock()
+        self._outcomes: dict[str, Exception | bool | None] = {}
+
+    def validate(self, name: str, df: DataFrame, lookup: Lookup) -> None:
+        """Run or reuse the unique-key validation for one lookup.
+
+        Raises:
+            LookupResolutionError: The winner's abort, re-raised for every
+                consumer that reuses the memoized failure.
+        """
+        if not lookup.unique_key or lookup.key is None:
+            return
+        with self._lock:
+            if name not in self._outcomes:
+                try:
+                    self._outcomes[name] = _check_unique_key(
+                        df, lookup.key, name, lookup.on_failure
+                    )
+                except Exception as exc:
+                    self._outcomes[name] = exc
+                    raise
+            outcome = self._outcomes[name]
+        if isinstance(outcome, Exception):
+            # A fresh exception per consumer: re-raising one instance from
+            # several threads mutates its traceback concurrently
+            raise LookupResolutionError(str(outcome)) from outcome
+
+
 def build_lookup_meta(
     results: list[LookupResult],
     base: dict[str, LookupMeta] | None = None,
@@ -183,6 +226,8 @@ def _apply_narrow_pipeline(
     df: DataFrame,
     lookup: Lookup,
     name: str,
+    *,
+    run_unique_check: bool = True,
 ) -> tuple[DataFrame, bool, bool, bool | None]:
     """Apply filter, projection, and unique-key check to a lookup DataFrame.
 
@@ -193,6 +238,10 @@ def _apply_narrow_pipeline(
         df: Raw DataFrame from source read.
         lookup: Lookup definition with optional narrow fields.
         name: Lookup name for error messages.
+        run_unique_check: The materialized path passes False and runs the
+            check itself AGAINST THE CACHE after persisting — checking here
+            would read the source once for the check and again for the
+            cache fill. The on-demand path keeps the inline check.
 
     Returns:
         Tuple of (narrowed DataFrame, filter_applied, unique_key_checked,
@@ -220,7 +269,7 @@ def _apply_narrow_pipeline(
         _validate_columns(df, lookup.key, name)
 
     # 3. Unique-key check
-    if lookup.unique_key:
+    if lookup.unique_key and run_unique_check:
         if lookup.key is None:
             raise LookupResolutionError(f"Lookup '{name}': 'unique_key' requires 'key' to be set")
         unique_key_checked = True
@@ -270,18 +319,36 @@ def materialize_lookups(
             df = read_source(spark, name, lookup.source, connections=connections)
             source_size = _delta_source_size(spark, lookup.source, connections)
 
-            # Apply narrow pipeline (filter → project → unique_key)
-            df, filter_applied, uk_checked, uk_passed = _apply_narrow_pipeline(df, lookup, name)
+            # Narrow first (filter → project), check LATER against the
+            # cache: persist-before-check means the source is read exactly
+            # once — the warming count fills the cache and the unique-key
+            # check reuses it
+            df, filter_applied, _, _ = _apply_narrow_pipeline(
+                df, lookup, name, run_unique_check=False
+            )
+
+            from pyspark import StorageLevel
 
             if lookup.strategy == "broadcast":
+                # Persist AND hint — they compose: the warming count fills
+                # the cache, consuming joins build their broadcast exchange
+                # from cache instead of re-reading the source per join.
+                # Hint before persist so unpersist targets the cached plan.
                 df = F.broadcast(df)
-            else:
-                from pyspark import StorageLevel
+            df.persist(StorageLevel.MEMORY_AND_DISK)
 
-                df.persist(StorageLevel.MEMORY_AND_DISK)
-
-            # Trigger materialization and get count
+            # Trigger materialization and get count — the single source read
             row_count = df.count()
+
+            uk_checked = False
+            uk_passed: bool | None = None
+            if lookup.unique_key:
+                if lookup.key is None:
+                    raise LookupResolutionError(
+                        f"Lookup '{name}': 'unique_key' requires 'key' to be set"
+                    )
+                uk_checked = True
+                uk_passed = _check_unique_key(df, lookup.key, name, lookup.on_failure)
 
             cached[name] = df
             elapsed_ms = (time.monotonic() - start) * 1000
@@ -356,6 +423,7 @@ def resolve_thread_lookups(
     cached_dfs: dict[str, DataFrame],
     spark: SparkSession,
     connections: dict[str, OneLakeConnection] | None = None,
+    uk_memo: UniqueKeyMemo | None = None,
 ) -> dict[str, DataFrame]:
     """Resolve thread source lookup references to DataFrames.
 
@@ -369,6 +437,9 @@ def resolve_thread_lookups(
         cached_dfs: Pre-materialized DataFrames from :func:`materialize_lookups`.
         spark: Active SparkSession for on-demand reads.
         connections: Named connection declarations forwarded to on-demand reads.
+        uk_memo: Per-weave validate-exactly-once memo for non-materialized
+            ``unique_key`` lookups; when absent (direct callers) the check
+            runs inline per call, as before.
 
     Returns:
         Mapping of source alias to resolved DataFrame.
@@ -393,8 +464,17 @@ def resolve_thread_lookups(
         else:
             lookup_def = weave_lookups[lookup_name]
             df = read_source(spark, lookup_name, lookup_def.source, connections=connections)
-            # Apply narrow pipeline for on-demand reads
-            df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
+            if uk_memo is not None:
+                # Narrow without the inline check; the memo validates
+                # exactly once per weave (first consumer wins, others —
+                # including concurrent group-mates — reuse the outcome)
+                df, _, _, _ = _apply_narrow_pipeline(
+                    df, lookup_def, lookup_name, run_unique_check=False
+                )
+                uk_memo.validate(lookup_name, df, lookup_def)
+            else:
+                # Direct callers keep today's inline per-call check
+                df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
             resolved[alias] = df
 
     return resolved

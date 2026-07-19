@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pyspark.sql import SparkSession
 
 from weevr.engine.column_sets import materialize_column_sets, resolve_column_set
 from weevr.errors.exceptions import ConfigError, ExecutionError
@@ -673,3 +674,172 @@ class TestMaterializeColumnSets:
         assert resolved == {}
         assert results == []
         mock_read.assert_not_called()
+
+
+@pytest.mark.spark
+class TestResolveOncePerScope:
+    """Column sets resolve once per declaring scope; precedence unchanged."""
+
+    @pytest.fixture()
+    def materialize_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+        """Record the def-name sets each materialization call resolves."""
+        from weevr.engine import runner as runner_mod
+
+        calls: list[list[str]] = []
+        original = runner_mod.materialize_column_sets
+
+        def _spy(spark_arg, defs, *args, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(sorted(defs))
+            return original(spark_arg, defs, *args, **kwargs)
+
+        monkeypatch.setattr(runner_mod, "materialize_column_sets", _spy)
+        return calls
+
+    def test_loom_set_resolves_once_across_weaves(
+        self, spark: SparkSession, tmp_path, materialize_spy: list[list[str]]
+    ) -> None:
+        from weevr.engine.runner import execute_loom
+        from weevr.model.loom import Loom
+        from weevr.model.thread import Thread
+        from weevr.model.weave import Weave
+
+        src = str(tmp_path / "rps_src")
+        spark.createDataFrame([{"from_a": 1}]).write.format("delta").save(src)
+
+        def _weave(name: str, tgt: str) -> Weave:
+            return Weave.model_validate(
+                {
+                    "name": name,
+                    "config_version": "1",
+                    "threads": [{"name": f"{name}_t"}],
+                }
+            )
+
+        def _thread(name: str, tgt: str) -> Thread:
+            return Thread.model_validate(
+                {
+                    "name": name,
+                    "config_version": "1",
+                    "sources": {"main": {"type": "delta", "alias": src}},
+                    "steps": [{"rename": {"column_set": "loomset"}}],
+                    "target": {"path": tgt},
+                    "write": {"mode": "overwrite"},
+                }
+            )
+
+        loom = Loom.model_validate(
+            {
+                "name": "rps_loom",
+                "config_version": "1",
+                "weaves": [{"name": "w1"}, {"name": "w2"}],
+                "column_sets": {"loomset": {"param": "cs_param"}},
+            }
+        )
+        weaves = {
+            "w1": _weave("w1", str(tmp_path / "t1")),
+            "w2": _weave("w2", str(tmp_path / "t2")),
+        }
+        threads = {
+            "w1": {"w1_t": _thread("w1_t", str(tmp_path / "t1"))},
+            "w2": {"w2_t": _thread("w2_t", str(tmp_path / "t2"))},
+        }
+        result = execute_loom(
+            spark,
+            loom,
+            weaves,
+            threads,
+            params={"cs_param": {"from_a": "to_a"}},
+        )
+        assert result.status == "success"
+        # The loom set materialized exactly once, at loom scope — neither
+        # weave re-resolved it
+        assert materialize_spy == [["loomset"]]
+        # Params-invariance: both weaves observed the SAME loom-resolved
+        # mapping (params flow as one unchanged object loom→weave→thread)
+        cols1 = spark.read.format("delta").load(str(tmp_path / "t1")).columns
+        cols2 = spark.read.format("delta").load(str(tmp_path / "t2")).columns
+        assert "to_a" in cols1 and "to_a" in cols2
+
+    def test_weave_override_still_wins(
+        self, spark: SparkSession, tmp_path, materialize_spy: list[list[str]]
+    ) -> None:
+        from weevr.engine.planner import build_plan
+        from weevr.engine.runner import execute_weave
+        from weevr.model.thread import Thread
+        from weevr.model.weave import ThreadEntry
+
+        src = str(tmp_path / "rps_ov_src")
+        tgt = str(tmp_path / "rps_ov_tgt")
+        spark.createDataFrame([{"src_col": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "ov_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"rename": {"column_set": "shared"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        threads = {"ov_t": thread}
+        plan = build_plan("rps_ov", threads, [ThreadEntry(name="ov_t")])
+
+        from weevr.model.column_set import ColumnSet
+
+        weave_def = ColumnSet(param="weave_map")  # type: ignore[arg-type]
+        # Loom pre-resolved a DIFFERENT mapping under the same name; the
+        # caller (execute_loom) excludes overridden keys, so here the weave
+        # def must be the one that materializes
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            column_set_defs={"shared": weave_def},
+            params={"weave_map": {"src_col": "renamed_by_weave"}},
+            pre_resolved_column_sets=None,
+            pre_column_set_results=None,
+        )
+        assert result.status == "success"
+        out_cols = spark.read.format("delta").load(tgt).columns
+        assert "renamed_by_weave" in out_cols  # weave mapping applied
+        assert materialize_spy == [["shared"]]
+
+    def test_pre_resolved_sets_skip_weave_materialization(
+        self, spark: SparkSession, tmp_path, materialize_spy: list[list[str]]
+    ) -> None:
+        from weevr.engine.planner import build_plan
+        from weevr.engine.runner import execute_weave
+        from weevr.model.column_set import ColumnSet
+        from weevr.model.thread import Thread
+        from weevr.model.weave import ThreadEntry
+
+        src = str(tmp_path / "rps_pre_src")
+        tgt = str(tmp_path / "rps_pre_tgt")
+        spark.createDataFrame([{"src_col": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "pre_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"rename": {"column_set": "loomset"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        threads = {"pre_t": thread}
+        plan = build_plan("rps_pre", threads, [ThreadEntry(name="pre_t")])
+
+        loom_def = ColumnSet(param="unused")  # type: ignore[arg-type]
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            column_set_defs={"loomset": loom_def},
+            pre_resolved_column_sets={"loomset": {"src_col": "renamed_by_loom"}},
+        )
+        assert result.status == "success"
+        out_cols = spark.read.format("delta").load(tgt).columns
+        assert "renamed_by_loom" in out_cols  # pre-resolved mapping served
+        assert materialize_spy == []  # nothing re-resolved at weave scope

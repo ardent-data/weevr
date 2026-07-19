@@ -61,6 +61,17 @@ def read_source(
         ) from exc
 
 
+def apply_source_dedup(df: DataFrame, source: Source) -> DataFrame:
+    """Apply a source's dedup configuration to an already-read DataFrame.
+
+    Registry-served snapshots go through the same post-read semantics a
+    direct :func:`read_source` would apply.
+    """
+    if source.dedup is not None:
+        return _apply_dedup(df, source.dedup)
+    return df
+
+
 def read_sources(
     spark: SparkSession,
     sources: dict[str, Source],
@@ -89,16 +100,17 @@ def _read_raw(
     """Read source data without applying deduplication."""
     # Connection-based read: resolve to an abfss:// path via the named connection.
     if source.connection:
-        if not connections or source.connection not in connections:
+        from weevr.config.paths import resolve_connection_path
+
+        try:
+            path = resolve_connection_path(
+                source.connection, source.table, source.schema_override, connections
+            )
+        except ValueError as exc:
             raise ExecutionError(
                 f"Source references undefined connection '{source.connection}'",
                 source_name=source.connection,
-            )
-        from weevr.config.paths import build_onelake_path
-
-        conn = connections[source.connection]
-        assert source.table is not None  # guaranteed by Source validator
-        path = build_onelake_path(conn, source.schema_override, source.table)
+            ) from exc
         return spark.read.format("delta").load(path)
 
     if source.type == "delta":

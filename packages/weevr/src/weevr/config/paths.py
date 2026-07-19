@@ -7,34 +7,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
+from weevr.config.onelake import build_onelake_path, resolve_connection_path
 from weevr.model.connection import OneLakeConnection
+
+__all__ = [
+    "OneLakeConnection",
+    "build_onelake_path",
+    "resolve_connection_path",
+    "resolve_fuse_path",
+]
 
 _ONELAKE_HOST = "onelake.dfs.fabric.microsoft.com"
 _FUSE_PREFIX = "/lakehouse/"
-
-
-def build_onelake_path(
-    connection: OneLakeConnection,
-    schema: str | None,
-    table: str,
-) -> str:
-    """Build an abfss:// path from connection properties.
-
-    Args:
-        connection: OneLake connection declaration with workspace and lakehouse
-            identifiers.
-        schema: Schema name to use. When provided, takes precedence over
-            ``connection.default_schema``.
-        table: Table name to append to the path.
-
-    Returns:
-        A fully-qualified ``abfss://`` URI for the given table.
-    """
-    effective_schema = schema or connection.default_schema
-    base = f"abfss://{connection.workspace}@{_ONELAKE_HOST}/{connection.lakehouse}/Tables"
-    if effective_schema:
-        return f"{base}/{effective_schema}/{table}"
-    return f"{base}/{table}"
 
 
 def resolve_fuse_path(path: str, spark: SparkSession) -> str:

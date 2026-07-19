@@ -14,9 +14,11 @@ from pyspark.sql import Observation, SparkSession
 from pyspark.sql import functions as F
 
 from weevr.delta import read_delta
+from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.hooks import run_hook_steps
 from weevr.engine.lookups import (
+    UniqueKeyMemo,
     build_lookup_meta,
     cleanup_lookups,
     materialize_lookups,
@@ -24,6 +26,7 @@ from weevr.engine.lookups import (
 )
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
+from weevr.engine.target_identity import resolve_target_identity
 from weevr.engine.variables import VariableContext
 from weevr.errors.exceptions import (
     DataValidationError,
@@ -51,11 +54,11 @@ from weevr.operations.pipeline import LookupMeta, ObservationRegistry, run_pipel
 from weevr.operations.pipeline._observations import read_observation
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
+    apply_source_dedup,
     compute_generic_cdc_hwm,
     read_cdc_source,
     read_source,
     read_source_incremental,
-    read_sources,
 )
 from weevr.operations.seeding import build_system_member_rows, execute_seeds
 from weevr.operations.target_handle import TargetHandle
@@ -90,6 +93,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     connections: dict[str, OneLakeConnection] | None = None,
     lookup_meta: dict[str, LookupMeta] | None = None,
     capture_samples: bool = False,
+    cache_registry: CacheManager | None = None,
+    uk_memo: UniqueKeyMemo | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -148,6 +153,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         capture_samples: Whether to capture 10-row output/quarantine
             samples for display (effective ``execution.capture_samples``).
             Off by default — sampling re-executes the pipeline lineage.
+        cache_registry: Weave-level cache registry; Delta-backed sources
+            whose canonical identity matches a registered producer are
+            served the post-write snapshot instead of a storage read.
+            A miss falls back to a direct read.
+        uk_memo: Per-weave validate-exactly-once memo for non-materialized
+            ``unique_key`` lookups.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -226,19 +237,23 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 weave_lookups, thread.lookups, "lookup", "weave", "thread"
             )
 
-        # Merge thread-level column_sets with weave-level (thread wins)
+        # Merge thread-level column_sets with weave-level (thread wins).
+        # Only the THREAD's defs materialize here — the weave's mappings
+        # arrive already resolved and merge as plain dicts, so a weave set
+        # resolves once per weave regardless of thread count
         if thread.column_sets:
             merged_cs_defs = merge_resource_dicts(
                 column_set_defs, thread.column_sets, "column_set", "weave", "thread"
             )
             if merged_cs_defs:
                 effective_column_set_defs = merged_cs_defs
-                effective_column_sets, _ = materialize_column_sets(
-                    spark,
-                    merged_cs_defs,
-                    resolved_params or {},
-                    connections=connections,
-                )
+            thread_resolved_cs, _ = materialize_column_sets(
+                spark,
+                dict(thread.column_sets),
+                resolved_params or {},
+                connections=connections,
+            )
+            effective_column_sets = {**(column_sets or {}), **thread_resolved_cs}
 
         # Run thread-level pre_steps
         if thread.pre_steps:
@@ -256,24 +271,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             target_path = thread.target.alias or thread.target.path
             if target_path is None and thread.target.connection:
                 conn_name = thread.target.connection
-                if not connections or conn_name not in connections:
-                    raise ExecutionError(
-                        f"Target references undefined connection '{conn_name}'",
-                        thread_name=thread.name,
-                    )
-                from weevr.config.paths import build_onelake_path
+                from weevr.config.paths import resolve_connection_path
 
-                conn = connections[conn_name]
-                if thread.target.table is None:
-                    raise ExecutionError(
-                        "Target connection requires 'table'",
-                        thread_name=thread.name,
+                try:
+                    target_path = resolve_connection_path(
+                        conn_name,
+                        thread.target.table,
+                        thread.target.schema_override,
+                        connections,
                     )
-                target_path = build_onelake_path(
-                    conn,
-                    thread.target.schema_override,
-                    thread.target.table,
-                )
+                except ValueError as exc:
+                    raise ExecutionError(
+                        f"Target connection resolution failed: {exc}",
+                        thread_name=thread.name,
+                    ) from exc
                 logger.debug(
                     "Thread '%s': resolved target connection '%s' → %s",
                     thread.name,
@@ -347,6 +358,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     effective_cached_lookups or {},
                     spark,
                     connections=connections,
+                    uk_memo=uk_memo,
                 )
 
             # --- Step 4: Read sources ---
@@ -363,12 +375,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     connections=connections,
                 )
 
-                # Read secondary sources normally (skip lookup-resolved ones)
+                # Secondary sources (the primary keeps its filtered read —
+                # snapshot semantics don't apply to it) consult the cache
+                # registry like any full-mode source
                 sources_map = {primary_alias: primary_df}
                 for alias, source in thread.sources.items():
                     if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = read_source(
-                            spark, alias, source, connections=connections
+                        sources_map[alias] = _read_source_via_registry(
+                            spark, alias, source, connections, cache_registry
                         )
                 sources_map.update(lookup_dfs)
 
@@ -438,18 +452,27 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         prior_state is not None,
                     )
 
-                # Read secondary sources normally (skip lookup-resolved ones)
+                # Secondary sources (the primary keeps its filtered read —
+                # snapshot semantics don't apply to it) consult the cache
+                # registry like any full-mode source
                 sources_map = {primary_alias: primary_df}
                 for alias, source in thread.sources.items():
                     if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = read_source(
-                            spark, alias, source, connections=connections
+                        sources_map[alias] = _read_source_via_registry(
+                            spark, alias, source, connections, cache_registry
                         )
                 sources_map.update(lookup_dfs)
             else:
-                # Full mode or incremental_parameter — read non-lookup sources normally
+                # Full mode or incremental_parameter — read non-lookup
+                # sources, serving registered cache snapshots when the
+                # source's identity matches a same-run producer
                 normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
-                sources_map = read_sources(spark, normal_sources, connections=connections)
+                sources_map = {
+                    alias_name: _read_source_via_registry(
+                        spark, alias_name, src, connections, cache_registry
+                    )
+                    for alias_name, src in normal_sources.items()
+                }
                 sources_map.update(lookup_dfs)
 
             # Step statistics attach as Observations (harvested after the
@@ -1214,6 +1237,42 @@ def _validate_cdc_write_config(thread: Thread) -> WriteConfig:
             thread_name=thread.name,
         )
     return thread.write
+
+
+def _read_source_via_registry(
+    spark: SparkSession,
+    alias_name: str,
+    source: Any,
+    connections: dict[str, OneLakeConnection] | None,
+    cache_registry: CacheManager | None,
+) -> Any:
+    """Serve a source from the weave cache registry, or read it directly.
+
+    Registry consultation is strictly the thread-target read path (the
+    lookup lane has its own materialization); a hit hands back the
+    producer's post-write snapshot with the source's own dedup applied —
+    identical to what a direct read would see absent interleaved writers.
+    Plan-time validation rejects unordered same-target writers across
+    alias, path, AND connection declaration forms; the one residual is
+    FUSE-vs-abfss notation for the same table, which plan time cannot
+    unify (no session) — such pairs miss the registry rather than hit it
+    wrongly, and their scheduling blindness predates the registry.
+    """
+    if cache_registry is not None and (source.type == "delta" or source.connection):
+        identity = resolve_target_identity(
+            spark,
+            alias=source.alias,
+            path=source.path,
+            connection=source.connection,
+            table=source.table,
+            schema_override=source.schema_override,
+            connections=connections,
+        )
+        hit = cache_registry.get(identity)
+        if hit is not None:
+            logger.debug("Source '%s' served from cache registry", alias_name)
+            return apply_source_dedup(hit, source)
+    return read_source(spark, alias_name, source, connections=connections)
 
 
 def _build_telemetry(

@@ -27,8 +27,12 @@ conditional execution, and structured result collection.
 - **Parallel execution group** — A set of threads with no mutual dependencies
   that can run concurrently on the same SparkSession.
 - **Cache target** — A thread whose output is read by two or more downstream
-  threads. The engine caches the DataFrame in memory to avoid re-reading from
-  Delta.
+  threads. The engine persists the post-write snapshot under the target's
+  canonical identity (alias, path, and connection-declared forms all map to
+  one key) and serves consumers from an explicit registry — a registry miss
+  simply falls back to a direct Delta read. The snapshot materializes
+  eagerly at registration, so parallel consumers in one group never race to
+  compute it.
 
 ## How it works
 
@@ -115,13 +119,30 @@ skipped.
    after pre-steps and before any thread runs. Internal lookups
    whose source is produced by a thread in group N are deferred
    and materialized at the group N+1 boundary — after their
-   producer completes.
-4. **Column set materialization** — If the weave (or loom) defines
-   `column_sets`, all sets are resolved to from→to mapping dicts.
-   Delta/YAML sources are read via `read_source()`; param sources
-   resolve from runtime parameters. Connection-backed column sets
-   resolve through the merged loom + weave connection dict.
-   Results are captured in `WeaveTelemetry.column_set_results`.
+   producer completes. Materialization reads the source exactly
+   once: the narrowed frame persists first and both the warming
+   count and the `unique_key` check run against the cache. A
+   `strategy: broadcast` lookup persists *and* carries the
+   broadcast hint — consuming joins build their exchange from the
+   resident cache instead of re-reading the source per join, so
+   its memory profile is "resident cache + per-join exchange"
+   rather than a fresh exchange per join. Non-materialized
+   (`materialize: false`) lookups keep their per-thread re-read,
+   but a declared `unique_key` validates once per weave — the
+   first consumer validates (concurrent group-mates block on that
+   outcome), and a failure outcome is observed consistently by
+   every later consumer.
+4. **Column set materialization** — Column sets resolve to
+   from→to mapping dicts **once per declaring scope**: loom-level
+   sets resolve at loom start and pass down as resolved mappings;
+   a weave materializes only its own declarations (including any
+   overrides of loom sets — precedence is unchanged); a thread
+   materializes only thread-level declarations and merges the
+   already-resolved parent mappings. Delta/YAML sources are read
+   via `read_source()`; param sources resolve from runtime
+   parameters; connection-backed sets resolve through the merged
+   loom + weave connection dict. Results are captured in
+   `WeaveTelemetry.column_set_results`.
 5. **Thread execution** — Parallel groups are processed
    sequentially. Within each group, threads are submitted to a
    `ThreadPoolExecutor` for concurrent execution. Threads
