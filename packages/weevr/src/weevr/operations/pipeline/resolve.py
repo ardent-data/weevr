@@ -374,7 +374,11 @@ def _uniqueness_reusable(
         return False
     if normalize is not None and normalize != "none":
         return False
-    return meta.key_columns is not None and list(meta.key_columns) == join_key_columns
+    if meta.key_columns is None:
+        return False
+    # Order-insensitive: uniqueness over a column set is independent of
+    # declaration order, and the join condition is a conjunction.
+    return set(meta.key_columns) == set(join_key_columns)
 
 
 def _has_duplicate_join_keys(lookup_df: DataFrame, join_columns: list[str]) -> bool:

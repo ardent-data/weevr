@@ -451,7 +451,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 lookup_meta=lookup_meta,
             )
 
-            # Capture intermediate row count for waterfall visualization
+            # Capture intermediate row count for waterfall visualization.
+            # This count is also the FIRST action over the pipeline plan:
+            # Spark observations are fixed by the first completed execution,
+            # so the step statistics harvested later carry the values from
+            # this full-scale execution — removing or reordering this count
+            # changes which action fixes them.
             rows_after_transforms = df.count()
 
             # Step 7 — run validation rules

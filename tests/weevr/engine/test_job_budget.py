@@ -16,6 +16,8 @@ Two instruments, two purposes:
   lock below is expressed in actions, not jobs.
 """
 
+from typing import Any
+
 import pytest
 from pyspark.sql import SparkSession
 
@@ -105,3 +107,41 @@ class TestResolveActionBudgetObserved:
         df = apply_resolve(df, _params("fk_0"), lookup, observations=registry, lookup_meta=meta).df
         df = apply_resolve(df, _params("fk_1"), lookup, observations=registry, lookup_meta=meta).df
         assert spark_action_counter["total"] - start == 0
+
+
+@pytest.mark.spark
+class TestSingleSourceScan:
+    """A multi-resolve chain executes the fact source scan exactly once."""
+
+    def test_chain_construction_runs_zero_jobs_and_scans_once(
+        self, spark: SparkSession, job_counter, tmp_path
+    ) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        fact_path = str(tmp_path / "budget_fact")
+        _fact(spark, 200).write.format("delta").save(fact_path)
+        lookup = _lookup(spark)
+        meta = LookupMeta(key_columns=("code",), unique_key_checked=True, unique_key_passed=True)
+        registry = ObservationRegistry(scope="main")
+
+        df = spark.read.format("delta").load(fact_path)
+        with job_counter() as jc:
+            for i in range(3):
+                df = apply_resolve(
+                    df, _params(f"fk_{i}"), lookup, observations=registry, lookup_meta=meta
+                ).df
+        # Listener-verified: constructing the chain executes NOTHING — no
+        # job may touch the source before the terminal action.
+        assert jc.jobs == 0
+
+        # The final plan contains exactly one file-backed relation — the
+        # fact source (the lookup is an in-memory frame). Combined with the
+        # zero-jobs construction assertion, the single terminal action is
+        # the only execution of that scan.
+        jdf: Any = df._jdf
+        plan = str(jdf.queryExecution().optimizedPlan())
+        assert plan.count("parquet") == 1
+
+        with job_counter() as jc_terminal:
+            df.collect()
+        assert jc_terminal.jobs > 0  # exactly one action executed the chain

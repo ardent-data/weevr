@@ -1264,3 +1264,79 @@ class TestObservedMapAndFallbackStats:
             "duplicates": 0,
             "match_rate": 0.0,
         }
+
+
+class TestDuplicateGateEffectiveDateModes:
+    """warn/first on the effective-date axis (path unconditionally legacy)."""
+
+    @staticmethod
+    def _overlapping_dim(spark: SparkSession):
+        # Overlapping validity ranges for 'A': a fact date inside the overlap
+        # matches both versions — genuine duplicates on the range join
+        return spark.createDataFrame(
+            [
+                (1, "A", "2026-01-01", "2026-03-01"),
+                (2, "A", "2026-02-01", None),
+            ],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("natural_id", StringType(), False),
+                    StructField("vf", StringType(), False),
+                    StructField("vt", StringType(), True),
+                ]
+            ),
+        )
+
+    def _params(self, mode: str) -> ResolveParams:
+        from weevr.model.pipeline import EffectiveConfig
+
+        return ResolveParams(
+            name="fk",
+            lookup="dim",
+            match={"bk": "natural_id"},
+            pk="id",
+            on_duplicate=mode,  # type: ignore[arg-type]
+            effective=EffectiveConfig(date_column="event_date", **{"from": "vf", "to": "vt"}),
+        )
+
+    def test_warn_takes_first_in_overlap(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("A", "2026-02-15")], _fact_schema("bk", "event_date"))
+        result = apply_resolve(fact, self._params("warn"), self._overlapping_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 1
+        assert rows[0]["fk"] == 1  # asc_nulls_last: lowest pk wins
+
+    def test_first_silent_in_overlap(self, spark: SparkSession) -> None:
+        fact = spark.createDataFrame([("A", "2026-02-15")], _fact_schema("bk", "event_date"))
+        result = apply_resolve(fact, self._params("first"), self._overlapping_dim(spark))
+        rows = result.df.collect()
+        assert len(rows) == 1
+        assert rows[0]["fk"] == 1
+
+
+class TestReuseKeyOrderInsensitivity:
+    def test_reordered_composite_key_still_reuses(
+        self, spark: SparkSession, spark_action_counter
+    ) -> None:
+        from weevr.operations.pipeline import LookupMeta, ObservationRegistry
+
+        dim = spark.createDataFrame(
+            [(1, "A", "X"), (2, "B", "Y")],
+            StructType(
+                [
+                    StructField("id", IntegerType(), False),
+                    StructField("k1", StringType(), False),
+                    StructField("k2", StringType(), False),
+                ]
+            ),
+        )
+        fact = spark.createDataFrame([("A", "X")], _fact_schema("c1", "c2"))
+        params = ResolveParams(name="fk", lookup="dim", match={"c1": "k1", "c2": "k2"}, pk="id")
+        # Declared key order reversed relative to the match values
+        meta = LookupMeta(key_columns=("k2", "k1"), unique_key_checked=True, unique_key_passed=True)
+        registry = ObservationRegistry(scope="main")
+
+        start = spark_action_counter["total"]
+        apply_resolve(fact, params, dim, observations=registry, lookup_meta=meta)
+        assert spark_action_counter["total"] - start == 0  # reuse held despite order

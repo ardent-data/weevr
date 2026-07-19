@@ -32,6 +32,14 @@ def _get_with_timeout(observation: Observation, timeout: float) -> dict[str, Any
     non-blocking probe on this Spark line, so the read runs on a daemon
     thread — on timeout the thread stays parked but, being a daemon,
     can never hang interpreter shutdown.
+
+    Residual risk, accepted deliberately: each timed-out read leaks one
+    parked daemon thread for the life of the process, and harvest time
+    is bounded only per-entry. This is acceptable ONLY because every
+    harvest call site guarantees a prior action over every observed node
+    (executor: the rows_after_transforms count; CTEs: the per-CTE count;
+    preview: harvest is skipped unless the sampling action succeeded) —
+    a new call path must preserve that invariant or bound the harvest.
     """
     result: list[dict[str, Any]] = []
 
