@@ -4560,7 +4560,7 @@ change detection spec.</p>
 
 
 <h3 id="weevr.operations.run_pipeline" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">run_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">run_pipeline</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">steps</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">column_sets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_set_defs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">observations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookup_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.run_pipeline" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4685,6 +4685,43 @@ that reference a column set.</p>
               <div class="doc-md-description">
                 <p>Cached lookup DataFrames keyed by name. Required for
 resolve steps that reference named lookups.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>observations</code>
+            </td>
+            <td>
+                  <code><span title="weevr.operations.pipeline._observations.ObservationRegistry">ObservationRegistry</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Registry for lazily observed step statistics. When
+provided, stat-producing handlers attach Observations instead
+of running eager aggregations; the caller harvests after its
+terminal action.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookup_meta</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="weevr.operations.pipeline._lookup_meta.LookupMeta">LookupMeta</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Materialization-time lookup facts keyed by lookup
+name; resolve steps reuse unique-key outcomes to skip their
+duplicate pre-check when valid.</p>
               </div>
             </td>
             <td>

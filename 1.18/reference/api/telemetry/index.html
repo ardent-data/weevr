@@ -5218,6 +5218,19 @@ on the thread.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.telemetry.ThreadTelemetry.step_stats">step_stats</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-step pipeline statistics harvested after the write,
+keyed <code>&lt;scope&gt;.&lt;step&gt;.&lt;name&gt;</code>. Engine-internal — the key set
+and value shapes are unstable and may change without notice.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 

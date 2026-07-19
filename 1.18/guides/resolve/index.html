@@ -3390,8 +3390,8 @@ after all FKs complete.</p>
 <a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a><span class="w">    </span><span class="nt">max_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.10</span>
 </code></pre></div>
 <h2 id="resolution-statistics">Resolution statistics<a class="headerlink" href="#resolution-statistics" title="Permanent link">&para;</a></h2>
-<p>Each resolve step records per-FK statistics in the step
-result metadata:</p>
+<p>Each resolve step records per-FK statistics, surfaced on thread
+telemetry after the write (<code>step_stats</code>, engine-internal):</p>
 <ul>
 <li><code>total</code> — total fact rows processed</li>
 <li><code>matched</code> — rows with a successful FK match</li>
@@ -3400,6 +3400,15 @@ result metadata:</p>
 <li><code>duplicates</code> — rows with multiple matches (before dedup)</li>
 <li><code>match_rate</code> — percentage of matched rows</li>
 </ul>
+<p>The statistics are computed as a byproduct of the write — resolve
+steps no longer execute extra Spark jobs per step, so deep resolve
+chains no longer pay a per-step recompute of the full pipeline.
+Duplicate handling is likewise decided by a dimension-sized check
+against the lookup side: when the lookup's join keys are
+duplicate-free (the common case), the per-row duplicate machinery
+is skipped entirely. <code>on_duplicate</code> outcomes are unchanged —
+<code>error</code> still fires only when a fact row actually matches a
+duplicated key, before the write.</p>
 
 
 
