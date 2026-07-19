@@ -7,11 +7,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
-from weevr.config.onelake import (  # noqa: F401 — re-exported for compatibility
-    build_onelake_path,
-    resolve_connection_path,
-)
-from weevr.model.connection import OneLakeConnection  # noqa: F401
+from weevr.config.onelake import build_onelake_path, resolve_connection_path
+from weevr.model.connection import OneLakeConnection
+
+__all__ = [
+    "OneLakeConnection",
+    "build_onelake_path",
+    "resolve_connection_path",
+    "resolve_fuse_path",
+]
 
 _ONELAKE_HOST = "onelake.dfs.fabric.microsoft.com"
 _FUSE_PREFIX = "/lakehouse/"

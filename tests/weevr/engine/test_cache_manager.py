@@ -77,7 +77,7 @@ class TestRegistryThroughWeave:
         # Producer writes shared; consumer declares it as a source. The
         # consumer's read must be served from the registry — read_source is
         # never called for that alias.
-        import weevr.engine.executor as executor_mod
+        from weevr.engine import executor as executor_mod
 
         src = tmp_delta_path("cmw_src")
         shared = tmp_delta_path("cmw_shared")
@@ -159,7 +159,7 @@ class TestConnectionFormRegistry:
         # The runner's registration path resolves a connection-form target
         # to a canonical identity — previously `alias or path` yielded None
         # and the entry was silently unfetchable
-        import weevr.engine.runner as runner_mod
+        from weevr.engine import runner as runner_mod
 
         registrations: list[tuple[str, str | None]] = []
 
