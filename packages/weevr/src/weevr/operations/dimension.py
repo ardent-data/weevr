@@ -492,7 +492,10 @@ def _populate_merge_result(
         return result
     metrics = handle.commit_metrics_after(pre_version)
     if metrics is None or "numTargetRowsMatchedUpdated" not in metrics:
-        logger.warning("Dimension merge metrics unavailable; counts reported as zero")
+        logger.warning(
+            "Dimension merge metrics unavailable for '%s'; counts reported as zero",
+            handle.path,
+        )
         return result
     matched_updated = int(metrics.get("numTargetRowsMatchedUpdated", 0))
     inserted = int(metrics.get("numTargetRowsInserted", 0))

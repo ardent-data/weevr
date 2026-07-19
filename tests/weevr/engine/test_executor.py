@@ -2145,3 +2145,98 @@ class TestPersistBoundaries:
         assert result2.status == "success"
         assert spark.read.format("delta").load(tgt + "_quarantine").count() == 1
         assert len(unpersist_spy) >= 1  # quarantine persist released in finally
+
+
+@pytest.mark.spark
+class TestFindingsRegression:
+    """Locks for the review-round fixes."""
+
+    def test_dimension_rows_written_with_multi_rule_quarantine(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        # One row fails TWO error rules → quarantine explodes to 2 rows;
+        # rows_written must still count write-input rows (2), not
+        # rows_after_transforms − exploded (3 − 2 = 1)
+        src = tmp_delta_path("fr_dim_src")
+        tgt = tmp_delta_path("fr_dim_tgt")
+        spark.createDataFrame(
+            [
+                {"customer_id": "C1", "v": 5, "w": 5},
+                {"customer_id": "C2", "v": 5, "w": 5},
+                {"customer_id": "C3", "v": -1, "w": -1},
+            ]
+        ).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "fr_dim_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {
+                    "path": tgt,
+                    "dimension": {
+                        "business_key": ["customer_id"],
+                        "surrogate_key": {"name": "_sk", "columns": ["customer_id"]},
+                    },
+                },
+                "validations": [
+                    {"rule": "v >= 0", "severity": "error", "name": "v_ok"},
+                    {"rule": "w >= 0", "severity": "error", "name": "w_ok"},
+                ],
+            }
+        )
+        # First run creates the table; second run exercises the merge path
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+        result2 = execute_thread(spark, thread)
+        assert result2.status == "success", result2.error
+
+        telem = result2.telemetry
+        assert telem is not None
+        assert telem.rows_quarantined == 2  # exploded per rule (existing semantic)
+        assert result2.rows_written == 2  # C1, C2 — never 1
+
+    def test_failing_write_still_unpersists(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The B-007 lesson: a failure mid-write must not leak the export
+        # persist — the finally block releases every boundary
+        from pyspark.sql import DataFrame
+
+        import weevr.engine.executor as executor_mod
+
+        unpersists: list[int] = []
+        original_unpersist = DataFrame.unpersist
+
+        def _unpersist_spy(inner_self, blocking=False):  # type: ignore[no-untyped-def]
+            unpersists.append(1)
+            return original_unpersist(inner_self, blocking)
+
+        def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("write exploded")
+
+        monkeypatch.setattr(DataFrame, "unpersist", _unpersist_spy)
+        monkeypatch.setattr(executor_mod, "write_target", _boom)
+
+        src = tmp_delta_path("fr_fail_src")
+        tgt = tmp_delta_path("fr_fail_tgt")
+        exp = tmp_delta_path("fr_fail_exp")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "fr_fail_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "exports": [{"name": "e1", "type": "delta", "path": exp}],
+            }
+        )
+        from weevr.errors.exceptions import ExecutionError
+
+        with pytest.raises(ExecutionError, match="write exploded"):
+            execute_thread(spark, thread)
+        assert len(unpersists) >= 1  # the export persist was released

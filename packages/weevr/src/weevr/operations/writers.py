@@ -473,6 +473,8 @@ def execute_cdc_merge(
                 cdc_writer.saveAsTable(target_path)
             else:
                 cdc_writer.save(target_path)
+            if handle is not None:
+                handle.mark_exists()
             return counts
 
         delta_table = resolve_delta_table(spark, target_path)
@@ -537,6 +539,8 @@ def execute_cdc_merge(
             )
 
         merger.execute()
+        if handle is not None:
+            handle.mark_exists()
         return counts
 
     except ExecutionError:

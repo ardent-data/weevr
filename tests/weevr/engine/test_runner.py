@@ -8,6 +8,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+from pyspark.sql import SparkSession
+
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.planner import build_plan
 from weevr.engine.result import ThreadResult, WeaveResult
@@ -2612,3 +2615,57 @@ class TestConnectionPropagation:
             call_kwargs = call[1]
             assert "connections" in call_kwargs
             assert call_kwargs["connections"]["gold"] is fake_conn
+
+
+@pytest.mark.spark
+class TestCaptureSamplesWiring:
+    """execution.capture_samples rides weave config → runner → executor."""
+
+    def test_weave_execution_flag_reaches_thread_sampling(
+        self,
+        spark: SparkSession,
+        tmp_path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from pyspark.sql import DataFrame
+
+        attempts: list[int] = []
+        original = DataFrame.toPandas
+
+        def _spy(inner_self):  # type: ignore[no-untyped-def]
+            attempts.append(1)
+            return original(inner_self)
+
+        monkeypatch.setattr(DataFrame, "toPandas", _spy)
+
+        src = str(tmp_path / "csw_src")
+        tgt = str(tmp_path / "csw_tgt")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        thread = Thread.model_validate(
+            {
+                "name": "csw_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+        threads = {"csw_t": thread}
+        plan = build_plan("csw_weave", threads, _entries("csw_t"))
+
+        # Flag off (default): no sampling attempts
+        result_off = execute_weave(spark, plan, threads)
+        assert result_off.status == "success"
+        assert attempts == []
+
+        # Flag on via the weave's execution block: sampling attempted
+        result_on = execute_weave(
+            spark,
+            plan,
+            threads,
+            execution=ExecutionConfig(capture_samples=True),
+        )
+        assert result_on.status == "success"
+        assert len(attempts) >= 1

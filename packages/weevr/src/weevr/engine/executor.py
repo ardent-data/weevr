@@ -51,6 +51,7 @@ from weevr.operations.pipeline import LookupMeta, ObservationRegistry, run_pipel
 from weevr.operations.pipeline._observations import read_observation
 from weevr.operations.quarantine import write_quarantine
 from weevr.operations.readers import (
+    compute_generic_cdc_hwm,
     read_cdc_source,
     read_source,
     read_source_incremental,
@@ -395,6 +396,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     load_config=thread.load,
                     prior_state=prior_state,
                     connections=connections,
+                    compute_hwm=False,
                 )
                 # Persist the change window: the version capture, the
                 # op-code counts, and the merge itself all execute this
@@ -402,6 +404,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # thread's finally block
                 primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
                 cdc_window_df = primary_df
+                # Generic-preset HWM computes AGAINST the persisted window,
+                # sharing one lineage with the op counts and the merge — the
+                # captured value and the applied rows cannot diverge. (The
+                # old in-read capture ran on a separate execution: a commit
+                # between it and the merge silently decoupled persisted
+                # state from applied state.)
+                if thread.load.cdc.preset != "delta_cdf":
+                    cdc_new_hwm = compute_generic_cdc_hwm(primary_df, thread.load)
 
                 # Capture new CDF version if Delta CDF
                 if (
@@ -628,16 +638,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 merge_result = execute_dimension_merge(
                     spark, df, dim_builder, target_path, run_timestamp, handle=target_handle
                 )
-                # Input-rows semantic without a third full-scale action:
-                # transforms after the eager rows_after_transforms count are
-                # column-only, so write-input rows = that count minus the
-                # quarantined rows (both already known). First writes report
-                # the commit's own numOutputRows instead.
-                rows_written = (
-                    merge_result.rows_inserted
-                    if was_first_write
-                    else rows_after_transforms - rows_quarantined
-                )
+                # Input-rows semantic. Quarantine-free merges need no new
+                # action: transforms after the eager rows_after_transforms
+                # count are column-only, so write-input rows equal it. With
+                # quarantined rows the subtraction would lie — quarantine
+                # frames are exploded one row per FAILED RULE, so a source
+                # row failing two rules subtracts twice — and the input df
+                # must be counted directly (exact beats cheap here). First
+                # writes report the commit's own numOutputRows.
+                if was_first_write:
+                    rows_written = merge_result.rows_inserted
+                elif rows_quarantined:
+                    rows_written = df.count()
+                else:
+                    rows_written = rows_after_transforms
 
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
                 # CDC merge routing (no dimension) — skip target column

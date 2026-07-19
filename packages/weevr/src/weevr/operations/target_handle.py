@@ -34,6 +34,7 @@ class TargetHandle:
         self._spark = spark
         self.path = path
         self._exists: bool | None = None
+        self._version_read_failed = False
 
     def exists(self) -> bool:
         """Whether a Delta table exists at the target (cached until refresh)."""
@@ -64,11 +65,19 @@ class TargetHandle:
         before a counted write so the engine's own earlier commits to the
         same target (warp pre-init, seeds) are already included.
         """
+        self._version_read_failed = False
+        if not self.exists():
+            return None
         try:
             table = _delta.resolve_delta_table(self._spark, self.path)
             row = table.history(1).select("version").collect()
             return int(row[0][0]) if row else None
         except Exception:
+            # An EXISTING table whose history could not be read is not a
+            # fresh table — remember the difference so the metrics guard
+            # reports the right cause instead of a phantom foreign commit
+            self._version_read_failed = True
+            logger.warning("Could not read current version for '%s'", self.path)
             return None
 
     def commit_metrics_after(self, pre_version: int | None) -> dict[str, str] | None:
@@ -80,6 +89,13 @@ class TargetHandle:
         version jump, and the metrics are then reported absent rather
         than misattributed. Degrade, never misattribute.
         """
+        if self._version_read_failed:
+            logger.warning(
+                "Commit metrics for '%s' skipped: pre-write version was "
+                "unreadable, so the commit cannot be attributed",
+                self.path,
+            )
+            return None
         expected = 0 if pre_version is None else pre_version + 1
         try:
             table = _delta.resolve_delta_table(self._spark, self.path)

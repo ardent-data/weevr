@@ -1196,3 +1196,62 @@ class TestCdcWindowBoundedness:
             window_df.unpersist()
         finally:
             spark.sql("RESET spark.databricks.delta.properties.defaults.enableChangeDataFeed")
+
+
+@pytest.mark.spark
+class TestGenericCdcWindowConsistency:
+    """Generic-preset HWM derives from the same frame the merge processes.
+
+    Note: Delta recaches persisted plans on same-session commits, so a
+    persist alone cannot freeze the window against them — but same-run
+    source mutation is already rejected territory (concurrent same-target
+    writes), and foreign-session commits do not invalidate this session's
+    cache. What the executor's post-persist capture guarantees — and what
+    the old in-read capture broke — is that the persisted watermark and
+    the applied rows derive from ONE lineage and cannot diverge.
+    """
+
+    def test_generic_hwm_consistent_with_processed_rows(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        from pyspark import StorageLevel
+
+        from weevr.model.load import LoadConfig
+        from weevr.operations.readers import compute_generic_cdc_hwm, read_cdc_source
+
+        src = tmp_delta_path("gcdc_src")
+        spark.createDataFrame(
+            [
+                {"id": 1, "op": "I", "seq": 10},
+                {"id": 2, "op": "I", "seq": 20},
+            ]
+        ).write.format("delta").save(src)
+
+        load = LoadConfig(
+            mode="cdc",
+            watermark_column="seq",
+            watermark_type="long",
+            cdc=CdcConfig(operation_column="op", insert_value="I"),
+        )
+        window_df, hwm_in_read = read_cdc_source(
+            spark,
+            Source(type="delta", alias=src),
+            load.cdc,
+            load_config=load,
+            compute_hwm=False,
+        )
+        assert hwm_in_read is None  # deferred to the caller, post-persist
+
+        window_df = window_df.persist(StorageLevel.MEMORY_AND_DISK)
+        window_df.count()
+
+        # Whatever the frame holds when processed, the HWM matches it —
+        # including after a (same-session) commit widens the recached plan
+        spark.createDataFrame([{"id": 3, "op": "I", "seq": 99}]).write.format("delta").mode(
+            "append"
+        ).save(src)
+
+        processed_rows = window_df.collect()
+        hwm = compute_generic_cdc_hwm(window_df, load)
+        assert hwm == str(max(r["seq"] for r in processed_rows))
+        window_df.unpersist()
