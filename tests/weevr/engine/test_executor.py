@@ -1843,3 +1843,73 @@ class TestCteObservationScoping:
         # The CTE already rewrote A→alpha, so every row ('alpha','X','alpha')
         # is unmapped for the main step's A→alpha mapping
         assert stats["main.map.code"]["unmapped_count"] == 3
+
+
+@pytest.mark.spark
+class TestCaptureSamplesGate:
+    """Samples are opt-in: off fires no sampling, on attempts it."""
+
+    @staticmethod
+    def _thread(src: str, tgt: str) -> Thread:
+        return Thread.model_validate(
+            {
+                "name": "sample_t",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+            }
+        )
+
+    @pytest.fixture()
+    def topandas_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+        from pyspark.sql import DataFrame
+
+        calls: list[int] = []
+        original = DataFrame.toPandas
+
+        def _spy(self):  # type: ignore[no-untyped-def]
+            calls.append(1)
+            return original(self)
+
+        monkeypatch.setattr(DataFrame, "toPandas", _spy)
+        return calls
+
+    def test_off_by_default_no_sampling(
+        self, spark: SparkSession, tmp_delta_path, topandas_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("cs_src_off")
+        tgt = tmp_delta_path("cs_tgt_off")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        result = execute_thread(spark, self._thread(src, tgt))
+
+        assert result.status == "success"
+        assert topandas_spy == []  # zero sampling attempts
+        assert result.samples is None or "output" not in (result.samples or {})
+
+    def test_on_attempts_sampling(
+        self, spark: SparkSession, tmp_delta_path, topandas_spy: list[int]
+    ) -> None:
+        src = tmp_delta_path("cs_src_on")
+        tgt = tmp_delta_path("cs_tgt_on")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        result = execute_thread(spark, self._thread(src, tgt), capture_samples=True)
+
+        assert result.status == "success"
+        # The attempt is what the flag governs; content requires pandas
+        # (present on Fabric, optional in dev) and stays suppressed-on-error
+        assert len(topandas_spy) >= 1
+
+    def test_display_hint_when_samples_absent(self, spark: SparkSession, tmp_delta_path) -> None:
+        src = tmp_delta_path("cs_src_hint")
+        tgt = tmp_delta_path("cs_tgt_hint")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        from weevr.engine.display import _render_execute_thread_detail
+
+        result = execute_thread(spark, self._thread(src, tgt))
+        html_out = _render_execute_thread_detail(result, result.telemetry, None)
+        assert "capture_samples" in html_out  # the hint names the switch

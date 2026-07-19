@@ -84,6 +84,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     column_set_defs: dict[str, ColumnSet] | None = None,
     connections: dict[str, OneLakeConnection] | None = None,
     lookup_meta: dict[str, LookupMeta] | None = None,
+    capture_samples: bool = False,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -139,6 +140,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             configured.
         lookup_meta: Materialization-time lookup facts inherited from the
             weave/loom scope; thread-level facts merge on top.
+        capture_samples: Whether to capture 10-row output/quarantine
+            samples for display (effective ``execution.capture_samples``).
+            Off by default — sampling re-executes the pipeline lineage.
 
     Returns:
         :class:`ThreadResult` with status, row count, write mode, target path,
@@ -472,10 +476,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # Write quarantine rows if present
                 if outcome.quarantine_df is not None:
                     rows_quarantined = write_quarantine(spark, outcome.quarantine_df, target_path)
-                    with contextlib.suppress(Exception):
-                        quarantine_sample = (
-                            outcome.quarantine_df.limit(10).toPandas().to_dict("records")
-                        )
+                    if capture_samples:
+                        with contextlib.suppress(Exception):
+                            quarantine_sample = (
+                                outcome.quarantine_df.limit(10).toPandas().to_dict("records")
+                            )
 
                 # Continue with clean_df
                 df = outcome.clean_df
@@ -559,8 +564,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         execute_seeds(spark, combined_seed, target_path, target_schema)
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
+                if capture_samples:
+                    with contextlib.suppress(Exception):
+                        output_sample = df.limit(10).toPandas().to_dict("records")
                 execute_dimension_merge(spark, df, dim_builder, target_path, run_timestamp)
                 rows_written = df.count()
 
@@ -584,8 +590,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 )
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
+                if capture_samples:
+                    with contextlib.suppress(Exception):
+                        output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
                 cdc_counts = execute_cdc_merge(
                     spark, df, target_path, cdc_write, thread.load.cdc, load_config=thread.load
@@ -615,8 +622,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     execute_seeds(spark, seed_config, target_path, df.schema)
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                with contextlib.suppress(Exception):
-                    output_sample = df.limit(10).toPandas().to_dict("records")
+                if capture_samples:
+                    with contextlib.suppress(Exception):
+                        output_sample = df.limit(10).toPandas().to_dict("records")
                 rows_written = write_target(spark, df, thread.target, thread.write, target_path)
 
             # Step 13b — post-write fact sentinel advisory. Runs against

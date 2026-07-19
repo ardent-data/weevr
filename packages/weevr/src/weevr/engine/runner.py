@@ -337,6 +337,9 @@ def execute_weave(
                                     all_lookup_results, base=pre_lookup_meta
                                 )
                                 or None,
+                                capture_samples=(
+                                    execution.capture_samples if execution is not None else False
+                                ),
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
@@ -357,6 +360,9 @@ def execute_weave(
                                     all_lookup_results, base=pre_lookup_meta
                                 )
                                 or None,
+                                capture_samples=(
+                                    execution.capture_samples if execution is not None else False
+                                ),
                                 weave_lookups=lookups,
                                 resolved_params=params,
                                 loom_name=loom_name,
