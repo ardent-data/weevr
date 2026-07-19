@@ -9,6 +9,7 @@ from pyspark.sql import types as T
 
 from weevr.errors.exceptions import ConfigError
 from weevr.model.pipeline import DateOpsParams, StringOpsParams
+from weevr.operations.pipeline._batch_safety import references_any_column
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +101,18 @@ def _apply_expr_template(
         logger.warning("%s: no columns matched selectors %s — skipping", step_name, columns)
         return df
 
+    # Batch when the template provably references no matched column by
+    # name (a sibling reference makes sequential chaining observable
+    # semantics — one scan of the shared template covers every column);
+    # any possible sibling naming falls back to today's sequential loop
     result = df
-    for col_name in resolved:
-        result = result.withColumn(col_name, F.expr(expr.replace("{col}", col_name)))
-    return result
+    if references_any_column(expr, resolved):
+        for col_name in resolved:
+            result = result.withColumn(col_name, F.expr(expr.replace("{col}", col_name)))
+        return result
+    return result.withColumns(
+        {col_name: F.expr(expr.replace("{col}", col_name)) for col_name in resolved}
+    )
 
 
 def apply_string_ops(df: DataFrame, params: StringOpsParams) -> DataFrame:

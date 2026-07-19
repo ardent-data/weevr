@@ -1,5 +1,7 @@
 """Tests for column-ops pipeline step handlers — string_ops, date_ops, type selectors."""
 
+from typing import Any
+
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql import types as T
@@ -208,3 +210,42 @@ class TestApplyDateOps:
         params = DateOpsParams(columns=["*:timestamp"], expr="date_format({col}, 'yyyy-MM-dd')")
         result = apply_date_ops(df, params)
         assert result.collect()[0]["ts"] == "2024-01-01"
+
+
+@pytest.mark.spark
+class TestTemplateBatching:
+    """string_ops/date_ops batch when safe, fall back when siblings named."""
+
+    def test_plain_template_batches_with_identical_results(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame(
+            [{"a": " x ", "b": " y ", "keep": 1}, {"a": " p ", "b": " q ", "keep": 2}]
+        )
+        params = StringOpsParams(columns=["a", "b"], expr="trim({col})")
+        result = apply_string_ops(df, params)
+        rows = sorted(result.collect(), key=lambda r: r["keep"])
+        assert [r["a"] for r in rows] == ["x", "p"]
+        assert [r["b"] for r in rows] == ["y", "q"]
+        # Batched: a single projection over the pre-batch frame
+        jdf: Any = result._jdf
+        plan = str(jdf.queryExecution().optimizedPlan())
+        assert plan.count("Project") <= 2
+
+    def test_sibling_template_falls_back_byte_identical(self, spark: SparkSession) -> None:
+        # The template names 'b', a matched sibling — sequential chaining is
+        # the OBSERVABLE semantic: when 'b' processes first, 'a' reads the
+        # MODIFIED b. The scan must preserve exactly that.
+        df = spark.createDataFrame([{"a": "1", "b": "2"}])
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, b)")
+        result = apply_string_ops(df, params)
+        row = result.collect()[0]
+        # Sequential order (dict order a, b): a = a+b = "12"; b = b+b = "22"
+        assert row["a"] == "12"
+        assert row["b"] == "22"
+
+    def test_case_variant_sibling_falls_back(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame([{"a": "1", "b": "2"}])
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, B)")
+        result = apply_string_ops(df, params)
+        row = result.collect()[0]
+        assert row["a"] == "12"  # same sequential outcome — case is no escape
+        assert row["b"] == "22"
