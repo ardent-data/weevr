@@ -257,7 +257,14 @@ depends on what was executed:
 `ThreadTelemetry` is the most detailed telemetry object. It includes:
 
 - **span** -- The thread's execution span
-- **rows_read**, **rows_written**, **rows_quarantined** -- Row counts
+- **rows_read**, **rows_written**, **rows_quarantined** -- Row counts.
+  On single-pass write paths these are computed as byproducts of the
+  write itself (query observations and Delta commit metrics) rather
+  than by separate Spark jobs. When a commit-metrics read fails or a
+  concurrent writer commits between the write and the read, the count
+  degrades to zero with a logged warning — a wrong number is never
+  reported. Merge-based paths (dimensions, CDC, merge write mode)
+  retain direct counts.
 - **validation_results** -- Per-rule pass/fail counts and severity
 - **assertion_results** -- Post-write assertion outcomes
 - **load_mode** -- The load mode used (full, incremental, CDC)

@@ -21,6 +21,7 @@ execution:
 | `log_level` | `minimal` \| `standard` \| `verbose` \| `debug` | `standard` | Logging verbosity for execution output |
 | `trace` | `bool` | `true` | Whether execution spans are collected for telemetry |
 | `max_parallel_threads` | `int >= 1` | unset | Upper bound on concurrently executing threads within a weave's parallel group; unset means unbounded |
+| `capture_samples` | `bool` | `false` | Capture 10-row output/quarantine samples at write time for display. Preview always samples regardless. |
 
 ## How loom and weave blocks combine
 
@@ -106,3 +107,18 @@ WARN: loom 'nightly' declares defaults.execution (log_level) — thread-scoped
 execution settings are not applied. Move them to the top-level execution
 block on the loom or weave.
 ```
+
+## Output samples
+
+Sample capture re-executes the working DataFrame's lineage, so it is
+off by default. Enable it per loom or weave:
+
+```yaml
+execution:
+  capture_samples: true
+```
+
+When disabled, result rendering shows a hint in place of the sample
+table. Preview mode always captures samples — previewing is what it is
+for. Like every `execution:` field, thread-scoped declarations are
+accepted but not applied in v1.x and produce a run-start warning.
