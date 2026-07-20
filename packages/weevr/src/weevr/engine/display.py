@@ -9,11 +9,14 @@ from typing import TYPE_CHECKING, Any
 
 from weevr.engine.formatting import format_duration as _format_duration
 from weevr.model.pipeline import STEP_TYPES
-from weevr.result import PreviewThreadMetadata
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
     from weevr.model.thread import Thread
+
+    # Annotation-only: weevr.result lazily imports this module for
+    # _repr_html_, so a runtime import here would be cyclic.
+    from weevr.result import PreviewThreadMetadata
 
 # ---------------------------------------------------------------------------
 # SVG layout constants
