@@ -613,14 +613,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # Lineage stamp for the counted write's commit — carries the
             # same run identity as audit columns and exports, so table
             # history joins to telemetry via run_id.
-            effective_weave = weave_name or (
-                thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
-            )
             commit_stamp = CommitStamp(
                 run_id=run_id,
                 thread=thread.name,
                 loom=loom_name or None,
-                weave=effective_weave or None,
+                weave=_effective_weave_name(thread, weave_name) or None,
                 mode=write_mode,
             )
 
@@ -1210,6 +1207,18 @@ def _build_thread_variable_context(thread: Thread) -> VariableContext:
     return VariableContext(None)
 
 
+def _effective_weave_name(thread: Thread, weave_name: str) -> str:
+    """The weave name as carried by run identity surfaces.
+
+    Falls back to the prefix of the thread's qualified key when no
+    weave name was passed (standalone thread runs). Shared by audit
+    context and the commit lineage stamp so the two never drift.
+    """
+    if weave_name:
+        return weave_name
+    return thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
+
+
 def _build_audit_context(
     thread: Thread,
     weave_name: str,
@@ -1218,9 +1227,7 @@ def _build_audit_context(
     run_id: str,
 ) -> AuditContext:
     """Build an AuditContext for context variable resolution."""
-    effective_weave = weave_name or (
-        thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
-    )
+    effective_weave = _effective_weave_name(thread, weave_name)
     primary_alias = next(iter(thread.sources))
     primary_source = thread.sources[primary_alias]
     return AuditContext(

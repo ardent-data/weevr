@@ -3032,7 +3032,7 @@ def _render_execute_html(result: Any) -> str:
     )
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Rows Written</strong></td>'
-        f'<td style="{_S_TD}">{total_rows:,}</td></tr>'
+        f'<td style="{_S_TD}">{_fmt_row_count(total_rows)}</td></tr>'
     )
     if len(thread_results) > 1:
         parts.append(
@@ -3425,18 +3425,20 @@ def _render_preview_html(result: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _count_total_rows(result: Any) -> int:
+def _count_total_rows(result: Any) -> int | None:
     """Sum the known rows_written values across the result detail tree.
 
-    Unknown counts (None) are excluded from the sum — the warning that
-    accompanies them qualifies the total.
+    At weave/loom scope, unknown counts (None) are excluded from the
+    sum — the warning that accompanies them qualifies the total. At
+    thread scope there is nothing to sum: an unknown count stays None
+    so the renderer shows "unknown", never a false 0.
     """
     detail = getattr(result, "detail", None)
     if detail is None:
         return 0
     config_type = str(getattr(result, "config_type", ""))
     if config_type == "thread":
-        return getattr(detail, "rows_written", 0) or 0
+        return getattr(detail, "rows_written", 0)
     if config_type == "weave":
         thread_results = getattr(detail, "thread_results", [])
     elif config_type == "loom":

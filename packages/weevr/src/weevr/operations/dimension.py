@@ -253,7 +253,10 @@ def execute_dimension_merge(
     if not handle.exists():
         # First write — insert all rows directly; the count comes from the
         # write's own commit metrics (stamped, else version-guarded), not
-        # a pre-count
+        # a pre-count. Deliberately no .mode() here: Spark's default
+        # ErrorIfExists is what keeps a failed existence probe from
+        # silently overwriting a target that does exist — if a mode is
+        # ever added, an exists_uncertain() guard must come with it.
         writer = source_df.write.format("delta")
         if stamp is not None:
             writer = writer.option("userMetadata", stamp.to_json())

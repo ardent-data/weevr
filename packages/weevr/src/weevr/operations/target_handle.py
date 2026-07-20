@@ -41,7 +41,9 @@ class CommitStamp:
         thread: Name of the thread that made the commit.
         loom: Loom name, when the thread ran under one.
         weave: Weave name, when the thread ran under one.
-        mode: Write mode of the commit (overwrite/append/merge).
+        mode: The thread's configured write mode. Best-effort intent,
+            not the physical branch taken — a first write executes as
+            overwrite regardless of the configured mode.
     """
 
     run_id: str
@@ -237,7 +239,12 @@ class TargetHandle:
                 # No commit of ANY kind landed after pre_version: Delta
                 # skips the commit entirely for a zero-row single-pass
                 # write, so the engine provably wrote nothing — an exact
-                # zero, not an unknown.
+                # zero, not an unknown. This deduction leans on the Delta
+                # log still holding every commit after pre_version at
+                # read time; an aggressively short logRetentionDuration
+                # could in principle empty the window, but within the
+                # milliseconds between a write and its metrics read that
+                # is not a practical concern.
                 return {"numOutputRows": "0"}
             logger.warning(
                 "Commit metrics for '%s' skipped: no commit stamped by this "

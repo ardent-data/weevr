@@ -542,6 +542,37 @@ class TestRenderResultHtml:
         assert "500" in html_out
         assert "overwrite" in html_out
 
+    def test_execute_thread_scope_unknown_rows_render_as_unknown(self) -> None:
+        """A thread-scope result with an unknown count never shows a false 0."""
+        detail = type(
+            "TR",
+            (),
+            {
+                "status": "success",
+                "thread_name": "dim_unattr",
+                "rows_written": None,
+                "write_mode": "append",
+                "target_path": "Tables/dim_unattr",
+                "error": None,
+            },
+        )()
+        result = type(
+            "R",
+            (),
+            {
+                "mode": "execute",
+                "status": "success",
+                "config_type": "thread",
+                "config_name": "dim_unattr",
+                "duration_ms": 500,
+                "detail": detail,
+                "warnings": ["Thread 'dim_unattr': rows written could not be attributed"],
+            },
+        )()
+        html_out = render_result_html(result)
+        assert "unknown" in html_out
+        assert ">0<" not in html_out  # no cell renders the count as zero
+
     def test_execute_unknown_rows_render_as_unknown(self) -> None:
         """A None rows_written renders as unknown, and totals sum known values."""
         t_known = type(

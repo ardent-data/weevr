@@ -904,6 +904,25 @@ class TestCommitStamp:
         assert rows == 0
         assert spark.read.format("delta").load(path).count() == 1
 
+    def test_zero_row_first_write_reports_exact_zero(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        """Unlike an append to an existing table, a zero-row FIRST write
+        does create the table's initializing commit — the stamp scan
+        attributes it normally and reports an exact 0."""
+        path = tmp_delta_path("stamp_zero_first")
+        empty_df = simple_df.filter("id > 99")
+        rows = write_target(
+            spark,
+            empty_df,
+            Target(path=path),
+            WriteConfig(mode="append"),
+            path,
+            stamp=self._stamp(),
+        )
+        assert rows == 0
+        assert spark.read.format("delta").load(path).count() == 0
+
     def test_interleaved_foreign_commit_count_is_exact(
         self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
