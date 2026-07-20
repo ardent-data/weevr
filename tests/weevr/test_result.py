@@ -1588,3 +1588,19 @@ class TestSummaryPreviewMetadata:
         )
         s = result.summary()
         assert "(unavailable)" in s
+
+    def test_summary_zero_row_preview_renders_zero(self) -> None:
+        """A 0-row preview is a real answer, not a degrade case."""
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+            preview_data={"dim_customer": self._Poison()},
+        )
+        result._preview_metadata = {
+            "dim_customer": {"output_schema": [("id", "bigint")], "row_count": 0}
+        }
+        s = result.summary()
+        assert "1 cols × 0 rows" in s
+        assert "(unavailable)" not in s

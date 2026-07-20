@@ -2088,3 +2088,27 @@ class TestDisplayPurity:
         )
         hits = [pattern for pattern in forbidden if pattern in source]
         assert hits == [], f"DataFrame computation crept into display.py: {hits}"
+
+
+class TestPreviewZeroRows:
+    """A 0-row preview renders '0', never '(unavailable)'."""
+
+    def test_output_shape_renders_zero_not_unavailable(self) -> None:
+        import types as _types
+
+        from weevr.engine.display import _render_preview_html
+
+        result = _types.SimpleNamespace(
+            status="success",
+            config_type="thread",
+            config_name="empty_t",
+            duration_ms=0,
+            preview_data={"empty_t": object()},
+            _preview_metadata={"empty_t": {"output_schema": [("id", "bigint")], "row_count": 0}},
+            telemetry=None,
+            _resolved_threads=None,
+            warnings=[],
+        )
+        html_out = _render_preview_html(result)
+        assert ">0<" in html_out
+        assert "(unavailable)" not in html_out

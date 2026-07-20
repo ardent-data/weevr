@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from weevr.engine.formatting import format_duration as _format_duration
 from weevr.model.pipeline import STEP_TYPES
+from weevr.result import PreviewThreadMetadata
 
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
@@ -3294,7 +3295,9 @@ def _render_preview_html(result: Any) -> str:
     config_name = html.escape(str(getattr(result, "config_name", "")))
     duration_ms = getattr(result, "duration_ms", 0) or 0
     preview_data: dict[str, Any] = getattr(result, "preview_data", None) or {}
-    preview_meta: dict[str, dict[str, Any]] = getattr(result, "_preview_metadata", None) or {}
+    preview_meta: dict[str, PreviewThreadMetadata] = (
+        getattr(result, "_preview_metadata", None) or {}
+    )
     telemetry = getattr(result, "telemetry", None)
     resolved = getattr(result, "_resolved_threads", None) or {}
     warnings: list[str] = getattr(result, "warnings", []) or []

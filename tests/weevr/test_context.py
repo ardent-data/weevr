@@ -1473,3 +1473,36 @@ write:
         # the -2 row (error rule) is split out; the NULL row (fatal) stays.
         ids = {r["id"] for r in result.preview_data["valprev1"].collect()}
         assert ids == {1, None}
+
+
+@pytest.mark.spark
+class TestPreviewPartialMetadata:
+    """Each preview metadata key degrades independently."""
+
+    def test_sample_capture_failure_keeps_count(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        from pyspark.sql import DataFrame
+
+        src = str(tmp_path / "src_partial")
+        tgt = str(tmp_path / "tgt_partial")
+        rows = [{"id": i} for i in range(3)]
+        spark.createDataFrame(rows, "id INT").write.format("delta").save(src)
+        yaml_path = _create_thread_yaml(tmp_path, "prevs1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+
+        def refuse_pandas(self, *args, **kwargs):
+            raise RuntimeError("sample capture blocked")
+
+        monkeypatch.setattr(DataFrame, "toPandas", refuse_pandas)
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        assert result._preview_metadata is not None
+        meta = result._preview_metadata["prevs1"]
+        assert meta["row_count"] == 3
+        assert "samples" not in meta
+
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert ">3<" in html_out

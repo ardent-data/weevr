@@ -48,7 +48,7 @@ from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
-from weevr.result import ExecutionMode, LoadedConfig, RunResult
+from weevr.result import ExecutionMode, LoadedConfig, PreviewThreadMetadata, RunResult
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -763,7 +763,7 @@ class Context:
         )
 
         preview_data: dict[str, Any] = {}
-        preview_metadata: dict[str, dict[str, Any]] = {}
+        preview_metadata: dict[str, PreviewThreadMetadata] = {}
         errors: list[str] = []
 
         for thread_name, thread in all_threads.items():
@@ -796,7 +796,7 @@ class Context:
                 preview_data[thread_name] = df
 
                 # Capture preview metadata for enhanced HTML rendering
-                meta: dict[str, Any] = {
+                meta: PreviewThreadMetadata = {
                     "output_schema": [(name, str(dtype)) for name, dtype in df.dtypes],
                 }
                 with contextlib.suppress(Exception):
@@ -822,6 +822,9 @@ class Context:
                 # compute it. Rides its own suppress — a flaky count must
                 # degrade to a missing key (renderers show "(unavailable)"),
                 # never demote the whole thread to errors via the outer try.
+                # Unlike the harvest above, deliberately NOT gated on the
+                # sample capture: every metadata key degrades independently,
+                # so a thread can render a count without a sample table.
                 with contextlib.suppress(Exception):
                     meta["row_count"] = df.count()
                 preview_metadata[thread_name] = meta
