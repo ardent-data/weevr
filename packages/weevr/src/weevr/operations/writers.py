@@ -14,7 +14,7 @@ from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import typed_watermark_col
-from weevr.operations.target_handle import TargetHandle
+from weevr.operations.target_handle import CommitStamp, TargetHandle
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,7 @@ def write_target(
     write_config: WriteConfig | None,
     target_path: str,
     handle: TargetHandle | None = None,
+    stamp: CommitStamp | None = None,
 ) -> int:
     """Write a DataFrame to a Delta table.
 
@@ -126,6 +127,9 @@ def write_target(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        stamp: Lineage stamp for single-pass commits; enables exact
+            own-commit attribution. True MERGE commits are not stamped
+            (per-write userMetadata is not honored there).
 
     Returns:
         Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
@@ -171,6 +175,8 @@ def write_target(
                     F.lit(write_config.soft_delete_active_value).cast("boolean"),
                 )
             writer = df.write.format("delta").mode("overwrite")
+            if stamp is not None:
+                writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
             if use_table_api:
@@ -180,6 +186,8 @@ def write_target(
 
         elif mode == "append":
             writer = df.write.format("delta").mode("append")
+            if stamp is not None:
+                writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
             if use_table_api:
@@ -195,9 +203,10 @@ def write_target(
             _execute_merge(spark, df, write_config, target_path)
 
         if row_count == -1:
-            # Single-pass write: the commit's own numOutputRows, guarded
-            # against foreign commits. Absent-with-warning on any miss.
-            metrics = handle.commit_metrics_after(pre_version)
+            # Single-pass write: the commit's own numOutputRows — found by
+            # its stamp when one was written, version-guarded otherwise.
+            # Absent-with-warning on any miss.
+            metrics = handle.commit_metrics_after(pre_version, stamp=stamp)
             if metrics is not None and "numOutputRows" in metrics:
                 row_count = int(metrics["numOutputRows"])
             else:

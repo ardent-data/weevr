@@ -61,7 +61,7 @@ from weevr.operations.readers import (
     read_source_incremental,
 )
 from weevr.operations.seeding import build_system_member_rows, execute_seeds
-from weevr.operations.target_handle import TargetHandle
+from weevr.operations.target_handle import CommitStamp, TargetHandle
 from weevr.operations.validation import validate_dataframe
 from weevr.operations.warp import (
     append_warp_only_columns,
@@ -609,6 +609,20 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
 
+            # Lineage stamp for the counted write's commit — carries the
+            # same run identity as audit columns and exports, so table
+            # history joins to telemetry via run_id.
+            effective_weave = weave_name or (
+                thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
+            )
+            commit_stamp = CommitStamp(
+                run_id=run_id,
+                thread=thread.name,
+                loom=loom_name or None,
+                weave=effective_weave or None,
+                mode=write_mode,
+            )
+
             if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
                 df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
@@ -659,7 +673,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 was_first_write = not target_handle.exists()
                 merge_result = execute_dimension_merge(
-                    spark, df, dim_builder, target_path, run_timestamp, handle=target_handle
+                    spark,
+                    df,
+                    dim_builder,
+                    target_path,
+                    run_timestamp,
+                    handle=target_handle,
+                    stamp=commit_stamp,
                 )
                 # Input-rows semantic. Quarantine-free merges need no new
                 # action: transforms after the eager rows_after_transforms
@@ -755,7 +775,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 rows_written = write_target(
-                    spark, df, thread.target, thread.write, target_path, handle=target_handle
+                    spark,
+                    df,
+                    thread.target,
+                    thread.write,
+                    target_path,
+                    handle=target_handle,
+                    stamp=commit_stamp,
                 )
 
             # Step 13b — post-write fact sentinel advisory. Runs against

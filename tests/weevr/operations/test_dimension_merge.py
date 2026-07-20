@@ -62,6 +62,57 @@ class TestFirstWrite:
         target = spark.read.format("delta").load(path)
         assert target.count() == 2
 
+    def test_first_write_stamped_and_exact_under_interleaved_commit(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The dimension first write is a plain save — stamped and attributed
+        like write_target's first write, exact when a foreign commit lands
+        between the write and the metrics read."""
+        import json
+
+        from weevr.operations import target_handle as th_mod
+        from weevr.operations.target_handle import CommitStamp
+
+        path = tmp_delta_path("dim_first_stamped")
+        dim = _make_dim()
+        source = _prepare_source(
+            spark,
+            [
+                {"customer_id": "C1", "name": "Alice"},
+                {"customer_id": "C2", "name": "Bob"},
+            ],
+            dim,
+        )
+        builder = DimensionMergeBuilder(dim)
+        stamp = CommitStamp(run_id="run-dim", thread="dim_thread", mode="merge")
+
+        # A foreign commit lands after the engine write, before the metrics
+        # read: intercept the history resolution to append it first.
+        original_resolve = th_mod._delta.resolve_delta_table
+        fired = {"done": False}
+
+        def _foreign_then_resolve(spark_arg, path_arg):  # type: ignore[no-untyped-def]
+            if not fired["done"]:
+                fired["done"] = True
+                frame = spark.createDataFrame([{"customer_id": "ZZ", "name": "foreign"}])
+                frame.write.format("delta").mode("append").option("mergeSchema", "true").save(path)
+            return original_resolve(spark_arg, path_arg)
+
+        monkeypatch.setattr(th_mod._delta, "resolve_delta_table", _foreign_then_resolve)
+        result = execute_dimension_merge(spark, source, builder, path, "2026-01-01", stamp=stamp)
+        monkeypatch.undo()
+
+        assert result.rows_inserted == 2  # exact — not 0, not the foreign 1
+
+        from weevr.delta import resolve_delta_table
+
+        history = resolve_delta_table(spark, path).history().select("userMetadata").collect()
+        stamped = [
+            row[0] for row in history if row[0] and json.loads(row[0]).get("engine") == "weevr"
+        ]
+        assert len(stamped) == 1
+        assert json.loads(stamped[0])["run_id"] == "run-dim"
+
 
 @pytest.mark.spark
 class TestIdempotency:

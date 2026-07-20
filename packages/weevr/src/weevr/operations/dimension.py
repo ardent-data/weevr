@@ -20,7 +20,7 @@ from pyspark.sql import functions as F
 from weevr.delta import resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
-from weevr.operations.target_handle import TargetHandle
+from weevr.operations.target_handle import CommitStamp, TargetHandle
 from weevr.operations.writers import quote_identifier
 
 logger = logging.getLogger(__name__)
@@ -209,6 +209,7 @@ def execute_dimension_merge(
     target_path: str,
     run_timestamp: str,
     handle: TargetHandle | None = None,
+    stamp: CommitStamp | None = None,
 ) -> DimensionMergeResult:
     """Execute the staged dimension merge against a Delta target.
 
@@ -235,6 +236,9 @@ def execute_dimension_merge(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        stamp: Lineage stamp for the first-write commit (a plain save,
+            not a MERGE); enables exact own-commit attribution. Merge
+            commits are not stamped.
 
     Returns:
         DimensionMergeResult with row-level metrics.
@@ -246,9 +250,13 @@ def execute_dimension_merge(
         handle = TargetHandle(spark, target_path)
     if not handle.exists():
         # First write — insert all rows directly; the count comes from the
-        # write's own commit metrics (guarded), not a pre-count
-        source_df.write.format("delta").save(target_path)
-        metrics = handle.commit_metrics_after(None)
+        # write's own commit metrics (stamped, else version-guarded), not
+        # a pre-count
+        writer = source_df.write.format("delta")
+        if stamp is not None:
+            writer = writer.option("userMetadata", stamp.to_json())
+        writer.save(target_path)
+        metrics = handle.commit_metrics_after(None, stamp=stamp)
         if metrics is not None and "numOutputRows" in metrics:
             result.rows_inserted = int(metrics["numOutputRows"])
         else:

@@ -12,13 +12,80 @@ three to five per thread.
 
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 from pyspark.sql import SparkSession
 
 from weevr import delta as _delta
 
 logger = logging.getLogger(__name__)
+
+STAMP_ENGINE_MARKER = "weevr"
+STAMP_VERSION = 1
+
+
+@dataclass(frozen=True)
+class CommitStamp:
+    """Lineage stamp written as Delta commit ``userMetadata`` on engine writes.
+
+    Visible in ``DESCRIBE HISTORY`` and joinable to telemetry via
+    ``run_id``. The stable core is the engine marker, ``run_id``, and
+    ``thread`` — attribution matches on exactly that; the remaining
+    fields are best-effort context and may evolve.
+
+    Attributes:
+        run_id: Run identity shared with audit columns and exports.
+        thread: Name of the thread that made the commit.
+        loom: Loom name, when the thread ran under one.
+        weave: Weave name, when the thread ran under one.
+        mode: Write mode of the commit (overwrite/append/merge).
+    """
+
+    run_id: str
+    thread: str
+    loom: str | None = None
+    weave: str | None = None
+    mode: str | None = None
+
+    def to_json(self) -> str:
+        """Serialize to the compact JSON written as commit userMetadata."""
+        payload: dict[str, Any] = {
+            "engine": STAMP_ENGINE_MARKER,
+            "version": STAMP_VERSION,
+            "run_id": self.run_id,
+            "thread": self.thread,
+        }
+        if self.loom:
+            payload["loom"] = self.loom
+        if self.weave:
+            payload["weave"] = self.weave
+        if self.mode:
+            payload["mode"] = self.mode
+        return json.dumps(payload, separators=(",", ":"))
+
+    def matches(self, user_metadata: str | None) -> bool:
+        """Whether *user_metadata* is this write's own stamp.
+
+        Matches on the stable core only (engine marker + ``run_id`` +
+        ``thread``), so an engine-shaped stamp from another run in the
+        same history window is never claimed.
+        """
+        if not user_metadata:
+            return False
+        try:
+            data = json.loads(user_metadata)
+        except ValueError:
+            return False
+        if not isinstance(data, dict):
+            return False
+        return (
+            data.get("engine") == STAMP_ENGINE_MARKER
+            and data.get("run_id") == self.run_id
+            and data.get("thread") == self.thread
+        )
 
 
 class TargetHandle:
@@ -99,15 +166,25 @@ class TargetHandle:
             logger.warning("Could not read current version for '%s'", self.path)
             return None
 
-    def commit_metrics_after(self, pre_version: int | None) -> dict[str, str] | None:
-        """Operation metrics of the commit that followed ``pre_version``.
+    def commit_metrics_after(
+        self, pre_version: int | None, stamp: CommitStamp | None = None
+    ) -> dict[str, str] | None:
+        """Operation metrics of the engine's own commit after ``pre_version``.
 
-        Accepts the latest commit ONLY when its version is exactly
-        ``pre_version + 1`` (or 0 for a fresh table) — a foreign commit
-        landing between the engine's write and this read makes the
-        version jump, and the metrics are then reported absent rather
-        than misattributed. Degrade, never misattribute.
+        With a *stamp* (single-pass writes), the history window since
+        ``pre_version`` is scanned for the commit carrying the write's
+        own stamp — exact regardless of interleaved foreign commits.
+
+        Without a stamp (merge paths, where per-write userMetadata is
+        not honored), the latest commit is accepted ONLY when its
+        version is exactly ``pre_version + 1`` (or 0 for a fresh
+        table) — a foreign commit landing between the engine's write
+        and this read makes the version jump, and the metrics are then
+        reported absent rather than misattributed. Either way: degrade,
+        never misattribute.
         """
+        if stamp is not None:
+            return self._stamped_commit_metrics(pre_version, stamp)
         if self._version_read_failed:
             logger.warning(
                 "Commit metrics for '%s' skipped: pre-write version was "
@@ -132,3 +209,36 @@ class TargetHandle:
             )
             return None
         return dict(row[1])
+
+    def _stamped_commit_metrics(
+        self, pre_version: int | None, stamp: CommitStamp
+    ) -> dict[str, str] | None:
+        """Find the own-stamped commit in the window after ``pre_version``.
+
+        A driver-side log read. The window is bounded below by
+        ``pre_version`` (full history when the pre-write version was
+        unreadable — the stamp still identifies the own commit exactly).
+        """
+        floor = -1 if pre_version is None else pre_version
+        try:
+            table = _delta.resolve_delta_table(self._spark, self.path)
+            rows = (
+                table.history()
+                .select("version", "operationMetrics", "userMetadata")
+                .where(f"version > {floor}")
+                .collect()
+            )
+        except Exception:
+            logger.warning("Commit metrics unavailable for '%s'", self.path)
+            return None
+        own = [row for row in rows if stamp.matches(row["userMetadata"])]
+        if not own:
+            logger.warning(
+                "Commit metrics for '%s' skipped: no commit stamped by this "
+                "write found after version %s (own commit unattributable)",
+                self.path,
+                "?" if pre_version is None else pre_version,
+            )
+            return None
+        latest = max(own, key=lambda row: int(row["version"]))
+        return dict(latest["operationMetrics"])

@@ -54,6 +54,68 @@ def _make_thread(
     )
 
 
+class TestCommitStampIntegration:
+    """The executor stamps engine commits and attributes them exactly."""
+
+    def test_rows_written_exact_under_interleaved_commit(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A foreign commit between pre-version capture and the engine write
+        no longer degrades rows_written."""
+        from weevr.operations.target_handle import TargetHandle
+
+        src = tmp_delta_path("stampint_src")
+        tgt = tmp_delta_path("stampint_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}, {"id": 3}])
+        create_delta_table(spark, tgt, [{"id": 0}])
+
+        original_cv = TargetHandle.current_version
+
+        def _capture_then_foreign(handle_self):  # type: ignore[no-untyped-def]
+            version = original_cv(handle_self)
+            spark.createDataFrame([{"id": 100}]).write.format("delta").mode("append").save(tgt)
+            return version
+
+        monkeypatch.setattr(TargetHandle, "current_version", _capture_then_foreign)
+        thread = _make_thread("stamp_thread", src, tgt, write=WriteConfig(mode="append"))
+        result = execute_thread(spark, thread)
+        monkeypatch.undo()
+
+        assert result.status == "success"
+        assert result.rows_written == 3
+
+    def test_stamp_run_id_matches_audit_run_identity(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """The stamp's run_id is the same run identity audit columns carry —
+        the join key between table history and telemetry."""
+        import json
+
+        from weevr.delta import resolve_delta_table
+
+        src = tmp_delta_path("stampid_src")
+        tgt = tmp_delta_path("stampid_tgt")
+        create_delta_table(spark, src, [{"id": 1}])
+
+        thread = Thread(
+            name="stamp_identity",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt, audit_columns={"_run_id": "'${run.id}'"}),
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success"
+
+        audit_run_id = spark.read.format("delta").load(tgt).collect()[0]["_run_id"]
+        raw = resolve_delta_table(spark, tgt).history(1).select("userMetadata").collect()[0][0]
+        assert raw is not None
+        stamp = json.loads(raw)
+        assert stamp["engine"] == "weevr"
+        assert stamp["run_id"] == audit_run_id
+        assert stamp["thread"] == "stamp_identity"
+
+
 class TestExecuteThreadResult:
     """ThreadResult fields populated correctly by execute_thread."""
 
