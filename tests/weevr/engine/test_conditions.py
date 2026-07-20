@@ -108,3 +108,86 @@ class TestParamConditions:
         cond = ConditionSpec(when="??? invalid")
         with pytest.raises(ConfigError, match="Cannot evaluate"):
             evaluate_condition(cond)
+
+
+@pytest.mark.spark
+class TestBuiltinMemo:
+    """Memoization of builtin probes within one evaluation batch."""
+
+    def _counting_read(self, monkeypatch):
+        from weevr.engine import conditions as conditions_mod
+
+        calls = {"n": 0}
+        real_read = conditions_mod.read_delta
+
+        def counting(spark_arg, path_arg):
+            calls["n"] += 1
+            return real_read(spark_arg, path_arg)
+
+        monkeypatch.setattr(conditions_mod, "read_delta", counting)
+        return calls
+
+    def test_shared_memo_computes_builtin_once(self, spark, tmp_delta_path, monkeypatch):
+        from spark_helpers import create_delta_table
+
+        path = tmp_delta_path("memo_shared")
+        create_delta_table(spark, path, [{"id": 1}, {"id": 2}])
+        calls = self._counting_read(monkeypatch)
+
+        memo: dict = {}
+        for _ in range(3):
+            cond = ConditionSpec(when=f"row_count('{path}') > 0")
+            assert evaluate_condition(cond, spark=spark, memo=memo) is True
+        assert calls["n"] == 1
+
+    def test_distinct_arguments_memoized_separately(self, spark, tmp_delta_path, monkeypatch):
+        from spark_helpers import create_delta_table
+
+        path_a = tmp_delta_path("memo_arg_a")
+        path_b = tmp_delta_path("memo_arg_b")
+        create_delta_table(spark, path_a, [{"id": 1}])
+        create_delta_table(spark, path_b, [{"id": 1}, {"id": 2}])
+        calls = self._counting_read(monkeypatch)
+
+        memo: dict = {}
+        assert (
+            evaluate_condition(
+                ConditionSpec(when=f"row_count('{path_a}') > 1"), spark=spark, memo=memo
+            )
+            is False
+        )
+        assert (
+            evaluate_condition(
+                ConditionSpec(when=f"row_count('{path_b}') > 1"), spark=spark, memo=memo
+            )
+            is True
+        )
+        assert calls["n"] == 2
+
+    def test_fresh_containers_observe_new_writes(self, spark, tmp_delta_path):
+        """A new memo container sees writes made after the previous batch."""
+        from spark_helpers import create_delta_table
+
+        path = tmp_delta_path("memo_fresh")
+        create_delta_table(spark, path, [{"id": 1}])
+        cond = ConditionSpec(when=f"row_count('{path}') > 1")
+
+        batch_one: dict = {}
+        assert evaluate_condition(cond, spark=spark, memo=batch_one) is False
+
+        spark.createDataFrame([(2,)], "id BIGINT").write.format("delta").mode("append").save(path)
+
+        batch_two: dict = {}
+        assert evaluate_condition(cond, spark=spark, memo=batch_two) is True
+
+    def test_no_memo_evaluates_fresh_every_time(self, spark, tmp_delta_path, monkeypatch):
+        from spark_helpers import create_delta_table
+
+        path = tmp_delta_path("memo_absent")
+        create_delta_table(spark, path, [{"id": 1}])
+        calls = self._counting_read(monkeypatch)
+
+        cond = ConditionSpec(when=f"row_count('{path}') > 0")
+        assert evaluate_condition(cond, spark=spark) is True
+        assert evaluate_condition(cond, spark=spark) is True
+        assert calls["n"] == 2

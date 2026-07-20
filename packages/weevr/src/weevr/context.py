@@ -33,7 +33,7 @@ from weevr.config.validation import (
     collect_trace_composition_warnings,
     validate_schema,
 )
-from weevr.delta import is_table_alias
+from weevr.delta import delta_table_exists
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
 from weevr.engine.runner import execute_loom, execute_weave
@@ -586,7 +586,12 @@ class Context:
         )
 
     def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
-        """Check that all sources referenced by threads exist."""
+        """Check that all sources referenced by threads exist.
+
+        Existence is a metadata question: Delta sources go through the
+        catalog or Delta-log check, file sources through a filesystem
+        probe — no reads, no schema inference, no Spark jobs.
+        """
         errors: list[str] = []
         checked: set[str] = set()
 
@@ -599,18 +604,35 @@ class Context:
                     continue
                 checked.add(resolve_path)
 
-                try:
-                    fmt = source.type if source.type != "excel" else "com.crealytics.spark.excel"
-                    if source.type == "delta" and is_table_alias(resolve_path):
-                        self._spark.read.format(fmt).table(resolve_path).limit(0).collect()
-                    else:
-                        self._spark.read.format(fmt).load(resolve_path).limit(0).collect()
-                except Exception:
+                if not self._source_location_exists(source.type, resolve_path):
                     errors.append(
                         f"Source '{source_name}' in thread '{thread_name}' "
                         f"not found: {resolve_path}"
                     )
         return errors
+
+    def _source_location_exists(self, source_type: str, resolve_path: str) -> bool:
+        """Job-free existence probe for a single source location.
+
+        Existence, not readability: a location that exists but holds
+        nothing parseable (an empty directory for a csv source, say)
+        counts as present here, where the old reader-based probe failed
+        schema inference and reported it missing. Deliberate — validate
+        mode answers "is the config pointed at something real", and
+        parse problems surface at execution with a better error. Same
+        posture as the catalog-vs-Delta-readable gap documented on
+        ``delta_table_exists``.
+        """
+        try:
+            if source_type == "delta":
+                return delta_table_exists(self._spark, resolve_path)
+            jvm: Any = self._spark._jvm  # noqa: SLF001
+            jsc: Any = self._spark._jsc  # noqa: SLF001
+            location = jvm.org.apache.hadoop.fs.Path(resolve_path)
+            fs = location.getFileSystem(jsc.hadoopConfiguration())
+            return bool(fs.exists(location))
+        except Exception:
+            return False
 
     @staticmethod
     def _collect_all_threads(resolved: _ResolvedConfig) -> dict[str, Thread]:

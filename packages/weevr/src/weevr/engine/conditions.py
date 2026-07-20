@@ -63,15 +63,29 @@ def _resolve_params(expr: str, params: dict[str, Any]) -> str:
     return _PARAM_REF.sub(_replace, expr)
 
 
-def _evaluate_builtins(expr: str, spark: SparkSession | None) -> str:
-    """Replace built-in function calls with their boolean/int results."""
+def _evaluate_builtins(
+    expr: str,
+    spark: SparkSession | None,
+    memo: dict[tuple[str, str], Any] | None = None,
+) -> str:
+    """Replace built-in function calls with their boolean/int results.
+
+    When *memo* is provided, each (builtin, argument) pair is computed
+    once and reused for the rest of the batch sharing the container.
+    """
 
     def _replace(match: re.Match[str]) -> str:
         func_name = match.group(1)
         arg = match.group(2)
         if spark is None:
             raise ExecutionError(f"Built-in check '{func_name}' requires a SparkSession")
-        result = _BUILTIN_FUNCS[func_name](spark, arg)
+        key = (func_name, arg)
+        if memo is not None and key in memo:
+            result = memo[key]
+        else:
+            result = _BUILTIN_FUNCS[func_name](spark, arg)
+            if memo is not None:
+                memo[key] = result
         if isinstance(result, bool):
             return "True" if result else "False"
         return str(result)
@@ -190,6 +204,7 @@ def evaluate_condition(
     condition: ConditionSpec,
     spark: SparkSession | None = None,
     params: dict[str, Any] | None = None,
+    memo: dict[tuple[str, str], Any] | None = None,
 ) -> bool:
     """Evaluate a condition specification.
 
@@ -202,6 +217,11 @@ def evaluate_condition(
             condition uses ``table_exists()``, ``table_empty()``, or
             ``row_count()``.
         params: Parameter dictionary for ``${param.x}`` references.
+        memo: Optional builtin-result cache shared by one evaluation
+            batch. Only pass a container whose evaluations are
+            semantically simultaneous — results are keyed by
+            (builtin, argument) with no invalidation, so a memo that
+            outlives its batch replays stale table state.
 
     Returns:
         True if the condition is met, False otherwise.
@@ -218,7 +238,7 @@ def evaluate_condition(
     expr = _resolve_params(expr, resolved_params)
 
     # Step 2: Evaluate built-in function calls
-    expr = _evaluate_builtins(expr, spark)
+    expr = _evaluate_builtins(expr, spark, memo)
 
     # Step 3: Evaluate boolean expression
     return _safe_eval(expr)

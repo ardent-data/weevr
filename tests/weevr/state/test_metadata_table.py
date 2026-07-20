@@ -137,3 +137,53 @@ class TestMetadataTableStore:
         y = store.read(spark, "thread_y")
         assert x is not None and x.last_value == "10"
         assert y is not None and y.last_value == "20"
+
+
+@pytest.mark.spark
+class TestEnsureDdlOnce:
+    """The ensure-DDL runs at most once per store instance."""
+
+    def test_ddl_once_across_reads_and_writes(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch
+    ) -> None:
+        path = tmp_delta_path("wm_ddl_once")
+        store = MetadataTableStore(path)
+        calls = {"ddl": 0}
+        real_sql = spark.sql
+
+        def counting_sql(query, *args, **kwargs):
+            if "CREATE TABLE IF NOT EXISTS" in query:
+                calls["ddl"] += 1
+            return real_sql(query, *args, **kwargs)
+
+        monkeypatch.setattr(spark, "sql", counting_sql)
+
+        state = WatermarkState(
+            thread_name="t1",
+            watermark_column="ts",
+            watermark_type="timestamp",
+            last_value="2024-01-01T00:00:00",
+            last_updated=datetime(2024, 6, 1, tzinfo=UTC),
+        )
+        assert store.read(spark, "t1") is None
+        store.write(spark, state)
+        assert store.read(spark, "t1") is not None
+        store.write(spark, state)
+
+        assert calls["ddl"] == 1
+
+    def test_fresh_instance_still_creates_table(self, spark: SparkSession, tmp_delta_path) -> None:
+        """The once-guard is per instance — a new store still ensures."""
+        path = tmp_delta_path("wm_ddl_fresh")
+        first = MetadataTableStore(path)
+        state = WatermarkState(
+            thread_name="t1",
+            watermark_column="ts",
+            watermark_type="timestamp",
+            last_value="2024-01-01T00:00:00",
+            last_updated=datetime(2024, 6, 1, tzinfo=UTC),
+        )
+        first.write(spark, state)
+
+        second = MetadataTableStore(path)
+        assert second.read(spark, "t1") is not None

@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, NamedTuple
 
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 from weevr.delta import read_delta
 from weevr.model.validation import Assertion
 from weevr.telemetry.results import AssertionResult
+
+
+class _SentinelCheck(NamedTuple):
+    """One (column, sentinel group) pair to rate-check against a threshold."""
+
+    col: str
+    group: str
+    sentinel: Any
+    threshold: float
 
 
 def evaluate_assertions(
@@ -22,6 +33,9 @@ def evaluate_assertions(
     and expression. Each assertion produces an AssertionResult with
     pass/fail status, details, and the configured severity.
 
+    The target is read once and shared across all assertions; each
+    assertion type answers its question in a single aggregation.
+
     Args:
         spark: Active SparkSession.
         assertions: List of assertion definitions to evaluate.
@@ -32,9 +46,23 @@ def evaluate_assertions(
     """
     results: list[AssertionResult] = []
 
+    try:
+        df = read_delta(spark, target_path)
+    except Exception as exc:
+        return [
+            AssertionResult(
+                assertion_type=assertion.type,
+                severity=assertion.severity,
+                passed=False,
+                details=f"Evaluation error: {exc}",
+                columns=assertion.columns,
+            )
+            for assertion in assertions
+        ]
+
     for assertion in assertions:
         try:
-            result = _evaluate_one(spark, assertion, target_path)
+            result = _evaluate_one(spark, assertion, df)
         except Exception as exc:
             result = AssertionResult(
                 assertion_type=assertion.type,
@@ -51,19 +79,19 @@ def evaluate_assertions(
 def _evaluate_one(
     spark: SparkSession,
     assertion: Assertion,
-    target_path: str,
+    df: DataFrame,
 ) -> AssertionResult:
-    """Evaluate a single assertion against the target."""
+    """Evaluate a single assertion against the target DataFrame."""
     if assertion.type == "row_count":
-        return _eval_row_count(spark, assertion, target_path)
+        return _eval_row_count(assertion, df)
     if assertion.type == "column_not_null":
-        return _eval_column_not_null(spark, assertion, target_path)
+        return _eval_column_not_null(assertion, df)
     if assertion.type == "unique":
-        return _eval_unique(spark, assertion, target_path)
+        return _eval_unique(assertion, df)
     if assertion.type == "expression":
-        return _eval_expression(spark, assertion, target_path)
+        return _eval_expression(spark, assertion, df)
     if assertion.type == "fk_sentinel_rate":
-        return _eval_fk_sentinel_rate(spark, assertion, target_path)
+        return _eval_fk_sentinel_rate(assertion, df)
     return AssertionResult(
         assertion_type=assertion.type,
         severity=assertion.severity,
@@ -73,12 +101,10 @@ def _evaluate_one(
 
 
 def _eval_row_count(
-    spark: SparkSession,
     assertion: Assertion,
-    target_path: str,
+    df: DataFrame,
 ) -> AssertionResult:
     """Check row count is within min/max bounds."""
-    df = read_delta(spark, target_path)
     count = df.count()
 
     if assertion.min is not None and count < assertion.min:
@@ -104,9 +130,8 @@ def _eval_row_count(
 
 
 def _eval_column_not_null(
-    spark: SparkSession,
     assertion: Assertion,
-    target_path: str,
+    df: DataFrame,
 ) -> AssertionResult:
     """Check that specified columns have no null values."""
     columns = assertion.columns or []
@@ -118,11 +143,19 @@ def _eval_column_not_null(
             details="No columns specified for column_not_null assertion",
         )
 
-    df = read_delta(spark, target_path)
+    # count() over a when() with no otherwise counts only the null rows,
+    # and is 0 (never NULL) on an empty table.
+    agg_row = df.agg(
+        *[
+            F.count(F.when(df[col].isNull(), 1)).alias(f"__null_{i}")
+            for i, col in enumerate(columns)
+        ]
+    ).first()
+    assert agg_row is not None
 
     null_counts: dict[str, int] = {}
-    for col in columns:
-        null_count = df.filter(df[col].isNull()).count()
+    for i, col in enumerate(columns):
+        null_count = agg_row[f"__null_{i}"]
         if null_count > 0:
             null_counts[col] = null_count
 
@@ -145,9 +178,8 @@ def _eval_column_not_null(
 
 
 def _eval_unique(
-    spark: SparkSession,
     assertion: Assertion,
-    target_path: str,
+    df: DataFrame,
 ) -> AssertionResult:
     """Check that specified columns form a unique key."""
     columns = assertion.columns or []
@@ -159,11 +191,20 @@ def _eval_unique(
             details="No columns specified for unique assertion",
         )
 
-    df = read_delta(spark, target_path)
-
-    total = df.count()
-    distinct = df.select(*columns).distinct().count()
-    duplicates = total - distinct
+    # groupBy groups NULL keys (unlike countDistinct, which drops them),
+    # so group count matches distinct().count() while sharing one pass
+    # with the total.
+    agg_row = (
+        df.groupBy(*columns)
+        .agg(F.count(F.lit(1)).alias("__group_rows"))
+        .agg(
+            F.coalesce(F.sum("__group_rows"), F.lit(0)).alias("__total"),
+            F.count(F.lit(1)).alias("__distinct"),
+        )
+        .first()
+    )
+    assert agg_row is not None
+    duplicates = agg_row["__total"] - agg_row["__distinct"]
 
     if duplicates > 0:
         return AssertionResult(
@@ -185,10 +226,9 @@ def _eval_unique(
 def _eval_expression(
     spark: SparkSession,
     assertion: Assertion,
-    target_path: str,
+    df: DataFrame,
 ) -> AssertionResult:
     """Evaluate a Spark SQL expression against the target table."""
-    df = read_delta(spark, target_path)
     expr = assertion.expression
 
     if not expr:
@@ -223,19 +263,48 @@ def _eval_expression(
 
 
 def _eval_fk_sentinel_rate(
-    spark: SparkSession,
     assertion: Assertion,
-    target_path: str,
+    df: DataFrame,
 ) -> AssertionResult:
     """Check FK sentinel value rates against thresholds.
 
     Supports single sentinel, named sentinel groups with shared or
-    per-group max_rate, and column/columns specification.
+    per-group max_rate, and column/columns specification. All sentinel
+    counts and the row total come from one aggregation.
     """
     from weevr.model.validation import SentinelGroup
 
-    df = read_delta(spark, target_path)
-    total = df.count()
+    # Determine columns to check
+    check_cols: list[str] = []
+    if assertion.column is not None:
+        check_cols = [assertion.column]
+    elif assertion.columns is not None:
+        check_cols = list(assertion.columns)
+
+    # Build sentinel groups to evaluate
+    groups: dict[str, SentinelGroup] = {}
+    if assertion.sentinels is not None:
+        groups = dict(assertion.sentinels)
+    elif assertion.sentinel is not None:
+        groups = {"default": SentinelGroup(value=assertion.sentinel)}
+
+    shared_max_rate = assertion.max_rate
+
+    checks: list[_SentinelCheck] = []
+    for col_name in check_cols:
+        for group_name, group in groups.items():
+            threshold = group.max_rate if group.max_rate is not None else shared_max_rate
+            if threshold is None:
+                continue
+            checks.append(_SentinelCheck(col_name, group_name, group.value, threshold))
+
+    agg_exprs = [F.count(F.lit(1)).alias("__total")] + [
+        F.count(F.when(df[check.col] == check.sentinel, 1)).alias(f"__sentinel_{i}")
+        for i, check in enumerate(checks)
+    ]
+    agg_row = df.agg(*agg_exprs).first()
+    assert agg_row is not None
+    total = agg_row["__total"]
 
     if total == 0:
         return AssertionResult(
@@ -246,13 +315,6 @@ def _eval_fk_sentinel_rate(
             columns=assertion.columns or ([assertion.column] if assertion.column else None),
         )
 
-    # Determine columns to check
-    check_cols: list[str] = []
-    if assertion.column is not None:
-        check_cols = [assertion.column]
-    elif assertion.columns is not None:
-        check_cols = list(assertion.columns)
-
     if not check_cols:
         return AssertionResult(
             assertion_type="fk_sentinel_rate",
@@ -261,32 +323,17 @@ def _eval_fk_sentinel_rate(
             details="fk_sentinel_rate requires column or columns to be set",
         )
 
-    # Build sentinel groups to evaluate
-    groups: dict[str, SentinelGroup] = {}
-    if assertion.sentinels is not None:
-        groups = dict(assertion.sentinels)
-    elif assertion.sentinel is not None:
-        groups = {"default": SentinelGroup(value=assertion.sentinel)}
-
-    shared_max_rate = assertion.max_rate
     failures: list[str] = []
+    for i, check in enumerate(checks):
+        sentinel_count = agg_row[f"__sentinel_{i}"]
+        rate = sentinel_count / total
 
-    for col_name in check_cols:
-        for group_name, group in groups.items():
-            sentinel_val = group.value
-            threshold = group.max_rate if group.max_rate is not None else shared_max_rate
-            if threshold is None:
-                continue
-
-            sentinel_count = df.filter(df[col_name] == sentinel_val).count()
-            rate = sentinel_count / total
-
-            if rate > threshold:
-                failures.append(
-                    f"column '{col_name}' sentinel group '{group_name}': "
-                    f"rate {rate:.2%} exceeds threshold {threshold:.2%} "
-                    f"(sentinel={sentinel_val}, count={sentinel_count}/{total})"
-                )
+        if rate > check.threshold:
+            failures.append(
+                f"column '{check.col}' sentinel group '{check.group}': "
+                f"rate {rate:.2%} exceeds threshold {check.threshold:.2%} "
+                f"(sentinel={check.sentinel}, count={sentinel_count}/{total})"
+            )
 
     if failures:
         msg = assertion.message or "FK sentinel rate exceeded"

@@ -409,3 +409,132 @@ class TestEC010PartialStatus:
         assert any(r.thread_name == "C" for r in succeeded)
         assert "B" in result.threads_skipped
         assert result.duration_ms >= 0
+
+
+# ---------------------------------------------------------------------------
+# Condition memo scope — shared within a group batch, fresh across groups
+# ---------------------------------------------------------------------------
+
+
+class TestConditionMemoScope:
+    def test_same_builtin_shared_within_group(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch
+    ) -> None:
+        """Two same-group threads with the same builtin probe share one scan."""
+        from weevr.engine import conditions as conditions_mod
+        from weevr.model.weave import ConditionSpec
+
+        src_c = tmp_delta_path("memo_group_src_c")
+        src_d = tmp_delta_path("memo_group_src_d")
+        gate = tmp_delta_path("memo_group_gate")
+        tgt_c = tmp_delta_path("memo_group_tgt_c")
+        tgt_d = tmp_delta_path("memo_group_tgt_d")
+        create_delta_table(spark, src_c, [{"id": 1}])
+        create_delta_table(spark, src_d, [{"id": 2}])
+        create_delta_table(spark, gate, [{"id": 9}])
+
+        calls = {"n": 0}
+        real_read = conditions_mod.read_delta
+
+        def counting(spark_arg, path_arg):
+            calls["n"] += 1
+            return real_read(spark_arg, path_arg)
+
+        monkeypatch.setattr(conditions_mod, "read_delta", counting)
+
+        threads = {
+            "C": _thread("C", src_c, tgt_c),
+            "D": _thread("D", src_d, tgt_d),
+        }
+        plan = build_plan("test_weave", threads, _entries("C", "D"))
+        condition = ConditionSpec(when=f"row_count('{gate}') > 0")
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            thread_conditions={"C": condition, "D": condition},
+        )
+
+        assert result.status == "success"
+        assert result.threads_skipped == []
+        assert calls["n"] == 1
+
+    def test_group_two_condition_observes_group_one_write(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """The stale-memo trap: a later group's condition must evaluate fresh.
+
+        C (group 1) probes A's yet-unwritten target and is skipped; B
+        (group 2, downstream of A) probes the same table after A has
+        written it and must run. A memo outliving the group batch would
+        replay C's zero and wrongly skip B.
+        """
+        from weevr.model.weave import ConditionSpec
+
+        src_a = tmp_delta_path("memo_stale_src_a")
+        src_c = tmp_delta_path("memo_stale_src_c")
+        tgt_a = tmp_delta_path("memo_stale_tgt_a")
+        tgt_b = tmp_delta_path("memo_stale_tgt_b")
+        tgt_c = tmp_delta_path("memo_stale_tgt_c")
+        create_delta_table(spark, src_a, [{"id": 1}])
+        create_delta_table(spark, src_c, [{"id": 3}])
+
+        threads = {
+            "A": _thread("A", src_a, tgt_a),
+            "B": _thread("B", tgt_a, tgt_b),
+            "C": _thread("C", src_c, tgt_c),
+        }
+        plan = build_plan("test_weave", threads, _entries("A", "B", "C"))
+        assert "A" in plan.dependencies["B"]
+
+        condition = ConditionSpec(when=f"row_count('{tgt_a}') > 0")
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            thread_conditions={"B": condition, "C": condition},
+        )
+
+        assert result.threads_skipped == ["C"]
+        statuses = {r.thread_name: r.status for r in result.thread_results}
+        assert statuses["A"] == "success"
+        assert statuses["B"] == "success"
+
+    def test_weave_condition_observes_earlier_weave_write(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """The loom-level site carries no memo: each weave probes fresh."""
+        src1 = tmp_delta_path("memo_loom_src1")
+        tgt1 = tmp_delta_path("memo_loom_tgt1")
+        src2 = tmp_delta_path("memo_loom_src2")
+        tgt2 = tmp_delta_path("memo_loom_tgt2")
+        create_delta_table(spark, src1, [{"id": 1}])
+        create_delta_table(spark, src2, [{"id": 2}])
+
+        loom = Loom.model_validate(
+            {
+                "name": "memo_loom",
+                "config_version": "1",
+                "weaves": [
+                    {"name": "weave1", "condition": {"when": f"row_count('{tgt1}') == 0"}},
+                    {"name": "weave2", "condition": {"when": f"row_count('{tgt1}') > 0"}},
+                ],
+            }
+        )
+        weaves = {
+            "weave1": Weave.model_validate(
+                {"config_version": "1", "name": "weave1", "threads": ["t1"]}
+            ),
+            "weave2": Weave.model_validate(
+                {"config_version": "1", "name": "weave2", "threads": ["t2"]}
+            ),
+        }
+        threads = {
+            "weave1": {"t1": _thread("t1", src1, tgt1)},
+            "weave2": {"t2": _thread("t2", src2, tgt2)},
+        }
+
+        result = execute_loom(spark, loom, weaves, threads)
+
+        assert result.status == "success"
+        assert [w.status for w in result.weave_results] == ["success", "success"]
