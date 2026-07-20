@@ -174,3 +174,39 @@ class TestValidationOutcome:
     def test_slots(self):
         """ValidationOutcome uses __slots__ for memory efficiency."""
         assert hasattr(ValidationOutcome, "__slots__")
+
+
+@pytest.mark.spark
+class TestTagBatching:
+    """Rule tags apply in one mutation; per-rule failure granularity kept."""
+
+    def test_invalid_rule_isolated_and_valid_rules_batched(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame([{"v": 5}, {"v": -1}])
+        rules = [
+            ValidationRule(name="ok1", rule="v >= 0", severity="error"),
+            ValidationRule(name="broken", rule="nonsense_fn(v)", severity="error"),
+            ValidationRule(name="ok2", rule="v < 100", severity="error"),
+        ]
+        outcome = validate_dataframe(df, rules)
+        by_name = {r.rule_name: r for r in outcome.validation_results}
+        assert by_name["broken"].applied is False
+        assert by_name["ok1"].applied is not False
+        assert by_name["ok2"].applied is not False
+
+    def test_rule_probes_launch_zero_jobs(
+        self, spark: SparkSession, job_counter, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Isolate the probe phase: skip the (pre-existing) results
+        # aggregation so any JVM job inside the with-block can only come
+        # from the per-rule analysis probes — which must be analysis-only
+        from weevr.operations import validation as validation_mod
+
+        monkeypatch.setattr(validation_mod, "_compute_results", lambda *a, **k: [])
+        df = spark.createDataFrame([{"v": 5}])
+        rules = [
+            ValidationRule(name="ok1", rule="v >= 0", severity="error"),
+            ValidationRule(name="broken", rule="nonsense_fn(v)", severity="error"),
+        ]
+        with job_counter() as jc:
+            validate_dataframe(df, rules)
+        assert jc.jobs == 0  # probing is catalyst analysis, never a job

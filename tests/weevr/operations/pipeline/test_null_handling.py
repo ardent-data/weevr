@@ -470,3 +470,47 @@ class TestFillLiteral:
         field = StructField("amount", IntegerType())
         with pytest.raises(TypeError, match="Decimal fill value.*IntegerType"):
             _fill_literal(field, Decimal("1"))
+
+
+@pytest.mark.spark
+class TestFillNullBatching:
+    """Conditional type-default fills batch when the where is clean."""
+
+    @staticmethod
+    def _df(spark: SparkSession, rows):  # type: ignore[no-untyped-def]
+        return spark.createDataFrame(
+            rows,
+            schema=StructType(
+                [
+                    StructField("a", StringType()),
+                    StructField("b", StringType()),
+                    StructField("flag", IntegerType()),
+                ]
+            ),
+        )
+
+    def test_plain_where_batches_with_identical_results(self, spark: SparkSession) -> None:
+        df = self._df(spark, [(None, None, 1), ("x", "y", 0)])
+        params = FillNullParams(mode="type_defaults", code="unknown", where="flag = 1")
+        rows = {r["flag"]: r for r in apply_fill_null(df, params).df.collect()}
+        assert rows[1]["a"] == "Unknown" and rows[1]["b"] == "Unknown"
+        assert rows[0]["a"] == "x" and rows[0]["b"] == "y"
+
+    def test_where_naming_filled_column_falls_back_byte_identical(
+        self, spark: SparkSession
+    ) -> None:
+        # `where` references 'a', itself a filled column: sequentially,
+        # filling 'a' first makes the condition false for 'b''s pass — the
+        # observable chaining the scan must preserve
+        df = self._df(spark, [(None, None, 1)])
+        params = FillNullParams(mode="type_defaults", code="unknown", where="a IS NULL")
+        row = apply_fill_null(df, params).df.collect()[0]
+        assert row["a"] == "Unknown"
+        assert row["b"] is None  # b's pass saw the FILLED a → condition false
+
+    def test_case_variant_where_reference_falls_back(self, spark: SparkSession) -> None:
+        df = self._df(spark, [(None, None, 1)])
+        params = FillNullParams(mode="type_defaults", code="unknown", where="A IS NULL")
+        row = apply_fill_null(df, params).df.collect()[0]
+        assert row["a"] == "Unknown"
+        assert row["b"] is None  # same sequential outcome — case is no escape

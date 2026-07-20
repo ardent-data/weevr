@@ -1,5 +1,7 @@
 """Tests for column-ops pipeline step handlers — string_ops, date_ops, type selectors."""
 
+from typing import Any
+
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql import types as T
@@ -208,3 +210,53 @@ class TestApplyDateOps:
         params = DateOpsParams(columns=["*:timestamp"], expr="date_format({col}, 'yyyy-MM-dd')")
         result = apply_date_ops(df, params)
         assert result.collect()[0]["ts"] == "2024-01-01"
+
+
+@pytest.mark.spark
+class TestTemplateBatching:
+    """string_ops/date_ops batch when safe, fall back when siblings named."""
+
+    def test_plain_template_batches_with_identical_results(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame(
+            [{"a": " x ", "b": " y ", "keep": 1}, {"a": " p ", "b": " q ", "keep": 2}]
+        )
+        params = StringOpsParams(columns=["a", "b"], expr="trim({col})")
+        result = apply_string_ops(df, params)
+        rows = sorted(result.collect(), key=lambda r: r["keep"])
+        assert [r["a"] for r in rows] == ["x", "p"]
+        assert [r["b"] for r in rows] == ["y", "q"]
+        # Batched: a single projection over the pre-batch frame
+        jdf: Any = result._jdf
+        plan = str(jdf.queryExecution().optimizedPlan())
+        assert plan.count("Project") <= 2
+
+    def test_sibling_template_falls_back_order_discriminating(self, spark: SparkSession) -> None:
+        # The template names 'a', the FIRST processed column: sequentially,
+        # 'b' reads the already-MODIFIED a ("11"); batched, it would read
+        # the pre-batch a ("1"). The assertion fails if the scan ever lets
+        # this template batch — a genuinely discriminating lock.
+        df = spark.createDataFrame([{"a": "1", "b": "2"}])
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, a)")
+        result = apply_string_ops(df, params)
+        row = result.collect()[0]
+        assert row["a"] == "11"  # a = a + a
+        assert row["b"] == "211"  # b + MODIFIED a; batched would give "21"
+
+    def test_case_variant_sibling_falls_back(self, spark: SparkSession) -> None:
+        df = spark.createDataFrame([{"a": "1", "b": "2"}])
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, A)")
+        result = apply_string_ops(df, params)
+        row = result.collect()[0]
+        assert row["a"] == "11"
+        assert row["b"] == "211"  # same discriminating outcome — case is no escape
+
+    def test_literal_backtick_template_falls_back_discriminating(self, spark: SparkSession) -> None:
+        # The reviewer's reproduction, end-to-end: backticks inside string
+        # literals surrounding a real reference to the first-processed
+        # column — must take the sequential path
+        df = spark.createDataFrame([{"a": "1", "b": "2"}])
+        params = StringOpsParams(columns=["a", "b"], expr="concat({col}, 'x`', a, '`y')")
+        result = apply_string_ops(df, params)
+        row = result.collect()[0]
+        assert row["a"] == "1x`1`y"
+        assert row["b"] == "2x`1x`1`y`y"  # sequential: reads MODIFIED a
