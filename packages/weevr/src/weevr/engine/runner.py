@@ -289,13 +289,19 @@ def execute_weave(
                         threads_skipped.append(name)
                 continue
 
-            # Evaluate conditions for pending threads before execution
+            # Evaluate conditions for pending threads before execution.
+            # The builtin memo lives strictly within this group's batch —
+            # all evaluations here are semantically simultaneous, while a
+            # later group must observe writes made by this one.
             conditions = thread_conditions or {}
+            condition_memo: dict[tuple[str, str], Any] = {}
             for name in group:
                 if (
                     thread_states[name] == "pending"
                     and name in conditions
-                    and not evaluate_condition(conditions[name], spark=spark, params=params)
+                    and not evaluate_condition(
+                        conditions[name], spark=spark, params=params, memo=condition_memo
+                    )
                 ):
                     thread_states[name] = "skipped"
                     threads_skipped.append(name)
@@ -719,7 +725,9 @@ def execute_loom(
         for weave_entry in loom.weaves:
             weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
 
-            # Evaluate weave-level condition
+            # Evaluate weave-level condition. Deliberately memo-less:
+            # each weave's condition runs once, with weave executions in
+            # between, so any carried cache would be stale by construction.
             if weave_entry.condition is not None and not evaluate_condition(
                 weave_entry.condition, spark=spark, params=params
             ):
