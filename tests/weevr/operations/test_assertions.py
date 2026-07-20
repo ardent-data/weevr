@@ -262,3 +262,92 @@ class TestFkSentinelRate:
         ]
         results = evaluate_assertions(spark, assertions, path)
         assert results[0].passed is True
+
+
+# ---------------------------------------------------------------------------
+# Scan hygiene: one read per evaluation, one aggregation per assertion type
+# ---------------------------------------------------------------------------
+
+
+class TestScanHygiene:
+    def test_one_read_for_many_assertions(self, spark, target_df, monkeypatch):
+        """The target is read once no matter how many assertions run."""
+        import weevr.operations.assertions as assertions_mod
+
+        calls = {"n": 0}
+        real_read = assertions_mod.read_delta
+
+        def counting_read(spark_arg, path_arg):
+            calls["n"] += 1
+            return real_read(spark_arg, path_arg)
+
+        monkeypatch.setattr(assertions_mod, "read_delta", counting_read)
+        assertions = [
+            Assertion(type="row_count", min=1),
+            Assertion(type="column_not_null", columns=["id", "amount"]),
+            Assertion(type="unique", columns=["id"]),
+            Assertion(type="expression", expression=SparkExpr("count(*) >= 1")),
+        ]
+        results = evaluate_assertions(spark, assertions, target_df)
+        assert [r.passed for r in results] == [True, True, True, True]
+        assert calls["n"] == 1
+
+    def test_missing_table_errors_every_assertion(self, spark, tmp_delta_path):
+        """A failed read surfaces as an evaluation error on each assertion."""
+        path = tmp_delta_path("assertion_missing")
+        assertions = [
+            Assertion(type="row_count", min=1),
+            Assertion(type="unique", columns=["id"]),
+        ]
+        results = evaluate_assertions(spark, assertions, path)
+        assert len(results) == 2
+        assert all(r.passed is False for r in results)
+        assert all("Evaluation error" in r.details for r in results)
+        assert results[1].columns == ["id"]
+
+    def test_column_not_null_single_aggregation(self, spark, target_df, spark_action_counter):
+        """Multi-column not-null resolves in one aggregation, not one scan per column."""
+        assertions = [Assertion(type="column_not_null", columns=["id", "name", "amount"])]
+        results = evaluate_assertions(spark, assertions, target_df)
+        assert results[0].passed is False
+        assert "'name' has 1 nulls" in results[0].details
+        assert spark_action_counter["total"] == 1
+
+    def test_column_not_null_empty_table_passes(self, spark, tmp_delta_path):
+        path = tmp_delta_path("not_null_empty")
+        spark.createDataFrame([], "id: int, name: string").write.format("delta").save(path)
+        results = evaluate_assertions(
+            spark, [Assertion(type="column_not_null", columns=["id", "name"])], path
+        )
+        assert results[0].passed is True
+
+    def test_unique_single_pass(self, spark, dup_target_df, spark_action_counter):
+        """Unique check computes total and distinct in one action over the table."""
+        results = evaluate_assertions(
+            spark, [Assertion(type="unique", columns=["id", "name"])], dup_target_df
+        )
+        assert results[0].passed is False
+        assert "1 duplicate rows" in results[0].details
+        assert spark_action_counter["total"] == 1
+
+    def test_unique_counts_null_keys_as_distinct_values(self, spark, tmp_delta_path):
+        """NULL key rows group together — same answer distinct() gave."""
+        path = tmp_delta_path("null_key_unique")
+        spark.createDataFrame([(1,), (None,), (None,)], "id INT").write.format("delta").save(path)
+        results = evaluate_assertions(spark, [Assertion(type="unique", columns=["id"])], path)
+        assert results[0].passed is False
+        assert "1 duplicate rows" in results[0].details
+
+    def test_fk_sentinel_single_aggregation(self, spark, fk_target_df, spark_action_counter):
+        """Columns x groups resolve in one aggregation, not one scan per pair."""
+        assertions = [
+            Assertion(
+                type="fk_sentinel_rate",
+                columns=["plant_id", "company_id"],
+                sentinels={"invalid": -4, "unknown": -1},  # type: ignore[arg-type]
+                max_rate=0.25,
+            )
+        ]
+        results = evaluate_assertions(spark, assertions, fk_target_df)
+        assert results[0].passed is True
+        assert spark_action_counter["total"] == 1
