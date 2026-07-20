@@ -139,6 +139,15 @@ def write_target(
     if handle is None:
         handle = TargetHandle(spark, target_path)
     target_exists = handle.exists()
+    if not target_exists and mode in ("append", "merge") and handle.exists_uncertain():
+        # A failed probe is not a confirmed absence — the first-write
+        # branch would overwrite a target that may exist. Overwrite mode
+        # is exempt: destructive by contract.
+        raise ExecutionError(
+            f"Cannot {mode} to '{target_path}': the existence probe failed, so "
+            f"the target may already exist and the first-write path would "
+            f"overwrite it; resolve the probe failure and re-run"
+        )
 
     try:
         # Merge keeps an eager input count — merge metrics express outcome
@@ -440,9 +449,17 @@ def execute_cdc_merge(
         )
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
-    target_exists = (
-        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
-    )
+    if handle is None:
+        handle = TargetHandle(spark, target_path)
+    target_exists = handle.exists()
+    if not target_exists and handle.exists_uncertain():
+        # Same posture as write_target: a failed probe must never route
+        # onto the destructive first-CDC-write (overwrite) branch.
+        raise ExecutionError(
+            f"Cannot run CDC merge on '{target_path}': the existence probe "
+            f"failed, so the target may already exist and the first-write "
+            f"path would overwrite it; resolve the probe failure and re-run"
+        )
 
     try:
         # Count operations in a single pass over the (reduced) window

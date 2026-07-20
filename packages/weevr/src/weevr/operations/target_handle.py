@@ -34,13 +34,30 @@ class TargetHandle:
         self._spark = spark
         self.path = path
         self._exists: bool | None = None
+        self._exists_uncertain = False
         self._version_read_failed = False
 
     def exists(self) -> bool:
-        """Whether a Delta table exists at the target (cached until refresh)."""
+        """Whether a Delta table exists at the target (cached until refresh).
+
+        A probe *failure* is folded into False for this method's bool
+        contract, but recorded on :meth:`exists_uncertain` — the write
+        path must not treat "could not ask" as "confirmed absent".
+        """
         if self._exists is None:
-            self._exists = _delta.delta_table_exists(self._spark, self.path)
+            self._exists_uncertain = False
+            try:
+                self._exists = _delta.probe_delta_table_exists(self._spark, self.path)
+            except Exception as exc:
+                logger.warning("Existence probe failed for '%s': %s", self.path, exc)
+                self._exists = False
+                self._exists_uncertain = True
         return self._exists
+
+    def exists_uncertain(self) -> bool:
+        """True when the cached False came from a failed probe, not a clean answer."""
+        self.exists()
+        return self._exists_uncertain
 
     def refresh(self) -> None:
         """Invalidate the cached existence after an engine-internal commit.
@@ -49,6 +66,7 @@ class TargetHandle:
         thread makes to its own target before the primary write.
         """
         self._exists = None
+        self._exists_uncertain = False
 
     def mark_exists(self) -> None:
         """Record that the target now exists without re-probing.
@@ -57,6 +75,7 @@ class TargetHandle:
         existence is monotonic within a run.
         """
         self._exists = True
+        self._exists_uncertain = False
 
     def current_version(self) -> int | None:
         """The target's latest Delta commit version, or None when absent.

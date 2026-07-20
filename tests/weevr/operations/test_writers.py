@@ -631,6 +631,127 @@ class TestWriteTargetMerge:
 
 
 @pytest.mark.spark
+class TestUncertainExistenceGuard:
+    """A failed existence probe must never route append/merge onto the
+    destructive first-write (overwrite) branch."""
+
+    @staticmethod
+    def _break_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+        import weevr.delta as delta_mod
+
+        def _boom(spark_arg, path_arg):  # type: ignore[no-untyped-def]
+            raise RuntimeError("transient metastore outage")
+
+        monkeypatch.setattr(delta_mod, "probe_delta_table_exists", _boom)
+
+    def test_append_uncertain_raises_and_preserves_content(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        path = tmp_delta_path("uncertain_append")
+        create_delta_table(spark, path, [{"id": 99, "val": "keep"}])
+        self._break_probe(monkeypatch)
+
+        target = Target(path=path)
+        with pytest.raises(ExecutionError) as exc_info:
+            write_target(spark, simple_df, target, WriteConfig(mode="append"), path)
+        message = str(exc_info.value)
+        assert path in message
+        assert "append" in message
+        assert "probe" in message.lower()
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert [r["val"] for r in result.collect()] == ["keep"]
+
+    def test_merge_uncertain_raises_and_preserves_content(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        path = tmp_delta_path("uncertain_merge")
+        create_delta_table(spark, path, [{"id": 99, "val": "keep"}])
+        self._break_probe(monkeypatch)
+
+        target = Target(path=path)
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        with pytest.raises(ExecutionError) as exc_info:
+            write_target(spark, simple_df, target, write_config, path)
+        message = str(exc_info.value)
+        assert path in message
+        assert "merge" in message
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert [r["val"] for r in result.collect()] == ["keep"]
+
+    def test_probe_failure_logs_warning_naming_target(
+        self,
+        spark: SparkSession,
+        simple_df,
+        tmp_delta_path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog,
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        path = tmp_delta_path("uncertain_logged")
+        self._break_probe(monkeypatch)
+
+        with pytest.raises(ExecutionError):
+            write_target(spark, simple_df, Target(path=path), WriteConfig(mode="append"), path)
+        assert path in caplog.text
+        assert "transient metastore outage" in caplog.text
+
+    def test_overwrite_uncertain_proceeds(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Overwrite is destructive by contract — uncertainty does not block it."""
+        path = tmp_delta_path("uncertain_overwrite")
+        create_delta_table(spark, path, [{"id": 99, "val": "old"}])
+        self._break_probe(monkeypatch)
+
+        write_target(spark, simple_df, Target(path=path), WriteConfig(mode="overwrite"), path)
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
+        assert result.filter("id = 99").count() == 0
+
+    def test_cdc_first_write_uncertain_raises_and_preserves_content(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+        from weevr.model.load import CdcConfig
+        from weevr.operations.writers import execute_cdc_merge
+
+        path = tmp_delta_path("uncertain_cdc")
+        create_delta_table(spark, path, [{"id": 99, "val": "keep"}])
+        self._break_probe(monkeypatch)
+
+        incoming = spark.createDataFrame([{"id": 1, "val": "a", "op": "I"}])
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        cdc_config = CdcConfig(operation_column="op", insert_value="I")
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_cdc_merge(spark, incoming, path, write_config, cdc_config)
+        assert path in str(exc_info.value)
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert [r["val"] for r in result.collect()] == ["keep"]
+
+    def test_clean_absent_first_write_unaffected(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        """A probe that cleanly answers False keeps today's first-write behavior."""
+        path = tmp_delta_path("clean_absent_append")
+        rows = write_target(spark, simple_df, Target(path=path), WriteConfig(mode="append"), path)
+        assert rows == 2
+        assert spark.read.format("delta").load(path).count() == 2
+
+
+@pytest.mark.spark
 class TestCommitMetricsCounts:
     """Write counts come from guarded commit metrics on single-pass paths."""
 

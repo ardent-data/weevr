@@ -75,3 +75,25 @@ class TestDeltaTableExists:
         with job_counter() as jc:
             assert delta_table_exists(spark, alias_table) is True
         assert jc.jobs == 0
+
+
+class TestProbeFailure:
+    """A probe failure is not a probe answer — it must leave a diagnostic trail."""
+
+    def test_probe_failure_returns_false_with_warning(self, spark, monkeypatch, caplog):
+        """The bool contract holds (False), but the failure is logged with its cause."""
+        import weevr.delta as delta_mod
+
+        def _boom(spark_arg, path_arg):
+            raise RuntimeError("transient catalog outage")
+
+        monkeypatch.setattr(delta_mod, "probe_delta_table_exists", _boom)
+        assert delta_table_exists(spark, "default.exists_probe_broken") is False
+        assert "default.exists_probe_broken" in caplog.text
+        assert "transient catalog outage" in caplog.text
+
+    def test_probe_success_logs_nothing(self, spark, tmp_delta_path, caplog):
+        """A clean absent answer stays silent — no phantom failure warnings."""
+        path = tmp_delta_path("exists_probe_clean_absent")
+        assert delta_table_exists(spark, path) is False
+        assert "probe" not in caplog.text.lower()
