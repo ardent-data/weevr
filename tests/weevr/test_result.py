@@ -1549,3 +1549,42 @@ class TestSummaryExports:
         )
         text = result.summary()
         assert "Exports:" not in text
+
+
+class TestSummaryPreviewMetadata:
+    """summary() on preview results is pure formatting over stored metadata."""
+
+    class _Poison:
+        """Fails loudly on any attribute access — a stand-in DataFrame."""
+
+        def __getattr__(self, name: str):
+            raise AssertionError("summary must not touch preview DataFrames")
+
+    def test_summary_reads_metadata_not_dataframes(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+            preview_data={"dim_customer": self._Poison()},
+        )
+        result._preview_metadata = {
+            "dim_customer": {
+                "output_schema": [("id", "bigint"), ("name", "string")],
+                "row_count": 42,
+            }
+        }
+        s = result.summary()
+        assert "2 cols" in s
+        assert "42 rows" in s
+
+    def test_summary_missing_metadata_degrades(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+            preview_data={"dim_customer": self._Poison()},
+        )
+        s = result.summary()
+        assert "(unavailable)" in s

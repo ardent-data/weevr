@@ -471,12 +471,14 @@ class RunResult:
         if self.preview_data:
             lines.append("")
             lines.append("Preview:")
-            for name, df in self.preview_data.items():
-                try:
-                    cols = len(df.columns)
-                    rows = df.count()
-                    lines.append(f"  {name}  {cols} cols \u00d7 {rows} rows")
-                except Exception:
+            preview_meta = self._preview_metadata or {}
+            for name in self.preview_data:
+                meta = preview_meta.get(name) or {}
+                output_schema = meta.get("output_schema")
+                rows = meta.get("row_count")
+                if output_schema is not None and rows is not None:
+                    lines.append(f"  {name}  {len(output_schema)} cols \u00d7 {rows} rows")
+                else:
                     lines.append(f"  {name}  (unavailable)")
 
         return lines
