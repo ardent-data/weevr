@@ -14,10 +14,6 @@ if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
     from weevr.model.thread import Thread
 
-    # Annotation-only: weevr.result lazily imports this module for
-    # _repr_html_, so a runtime import here would be cyclic.
-    from weevr.result import PreviewThreadMetadata
-
 # ---------------------------------------------------------------------------
 # SVG layout constants
 # ---------------------------------------------------------------------------
@@ -3298,9 +3294,11 @@ def _render_preview_html(result: Any) -> str:
     config_name = html.escape(str(getattr(result, "config_name", "")))
     duration_ms = getattr(result, "duration_ms", 0) or 0
     preview_data: dict[str, Any] = getattr(result, "preview_data", None) or {}
-    preview_meta: dict[str, PreviewThreadMetadata] = (
-        getattr(result, "_preview_metadata", None) or {}
-    )
+    # Duck-typed like every other field read here; the metadata shape is
+    # defined once as PreviewThreadMetadata in weevr.result (not imported —
+    # weevr.result lazily imports this module, so any import edge back
+    # would be cyclic).
+    preview_meta: dict[str, dict[str, Any]] = getattr(result, "_preview_metadata", None) or {}
     telemetry = getattr(result, "telemetry", None)
     resolved = getattr(result, "_resolved_threads", None) or {}
     warnings: list[str] = getattr(result, "warnings", []) or []
