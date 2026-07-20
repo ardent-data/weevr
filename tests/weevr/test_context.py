@@ -1274,3 +1274,70 @@ write:
         assert "samples" not in meta
         assert "step_stats" not in meta
         assert result.preview_data is not None and "pdeg" in result.preview_data
+
+
+@pytest.mark.spark
+class TestValidateModeSourceProbes:
+    """Validate-mode existence probes: same reports, zero Spark jobs."""
+
+    def _thread_with_source(self, stype: str, location: str, tgt: str) -> Thread:
+        source: dict = {"type": stype}
+        if stype == "delta":
+            source["alias"] = location
+        else:
+            source["path"] = location
+        return Thread.model_validate(
+            {
+                "name": "probe_t",
+                "config_version": "1",
+                "sources": {"main": source},
+                "target": {"path": tgt},
+            }
+        )
+
+    def test_validate_mode_probe_matrix(self, spark: SparkSession, tmp_path: Path) -> None:
+        delta_src = str(tmp_path / "probe_delta")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(delta_src)
+        csv_src = tmp_path / "probe.csv"
+        csv_src.write_text("id,val\n1,a\n")
+        json_src = tmp_path / "probe.json"
+        json_src.write_text('{"id": 1}\n')
+        tgt = str(tmp_path / "probe_tgt")
+
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        present = {
+            "d": self._thread_with_source("delta", delta_src, tgt),
+            "c": self._thread_with_source("csv", str(csv_src), tgt),
+            "j": self._thread_with_source("json", str(json_src), tgt),
+        }
+        assert ctx._check_source_existence(present) == []
+
+        missing = {
+            "d": self._thread_with_source("delta", str(tmp_path / "no_delta"), tgt),
+            "c": self._thread_with_source("csv", str(tmp_path / "no.csv"), tgt),
+            "j": self._thread_with_source("json", str(tmp_path / "no.json"), tgt),
+        }
+        errors = ctx._check_source_existence(missing)
+        assert len(errors) == 3
+        assert all("not found" in e for e in errors)
+
+    def test_validate_mode_probes_launch_zero_jobs(
+        self, spark: SparkSession, tmp_path: Path, job_counter
+    ) -> None:
+        delta_src = str(tmp_path / "zerojob_delta")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(delta_src)
+        csv_src = tmp_path / "zerojob.csv"
+        csv_src.write_text("id,val\n1,a\n2,b\n")
+        json_src = tmp_path / "zerojob.json"
+        json_src.write_text('{"id": 1}\n{"id": 2}\n')
+        tgt = str(tmp_path / "zerojob_tgt")
+
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {
+            "d": self._thread_with_source("delta", delta_src, tgt),
+            "c": self._thread_with_source("csv", str(csv_src), tgt),
+            "j": self._thread_with_source("json", str(json_src), tgt),
+        }
+        with job_counter() as jc:
+            assert ctx._check_source_existence(threads) == []
+        assert jc.jobs == 0
