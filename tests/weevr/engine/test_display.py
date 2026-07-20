@@ -2067,3 +2067,24 @@ class TestLayoutBaseline:
         )
         baseline = (Path(__file__).parent / "fixtures" / "dag_layout_baseline.svg").read_text()
         assert render_dag_svg(plan) == baseline
+
+
+class TestDisplayPurity:
+    """display.py is pure formatting — it never computes over DataFrames."""
+
+    def test_no_dataframe_method_calls_in_source(self) -> None:
+        import inspect
+
+        from weevr.engine import display
+
+        source = Path(inspect.getfile(display)).read_text()
+        forbidden = (
+            ".count()",
+            ".collect()",
+            ".toPandas()",
+            ".first()",
+            ".take(",
+            ".limit(",
+        )
+        hits = [pattern for pattern in forbidden if pattern in source]
+        assert hits == [], f"DataFrame computation crept into display.py: {hits}"
