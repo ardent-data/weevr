@@ -1549,3 +1549,56 @@ class TestSummaryExports:
         )
         text = result.summary()
         assert "Exports:" not in text
+
+
+class TestSummaryPreviewMetadata:
+    """summary() on preview results is pure formatting over stored metadata."""
+
+    # A bare object() stands in for the DataFrame: it has no DataFrame
+    # surface at all, so any attribute access (df.count, df.columns)
+    # raises AttributeError and errors the test.
+
+    def test_summary_reads_metadata_not_dataframes(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+            preview_data={"dim_customer": object()},
+        )
+        result._preview_metadata = {
+            "dim_customer": {
+                "output_schema": [("id", "bigint"), ("name", "string")],
+                "row_count": 42,
+            }
+        }
+        s = result.summary()
+        assert "2 cols" in s
+        assert "42 rows" in s
+
+    def test_summary_missing_metadata_degrades(self) -> None:
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+            preview_data={"dim_customer": object()},
+        )
+        s = result.summary()
+        assert "(unavailable)" in s
+
+    def test_summary_zero_row_preview_renders_zero(self) -> None:
+        """A 0-row preview is a real answer, not a degrade case."""
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PREVIEW,
+            config_type="thread",
+            config_name="dim_customer",
+            preview_data={"dim_customer": object()},
+        )
+        result._preview_metadata = {
+            "dim_customer": {"output_schema": [("id", "bigint")], "row_count": 0}
+        }
+        s = result.summary()
+        assert "1 cols × 0 rows" in s
+        assert "(unavailable)" not in s

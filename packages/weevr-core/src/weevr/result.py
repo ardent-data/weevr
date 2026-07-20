@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from weevr.engine.formatting import format_duration as _format_duration
 
@@ -44,6 +44,22 @@ class ExecutionMode(StrEnum):
     VALIDATE = "validate"
     PLAN = "plan"
     PREVIEW = "preview"
+
+
+class PreviewThreadMetadata(TypedDict, total=False):
+    """Per-thread metadata captured once at preview build time.
+
+    The single definition of the contract between the preview builder
+    (``Context._run_preview``, which writes it) and the renderers
+    (``weevr.engine.display`` and :meth:`RunResult.summary`, which read
+    it). Every key is optional: each capture degrades independently, and
+    readers must treat a missing key as "(unavailable)".
+    """
+
+    output_schema: list[tuple[str, str]]
+    row_count: int
+    samples: dict[str, list[dict[str, Any]]]
+    step_stats: dict[str, dict[str, Any]]
 
 
 class RunResult:
@@ -111,7 +127,7 @@ class RunResult:
         self.validation_errors = validation_errors
         self.warnings: list[str] = warnings if warnings is not None else []
         self._resolved_threads: dict[str, Any] | None = None
-        self._preview_metadata: dict[str, dict[str, Any]] | None = None
+        self._preview_metadata: dict[str, PreviewThreadMetadata] | None = None
 
     def dag(self, *, dark: bool | None = None) -> Any:
         """Return a DAG diagram for plan mode results.
@@ -471,12 +487,14 @@ class RunResult:
         if self.preview_data:
             lines.append("")
             lines.append("Preview:")
-            for name, df in self.preview_data.items():
-                try:
-                    cols = len(df.columns)
-                    rows = df.count()
-                    lines.append(f"  {name}  {cols} cols \u00d7 {rows} rows")
-                except Exception:
+            preview_meta = self._preview_metadata or {}
+            for name in self.preview_data:
+                meta = preview_meta.get(name) or {}
+                output_schema = meta.get("output_schema")
+                rows = meta.get("row_count")
+                if output_schema is not None and rows is not None:
+                    lines.append(f"  {name}  {len(output_schema)} cols \u00d7 {rows} rows")
+                else:
                     lines.append(f"  {name}  (unavailable)")
 
         return lines

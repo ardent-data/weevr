@@ -210,3 +210,48 @@ class TestTagBatching:
         with job_counter() as jc:
             validate_dataframe(df, rules)
         assert jc.jobs == 0  # probing is catalyst analysis, never a job
+
+
+@pytest.mark.spark
+class TestComputeResultsFlag:
+    """compute_results=False skips the aggregation preview discards."""
+
+    def test_false_skips_results_and_always_splits(self, spark) -> None:
+        """Error split happens even alongside a failing fatal rule.
+
+        Without computed results there is no fatal detection, so the
+        split path always runs — the chosen preview behavior.
+        """
+        df = spark.createDataFrame([(1, 100), (2, -5), (None, 50)], "id INT, amount INT")
+        rules = [
+            ValidationRule(rule=SparkExpr("amount > 0"), severity="error", name="positive"),
+            ValidationRule(rule=SparkExpr("id IS NOT NULL"), severity="fatal", name="id_fatal"),
+        ]
+        outcome = validate_dataframe(df, rules, compute_results=False)
+
+        assert outcome.validation_results == []
+        assert outcome.has_fatal is False
+        clean_rows = {r["amount"] for r in outcome.clean_df.collect()}
+        assert clean_rows == {100, 50}
+        assert outcome.quarantine_df is not None
+        assert outcome.quarantine_df.count() == 1
+
+    def test_false_launches_no_results_aggregation(self, spark, monkeypatch) -> None:
+        from weevr.operations import validation as validation_mod
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("results aggregation must be skipped")
+
+        monkeypatch.setattr(validation_mod, "_compute_results", refuse)
+        df = spark.createDataFrame([(1,), (2,)], "id INT")
+        rules = [ValidationRule(rule=SparkExpr("id IS NOT NULL"), severity="error", name="nn")]
+        outcome = validate_dataframe(df, rules, compute_results=False)
+        assert outcome.clean_df.count() == 2
+
+    def test_default_still_computes_and_short_circuits_fatal(self, spark) -> None:
+        df = spark.createDataFrame([(1,), (None,)], "id INT")
+        rules = [ValidationRule(rule=SparkExpr("id IS NOT NULL"), severity="fatal", name="f")]
+        outcome = validate_dataframe(df, rules)
+        assert outcome.has_fatal is True
+        assert outcome.validation_results
+        assert outcome.clean_df is df

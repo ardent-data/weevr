@@ -2043,3 +2043,72 @@ class TestPartialData:
         # Row counts should still be present
         assert "Row Counts" in html_out
         assert "100" in html_out
+
+
+class TestLayoutBaseline:
+    """The layout refactor is locked by byte-identical SVG output."""
+
+    def test_multi_group_dag_matches_baseline(self) -> None:
+        plan = _make_plan(
+            threads=["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
+            dependencies={
+                "alpha": [],
+                "beta": [],
+                "gamma": ["alpha"],
+                "delta": ["alpha", "beta"],
+                "epsilon": ["gamma"],
+                "zeta": ["gamma", "delta"],
+            },
+            execution_order=[["alpha", "beta"], ["gamma", "delta"], ["epsilon", "zeta"]],
+            cache_targets=["alpha"],
+            lookup_schedule={1: ["lk_rates", "lk_geo"]},
+            lookup_producers={"lk_rates": "alpha", "lk_geo": None},
+            lookup_consumers={"lk_rates": ["delta"], "lk_geo": ["zeta"]},
+        )
+        baseline = (Path(__file__).parent / "fixtures" / "dag_layout_baseline.svg").read_text()
+        assert render_dag_svg(plan) == baseline
+
+
+class TestDisplayPurity:
+    """display.py is pure formatting — it never computes over DataFrames."""
+
+    def test_no_dataframe_method_calls_in_source(self) -> None:
+        import inspect
+
+        from weevr.engine import display
+
+        source = Path(inspect.getfile(display)).read_text()
+        forbidden = (
+            ".count()",
+            ".collect()",
+            ".toPandas()",
+            ".first()",
+            ".take(",
+            ".limit(",
+        )
+        hits = [pattern for pattern in forbidden if pattern in source]
+        assert hits == [], f"DataFrame computation crept into display.py: {hits}"
+
+
+class TestPreviewZeroRows:
+    """A 0-row preview renders '0', never '(unavailable)'."""
+
+    def test_output_shape_renders_zero_not_unavailable(self) -> None:
+        import types as _types
+
+        from weevr.engine.display import _render_preview_html
+
+        result = _types.SimpleNamespace(
+            status="success",
+            config_type="thread",
+            config_name="empty_t",
+            duration_ms=0,
+            preview_data={"empty_t": object()},
+            _preview_metadata={"empty_t": {"output_schema": [("id", "bigint")], "row_count": 0}},
+            telemetry=None,
+            _resolved_threads=None,
+            warnings=[],
+        )
+        html_out = _render_preview_html(result)
+        assert ">0<" in html_out
+        assert "(unavailable)" not in html_out

@@ -1358,3 +1358,151 @@ class TestValidateModeSourceProbes:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         threads = {"c": self._thread_with_source("csv", str(empty_dir), tgt)}
         assert ctx._check_source_existence(threads) == []
+
+
+@pytest.mark.spark
+class TestPreviewRenderPurity:
+    """Preview rendering is pure formatting over metadata captured at build."""
+
+    def test_render_and_rerender_fire_zero_jobs(
+        self, spark: SparkSession, tmp_path: Path, job_counter
+    ) -> None:
+        src = str(tmp_path / "src_purity")
+        tgt = str(tmp_path / "tgt_purity")
+        data = [{"id": i, "val": f"v{i}"} for i in range(25)]
+        spark.createDataFrame(data).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "prevp1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview", sample_rows=50)
+
+        assert result._preview_metadata is not None
+        assert result._preview_metadata["prevp1"]["row_count"] == 25
+
+        with job_counter() as jc:
+            html_first = result._repr_html_()
+            html_second = result._repr_html_()
+        assert jc.jobs == 0
+        assert html_first is not None
+        assert "(unavailable)" not in html_first
+        assert ">25<" in html_first
+        assert html_first == html_second
+
+    def test_count_capture_failure_degrades_cleanly(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        """A failed count leaves the preview intact, never demotes to errors."""
+        from pyspark.sql import DataFrame
+
+        src = str(tmp_path / "src_degrade")
+        tgt = str(tmp_path / "tgt_degrade")
+        spark.createDataFrame([{"id": 1, "val": "a"}]).write.format("delta").save(src)
+        yaml_path = _create_thread_yaml(tmp_path, "prevd1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+
+        def refuse_count(self, *args, **kwargs):
+            raise RuntimeError("count blocked for degrade test")
+
+        monkeypatch.setattr(DataFrame, "count", refuse_count)
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        assert not [w for w in (result.warnings or []) if "Preview failed" in w]
+        assert result._preview_metadata is not None
+        meta = result._preview_metadata["prevd1"]
+        assert "row_count" not in meta
+        assert "output_schema" in meta
+
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "(unavailable)" in html_out
+        assert "Output Schema" in html_out or "output_schema" not in html_out
+
+
+@pytest.mark.spark
+class TestPreviewValidationSkipsResults:
+    """Preview never pays for validation results it discards."""
+
+    def _thread_yaml_with_validations(self, base: Path, name: str, src: str, tgt: str) -> Path:
+        thread_dir = base / "threads"
+        thread_dir.mkdir(parents=True, exist_ok=True)
+        file_path = thread_dir / f"{name}.thread"
+        file_path.write_text(
+            f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{src}"
+validations:
+  - name: positive_val
+    rule: "id IS NULL OR id >= 0"
+    severity: error
+  - name: id_present
+    rule: "id IS NOT NULL"
+    severity: fatal
+target:
+  path: "{tgt}"
+write:
+  mode: overwrite
+"""
+        )
+        return file_path
+
+    def test_preview_skips_results_aggregation_and_splits(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        from weevr.operations import validation as validation_mod
+
+        src = str(tmp_path / "src_valprev")
+        tgt = str(tmp_path / "tgt_valprev")
+        rows = [{"id": 1}, {"id": -2}, {"id": None}]
+        spark.createDataFrame(rows, "id INT").write.format("delta").save(src)
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("preview must not compute validation results")
+
+        monkeypatch.setattr(validation_mod, "_compute_results", refuse)
+        yaml_path = self._thread_yaml_with_validations(tmp_path, "valprev1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        assert result.preview_data is not None
+        # Error-split view even though the fatal rule fails on the sample:
+        # the -2 row (error rule) is split out; the NULL row (fatal) stays.
+        ids = {r["id"] for r in result.preview_data["valprev1"].collect()}
+        assert ids == {1, None}
+
+
+@pytest.mark.spark
+class TestPreviewPartialMetadata:
+    """Each preview metadata key degrades independently."""
+
+    def test_sample_capture_failure_keeps_count(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        from pyspark.sql import DataFrame
+
+        src = str(tmp_path / "src_partial")
+        tgt = str(tmp_path / "tgt_partial")
+        rows = [{"id": i} for i in range(3)]
+        spark.createDataFrame(rows, "id INT").write.format("delta").save(src)
+        yaml_path = _create_thread_yaml(tmp_path, "prevs1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+
+        def refuse_pandas(self, *args, **kwargs):
+            raise RuntimeError("sample capture blocked")
+
+        monkeypatch.setattr(DataFrame, "toPandas", refuse_pandas)
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        assert result._preview_metadata is not None
+        meta = result._preview_metadata["prevs1"]
+        assert meta["row_count"] == 3
+        assert "samples" not in meta
+
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert ">3<" in html_out

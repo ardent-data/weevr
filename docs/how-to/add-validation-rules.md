@@ -116,6 +116,11 @@ it straightforward to inspect and reprocess quarantined records.
     `fatal` for invariants that indicate corrupted or fundamentally invalid
     source data.
 
+    Preview mode is the one exception: it skips the per-rule result
+    computation, so fatal rules are not detected there and sampled data is
+    always shown with error-severity rows split out — the view you are
+    previewing for. Execute mode still aborts.
+
 ## Step 3 -- Add post-execution assertions
 
 Assertions validate outcomes after data is written. They check properties of

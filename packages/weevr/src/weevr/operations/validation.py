@@ -43,6 +43,7 @@ class ValidationOutcome:
 def validate_dataframe(
     df: DataFrame,
     rules: list[ValidationRule],
+    compute_results: bool = True,
 ) -> ValidationOutcome:
     """Evaluate all validation rules in a single pass with severity routing.
 
@@ -55,6 +56,11 @@ def validate_dataframe(
     Args:
         df: Input DataFrame to validate.
         rules: Validation rules to evaluate.
+        compute_results: When False, skip the per-rule results aggregation
+            (a collect job) for callers that discard it — preview mode.
+            ``validation_results`` comes back empty and, with no computed
+            counts, there is no fatal detection: the error-rule split
+            always runs. Execute-mode callers must keep the default.
 
     Returns:
         ValidationOutcome with clean/quarantine split and per-rule results.
@@ -96,17 +102,19 @@ def validate_dataframe(
         tagged = tagged.withColumns(tag_exprs)
 
     # Step 2: Compute validation results in a single aggregation
-    validation_results = _compute_results(tagged, applied, unapplied)
+    validation_results: list[ValidationResult] = []
+    if compute_results:
+        validation_results = _compute_results(tagged, applied, unapplied)
 
-    # Step 3: Check for fatal failures
-    has_fatal = any(vr.severity == "fatal" and vr.rows_failed > 0 for vr in validation_results)
-    if has_fatal:
-        return ValidationOutcome(
-            clean_df=df,
-            quarantine_df=None,
-            validation_results=validation_results,
-            has_fatal=True,
-        )
+        # Step 3: Check for fatal failures
+        has_fatal = any(vr.severity == "fatal" and vr.rows_failed > 0 for vr in validation_results)
+        if has_fatal:
+            return ValidationOutcome(
+                clean_df=df,
+                quarantine_df=None,
+                validation_results=validation_results,
+                has_fatal=True,
+            )
 
     # Step 4: Identify error-severity rules for split
     error_rules = [(i, col, rule) for i, col, rule in applied if rule.severity == "error"]
