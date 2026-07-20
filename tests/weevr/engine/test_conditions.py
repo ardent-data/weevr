@@ -115,7 +115,7 @@ class TestBuiltinMemo:
     """Memoization of builtin probes within one evaluation batch."""
 
     def _counting_read(self, monkeypatch):
-        import weevr.engine.conditions as conditions_mod
+        from weevr.engine import conditions as conditions_mod
 
         calls = {"n": 0}
         real_read = conditions_mod.read_delta
@@ -164,7 +164,7 @@ class TestBuiltinMemo:
         )
         assert calls["n"] == 2
 
-    def test_fresh_containers_observe_new_writes(self, spark, tmp_delta_path, monkeypatch):
+    def test_fresh_containers_observe_new_writes(self, spark, tmp_delta_path):
         """A new memo container sees writes made after the previous batch."""
         from spark_helpers import create_delta_table
 

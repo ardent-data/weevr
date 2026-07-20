@@ -421,7 +421,7 @@ class TestConditionMemoScope:
         self, spark: SparkSession, tmp_delta_path, monkeypatch
     ) -> None:
         """Two same-group threads with the same builtin probe share one scan."""
-        import weevr.engine.conditions as conditions_mod
+        from weevr.engine import conditions as conditions_mod
         from weevr.model.weave import ConditionSpec
 
         src_c = tmp_delta_path("memo_group_src_c")
