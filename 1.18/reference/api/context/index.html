@@ -1867,6 +1867,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.PreviewThreadMetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PreviewThreadMetadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.RunResult" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2418,6 +2429,17 @@
     <span class="md-ellipsis">
       
         ExecutionMode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.PreviewThreadMetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PreviewThreadMetadata
       
     </span>
   </a>
@@ -5068,6 +5090,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.PreviewThreadMetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PreviewThreadMetadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.RunResult" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5619,6 +5652,17 @@
     <span class="md-ellipsis">
       
         ExecutionMode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.PreviewThreadMetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PreviewThreadMetadata
       
     </span>
   </a>
@@ -8326,6 +8370,59 @@ uses <code>prefers-color-scheme</code> media query (default).</p>
     </div>
 
 </div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.context.PreviewThreadMetadata" class="doc doc-heading">
+            <code>PreviewThreadMetadata</code>
+
+
+<a href="#weevr.context.PreviewThreadMetadata" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.TypedDict">TypedDict</span></code></p>
+
+
+
+        <p>Per-thread metadata captured once at preview build time.</p>
+<p>The single definition of the contract between the preview builder
+(<code>Context._run_preview</code>, which writes it) and the renderers
+(<code>weevr.engine.display</code> and :meth:<code>RunResult.summary</code>, which read
+it). Every key is optional: each capture degrades independently, and
+readers must treat a missing key as "(unavailable)".</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
 
 
 
@@ -13681,6 +13778,59 @@ slicing, formatting, <code>print()</code>, and serialization are unaffected.</p>
           </tr>
       </tbody>
     </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="weevr.result.PreviewThreadMetadata" class="doc doc-heading">
+            <code>PreviewThreadMetadata</code>
+
+
+<a href="#weevr.result.PreviewThreadMetadata" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.TypedDict">TypedDict</span></code></p>
+
+
+
+        <p>Per-thread metadata captured once at preview build time.</p>
+<p>The single definition of the contract between the preview builder
+(<code>Context._run_preview</code>, which writes it) and the renderers
+(<code>weevr.engine.display</code> and :meth:<code>RunResult.summary</code>, which read
+it). Every key is optional: each capture degrades independently, and
+readers must treat a missing key as "(unavailable)".</p>
 
 
 

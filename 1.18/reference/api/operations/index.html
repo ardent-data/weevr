@@ -5145,7 +5145,7 @@ Required when <code>source.connection</code> is set.</p>
 
 
 <h3 id="weevr.operations.validate_dataframe" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">validate_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">rules</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">validate_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">rules</span><span class="p">,</span> <span class="n">compute_results</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.validate_dataframe" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5201,6 +5201,26 @@ with pass/fail per rule, then routed based on severity:
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>compute_results</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>When False, skip the per-rule results aggregation
+(a collect job) for callers that discard it — preview mode.
+<code>validation_results</code> comes back empty and, with no computed
+counts, there is no fatal detection: the error-rule split
+always runs. Execute-mode callers must keep the default.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
             </td>
           </tr>
       </tbody>
