@@ -612,7 +612,17 @@ class Context:
         return errors
 
     def _source_location_exists(self, source_type: str, resolve_path: str) -> bool:
-        """Job-free existence probe for a single source location."""
+        """Job-free existence probe for a single source location.
+
+        Existence, not readability: a location that exists but holds
+        nothing parseable (an empty directory for a csv source, say)
+        counts as present here, where the old reader-based probe failed
+        schema inference and reported it missing. Deliberate — validate
+        mode answers "is the config pointed at something real", and
+        parse problems surface at execution with a better error. Same
+        posture as the catalog-vs-Delta-readable gap documented on
+        ``delta_table_exists``.
+        """
         try:
             if source_type == "delta":
                 return delta_table_exists(self._spark, resolve_path)

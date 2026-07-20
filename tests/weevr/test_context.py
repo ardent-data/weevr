@@ -1341,3 +1341,20 @@ class TestValidateModeSourceProbes:
         with job_counter() as jc:
             assert ctx._check_source_existence(threads) == []
         assert jc.jobs == 0
+
+    def test_validate_mode_existing_but_empty_directory_counts_as_present(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        """Existence, not readability: an empty directory passes the probe.
+
+        The old reader-based probe failed schema inference here and
+        reported the source missing; the job-free probe answers the
+        existence question only.
+        """
+        empty_dir = tmp_path / "empty_csv_dir"
+        empty_dir.mkdir()
+        tgt = str(tmp_path / "empty_dir_tgt")
+
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {"c": self._thread_with_source("csv", str(empty_dir), tgt)}
+        assert ctx._check_source_existence(threads) == []

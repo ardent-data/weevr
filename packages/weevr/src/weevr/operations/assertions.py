@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, NamedTuple
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -11,6 +11,15 @@ from pyspark.sql import functions as F
 from weevr.delta import read_delta
 from weevr.model.validation import Assertion
 from weevr.telemetry.results import AssertionResult
+
+
+class _SentinelCheck(NamedTuple):
+    """One (column, sentinel group) pair to rate-check against a threshold."""
+
+    col: str
+    group: str
+    sentinel: Any
+    threshold: float
 
 
 def evaluate_assertions(
@@ -281,17 +290,17 @@ def _eval_fk_sentinel_rate(
 
     shared_max_rate = assertion.max_rate
 
-    checks: list[tuple[str, str, Any, float]] = []
+    checks: list[_SentinelCheck] = []
     for col_name in check_cols:
         for group_name, group in groups.items():
             threshold = group.max_rate if group.max_rate is not None else shared_max_rate
             if threshold is None:
                 continue
-            checks.append((col_name, group_name, group.value, threshold))
+            checks.append(_SentinelCheck(col_name, group_name, group.value, threshold))
 
     agg_exprs = [F.count(F.lit(1)).alias("__total")] + [
-        F.count(F.when(df[col_name] == sentinel_val, 1)).alias(f"__sentinel_{i}")
-        for i, (col_name, _, sentinel_val, _) in enumerate(checks)
+        F.count(F.when(df[check.col] == check.sentinel, 1)).alias(f"__sentinel_{i}")
+        for i, check in enumerate(checks)
     ]
     agg_row = df.agg(*agg_exprs).first()
     assert agg_row is not None
@@ -315,15 +324,15 @@ def _eval_fk_sentinel_rate(
         )
 
     failures: list[str] = []
-    for i, (col_name, group_name, sentinel_val, threshold) in enumerate(checks):
+    for i, check in enumerate(checks):
         sentinel_count = agg_row[f"__sentinel_{i}"]
         rate = sentinel_count / total
 
-        if rate > threshold:
+        if rate > check.threshold:
             failures.append(
-                f"column '{col_name}' sentinel group '{group_name}': "
-                f"rate {rate:.2%} exceeds threshold {threshold:.2%} "
-                f"(sentinel={sentinel_val}, count={sentinel_count}/{total})"
+                f"column '{check.col}' sentinel group '{check.group}': "
+                f"rate {rate:.2%} exceeds threshold {check.threshold:.2%} "
+                f"(sentinel={check.sentinel}, count={sentinel_count}/{total})"
             )
 
     if failures:
