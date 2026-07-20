@@ -325,19 +325,28 @@ class RunResult:
     def _summary_execute(self) -> list[str]:
         lines: list[str] = [f"Scope:  {self.config_type}:{self.config_name}"]
 
-        rows_written = 0
+        # Sum the known counts; None means a write whose count could not
+        # be attributed (unknown, never 0) — the accompanying warning
+        # qualifies the total.
+        rows_written: int | None = 0
         if self.detail is not None:
             if self.config_type == "thread":
                 rows_written = getattr(self.detail, "rows_written", 0)
-            elif self.config_type == "weave":
-                for tr in getattr(self.detail, "thread_results", []):
-                    rows_written += getattr(tr, "rows_written", 0)
-            elif self.config_type == "loom":
-                for wr in getattr(self.detail, "weave_results", []):
-                    for tr in getattr(wr, "thread_results", []):
-                        rows_written += getattr(tr, "rows_written", 0)
+            else:
+                thread_results: list[Any] = []
+                if self.config_type == "weave":
+                    thread_results = getattr(self.detail, "thread_results", [])
+                elif self.config_type == "loom":
+                    for wr in getattr(self.detail, "weave_results", []):
+                        thread_results.extend(getattr(wr, "thread_results", []))
+                rows_written = sum(
+                    rows
+                    for tr in thread_results
+                    if (rows := getattr(tr, "rows_written", 0)) is not None
+                )
 
-        lines.append(f"Rows:   {rows_written:,} written")
+        rows_text = "unknown" if rows_written is None else f"{rows_written:,}"
+        lines.append(f"Rows:   {rows_text} written")
         lines.append(f"Time:   {_format_duration(self.duration_ms)}")
 
         if self.config_type == "loom" and self.detail is not None:

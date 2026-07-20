@@ -111,7 +111,7 @@ def write_target(
     target_path: str,
     handle: TargetHandle | None = None,
     stamp: CommitStamp | None = None,
-) -> int:
+) -> int | None:
     """Write a DataFrame to a Delta table.
 
     If *target_path* is a table alias (e.g. ``staging.stg_customers``), the
@@ -132,7 +132,9 @@ def write_target(
             (per-write userMetadata is not honored there).
 
     Returns:
-        Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
+        Number of rows written (input rows for merge), or ``None`` when a
+        successful single-pass write's count could not be attributed to
+        the engine's own commit — unknown, never a false 0.
 
     Raises:
         ExecutionError: If the write operation fails.
@@ -158,7 +160,7 @@ def write_target(
         # rows, not the input-rows semantic this function returns, and the
         # merge action cannot fulfill observations (it zero-fires them).
         # Single-pass modes count from the write's own commit metrics.
-        row_count = df.count() if mode == "merge" and target_exists else -1
+        row_count: int | None = df.count() if mode == "merge" and target_exists else -1
         pre_version = handle.current_version() if row_count == -1 and target_exists else None
 
         if mode == "overwrite" or not target_exists:
@@ -211,10 +213,10 @@ def write_target(
                 row_count = int(metrics["numOutputRows"])
             else:
                 logger.warning(
-                    "Rows-written count unavailable for '%s'; reporting 0",
+                    "Rows-written count unavailable for '%s'; reporting unknown",
                     target_path,
                 )
-                row_count = 0
+                row_count = None
         handle.mark_exists()
         return row_count
 

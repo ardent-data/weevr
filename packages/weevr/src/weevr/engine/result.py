@@ -15,7 +15,9 @@ class ThreadResult(FrozenBase):
         status: Outcome of the execution — ``"success"``, ``"failure"``, or
             ``"skipped"`` (when a condition evaluated to False).
         thread_name: Name of the thread that was executed.
-        rows_written: Number of rows in the DataFrame at write time.
+        rows_written: Number of rows written to the target, or ``None``
+            when a successful write's count could not be attributed to
+            the engine's own commit (unknown, never a false 0).
         write_mode: The write mode used (``"overwrite"``, ``"append"``, or ``"merge"``).
         target_path: Physical path of the Delta table that was written.
         telemetry: Thread-level telemetry with validation/assertion results and row counts.
@@ -31,11 +33,13 @@ class ThreadResult(FrozenBase):
         warp_findings: Warp enforcement findings from this run — each entry names
             a column and the mismatch reason. ``None`` when warp enforcement is
             not configured for the target.
+        warnings: Non-fatal messages surfaced to the caller (e.g. an
+            unattributable write count). Merged into ``RunResult.warnings``.
     """
 
     status: Literal["success", "failure", "skipped"]
     thread_name: str
-    rows_written: int
+    rows_written: int | None
     write_mode: str
     target_path: str
     telemetry: ThreadTelemetry | None = None
@@ -45,6 +49,7 @@ class ThreadResult(FrozenBase):
     samples: dict[str, list[dict[str, Any]]] | None = None
     drift_report: dict[str, Any] | None = None
     warp_findings: list[dict[str, str]] | None = None
+    warnings: list[str] | None = None
 
 
 class WeaveResult(FrozenBase):

@@ -965,6 +965,34 @@ class TestCommitStamp:
 
 
 @pytest.mark.spark
+class TestUnattributableCount:
+    """An unattributable count is unknown (None), never a false 0."""
+
+    def test_write_target_returns_none_on_attribution_miss(
+        self,
+        spark: SparkSession,
+        simple_df,
+        tmp_delta_path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog,
+    ) -> None:
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("unattr_write")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+        monkeypatch.setattr(
+            TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
+        )
+
+        rows = write_target(spark, simple_df, Target(path=path), WriteConfig(mode="append"), path)
+        assert rows is None
+        assert "unavailable" in caplog.text
+
+        monkeypatch.undo()
+        assert spark.read.format("delta").load(path).count() == 3  # the write itself landed
+
+
+@pytest.mark.spark
 class TestVersionReadFailureDistinction:
     """A failed history read on an existing table is not a fresh table."""
 

@@ -113,6 +113,27 @@ class TestFirstWrite:
         assert len(stamped) == 1
         assert json.loads(stamped[0])["run_id"] == "run-dim"
 
+    def test_first_write_unattributable_reports_unknown(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch, caplog
+    ) -> None:
+        """A first-write count that cannot be attributed is None, never 0."""
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("dim_first_unattr")
+        dim = _make_dim()
+        source = _prepare_source(spark, [{"customer_id": "C1", "name": "Alice"}], dim)
+        builder = DimensionMergeBuilder(dim)
+        monkeypatch.setattr(
+            TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
+        )
+
+        result = execute_dimension_merge(spark, source, builder, path, "2026-01-01")
+        assert result.rows_inserted is None
+        assert "unavailable" in caplog.text
+
+        monkeypatch.undo()
+        assert spark.read.format("delta").load(path).count() == 1  # the write itself landed
+
 
 @pytest.mark.spark
 class TestIdempotency:

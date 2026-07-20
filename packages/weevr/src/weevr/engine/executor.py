@@ -184,8 +184,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
     validation_results: list = []
     assertion_results: list = []
+    thread_warnings: list[str] = []
     rows_read = 0
-    rows_written = 0
+    rows_written: int | None = 0
     rows_quarantined = 0
     rows_after_transforms = 0
     output_schema: list[tuple[str, str]] | None = None
@@ -784,6 +785,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     stamp=commit_stamp,
                 )
 
+            # A successful write whose count could not be attributed reads
+            # as unknown, never as zero — surface it to the caller.
+            if rows_written is None:
+                thread_warnings.append(
+                    f"Thread '{thread.name}': rows written to '{target_path}' "
+                    f"could not be attributed to the engine's commit; "
+                    f"reported as unknown"
+                )
+
             # Step 13b — post-write fact sentinel advisory. Runs against
             # the written table, where columnar stats make per-column
             # scans cheap. Advisory only: failures never block the run.
@@ -972,6 +982,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 samples=samples,
                 drift_report=drift_report_dict,
                 warp_findings=warp_findings if warp_findings else None,
+                warnings=thread_warnings or None,
             )
 
         except DataValidationError:
@@ -1306,7 +1317,7 @@ def _build_telemetry(
     validation_results: list,
     assertion_results: list,
     rows_read: int,
-    rows_written: int,
+    rows_written: int | None,
     rows_quarantined: int,
     status: SpanStatus = SpanStatus.OK,
     collector: SpanCollector | None = None,

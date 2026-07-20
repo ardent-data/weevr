@@ -33,14 +33,16 @@ class DimensionMergeResult:
     Attributes:
         rows_versioned: Rows closed and re-inserted as new versions.
         rows_overwritten: Rows updated in place.
-        rows_inserted: New rows inserted (unmatched in target).
+        rows_inserted: New rows inserted (unmatched in target), or
+            ``None`` when a first-write count could not be attributed
+            to the engine's own commit (unknown, never a false 0).
         rows_unchanged: Matched rows with no hash change.
         rows_deleted: Rows deleted or soft-deleted (unmatched by source).
     """
 
     rows_versioned: int = 0
     rows_overwritten: int = 0
-    rows_inserted: int = 0
+    rows_inserted: int | None = 0
     rows_unchanged: int = 0
     rows_deleted: int = 0
 
@@ -260,7 +262,10 @@ def execute_dimension_merge(
         if metrics is not None and "numOutputRows" in metrics:
             result.rows_inserted = int(metrics["numOutputRows"])
         else:
-            logger.warning("First-write row count unavailable for '%s'; reporting 0", target_path)
+            logger.warning(
+                "First-write row count unavailable for '%s'; reporting unknown", target_path
+            )
+            result.rows_inserted = None
         handle.mark_exists()
         return result
 

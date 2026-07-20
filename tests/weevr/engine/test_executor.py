@@ -116,6 +116,47 @@ class TestCommitStampIntegration:
         assert stamp["thread"] == "stamp_identity"
 
 
+class TestUnknownRowsWritten:
+    """Attribution failure surfaces as an unknown count plus a warning."""
+
+    def test_attribution_failure_surfaces_unknown_with_warning(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.operations.target_handle import TargetHandle
+
+        src = tmp_delta_path("unknown_src")
+        tgt = tmp_delta_path("unknown_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+        create_delta_table(spark, tgt, [{"id": 0}])
+        monkeypatch.setattr(
+            TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
+        )
+
+        thread = _make_thread("unknown_rows", src, tgt, write=WriteConfig(mode="append"))
+        result = execute_thread(spark, thread)
+        monkeypatch.undo()
+
+        assert result.status == "success"
+        assert result.rows_written is None
+        assert result.telemetry is not None
+        assert result.telemetry.rows_written is None
+        assert result.warnings is not None
+        assert any("unknown_rows" in w and tgt in w for w in result.warnings)
+
+    def test_success_path_reports_exact_int_without_warning(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src = tmp_delta_path("known_src")
+        tgt = tmp_delta_path("known_tgt")
+        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+
+        thread = _make_thread("known_rows", src, tgt)
+        result = execute_thread(spark, thread)
+
+        assert result.rows_written == 2
+        assert not result.warnings
+
+
 class TestExecuteThreadResult:
     """ThreadResult fields populated correctly by execute_thread."""
 
@@ -1983,25 +2024,23 @@ class TestTargetHandle:
 
     @pytest.fixture()
     def probe_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
-        """Count real existence probes across every consuming module."""
+        """Count real existence probes across every consuming module.
+
+        Every probe funnels through ``probe_delta_table_exists`` — the
+        handle calls it directly, and ``delta_table_exists`` (the
+        failure-folding wrapper used by other consumers) delegates to
+        it — so one patch point sees them all.
+        """
         from weevr import delta as delta_mod
 
         calls: list[str] = []
-        original = delta_mod.delta_table_exists
+        original = delta_mod.probe_delta_table_exists
 
         def _spy(spark, path):  # type: ignore[no-untyped-def]
             calls.append(path)
             return original(spark, path)
 
-        # Patch the source module (the handle reads it) and each module
-        # still holding a direct reference from `from weevr.delta import ...`
-        # (dimension.py probes exclusively through the handle now)
-        import weevr.operations.seeding as seed_mod
-        import weevr.operations.writers as writers_mod
-
-        monkeypatch.setattr(delta_mod, "delta_table_exists", _spy)
-        monkeypatch.setattr(writers_mod, "delta_table_exists", _spy)
-        monkeypatch.setattr(seed_mod, "delta_table_exists", _spy)
+        monkeypatch.setattr(delta_mod, "probe_delta_table_exists", _spy)
         return calls
 
     def test_standard_path_probes_once(
