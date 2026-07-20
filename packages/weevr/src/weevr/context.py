@@ -781,7 +781,11 @@ class Context:
                 df = run_pipeline(df, thread.steps, sources_map, observations=obs_registry)
 
                 if thread.validations:
-                    outcome = validate_dataframe(df, thread.validations)
+                    # Preview discards the per-rule results, so skip their
+                    # aggregation. Consequence (chosen behavior): no fatal
+                    # detection here — sampled data failing a fatal rule
+                    # still renders the error-split view.
+                    outcome = validate_dataframe(df, thread.validations, compute_results=False)
                     df = outcome.clean_df
 
                 if thread.keys is not None:

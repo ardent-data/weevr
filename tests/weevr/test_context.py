@@ -1417,3 +1417,59 @@ class TestPreviewRenderPurity:
         assert html_out is not None
         assert "(unavailable)" in html_out
         assert "Output Schema" in html_out or "output_schema" not in html_out
+
+
+@pytest.mark.spark
+class TestPreviewValidationSkipsResults:
+    """Preview never pays for validation results it discards."""
+
+    def _thread_yaml_with_validations(self, base: Path, name: str, src: str, tgt: str) -> Path:
+        thread_dir = base / "threads"
+        thread_dir.mkdir(parents=True, exist_ok=True)
+        file_path = thread_dir / f"{name}.thread"
+        file_path.write_text(
+            f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{src}"
+validations:
+  - name: positive_val
+    rule: "id IS NULL OR id >= 0"
+    severity: error
+  - name: id_present
+    rule: "id IS NOT NULL"
+    severity: fatal
+target:
+  path: "{tgt}"
+write:
+  mode: overwrite
+"""
+        )
+        return file_path
+
+    def test_preview_skips_results_aggregation_and_splits(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        from weevr.operations import validation as validation_mod
+
+        src = str(tmp_path / "src_valprev")
+        tgt = str(tmp_path / "tgt_valprev")
+        rows = [{"id": 1}, {"id": -2}, {"id": None}]
+        spark.createDataFrame(rows, "id INT").write.format("delta").save(src)
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("preview must not compute validation results")
+
+        monkeypatch.setattr(validation_mod, "_compute_results", refuse)
+        yaml_path = self._thread_yaml_with_validations(tmp_path, "valprev1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        assert result.preview_data is not None
+        # Error-split view even though the fatal rule fails on the sample:
+        # the -2 row (error rule) is split out; the NULL row (fatal) stays.
+        ids = {r["id"] for r in result.preview_data["valprev1"].collect()}
+        assert ids == {1, None}
