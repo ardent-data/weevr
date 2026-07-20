@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import html
 import types
 from pathlib import Path
@@ -3338,17 +3337,18 @@ def _render_preview_html(result: Any) -> str:
             f'<th style="{_S_TH}">Columns</th>'
             f'<th style="{_S_TH}">Rows</th></tr>'
         )
-        for name, df in preview_data.items():
+        for name in preview_data:
             name_esc = html.escape(name)
-            try:
-                cols = len(df.columns)
-                rows = df.count()
+            meta = preview_meta.get(name, {})
+            output_schema = meta.get("output_schema")
+            row_count = meta.get("row_count")
+            if output_schema is not None and row_count is not None:
                 parts.append(
                     f'<tr><td style="{_S_TD}">{name_esc}</td>'
-                    f'<td style="{_S_TD}">{cols}</td>'
-                    f'<td style="{_S_TD}">{rows:,}</td></tr>'
+                    f'<td style="{_S_TD}">{len(output_schema)}</td>'
+                    f'<td style="{_S_TD}">{row_count:,}</td></tr>'
                 )
-            except Exception:
+            else:
                 parts.append(
                     f'<tr><td style="{_S_TD}">{name_esc}</td>'
                     f'<td style="{_S_TD}" colspan="2">'
@@ -3377,11 +3377,7 @@ def _render_preview_html(result: Any) -> str:
         # Data flow waterfall SVG (partial: preview mode)
         if meta:
             try:
-                row_count = 0
-                df = preview_data.get(name)
-                if df is not None:
-                    with contextlib.suppress(Exception):
-                        row_count = df.count()
+                row_count = meta.get("row_count", 0)
                 pt = types.SimpleNamespace(
                     rows_read=row_count,
                     rows_after_transforms=row_count,

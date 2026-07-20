@@ -1358,3 +1358,62 @@ class TestValidateModeSourceProbes:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         threads = {"c": self._thread_with_source("csv", str(empty_dir), tgt)}
         assert ctx._check_source_existence(threads) == []
+
+
+@pytest.mark.spark
+class TestPreviewRenderPurity:
+    """Preview rendering is pure formatting over metadata captured at build."""
+
+    def test_render_and_rerender_fire_zero_jobs(
+        self, spark: SparkSession, tmp_path: Path, job_counter
+    ) -> None:
+        src = str(tmp_path / "src_purity")
+        tgt = str(tmp_path / "tgt_purity")
+        data = [{"id": i, "val": f"v{i}"} for i in range(25)]
+        spark.createDataFrame(data).write.format("delta").save(src)
+
+        yaml_path = _create_thread_yaml(tmp_path, "prevp1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(yaml_path, mode="preview", sample_rows=50)
+
+        assert result._preview_metadata is not None
+        assert result._preview_metadata["prevp1"]["row_count"] == 25
+
+        with job_counter() as jc:
+            html_first = result._repr_html_()
+            html_second = result._repr_html_()
+        assert jc.jobs == 0
+        assert html_first is not None
+        assert "(unavailable)" not in html_first
+        assert ">25<" in html_first
+        assert html_first == html_second
+
+    def test_count_capture_failure_degrades_cleanly(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        """A failed count leaves the preview intact, never demotes to errors."""
+        from pyspark.sql import DataFrame
+
+        src = str(tmp_path / "src_degrade")
+        tgt = str(tmp_path / "tgt_degrade")
+        spark.createDataFrame([{"id": 1, "val": "a"}]).write.format("delta").save(src)
+        yaml_path = _create_thread_yaml(tmp_path, "prevd1", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+
+        def refuse_count(self, *args, **kwargs):
+            raise RuntimeError("count blocked for degrade test")
+
+        monkeypatch.setattr(DataFrame, "count", refuse_count)
+        result = ctx.run(yaml_path, mode="preview")
+
+        assert result.status == "success"
+        assert not [w for w in (result.warnings or []) if "Preview failed" in w]
+        assert result._preview_metadata is not None
+        meta = result._preview_metadata["prevd1"]
+        assert "row_count" not in meta
+        assert "output_schema" in meta
+
+        html_out = result._repr_html_()
+        assert html_out is not None
+        assert "(unavailable)" in html_out
+        assert "Output Schema" in html_out or "output_schema" not in html_out

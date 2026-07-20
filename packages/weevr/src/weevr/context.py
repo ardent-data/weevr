@@ -814,6 +814,12 @@ class Context:
                             "Preview step-statistics harvest failed for thread '%s'",
                             thread_name,
                         )
+                # Row count captured once here so rendering never has to
+                # compute it. Rides its own suppress — a flaky count must
+                # degrade to a missing key (renderers show "(unavailable)"),
+                # never demote the whole thread to errors via the outer try.
+                with contextlib.suppress(Exception):
+                    meta["row_count"] = df.count()
                 preview_metadata[thread_name] = meta
             except Exception as exc:
                 errors.append(f"Preview failed for thread '{thread_name}': {exc}")
