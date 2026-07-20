@@ -2187,10 +2187,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.context.is_table_alias" class="md-nav__link">
+  <a href="#weevr.context.delta_table_exists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        is_table_alias
+        delta_table_exists
       
     </span>
   </a>
@@ -5388,10 +5388,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.context.is_table_alias" class="md-nav__link">
+  <a href="#weevr.context.delta_table_exists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        is_table_alias
+        delta_table_exists
       
     </span>
   </a>
@@ -10829,17 +10829,69 @@ weave name.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="weevr.context.is_table_alias" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">is_table_alias</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></code>
+<h3 id="weevr.context.delta_table_exists" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">delta_table_exists</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></code>
 
-<a href="#weevr.context.is_table_alias" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#weevr.context.delta_table_exists" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Return True if <em>path</em> looks like a table alias (e.g. <code>schema.table</code>).</p>
-<p>Table aliases are dot-separated identifiers resolved by the Spark metastore.
-File paths contain slashes or URI schemes (<code>://</code>).</p>
+        <p>Return True if a Delta table exists at the given path or alias.</p>
+<p>The alias branch asks the catalog rather than resolving the table
+through a reader, so no Delta log is read and no job is launched.
+<code>tableExists</code> answers "any table exists" — not "a Delta-readable
+table exists" — which is equivalent on Fabric, where lakehouse
+tables are Delta by platform contract. If parity evidence ever
+demands distinguishing non-Delta catalog entries, the fallback is a
+provider check (catalog provider field or <code>DESCRIBE DETAIL</code>).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>spark</code>
+            </td>
+            <td>
+                  <code><span title="pyspark.sql.SparkSession">SparkSession</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Active SparkSession.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Table alias or file path.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>

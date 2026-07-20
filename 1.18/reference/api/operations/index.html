@@ -3708,6 +3708,8 @@ error-severity rules exist or when a fatal rule triggered.</p>
 <p>Supports four assertion types: row_count, column_not_null, unique,
 and expression. Each assertion produces an AssertionResult with
 pass/fail status, details, and the configured severity.</p>
+<p>The target is read once and shared across all assertions; each
+assertion type answers its question in a single aggregation.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
