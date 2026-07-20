@@ -36,17 +36,17 @@ class SeedResult:
     skipped_reason: str | None = field(default=None)
 
 
-def _table_row_count(spark: SparkSession, path: str) -> int:
-    """Return the number of rows in an existing Delta table.
+def _table_is_empty(spark: SparkSession, path: str) -> bool:
+    """Return True if an existing Delta table has no rows.
+
+    Probes for a single row rather than counting the table — the
+    trigger only needs to know whether any row exists.
 
     Args:
         spark: Active SparkSession.
         path: File path to the Delta table.
-
-    Returns:
-        Row count as an integer.
     """
-    return spark.read.format("delta").load(path).count()
+    return spark.read.format("delta").load(path).first() is None
 
 
 def check_seed_trigger(
@@ -80,7 +80,7 @@ def check_seed_trigger(
     # on == "empty"
     if not exists:
         return True
-    return _table_row_count(spark, table_path) == 0
+    return _table_is_empty(spark, table_path)
 
 
 def build_seed_dataframe(

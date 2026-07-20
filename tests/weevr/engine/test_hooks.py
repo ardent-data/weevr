@@ -134,7 +134,7 @@ class TestRunHookStepsSqlStatement:
         spark = MagicMock()
         mock_row = MagicMock()
         mock_row.__getitem__ = MagicMock(return_value=42)
-        spark.sql.return_value.collect.return_value = [mock_row]
+        spark.sql.return_value.first.return_value = mock_row
 
         specs = {"result": VariableSpec(type="int")}
         ctx = VariableContext(specs)
@@ -149,7 +149,7 @@ class TestRunHookStepsSqlStatement:
     def test_sql_set_var_empty_result(self):
         """SQL with set_var and empty result sets variable to None."""
         spark = MagicMock()
-        spark.sql.return_value.collect.return_value = []
+        spark.sql.return_value.first.return_value = None
 
         specs = {"val": VariableSpec(type="string")}
         ctx = VariableContext(specs)
@@ -158,6 +158,29 @@ class TestRunHookStepsSqlStatement:
         run_hook_steps(spark, [step], "pre", ctx)
 
         assert ctx.get("val") is None
+
+    @pytest.mark.spark
+    def test_sql_set_var_multi_row_stores_bare_scalar(self, spark):
+        """set_var takes the first row's first column as a plain value.
+
+        A Row object stored here would corrupt ``${var.*}`` interpolation,
+        so the extraction is asserted on a real multi-row result.
+        """
+        from pyspark.sql import Row
+
+        specs = {"val": VariableSpec(type="int")}
+        ctx = VariableContext(specs)
+        step = SqlStatementStep(
+            type="sql_statement",
+            sql="SELECT id FROM VALUES (7), (8), (9) AS t(id) ORDER BY id",
+            set_var="val",
+        )
+
+        run_hook_steps(spark, [step], "pre", ctx)
+
+        value = ctx.get("val")
+        assert value == 7
+        assert not isinstance(value, Row)
 
     def test_sql_resolves_variables(self):
         """SQL statement text resolves ${var.name} refs."""

@@ -454,3 +454,23 @@ class TestBuildSystemMemberRows:
         assert unknown_row["_valid_from"] == "1970-01-01"
         assert unknown_row["_valid_to"] == "9999-12-31"
         assert unknown_row["_is_current"] is True
+
+
+@pytest.mark.spark
+class TestEmptyProbeIsCheap:
+    """The 'empty' trigger answers without counting the whole table."""
+
+    def test_emptiness_probe_avoids_full_count(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch
+    ) -> None:
+        from pyspark.sql import DataFrame
+
+        path = tmp_delta_path("empty_probe_cheap")
+        create_delta_table(spark, path, [{"id": i, "name": "x"} for i in range(50)])
+
+        def no_full_count(self, *args, **kwargs):
+            raise AssertionError("emptiness probe must not count() the table")
+
+        monkeypatch.setattr(DataFrame, "count", no_full_count)
+        config = SeedConfig(on="empty", rows=[{"id": 99}])
+        assert check_seed_trigger(spark, path, config) is False

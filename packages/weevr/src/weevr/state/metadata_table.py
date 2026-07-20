@@ -40,6 +40,7 @@ class MetadataTableStore(WatermarkStore):
                 store_type="metadata_table",
             )
         self._table_path = table_path
+        self._table_ensured = False
 
     @property
     def table_path(self) -> str:
@@ -47,7 +48,13 @@ class MetadataTableStore(WatermarkStore):
         return self._table_path
 
     def _ensure_table_exists(self, spark: SparkSession) -> None:
-        """Create the watermarks table if it does not exist."""
+        """Create the watermarks table if it does not exist.
+
+        Runs the DDL at most once per store instance — table existence
+        is monotonic within a run, so later reads and writes skip it.
+        """
+        if self._table_ensured:
+            return
         if is_table_alias(self._table_path):
             table_ref = self._table_path
         else:
@@ -63,6 +70,7 @@ class MetadataTableStore(WatermarkStore):
             )
             USING DELTA
         """)
+        self._table_ensured = True
 
     def read(self, spark: SparkSession, thread_name: str) -> WatermarkState | None:
         """Load watermark state for a thread from the metadata table."""

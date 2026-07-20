@@ -180,8 +180,8 @@ def _execute_sql_statement(
     result = spark.sql(resolved_sql)  # noqa: S608
 
     if step.set_var:
-        rows = result.collect()
-        value = rows[0][0] if rows else None
+        row = result.first()
+        value = row[0] if row is not None else None
         variable_ctx.set(step.set_var, value)
 
 
