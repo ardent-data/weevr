@@ -35,14 +35,21 @@ def read_delta(spark: SparkSession, path: str) -> DataFrame:
 def delta_table_exists(spark: SparkSession, path: str) -> bool:
     """Return True if a Delta table exists at the given path or alias.
 
+    The alias branch asks the catalog rather than resolving the table
+    through a reader, so no Delta log is read and no job is launched.
+    ``tableExists`` answers "any table exists" — not "a Delta-readable
+    table exists" — which is equivalent on Fabric, where lakehouse
+    tables are Delta by platform contract. If parity evidence ever
+    demands distinguishing non-Delta catalog entries, the fallback is a
+    provider check (catalog provider field or ``DESCRIBE DETAIL``).
+
     Args:
         spark: Active SparkSession.
         path: Table alias or file path.
     """
     try:
         if is_table_alias(path):
-            spark.read.format("delta").table(path).limit(0).collect()
-            return True
+            return spark.catalog.tableExists(path)
         from delta.tables import DeltaTable
 
         return DeltaTable.isDeltaTable(spark, path)
