@@ -884,6 +884,26 @@ class TestCommitStamp:
         write_target(spark, simple_df, Target(path=path), WriteConfig(mode="overwrite"), path)
         assert self._latest_user_metadata(spark, path) is None
 
+    def test_zero_row_append_reports_exact_zero(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        """Delta skips the commit for a zero-row append — an empty commit
+        window since the pre-version is a provable zero, not an unknown."""
+        path = tmp_delta_path("stamp_zero_rows")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+
+        empty_df = simple_df.filter("id > 99")
+        rows = write_target(
+            spark,
+            empty_df,
+            Target(path=path),
+            WriteConfig(mode="append"),
+            path,
+            stamp=self._stamp(),
+        )
+        assert rows == 0
+        assert spark.read.format("delta").load(path).count() == 1
+
     def test_interleaved_foreign_commit_count_is_exact(
         self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

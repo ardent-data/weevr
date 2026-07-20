@@ -913,7 +913,9 @@ class TestExecuteThreadConnections:
 
         captured_paths: list[str] = []
 
-        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None):
+        def fake_write_target(
+            spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None, stamp=None
+        ):
             captured_paths.append(path_arg)
             return df_arg.count()
 
@@ -953,7 +955,9 @@ class TestExecuteThreadConnections:
 
         captured_paths: list[str] = []
 
-        def fake_write_target(spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None):
+        def fake_write_target(
+            spark_arg, df_arg, target_arg, write_arg, path_arg, handle=None, stamp=None
+        ):
             captured_paths.append(path_arg)
             return df_arg.count()
 

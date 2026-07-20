@@ -233,6 +233,12 @@ class TargetHandle:
             return None
         own = [row for row in rows if stamp.matches(row["userMetadata"])]
         if not own:
+            if not rows and pre_version is not None:
+                # No commit of ANY kind landed after pre_version: Delta
+                # skips the commit entirely for a zero-row single-pass
+                # write, so the engine provably wrote nothing — an exact
+                # zero, not an unknown.
+                return {"numOutputRows": "0"}
             logger.warning(
                 "Commit metrics for '%s' skipped: no commit stamped by this "
                 "write found after version %s (own commit unattributable)",
