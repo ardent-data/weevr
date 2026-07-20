@@ -2043,3 +2043,27 @@ class TestPartialData:
         # Row counts should still be present
         assert "Row Counts" in html_out
         assert "100" in html_out
+
+
+class TestLayoutBaseline:
+    """The layout refactor is locked by byte-identical SVG output."""
+
+    def test_multi_group_dag_matches_baseline(self) -> None:
+        plan = _make_plan(
+            threads=["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
+            dependencies={
+                "alpha": [],
+                "beta": [],
+                "gamma": ["alpha"],
+                "delta": ["alpha", "beta"],
+                "epsilon": ["gamma"],
+                "zeta": ["gamma", "delta"],
+            },
+            execution_order=[["alpha", "beta"], ["gamma", "delta"], ["epsilon", "zeta"]],
+            cache_targets=["alpha"],
+            lookup_schedule={1: ["lk_rates", "lk_geo"]},
+            lookup_producers={"lk_rates": "alpha", "lk_geo": None},
+            lookup_consumers={"lk_rates": ["delta"], "lk_geo": ["zeta"]},
+        )
+        baseline = (Path(__file__).parent / "fixtures" / "dag_layout_baseline.svg").read_text()
+        assert render_dag_svg(plan) == baseline

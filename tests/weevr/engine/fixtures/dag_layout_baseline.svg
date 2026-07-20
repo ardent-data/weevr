@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264 450" width="264" height="450"><style>
+  .dag-node{fill:#f7fafc;stroke:#a0aec0;stroke-width:1.5}
+  .dag-node-cached{fill:#ebf8ff;stroke:#3182ce;stroke-width:2}
+  .dag-label{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central}
+  .dag-label-cached{fill:#2c5282;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central}
+  .dag-edge{stroke:#a0aec0;stroke-width:1.5;fill:none}
+  .dag-arrow{fill:#a0aec0}
+  .dag-lookup-node{fill:#fffaf0;stroke:#dd6b20;stroke-width:1.5;stroke-dasharray:4 2}
+  .dag-lookup-node-label{fill:#c05621;font-family:system-ui, -apple-system, sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central}
+  .dag-lookup-edge{stroke:#dd6b20;stroke-width:1.5;fill:none;stroke-dasharray:6 3}
+  .dag-lookup-line{stroke:#dd6b20;stroke-width:1;stroke-dasharray:6 3}
+  .dag-lookup-label{fill:#c05621;font-family:system-ui, -apple-system, sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central}
+  .dag-swimlane{fill:none;stroke:#a0aec0;stroke-width:1;rx:8}
+  .dag-swimlane-header{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central;font-weight:600}
+  .dag-bg{fill:#ffffff}
+  @media(prefers-color-scheme:dark){
+    .dag-node{fill:#2d3748;stroke:#718096}
+    .dag-node-cached{fill:#2a4365;stroke:#63b3ed}
+    .dag-label{fill:#e2e8f0}
+    .dag-label-cached{fill:#bee3f8}
+    .dag-edge{stroke:#718096}
+    .dag-arrow{fill:#718096}
+    .dag-lookup-node{fill:#744210;stroke:#ed8936}
+    .dag-lookup-node-label{fill:#fbd38d}
+    .dag-lookup-edge{stroke:#ed8936}
+    .dag-lookup-line{stroke:#ed8936}
+    .dag-lookup-label{fill:#fbd38d}
+    .dag-swimlane{stroke:#718096}
+    .dag-swimlane-header{fill:#e2e8f0}
+    .dag-bg{fill:#1a202c}
+  }
+</style><defs><marker id="dag-arrowhead" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto-start-reverse"><polygon points="0 0, 8 4, 0 8" class="dag-arrow"/></marker><marker id="dag-arrowhead-lookup" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto-start-reverse"><polygon points="0 0, 8 4, 0 8" fill="#dd6b20"/></marker></defs><rect width="264" height="450" class="dag-bg"/><line x1="70.0" y1="56.0" x2="80.0" y2="176.0" class="dag-lookup-edge" marker-end="url(#dag-arrowhead-lookup)"/><line x1="80.0" y1="202.0" x2="194.0" y2="242.0" class="dag-lookup-edge" marker-end="url(#dag-arrowhead-lookup)"/><line x1="189.2" y1="202.0" x2="194.0" y2="358.0" class="dag-lookup-edge" marker-end="url(#dag-arrowhead-lookup)"/><rect x="34.8" y="176.0" width="90.4" height="26.0" rx="13" class="dag-lookup-node"/><text x="80.0" y="189.0" class="dag-lookup-node-label">lk_rates</text><rect x="149.2" y="176.0" width="80.0" height="26.0" rx="13" class="dag-lookup-node"/><text x="189.2" y="189.0" class="dag-lookup-node-label">lk_geo</text><line x1="70.0" y1="56.0" x2="70.0" y2="242.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="70.0" y1="56.0" x2="194.0" y2="242.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="194.0" y1="56.0" x2="194.0" y2="242.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="70.0" y1="278.0" x2="70.0" y2="358.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="70.0" y1="278.0" x2="194.0" y2="358.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="194.0" y1="278.0" x2="194.0" y2="358.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><rect x="20.0" y="20.0" width="100.0" height="36.0" rx="6" class="dag-node-cached"/><text x="70.0" y="38.0" class="dag-label-cached">alpha</text><rect x="144.0" y="20.0" width="100.0" height="36.0" rx="6" class="dag-node"/><text x="194.0" y="38.0" class="dag-label">beta</text><rect x="20.0" y="242.0" width="100.0" height="36.0" rx="6" class="dag-node"/><text x="70.0" y="260.0" class="dag-label">gamma</text><rect x="144.0" y="242.0" width="100.0" height="36.0" rx="6" class="dag-node"/><text x="194.0" y="260.0" class="dag-label">delta</text><rect x="20.0" y="358.0" width="100.0" height="36.0" rx="6" class="dag-node"/><text x="70.0" y="376.0" class="dag-label">epsilon</text><rect x="144.0" y="358.0" width="100.0" height="36.0" rx="6" class="dag-node"/><text x="194.0" y="376.0" class="dag-label">zeta</text></svg>

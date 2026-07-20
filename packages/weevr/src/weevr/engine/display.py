@@ -351,16 +351,22 @@ def _compute_layout(
 
         y += _NODE_HEIGHT + _V_SPACING
 
-    # Center rows horizontally
+    # Center rows horizontally. Group membership and per-group row widths
+    # are precomputed once so this pass stays linear in node count.
     canvas_width = max_row_width + _SVG_PADDING * 2
+    group_of: dict[str, int] = {
+        name: group_idx for group_idx, group in enumerate(plan.execution_order) for name in group
+    }
+    group_row_widths: dict[int, float] = {}
+    group_sizes: dict[int, int] = {}
+    for name in nodes:
+        group_idx = group_of.get(name, -1)
+        group_row_widths[group_idx] = group_row_widths.get(group_idx, 0.0) + nodes[name][2]
+        group_sizes[group_idx] = group_sizes.get(group_idx, 0) + 1
+    for group_idx, size in group_sizes.items():
+        group_row_widths[group_idx] += _H_SPACING * max(size - 1, 0)
     for name, (nx, ny, nw, nh) in list(nodes.items()):
-        group_idx = _find_group_index(name, plan.execution_order)
-        ordered_in_group = [
-            n for n in nodes if _find_group_index(n, plan.execution_order) == group_idx
-        ]
-        row_width = sum(nodes[n][2] for n in ordered_in_group) + _H_SPACING * max(
-            len(ordered_in_group) - 1, 0
-        )
+        row_width = group_row_widths[group_of.get(name, -1)]
         offset = (canvas_width - row_width) / 2 - _SVG_PADDING
         nodes[name] = (nx + offset, ny, nw, nh)
         node_x_center[name] = nx + offset + nw / 2
@@ -395,14 +401,6 @@ def _compute_layout(
 
     canvas_height = y - _V_SPACING + _NODE_HEIGHT + _SVG_PADDING
     return nodes, edges, canvas_width, canvas_height, lookup_nodes, lookup_edges
-
-
-def _find_group_index(name: str, execution_order: list[list[str]]) -> int:
-    """Find which execution group a thread belongs to."""
-    for idx, group in enumerate(execution_order):
-        if name in group:
-            return idx
-    return 0
 
 
 def _build_svg_style(dark: bool | None = None) -> str:
