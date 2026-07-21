@@ -78,6 +78,13 @@ def _compute_weave_status(
     return "partial"
 
 
+def _skip_pending(thread_states: dict[str, _ThreadState]) -> None:
+    """Mark every still-pending thread skipped (weave abort)."""
+    for name, state in thread_states.items():
+        if state == "pending":
+            thread_states[name] = "skipped"
+
+
 def execute_weave(
     spark: SparkSession,
     plan: ExecutionPlan,
@@ -171,6 +178,14 @@ def execute_weave(
     cache = CacheManager(plan.cache_targets, plan.dependents)
     uk_memo = UniqueKeyMemo()
     aborted = False
+    # Mutual-exclusion backstop state for condition-exempted shared
+    # targets: writer → target path, and target path → first survivor.
+    conditional_writer_target: dict[str, str] = {}
+    if plan.conditional_target_writers:
+        for path, writer_names in plan.conditional_target_writers.items():
+            for writer in writer_names:
+                conditional_writer_target[writer] = path
+    conditional_survivors: dict[str, str] = {}
     _weave_raised = False
     max_parallel_threads = execution.max_parallel_threads if execution is not None else None
     group_thread_counts: list[int] = []
@@ -320,6 +335,48 @@ def execute_weave(
                         name,
                         conditions[name].when,
                     )
+
+            # Mutual-exclusion backstop: conditions on a shared target's
+            # writers assert that at most one survives per run. A second
+            # survivor means the conditions overlap — abort before its
+            # write executes (same-group overlaps abort before ANY write;
+            # for cross-group overlaps the completed first write stands).
+            for name in group:
+                if thread_states[name] != "pending" or name not in conditional_writer_target:
+                    continue
+                path = conditional_writer_target[name]
+                first = conditional_survivors.setdefault(path, name)
+                if first == name:
+                    continue
+                if thread_states[first] == "pending":
+                    completed_note = ""
+                else:
+                    completed_note = (
+                        f" Thread '{first}' has already written the target; "
+                        f"aborting before the second write — its complete "
+                        f"write stands."
+                    )
+                error_msg = (
+                    f"Conditional writers of target '{path}' overlap in weave "
+                    f"'{plan.weave_name}': threads '{first}' and '{name}' both "
+                    f"survived their conditions, but the conditions must be "
+                    f"mutually exclusive.{completed_note}"
+                )
+                thread_states[name] = "failed"
+                thread_results.append(
+                    ThreadResult(
+                        status="failure",
+                        thread_name=name,
+                        rows_written=0,
+                        write_mode="",
+                        target_path=path,
+                        error=error_msg,
+                    )
+                )
+                _skip_pending(thread_states)
+                aborted = True
+                logger.error("%s", error_msg)
+                break
 
             # Separate threads that should run vs those already skipped
             to_run = [n for n in group if thread_states[n] == "pending"]
@@ -472,10 +529,7 @@ def execute_weave(
                         downstream = _get_transitive_dependents(name, plan.dependents)
 
                         if on_failure == "abort_weave":
-                            # Mark all remaining pending threads as skipped
-                            for t in plan.threads:
-                                if thread_states[t] == "pending":
-                                    thread_states[t] = "skipped"
+                            _skip_pending(thread_states)
                             aborted = True
                             logger.debug(
                                 "Thread '%s' abort_weave — remaining threads skipped", name
@@ -760,11 +814,13 @@ def execute_loom(
                 lookups=weave_lookups,
             )
 
-            # Build thread condition map from ThreadEntry conditions
+            # Build thread condition map from ThreadEntry conditions,
+            # keyed by EFFECTIVE name — an aliased entry's condition
+            # keyed by its raw name would silently never evaluate
             thread_conditions: dict[str, ConditionSpec] = {}
             for te in weave.threads:
                 if te.condition is not None:
-                    thread_conditions[te.name] = te.condition
+                    thread_conditions[te.effective_name] = te.condition
 
             # Merge loom and weave resources using cascade helpers (weave wins)
             loom_cs = dict(loom.column_sets) if loom.column_sets else None

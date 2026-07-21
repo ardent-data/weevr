@@ -577,6 +577,41 @@ class TestContextRunExecute:
         assert result.detail.rows_written is None
         assert any("t_unattr" in w and tgt in w for w in result.warnings)
 
+    def test_aliased_entry_condition_gates_the_thread(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        """An as-aliased entry's condition must actually be evaluated —
+        conditions are keyed by effective name, not raw entry name."""
+        src = str(tmp_path / "src_alias_cond")
+        tgt = str(tmp_path / "tgt_alias_cond")
+        absent_gate = str(tmp_path / "gate_never_created")
+        spark.createDataFrame([{"id": 1, "val": "a"}]).write.format("delta").save(src)
+
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "t_base", src, tgt)
+        weave_dir = project / "weaves"
+        weave_dir.mkdir(parents=True, exist_ok=True)
+        weave_yaml = weave_dir / "walias.weave"
+        weave_yaml.write_text(
+            f"""\
+config_version: "1.0"
+threads:
+  - ref: "threads/t_base.thread"
+    as: "gated_variant"
+    condition:
+      when: "table_exists('{absent_gate}')"
+"""
+        )
+        ctx = Context(spark=spark, project=project)
+        result = ctx.run(weave_yaml)
+
+        assert result.status == "success"
+        assert result.detail is not None
+        assert "gated_variant" in result.detail.threads_skipped
+        from weevr.delta import delta_table_exists
+
+        assert delta_table_exists(spark, tgt) is False  # the write never ran
+
     def test_run_execute_weave(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_wexec")
         tgt = str(tmp_path / "tgt_wexec")

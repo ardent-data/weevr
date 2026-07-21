@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import deque
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from weevr.config.onelake import resolve_connection_path
@@ -176,7 +175,7 @@ def _build_explicit_index(
     """
     explicit_index: dict[str, list[str]] = {name: [] for name in threads}
     for entry in thread_entries:
-        effective_name = entry.as_ or entry.name or (Path(entry.ref).stem if entry.ref else "")
+        effective_name = entry.effective_name
         if entry.dependencies:
             for dep in entry.dependencies:
                 if dep not in threads:
@@ -643,11 +642,7 @@ def build_plan(
     #    to decide whether same-target writers are serialized. Conditioned
     #    effective names feed the condition exemption for shared targets.
     explicit = _build_explicit_index(threads, thread_entries)
-    conditioned = {
-        (entry.as_ or entry.name or (Path(entry.ref).stem if entry.ref else ""))
-        for entry in thread_entries
-        if entry.condition is not None
-    }
+    conditioned = {entry.effective_name for entry in thread_entries if entry.condition is not None}
 
     # 0b. Build shared target index (rejects unordered duplicate targets
     #     unless chained or fully condition-gated)
