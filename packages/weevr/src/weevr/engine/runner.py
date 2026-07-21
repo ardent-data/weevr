@@ -298,10 +298,9 @@ def execute_weave(
                 _materialize_scheduled(group_idx)
 
             if aborted:
-                for name in group:
-                    if thread_states[name] == "pending":
-                        thread_states[name] = "skipped"
-                        threads_skipped.append(name)
+                # Every abort site already swept pending threads to
+                # skipped via _skip_pending; the final bookkeeping loop
+                # backfills threads_skipped from the states.
                 continue
 
             # Evaluate conditions for pending threads before execution.
@@ -348,14 +347,27 @@ def execute_weave(
                 first = conditional_survivors.setdefault(path, name)
                 if first == name:
                     continue
-                if thread_states[first] == "pending":
-                    completed_note = ""
-                else:
+                # The first survivor's terminal state decides the framing:
+                # a SUCCEEDED writer's complete write stands; a FAILED one
+                # may have failed before or after its write, so no claim
+                # about the target's state is safe. Either way the second
+                # write is blocked — the exclusivity contract is broken,
+                # and proceeding could double-write a post-write failure.
+                if thread_states[first] == "succeeded":
                     completed_note = (
                         f" Thread '{first}' has already written the target; "
                         f"aborting before the second write — its complete "
                         f"write stands."
                     )
+                elif thread_states[first] == "failed":
+                    completed_note = (
+                        f" Thread '{first}' survived its condition but "
+                        f"failed during execution, so whether it wrote the "
+                        f"target is unverified; aborting before the second "
+                        f"write."
+                    )
+                else:
+                    completed_note = ""
                 error_msg = (
                     f"Conditional writers of target '{path}' overlap in weave "
                     f"'{plan.weave_name}': threads '{first}' and '{name}' both "

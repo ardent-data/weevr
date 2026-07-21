@@ -468,8 +468,6 @@ class TestConditionMemoScope:
         written it and must run. A memo outliving the group batch would
         replay C's zero and wrongly skip B.
         """
-        from weevr.model.weave import ConditionSpec
-
         src_a = tmp_delta_path("memo_stale_src_a")
         src_c = tmp_delta_path("memo_stale_src_c")
         tgt_a = tmp_delta_path("memo_stale_tgt_a")
@@ -666,3 +664,102 @@ class TestConditionalSharedTarget:
         # A's complete write stands; B never executed a second write
         rows = spark.read.format("delta").load(shared).collect()
         assert [r["who"] for r in rows] == ["A"]
+
+    def test_failed_first_writer_is_not_reported_as_written(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A first survivor that FAILED at execution may never have written
+        the target — the overlap abort must not claim its write stands."""
+        gate = tmp_delta_path("cff_gate")
+        create_delta_table(spark, gate, [{"id": 1}])
+        src_b = tmp_delta_path("cff_src_b")
+        src_x = tmp_delta_path("cff_src_x")
+        shared = tmp_delta_path("cff_shared")
+        tgt_x = tmp_delta_path("cff_tgt_x")
+        missing_src = tmp_delta_path("cff_src_missing")  # never created — A fails
+        create_delta_table(spark, src_b, [{"id": 2, "who": "B"}])
+        create_delta_table(spark, src_x, [{"id": 3, "who": "X"}])
+
+        threads = {
+            "A": _thread("A", missing_src, shared, on_failure="continue"),
+            "X": _thread("X", src_x, tgt_x),
+            "B": _thread("B", src_b, shared),
+        }
+        entries = [
+            ThreadEntry(name="A", condition=ConditionSpec(when="1 == 1")),
+            ThreadEntry(name="X"),
+            ThreadEntry(name="B", condition=ConditionSpec(when="1 == 1"), dependencies=["X"]),
+        ]
+        plan = build_plan("test_weave", threads, entries)
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            thread_conditions={"A": self._cond(gate), "B": self._cond(gate)},
+        )
+
+        backstop = [
+            r for r in result.thread_results if r.thread_name == "B" and r.status == "failure"
+        ]
+        assert backstop
+        message = backstop[0].error or ""
+        assert "unverified" in message
+        assert "complete write stands" not in message
+        from weevr.delta import delta_table_exists
+
+        assert delta_table_exists(spark, shared) is False  # A failed before writing
+
+    def test_three_true_conditions_abort_before_any_write(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        gate = tmp_delta_path("c3_gate")
+        create_delta_table(spark, gate, [{"id": 1}])
+        srcs = {}
+        for n in ("A", "B", "C"):
+            srcs[n] = tmp_delta_path(f"c3_src_{n}")
+            create_delta_table(spark, srcs[n], [{"id": 1, "who": n}])
+        shared = tmp_delta_path("c3_shared")
+
+        threads = {n: _thread(n, srcs[n], shared) for n in ("A", "B", "C")}
+        entries = [
+            ThreadEntry(name=n, condition=ConditionSpec(when="1 == 1")) for n in ("A", "B", "C")
+        ]
+        plan = build_plan("test_weave", threads, entries)
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            thread_conditions={n: self._cond(gate) for n in ("A", "B", "C")},
+        )
+
+        assert result.status == "failure"
+        from weevr.delta import delta_table_exists
+
+        assert delta_table_exists(spark, shared) is False
+        failures = [r for r in result.thread_results if r.status == "failure"]
+        assert failures and shared in (failures[0].error or "")
+
+    def test_backstop_unaffected_by_max_parallel_threads(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """The backstop runs before the pool is built — pool sizing is moot."""
+        from weevr.model.execution import ExecutionConfig
+
+        gate = tmp_delta_path("cmp_gate")
+        create_delta_table(spark, gate, [{"id": 1}])
+        threads, plan, shared, tgt_out = self._setup(spark, tmp_delta_path, "cmp")
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            thread_conditions={"A": self._cond(gate), "B": self._cond(gate)},
+            execution=ExecutionConfig(max_parallel_threads=1),
+        )
+
+        assert result.status == "failure"
+        from weevr.delta import delta_table_exists
+
+        assert delta_table_exists(spark, shared) is False

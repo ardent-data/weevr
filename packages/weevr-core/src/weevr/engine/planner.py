@@ -297,6 +297,24 @@ def _build_target_index(
     return target_index, conditional_writers
 
 
+def _resolve_producers(
+    path: str,
+    conditional_writers: dict[str, list[str]],
+    target_index: dict[str, str],
+) -> list[str]:
+    """Every thread that may produce ``path`` — the crux of the exemption.
+
+    A condition-exempted shared target has no single producer: consumers
+    must wait on every writer, since any one of them may be the survivor.
+    Otherwise the single-valued index answers (empty when external).
+    """
+    writers = conditional_writers.get(path)
+    if writers is not None:
+        return writers
+    single = target_index.get(path)
+    return [single] if single is not None else []
+
+
 def _infer_dependencies(
     threads: dict[str, Thread],
     target_index: dict[str, str],
@@ -322,11 +340,7 @@ def _infer_dependencies(
     for name, thread in threads.items():
         source_paths = _extract_source_paths(thread)
         for src_path in source_paths:
-            producers = conditional_writers.get(src_path)
-            if producers is None:
-                single = target_index.get(src_path)
-                producers = [single] if single is not None else []
-            for producer in producers:
+            for producer in _resolve_producers(src_path, conditional_writers, target_index):
                 if producer != name and producer not in inferred[name]:
                     inferred[name].append(producer)
     return inferred
@@ -506,22 +520,26 @@ def _infer_lookup_dependencies(
         - ``lookup_conditional`` maps lookup names to the writer set of the
           conditional shared target they read (empty when they don't).
     """
-    # Find the producer thread(s) for each lookup
+    # Find the producer thread(s) for each lookup. A conditional set
+    # (2+ writers) has no single producer: the public mapping records
+    # None and the conditional map carries the full set.
     lookup_producer: dict[str, str | None] = {}
     lookup_conditional: dict[str, list[str]] = {}
+    producers_by_lookup: dict[str, list[str]] = {}
     for lk_name, lk in lookups.items():
         src = lk.source
         raw = src.alias or src.path
-        if raw is not None:
-            normalized = _normalize_path(raw)
-            writers = conditional_writers.get(normalized)
-            if writers is not None:
-                lookup_conditional[lk_name] = writers
-                lookup_producer[lk_name] = None
-            else:
-                lookup_producer[lk_name] = target_index.get(normalized)
-        else:
+        producers = (
+            _resolve_producers(_normalize_path(raw), conditional_writers, target_index)
+            if raw is not None
+            else []
+        )
+        producers_by_lookup[lk_name] = producers
+        if len(producers) > 1:
+            lookup_conditional[lk_name] = producers
             lookup_producer[lk_name] = None
+        else:
+            lookup_producer[lk_name] = producers[0] if producers else None
 
     # Find which threads consume each lookup
     lookup_consumers: dict[str, list[str]] = {lk: [] for lk in lookups}
@@ -536,11 +554,7 @@ def _infer_lookup_dependencies(
 
     # Build implicit deps: consumer depends on producer(s)
     lookup_deps: dict[str, list[str]] = {name: [] for name in threads}
-    for lk_name in lookups:
-        producers = lookup_conditional.get(lk_name)
-        if producers is None:
-            single = lookup_producer[lk_name]
-            producers = [single] if single is not None else []
+    for lk_name, producers in producers_by_lookup.items():
         for producer in producers:
             for consumer in lookup_consumers.get(lk_name, []):
                 if consumer != producer and producer not in lookup_deps[consumer]:

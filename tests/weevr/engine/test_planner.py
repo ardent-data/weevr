@@ -769,6 +769,23 @@ class TestConditionalWriterExemption:
         plan = build_plan("w", threads, entries)
         assert plan.conditional_target_writers is None
 
+    def test_three_conditioned_writers_accepted(self):
+        threads = {
+            "w1": _make_thread("w1", target_alias="sales.monthly"),
+            "w2": _make_thread("w2", target_alias="sales.monthly"),
+            "w3": _make_thread("w3", target_alias="sales.monthly"),
+            "report": _make_thread("report", source_aliases=["sales.monthly"]),
+        }
+        entries = [
+            _cond_entry("w1"),
+            _cond_entry("w2"),
+            _cond_entry("w3"),
+            ThreadEntry(name="report"),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.conditional_target_writers == {"sales.monthly": ["w1", "w2", "w3"]}
+        assert set(plan.dependencies["report"]) == {"w1", "w2", "w3"}
+
     def test_consumer_depends_on_all_conditional_writers(self):
         threads = {
             "load_full": _make_thread("load_full", target_alias="sales.monthly"),
