@@ -1967,6 +1967,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="ThreadEntry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ThreadEntry.effective_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effective_name
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -4456,6 +4473,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="ThreadEntry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.ThreadEntry.effective_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        effective_name
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -9648,6 +9682,32 @@ thread is only executed if the condition evaluates to True.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="weevr.model.ThreadEntry.effective_name" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">effective_name</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.model.ThreadEntry.effective_name" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The name this entry is known by downstream (planner, runner).</p>
+<p><code>as</code> aliasing overrides the raw name; ref-only entries fall
+back to the file stem. Anything keyed by thread name (plan
+states, condition maps, telemetry) MUST use this — keying an
+aliased entry by its raw name silently misses it.</p>
+
+    </div>
+
+</div>
 
 
 

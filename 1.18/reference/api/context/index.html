@@ -12560,6 +12560,25 @@ called with lookups.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ExecutionPlan.conditional_target_writers">conditional_target_writers</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="list">list</span>[<span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maps a normalized target path to the
+writers sharing it under the condition exemption — every
+writer carries a thread-entry condition, and the conditions
+assert mutual exclusion (the runner enforces it at
+condition-resolution time). <code>None</code> when no target is
+shared this way. Lookups reading such a target have no
+single producer: <code>lookup_producers</code> records <code>None</code> for
+them, while the schedule places them after the last
+writer's group and consumers depend on every writer.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
