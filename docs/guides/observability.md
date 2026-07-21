@@ -125,15 +125,7 @@ loom: loom:nightly {
   style.font-size: 18
 
   weave_dim: weave:dimensions {
-    t1: thread:dim_customer {
-      read: read sources
-      transform: transform
-      validate: validate
-      write: write target
-      assert: assert
-
-      read -> transform -> validate -> write -> assert
-    }
+    t1: thread:dim_customer
     t2: thread:dim_product
     t3: thread:dim_store
   }
@@ -153,10 +145,15 @@ legend: {
   note: |md
     Each span carries **trace_id**, **span_id**, **status**,
     **start_time**, **end_time**, and **attributes**.
-    Thread spans contain step-level child spans.
   |
 }
 ```
+
+Step-level work (read, transform, validate, write, assert) is not
+modeled as child spans — that detail lives in the thread span's
+attributes and events, and in `step_stats` on `ThreadTelemetry`.
+Hooks, lookups, column sets, and sub-pipeline CTEs do get their own
+spans, parented to the scope that ran them.
 
 The `parent_span_id` on each span links it to its parent, forming a
 navigable tree. The `trace_id` is shared across all spans in a single
@@ -230,7 +227,7 @@ result: RunResult {
   telemetry: LoomTelemetry {
     style.fill: "#C8E6C9"
 
-    loom_span: loom span\ntrace_id, duration, status
+    loom_span: loom span\ntrace_id, start/end time, status
 
     weave_dim: WeaveTelemetry — dimensions {
       style.fill: "#FFF3E0"
@@ -309,13 +306,21 @@ depends on what was executed:
   and may change without notice. In preview mode the values are
   sample-scoped (they reflect the sampled rows, not the full
   source), and are present only when sample capture succeeded.
+- **resolved_params** -- Runtime parameter values that drove this
+  execution (populated on the outermost telemetry object)
+- **warp_name**, **warp_source**, **warp_enforcement** -- Which warp
+  applied (description), how it was resolved (`explicit`/`auto`),
+  and the enforcement mode in force
+- **drift_detected**, **drift_columns**, **drift_mode**,
+  **drift_action_taken** -- Schema drift outcome for this run; see
+  the [Schema Drift guide](schema-drift.md)
 
 ### Dimension merge metrics
 
-Dimension writes report merge outcomes derived from the Delta commit's
-split update keys — never the conflated `numTargetRowsUpdated`
-aggregate, which folds soft-delete stamps into the same number as
-version closes:
+Internally, dimension writes derive merge outcomes from the Delta
+commit's split update keys — never the conflated
+`numTargetRowsUpdated` aggregate, which folds soft-delete stamps into
+the same number as version closes:
 
 - `rows_versioned` — current rows closed (a new version was inserted)
 - `rows_inserted` — genuinely new entities (new-version inserts are
@@ -333,6 +338,10 @@ plain save, not a merge: its commit carries the
 [lineage stamp](#commit-lineage-stamps), and an unattributable
 first-write count reports `rows_inserted` as `None` (unknown), never
 zero.
+
+Of these, only the first-write insert count currently reaches the
+telemetry surface (as the thread's `rows_written`); the per-outcome
+split is not yet exposed on `ThreadTelemetry`.
 
 ### Weave telemetry fields
 

@@ -364,13 +364,13 @@ Post-execution assertions on the target dataset.
 |-------|------|---------|-------------|
 | `type` | `"row_count" \| "column_not_null" \| "unique" \| "expression" \| "fk_sentinel_rate"` | *required* | Assertion type |
 | `severity` | `"info" \| "warn" \| "error" \| "fatal"` | `"warn"` | Failure severity |
-| `columns` | `list[str]` | `None` | Columns for `column_not_null` and `unique` |
-| `column` | `str` | `None` | FK column for `fk_sentinel_rate` |
+| `columns` | `list[str]` | `None` | Columns for `column_not_null`, `unique`, and `fk_sentinel_rate` |
+| `column` | `str` | `None` | Single FK column for `fk_sentinel_rate` (mutually exclusive with `columns`) |
 | `min` | `int` | `None` | Minimum for `row_count` |
 | `max` | `int` | `None` | Maximum for `row_count` |
 | `expression` | `SparkExpr` | `None` | Expression for `expression` type |
-| `sentinel` | `Any` | `None` | Single sentinel value for `fk_sentinel_rate` |
-| `sentinels` | `list[Any]` | `None` | Multiple sentinel values for `fk_sentinel_rate` |
+| `sentinel` | `int \| str` | `None` | Single sentinel value for `fk_sentinel_rate` (mutually exclusive with `sentinels`) |
+| `sentinels` | `dict[str, SentinelGroup]` | `None` | Named sentinel groups for `fk_sentinel_rate` (mutually exclusive with `sentinel`) |
 | `max_rate` | `float` | `None` | Maximum acceptable sentinel rate (0.0-1.0) for `fk_sentinel_rate` |
 | `message` | `str` | `None` | Custom failure message for `fk_sentinel_rate` |
 
@@ -388,7 +388,7 @@ fields win). Thread-scoped declarations are not applied. See the
 | `log_level` | `"minimal" \| "standard" \| "verbose" \| "debug"` | `"standard"` | Logging verbosity. An explicit `Context(log_level=...)` argument takes precedence. |
 | `trace` | `bool` | `True` | Collect execution spans. `false` at loom scope disables telemetry for the run; at weave scope, omits that weave's nodes. |
 | `max_parallel_threads` | `int >= 1` | `None` | Cap on concurrently executing threads per weave group. Unset means unbounded. |
-| `capture_samples` | `bool` | `false` | Capture 10-row output samples at write time. Preview always samples. |
+| `capture_samples` | `bool` | `false` | Capture 10-row output/quarantine samples at write time. Preview always samples. |
 
 ---
 

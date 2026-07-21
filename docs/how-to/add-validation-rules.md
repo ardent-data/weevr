@@ -152,7 +152,8 @@ Available assertion types:
 - `fk_sentinel_rate` -- Verify the share of foreign-key values landing on
   sentinel members (e.g. `-1` unknown) stays under a threshold. See the
   [thread schema](../reference/yaml-schema/thread.md#assertions) for its
-  fields and the [Fact Tables guide](../guides/fact-tables.md) for usage
+  fields and the [Resolve guide](../guides/resolve.md#fk_sentinel_rate-assertion)
+  for worked examples
 
 ## Step 4 -- Verify results via telemetry
 

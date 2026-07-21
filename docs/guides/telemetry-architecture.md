@@ -160,14 +160,18 @@ Log level mapping from weevr config values to Python levels:
 
 ## Module map
 
-| Module | Responsibility |
-|--------|----------------|
-| `telemetry/span.py` | `ExecutionSpan`, `SpanEvent`, `SpanStatus`, ID generators |
-| `telemetry/collector.py` | `SpanBuilder` (mutable), `SpanCollector` (accumulator) |
-| `telemetry/trace.py` | Legacy tree wrappers — not constructed by the engine; use the telemetry tree |
-| `telemetry/logging.py` | `StructuredJsonFormatter`, `configure_logging`, `LogLevel` |
-| `telemetry/results.py` | `ThreadTelemetry`, `WeaveTelemetry`, `LoomTelemetry`, `ValidationResult`, `AssertionResult` |
-| `telemetry/events.py` | `LogEvent` model, `create_log_event` factory |
+The `weevr.telemetry` namespace is federated across the two packages:
+the Spark-free contract types ship in **weevr-core**, while the
+Spark-bound runtime helpers ship in the **weevr** engine package.
+
+| Module | Package | Responsibility |
+|--------|---------|----------------|
+| `telemetry/span.py` | weevr-core | `ExecutionSpan`, `SpanEvent`, `SpanStatus`, ID generators |
+| `telemetry/collector.py` | weevr | `SpanBuilder` (mutable), `SpanCollector` (accumulator) |
+| `telemetry/trace.py` | weevr-core | Legacy tree wrappers — not constructed by the engine; use the telemetry tree |
+| `telemetry/logging.py` | weevr | `StructuredJsonFormatter`, `configure_logging`, `LogLevel` |
+| `telemetry/results.py` | weevr-core | `ThreadTelemetry`, `WeaveTelemetry`, `LoomTelemetry`, `ValidationResult`, `AssertionResult`, `ExportResult`, `ColumnSetResult` |
+| `telemetry/events.py` | weevr-core | `LogEvent` model, `create_log_event` factory |
 
 ## Design decisions
 

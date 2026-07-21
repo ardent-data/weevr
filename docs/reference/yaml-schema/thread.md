@@ -1321,7 +1321,7 @@ loom or weave top level instead. See the
 | `log_level` | `string` | no | `"standard"` | Logging verbosity: `"minimal"`, `"standard"`, `"verbose"`, `"debug"` |
 | `trace` | `bool` | no | `true` | Collect execution spans for telemetry |
 | `max_parallel_threads` | `int` | no | unset | Cap on concurrently executing threads per group (`>= 1`) |
-| `capture_samples` | `bool` | no | `false` | Capture 10-row output samples at write time. Preview always samples. |
+| `capture_samples` | `bool` | no | `false` | Capture 10-row output/quarantine samples at write time. Preview always samples. |
 
 ```yaml
 execution:
