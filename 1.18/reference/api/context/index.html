@@ -10935,13 +10935,9 @@ weave name.</p>
     <div class="doc doc-contents ">
 
         <p>Return True if a Delta table exists at the given path or alias.</p>
-<p>The alias branch asks the catalog rather than resolving the table
-through a reader, so no Delta log is read and no job is launched.
-<code>tableExists</code> answers "any table exists" — not "a Delta-readable
-table exists" — which is equivalent on Fabric, where lakehouse
-tables are Delta by platform contract. If parity evidence ever
-demands distinguishing non-Delta catalog entries, the fallback is a
-provider check (catalog provider field or <code>DESCRIBE DETAIL</code>).</p>
+<p>A probe failure (metastore or storage error — not a clean "absent"
+answer) is logged with its cause and reported as False. Callers for
+whom that conflation is unsafe use :func:<code>probe_delta_table_exists</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -12823,11 +12819,13 @@ if some weaves succeeded before a failure.</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.result.ThreadResult.rows_written">rows_written</span></code></td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of rows in the DataFrame at write time.</p>
+                <p>Number of rows written to the target, or <code>None</code>
+when a successful write's count could not be attributed to
+the engine's own commit (unknown, never a false 0).</p>
               </div>
             </td>
           </tr>
@@ -12933,6 +12931,18 @@ detection is active. <code>None</code> when no drift handling is configured.</p>
                 <p>Warp enforcement findings from this run — each entry names
 a column and the mismatch reason. <code>None</code> when warp enforcement is
 not configured for the target.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.result.ThreadResult.warnings">warnings</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Non-fatal messages surfaced to the caller (e.g. an
+unattributable write count). Merged into <code>RunResult.warnings</code>.</p>
               </div>
             </td>
           </tr>
@@ -13285,11 +13295,12 @@ Populated on the outermost telemetry object only (loom-level runs).</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.result.ThreadTelemetry.rows_written">rows_written</span></code></td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Rows written to the target.</p>
+                <p>Rows written to the target, or <code>None</code> when a
+successful write's count could not be attributed (unknown).</p>
               </div>
             </td>
           </tr>

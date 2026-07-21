@@ -5387,7 +5387,7 @@ self-resolves existence (operations stay independently usable).</p>
 
 
 <h3 id="weevr.operations.write_target" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">write_target</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">write_config</span><span class="p">,</span> <span class="n">target_path</span><span class="p">,</span> <span class="n">handle</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">write_target</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">write_config</span><span class="p">,</span> <span class="n">target_path</span><span class="p">,</span> <span class="n">handle</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">stamp</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.write_target" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5508,6 +5508,24 @@ self-resolves existence (operations stay independently usable).</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>stamp</code>
+            </td>
+            <td>
+                  <code><span title="weevr.operations.target_handle.CommitStamp">CommitStamp</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Lineage stamp for single-pass commits; enables exact
+own-commit attribution. True MERGE commits are not stamped
+(per-write userMetadata is not honored there).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -5523,11 +5541,31 @@ self-resolves existence (operations stay independently usable).</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of rows in <code>df</code> (rows written for overwrite/append; input rows for merge).</p>
+                <p>Number of rows written (input rows for merge), or <code>None</code> when a</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>successful single-pass write's count could not be attributed to</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the engine's own commit — unknown, never a false 0.</p>
               </div>
             </td>
           </tr>

@@ -5053,11 +5053,12 @@ Populated on the outermost telemetry object only (loom-level runs).</p>
           <tr class="doc-section-item">
             <td><code><span title="weevr.telemetry.ThreadTelemetry.rows_written">rows_written</span></code></td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="int">int</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Rows written to the target.</p>
+                <p>Rows written to the target, or <code>None</code> when a
+successful write's count could not be attributed (unknown).</p>
               </div>
             </td>
           </tr>

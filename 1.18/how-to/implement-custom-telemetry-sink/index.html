@@ -3013,6 +3013,10 @@ executed:</p>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    Rows written: </span><span class="si">{</span><span class="n">thread_telem</span><span class="o">.</span><span class="n">rows_written</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    Quarantined:  </span><span class="si">{</span><span class="n">thread_telem</span><span class="o">.</span><span class="n">rows_quarantined</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
+<p><code>rows_written</code> is <code>int | None</code> — <code>None</code> means the write succeeded but
+its count could not be attributed to the engine's own commit. Sinks
+should carry the null through (and alert on it) rather than coalescing
+it to zero, which would read as "wrote nothing".</p>
 <h2 id="step-2-write-telemetry-to-a-delta-table">Step 2 -- Write telemetry to a Delta table<a class="headerlink" href="#step-2-write-telemetry-to-a-delta-table" title="Permanent link">&para;</a></h2>
 <p>Flatten the telemetry hierarchy into rows and write to a dedicated telemetry
 table:</p>
