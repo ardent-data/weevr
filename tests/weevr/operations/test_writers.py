@@ -637,12 +637,10 @@ class TestUncertainExistenceGuard:
 
     @staticmethod
     def _break_probe(monkeypatch: pytest.MonkeyPatch) -> None:
-        import weevr.delta as delta_mod
-
         def _boom(spark_arg, path_arg):  # type: ignore[no-untyped-def]
             raise RuntimeError("transient metastore outage")
 
-        monkeypatch.setattr(delta_mod, "probe_delta_table_exists", _boom)
+        monkeypatch.setattr("weevr.delta.probe_delta_table_exists", _boom)
 
     def test_append_uncertain_raises_and_preserves_content(
         self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch

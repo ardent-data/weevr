@@ -82,12 +82,11 @@ class TestProbeFailure:
 
     def test_probe_failure_returns_false_with_warning(self, spark, monkeypatch, caplog):
         """The bool contract holds (False), but the failure is logged with its cause."""
-        import weevr.delta as delta_mod
 
         def _boom(spark_arg, path_arg):
             raise RuntimeError("transient catalog outage")
 
-        monkeypatch.setattr(delta_mod, "probe_delta_table_exists", _boom)
+        monkeypatch.setattr("weevr.delta.probe_delta_table_exists", _boom)
         assert delta_table_exists(spark, "default.exists_probe_broken") is False
         assert "default.exists_probe_broken" in caplog.text
         assert "transient catalog outage" in caplog.text
