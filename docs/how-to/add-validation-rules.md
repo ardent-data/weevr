@@ -149,6 +149,11 @@ Available assertion types:
 - `column_not_null` -- Verify specified columns contain no nulls
 - `unique` -- Verify specified columns form a unique key
 - `expression` -- Evaluate a custom Spark SQL expression
+- `fk_sentinel_rate` -- Verify the share of foreign-key values landing on
+  sentinel members (e.g. `-1` unknown) stays under a threshold. See the
+  [thread schema](../reference/yaml-schema/thread.md#assertions) for its
+  fields and the [Resolve guide](../guides/resolve.md#fk_sentinel_rate-assertion)
+  for worked examples
 
 ## Step 4 -- Verify results via telemetry
 

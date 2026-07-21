@@ -38,7 +38,9 @@ For a loom execution, drill into per-weave and per-thread telemetry:
 
 ```python
 for weave_name, weave_telem in telemetry.weave_telemetry.items():
-    print(f"Weave: {weave_name}, duration: {weave_telem.span.duration_ms}ms")
+    span = weave_telem.span
+    elapsed = (span.end_time - span.start_time).total_seconds()
+    print(f"Weave: {weave_name}, duration: {elapsed:.1f}s")
 
     for thread_name, thread_telem in weave_telem.thread_telemetry.items():
         print(f"  Thread: {thread_name}")
@@ -72,7 +74,9 @@ for weave_name, weave_telem in telemetry.weave_telemetry.items():
             "rows_read": t.rows_read,
             "rows_written": t.rows_written,
             "rows_quarantined": t.rows_quarantined,
-            "duration_ms": t.span.duration_ms,
+            "duration_ms": int(
+                (t.span.end_time - t.span.start_time).total_seconds() * 1000
+            ),
             "load_mode": t.load_mode,
         })
 
