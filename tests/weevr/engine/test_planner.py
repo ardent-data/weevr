@@ -11,7 +11,7 @@ from weevr.errors.exceptions import ConfigError
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
 from weevr.model.thread import Thread
-from weevr.model.weave import ThreadEntry
+from weevr.model.weave import ConditionSpec, ThreadEntry
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -727,6 +727,130 @@ class TestDuplicateTargets:
         plan = build_plan("w", threads, entries, lookups=lookups)
         assert plan.lookup_producers is not None
         assert plan.lookup_producers["monthly"] == "load_feb"
+
+
+def _cond_entry(name: str, when: str = "${param.branch} == 'x'") -> ThreadEntry:
+    return ThreadEntry(name=name, condition=ConditionSpec(when=when))
+
+
+class TestConditionalWriterExemption:
+    """Writers of one target are exempt from the rejection when every one
+    of them carries a condition — conditions assert mutual exclusion."""
+
+    def test_all_conditioned_writers_accepted(self):
+        threads = {
+            "load_full": _make_thread("load_full", target_alias="sales.monthly"),
+            "load_incr": _make_thread("load_incr", target_alias="sales.monthly"),
+        }
+        entries = [_cond_entry("load_full"), _cond_entry("load_incr")]
+        plan = build_plan("w", threads, entries)
+        assert plan.conditional_target_writers == {"sales.monthly": ["load_full", "load_incr"]}
+
+    def test_one_unconditioned_writer_still_raises(self):
+        threads = {
+            "load_full": _make_thread("load_full", target_alias="sales.monthly"),
+            "load_incr": _make_thread("load_incr", target_alias="sales.monthly"),
+        }
+        entries = [_cond_entry("load_full"), ThreadEntry(name="load_incr")]
+        with pytest.raises(ConfigError, match="explicit dependencies"):
+            build_plan("w", threads, entries)
+
+    def test_explicit_chain_exemption_takes_precedence(self):
+        """A totally ordered writer pair keeps today's chain semantics even
+        when conditions are also present — no conditional set is recorded."""
+        threads = {
+            "load_jan": _make_thread("load_jan", target_alias="sales.monthly"),
+            "load_feb": _make_thread("load_feb", target_alias="sales.monthly"),
+        }
+        entries = [
+            ThreadEntry(name="load_jan"),
+            _entry_with_deps("load_feb", ["load_jan"]),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.conditional_target_writers is None
+
+    def test_three_conditioned_writers_accepted(self):
+        threads = {
+            "w1": _make_thread("w1", target_alias="sales.monthly"),
+            "w2": _make_thread("w2", target_alias="sales.monthly"),
+            "w3": _make_thread("w3", target_alias="sales.monthly"),
+            "report": _make_thread("report", source_aliases=["sales.monthly"]),
+        }
+        entries = [
+            _cond_entry("w1"),
+            _cond_entry("w2"),
+            _cond_entry("w3"),
+            ThreadEntry(name="report"),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.conditional_target_writers == {"sales.monthly": ["w1", "w2", "w3"]}
+        assert set(plan.dependencies["report"]) == {"w1", "w2", "w3"}
+
+    def test_consumer_depends_on_all_conditional_writers(self):
+        threads = {
+            "load_full": _make_thread("load_full", target_alias="sales.monthly"),
+            "load_incr": _make_thread("load_incr", target_alias="sales.monthly"),
+            "report": _make_thread("report", source_aliases=["sales.monthly"]),
+        }
+        entries = [
+            _cond_entry("load_full"),
+            _cond_entry("load_incr"),
+            ThreadEntry(name="report"),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert set(plan.dependencies["report"]) == {"load_full", "load_incr"}
+        groups = {name: idx for idx, group in enumerate(plan.execution_order) for name in group}
+        assert groups["report"] > groups["load_full"]
+        assert groups["report"] > groups["load_incr"]
+
+    def test_aliased_writer_resolves_to_effective_name(self):
+        """The conditional set is keyed by effective (as-aliased) names."""
+        threads = {
+            "load_full": _make_thread("load_full", target_alias="sales.monthly"),
+            "variant": _make_thread("variant", target_alias="sales.monthly"),
+        }
+        entries = [
+            _cond_entry("load_full"),
+            ThreadEntry(
+                name="load_incr",
+                as_="variant",
+                condition=ConditionSpec(when="${param.branch} == 'y'"),
+            ),
+        ]
+        plan = build_plan("w", threads, entries)
+        assert plan.conditional_target_writers == {"sales.monthly": ["load_full", "variant"]}
+
+    def test_lookup_on_conditional_target_scheduled_after_all_writers(self):
+        """A lookup reading the shared target materializes only after the
+        LAST writer's group, and its consumers depend on every writer."""
+        threads = {
+            "gate": _make_thread("gate", target_alias="out_gate"),
+            "load_full": _make_thread("load_full", target_alias="sales.monthly"),
+            "load_incr": _make_thread("load_incr", target_alias="sales.monthly"),
+            "consumer": _make_thread_with_lookup("consumer", "monthly"),
+        }
+        entries = [
+            ThreadEntry(name="gate"),
+            _cond_entry("load_full"),
+            ThreadEntry(
+                name="load_incr",
+                condition=ConditionSpec(when="${param.branch} == 'y'"),
+                dependencies=["gate"],
+            ),
+            ThreadEntry(name="consumer"),
+        ]
+        lookups = {"monthly": _make_lookup("sales.monthly")}
+        plan = build_plan("w", threads, entries, lookups=lookups)
+
+        groups = {name: idx for idx, group in enumerate(plan.execution_order) for name in group}
+        assert groups["load_incr"] == 1  # forced later than load_full by the gate dep
+        assert plan.lookup_schedule is not None
+        scheduled_at = next(
+            idx for idx, names in plan.lookup_schedule.items() if "monthly" in names
+        )
+        assert scheduled_at > groups["load_incr"]
+        assert scheduled_at > groups["load_full"]
+        assert {"load_full", "load_incr"} <= set(plan.dependencies["consumer"])
 
 
 class TestExecutionPlanDisplay:

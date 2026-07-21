@@ -70,11 +70,21 @@ execute -> aggregate: results + telemetry
 The planner builds a DAG from thread configurations:
 
 1. **Check target ownership** — Each target may have only one writing thread,
-   unless explicit dependencies fully serialize the writers into a chain.
-   Unordered threads sharing a target are rejected with a `ConfigError` naming
-   the target and every writer — running them concurrently would corrupt the
-   table. For an ordered chain, downstream consumers depend on the *last*
-   writer, so they always see the target's final state.
+   unless one of two exemptions applies. Explicit dependencies that fully
+   serialize the writers into a chain are one; downstream consumers then
+   depend on the *last* writer, so they always see the target's final state.
+   The other: every writer of the target carries a thread-entry `condition`.
+   Declaring conditions on all writers asserts they are **mutually
+   exclusive** — at most one runs per execution (say, a full-load thread
+   and an incremental thread for the same table). The planner cannot prove
+   the conditions exclude each other (they may read live table state), so
+   the engine enforces the assertion at runtime: if a second writer's
+   condition also evaluates true, the weave aborts before that writer
+   executes. Consumers of such a target depend on *every* writer, and a
+   lookup reading it materializes only after the last writer's group.
+   Unordered writers sharing a target where any writer lacks a condition
+   are rejected with a `ConfigError` naming the target and every writer —
+   running them concurrently would corrupt the table.
 2. **Infer dependencies** — If thread B reads from thread A's target path, B
    depends on A. This happens automatically by matching source paths/aliases
    to target paths/aliases across all threads.
@@ -144,10 +154,19 @@ skipped.
    loom + weave connection dict. Results are captured in
    `WeaveTelemetry.column_set_results`.
 5. **Thread execution** — Parallel groups are processed
-   sequentially. Within each group, threads are submitted to a
-   `ThreadPoolExecutor` for concurrent execution. Threads
-   reference lookups via `source.lookup` and receive the cached
-   DataFrame.
+   sequentially. At each group's top, thread conditions evaluate
+   (fresh per group, memoized within it); threads whose condition
+   is false are skipped without cascading to their dependents.
+   Where condition-gated writers share a target, survivors are
+   tracked as conditions resolve: a second surviving writer means
+   the conditions overlap, and the weave aborts before that
+   writer executes. In the same group this happens before *any*
+   write; across groups the earlier writer's complete, sequential
+   write stands, and the error says so — the abort exists to
+   prevent the second write, not to undo the first. Remaining
+   threads are then submitted to a `ThreadPoolExecutor` for
+   concurrent execution. Threads reference lookups via
+   `source.lookup` and receive the cached DataFrame.
 6. **Post-steps** — After all threads complete, `post_steps` hook
    steps run. Failures with `on_failure: abort` mark the weave
    as failed.

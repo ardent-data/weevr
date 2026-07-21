@@ -1,5 +1,6 @@
 """Weave domain model."""
 
+from pathlib import PurePath
 from typing import Any
 
 from pydantic import Field, model_validator
@@ -99,6 +100,21 @@ class ThreadEntry(FrozenBase):
             "only if the condition evaluates to True."
         ),
     )
+
+    @property
+    def effective_name(self) -> str:
+        """The name this entry is known by downstream (planner, runner).
+
+        ``as`` aliasing overrides the raw name; ref-only entries fall
+        back to the file stem. Anything keyed by thread name (plan
+        states, condition maps, telemetry) MUST use this — keying an
+        aliased entry by its raw name silently misses it.
+        """
+        if self.as_:
+            return self.as_
+        if self.name:
+            return self.name
+        return PurePath(self.ref).stem if self.ref else ""
 
 
 class Weave(FrozenBase):

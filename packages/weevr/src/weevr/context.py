@@ -387,11 +387,13 @@ class Context:
                 thread_entries=filtered_entries,
                 lookups=weave_lookups,
             )
-            # Build thread condition map from ThreadEntry conditions
+            # Build thread condition map from ThreadEntry conditions,
+            # keyed by EFFECTIVE name — an aliased entry's condition
+            # keyed by its raw name would silently never evaluate
             thread_conditions: dict[str, ConditionSpec] = {}
             for te in model.threads:
                 if te.condition is not None:
-                    thread_conditions[te.name] = te.condition
+                    thread_conditions[te.effective_name] = te.condition
 
             from weevr.telemetry.collector import SpanCollector
             from weevr.telemetry.span import generate_trace_id
