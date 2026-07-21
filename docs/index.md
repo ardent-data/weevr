@@ -12,7 +12,8 @@ orchestration — just deterministic, metadata-driven data pipelines.
 - **Spark-native** — Executes via PySpark DataFrame APIs in Microsoft Fabric
 - **Deterministic** — Same config + inputs = same outputs, every time
 - **23 transform types** — Filter, derive, join, aggregate, window, pivot, and more
-- **DAG orchestration** — Threads form weaves, weaves form looms, with automatic dependency resolution
+- **DAG orchestration** — Threads form weaves, weaves form looms, with
+  automatic dependency resolution
 - **Incremental processing** — Watermark and CDC modes for efficient loads
 - **Structured telemetry** — Spans, events, and row counts for full observability
 

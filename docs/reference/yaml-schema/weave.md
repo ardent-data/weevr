@@ -20,7 +20,7 @@ runtime settings.
 | `post_steps` | `list[HookStep]` | no | `null` | Hook steps executed after all threads complete |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every thread in this weave. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this weave |
-| `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`. Explicitly set fields override the loom's. See the [Execution Settings guide](../../guides/execution-settings.md). |
+| `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`, `capture_samples`. Explicitly set fields override the loom's. See the [Execution Settings guide](../../guides/execution-settings.md). |
 | `naming` | `NamingConfig` | no | `null` | Naming normalization cascaded to threads |
 | `audit_templates` | `dict[string, AuditTemplate]` | no | `null` | Named audit column templates cascaded to all threads in this weave. Thread-level definitions override weave-level definitions with the same name. A flat `dict[string, string]` shorthand is also accepted. See [Audit Templates guide](../../guides/audit-templates.md). |
 | `connections` | `dict[string, OneLakeConnection]` | no | `null` | Named connection definitions cascaded to threads. Thread-level connections with the same name override weave-level. See [Connections guide](../../guides/connections.md). |
@@ -307,6 +307,7 @@ blocks are declared but not applied. See the
 | `log_level` | `string` | no | `"standard"` | Logging verbosity: `"minimal"`, `"standard"`, `"verbose"`, `"debug"` |
 | `trace` | `bool` | no | `true` | Collect execution spans for telemetry |
 | `max_parallel_threads` | `int` | no | unset | Cap on concurrently executing threads per group (`>= 1`); unset means unbounded |
+| `capture_samples` | `bool` | no | `false` | Capture 10-row output samples at write time. Preview always samples. |
 
 ---
 
