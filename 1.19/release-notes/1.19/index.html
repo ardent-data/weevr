@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.19/release-notes/1.5/">
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.19/release-notes/1.19/">
       
       
-        <link rel="prev" href="../1.6/">
+        <link rel="prev" href="../../contributing/">
       
       
-        <link rel="next" href="../1.4/">
+        <link rel="next" href="../1.18/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>1.5 - weevr</title>
+        <title>1.19 - weevr</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#release-notes-v15" class="md-skip">
+        <a href="#release-notes-v119" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              1.5
+              1.19
             
           </span>
         </div>
@@ -404,7 +404,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../1.19/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -2166,10 +2166,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../1.19/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.19
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2185,6 +2212,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#correct-history-correct-merges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correct history, correct merges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-write-path-that-fails-loudly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A write path that fails loudly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#each-thread-executes-once" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Each thread executes once
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-execution-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The execution: block
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#also-included" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Also included
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2558,37 +2682,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    1.5
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../1.5/" class="md-nav__link">
         
   
   
@@ -2604,153 +2701,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#thread-flow-diagrams" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Thread Flow Diagrams
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Thread Flow Diagrams">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#configflow-processing-pipeline-svg" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        config.flow() — Processing Pipeline SVG
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dark-mode-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dark Mode Support
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution-timeline-svg" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution Timeline SVG
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#data-waterfall-svg" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Data Waterfall SVG
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#annotated-dag-svg" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Annotated DAG SVG
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enhanced-execute-mode-reports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enhanced Execute Mode Reports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enhanced-preview-mode-reports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enhanced Preview Mode Reports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#telemetry-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Telemetry Enhancements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        New Public Exports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2958,49 +2908,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#thread-flow-diagrams" class="md-nav__link">
+  <a href="#correct-history-correct-merges" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Thread Flow Diagrams
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Thread Flow Diagrams">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#configflow-processing-pipeline-svg" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        config.flow() — Processing Pipeline SVG
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dark-mode-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dark Mode Support
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution-timeline-svg" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution Timeline SVG
+        Correct history, correct merges
       
     </span>
   </a>
@@ -3008,10 +2919,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#data-waterfall-svg" class="md-nav__link">
+  <a href="#a-write-path-that-fails-loudly" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Data Waterfall SVG
+        A write path that fails loudly
       
     </span>
   </a>
@@ -3019,10 +2930,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#annotated-dag-svg" class="md-nav__link">
+  <a href="#each-thread-executes-once" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Annotated DAG SVG
+        Each thread executes once
       
     </span>
   </a>
@@ -3030,10 +2941,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#enhanced-execute-mode-reports" class="md-nav__link">
+  <a href="#the-execution-block" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enhanced Execute Mode Reports
+        The execution: block
       
     </span>
   </a>
@@ -3041,10 +2952,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#enhanced-preview-mode-reports" class="md-nav__link">
+  <a href="#also-included" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enhanced Preview Mode Reports
+        Also included
       
     </span>
   </a>
@@ -3052,10 +2963,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#telemetry-enhancements" class="md-nav__link">
+  <a href="#upgrade-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Telemetry Enhancements
+        Upgrade notes
       
     </span>
   </a>
@@ -3063,21 +2974,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#new-public-exports" class="md-nav__link">
+  <a href="#whats-next" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New Public Exports
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility
+        What's next
       
     </span>
   </a>
@@ -3104,138 +3004,161 @@
   
 
 
-<!-- markdownlint-disable MD033 -->
-
-<h1 id="release-notes-v15">Release Notes — v1.5<a class="headerlink" href="#release-notes-v15" title="Permanent link">&para;</a></h1>
-<p><strong>Release date:</strong> March 2026</p>
-<p>This release adds <strong>thread flow visualization, execution timeline SVGs,
-data waterfall charts, and enhanced result reports</strong> — delivering rich
-inline diagrams and improved notebook rendering across all execution
-modes.</p>
+<h1 id="release-notes-v119">Release Notes — v1.19<a class="headerlink" href="#release-notes-v119" title="Permanent link">&para;</a></h1>
+<p><strong>Release date:</strong> July 2026</p>
+<p>This release is about trust in what the engine writes and how fast it
+writes it. A coordinated correctness pass fixed long-standing defects
+in dimension history, CDC merging, incremental loading, and the write
+path itself — several of them silent-data hazards. Alongside it, a
+performance pass removed the redundant Spark work that made wide runs
+slow: a thread now executes its data exactly once, metadata questions
+stop launching jobs, and notebook display costs nothing. A new
+<code>execution:</code> block puts concurrency, logging, and sampling under
+configuration control.</p>
 <hr />
-<h2 id="thread-flow-diagrams">Thread Flow Diagrams<a class="headerlink" href="#thread-flow-diagrams" title="Permanent link">&para;</a></h2>
-<h3 id="configflow-processing-pipeline-svg"><code>config.flow()</code> — Processing Pipeline SVG<a class="headerlink" href="#configflow-processing-pipeline-svg" title="Permanent link">&para;</a></h3>
-<p>Thread configs now expose a <code>flow()</code> method that returns a <code>FlowDiagram</code>
-object showing the thread's processing pipeline: sources, joins,
-transforms, and target.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">config</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;stg_customers.thread&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">flow</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">flow</span><span class="p">()</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">flow</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;pipeline.svg&quot;</span><span class="p">)</span>   <span class="c1"># export to file</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">flow</span>                         <span class="c1"># renders inline in a notebook</span>
+<h2 id="correct-history-correct-merges">Correct history, correct merges<a class="headerlink" href="#correct-history-correct-merges" title="Permanent link">&para;</a></h2>
+<p>Dimension and CDC loading received the deepest fixes in this release.</p>
+<p><strong>SCD2 dimensions keep their history.</strong> Closed rows now keep their
+<code>valid_to</code>, overwrite-column, and previous-value contents permanently —
+merges no longer re-stamp history rows from the third version onward,
+so point-in-time queries return non-overlapping intervals. New-version
+detection always operates on current rows, eliminating duplicate
+current rows. And <code>on_no_match_source: delete</code> / <code>soft_delete</code> now
+actually remove or flag entities absent from the source (previously
+silent no-ops); on versioned dimensions both act on the current row
+only, and system-member exclusion now works for string surrogate keys.</p>
+<div class="admonition warning">
+<p class="admonition-title">Existing corrupted dimensions are not auto-repaired</p>
+<p>Upgrading stops the degradation; it does not undo it. If a
+dimension already has overlapping intervals or duplicate current
+rows from the pre-fix behavior, rebuild it from source history, or
+close the duplicate current rows manually (set <code>valid_to</code> and
+clear the current flag on the older duplicates).</p>
+</div>
+<p><strong>CDC windows merge to the latest state per key.</strong> A key changing more
+than once per change window now merges cleanly to its final state
+(previously the thread failed with a merge cardinality error, and
+first writes wrote duplicate keys). Change-feed windows order by
+commit version, explicit mappings order by the watermark column, and
+ties resolve delete over update over insert.</p>
+<p><strong>Incremental loads can no longer overwrite themselves.</strong> Combining
+<code>incremental_watermark</code> with the (defaulted) <code>overwrite</code> write mode
+now fails validation — the prior behavior silently replaced the table
+with each incremental slice. Declare <code>write: {mode: append}</code> or
+<code>merge</code>.</p>
+<h2 id="a-write-path-that-fails-loudly">A write path that fails loudly<a class="headerlink" href="#a-write-path-that-fails-loudly" title="Permanent link">&para;</a></h2>
+<p>Three changes harden the moment data lands in a table.</p>
+<p><strong>Existence probes no longer guess.</strong> A failed target-existence probe
+(a transient metastore or storage error) used to read as "table
+absent" — which routed <code>append</code> and <code>merge</code> writes onto the
+table-creating overwrite branch, silently replacing existing data. The
+thread now fails with a clear error naming the target, the mode, and
+the probe failure.</p>
+<p><strong>Every engine commit carries a lineage stamp.</strong> Single-pass writes
+stamp their Delta commit with a small JSON document in <code>userMetadata</code>,
+visible in <code>DESCRIBE HISTORY</code>: an engine marker, the run identity, and
+the thread name, plus best-effort context. Row-count attribution finds
+the engine's own stamped commit, so concurrent writers interleaving
+with a run no longer degrade <code>rows_written</code> — and the stamp's run
+identity joins table history to audit columns and telemetry.</p>
+<p><strong>Unknown is reported as unknown.</strong> In the rare case a successful
+write's count truly cannot be attributed, <code>rows_written</code> is now <code>None</code>
+with a warning on <code>RunResult.warnings</code> — never a false <code>0</code>. Weave and
+loom totals sum the known values. If automation gates on
+<code>rows_written == 0</code>, treat <code>None</code> as "check the table", not as an
+empty write.</p>
+<p><strong>Shared targets are guarded — with a conditional escape hatch.</strong> Two
+threads writing the same target now fail validation unless explicit
+dependencies serialize them, or every writer carries a <code>condition:</code> —
+the full-load/incremental pattern. Conditions on all writers assert
+mutual exclusion, and the engine enforces it at runtime: if two
+writers' conditions both come true, the weave aborts before the second
+write executes. Consumers and lookups reading such a target wait for
+every writer.</p>
+<h2 id="each-thread-executes-once">Each thread executes once<a class="headerlink" href="#each-thread-executes-once" title="Permanent link">&para;</a></h2>
+<p>The performance theme of this release: stop re-computing.</p>
+<p>A thread with no gates now executes its data exactly once — the write.
+Row counts arrive as byproducts of the write (query observations and
+commit metrics) instead of separate jobs; exports reuse one computed
+frame instead of re-executing the pipeline per export; the CDC change
+window and the SCD2 merge source each compute once; target existence
+resolves once per thread. Per-step pipeline statistics (resolve match
+rates and friends) are likewise collected as a byproduct of the write —
+resolve-heavy threads stop paying quadratic recompute.</p>
+<p>Around the write, the supporting cast got cheaper too: loom-level
+materialized lookups stay cached across all weaves; lookups read their
+source exactly once and small ones broadcast explicitly; column sets
+resolve once per declaring scope; fact FK sentinel checks and warp
+nullability enforcement run as single aggregations (and sentinel
+warnings are now exact, not sampled); wide-frame plan mutations batch
+where provably safe; table existence asks the catalog; and re-display
+of a result in a notebook launches zero Spark jobs.</p>
+<p>One behavior change funds part of this: output samples are now opt-in
+via <code>execution.capture_samples</code>. Default runs skip the sampling jobs
+(the report shows a hint); preview always samples.</p>
+<h2 id="the-execution-block">The <code>execution:</code> block<a class="headerlink" href="#the-execution-block" title="Permanent link">&para;</a></h2>
+<p>Runtime settings now live in configuration, on the loom or weave:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verbose</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">max_parallel_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">capture_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>Join sources are positioned above their target join node to show the
-data flow clearly. Primary sources appear on the left with horizontal
-arrows through the transform chain.</p>
-<p><code>flow()</code> is only available for thread configs — weave and loom configs
-return <code>None</code>.</p>
-<figure>
-  <img src="../../assets/svg/flow-example.svg"
-    alt="Thread flow diagram showing sources, joins,
-    transforms, and target">
-  <figcaption>Example flow diagram for a
-    <code>fact_orders</code> thread with two join sources,
-    filters, derives, and a merge target.</figcaption>
-</figure>
-
-<h3 id="dark-mode-support">Dark Mode Support<a class="headerlink" href="#dark-mode-support" title="Permanent link">&para;</a></h3>
-<p>All SVG renderers accept a <code>dark</code> keyword argument to force a specific
-color palette:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">config</span><span class="o">.</span><span class="n">flow</span><span class="p">(</span><span class="n">dark</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>    <span class="c1"># force dark palette</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">result</span><span class="o">.</span><span class="n">dag</span><span class="p">(</span><span class="n">dark</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>    <span class="c1"># force light palette</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">result</span><span class="o">.</span><span class="n">dag</span><span class="p">()</span>              <span class="c1"># auto-detect via prefers-color-scheme (default)</span>
-</code></pre></div>
-<h2 id="execution-timeline-svg">Execution Timeline SVG<a class="headerlink" href="#execution-timeline-svg" title="Permanent link">&para;</a></h2>
-<p>Execute mode results for weave and loom runs now include a phased
-execution timeline Gantt chart. The timeline shows lookups, pre-hooks,
-thread execution groups, and post-hooks as sequential phases with
-wall-clock duration bars.</p>
-<figure>
-  <img src="../../assets/svg/timeline-example.svg"
-    alt="Execution timeline Gantt chart showing
-    phased execution">
-  <figcaption>Timeline for a weave with a lookup
-    materialization, quality gate pre-hook, two parallel
-    execution groups, and a post-hook.</figcaption>
-</figure>
-
-<h2 id="data-waterfall-svg">Data Waterfall SVG<a class="headerlink" href="#data-waterfall-svg" title="Permanent link">&para;</a></h2>
-<p>Per-thread results include a data waterfall chart showing row counts at
-each processing stage: rows read, after transforms, quarantined, and
-rows written. Preview mode shows the first two stages only.</p>
-<figure>
-  <img src="../../assets/svg/waterfall-example.svg"
-    alt="Data waterfall chart showing row counts
-    through processing stages">
-  <figcaption>Waterfall for <code>fact_orders</code>:
-    15,000 rows read, 14,200 after transforms,
-    85 quarantined, 14,115 written.</figcaption>
-</figure>
-
-<h2 id="annotated-dag-svg">Annotated DAG SVG<a class="headerlink" href="#annotated-dag-svg" title="Permanent link">&para;</a></h2>
-<p>Execute mode results include an annotated DAG with colored status badges
-(success/failure/skipped) and duration annotations on each thread node.</p>
-<figure>
-  <img src="../../assets/svg/annotated-dag-example.svg"
-    alt="Annotated DAG with status badges and
-    duration labels">
-  <figcaption>Post-execution DAG for a loom with six
-    threads across three execution groups, showing
-    success badges and per-thread durations.</figcaption>
-</figure>
-
-<h2 id="enhanced-execute-mode-reports">Enhanced Execute Mode Reports<a class="headerlink" href="#enhanced-execute-mode-reports" title="Permanent link">&para;</a></h2>
-<p>Execute mode notebook rendering now includes:</p>
+<p><code>max_parallel_threads</code> bounds intra-group thread concurrency (loom
+default, weave override). <code>log_level</code> and <code>trace</code> in YAML now take
+effect (previously silent no-ops), with documented precedence against
+the <code>Context</code> argument. Settings declared where they cannot apply
+produce a run-start warning. See the
+<a href="../../guides/execution-settings/">Execution Settings guide</a>.</p>
+<h2 id="also-included">Also included<a class="headerlink" href="#also-included" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Executive summary</strong> — status, duration, thread/row counts</li>
-<li><strong>Per-thread detail</strong> — expandable sections with flow diagrams,
-  data waterfalls, output schema, and data samples</li>
-<li><strong>Execution timeline</strong> — phased Gantt chart (weave/loom runs)</li>
-<li><strong>Annotated DAG</strong> — status-badged dependency graph (weave/loom runs)</li>
+<li>Aliased (<code>as:</code>) thread entries' conditions now actually gate the
+  thread — they were silently never evaluated.</li>
+<li>Cache targets are consumed through a registry keyed by canonical
+  target identity; connection-declared cache targets now participate.</li>
+<li>Duplicate-free lookups skip duplicate-handling work entirely; the
+  duplicate path is unchanged.</li>
+<li>Non-materialized <code>unique_key</code> lookups validate once per weave.</li>
+<li>The observability guide documents the commit lineage stamp, and the
+  telemetry pages now describe the exact objects the engine returns.</li>
 </ul>
-<h2 id="enhanced-preview-mode-reports">Enhanced Preview Mode Reports<a class="headerlink" href="#enhanced-preview-mode-reports" title="Permanent link">&para;</a></h2>
-<p>Preview mode notebook rendering now includes per-thread expandable
-sections with output schema tables and data sample previews with row
-numbers.</p>
-<h2 id="telemetry-enhancements">Telemetry Enhancements<a class="headerlink" href="#telemetry-enhancements" title="Permanent link">&para;</a></h2>
+<h2 id="upgrade-notes">Upgrade notes<a class="headerlink" href="#upgrade-notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>ThreadResult</code> now carries <code>output_schema</code> and <code>samples</code> fields</li>
-<li><code>ThreadTelemetry</code> includes <code>rows_after_transforms</code> for waterfall charts</li>
-<li><code>resolved_params</code> is available on all telemetry levels (thread, weave,
-  loom) for the outermost execution scope</li>
+<li><strong>Audit incremental threads before upgrading:</strong> any thread using
+  <code>incremental_watermark</code> without an explicit <code>write:</code> block now fails
+  validation. Add <code>write: {mode: append}</code> (or <code>merge</code>).</li>
+<li><strong>Dormant delete configs activate:</strong> threads that declared
+  <code>on_no_match_source: delete</code>/<code>soft_delete</code> begin acting on the next
+  run — removed entities start disappearing or being flagged. The
+  prior behavior was non-functional.</li>
+<li><strong>Generic CDC mappings need an ordering column:</strong> mappings declaring
+  <code>update_value</code> or <code>delete_value</code> now require <code>load.watermark_column</code>.
+  Insert-only mappings and <code>preset: delta_cdf</code> are unaffected.</li>
+<li><strong>Same-target writers are rejected</strong> unless serialized by explicit
+  dependencies or condition-gated on every writer. This includes
+  connection-declared targets, which now resolve to real paths and
+  participate in the duplicate-writer check.</li>
+<li><strong>Table-alias existence asks the catalog</strong> ("any table exists"). On
+  Fabric this is equivalent — lakehouse tables are Delta by platform
+  contract. In non-Fabric dev environments, an alias bound to a
+  non-Delta catalog table now reads as existing, which flips
+  <code>seed.on: first_write</code> and existence-gated branches there.</li>
+<li><strong><code>rows_written</code> is <code>int | None</code></strong> on <code>ThreadResult</code> and
+  <code>ThreadTelemetry</code>. Typed consumers comparing or summing it must
+  handle <code>None</code>; custom telemetry sinks should carry the null through
+  rather than coalescing it to zero.</li>
+<li><strong>Engine commits stamp <code>userMetadata</code>:</strong> if you set a session-level
+  <code>userMetadata</code>, engine-stamped commits override it; unstamped engine
+  commits (merges, seeds, warp pre-initialization) still carry the
+  session value.</li>
+<li><strong>Sampling is opt-in:</strong> set <code>execution.capture_samples: true</code> to
+  restore pre-1.19 output samples in reports.</li>
+<li>No schema removals and no breaking API changes.</li>
 </ul>
-<h2 id="new-public-exports">New Public Exports<a class="headerlink" href="#new-public-exports" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>FlowDiagram</code> is now exported from <code>weevr.engine</code></li>
-</ul>
-<h2 id="compatibility">Compatibility<a class="headerlink" href="#compatibility" title="Permanent link">&para;</a></h2>
-<p>No breaking changes. All existing configurations and API usage continue
-to work without modification.</p>
-<table>
-<thead>
-<tr>
-<th>Component</th>
-<th>Version</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Python</td>
-<td>3.11</td>
-</tr>
-<tr>
-<td>PySpark</td>
-<td>3.5.x</td>
-</tr>
-<tr>
-<td>Delta Lake</td>
-<td>3.2.x</td>
-</tr>
-<tr>
-<td>Microsoft Fabric Runtime</td>
-<td>1.3</td>
-</tr>
-</tbody>
-</table>
+<h2 id="whats-next">What's next<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
+<p>The next cycle turns toward v2: a reshaped telemetry contract,
+schema-enforced configuration, and the Delta write surface — see
+<a href="https://github.com/ardent-data/weevr">the roadmap</a> for direction.</p>
 
 
 
