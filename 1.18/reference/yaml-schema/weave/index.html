@@ -3358,7 +3358,7 @@ runtime settings.</p>
 <td><code>ExecutionConfig</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Runtime settings: <code>log_level</code>, <code>trace</code>, <code>max_parallel_threads</code>. Explicitly set fields override the loom's. See the <a href="../../../guides/execution-settings/">Execution Settings guide</a>.</td>
+<td>Runtime settings: <code>log_level</code>, <code>trace</code>, <code>max_parallel_threads</code>, <code>capture_samples</code>. Explicitly set fields override the loom's. See the <a href="../../../guides/execution-settings/">Execution Settings guide</a>.</td>
 </tr>
 <tr>
 <td><code>naming</code></td>
@@ -4046,6 +4046,13 @@ blocks are declared but not applied. See the
 <td>no</td>
 <td>unset</td>
 <td>Cap on concurrently executing threads per group (<code>&gt;= 1</code>); unset means unbounded</td>
+</tr>
+<tr>
+<td><code>capture_samples</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>Capture 10-row output/quarantine samples at write time. Preview always samples.</td>
 </tr>
 </tbody>
 </table>
