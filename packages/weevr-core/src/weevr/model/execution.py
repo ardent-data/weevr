@@ -35,8 +35,9 @@ class ExecutionConfig(FrozenBase):
         max_parallel_threads: Upper bound on concurrently executing
             threads within a weave's parallel group. Unset means
             unbounded (pool sized to the group).
-        capture_samples: Whether output samples are captured at write
-            time. Off by default; preview always samples.
+        capture_samples: Whether output and quarantine samples are
+            captured at write time. Off by default; preview always
+            samples.
     """
 
     log_level: LogLevel = Field(
@@ -58,9 +59,9 @@ class ExecutionConfig(FrozenBase):
     capture_samples: bool = Field(
         default=False,
         description=(
-            "Whether to capture 10-row output samples at write time for "
-            "display. Preview mode always captures samples regardless of "
-            "this setting."
+            "Whether to capture 10-row output and quarantine samples at "
+            "write time for display. Preview mode always captures samples "
+            "regardless of this setting."
         ),
     )
 
