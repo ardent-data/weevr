@@ -224,6 +224,11 @@ def _xml_escape(text: str) -> str:
     )
 
 
+def _fmt_row_count(value: Any) -> str:
+    """Format a rows-written value; None means unknown, never 0."""
+    return "unknown" if value is None else f"{value:,}"
+
+
 def _estimate_node_width(name: str) -> float:
     """Estimate node width in pixels from the thread name length."""
     text_width = len(name) * _CHAR_WIDTH_ESTIMATE
@@ -1775,15 +1780,15 @@ def render_waterfall_svg(
 
     max_count = max(rows_read, rows_after, 1)
 
-    def _bh(count: int) -> float:
-        """Proportional band height."""
-        if count <= 0:
+    def _bh(count: int | None) -> float:
+        """Proportional band height (unknown counts render at minimum)."""
+        if count is None or count <= 0:
             return band_min
         return max((count / max_count) * max_band_h, band_min)
 
     # --- Compute band heights ---
     clean_rows = max(rows_after - rows_quarantined, 0) if mode == "execute" else 0
-    output_dests: list[tuple[str, int]] = []
+    output_dests: list[tuple[str, int | None]] = []
     if mode == "execute":
         output_dests.append(("Target", rows_written))
         for er in export_results:
@@ -1890,7 +1895,7 @@ def render_waterfall_svg(
         w: float,
         h: float,
         label: str,
-        count: int,
+        count: int | None,
         role: str,
     ) -> None:
         color = bc[role]
@@ -1905,7 +1910,7 @@ def render_waterfall_svg(
         parts.append(
             f'<text x="{x + w / 2:.1f}" y="{y + h / 2 - 4:.1f}" '
             f'dominant-baseline="central" class="wf-count">'
-            f"{count:,}</text>"
+            f"{_fmt_row_count(count)}</text>"
         )
         parts.append(
             f'<text x="{x + w / 2:.1f}" y="{y + h / 2 + 8:.1f}" '
@@ -2827,7 +2832,7 @@ def _render_plan_warp_summary(thread_model: Any) -> str:
     return "\n".join(parts)
 
 
-def _render_row_counts(telemetry: Any, rows_written: int = 0) -> str:
+def _render_row_counts(telemetry: Any, rows_written: int | None = 0) -> str:
     """Render rows read vs written summary."""
     rows_read = getattr(telemetry, "rows_read", 0)
     rows_quarantined = getattr(telemetry, "rows_quarantined", 0)
@@ -2851,7 +2856,8 @@ def _render_row_counts(telemetry: Any, rows_written: int = 0) -> str:
             f'<td style="{_S_TD}">{rows_quarantined:,}</td></tr>'
         )
     parts.append(
-        f'<tr><td style="{_S_TD}">Rows written</td><td style="{_S_TD}">{rows_written:,}</td></tr>'
+        f'<tr><td style="{_S_TD}">Rows written</td>'
+        f'<td style="{_S_TD}">{_fmt_row_count(rows_written)}</td></tr>'
     )
     parts.append("</table>")
     return "\n".join(parts)
@@ -2909,7 +2915,7 @@ def _render_execute_thread_detail(
     # Auto-expand failed threads
     open_attr = " open" if tr_status == "failure" else ""
     parts = [f'<details style="{_S_DETAILS}"{open_attr}>']
-    summary_detail = f"{rows:,} rows"
+    summary_detail = f"{_fmt_row_count(rows)} rows"
     if dur_text:
         summary_detail += f", {dur_text}"
     parts.append(
@@ -3026,7 +3032,7 @@ def _render_execute_html(result: Any) -> str:
     )
     parts.append(
         f'<tr><td style="{_S_TD}"><strong>Rows Written</strong></td>'
-        f'<td style="{_S_TD}">{total_rows:,}</td></tr>'
+        f'<td style="{_S_TD}">{_fmt_row_count(total_rows)}</td></tr>'
     )
     if len(thread_results) > 1:
         parts.append(
@@ -3109,7 +3115,7 @@ def _render_execute_html(result: Any) -> str:
             parts.append(
                 f'<tr><td style="{_S_TD}">{name}</td>'
                 f'<td style="{_S_TD}">{_status_badge(tr_status)}</td>'
-                f'<td style="{_S_TD}">{rows:,}</td>'
+                f'<td style="{_S_TD}">{_fmt_row_count(rows)}</td>'
                 f'<td style="{_S_TD}">{dur_text}</td>'
                 f'<td style="{_S_TD}">{write_mode}</td>'
                 f'<td style="{_S_TD}">{load_mode}</td></tr>'
@@ -3419,8 +3425,14 @@ def _render_preview_html(result: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _count_total_rows(result: Any) -> int:
-    """Sum rows_written across all threads in the result detail tree."""
+def _count_total_rows(result: Any) -> int | None:
+    """Sum the known rows_written values across the result detail tree.
+
+    At weave/loom scope, unknown counts (None) are excluded from the
+    sum — the warning that accompanies them qualifies the total. At
+    thread scope there is nothing to sum: an unknown count stays None
+    so the renderer shows "unknown", never a false 0.
+    """
     detail = getattr(result, "detail", None)
     if detail is None:
         return 0
@@ -3428,13 +3440,17 @@ def _count_total_rows(result: Any) -> int:
     if config_type == "thread":
         return getattr(detail, "rows_written", 0)
     if config_type == "weave":
-        return sum(getattr(tr, "rows_written", 0) for tr in getattr(detail, "thread_results", []))
-    if config_type == "loom":
-        total = 0
-        for wr in getattr(detail, "weave_results", []):
-            total += sum(getattr(tr, "rows_written", 0) for tr in getattr(wr, "thread_results", []))
-        return total
-    return 0
+        thread_results = getattr(detail, "thread_results", [])
+    elif config_type == "loom":
+        thread_results = [
+            tr
+            for wr in getattr(detail, "weave_results", [])
+            for tr in getattr(wr, "thread_results", [])
+        ]
+    else:
+        return 0
+    known = (getattr(tr, "rows_written", 0) for tr in thread_results)
+    return sum(rows for rows in known if rows is not None)
 
 
 def _collect_thread_results(result: Any) -> list[Any]:

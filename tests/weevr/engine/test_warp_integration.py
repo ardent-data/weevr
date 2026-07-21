@@ -65,7 +65,7 @@ class TestDefaultBehavior:
             result = execute_thread(spark, thread)
 
         assert result.status == "success"
-        assert result.rows_written > 0
+        assert result.rows_written is not None and result.rows_written > 0
         assert result.warp_findings is None
         assert result.drift_report is None
 

@@ -356,6 +356,7 @@ class Context:
                 config_name=resolved.config_name,
                 detail=engine_result,
                 telemetry=engine_result.telemetry,
+                warnings=self._collect_thread_warnings(engine_result),
             )
             result._resolved_threads = {resolved.config_name: model}
             return result
@@ -427,7 +428,7 @@ class Context:
                 config_name=resolved.config_name,
                 detail=engine_result,
                 telemetry=engine_result.telemetry,
-                warnings=warnings,
+                warnings=warnings + self._collect_thread_warnings(engine_result),
             )
             result._resolved_threads = dict(weave_threads)
             return result
@@ -479,7 +480,7 @@ class Context:
             config_name=resolved.config_name,
             detail=engine_result,
             telemetry=engine_result.telemetry,
-            warnings=all_warnings,
+            warnings=all_warnings + self._collect_thread_warnings(engine_result),
         )
         merged_threads: dict[str, Any] = {}
         for thread_map in filtered_threads.values():
@@ -490,6 +491,27 @@ class Context:
     # ------------------------------------------------------------------
     # Thread filtering
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _collect_thread_warnings(detail: Any) -> list[str]:
+        """Gather per-thread warnings from an engine result detail tree.
+
+        Threads surface non-fatal conditions (e.g. an unattributable
+        write count) on ``ThreadResult.warnings``; they must reach
+        ``RunResult.warnings`` at every scope.
+        """
+        threads: list[Any]
+        if hasattr(detail, "weave_results"):
+            threads = [tr for wr in detail.weave_results for tr in wr.thread_results]
+        elif hasattr(detail, "thread_results"):
+            threads = list(detail.thread_results)
+        else:
+            threads = [detail]
+        collected: list[str] = []
+        for tr in threads:
+            if getattr(tr, "warnings", None):
+                collected.extend(tr.warnings)
+        return collected
 
     @staticmethod
     def _filter_threads(

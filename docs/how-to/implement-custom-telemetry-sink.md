@@ -47,6 +47,11 @@ for weave_name, weave_telem in telemetry.weave_telemetry.items():
         print(f"    Quarantined:  {thread_telem.rows_quarantined}")
 ```
 
+`rows_written` is `int | None` — `None` means the write succeeded but
+its count could not be attributed to the engine's own commit. Sinks
+should carry the null through (and alert on it) rather than coalescing
+it to zero, which would read as "wrote nothing".
+
 ## Step 2 -- Write telemetry to a Delta table
 
 Flatten the telemetry hierarchy into rows and write to a dedicated telemetry

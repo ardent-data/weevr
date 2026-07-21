@@ -79,7 +79,8 @@ class ThreadTelemetry(FrozenBase):
         validation_results: Results of pre-write validation rules.
         assertion_results: Results of post-write assertions.
         rows_read: Total rows read from sources.
-        rows_written: Rows written to the target.
+        rows_written: Rows written to the target, or ``None`` when a
+            successful write's count could not be attributed (unknown).
         rows_quarantined: Rows written to the quarantine table.
         rows_after_transforms: Row count after transforms, before validation.
         load_mode: Load mode used (full, incremental_watermark, etc.).
@@ -106,7 +107,7 @@ class ThreadTelemetry(FrozenBase):
     validation_results: list[ValidationResult] = []
     assertion_results: list[AssertionResult] = []
     rows_read: int = 0
-    rows_written: int = 0
+    rows_written: int | None = 0
     rows_quarantined: int = 0
     rows_after_transforms: int = 0
     load_mode: str | None = None

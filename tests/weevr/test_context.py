@@ -554,6 +554,29 @@ class TestContextRunExecute:
         assert result.detail is not None
         assert result.duration_ms >= 0
 
+    def test_run_execute_thread_unknown_rows_warning_reaches_run_result(
+        self, spark: SparkSession, tmp_path: Path, monkeypatch
+    ) -> None:
+        """An unattributable write count surfaces on RunResult.warnings."""
+        from weevr.operations.target_handle import TargetHandle
+
+        src = str(tmp_path / "src_unattr")
+        tgt = str(tmp_path / "tgt_unattr")
+        spark.createDataFrame([{"id": 1, "val": "a"}]).write.format("delta").save(src)
+        monkeypatch.setattr(
+            TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
+        )
+
+        thread_yaml = _create_thread_yaml(tmp_path, "t_unattr", src, tgt)
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        result = ctx.run(thread_yaml)
+        monkeypatch.undo()
+
+        assert result.status == "success"
+        assert result.detail is not None
+        assert result.detail.rows_written is None
+        assert any("t_unattr" in w and tgt in w for w in result.warnings)
+
     def test_run_execute_weave(self, spark: SparkSession, tmp_path: Path) -> None:
         src = str(tmp_path / "src_wexec")
         tgt = str(tmp_path / "tgt_wexec")

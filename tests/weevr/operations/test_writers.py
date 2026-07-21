@@ -631,6 +631,125 @@ class TestWriteTargetMerge:
 
 
 @pytest.mark.spark
+class TestUncertainExistenceGuard:
+    """A failed existence probe must never route append/merge onto the
+    destructive first-write (overwrite) branch."""
+
+    @staticmethod
+    def _break_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+        def _boom(spark_arg, path_arg):  # type: ignore[no-untyped-def]
+            raise RuntimeError("transient metastore outage")
+
+        monkeypatch.setattr("weevr.delta.probe_delta_table_exists", _boom)
+
+    def test_append_uncertain_raises_and_preserves_content(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        path = tmp_delta_path("uncertain_append")
+        create_delta_table(spark, path, [{"id": 99, "val": "keep"}])
+        self._break_probe(monkeypatch)
+
+        target = Target(path=path)
+        with pytest.raises(ExecutionError) as exc_info:
+            write_target(spark, simple_df, target, WriteConfig(mode="append"), path)
+        message = str(exc_info.value)
+        assert path in message
+        assert "append" in message
+        assert "probe" in message.lower()
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert [r["val"] for r in result.collect()] == ["keep"]
+
+    def test_merge_uncertain_raises_and_preserves_content(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        path = tmp_delta_path("uncertain_merge")
+        create_delta_table(spark, path, [{"id": 99, "val": "keep"}])
+        self._break_probe(monkeypatch)
+
+        target = Target(path=path)
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        with pytest.raises(ExecutionError) as exc_info:
+            write_target(spark, simple_df, target, write_config, path)
+        message = str(exc_info.value)
+        assert path in message
+        assert "merge" in message
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert [r["val"] for r in result.collect()] == ["keep"]
+
+    def test_probe_failure_logs_warning_naming_target(
+        self,
+        spark: SparkSession,
+        simple_df,
+        tmp_delta_path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog,
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        path = tmp_delta_path("uncertain_logged")
+        self._break_probe(monkeypatch)
+
+        with pytest.raises(ExecutionError):
+            write_target(spark, simple_df, Target(path=path), WriteConfig(mode="append"), path)
+        assert path in caplog.text
+        assert "transient metastore outage" in caplog.text
+
+    def test_overwrite_uncertain_proceeds(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Overwrite is destructive by contract — uncertainty does not block it."""
+        path = tmp_delta_path("uncertain_overwrite")
+        create_delta_table(spark, path, [{"id": 99, "val": "old"}])
+        self._break_probe(monkeypatch)
+
+        write_target(spark, simple_df, Target(path=path), WriteConfig(mode="overwrite"), path)
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert result.count() == 2
+        assert result.filter("id = 99").count() == 0
+
+    def test_cdc_first_write_uncertain_raises_and_preserves_content(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+        from weevr.model.load import CdcConfig
+        from weevr.operations.writers import execute_cdc_merge
+
+        path = tmp_delta_path("uncertain_cdc")
+        create_delta_table(spark, path, [{"id": 99, "val": "keep"}])
+        self._break_probe(monkeypatch)
+
+        incoming = spark.createDataFrame([{"id": 1, "val": "a", "op": "I"}])
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+        cdc_config = CdcConfig(operation_column="op", insert_value="I")
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_cdc_merge(spark, incoming, path, write_config, cdc_config)
+        assert path in str(exc_info.value)
+
+        monkeypatch.undo()
+        result = spark.read.format("delta").load(path)
+        assert [r["val"] for r in result.collect()] == ["keep"]
+
+    def test_clean_absent_first_write_unaffected(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        """A probe that cleanly answers False keeps today's first-write behavior."""
+        path = tmp_delta_path("clean_absent_append")
+        rows = write_target(spark, simple_df, Target(path=path), WriteConfig(mode="append"), path)
+        assert rows == 2
+        assert spark.read.format("delta").load(path).count() == 2
+
+
+@pytest.mark.spark
 class TestCommitMetricsCounts:
     """Write counts come from guarded commit metrics on single-pass paths."""
 
@@ -713,6 +832,201 @@ class TestCommitMetricsCounts:
         assert count_spy == []  # pre-count gone
 
         assert result.rows_inserted == 2
+
+
+@pytest.mark.spark
+class TestCommitStamp:
+    """Engine writes stamp their commits; attribution finds the own stamp
+    exactly, regardless of interleaved foreign commits."""
+
+    @staticmethod
+    def _stamp(run_id: str = "run-abc", thread: str = "t1"):
+        from weevr.operations.target_handle import CommitStamp
+
+        return CommitStamp(run_id=run_id, thread=thread, loom="loomy", weave="weavy", mode="append")
+
+    @staticmethod
+    def _latest_user_metadata(spark: SparkSession, path: str) -> str | None:
+        from weevr.delta import resolve_delta_table
+
+        row = resolve_delta_table(spark, path).history(1).select("userMetadata").collect()[0]
+        return row[0]
+
+    def test_stamp_visible_and_parseable_in_history(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        import json
+
+        path = tmp_delta_path("stamp_visible")
+        stamp = self._stamp()
+        write_target(
+            spark, simple_df, Target(path=path), WriteConfig(mode="overwrite"), path, stamp=stamp
+        )
+
+        raw = self._latest_user_metadata(spark, path)
+        assert raw is not None
+        assert len(raw.encode()) < 1024
+        data = json.loads(raw)
+        assert data["engine"] == "weevr"
+        assert isinstance(data["version"], int)
+        assert data["run_id"] == "run-abc"
+        assert data["thread"] == "t1"
+        assert data["loom"] == "loomy"
+        assert data["weave"] == "weavy"
+        assert data["mode"] == "append"
+
+    def test_unstamped_write_leaves_no_user_metadata(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("stamp_absent")
+        write_target(spark, simple_df, Target(path=path), WriteConfig(mode="overwrite"), path)
+        assert self._latest_user_metadata(spark, path) is None
+
+    def test_zero_row_append_reports_exact_zero(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        """Delta skips the commit for a zero-row append — an empty commit
+        window since the pre-version is a provable zero, not an unknown."""
+        path = tmp_delta_path("stamp_zero_rows")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+
+        empty_df = simple_df.filter("id > 99")
+        rows = write_target(
+            spark,
+            empty_df,
+            Target(path=path),
+            WriteConfig(mode="append"),
+            path,
+            stamp=self._stamp(),
+        )
+        assert rows == 0
+        assert spark.read.format("delta").load(path).count() == 1
+
+    def test_zero_row_first_write_reports_exact_zero(
+        self, spark: SparkSession, simple_df, tmp_delta_path
+    ) -> None:
+        """Unlike an append to an existing table, a zero-row FIRST write
+        does create the table's initializing commit — the stamp scan
+        attributes it normally and reports an exact 0."""
+        path = tmp_delta_path("stamp_zero_first")
+        empty_df = simple_df.filter("id > 99")
+        rows = write_target(
+            spark,
+            empty_df,
+            Target(path=path),
+            WriteConfig(mode="append"),
+            path,
+            stamp=self._stamp(),
+        )
+        assert rows == 0
+        assert spark.read.format("delta").load(path).count() == 0
+
+    def test_interleaved_foreign_commit_count_is_exact(
+        self, spark: SparkSession, simple_df, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The F-006 guard-degrade scenario, upgraded: a foreign commit
+        between pre-version capture and the engine write no longer costs
+        the engine its own count."""
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("stamp_interleave")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+        handle = TargetHandle(spark, path)
+
+        original_cv = handle.current_version
+
+        def _capture_then_foreign():
+            version = original_cv()
+            frame = spark.createDataFrame([{"id": 100, "val": "foreign"}])
+            frame.write.format("delta").mode("append").save(path)
+            return version
+
+        monkeypatch.setattr(handle, "current_version", _capture_then_foreign)
+        rows = write_target(
+            spark,
+            simple_df,
+            Target(path=path),
+            WriteConfig(mode="append"),
+            path,
+            handle=handle,
+            stamp=self._stamp(),
+        )
+        assert rows == 2  # the engine's own commit, not 0 and not the foreign 1
+
+    def test_foreign_only_window_is_unattributable(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        """No own stamp in the window → absent, never another commit's metrics."""
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("stamp_foreign_only")
+        create_delta_table(spark, path, [{"id": 0}])
+        handle = TargetHandle(spark, path)
+        pre = handle.current_version()
+
+        # An engine-shaped stamp from a DIFFERENT run lands in the window.
+        other = self._stamp(run_id="run-other")
+        frame = spark.createDataFrame([{"id": 1}])
+        frame.write.format("delta").mode("append").option("userMetadata", other.to_json()).save(
+            path
+        )
+
+        metrics = handle.commit_metrics_after(pre, stamp=self._stamp())
+        assert metrics is None
+        assert "unattributable" in caplog.text
+
+    def test_own_stamp_wins_over_foreign_engine_shaped_stamp(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Attribution matches on the run_id+thread core — an engine-shaped
+        stamp with a different run_id in the same window is not attributed."""
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("stamp_core_match")
+        create_delta_table(spark, path, [{"id": 0}])
+        handle = TargetHandle(spark, path)
+        pre = handle.current_version()
+
+        own = self._stamp()
+        other = self._stamp(run_id="run-other")
+        spark.createDataFrame([{"id": 1}, {"id": 2}, {"id": 3}]).write.format("delta").mode(
+            "append"
+        ).option("userMetadata", other.to_json()).save(path)
+        spark.createDataFrame([{"id": 4}, {"id": 5}]).write.format("delta").mode("append").option(
+            "userMetadata", own.to_json()
+        ).save(path)
+
+        metrics = handle.commit_metrics_after(pre, stamp=own)
+        assert metrics is not None
+        assert int(metrics["numOutputRows"]) == 2  # the own commit, not the foreign 3
+
+
+@pytest.mark.spark
+class TestUnattributableCount:
+    """An unattributable count is unknown (None), never a false 0."""
+
+    def test_write_target_returns_none_on_attribution_miss(
+        self,
+        spark: SparkSession,
+        simple_df,
+        tmp_delta_path,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog,
+    ) -> None:
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("unattr_write")
+        create_delta_table(spark, path, [{"id": 0, "val": "seed"}])
+        monkeypatch.setattr(
+            TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
+        )
+
+        rows = write_target(spark, simple_df, Target(path=path), WriteConfig(mode="append"), path)
+        assert rows is None
+        assert "unavailable" in caplog.text
+
+        monkeypatch.undo()
+        assert spark.read.format("delta").load(path).count() == 3  # the write itself landed
 
 
 @pytest.mark.spark

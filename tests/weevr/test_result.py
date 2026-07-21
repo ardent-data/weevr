@@ -235,6 +235,60 @@ class TestRunResult:
         s = result.summary()
         assert "1,234 written" in s
 
+    def test_summary_execute_thread_unknown_rows(self) -> None:
+        from weevr.engine.result import ThreadResult
+
+        detail = ThreadResult(
+            status="success",
+            thread_name="dim_customer",
+            rows_written=None,
+            write_mode="append",
+            target_path="/data/dim_customer",
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="thread",
+            config_name="dim_customer",
+            duration_ms=800,
+            detail=detail,
+        )
+        s = result.summary()
+        assert "unknown" in s
+        assert "0 written" not in s
+
+    def test_summary_execute_weave_sums_known_rows(self) -> None:
+        from weevr.engine.result import ThreadResult, WeaveResult
+
+        def _tr(name: str, rows: int | None) -> ThreadResult:
+            return ThreadResult(
+                status="success",
+                thread_name=name,
+                rows_written=rows,
+                write_mode="append",
+                target_path=f"/data/{name}",
+            )
+
+        weave = WeaveResult(
+            status="success",
+            weave_name="dims",
+            thread_results=[_tr("a", 10), _tr("b", None), _tr("c", 5)],
+            threads_skipped=[],
+            duration_ms=100,
+        )
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.EXECUTE,
+            config_type="weave",
+            config_name="dims",
+            duration_ms=100,
+            detail=weave,
+            warnings=["Thread 'b': rows written to '/data/b' could not be attributed"],
+        )
+        s = result.summary()
+        assert "15 written" in s
+        assert "Warnings:" in s
+
     def test_summary_validate_success(self) -> None:
         result = RunResult(
             status="success",

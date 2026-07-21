@@ -262,10 +262,13 @@ depends on what was executed:
   computed as byproducts of the write itself (query observations and
   Delta commit metrics) rather than by separate Spark jobs; a
   quarantine count runs only when validation actually quarantined
-  rows, against the cached quarantine frame. When a commit-metrics
-  read fails or a concurrent writer commits between the write and the
-  read, the count degrades to zero with a logged warning — a wrong
-  number is never reported. Merge-based paths (dimensions, CDC, merge
+  rows, against the cached quarantine frame. Single-pass commits carry
+  a [lineage stamp](#commit-lineage-stamps), so the engine finds its
+  own commit exactly even when concurrent writers interleave. In the
+  rare case where attribution is truly impossible (the history read
+  itself fails), `rows_written` is `None` — unknown, never a false
+  zero — and a warning naming the thread and target is surfaced on
+  `RunResult.warnings`. Merge-based paths (dimensions, CDC, merge
   write mode) retain direct counts.
 - **validation_results** -- Per-rule pass/fail counts and severity
 - **assertion_results** -- Post-write assertion outcomes
@@ -311,9 +314,13 @@ version closes:
 `rows_unchanged` is intentionally absent: no Delta metric expresses it
 (`numTargetRowsCopied` is a file-rewrite artifact, not a logical
 count), and deriving it arithmetically risks a wrong number under
-quarantine and seeding edge cases. When metrics cannot be read — or a
-concurrent writer's commit makes attribution unsafe — the fields stay
-zero and a warning is logged.
+quarantine and seeding edge cases. When merge metrics cannot be read —
+or a concurrent writer's commit makes attribution unsafe — the fields
+stay zero and a warning is logged. The first write of a dimension is a
+plain save, not a merge: its commit carries the
+[lineage stamp](#commit-lineage-stamps), and an unattributable
+first-write count reports `rows_inserted` as `None` (unknown), never
+zero.
 
 ### Weave telemetry fields
 
@@ -345,6 +352,59 @@ for weave_name, weave_telem in telemetry.weave_telemetry.items():
         print(f"    Written:     {t.rows_written}")
         print(f"    Quarantined: {t.rows_quarantined}")
 ```
+
+`rows_written` is `int | None`: `None` means the write succeeded but
+its count could not be attributed (unknown). Sinks and dashboards that
+aggregate counts should sum the known values and treat `None` as a
+data-quality signal, not as zero.
+
+## Commit lineage stamps
+
+Every single-pass engine write — overwrite, append, an incremental
+first write, and a dimension's first write — stamps its Delta commit
+with a small JSON document in the commit's `userMetadata`, visible in
+`DESCRIBE HISTORY`:
+
+```json
+{
+  "engine": "weevr",
+  "version": 1,
+  "run_id": "5f0c9c8e-...-b2a1",
+  "thread": "dim_customer",
+  "loom": "nightly",
+  "weave": "dimensions",
+  "mode": "append"
+}
+```
+
+The stamp serves two purposes:
+
+- **Exact attribution.** After a write, the engine finds its own
+  commit by its stamp rather than assuming the newest commit is its
+  own — so `rows_written` stays exact no matter how many concurrent
+  writers (ad-hoc appends, `OPTIMIZE`, other pipelines) interleave.
+- **Lineage.** The `run_id` in the stamp is the same run identity
+  carried by audit columns (`${run.id}`) and telemetry, so a table's
+  Delta history joins back to the run that produced each commit.
+
+The **stable core** of the stamp is the engine marker (`engine`),
+`run_id`, and `thread` — attribution matches on exactly these, and
+they are safe to build tooling against. The remaining fields (`loom`,
+`weave`, `mode`, `version`) are best-effort context and may evolve;
+`mode` records the thread's configured write mode, not the physical
+branch taken (a first write executes as an overwrite regardless).
+
+Two boundaries to be aware of:
+
+- **Merge commits are not stamped.** Delta only honors per-write
+  `userMetadata` on DataFrameWriter paths; merge commits (dimension
+  merges, CDC routing, merge write mode) would require session-level
+  configuration, which races across parallel threads. Their counts
+  come from eager inputs and guarded merge metrics instead.
+- **The stamp takes precedence.** If you set a session-level
+  `spark.databricks.delta.commitInfo.userMetadata`, engine-stamped
+  commits override it with the stamp; commits the engine does not
+  stamp (merges, seeds, warp pre-init) still carry your session value.
 
 ## Progress reporting
 

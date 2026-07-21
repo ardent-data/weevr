@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
+
+logger = logging.getLogger(__name__)
 
 
 def is_table_alias(path: str) -> bool:
@@ -32,8 +35,13 @@ def read_delta(spark: SparkSession, path: str) -> DataFrame:
     return spark.read.format("delta").load(path)
 
 
-def delta_table_exists(spark: SparkSession, path: str) -> bool:
-    """Return True if a Delta table exists at the given path or alias.
+def probe_delta_table_exists(spark: SparkSession, path: str) -> bool:
+    """Raw existence probe — raises when the probe itself fails.
+
+    Callers that must distinguish "confirmed absent" from "could not
+    ask" (the write path, where the two answers route to different
+    branches) use this directly; everyone else goes through
+    :func:`delta_table_exists`, which folds failures into False.
 
     The alias branch asks the catalog rather than resolving the table
     through a reader, so no Delta log is read and no job is launched.
@@ -47,13 +55,28 @@ def delta_table_exists(spark: SparkSession, path: str) -> bool:
         spark: Active SparkSession.
         path: Table alias or file path.
     """
-    try:
-        if is_table_alias(path):
-            return spark.catalog.tableExists(path)
-        from delta.tables import DeltaTable
+    if is_table_alias(path):
+        return spark.catalog.tableExists(path)
+    from delta.tables import DeltaTable
 
-        return DeltaTable.isDeltaTable(spark, path)
-    except Exception:
+    return DeltaTable.isDeltaTable(spark, path)
+
+
+def delta_table_exists(spark: SparkSession, path: str) -> bool:
+    """Return True if a Delta table exists at the given path or alias.
+
+    A probe failure (metastore or storage error — not a clean "absent"
+    answer) is logged with its cause and reported as False. Callers for
+    whom that conflation is unsafe use :func:`probe_delta_table_exists`.
+
+    Args:
+        spark: Active SparkSession.
+        path: Table alias or file path.
+    """
+    try:
+        return probe_delta_table_exists(spark, path)
+    except Exception as exc:
+        logger.warning("Existence probe failed for '%s'; treating as absent: %s", path, exc)
         return False
 
 

@@ -14,7 +14,7 @@ from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import typed_watermark_col
-from weevr.operations.target_handle import TargetHandle
+from weevr.operations.target_handle import CommitStamp, TargetHandle
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,8 @@ def write_target(
     write_config: WriteConfig | None,
     target_path: str,
     handle: TargetHandle | None = None,
-) -> int:
+    stamp: CommitStamp | None = None,
+) -> int | None:
     """Write a DataFrame to a Delta table.
 
     If *target_path* is a table alias (e.g. ``staging.stg_customers``), the
@@ -126,9 +127,14 @@ def write_target(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        stamp: Lineage stamp for single-pass commits; enables exact
+            own-commit attribution. True MERGE commits are not stamped
+            (per-write userMetadata is not honored there).
 
     Returns:
-        Number of rows in ``df`` (rows written for overwrite/append; input rows for merge).
+        Number of rows written (input rows for merge), or ``None`` when a
+        successful single-pass write's count could not be attributed to
+        the engine's own commit — unknown, never a false 0.
 
     Raises:
         ExecutionError: If the write operation fails.
@@ -139,13 +145,22 @@ def write_target(
     if handle is None:
         handle = TargetHandle(spark, target_path)
     target_exists = handle.exists()
+    if not target_exists and mode in ("append", "merge") and handle.exists_uncertain():
+        # A failed probe is not a confirmed absence — the first-write
+        # branch would overwrite a target that may exist. Overwrite mode
+        # is exempt: destructive by contract.
+        raise ExecutionError(
+            f"Cannot {mode} to '{target_path}': the existence probe failed, so "
+            f"the target may already exist and the first-write path would "
+            f"overwrite it; resolve the probe failure and re-run"
+        )
 
     try:
         # Merge keeps an eager input count — merge metrics express outcome
         # rows, not the input-rows semantic this function returns, and the
         # merge action cannot fulfill observations (it zero-fires them).
         # Single-pass modes count from the write's own commit metrics.
-        row_count = df.count() if mode == "merge" and target_exists else -1
+        row_count: int | None = df.count() if mode == "merge" and target_exists else -1
         pre_version = handle.current_version() if row_count == -1 and target_exists else None
 
         if mode == "overwrite" or not target_exists:
@@ -162,6 +177,8 @@ def write_target(
                     F.lit(write_config.soft_delete_active_value).cast("boolean"),
                 )
             writer = df.write.format("delta").mode("overwrite")
+            if stamp is not None:
+                writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
             if use_table_api:
@@ -171,6 +188,8 @@ def write_target(
 
         elif mode == "append":
             writer = df.write.format("delta").mode("append")
+            if stamp is not None:
+                writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
                 writer = writer.partitionBy(*partition_cols)
             if use_table_api:
@@ -186,17 +205,18 @@ def write_target(
             _execute_merge(spark, df, write_config, target_path)
 
         if row_count == -1:
-            # Single-pass write: the commit's own numOutputRows, guarded
-            # against foreign commits. Absent-with-warning on any miss.
-            metrics = handle.commit_metrics_after(pre_version)
+            # Single-pass write: the commit's own numOutputRows — found by
+            # its stamp when one was written, version-guarded otherwise.
+            # Absent-with-warning on any miss.
+            metrics = handle.commit_metrics_after(pre_version, stamp=stamp)
             if metrics is not None and "numOutputRows" in metrics:
                 row_count = int(metrics["numOutputRows"])
             else:
                 logger.warning(
-                    "Rows-written count unavailable for '%s'; reporting 0",
+                    "Rows-written count unavailable for '%s'; reporting unknown",
                     target_path,
                 )
-                row_count = 0
+                row_count = None
         handle.mark_exists()
         return row_count
 
@@ -440,9 +460,17 @@ def execute_cdc_merge(
         )
 
     counts: dict[str, int] = {"inserts": 0, "updates": 0, "deletes": 0}
-    target_exists = (
-        handle.exists() if handle is not None else delta_table_exists(spark, target_path)
-    )
+    if handle is None:
+        handle = TargetHandle(spark, target_path)
+    target_exists = handle.exists()
+    if not target_exists and handle.exists_uncertain():
+        # Same posture as write_target: a failed probe must never route
+        # onto the destructive first-CDC-write (overwrite) branch.
+        raise ExecutionError(
+            f"Cannot run CDC merge on '{target_path}': the existence probe "
+            f"failed, so the target may already exist and the first-write "
+            f"path would overwrite it; resolve the probe failure and re-run"
+        )
 
     try:
         # Count operations in a single pass over the (reduced) window

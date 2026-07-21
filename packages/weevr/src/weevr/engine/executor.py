@@ -61,7 +61,7 @@ from weevr.operations.readers import (
     read_source_incremental,
 )
 from weevr.operations.seeding import build_system_member_rows, execute_seeds
-from weevr.operations.target_handle import TargetHandle
+from weevr.operations.target_handle import CommitStamp, TargetHandle
 from weevr.operations.validation import validate_dataframe
 from weevr.operations.warp import (
     append_warp_only_columns,
@@ -184,8 +184,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
     validation_results: list = []
     assertion_results: list = []
+    thread_warnings: list[str] = []
     rows_read = 0
-    rows_written = 0
+    rows_written: int | None = 0
     rows_quarantined = 0
     rows_after_transforms = 0
     output_schema: list[tuple[str, str]] | None = None
@@ -609,6 +610,17 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
 
+            # Lineage stamp for the counted write's commit — carries the
+            # same run identity as audit columns and exports, so table
+            # history joins to telemetry via run_id.
+            commit_stamp = CommitStamp(
+                run_id=run_id,
+                thread=thread.name,
+                loom=loom_name or None,
+                weave=_effective_weave_name(thread, weave_name) or None,
+                mode=write_mode,
+            )
+
             if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
                 df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
@@ -659,7 +671,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 was_first_write = not target_handle.exists()
                 merge_result = execute_dimension_merge(
-                    spark, df, dim_builder, target_path, run_timestamp, handle=target_handle
+                    spark,
+                    df,
+                    dim_builder,
+                    target_path,
+                    run_timestamp,
+                    handle=target_handle,
+                    stamp=commit_stamp,
                 )
                 # Input-rows semantic. Quarantine-free merges need no new
                 # action: transforms after the eager rows_after_transforms
@@ -755,7 +773,22 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 rows_written = write_target(
-                    spark, df, thread.target, thread.write, target_path, handle=target_handle
+                    spark,
+                    df,
+                    thread.target,
+                    thread.write,
+                    target_path,
+                    handle=target_handle,
+                    stamp=commit_stamp,
+                )
+
+            # A successful write whose count could not be attributed reads
+            # as unknown, never as zero — surface it to the caller.
+            if rows_written is None:
+                thread_warnings.append(
+                    f"Thread '{thread.name}': rows written to '{target_path}' "
+                    f"could not be attributed to the engine's commit; "
+                    f"reported as unknown"
                 )
 
             # Step 13b — post-write fact sentinel advisory. Runs against
@@ -946,6 +979,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 samples=samples,
                 drift_report=drift_report_dict,
                 warp_findings=warp_findings if warp_findings else None,
+                warnings=thread_warnings or None,
             )
 
         except DataValidationError:
@@ -1173,6 +1207,18 @@ def _build_thread_variable_context(thread: Thread) -> VariableContext:
     return VariableContext(None)
 
 
+def _effective_weave_name(thread: Thread, weave_name: str) -> str:
+    """The weave name as carried by run identity surfaces.
+
+    Falls back to the prefix of the thread's qualified key when no
+    weave name was passed (standalone thread runs). Shared by audit
+    context and the commit lineage stamp so the two never drift.
+    """
+    if weave_name:
+        return weave_name
+    return thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
+
+
 def _build_audit_context(
     thread: Thread,
     weave_name: str,
@@ -1181,9 +1227,7 @@ def _build_audit_context(
     run_id: str,
 ) -> AuditContext:
     """Build an AuditContext for context variable resolution."""
-    effective_weave = weave_name or (
-        thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
-    )
+    effective_weave = _effective_weave_name(thread, weave_name)
     primary_alias = next(iter(thread.sources))
     primary_source = thread.sources[primary_alias]
     return AuditContext(
@@ -1280,7 +1324,7 @@ def _build_telemetry(
     validation_results: list,
     assertion_results: list,
     rows_read: int,
-    rows_written: int,
+    rows_written: int | None,
     rows_quarantined: int,
     status: SpanStatus = SpanStatus.OK,
     collector: SpanCollector | None = None,
