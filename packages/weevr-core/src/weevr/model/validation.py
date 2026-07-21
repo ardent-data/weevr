@@ -56,7 +56,10 @@ class Assertion(FrozenBase):
     )
     columns: list[str] | None = Field(
         default=None,
-        description="Columns to assert against, used by ``column_not_null`` and ``unique``.",
+        description=(
+            "Columns to assert against, used by ``column_not_null``, ``unique``, "
+            "and (as the multi-column alternative to ``column``) ``fk_sentinel_rate``."
+        ),
     )
     min: int | None = Field(
         default=None,
