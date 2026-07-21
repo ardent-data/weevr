@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.19.0](https://github.com/ardent-data/weevr/compare/weevr-v1.18.1...weevr-v1.19.0) (2026-07-21)
+
+
+### Features
+
+* **engine:** collect pipeline step statistics lazily via observations ([#204](https://github.com/ardent-data/weevr/issues/204)) ([780468c](https://github.com/ardent-data/weevr/commit/780468c6b8ab0192841f2556d623d5388b8ef039))
+* **engine:** execute each thread's DAG once behind a materialization boundary ([#205](https://github.com/ardent-data/weevr/issues/205)) ([8cf8122](https://github.com/ardent-data/weevr/commit/8cf81229e6f6da24355d1d6426907d530e0b6925))
+* **engine:** wire execution block with max_parallel_threads ([#191](https://github.com/ardent-data/weevr/issues/191)) ([4cef89d](https://github.com/ardent-data/weevr/commit/4cef89ddae9d1b08006177933bde1fa868403de1))
+
+
+### Bug Fixes
+
+* **config:** guard incremental_watermark against overwrite writes ([#193](https://github.com/ardent-data/weevr/issues/193)) ([1956594](https://github.com/ardent-data/weevr/commit/19565943b788ac0e273c998080cc9bd11b0facf7))
+* **engine:** allow condition-gated writers to share a target safely ([#212](https://github.com/ardent-data/weevr/issues/212)) ([431d390](https://github.com/ardent-data/weevr/commit/431d39058bc986436f70813733a1e0e03d5fec1d))
+* **engine:** harden write existence probes and commit attribution ([#211](https://github.com/ardent-data/weevr/issues/211)) ([b09aa1a](https://github.com/ardent-data/weevr/commit/b09aa1aec67bf48506e58f9115d9d44a697205c0))
+* **engine:** keep loom-level lookup caches alive across weaves ([#188](https://github.com/ardent-data/weevr/issues/188)) ([4e6390d](https://github.com/ardent-data/weevr/commit/4e6390d1364967367e248973d418cb6c57d9412f))
+* **engine:** reject unordered same-target threads at plan time ([#192](https://github.com/ardent-data/weevr/issues/192)) ([87b8207](https://github.com/ardent-data/weevr/commit/87b820773a24c735f031edca9d5a128e21c1890b))
+* **operations:** apply on_no_match_source delete and soft_delete clauses ([#203](https://github.com/ardent-data/weevr/issues/203)) ([57ce51e](https://github.com/ardent-data/weevr/commit/57ce51ec9cf74cd38de3e7f492ef23efc5cd1fa3))
+* **operations:** merge CDC change windows to latest state per key ([#194](https://github.com/ardent-data/weevr/issues/194)) ([29750d4](https://github.com/ardent-data/weevr/commit/29750d4213d4cd35637376bb46ead1d3235032a6))
+* **operations:** scope versioned dimension merge to current rows ([#195](https://github.com/ardent-data/weevr/issues/195)) ([7e87d1a](https://github.com/ardent-data/weevr/commit/7e87d1a689eb84c118562a45d25f587d39bc79cd))
+* **operations:** single-pass fact and warp validation probes ([#190](https://github.com/ardent-data/weevr/issues/190)) ([590c559](https://github.com/ardent-data/weevr/commit/590c55976603ac93fbf50f890d0e14cdeac18e33))
+
 ## [1.18.1](https://github.com/ardent-data/weevr/compare/weevr-v1.18.0...weevr-v1.18.1) (2026-05-27)
 
 
