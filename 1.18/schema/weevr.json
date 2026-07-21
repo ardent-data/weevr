@@ -136,7 +136,7 @@
               }
             ],
             "default": null,
-            "description": "Columns to assert against, used by ``column_not_null`` and ``unique``.",
+            "description": "Columns to assert against, used by ``column_not_null``, ``unique``, and (as the multi-column alternative to ``column``) ``fk_sentinel_rate``.",
             "title": "Columns"
           },
           "min": {
@@ -1349,7 +1349,7 @@
         "type": "object"
       },
       "ExecutionConfig": {
-        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).\n    capture_samples: Whether output samples are captured at write\n        time. Off by default; preview always samples.",
+        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).\n    capture_samples: Whether output and quarantine samples are\n        captured at write time. Off by default; preview always\n        samples.",
         "properties": {
           "log_level": {
             "$ref": "#/$defs/LogLevel",
@@ -1378,7 +1378,7 @@
           },
           "capture_samples": {
             "default": false,
-            "description": "Whether to capture 10-row output samples at write time for display. Preview mode always captures samples regardless of this setting.",
+            "description": "Whether to capture 10-row output and quarantine samples at write time for display. Preview mode always captures samples regardless of this setting.",
             "title": "Capture Samples",
             "type": "boolean"
           }
@@ -5329,7 +5329,7 @@
         "type": "object"
       },
       "ExecutionConfig": {
-        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).\n    capture_samples: Whether output samples are captured at write\n        time. Off by default; preview always samples.",
+        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).\n    capture_samples: Whether output and quarantine samples are\n        captured at write time. Off by default; preview always\n        samples.",
         "properties": {
           "log_level": {
             "$ref": "#/$defs/LogLevel",
@@ -5358,7 +5358,7 @@
           },
           "capture_samples": {
             "default": false,
-            "description": "Whether to capture 10-row output samples at write time for display. Preview mode always captures samples regardless of this setting.",
+            "description": "Whether to capture 10-row output and quarantine samples at write time for display. Preview mode always captures samples regardless of this setting.",
             "title": "Capture Samples",
             "type": "boolean"
           }
@@ -6849,7 +6849,7 @@
         "type": "object"
       },
       "ExecutionConfig": {
-        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).\n    capture_samples: Whether output samples are captured at write\n        time. Off by default; preview always samples.",
+        "description": "Runtime execution settings declared on the top-level ``execution:`` block.\n\nCanonical declaration sites are the top-level ``execution:`` field on\nLoom and Weave. The effective settings for a weave execution merge\nfield-level (see :func:`resolve_effective_execution`) rather than\nreplacing whole-block. Thread-scoped execution settings are declared\nbut not applied in v1.x.\n\nAttributes:\n    log_level: Logging verbosity for execution output.\n    trace: Whether to collect execution spans for telemetry.\n    max_parallel_threads: Upper bound on concurrently executing\n        threads within a weave's parallel group. Unset means\n        unbounded (pool sized to the group).\n    capture_samples: Whether output and quarantine samples are\n        captured at write time. Off by default; preview always\n        samples.",
         "properties": {
           "log_level": {
             "$ref": "#/$defs/LogLevel",
@@ -6878,7 +6878,7 @@
           },
           "capture_samples": {
             "default": false,
-            "description": "Whether to capture 10-row output samples at write time for display. Preview mode always captures samples regardless of this setting.",
+            "description": "Whether to capture 10-row output and quarantine samples at write time for display. Preview mode always captures samples regardless of this setting.",
             "title": "Capture Samples",
             "type": "boolean"
           }
