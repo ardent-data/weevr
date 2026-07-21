@@ -734,6 +734,39 @@ class TestValidateMode:
         assert result.validation_errors is not None
         assert any("not found" in e for e in result.validation_errors)
 
+    def test_validate_accepts_condition_gated_same_target_writers(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        """Writers of one target all carrying conditions validate cleanly —
+        the conditions assert mutual exclusion."""
+        src = str(tmp_path / "src_cdup")
+        tgt = str(tmp_path / "tgt_cdup")
+        spark.createDataFrame([{"id": 1}]).write.format("delta").save(src)
+
+        project = _project_dir(tmp_path)
+        _create_thread_yaml(project, "load_full", src, tgt)
+        _create_thread_yaml(project, "load_incr", src, tgt)
+        weave_dir = project / "weaves"
+        weave_dir.mkdir(parents=True, exist_ok=True)
+        weave_yaml = weave_dir / "vcdup.weave"
+        weave_yaml.write_text(
+            f"""\
+config_version: "1.0"
+threads:
+  - ref: "threads/load_full.thread"
+    condition:
+      when: "table_empty('{tgt}')"
+  - ref: "threads/load_incr.thread"
+    condition:
+      when: "not table_empty('{tgt}')"
+"""
+        )
+        ctx = Context(spark=spark, project=project)
+        result = ctx.run(weave_yaml, mode="validate")
+
+        assert result.status == "success"
+        assert result.validation_errors is None
+
 
 @pytest.mark.spark
 class TestPlanMode:

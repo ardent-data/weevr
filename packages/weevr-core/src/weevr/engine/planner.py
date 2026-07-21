@@ -43,6 +43,15 @@ class ExecutionPlan(FrozenBase):
         lookup_consumers: Maps lookup names to the list of threads that
             consume each lookup. Only populated when ``build_plan`` was
             called with lookups.
+        conditional_target_writers: Maps a normalized target path to the
+            writers sharing it under the condition exemption — every
+            writer carries a thread-entry condition, and the conditions
+            assert mutual exclusion (the runner enforces it at
+            condition-resolution time). ``None`` when no target is
+            shared this way. Lookups reading such a target have no
+            single producer: ``lookup_producers`` records ``None`` for
+            them, while the schedule places them after the last
+            writer's group and consumers depend on every writer.
     """
 
     weave_name: str
@@ -56,6 +65,7 @@ class ExecutionPlan(FrozenBase):
     lookup_schedule: dict[int, list[str]] | None = None
     lookup_producers: dict[str, str | None] | None = None
     lookup_consumers: dict[str, list[str]] | None = None
+    conditional_target_writers: dict[str, list[str]] | None = None
 
     def dag(self, *, dark: bool | None = None) -> DAGDiagram:
         """Return an inline SVG DAG diagram of this execution plan.
@@ -217,30 +227,45 @@ def _build_target_index(
     threads: dict[str, Thread],
     explicit_index: dict[str, list[str]],
     weave_name: str,
-) -> dict[str, str]:
+    conditioned: set[str],
+) -> tuple[dict[str, str], dict[str, list[str]]]:
     """Build a mapping of normalized target path to producing thread name.
 
     Used by thread and lookup dependency inference to identify which thread
     produces a given data path.
 
-    A target written by two or more threads is rejected unless explicit
-    dependencies totally order the writers: unordered writers would land in
-    one parallel group and race concurrent writes against a single table.
-    For an ordered writer chain, the target resolves to the last writer, so
-    downstream consumers run after the target's final state exists.
+    A target written by two or more threads is rejected unless one of two
+    exemptions applies:
+
+    - Explicit dependencies totally order the writers. The target then
+      resolves to the last writer, so downstream consumers run after the
+      target's final state exists.
+    - Every writer carries a thread-entry condition. The conditions assert
+      mutual exclusion (at most one writer survives per run); the runner
+      enforces the assertion at condition-resolution time. Such a target
+      has no single producer — it is returned in the conditional map
+      instead of the index, and consumers depend on every writer.
+
+    Unordered, uncondition-gated writers would land in one parallel group
+    and race concurrent writes against a single table.
 
     Args:
         threads: Mapping of thread name to Thread config.
         explicit_index: Explicit dependency index, used to check whether
             same-target writers are serialized by declared dependencies.
         weave_name: Weave name for error messages.
+        conditioned: Effective names of threads whose entry carries a
+            condition.
 
     Returns:
-        A dict mapping normalized target path to the producing thread's name.
+        A tuple of ``(target_index, conditional_writers)``: the normalized
+        target path → producing thread mapping, and the normalized target
+        path → sorted writer names mapping for condition-exempted targets.
 
     Raises:
         ConfigError: If two or more threads write the same target without
-            explicit dependencies totally ordering them.
+            explicit dependencies totally ordering them and without every
+            writer being condition-gated.
     """
     writers_by_path: dict[str, list[str]] = {}
     for name, thread in threads.items():
@@ -249,36 +274,47 @@ def _build_target_index(
             writers_by_path.setdefault(path, []).append(name)
 
     target_index: dict[str, str] = {}
+    conditional_writers: dict[str, list[str]] = {}
     for path, writers in writers_by_path.items():
         if len(writers) == 1:
             target_index[path] = writers[0]
             continue
         last_writer = _resolve_writer_chain(writers, explicit_index)
-        if last_writer is None:
-            names = ", ".join(f"'{n}'" for n in sorted(writers))
-            raise ConfigError(
-                f"Threads {names} all write target '{path}' in weave "
-                f"'{weave_name}' but are not ordered by explicit dependencies, "
-                f"so concurrent writes would corrupt the target. Declare "
-                f"explicit dependencies to serialize the writers, or give each "
-                f"thread its own target."
-            )
-        target_index[path] = last_writer
-    return target_index
+        if last_writer is not None:
+            target_index[path] = last_writer
+            continue
+        if all(w in conditioned for w in writers):
+            conditional_writers[path] = sorted(writers)
+            continue
+        names = ", ".join(f"'{n}'" for n in sorted(writers))
+        raise ConfigError(
+            f"Threads {names} all write target '{path}' in weave "
+            f"'{weave_name}' but are not ordered by explicit dependencies, "
+            f"so concurrent writes would corrupt the target. Declare "
+            f"explicit dependencies to serialize the writers, give each "
+            f"thread its own target, or put a mutually exclusive condition "
+            f"on every writer."
+        )
+    return target_index, conditional_writers
 
 
 def _infer_dependencies(
     threads: dict[str, Thread],
     target_index: dict[str, str],
+    conditional_writers: dict[str, list[str]],
 ) -> dict[str, list[str]]:
     """Build the inferred dependency dict from source/target path matching.
 
     For each thread, auto-infers an edge when another thread's target path
-    appears in this thread's source paths.
+    appears in this thread's source paths. A source matching a
+    condition-exempted shared target has no single producer — the consumer
+    depends on EVERY writer, so it runs after whichever one survived.
 
     Args:
         threads: Mapping of thread name to Thread config.
         target_index: Pre-built target path index.
+        conditional_writers: Condition-exempted shared targets and their
+            writer sets.
 
     Returns:
         A ``dict[thread_name, list[upstream_thread_name]]`` of inferred edges.
@@ -287,9 +323,13 @@ def _infer_dependencies(
     for name, thread in threads.items():
         source_paths = _extract_source_paths(thread)
         for src_path in source_paths:
-            producer = target_index.get(src_path)
-            if producer is not None and producer != name and producer not in inferred[name]:
-                inferred[name].append(producer)
+            producers = conditional_writers.get(src_path)
+            if producers is None:
+                single = target_index.get(src_path)
+                producers = [single] if single is not None else []
+            for producer in producers:
+                if producer != name and producer not in inferred[name]:
+                    inferred[name].append(producer)
     return inferred
 
 
@@ -432,34 +472,55 @@ def _infer_lookup_dependencies(
     threads: dict[str, Thread],
     lookups: dict[str, Lookup],
     target_index: dict[str, str],
-) -> tuple[dict[str, list[str]], dict[str, str | None], dict[str, list[str]]]:
+    conditional_writers: dict[str, list[str]],
+) -> tuple[
+    dict[str, list[str]],
+    dict[str, str | None],
+    dict[str, list[str]],
+    dict[str, list[str]],
+]:
     """Infer implicit thread dependencies mediated by lookups.
 
     When a lookup's source reads from a table produced by thread A, and
-    thread B consumes that lookup, then B implicitly depends on A.
+    thread B consumes that lookup, then B implicitly depends on A. A lookup
+    reading a condition-exempted shared target has no single producer:
+    ``lookup_producer`` records ``None`` and the conditional map carries
+    the full writer set — consumers depend on every writer, and the
+    schedule places the lookup after the last writer's group.
 
     Args:
         threads: Mapping of thread name to Thread config.
         lookups: Mapping of lookup name to Lookup config.
         target_index: Pre-built target path to thread name index.
+        conditional_writers: Condition-exempted shared targets and their
+            writer sets.
 
     Returns:
-        A tuple of ``(lookup_deps, lookup_producer, lookup_consumers)`` where:
+        A tuple of ``(lookup_deps, lookup_producer, lookup_consumers,
+        lookup_conditional)`` where:
         - ``lookup_deps`` maps consumer thread names to the list of producer
           thread names they implicitly depend on (via lookups).
         - ``lookup_producer`` maps lookup names to the producing thread name,
           or ``None`` for external lookups.
         - ``lookup_consumers`` maps lookup names to the list of thread names
           that consume each lookup.
+        - ``lookup_conditional`` maps lookup names to the writer set of the
+          conditional shared target they read (empty when they don't).
     """
-    # Find the producer thread for each lookup
+    # Find the producer thread(s) for each lookup
     lookup_producer: dict[str, str | None] = {}
+    lookup_conditional: dict[str, list[str]] = {}
     for lk_name, lk in lookups.items():
         src = lk.source
         raw = src.alias or src.path
         if raw is not None:
             normalized = _normalize_path(raw)
-            lookup_producer[lk_name] = target_index.get(normalized)
+            writers = conditional_writers.get(normalized)
+            if writers is not None:
+                lookup_conditional[lk_name] = writers
+                lookup_producer[lk_name] = None
+            else:
+                lookup_producer[lk_name] = target_index.get(normalized)
         else:
             lookup_producer[lk_name] = None
 
@@ -474,21 +535,25 @@ def _infer_lookup_dependencies(
             ):
                 lookup_consumers[source.lookup].append(thread_name)
 
-    # Build implicit deps: consumer depends on producer
+    # Build implicit deps: consumer depends on producer(s)
     lookup_deps: dict[str, list[str]] = {name: [] for name in threads}
-    for lk_name, producer in lookup_producer.items():
-        if producer is None:
-            continue
-        for consumer in lookup_consumers.get(lk_name, []):
-            if consumer != producer and producer not in lookup_deps[consumer]:
-                lookup_deps[consumer].append(producer)
+    for lk_name in lookups:
+        producers = lookup_conditional.get(lk_name)
+        if producers is None:
+            single = lookup_producer[lk_name]
+            producers = [single] if single is not None else []
+        for producer in producers:
+            for consumer in lookup_consumers.get(lk_name, []):
+                if consumer != producer and producer not in lookup_deps[consumer]:
+                    lookup_deps[consumer].append(producer)
 
-    return lookup_deps, lookup_producer, lookup_consumers
+    return lookup_deps, lookup_producer, lookup_consumers, lookup_conditional
 
 
 def _compute_lookup_schedule(
     lookups: dict[str, Lookup],
     lookup_producer: dict[str, str | None],
+    lookup_conditional: dict[str, list[str]],
     execution_order: list[list[str]],
 ) -> dict[int, list[str]]:
     """Compute when each materialized lookup should be read.
@@ -496,10 +561,14 @@ def _compute_lookup_schedule(
     Lookups with no producer (external data) are scheduled at group 0 (before
     the first execution group). Lookups whose source is produced by a thread
     in group N are scheduled at group N+1 (after the producer completes).
+    Lookups reading a condition-exempted shared target are scheduled after
+    the LAST writer's group — the surviving writer may sit in any of them.
 
     Args:
         lookups: Mapping of lookup name to Lookup config.
         lookup_producer: Maps lookup name to its producer thread, or ``None``.
+        lookup_conditional: Maps lookup names to the writer set of the
+            conditional shared target they read.
         execution_order: Parallel execution groups from topological sort.
 
     Returns:
@@ -516,8 +585,12 @@ def _compute_lookup_schedule(
     for lk_name, lk in lookups.items():
         if not lk.materialize:
             continue
-        producer = lookup_producer.get(lk_name)
-        group_idx = 0 if producer is None else thread_group_index[producer] + 1
+        writers = lookup_conditional.get(lk_name)
+        if writers:
+            group_idx = max(thread_group_index[w] for w in writers) + 1
+        else:
+            producer = lookup_producer.get(lk_name)
+            group_idx = 0 if producer is None else thread_group_index[producer] + 1
         schedule.setdefault(group_idx, []).append(lk_name)
 
     # Sort lookup names within each group for determinism
@@ -567,22 +640,32 @@ def build_plan(
     thread_names = list(threads.keys())
 
     # 0. Build the explicit dependency index first — the target index needs it
-    #    to decide whether same-target writers are serialized.
+    #    to decide whether same-target writers are serialized. Conditioned
+    #    effective names feed the condition exemption for shared targets.
     explicit = _build_explicit_index(threads, thread_entries)
+    conditioned = {
+        (entry.as_ or entry.name or (Path(entry.ref).stem if entry.ref else ""))
+        for entry in thread_entries
+        if entry.condition is not None
+    }
 
-    # 0b. Build shared target index (rejects unordered duplicate targets)
-    target_index = _build_target_index(threads, explicit, weave_name)
+    # 0b. Build shared target index (rejects unordered duplicate targets
+    #     unless chained or fully condition-gated)
+    target_index, conditional_writers = _build_target_index(
+        threads, explicit, weave_name, conditioned
+    )
 
     # 1. Infer data-based dependencies from source/target path matching
-    inferred = _infer_dependencies(threads, target_index)
+    inferred = _infer_dependencies(threads, target_index, conditional_writers)
 
     # 1b. Infer lookup-mediated dependencies when lookups are provided
     lookup_deps: dict[str, list[str]] | None = None
     lookup_producer: dict[str, str | None] | None = None
     lookup_consumers: dict[str, list[str]] | None = None
+    lookup_conditional: dict[str, list[str]] = {}
     if lookups:
-        lookup_deps, lookup_producer, lookup_consumers = _infer_lookup_dependencies(
-            threads, lookups, target_index
+        lookup_deps, lookup_producer, lookup_consumers, lookup_conditional = (
+            _infer_lookup_dependencies(threads, lookups, target_index, conditional_writers)
         )
         # Merge lookup deps into inferred deps
         for name, deps in lookup_deps.items():
@@ -611,7 +694,9 @@ def build_plan(
     # 7. Compute lookup materialization schedule
     lookup_schedule: dict[int, list[str]] | None = None
     if lookups and lookup_producer is not None:
-        lookup_schedule = _compute_lookup_schedule(lookups, lookup_producer, execution_order)
+        lookup_schedule = _compute_lookup_schedule(
+            lookups, lookup_producer, lookup_conditional, execution_order
+        )
 
     return ExecutionPlan(
         weave_name=weave_name,
@@ -625,4 +710,5 @@ def build_plan(
         lookup_schedule=lookup_schedule,
         lookup_producers=lookup_producer,
         lookup_consumers=lookup_consumers,
+        conditional_target_writers=conditional_writers or None,
     )
