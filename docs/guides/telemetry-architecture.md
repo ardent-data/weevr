@@ -22,8 +22,9 @@ only after thread completion.
 - **SpanCollector** — A mutable container that holds finished spans for a
   given scope (thread, weave, or loom). Collectors merge upward after
   execution completes.
-- **Trace tree** — A hierarchy of `LoomTrace` → `WeaveTrace` → `ThreadTrace`
-  objects that wrap spans with navigable parent-child relationships.
+- **Telemetry tree** — The `LoomTelemetry` → `WeaveTelemetry` →
+  `ThreadTelemetry` hierarchy returned on `RunResult.telemetry`. Each level
+  carries its own span, giving navigable parent-child access to the run.
 
 ## How it works
 
@@ -120,33 +121,23 @@ appends all spans from the thread collector into the weave collector's list.
 
 The same pattern repeats at the weave → loom boundary.
 
-### Trace tree composition
+### Telemetry tree composition
 
-The `telemetry.trace` module provides tree-shaped models for navigating
-execution results:
+The `telemetry.results` module provides the tree that execution attaches
+to the result objects returned by `ctx.run()`:
 
 | Model | Contains | Used for |
 |-------|----------|----------|
-| `LoomTrace` | Loom span + `dict[str, WeaveTrace]` | Root of the tree |
-| `WeaveTrace` | Weave span + `dict[str, ThreadTrace]` | Intermediate level |
-| `ThreadTrace` | Thread span + `ThreadTelemetry` | Leaf nodes with full metrics |
+| `LoomTelemetry` | Loom span + `dict[str, WeaveTelemetry]` | Root of the tree |
+| `WeaveTelemetry` | Weave span + `dict[str, ThreadTelemetry]` + hook/lookup/column-set results | Intermediate level |
+| `ThreadTelemetry` | Thread span + full metrics | Leaf nodes |
 
-Each trace type provides a `to_spans()` method that recursively flattens the
-tree into a list of `ExecutionSpan` objects, suitable for export to OTel-
-compatible backends.
-
-### Telemetry result hierarchy
-
-Parallel to the trace tree, the `telemetry.results` module provides data
-classes that carry execution metrics:
-
-- **ThreadTelemetry** — Span, row counts (read/written/quarantined), validation
-  results, assertion results, watermark state, CDC operation counts.
-- **WeaveTelemetry** — Span + `dict[str, ThreadTelemetry]`.
-- **LoomTelemetry** — Span + `dict[str, WeaveTelemetry]`.
-
-These are attached to the result objects returned by `ctx.run()`, giving
-callers both navigable tree access and flat metric queries.
+`ThreadTelemetry` carries the leaf detail: row counts
+(read/written/quarantined), validation and assertion results, watermark
+state, and CDC operation counts. Walking the tree gives navigable
+parent-child access; collecting each level's `span` attribute yields a
+flat list of `ExecutionSpan` objects suitable for export to
+OTel-compatible backends (see the custom telemetry sink how-to).
 
 ### Structured logging
 
@@ -173,7 +164,7 @@ Log level mapping from weevr config values to Python levels:
 |--------|----------------|
 | `telemetry/span.py` | `ExecutionSpan`, `SpanEvent`, `SpanStatus`, ID generators |
 | `telemetry/collector.py` | `SpanBuilder` (mutable), `SpanCollector` (accumulator) |
-| `telemetry/trace.py` | `LoomTrace`, `WeaveTrace`, `ThreadTrace` — tree navigation and flattening |
+| `telemetry/trace.py` | Legacy tree wrappers — not constructed by the engine; use the telemetry tree |
 | `telemetry/logging.py` | `StructuredJsonFormatter`, `configure_logging`, `LogLevel` |
 | `telemetry/results.py` | `ThreadTelemetry`, `WeaveTelemetry`, `LoomTelemetry`, `ValidationResult`, `AssertionResult` |
 | `telemetry/events.py` | `LogEvent` model, `create_log_event` factory |
@@ -191,9 +182,10 @@ Log level mapping from weevr config values to Python levels:
   sharing across threads and inclusion in result objects. `SpanBuilder`
   provides a natural accumulation API during execution. The `finish()` method
   enforces the transition from mutable to immutable.
-- **Two views of the same data** — The trace tree (`LoomTrace` → `WeaveTrace`
-  → `ThreadTrace`) provides hierarchical navigation for programmatic access.
-  The `to_spans()` method provides a flat list for serialization and export.
+- **Two views of the same data** — The telemetry tree (`LoomTelemetry` →
+  `WeaveTelemetry` → `ThreadTelemetry`) provides hierarchical navigation
+  for programmatic access; collecting each level's span yields the flat
+  list used for serialization and export.
 
 ## Further reading
 

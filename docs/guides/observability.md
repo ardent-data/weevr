@@ -183,17 +183,19 @@ thread finishes.
 
 ## Trace hierarchy and serialization
 
-The `telemetry.trace` module provides tree-shaped trace models that wrap
-spans with their child traces:
+Telemetry forms a tree that mirrors the execution hierarchy — the same
+objects returned on `RunResult.telemetry`:
 
-- `LoomTrace` -- Root of the tree, containing `WeaveTrace` entries
-- `WeaveTrace` -- Contains `ThreadTrace` entries
-- `ThreadTrace` -- Leaf node wrapping a single thread span and its
-  telemetry data
+- `LoomTelemetry` -- Root of the tree, holding per-weave
+  `WeaveTelemetry` entries keyed by weave name
+- `WeaveTelemetry` -- Holds per-thread `ThreadTelemetry` entries keyed
+  by thread name
+- `ThreadTelemetry` -- Leaf carrying the thread's span plus its full
+  metrics (row counts, validation results, watermark state)
 
-Each trace type exposes a `to_spans()` method that recursively flattens
-the tree into a list of `ExecutionSpan` objects, suitable for export to
-any OTel-compatible backend:
+Every level carries its own `ExecutionSpan`. Walking the tree gives
+hierarchical access; collecting the spans level by level yields a flat
+list suitable for export to any OTel-compatible backend:
 
 ```python
 result = ctx.run("nightly.loom")
@@ -202,8 +204,18 @@ result = ctx.run("nightly.loom")
 for weave_name, wt in result.telemetry.weave_telemetry.items():
     for thread_name, tt in wt.thread_telemetry.items():
         span = tt.span
-        print(f"{thread_name}: {span.status} in {span.duration_ms}ms")
+        elapsed = (span.end_time - span.start_time).total_seconds()
+        print(f"{thread_name}: {span.status} in {elapsed:.1f}s")
+
+# Flatten the spans for export
+spans = [result.telemetry.span]
+for wt in result.telemetry.weave_telemetry.values():
+    spans.append(wt.span)
+    spans.extend(tt.span for tt in wt.thread_telemetry.values())
 ```
+
+See the [custom telemetry sink how-to](../how-to/implement-custom-telemetry-sink.md)
+for a complete export example.
 
 ## Telemetry results
 
