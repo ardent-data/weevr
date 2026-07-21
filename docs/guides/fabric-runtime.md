@@ -54,8 +54,8 @@ Lakehouse Files area. Both wheels are required because `weevr` declares
 
 ```python
 %pip install \
-    /lakehouse/default/Files/libs/weevr-1.18.1-py3-none-any.whl \
-    /lakehouse/default/Files/libs/weevr_core-1.18.1-py3-none-any.whl
+    /lakehouse/default/Files/libs/weevr-1.19.0-py3-none-any.whl \
+    /lakehouse/default/Files/libs/weevr_core-1.19.0-py3-none-any.whl
 ```
 
 Replace the version numbers with the actual wheel filenames; both
