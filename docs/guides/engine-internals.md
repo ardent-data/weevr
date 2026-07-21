@@ -77,14 +77,14 @@ The planner builds a DAG from thread configurations:
    Declaring conditions on all writers asserts they are **mutually
    exclusive** — at most one runs per execution (say, a full-load thread
    and an incremental thread for the same table). The planner cannot prove
-   disjointness (conditions may read live table state), so the engine
-   enforces the assertion at runtime: if a second writer's condition also
-   evaluates true, the weave aborts before that writer executes. Consumers
-   of such a target depend on *every* writer, and a lookup reading it
-   materializes only after the last writer's group. Unordered,
-   uncondition-gated threads sharing a target are rejected with a
-   `ConfigError` naming the target and every writer — running them
-   concurrently would corrupt the table.
+   the conditions exclude each other (they may read live table state), so
+   the engine enforces the assertion at runtime: if a second writer's
+   condition also evaluates true, the weave aborts before that writer
+   executes. Consumers of such a target depend on *every* writer, and a
+   lookup reading it materializes only after the last writer's group.
+   Unordered writers sharing a target where any writer lacks a condition
+   are rejected with a `ConfigError` naming the target and every writer —
+   running them concurrently would corrupt the table.
 2. **Infer dependencies** — If thread B reads from thread A's target path, B
    depends on A. This happens automatically by matching source paths/aliases
    to target paths/aliases across all threads.
