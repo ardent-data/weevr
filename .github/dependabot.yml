@@ -4,3 +4,35 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # Covers the whole uv workspace (root uv.lock).
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      python-minor-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+      python-security:
+        applies-to: security-updates
+        update-types: ["minor", "patch"]
+    ignore:
+      # Spark and Delta track the Fabric Runtime; move them deliberately, not via Dependabot.
+      - dependency-name: "pyspark"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "delta-spark"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Published runtime dependencies; a new major is a compatibility decision.
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pyyaml"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      devcontainer-features:
+        patterns: ["*"]
