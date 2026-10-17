@@ -10,6 +10,9 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    # Never rewrite pyproject ranges: the published floors are chosen to stay
+    # installable on older Fabric Runtimes, so range changes are made by hand.
+    versioning-strategy: "lockfile-only"
     groups:
       python-minor-patch:
         applies-to: version-updates
