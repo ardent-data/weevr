@@ -272,10 +272,11 @@ class TestFkSentinelRate:
 class TestScanHygiene:
     def test_one_read_for_many_assertions(self, spark, target_df, monkeypatch):
         """The target is read once no matter how many assertions run."""
+        from weevr import delta as delta_mod
         from weevr.operations import assertions as assertions_mod
 
         calls = {"n": 0}
-        real_read = assertions_mod.read_delta
+        real_read = delta_mod.read_delta
 
         def counting_read(spark_arg, path_arg):
             calls["n"] += 1

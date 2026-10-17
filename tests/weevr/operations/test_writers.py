@@ -1036,7 +1036,7 @@ class TestVersionReadFailureDistinction:
     def test_unreadable_version_skips_metrics_without_foreign_commit_claim(
         self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch, caplog
     ) -> None:
-        from weevr.operations import target_handle as th_mod
+        from weevr import delta as delta_mod
         from weevr.operations.target_handle import TargetHandle
 
         path = tmp_delta_path("vrf_tgt")
@@ -1044,16 +1044,16 @@ class TestVersionReadFailureDistinction:
         handle = TargetHandle(spark, path)
         assert handle.exists() is True
 
-        original = th_mod._delta.resolve_delta_table
+        original = delta_mod.resolve_delta_table
 
         def _boom(spark_arg, path_arg):  # type: ignore[no-untyped-def]
             raise RuntimeError("history unavailable")
 
-        monkeypatch.setattr(th_mod._delta, "resolve_delta_table", _boom)
+        monkeypatch.setattr(delta_mod, "resolve_delta_table", _boom)
         pre = handle.current_version()
         assert pre is None  # degraded — but flagged as a read failure
 
-        monkeypatch.setattr(th_mod._delta, "resolve_delta_table", original)
+        monkeypatch.setattr(delta_mod, "resolve_delta_table", original)
         metrics = handle.commit_metrics_after(pre)
         assert metrics is None
         messages = " ".join(r.message for r in caplog.records)

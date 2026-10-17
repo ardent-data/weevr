@@ -70,7 +70,7 @@ class TestFirstWrite:
         between the write and the metrics read."""
         import json
 
-        from weevr.operations import target_handle as th_mod
+        from weevr import delta as delta_mod
         from weevr.operations.target_handle import CommitStamp
 
         path = tmp_delta_path("dim_first_stamped")
@@ -88,7 +88,7 @@ class TestFirstWrite:
 
         # A foreign commit lands after the engine write, before the metrics
         # read: intercept the history resolution to append it first.
-        original_resolve = th_mod._delta.resolve_delta_table
+        original_resolve = delta_mod.resolve_delta_table
         fired = {"done": False}
 
         def _foreign_then_resolve(spark_arg, path_arg):  # type: ignore[no-untyped-def]
@@ -98,7 +98,7 @@ class TestFirstWrite:
                 frame.write.format("delta").mode("append").option("mergeSchema", "true").save(path)
             return original_resolve(spark_arg, path_arg)
 
-        monkeypatch.setattr(th_mod._delta, "resolve_delta_table", _foreign_then_resolve)
+        monkeypatch.setattr(delta_mod, "resolve_delta_table", _foreign_then_resolve)
         result = execute_dimension_merge(spark, source, builder, path, "2026-01-01", stamp=stamp)
         monkeypatch.undo()
 

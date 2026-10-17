@@ -115,10 +115,11 @@ class TestBuiltinMemo:
     """Memoization of builtin probes within one evaluation batch."""
 
     def _counting_read(self, monkeypatch):
+        from weevr import delta as delta_mod
         from weevr.engine import conditions as conditions_mod
 
         calls = {"n": 0}
-        real_read = conditions_mod.read_delta
+        real_read = delta_mod.read_delta
 
         def counting(spark_arg, path_arg):
             calls["n"] += 1

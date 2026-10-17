@@ -683,10 +683,11 @@ class TestResolveOncePerScope:
     @pytest.fixture()
     def materialize_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
         """Record the def-name sets each materialization call resolves."""
+        from weevr.engine import column_sets as column_sets_mod
         from weevr.engine import runner as runner_mod
 
         calls: list[list[str]] = []
-        original = runner_mod.materialize_column_sets
+        original = column_sets_mod.materialize_column_sets
 
         def _spy(spark_arg, defs, *args, **kwargs):  # type: ignore[no-untyped-def]
             calls.append(sorted(defs))
