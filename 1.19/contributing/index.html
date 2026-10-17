@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -3564,7 +3564,7 @@ with:</p>
 <h2 id="commit-sign-off-dco">Commit sign-off (DCO)<a class="headerlink" href="#commit-sign-off-dco" title="Permanent link">&para;</a></h2>
 <p>Every commit must include a <code>Signed-off-by</code> line. This is enforced by a
 GitHub App and is a required status check.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat(config): add variable interpolation&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"feat(config): add variable interpolation"</span>
 </code></pre></div>
 <p>To automatically sign off all commits:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>format.signoff<span class="w"> </span><span class="nb">true</span>
@@ -3690,7 +3690,7 @@ tutorials, how-to guides, reference, and explanation.</p>
   sections, <code>###</code> for subsections.</li>
 <li>
 <p><strong>Admonitions</strong> -- Use MkDocs Material admonitions for callouts:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>!!! note &quot;Title&quot;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>!!! note "Title"
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
 <a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    Admonition body text.
 <a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
@@ -3769,11 +3769,11 @@ package, declared as a uv workspace at the repository root.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>packages/
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>  weevr-core/             -- Pure-Python validation, planner, telemetry contracts
 <a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    src/weevr/            -- Namespace contributions (no shared __init__.py)
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    pyproject.toml        -- name = &quot;weevr-core&quot;
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    pyproject.toml        -- name = "weevr-core"
 <a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  weevr/                  -- Spark engine and runtime helpers
 <a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    src/weevr/            -- Namespace contributions, owns weevr/__init__.py
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    pyproject.toml        -- name = &quot;weevr&quot;; depends on weevr-core
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>tests/weevr/              -- Tests (flat; mirrors both packages&#39; src layouts)
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    pyproject.toml        -- name = "weevr"; depends on weevr-core
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>tests/weevr/              -- Tests (flat; mirrors both packages' src layouts)
 <a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>docs/                     -- Documentation source (MkDocs)
 <a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>.github/                  -- Workflows, templates, CODEOWNERS
 <a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>mkdocs.yml                -- MkDocs configuration
@@ -3857,7 +3857,7 @@ for the full federated-namespace rules and the
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

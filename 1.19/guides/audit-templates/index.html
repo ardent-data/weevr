@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -3283,9 +3283,9 @@ thread-local templates.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># In a loom file</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">audit_templates</span><span class="p">:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">lineage</span><span class="p">:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">_source_system</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${param.source_system}&quot;</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">_load_ts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;current_timestamp()&quot;</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${param.run_id}&quot;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">_source_system</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.source_system}"</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">_load_ts</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
 </code></pre></div>
 <h3 id="applying-a-template-to-a-thread">Applying a template to a thread<a class="headerlink" href="#applying-a-template-to-a-thread" title="Permanent link">&para;</a></h3>
 <p>Reference a template by name in <code>target.audit_template</code>:</p>
@@ -3308,8 +3308,8 @@ template entries:</p>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">minimal</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">_weevr_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${param.custom_run_id}&quot;</span><span class="w">   </span><span class="c1"># overrides minimal preset</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">_domain</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;orders&#39;&quot;</span><span class="w">                        </span><span class="c1"># additional column</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">_weevr_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.custom_run_id}"</span><span class="w">   </span><span class="c1"># overrides minimal preset</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">_domain</span><span class="p">:</span><span class="w"> </span><span class="s">"'orders'"</span><span class="w">                        </span><span class="c1"># additional column</span>
 </code></pre></div>
 <p>The resolved set here would be <code>_weevr_loaded_at</code> and <code>_weevr_thread</code> from the
 preset, plus <code>_weevr_run_id</code> and <code>_domain</code> from the inline block (the inline
@@ -3324,7 +3324,7 @@ on name collision. Inline <code>audit_columns</code> always win over any templat
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lineage</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">_override</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&#39;manual&#39;&quot;</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">_override</span><span class="p">:</span><span class="w"> </span><span class="s">"'manual'"</span>
 </code></pre></div>
 <h2 id="inheritance-cascade-behavior">Inheritance: cascade behavior<a class="headerlink" href="#inheritance-cascade-behavior" title="Permanent link">&para;</a></h2>
 <p>Template <em>definitions</em> (<code>audit_templates</code> blocks) from all levels are
@@ -3340,7 +3340,7 @@ set <code>audit_template_inherit: false</code> on the target:</p>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">audit_template_inherit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom_local</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;current_timestamp()&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
 </code></pre></div>
 <p>This suppresses inherited template references and inline columns
 from loom and weave. The thread's own <code>audit_template</code> and
@@ -3365,7 +3365,7 @@ are subject to exclusion regardless of origin.</p>
 <p>weevr logs a warning at configuration load time when a user-defined
 template name matches a built-in preset name. This catches accidental
 shadowing of shipped defaults:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>WARN User-defined template &#39;fabric&#39; shadows built-in preset
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>WARN User-defined template 'fabric' shadows built-in preset
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>     with the same name
 </code></pre></div>
 <p>The user-defined template always takes precedence. The warning is
@@ -3377,8 +3377,8 @@ cascade audit columns from the loom or weave level:</p>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">defaults</span><span class="p">:</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;current_timestamp()&quot;</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${param.run_id}&quot;</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
 </code></pre></div>
 <p>This pattern continues to work. However, <code>audit_templates</code> offers a cleaner
 separation: the column definitions live in a named block rather than being
@@ -3449,7 +3449,7 @@ participate in the same merge order — template columns first, then
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
