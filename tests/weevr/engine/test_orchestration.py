@@ -421,6 +421,7 @@ class TestConditionMemoScope:
         self, spark: SparkSession, tmp_delta_path, monkeypatch
     ) -> None:
         """Two same-group threads with the same builtin probe share one scan."""
+        from weevr import delta as delta_mod
         from weevr.engine import conditions as conditions_mod
 
         src_c = tmp_delta_path("memo_group_src_c")
@@ -433,7 +434,7 @@ class TestConditionMemoScope:
         create_delta_table(spark, gate, [{"id": 9}])
 
         calls = {"n": 0}
-        real_read = conditions_mod.read_delta
+        real_read = delta_mod.read_delta
 
         def counting(spark_arg, path_arg):
             calls["n"] += 1

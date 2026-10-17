@@ -78,6 +78,7 @@ class TestRegistryThroughWeave:
         # consumer's read must be served from the registry — read_source is
         # never called for that alias.
         from weevr.engine import executor as executor_mod
+        from weevr.operations import readers as readers_mod
 
         src = tmp_delta_path("cmw_src")
         shared = tmp_delta_path("cmw_shared")
@@ -85,7 +86,7 @@ class TestRegistryThroughWeave:
         spark.createDataFrame([{"id": i} for i in range(5)]).write.format("delta").save(src)
 
         reads: list[str] = []
-        original = executor_mod.read_source
+        original = readers_mod.read_source
 
         def _spy(spark_arg, alias_arg, source_arg, connections=None):  # type: ignore[no-untyped-def]
             reads.append(source_arg.alias or source_arg.path or "")
@@ -160,6 +161,7 @@ class TestConnectionFormRegistry:
         # to a canonical identity — previously `alias or path` yielded None
         # and the entry was silently unfetchable
         from weevr.engine import runner as runner_mod
+        from weevr.engine.cache_manager import CacheManager
 
         registrations: list[tuple[str, str | None]] = []
 
@@ -168,7 +170,7 @@ class TestConnectionFormRegistry:
             # Skip the actual read: abfss:// is unreachable in tests — the
             # registration IDENTITY is what this locks
 
-        monkeypatch.setattr(runner_mod.CacheManager, "persist", _persist_spy)
+        monkeypatch.setattr(CacheManager, "persist", _persist_spy)
 
         def _fake_execute_thread(spark_arg, thread, **kwargs):  # type: ignore[no-untyped-def]
             from weevr.engine.result import ThreadResult
