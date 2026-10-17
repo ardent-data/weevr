@@ -90,8 +90,8 @@ print(result.validation_errors)
 
 # Inspect the execution plan
 result = ctx.run("nightly.loom", mode="plan")
-print(result.summary())     # compact: execution groups with cache markers
-print(result.explain())     # detailed: dependencies, cache targets, thread detail
+print(result.summary())  # compact: execution groups with cache markers
+print(result.explain())  # detailed: dependencies, cache targets, thread detail
 
 # Preview transforms without writing
 result = ctx.run("nightly.loom", mode="preview")
@@ -110,9 +110,9 @@ For plan mode, you can also retrieve the DAG diagram directly:
 
 ```python
 result = ctx.run("nightly.loom", mode="plan")
-dag = result.dag()           # single-weave DAG or loom-level swimlane
-dag.save("plan.svg")         # export to file
-dag                          # renders inline in a notebook
+dag = result.dag()  # single-weave DAG or loom-level swimlane
+dag.save("plan.svg")  # export to file
+dag  # renders inline in a notebook
 ```
 
 For per-weave access in a loom, use `result.execution_plan[0].dag()`.

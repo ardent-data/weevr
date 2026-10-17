@@ -221,7 +221,7 @@ For local iteration, use a standalone Spark installation:
 from pyspark.sql import SparkSession
 
 spark = (
-    SparkSession.builder
+    SparkSession.builder.appName("weevr-local")
     .master("local[*]")
     .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
     .config(

@@ -43,7 +43,7 @@ extension:
 from pyspark.sql import SparkSession
 
 spark = (
-    SparkSession.builder
+    SparkSession.builder.appName("weevr-local")
     .master("local[*]")
     .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
     .config(
@@ -150,7 +150,7 @@ Start by checking the `RunResult`:
 
 ```python
 result = ctx.run("nightly.loom")
-print(result.status)    # "success", "failure", or "partial"
+print(result.status)  # "success", "failure", or "partial"
 print(result.summary())
 ```
 
@@ -325,8 +325,8 @@ You can also use plan mode to see the execution order without running:
 
 ```python
 result = ctx.run("nightly.loom", mode="plan")
-print(result.summary())      # compact view with cache markers (e.g., dim_product*)
-print(result.explain())      # detailed breakdown: dependencies, cache targets, thread detail
+print(result.summary())  # compact view with cache markers (e.g., dim_product*)
+print(result.explain())  # detailed breakdown: dependencies, cache targets, thread detail
 ```
 
 Plan mode builds the full execution plan — thread ordering, dependency

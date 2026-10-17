@@ -209,8 +209,8 @@ result = ctx.run("daily.loom", mode="validate")
 
 # Show the execution plan (DAG order) without running
 result = ctx.run("daily.loom", mode="plan")
-print(result.summary())      # compact execution order with cache markers
-print(result.explain())      # detailed breakdown: dependencies, cache targets, thread detail
+print(result.summary())  # compact execution order with cache markers
+print(result.explain())  # detailed breakdown: dependencies, cache targets, thread detail
 
 # Run transforms against sampled data, no writes
 result = ctx.run("daily.loom", mode="preview")
