@@ -65,7 +65,8 @@ from datetime import datetime, UTC
 rows = []
 for weave_name, weave_telem in telemetry.weave_telemetry.items():
     for thread_name, t in weave_telem.thread_telemetry.items():
-        rows.append({
+        duration = t.span.end_time - t.span.start_time
+        row = {
             "run_timestamp": datetime.now(UTC).isoformat(),
             "loom": result.config_name,
             "weave": weave_name,
@@ -74,11 +75,10 @@ for weave_name, weave_telem in telemetry.weave_telemetry.items():
             "rows_read": t.rows_read,
             "rows_written": t.rows_written,
             "rows_quarantined": t.rows_quarantined,
-            "duration_ms": int(
-                (t.span.end_time - t.span.start_time).total_seconds() * 1000
-            ),
+            "duration_ms": int(duration.total_seconds() * 1000),
             "load_mode": t.load_mode,
-        })
+        }
+        rows.append(row)
 
 df = spark.createDataFrame(rows)
 df.write.format("delta").mode("append").save("Tables/weevr_telemetry")

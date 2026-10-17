@@ -187,8 +187,8 @@ Use plan mode to check which threads are cache targets before running:
 
 ```python
 result = ctx.run("orders.weave", mode="plan")
-print(result.summary())      # cache targets are marked with an asterisk (e.g., dim_product*)
-print(result.explain())      # "Cache targets" section lists each target and consumer count
+print(result.summary())  # cache targets are marked with an asterisk (e.g., dim_product*)
+print(result.explain())  # "Cache targets" section lists each target and consumer count
 ```
 
 To observe cache lifecycle events at runtime, use `verbose` or `debug`
