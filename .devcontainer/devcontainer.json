@@ -26,7 +26,6 @@
             "version": "17.0.12-tem"
         },
         "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
-        "ghcr.io/jsburckhardt/devcontainer-features/codex:1": {},
         "ghcr.io/ksh5022/devcontainer-features/d2:1": {
             "version": "0.7.1"
         },
@@ -50,7 +49,10 @@
 
     // After install.sh, flip the in-process auto-updater on (the native
     // installer ships with it disabled by default).
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && sudo chown vscode:vscode /home/vscode/.claude/downloads && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
+    // Codex comes from npm rather than the jsburckhardt feature: that feature
+    // installs the newest GitHub release including alphas, which often don't
+    // have linux assets published yet, and it has no version option to pin.
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && sudo chown vscode:vscode /home/vscode/.claude/downloads && npm install -g @openai/codex && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
 
     // Keep the venv current and the claude CLI fresh on every container start
     // (in-process auto-updater handles between-session refreshes; this is the
