@@ -15,11 +15,18 @@ os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 
 @pytest.fixture(scope="session")
-def spark() -> Generator[SparkSession, None, None]:
+def spark(tmp_path_factory: pytest.TempPathFactory) -> Generator[SparkSession, None, None]:
     """Session-scoped SparkSession with Delta Lake support.
 
     Configures a local Spark session suitable for unit and integration tests.
     Uses configure_spark_with_delta_pip to handle Delta JAR loading automatically.
+
+    Test tables hold a handful of rows, so default parallelism only adds
+    scheduling overhead: Delta alone replays the transaction log across 50
+    snapshot partitions per read. Everything is pinned to one partition.
+
+    Under pytest-xdist each worker gets its own session, so each also gets
+    its own warehouse directory to keep default-catalog tables apart.
     """
     from delta import configure_spark_with_delta_pip
 
@@ -31,12 +38,20 @@ def spark() -> Generator[SparkSession, None, None]:
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
-        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.sql.shuffle.partitions", "1")
+        .config("spark.default.parallelism", "1")
+        .config("spark.databricks.delta.snapshotPartitions", "1")
+        .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
+        .config("spark.sql.session.timeZone", "UTC")
         .config("spark.driver.memory", "3g")
         .config("spark.ui.enabled", "false")
+        .config("spark.ui.showConsoleProgress", "false")
         .config("spark.driver.bindAddress", "127.0.0.1")
         .config("spark.driver.host", "127.0.0.1")
     )
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        warehouse = tmp_path_factory.mktemp("spark-warehouse")
+        builder = builder.config("spark.sql.warehouse.dir", str(warehouse))
     session = configure_spark_with_delta_pip(builder).getOrCreate()
     session.sparkContext.setLogLevel("ERROR")
     yield session

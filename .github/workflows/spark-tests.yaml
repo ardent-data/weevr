@@ -4,7 +4,17 @@ on:
   push:
     branches:
       - main
+  # Docs, devcontainer, and tooling-only PRs skip the Spark suite. Every
+  # push to main still runs it in full.
   pull_request:
+    paths:
+      - "packages/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".tool-versions"
+      - ".github/workflows/spark-tests.yaml"
 
 permissions:
   contents: read
@@ -30,5 +40,17 @@ jobs:
       - name: Sync (locked)
         run: uv sync --locked --dev
 
+      # Delta JARs are resolved from Maven on first session start; keep the
+      # Ivy cache between runs. Keyed on the lockfile so a delta-spark bump
+      # resolves fresh.
+      - name: Cache Ivy (Delta JARs)
+        uses: actions/cache@v6
+        with:
+          path: ~/.ivy2
+          key: ivy-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: ivy-${{ runner.os }}-
+
       - name: Tests with coverage
-        run: uv run pytest -m "" --cov=weevr --cov-fail-under=90
+        # Two workers fit the 4-vCPU runner: each runs its own local[2]
+        # Spark session, and more workers lose to JVM contention.
+        run: uv run pytest -m "" -n 2 --cov=weevr --cov-fail-under=90
