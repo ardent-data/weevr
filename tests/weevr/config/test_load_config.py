@@ -948,7 +948,8 @@ class TestLoadConfigChildValidation:
             tmp_path,
             "w.weave",
             'config_version: "1.0"\nthreads:\n'
-            "  - name: t\n    sources:\n      data:\n        type: delta\n"
+            '  - name: t\n    config_version: "1.0"\n'
+            "    sources:\n      data:\n        type: delta\n"
             "        alias: raw.c\n    target:\n      path: T/c\n"
             "    write:\n      mode: bogus\n",
         )
@@ -1001,6 +1002,35 @@ class TestLoadConfigChildForeach:
             tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
         )
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+    def test_foreach_values_from_entry_params_load(self, tmp_path):
+        """foreach values passed in through a weave entry's params expand."""
+        self._write(
+            tmp_path,
+            "fe.thread",
+            _FOREACH_THREAD.replace("values: [a, b]", "values: ${param.cols}"),
+        )
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+            "    params:\n      cols: [x, y]\n",
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+
+    def test_inline_thread_with_foreach_loads(self, tmp_path):
+        """An inline thread in a weave can use foreach too."""
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n'
+            '  - name: t\n    config_version: "1.0"\n'
+            "    sources:\n      data:\n        type: delta\n"
+            "        alias: raw.c\n    target:\n      path: T/c\n"
+            "    steps:\n      - foreach:\n          values: [a, b]\n          as: col\n"
+            '          steps:\n            - filter:\n                expr: "{col} > 0"\n',
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
 
     def test_malformed_foreach_in_referenced_thread_names_thread(self, tmp_path):
         """A bad foreach block in a referenced thread names that thread."""

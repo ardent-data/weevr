@@ -551,7 +551,8 @@ class TestContextLoadErrorFileAttribution:
         from weevr.errors import ModelValidationError
 
         inline = (
-            "  - name: t\n    sources:\n      data:\n        type: delta\n"
+            '  - name: t\n    config_version: "1.0"\n'
+            "    sources:\n      data:\n        type: delta\n"
             "        alias: raw.c\n    target:\n      path: T/c\n"
             "    write:\n      mode: bogus\n"
         )
