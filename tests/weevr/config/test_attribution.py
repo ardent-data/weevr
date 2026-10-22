@@ -9,6 +9,11 @@ from weevr.config.locations import LocalConfigLocation
 from weevr.errors import ConfigError, ConfigSchemaError
 
 
+def _raise(exc: Exception) -> None:
+    """Raise ``exc`` from a call, the way code under ``attribute_errors`` fails."""
+    raise exc
+
+
 class TestAttributeErrors:
     """attribute_errors names the file on config errors leaving its block."""
 
@@ -16,14 +21,14 @@ class TestAttributeErrors:
         """A ConfigError without a file_path gets the block's location."""
         location = LocalConfigLocation(Path("/proj/a.thread"))
         with pytest.raises(ConfigSchemaError) as exc_info, attribute_errors(location):
-            raise ConfigSchemaError("bad shape")
+            _raise(ConfigSchemaError("bad shape"))
         assert exc_info.value.file_path == "/proj/a.thread"
 
     def test_existing_file_path_is_kept(self):
         """A ConfigError that already names a file keeps it."""
         location = LocalConfigLocation(Path("/proj/a.thread"))
         with pytest.raises(ConfigError) as exc_info, attribute_errors(location):
-            raise ConfigError("missing", file_path="/proj/other.thread")
+            _raise(ConfigError("missing", file_path="/proj/other.thread"))
         assert exc_info.value.file_path == "/proj/other.thread"
 
     def test_nested_blocks_keep_inner_location(self):
@@ -35,7 +40,7 @@ class TestAttributeErrors:
             attribute_errors(outer),
             attribute_errors(inner),
         ):
-            raise ConfigError("bad thread")
+            _raise(ConfigError("bad thread"))
         assert exc_info.value.file_path == "/proj/t.thread"
 
     def test_other_exceptions_pass_through(self):
@@ -43,6 +48,6 @@ class TestAttributeErrors:
         location = LocalConfigLocation(Path("/proj/a.thread"))
         original = ValueError("not a config error")
         with pytest.raises(ValueError) as exc_info, attribute_errors(location):
-            raise original
+            _raise(original)
         assert exc_info.value is original
         assert not hasattr(exc_info.value, "file_path")
