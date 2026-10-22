@@ -1685,17 +1685,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.context.ModelValidationError" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ModelValidationError
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#weevr.context.VariableResolutionError" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2048,6 +2037,28 @@
     <span class="md-ellipsis">
       
         attribute_errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.hydrate_children" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hydrate_children
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.hydrate_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hydrate_model
       
     </span>
   </a>
@@ -4947,17 +4958,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.context.ModelValidationError" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ModelValidationError
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#weevr.context.VariableResolutionError" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5310,6 +5310,28 @@
     <span class="md-ellipsis">
       
         attribute_errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.hydrate_children" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hydrate_children
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.hydrate_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hydrate_model
       
     </span>
   </a>
@@ -7639,57 +7661,6 @@ within a thread pipeline.</p>
 
 
 
-<h3 id="weevr.context.ModelValidationError" class="doc doc-heading">
-            <code>ModelValidationError</code>
-
-
-<a href="#weevr.context.ModelValidationError" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="ConfigError (weevr.errors.exceptions.ConfigError)" href="#weevr.context.ConfigError">ConfigError</a></code></p>
-
-
-
-        <p>Raised when a fully resolved config fails to hydrate into a typed model.</p>
-<p>This occurs after variable resolution and inheritance, when the concrete
-values are validated through the Pydantic domain model (Thread, Weave, or
-Loom). Semantic constraints that span multiple fields are checked here.</p>
-
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
 <h3 id="weevr.context.VariableResolutionError" class="doc doc-heading">
             <code>VariableResolutionError</code>
 
@@ -9364,7 +9335,7 @@ nest (a weave loading a referenced thread), the innermost file wins.</p>
                 <code>location</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="ConfigLocation (weevr.config.locations.ConfigLocation)" href="#weevr.context.ConfigLocation">ConfigLocation</a></code>
+                  <code><a class="autorefs autorefs-internal" title="ConfigLocation (weevr.config.locations.ConfigLocation)" href="#weevr.context.ConfigLocation">ConfigLocation</a> | <span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9395,6 +9366,307 @@ nest (a weave loading a referenced thread), the innermost file wins.</p>
             <td>
               <div class="doc-md-description">
                 <p>Nothing; the block runs unchanged.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.hydrate_children" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">hydrate_children</span><span class="p">(</span><span class="n">config_type</span><span class="p">,</span> <span class="n">resolved</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">prepare</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.context.hydrate_children" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Hydrate the weaves and threads a weave or loom pulls in.</p>
+<p>Consumes the private keys reference resolution stashed on the child
+dicts, so call it after hydrating the top-level model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>config_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of the top-level config.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>resolved</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The top-level config after reference resolution and the
+inheritance cascade.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>source</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConfigLocation (weevr.config.locations.ConfigLocation)" href="#weevr.context.ConfigLocation">ConfigLocation</a> | <span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The top-level config's file.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The top-level config's name, used as the weave key for a weave.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>prepare</code>
+            </td>
+            <td>
+                  <code><span title="weevr.config.hydration.ThreadPreparer">ThreadPreparer</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional hook applied to each thread dict before validation.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Weave (weevr.model.Weave)" href="../model/#weevr.model.Weave">Weave</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(weaves, threads)</code>: hydrated weaves by name (looms only), and each</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Thread (weevr.model.Thread)" href="../model/#weevr.model.Thread">Thread</a>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>weave's hydrated threads by weave name. Both are empty for a thread.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ModelValidationError (weevr.errors.ModelValidationError)" href="../errors/#weevr.errors.ModelValidationError">ModelValidationError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any child fails model validation. The error
+names the child's own file, or the enclosing file for inline
+definitions.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.hydrate_model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">hydrate_model</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">config_type</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span></code>
+
+<a href="#weevr.context.hydrate_model" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Validate a resolved config dict into its typed model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fully resolved config dict.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>'thread'</code>, <code>'weave'</code>, or <code>'loom'</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>source</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConfigLocation (weevr.config.locations.ConfigLocation)" href="#weevr.context.ConfigLocation">ConfigLocation</a> | <span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The file the config came from, named on failure.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Thread (weevr.model.Thread)" href="../model/#weevr.model.Thread">Thread</a> | <a class="autorefs autorefs-internal" title="Weave (weevr.model.Weave)" href="../model/#weevr.model.Weave">Weave</a> | <a class="autorefs autorefs-internal" title="Loom (weevr.model.Loom)" href="../model/#weevr.model.Loom">Loom</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The hydrated model.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ModelValidationError (weevr.errors.ModelValidationError)" href="../errors/#weevr.errors.ModelValidationError">ModelValidationError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the dict fails model validation.</p>
               </div>
             </td>
           </tr>
