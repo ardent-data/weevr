@@ -567,6 +567,7 @@ def resolve_references(
                             runtime_params,
                             visited.copy(),
                         )
+                    resolved_child["_source_path"] = str(weave_path)
 
                     resolved_weaves.append(resolved_child)
                 finally:
@@ -619,6 +620,7 @@ def resolve_references(
                                     runtime_params,
                                     visited.copy(),
                                 )
+                            resolved_child["_source_path"] = str(convention_path)
                             resolved_weaves.append(resolved_child)
                         finally:
                             visited.discard(convention_ref)
@@ -702,6 +704,8 @@ def resolve_references(
                         resolved_child = resolve_variables(
                             child_dict, context, consumed_keys=consumed
                         )
+
+                    resolved_child["_source_path"] = str(thread_path)
 
                     # Warn on unused params with source attribution
                     _warn_unused_params(

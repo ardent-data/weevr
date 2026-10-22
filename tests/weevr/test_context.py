@@ -424,6 +424,149 @@ connections:
         assert "workspace_id" in str(exc_info.value)
 
 
+_ATTR_THREAD = """\
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  path: Tables/customers
+"""
+
+
+class TestContextLoadErrorFileAttribution:
+    """Context.load errors name the file the problem was found in."""
+
+    @staticmethod
+    def _ctx(project: Path) -> Context:
+        return Context(spark=MagicMock(spec=SparkSession), project=str(project))
+
+    @staticmethod
+    def _project(tmp_path: Path, files: dict[str, str]) -> Path:
+        project = tmp_path / "attr.weevr"
+        project.mkdir()
+        for name, text in files.items():
+            (project / name).write_text(text)
+        return project
+
+    def test_schema_error_names_thread(self, tmp_path: Path) -> None:
+        """A schema-shape error in the loaded thread names it."""
+        from weevr.errors import ConfigSchemaError
+
+        project = self._project(
+            tmp_path,
+            {"shape.thread": 'config_version: "1.0"\nsources: [a]\ntarget:\n  path: T/x\n'},
+        )
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            self._ctx(project).load("shape.thread")
+        assert exc_info.value.file_path == str(project / "shape.thread")
+
+    def test_version_error_names_thread(self, tmp_path: Path) -> None:
+        """An unsupported version in the loaded thread names it."""
+        from weevr.errors import ConfigVersionError
+
+        project = self._project(tmp_path, {"ver.thread": _ATTR_THREAD.replace('"1.0"', '"9.0"')})
+        with pytest.raises(ConfigVersionError) as exc_info:
+            self._ctx(project).load("ver.thread")
+        assert exc_info.value.file_path == str(project / "ver.thread")
+
+    def test_template_thread_error_keeps_hint_and_names_thread(self, tmp_path: Path) -> None:
+        """A template thread's variable error keeps its hint, key and file."""
+        from weevr.errors import VariableResolutionError
+
+        project = self._project(
+            tmp_path,
+            {"tpl.thread": _ATTR_THREAD.replace("raw.customers", "${param.region}")},
+        )
+        with pytest.raises(VariableResolutionError) as exc_info:
+            self._ctx(project).load("tpl.thread")
+        assert "template" in exc_info.value.message
+        assert exc_info.value.config_key == "param.region"
+        assert exc_info.value.file_path == str(project / "tpl.thread")
+
+    def test_foreach_error_names_thread(self, tmp_path: Path) -> None:
+        """A malformed foreach block names the thread."""
+        project = self._project(
+            tmp_path,
+            {
+                "macro.thread": _ATTR_THREAD
+                + "steps:\n  - foreach:\n      values: []\n      as: col\n"
+                + "      steps:\n        - filter:\n            expr: x\n"
+            },
+        )
+        with pytest.raises(ConfigError, match="foreach") as exc_info:
+            self._ctx(project).load("macro.thread")
+        assert exc_info.value.file_path == str(project / "macro.thread")
+
+    def test_referenced_thread_schema_error_names_thread(self, tmp_path: Path) -> None:
+        """A schema error in a ref'd thread names the thread, not the weave."""
+        from weevr.errors import ConfigSchemaError
+
+        project = self._project(
+            tmp_path,
+            {
+                "shape.thread": 'config_version: "1.0"\nsources: [a]\ntarget:\n  path: T/x\n',
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: shape.thread\n',
+            },
+        )
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            self._ctx(project).load("w.weave")
+        assert exc_info.value.file_path == str(project / "shape.thread")
+
+    def test_referenced_thread_hydration_error_names_thread(self, tmp_path: Path) -> None:
+        """A ref'd thread failing hydration names the thread, not the weave."""
+        from weevr.errors import ModelValidationError
+
+        project = self._project(
+            tmp_path,
+            {
+                "bad.thread": _ATTR_THREAD + "write:\n  mode: bogus\n",
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n',
+            },
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            self._ctx(project).load("w.weave")
+        assert exc_info.value.file_path == str(project / "bad.thread")
+
+    def test_referenced_weave_hydration_error_names_weave(self, tmp_path: Path) -> None:
+        """A ref'd weave failing hydration names the weave, not the loom."""
+        from weevr.errors import ModelValidationError
+
+        project = self._project(
+            tmp_path,
+            {
+                "t.thread": _ATTR_THREAD,
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+                "lookups:\n  lk:\n    not_a_field: true\n",
+                "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+            },
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            self._ctx(project).load("top.loom")
+        assert exc_info.value.file_path == str(project / "w.weave")
+
+    def test_inline_thread_hydration_error_names_enclosing_weave(self, tmp_path: Path) -> None:
+        """An inline thread failing hydration names the weave that defines it."""
+        from weevr.errors import ModelValidationError
+
+        inline = (
+            "  - name: t\n    sources:\n      data:\n        type: delta\n"
+            "        alias: raw.c\n    target:\n      path: T/c\n"
+            "    write:\n      mode: bogus\n"
+        )
+        project = self._project(
+            tmp_path,
+            {
+                "w.weave": 'config_version: "1.0"\nthreads:\n' + inline,
+                "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+            },
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            self._ctx(project).load("top.loom")
+        assert exc_info.value.file_path == str(project / "w.weave")
+
+
 # ---------------------------------------------------------------------------
 # Integration tests — require Spark
 # ---------------------------------------------------------------------------
