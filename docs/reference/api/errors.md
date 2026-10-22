@@ -73,6 +73,25 @@ except WeevError as e:
 Base exception for configuration-related errors. Carries optional
 `file_path` and `config_key` context.
 
+Any `ConfigError` raised while loading a config, through `load_config()`
+or `Context.load()`, sets `file_path` to the file the problem was found
+in. When the problem is in a thread or weave pulled in through `ref:`,
+`file_path` names that referenced file rather than the file you loaded.
+Problems with the reference entry itself, such as an unresolvable entry
+`params` value or a duplicate thread name, name the file that contains
+the entry. A `ReferenceResolutionError` for a missing file names the
+file that couldn't be found.
+
+```python
+from weevr.config import load_config
+from weevr.errors import ConfigError
+
+try:
+    load_config("nightly.weave", project_root="project.weevr")
+except ConfigError as e:
+    print(f"{e.file_path}: {e.message}")
+```
+
 **Common causes:**
 
 - Project directory missing `.weevr` extension
