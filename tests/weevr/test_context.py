@@ -551,7 +551,8 @@ class TestContextLoadErrorFileAttribution:
         from weevr.errors import ModelValidationError
 
         inline = (
-            "  - name: t\n    sources:\n      data:\n        type: delta\n"
+            '  - name: t\n    config_version: "1.0"\n'
+            "    sources:\n      data:\n        type: delta\n"
             "        alias: raw.c\n    target:\n      path: T/c\n"
             "    write:\n      mode: bogus\n"
         )
@@ -565,6 +566,100 @@ class TestContextLoadErrorFileAttribution:
         with pytest.raises(ModelValidationError) as exc_info:
             self._ctx(project).load("top.loom")
         assert exc_info.value.file_path == str(project / "w.weave")
+
+
+_FOREACH_THREAD = (
+    _ATTR_THREAD
+    + "steps:\n  - foreach:\n      values: [a, b]\n      as: col\n"
+    + '      steps:\n        - filter:\n            expr: "{col} > 0"\n'
+)
+
+
+class TestContextLoadChildForeach:
+    """foreach blocks expand in threads a weave or loom references."""
+
+    @staticmethod
+    def _ctx(project: Path) -> Context:
+        return Context(spark=MagicMock(spec=SparkSession), project=str(project))
+
+    @staticmethod
+    def _project(tmp_path: Path, files: dict[str, str]) -> Path:
+        project = tmp_path / "fe.weevr"
+        project.mkdir()
+        for name, text in files.items():
+            (project / name).write_text(text)
+        return project
+
+    @staticmethod
+    def _filter_exprs(thread: Thread) -> list[str]:
+        return [step.filter.expr for step in thread.steps]  # type: ignore[union-attr]
+
+    def test_weave_expands_referenced_thread_foreach(self, tmp_path: Path) -> None:
+        """A referenced thread's foreach expands into concrete steps."""
+        project = self._project(
+            tmp_path,
+            {
+                "fe.thread": _FOREACH_THREAD,
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+            },
+        )
+        thread = self._ctx(project)._load_resolved("w.weave").threads["w"]["fe"]
+        assert self._filter_exprs(thread) == ["a > 0", "b > 0"]
+
+    def test_loom_expands_referenced_thread_foreach(self, tmp_path: Path) -> None:
+        """The same holds two levels down."""
+        project = self._project(
+            tmp_path,
+            {
+                "fe.thread": _FOREACH_THREAD,
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+                "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+            },
+        )
+        resolved = self._ctx(project)._load_resolved("top.loom")
+        assert self._filter_exprs(resolved.threads["w"]["fe"]) == ["a > 0", "b > 0"]
+
+    def test_foreach_values_from_entry_params(self, tmp_path: Path) -> None:
+        """foreach values supplied through a weave entry's params expand."""
+        thread = _FOREACH_THREAD.replace("values: [a, b]", "values: ${param.cols}")
+        project = self._project(
+            tmp_path,
+            {
+                "fe.thread": thread,
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+                "    params:\n      cols: [x, y, z]\n",
+            },
+        )
+        resolved = self._ctx(project)._load_resolved("w.weave")
+        assert self._filter_exprs(resolved.threads["w"]["fe"]) == ["x > 0", "y > 0", "z > 0"]
+
+    def test_malformed_foreach_in_referenced_thread_names_thread(self, tmp_path: Path) -> None:
+        """A bad foreach block in a referenced thread names that thread."""
+        project = self._project(
+            tmp_path,
+            {
+                "fe.thread": _FOREACH_THREAD.replace("values: [a, b]", "values: []"),
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+            },
+        )
+        with pytest.raises(ConfigError, match="foreach block at step index") as exc_info:
+            self._ctx(project).load("w.weave")
+        assert exc_info.value.file_path == str(project / "fe.thread")
+
+    def test_referenced_steps_match_direct_load(self, tmp_path: Path) -> None:
+        """Parity: a thread's steps are the same loaded directly or through a weave."""
+        project = self._project(
+            tmp_path,
+            {
+                "fe.thread": _FOREACH_THREAD,
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+            },
+        )
+        ctx = self._ctx(project)
+        direct = ctx._load_resolved("fe.thread").model
+        assert isinstance(direct, Thread)
+        via_weave = ctx._load_resolved("w.weave").threads["w"]["fe"]
+        assert via_weave.steps == direct.steps
 
 
 # ---------------------------------------------------------------------------

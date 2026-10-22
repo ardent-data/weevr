@@ -894,3 +894,152 @@ class TestLoadConfigReferencedFileAttribution:
             load_config(loom, project_root=tmp_path)
         assert exc_info.value.file_path == str(tmp_path / "gone.thread")
         assert exc_info.value.file_path != str(weave)
+
+
+class TestLoadConfigChildValidation:
+    """load_config validates the children of a weave or loom, not just the top level."""
+
+    @staticmethod
+    def _write(root: Path, name: str, text: str) -> Path:
+        path = root / name
+        path.write_text(text)
+        return path
+
+    def test_weave_with_invalid_thread_raises(self, tmp_path):
+        """A referenced thread that fails hydration fails the weave, naming the thread."""
+        thread = self._write(tmp_path, "bad.thread", _VALID_THREAD + "write:\n  mode: bogus\n")
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n'
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_loom_with_invalid_thread_raises(self, tmp_path):
+        """Two levels down, an invalid thread still fails the loom, naming the thread."""
+        thread = self._write(tmp_path, "bad.thread", _VALID_THREAD + "write:\n  mode: bogus\n")
+        self._write(tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n')
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_loom_with_invalid_weave_raises(self, tmp_path):
+        """A referenced weave that fails hydration fails the loom, naming the weave."""
+        self._write(tmp_path, "t.thread", _VALID_THREAD)
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+            "lookups:\n  lk:\n    not_a_field: true\n",
+        )
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_invalid_inline_thread_names_weave(self, tmp_path):
+        """An inline thread that fails hydration names the weave that defines it."""
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n'
+            '  - name: t\n    config_version: "1.0"\n'
+            "    sources:\n      data:\n        type: delta\n"
+            "        alias: raw.c\n    target:\n      path: T/c\n"
+            "    write:\n      mode: bogus\n",
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_valid_weave_and_loom_still_load(self, tmp_path):
+        """Valid children don't change what load_config returns."""
+        self._write(tmp_path, "t.thread", _VALID_THREAD)
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+        )
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+
+_FOREACH_THREAD = (
+    _VALID_THREAD
+    + "steps:\n  - foreach:\n      values: [a, b]\n      as: col\n"
+    + '      steps:\n        - filter:\n            expr: "{col} > 0"\n'
+)
+
+
+class TestLoadConfigChildForeach:
+    """foreach blocks expand in threads a weave or loom references."""
+
+    @staticmethod
+    def _write(root: Path, name: str, text: str) -> Path:
+        path = root / name
+        path.write_text(text)
+        return path
+
+    def test_weave_with_foreach_thread_loads(self, tmp_path):
+        """A referenced thread using foreach no longer fails its weave."""
+        self._write(tmp_path, "fe.thread", _FOREACH_THREAD)
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+
+    def test_loom_with_foreach_thread_loads(self, tmp_path):
+        """The same holds two levels down."""
+        self._write(tmp_path, "fe.thread", _FOREACH_THREAD)
+        self._write(tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n')
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+    def test_foreach_values_from_entry_params_load(self, tmp_path):
+        """foreach values passed in through a weave entry's params expand."""
+        self._write(
+            tmp_path,
+            "fe.thread",
+            _FOREACH_THREAD.replace("values: [a, b]", "values: ${param.cols}"),
+        )
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+            "    params:\n      cols: [x, y]\n",
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+
+    def test_inline_thread_with_foreach_loads(self, tmp_path):
+        """An inline thread in a weave can use foreach too."""
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n'
+            '  - name: t\n    config_version: "1.0"\n'
+            "    sources:\n      data:\n        type: delta\n"
+            "        alias: raw.c\n    target:\n      path: T/c\n"
+            "    steps:\n      - foreach:\n          values: [a, b]\n          as: col\n"
+            '          steps:\n            - filter:\n                expr: "{col} > 0"\n',
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+
+    def test_malformed_foreach_in_referenced_thread_names_thread(self, tmp_path):
+        """A bad foreach block in a referenced thread names that thread."""
+        thread = self._write(
+            tmp_path, "fe.thread", _FOREACH_THREAD.replace("values: [a, b]", "values: []")
+        )
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+        )
+        with pytest.raises(ConfigError, match="foreach block at step index") as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)

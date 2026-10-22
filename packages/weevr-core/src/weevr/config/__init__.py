@@ -3,9 +3,8 @@
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from weevr.config.attribution import attribute_errors
+from weevr.config.hydration import hydrate_children, hydrate_model
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.macros import expand_foreach
@@ -24,7 +23,7 @@ from weevr.config.resolver import (
     validate_params,
 )
 from weevr.config.validation import validate_schema
-from weevr.errors import ConfigError, ModelValidationError
+from weevr.errors import ConfigError
 from weevr.model import Loom, Thread, Weave
 
 
@@ -215,21 +214,17 @@ def _load_config_file(
     elif not resolved_with_refs.get("name"):
         resolved_with_refs["name"] = file_path.stem
 
-    # Step 10: Hydrate into typed domain model
-    model_map: dict[str, type[Thread | Weave | Loom]] = {
-        "thread": Thread,
-        "weave": Weave,
-        "loom": Loom,
-    }
-    if config_type in model_map:
-        try:
-            return model_map[config_type].model_validate(resolved_with_refs)
-        except ValidationError as exc:
-            raise ModelValidationError(
-                f"Model hydration failed for {config_type}: {exc}",
-                cause=exc,
-                file_path=str(path),
-            ) from exc
+    # Step 10: Hydrate into typed domain model, then validate the children a
+    # weave or loom pulls in. Children are checked, not returned.
+    if config_type in ("thread", "weave", "loom"):
+        model = hydrate_model(resolved_with_refs, config_type, str(path))
+        hydrate_children(
+            config_type,
+            resolved_with_refs,
+            file_path,
+            resolved_with_refs.get("name") or file_path.stem,
+        )
+        return model
 
     # params config type returns a plain dict
     return resolved_with_refs

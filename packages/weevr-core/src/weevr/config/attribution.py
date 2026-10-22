@@ -8,7 +8,7 @@ from weevr.errors.exceptions import ConfigError
 
 
 @contextmanager
-def attribute_errors(location: ConfigLocation) -> Iterator[None]:
+def attribute_errors(location: ConfigLocation | str) -> Iterator[None]:
     """Name ``location`` on any ``ConfigError`` raised inside the block.
 
     Only errors that don't already name a file are updated, so when blocks
