@@ -22,6 +22,15 @@ _MODELS: dict[str, type[Thread | Weave | Loom]] = {
 }
 
 
+def _entry_name(entry: Any) -> str:
+    """Name a thread or weave entry: its explicit ``name``, else its ``ref``'s stem."""
+    if isinstance(entry, dict):
+        if entry.get("ref") and not entry.get("name"):
+            return Path(entry["ref"]).stem
+        return entry.get("name", "") or entry.get("ref", "")
+    return str(entry)
+
+
 def hydrate_model(
     data: dict[str, Any], config_type: str, source: ConfigLocation | str
 ) -> Thread | Weave | Loom:
@@ -81,16 +90,8 @@ def hydrate_threads(
         thread_dict.pop("_entry_params", None)
         thread_source = thread_dict.pop("_source_path", None) or str(source)
 
-        # Determine the base name from the entry or resolved dict
-        if isinstance(entry, dict):
-            name = entry.get("name", "") or entry.get("ref", "")
-            if entry.get("ref") and not entry.get("name"):
-                name = Path(entry["ref"]).stem
-        else:
-            name = str(entry)
-
         # Effective name: as > name > stem
-        effective_name = entry_as or name
+        effective_name = entry_as or _entry_name(entry)
 
         if not thread_dict.get("name") or entry_as:
             thread_dict["name"] = effective_name
@@ -166,13 +167,7 @@ def hydrate_children(
             resolved.get("_resolved_weaves", []),
             strict=True,
         ):
-            # Determine weave name from entry or resolved dict
-            if isinstance(weave_entry, dict):
-                weave_name = weave_entry.get("name", "") or weave_entry.get("ref", "")
-                if weave_entry.get("ref") and not weave_entry.get("name"):
-                    weave_name = Path(weave_entry["ref"]).stem
-            else:
-                weave_name = str(weave_entry)
+            weave_name = _entry_name(weave_entry)
 
             if not weave_dict.get("name"):
                 weave_dict["name"] = weave_name
