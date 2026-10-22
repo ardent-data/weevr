@@ -6,7 +6,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from weevr.config.attribution import attribute_errors
 from weevr.config.locations import ConfigLocation
+from weevr.config.macros import expand_foreach
 from weevr.errors import ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
@@ -55,7 +57,8 @@ def hydrate_threads(
     """Hydrate a weave's resolved threads into a name-to-Thread mapping.
 
     Threads loaded from their own file are attributed to that file; inline
-    threads are attributed to ``source``, the enclosing file.
+    threads are attributed to ``source``, the enclosing file. ``foreach``
+    blocks in each thread's steps are expanded before validation.
 
     Args:
         entries: The weave's ``threads`` entries, aligned with ``resolved``.
@@ -96,6 +99,12 @@ def hydrate_threads(
         ref = entry.get("ref") if isinstance(entry, dict) else None
         if ref:
             thread_dict["template_ref"] = ref
+
+        # Expand foreach macros, as a directly loaded thread does at step 8b.
+        steps = thread_dict.get("steps")
+        if isinstance(steps, list):
+            with attribute_errors(thread_source):
+                thread_dict["steps"] = expand_foreach(steps)
 
         if prepare is not None:
             prepare(thread_dict)

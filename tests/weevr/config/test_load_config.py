@@ -967,3 +967,49 @@ class TestLoadConfigChildValidation:
         )
         assert isinstance(load_config(weave, project_root=tmp_path), Weave)
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+
+_FOREACH_THREAD = (
+    _VALID_THREAD
+    + "steps:\n  - foreach:\n      values: [a, b]\n      as: col\n"
+    + '      steps:\n        - filter:\n            expr: "{col} > 0"\n'
+)
+
+
+class TestLoadConfigChildForeach:
+    """foreach blocks expand in threads a weave or loom references."""
+
+    @staticmethod
+    def _write(root: Path, name: str, text: str) -> Path:
+        path = root / name
+        path.write_text(text)
+        return path
+
+    def test_weave_with_foreach_thread_loads(self, tmp_path):
+        """A referenced thread using foreach no longer fails its weave."""
+        self._write(tmp_path, "fe.thread", _FOREACH_THREAD)
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+
+    def test_loom_with_foreach_thread_loads(self, tmp_path):
+        """The same holds two levels down."""
+        self._write(tmp_path, "fe.thread", _FOREACH_THREAD)
+        self._write(tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n')
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+    def test_malformed_foreach_in_referenced_thread_names_thread(self, tmp_path):
+        """A bad foreach block in a referenced thread names that thread."""
+        thread = self._write(
+            tmp_path, "fe.thread", _FOREACH_THREAD.replace("values: [a, b]", "values: []")
+        )
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+        )
+        with pytest.raises(ConfigError, match="foreach block at step index") as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
