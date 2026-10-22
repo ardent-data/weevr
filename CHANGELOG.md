@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.1](https://github.com/ardent-data/weevr/compare/weevr-v1.19.0...weevr-v1.19.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **config:** identify the source file on every config load error ([#235](https://github.com/ardent-data/weevr/issues/235)) ([9d64eba](https://github.com/ardent-data/weevr/commit/9d64eba2d7319803aa1bf3791141be6abc17de16))
+* **config:** validate referenced threads and expand foreach steps ([#238](https://github.com/ardent-data/weevr/issues/238)) ([2ab27f0](https://github.com/ardent-data/weevr/commit/2ab27f0c3a99bece9c64548ab7dfd6b8fc03680e))
+
 ## [1.19.0](https://github.com/ardent-data/weevr/compare/weevr-v1.18.1...weevr-v1.19.0) (2026-07-21)
 
 
