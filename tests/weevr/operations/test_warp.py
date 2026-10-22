@@ -21,6 +21,7 @@ from weevr.operations.warp import (
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.spark
 class TestEnforceWarp:
     """Test warp enforcement logic."""
 
@@ -256,6 +257,7 @@ class TestEnforceWarp:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.spark
 class TestAppendWarpOnlyColumns:
     """Test warp-only column append."""
 
@@ -306,6 +308,7 @@ class TestAppendWarpOnlyColumns:
 class TestPreInitializeTable:
     """Test Delta table pre-initialization."""
 
+    @pytest.mark.spark
     def test_creates_table_with_correct_schema(self, spark: SparkSession, tmp_delta_path):
         """Pre-init creates table with correct schema from effective warp."""
         path = tmp_delta_path("pre_init_test")
@@ -324,6 +327,7 @@ class TestPreInitializeTable:
         assert "name" in df.columns
         assert df.count() == 0
 
+    @pytest.mark.spark
     def test_includes_warp_only_and_engine(self, spark: SparkSession, tmp_delta_path):
         """Pre-init includes warp-only and engine columns."""
         path = tmp_delta_path("pre_init_full")
@@ -336,6 +340,7 @@ class TestPreInitializeTable:
         df = spark.read.format("delta").load(path)
         assert set(df.columns) == {"id", "status", "_loaded_at"}
 
+    @pytest.mark.spark
     def test_noop_if_table_exists(self, spark: SparkSession, tmp_delta_path):
         """Pre-init is no-op if table already exists."""
         path = tmp_delta_path("pre_init_existing")
@@ -368,6 +373,7 @@ class TestPreInitializeTable:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.spark
 class TestAutoGenerateWarp:
     """Test warp auto-generation."""
 
