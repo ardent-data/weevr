@@ -725,3 +725,58 @@ connections:
         msg = str(exc_info.value)
         assert "workspace_id" in msg
         assert "bronze_to_silver.weave" in msg
+
+
+_VALID_THREAD = """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  path: Tables/customers
+"""
+
+
+class TestLoadConfigErrorFileAttribution:
+    """Errors raised while loading a file name that file in ``file_path``."""
+
+    def test_schema_error_names_file(self, tmp_path):
+        """A schema-shape error carries the loaded file's path."""
+        thread = tmp_path / "shape.thread"
+        thread.write_text(
+            'config_version: "1.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n'
+        )
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+        assert f"in {thread}" in str(exc_info.value)
+
+    def test_version_error_names_file(self, tmp_path):
+        """An unsupported config_version carries the loaded file's path."""
+        thread = tmp_path / "ver.thread"
+        thread.write_text(_VALID_THREAD.replace('"1.0"', '"9.0"'))
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_variable_error_names_file_and_keeps_key(self, tmp_path):
+        """An unresolved variable carries the file's path and its config key."""
+        thread = tmp_path / "vars.thread"
+        thread.write_text(_VALID_THREAD.replace("raw.customers", "${env.missing}"))
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+        assert exc_info.value.config_key == "env.missing"
+
+    def test_foreach_error_names_file(self, tmp_path):
+        """A malformed foreach block carries the loaded file's path."""
+        thread = tmp_path / "macro.thread"
+        thread.write_text(
+            _VALID_THREAD
+            + "steps:\n  - foreach:\n      values: []\n      as: col\n"
+            + '      steps:\n        - filter:\n            expr: "x > 0"\n'
+        )
+        with pytest.raises(ConfigError, match="foreach") as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)

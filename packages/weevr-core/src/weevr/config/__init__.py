@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from weevr.config.attribution import attribute_errors
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.macros import expand_foreach
@@ -79,7 +80,17 @@ def load_config(
         ModelValidationError: Semantic validation failures during model hydration
     """
     file_path = make_location(path)
+    with attribute_errors(file_path):
+        return _load_config_file(file_path, path, runtime_params, project_root)
 
+
+def _load_config_file(
+    file_path: ConfigLocation,
+    path: str | Path | ConfigLocation,
+    runtime_params: dict[str, Any] | None,
+    project_root: Path | ConfigLocation | None,
+) -> Thread | Weave | Loom | dict[str, Any]:
+    """Run the ``load_config`` pipeline for one already-wrapped location."""
     # Step 1: Parse YAML
     raw = parse_yaml(file_path)
 
