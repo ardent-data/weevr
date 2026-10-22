@@ -500,6 +500,7 @@ def resolve_references(
             reference detected.
         ConfigError: If an inline definition is missing a ``name`` field.
     """
+    from weevr.config.attribution import attribute_errors
     from weevr.config.locations import LocalConfigLocation
     from weevr.config.parser import (
         detect_config_type_from_extension,
@@ -540,31 +541,32 @@ def resolve_references(
                 weave_path = resolve_ref_path(ref, project_root)
                 visited.add(ref)
                 try:
-                    raw = parse_yaml(weave_path)
-                    version = extract_config_version(raw)
-                    ext_type = detect_config_type_from_extension(weave_path)
-                    child_type = ext_type if ext_type else "weave"
-                    validate_config_version(version, child_type)
-                    validated = validate_schema(raw, child_type)
-                    child_dict = validated.model_dump(exclude_unset=True)
+                    with attribute_errors(weave_path):
+                        raw = parse_yaml(weave_path)
+                        version = extract_config_version(raw)
+                        ext_type = detect_config_type_from_extension(weave_path)
+                        child_type = ext_type if ext_type else "weave"
+                        validate_config_version(version, child_type)
+                        validated = validate_schema(raw, child_type)
+                        child_dict = validated.model_dump(exclude_unset=True)
 
-                    # Inject name from filename stem
-                    if not child_dict.get("name"):
-                        child_dict["name"] = weave_path.stem
+                        # Inject name from filename stem
+                        if not child_dict.get("name"):
+                            child_dict["name"] = weave_path.stem
 
-                    # Set qualified key
-                    child_dict["qualified_key"] = ref
+                        # Set qualified key
+                        child_dict["qualified_key"] = ref
 
-                    context = build_param_context(runtime_params, child_dict.get("defaults"))
-                    resolved_child = resolve_variables(child_dict, context)
+                        context = build_param_context(runtime_params, child_dict.get("defaults"))
+                        resolved_child = resolve_variables(child_dict, context)
 
-                    resolved_child = resolve_references(
-                        resolved_child,
-                        child_type,
-                        project_root,
-                        runtime_params,
-                        visited.copy(),
-                    )
+                        resolved_child = resolve_references(
+                            resolved_child,
+                            child_type,
+                            project_root,
+                            runtime_params,
+                            visited.copy(),
+                        )
 
                     resolved_weaves.append(resolved_child)
                 finally:
@@ -590,32 +592,33 @@ def resolve_references(
                         # Load the weave file by convention
                         visited.add(convention_ref)
                         try:
-                            conv_raw = parse_yaml(convention_path)
-                            conv_version = extract_config_version(conv_raw)
-                            conv_type = detect_config_type_from_extension(convention_path)
-                            child_type = conv_type if conv_type else "weave"
-                            validate_config_version(conv_version, child_type)
-                            validated = validate_schema(conv_raw, child_type)
-                            child_dict = validated.model_dump(exclude_unset=True)
-                            if not child_dict.get("name"):
-                                child_dict["name"] = weave_name
-                            child_dict["qualified_key"] = convention_ref
+                            with attribute_errors(convention_path):
+                                conv_raw = parse_yaml(convention_path)
+                                conv_version = extract_config_version(conv_raw)
+                                conv_type = detect_config_type_from_extension(convention_path)
+                                child_type = conv_type if conv_type else "weave"
+                                validate_config_version(conv_version, child_type)
+                                validated = validate_schema(conv_raw, child_type)
+                                child_dict = validated.model_dump(exclude_unset=True)
+                                if not child_dict.get("name"):
+                                    child_dict["name"] = weave_name
+                                child_dict["qualified_key"] = convention_ref
 
-                            # Preserve entry-level overrides (condition)
-                            if "condition" in entry:
-                                child_dict["condition"] = entry["condition"]
+                                # Preserve entry-level overrides (condition)
+                                if "condition" in entry:
+                                    child_dict["condition"] = entry["condition"]
 
-                            context = build_param_context(
-                                runtime_params, child_dict.get("defaults")
-                            )
-                            resolved_child = resolve_variables(child_dict, context)
-                            resolved_child = resolve_references(
-                                resolved_child,
-                                child_type,
-                                project_root,
-                                runtime_params,
-                                visited.copy(),
-                            )
+                                context = build_param_context(
+                                    runtime_params, child_dict.get("defaults")
+                                )
+                                resolved_child = resolve_variables(child_dict, context)
+                                resolved_child = resolve_references(
+                                    resolved_child,
+                                    child_type,
+                                    project_root,
+                                    runtime_params,
+                                    visited.copy(),
+                                )
                             resolved_weaves.append(resolved_child)
                         finally:
                             visited.discard(convention_ref)
@@ -663,37 +666,42 @@ def resolve_references(
                 thread_path = resolve_ref_path(ref, project_root)
                 visited.add(ref)
                 try:
-                    raw = parse_yaml(thread_path)
-                    version = extract_config_version(raw)
-                    ext_type = detect_config_type_from_extension(thread_path)
-                    child_type = ext_type if ext_type else "thread"
-                    validate_config_version(version, child_type)
-                    validated = validate_schema(raw, child_type)
-                    child_dict = validated.model_dump(exclude_unset=True)
-
-                    # Inject name from filename stem
-                    if not child_dict.get("name"):
-                        child_dict["name"] = thread_path.stem
-
-                    # Set qualified key
-                    child_dict["qualified_key"] = ref
-
                     # Two-phase param resolution: resolve expressions
                     # in entry param values against parent context first,
                     # then inject resolved values into thread's param context.
+                    # Entry params belong to this weave, so they resolve
+                    # outside the referenced thread's attribution scope.
                     raw_entry_params = entry.get("params")
                     resolved_entry_params = None
                     if raw_entry_params:
                         parent_context = build_param_context(runtime_params, config.get("defaults"))
                         resolved_entry_params = resolve_variables(raw_entry_params, parent_context)
 
-                    context = build_param_context(
-                        runtime_params,
-                        child_dict.get("defaults"),
-                        entry_params=resolved_entry_params,
-                    )
-                    consumed: set[str] = set()
-                    resolved_child = resolve_variables(child_dict, context, consumed_keys=consumed)
+                    with attribute_errors(thread_path):
+                        raw = parse_yaml(thread_path)
+                        version = extract_config_version(raw)
+                        ext_type = detect_config_type_from_extension(thread_path)
+                        child_type = ext_type if ext_type else "thread"
+                        validate_config_version(version, child_type)
+                        validated = validate_schema(raw, child_type)
+                        child_dict = validated.model_dump(exclude_unset=True)
+
+                        # Inject name from filename stem
+                        if not child_dict.get("name"):
+                            child_dict["name"] = thread_path.stem
+
+                        # Set qualified key
+                        child_dict["qualified_key"] = ref
+
+                        context = build_param_context(
+                            runtime_params,
+                            child_dict.get("defaults"),
+                            entry_params=resolved_entry_params,
+                        )
+                        consumed: set[str] = set()
+                        resolved_child = resolve_variables(
+                            child_dict, context, consumed_keys=consumed
+                        )
 
                     # Warn on unused params with source attribution
                     _warn_unused_params(
