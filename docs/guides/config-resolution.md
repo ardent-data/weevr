@@ -126,11 +126,11 @@ loaded config.
    with `enabled: false` are removed after merge.
 
 2. **Expand macros** — `foreach` blocks in thread step lists are expanded
-   into repeated sequences. This only applies when loading a thread
-   config directly; for weave and loom configs, child thread steps
-   are already concrete after reference resolution. Expansion happens
-   after variable resolution so that `foreach.values` can reference
-   parameters.
+   into repeated sequences. This applies to a thread loaded directly and
+   to every thread a weave or loom references, which expand during
+   hydration (Stage 10). Expansion happens after variable resolution so
+   that `foreach.values` can reference parameters, including values a
+   weave passes in through a thread entry's `params`.
 
 ### Stage 10: Hydrate
 
@@ -139,6 +139,10 @@ validated against the filename stem (mismatch raises `ConfigError`;
 missing name is injected from the stem). The fully resolved dictionary
 is then validated through the typed Pydantic model (`Thread`, `Weave`,
 or `Loom`). Semantic errors at this stage raise `ModelValidationError`.
+For a weave or loom, every child it pulls in, whether referenced or
+inline, is hydrated and validated the same way, so a broken child fails
+the whole load. The error's `file_path` names the child's own file, or
+the file containing an inline definition.
 Incremental-mode constraints (e.g., CDC requires merge write mode) are
 checked as post-resolution cross-cutting validations.
 
