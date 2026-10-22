@@ -31,6 +31,15 @@ jobs:
         with:
           python-version-file: ".python-version"
 
+      # Spark 3.5 can't start on JDK 23+ (Subject.getSubject is unsupported),
+      # so don't rely on the runner image's default Java. 17 matches the
+      # devcontainer.
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -44,11 +53,22 @@ jobs:
       # Ivy cache between runs. Keyed on the lockfile so a delta-spark bump
       # resolves fresh.
       - name: Cache Ivy (Delta JARs)
+        id: ivy
         uses: actions/cache@v6
         with:
           path: ~/.ivy2
           key: ivy-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: ivy-${{ runner.os }}-
+
+      # On a cold cache, two xdist workers resolving the same JARs into
+      # ~/.ivy2 at once corrupt each other's downloads. Resolve them once,
+      # in a single process, before the parallel run.
+      - name: Resolve Delta JARs
+        if: steps.ivy.outputs.cache-hit != 'true'
+        run: >-
+          uv run python -c "from delta import configure_spark_with_delta_pip;
+          from pyspark.sql import SparkSession;
+          configure_spark_with_delta_pip(SparkSession.builder.master('local[1]')).getOrCreate().stop()"
 
       - name: Tests with coverage
         # Two workers fit the 4-vCPU runner: each runs its own local[2]

@@ -393,6 +393,7 @@ class TestMappingModeBypass:
         assert "name" not in result.columns
 
 
+@pytest.mark.spark
 class TestRunContextVariables:
     """Test ${run.timestamp} and ${run.id} context variable resolution."""
 

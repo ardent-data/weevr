@@ -6,6 +6,8 @@ from pyspark.sql import SparkSession
 from weevr.errors import SchemaDriftError
 from weevr.operations.drift import handle_drift
 
+pytestmark = pytest.mark.spark
+
 
 class TestHandleDrift:
     """Test drift detection and handling."""
