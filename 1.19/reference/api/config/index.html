@@ -1525,6 +1525,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.config.attribute_errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        attribute_errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.config.apply_inheritance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1694,6 +1705,17 @@
     <span class="md-ellipsis">
       
         load_config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.config._load_config_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _load_config_file
       
     </span>
   </a>
@@ -3819,6 +3841,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.config.attribute_errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        attribute_errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.config.apply_inheritance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3988,6 +4021,17 @@
     <span class="md-ellipsis">
       
         load_config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.config._load_config_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _load_config_file
       
     </span>
   </a>
@@ -5169,6 +5213,80 @@ of transformation steps, and a single target.</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.config.attribute_errors" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">attribute_errors</span><span class="p">(</span><span class="n">location</span><span class="p">)</span></code>
+
+<a href="#weevr.config.attribute_errors" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Name <code>location</code> on any <code>ConfigError</code> raised inside the block.</p>
+<p>Only errors that don't already name a file are updated, so when blocks
+nest (a weave loading a referenced thread), the innermost file wins.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>location</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConfigLocation (weevr.config.locations.ConfigLocation)" href="#weevr.config.ConfigLocation">ConfigLocation</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The config file being processed.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Yields:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Nothing; the block runs unchanged.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 
@@ -7062,6 +7180,24 @@ a bare :class:<code>pathlib.Path</code>.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.config._load_config_file" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">_load_config_file</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">runtime_params</span><span class="p">,</span> <span class="n">project_root</span><span class="p">)</span></code>
+
+<a href="#weevr.config._load_config_file" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Run the <code>load_config</code> pipeline for one already-wrapped location.</p>
 
 
     </div>
