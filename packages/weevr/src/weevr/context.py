@@ -9,10 +9,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
 from pyspark.sql import SparkSession
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.hydration import hydrate_children, hydrate_model
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.macros import expand_foreach
@@ -42,7 +42,6 @@ from weevr.errors import (
     ConfigError,
     DataValidationError,
     ExecutionError,
-    ModelValidationError,
     VariableResolutionError,
 )
 from weevr.model.execution import LogLevel, resolve_effective_execution
@@ -897,13 +896,13 @@ class Context:
     def _load_resolved(self, path: str | Path) -> _ResolvedConfig:
         """Run the config pipeline and return the hydrated model with children.
 
-        Replicates the ``load_config`` pipeline but captures resolved child
-        configs (``_resolved_threads`` / ``_resolved_weaves``) before Pydantic
-        hydration strips them.
+        Replicates the ``load_config`` pipeline but keeps the hydrated child
+        weaves and threads, which ``load_config`` validates and discards.
 
-        Note: This method replicates the ``load_config`` pipeline. Changes
-        to ``load_config`` must be mirrored here. A future refactor should
-        extract a shared ``_resolve_config_to_dict`` function.
+        Note: Parsing, resolution, and the inheritance cascade are still
+        duplicated from ``load_config``; changes there must be mirrored here.
+        Child hydration is shared through ``weevr.config.hydration``. A future
+        refactor should extract a shared ``_resolve_config_to_dict`` function.
         """
         file_path = self._resolve_config_path(path)
         with attribute_errors(file_path):
@@ -1027,53 +1026,16 @@ class Context:
         if config_type == "thread":
             self._resolve_source_paths(resolved_with_refs, self._project_root)
 
-        # Step 9: Hydrate top-level model
-        model = self._hydrate_model(resolved_with_refs, config_type, file_path)
-
-        # Extract and hydrate child models
-        weaves: dict[str, Weave] = {}
-        threads: dict[str, dict[str, Thread]] = {}
-
-        if config_type == "weave":
-            weave_name = config_name
-            thread_map = self._hydrate_threads(
-                resolved_with_refs.get("threads", []),
-                resolved_with_refs.get("_resolved_threads", []),
-                file_path,
-                project_root=self._project_root,
-            )
-            threads[weave_name] = thread_map
-
-        elif config_type == "loom":
-            for weave_entry, weave_dict in zip(
-                resolved_with_refs.get("weaves", []),
-                resolved_with_refs.get("_resolved_weaves", []),
-                strict=True,
-            ):
-                # Determine weave name from entry or resolved dict
-                if isinstance(weave_entry, dict):
-                    weave_name = weave_entry.get("name", "") or weave_entry.get("ref", "")
-                    if weave_entry.get("ref") and not weave_entry.get("name"):
-                        weave_name = Path(weave_entry["ref"]).stem
-                else:
-                    weave_name = str(weave_entry)
-
-                if not weave_dict.get("name"):
-                    weave_dict["name"] = weave_name
-                # Inline weaves have no file of their own; they live in the loom.
-                weave_source = weave_dict.pop("_source_path", None) or str(file_path)
-                weave_model = self._hydrate_model(weave_dict, "weave", weave_source)
-                if not isinstance(weave_model, Weave):  # pragma: no cover
-                    continue
-                weaves[weave_name] = weave_model
-
-                thread_map = self._hydrate_threads(
-                    weave_dict.get("threads", []),
-                    weave_dict.get("_resolved_threads", []),
-                    weave_source,
-                    project_root=self._project_root,
-                )
-                threads[weave_name] = thread_map
+        # Step 9: Hydrate the top-level model and the children it pulls in
+        model = hydrate_model(resolved_with_refs, config_type, file_path)
+        project_root = self._project_root
+        weaves, threads = hydrate_children(
+            config_type,
+            resolved_with_refs,
+            file_path,
+            config_name,
+            prepare=lambda thread_dict: self._resolve_source_paths(thread_dict, project_root),
+        )
 
         # Trace composition needs hydrated models (model_fields_set): a
         # weave's explicit trace: true under a traceless loom is a no-op.
@@ -1117,79 +1079,6 @@ class Context:
             pre_cascade_threads.append(resolved)
 
         return collect_execution_scope_warnings(defaults_by_scope, pre_cascade_threads)
-
-    @staticmethod
-    def _hydrate_model(
-        data: dict[str, Any], config_type: str, source_path: ConfigLocation | str
-    ) -> Thread | Weave | Loom:
-        """Hydrate a dict into a typed domain model."""
-        model_map: dict[str, type[Thread | Weave | Loom]] = {
-            "thread": Thread,
-            "weave": Weave,
-            "loom": Loom,
-        }
-        cls = model_map[config_type]
-        try:
-            return cls.model_validate(data)
-        except ValidationError as exc:
-            raise ModelValidationError(
-                f"Model hydration failed for {config_type}: {exc}",
-                cause=exc,
-                file_path=str(source_path),
-            ) from exc
-
-    @staticmethod
-    def _hydrate_threads(
-        thread_entries: list[Any],
-        resolved_dicts: list[dict[str, Any]],
-        source_path: ConfigLocation | str,
-        project_root: ConfigLocation | Path | str | None = None,
-    ) -> dict[str, Thread]:
-        """Hydrate resolved thread dicts into a name->Thread mapping.
-
-        Threads loaded from their own file are attributed to that file;
-        inline threads are attributed to ``source_path``, the enclosing file.
-        """
-        result: dict[str, Thread] = {}
-        for entry, thread_dict in zip(thread_entries, resolved_dicts, strict=True):
-            # Pop stashed entry-level fields before model validation.
-            # _entry_params was already consumed by the resolver during
-            # two-phase param resolution; popped here for model cleanliness.
-            entry_as = thread_dict.pop("_entry_as", None)
-            thread_dict.pop("_entry_params", None)
-            thread_source = thread_dict.pop("_source_path", None) or str(source_path)
-
-            # Determine the base name from the entry or resolved dict
-            if isinstance(entry, dict):
-                name = entry.get("name", "") or entry.get("ref", "")
-                if entry.get("ref") and not entry.get("name"):
-                    name = Path(entry["ref"]).stem
-            else:
-                name = str(entry)
-
-            # Effective name: as > name > stem
-            effective_name = entry_as or name
-
-            if not thread_dict.get("name") or entry_as:
-                thread_dict["name"] = effective_name
-
-            # Set template_ref for telemetry provenance
-            ref = entry.get("ref") if isinstance(entry, dict) else None
-            if ref:
-                thread_dict["template_ref"] = ref
-
-            if project_root is not None:
-                Context._resolve_source_paths(thread_dict, project_root)
-
-            try:
-                result[effective_name] = Thread.model_validate(thread_dict)
-            except ValidationError as exc:
-                raise ModelValidationError(
-                    f"Thread hydration failed for '{effective_name}': {exc}",
-                    cause=exc,
-                    file_path=thread_source,
-                ) from exc
-        return result
 
     @staticmethod
     def _compute_qualified_key(file_path: ConfigLocation, project_root: ConfigLocation) -> str:

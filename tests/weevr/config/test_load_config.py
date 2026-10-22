@@ -894,3 +894,76 @@ class TestLoadConfigReferencedFileAttribution:
             load_config(loom, project_root=tmp_path)
         assert exc_info.value.file_path == str(tmp_path / "gone.thread")
         assert exc_info.value.file_path != str(weave)
+
+
+class TestLoadConfigChildValidation:
+    """load_config validates the children of a weave or loom, not just the top level."""
+
+    @staticmethod
+    def _write(root: Path, name: str, text: str) -> Path:
+        path = root / name
+        path.write_text(text)
+        return path
+
+    def test_weave_with_invalid_thread_raises(self, tmp_path):
+        """A referenced thread that fails hydration fails the weave, naming the thread."""
+        thread = self._write(tmp_path, "bad.thread", _VALID_THREAD + "write:\n  mode: bogus\n")
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n'
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_loom_with_invalid_thread_raises(self, tmp_path):
+        """Two levels down, an invalid thread still fails the loom, naming the thread."""
+        thread = self._write(tmp_path, "bad.thread", _VALID_THREAD + "write:\n  mode: bogus\n")
+        self._write(tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n')
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_loom_with_invalid_weave_raises(self, tmp_path):
+        """A referenced weave that fails hydration fails the loom, naming the weave."""
+        self._write(tmp_path, "t.thread", _VALID_THREAD)
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+            "lookups:\n  lk:\n    not_a_field: true\n",
+        )
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_invalid_inline_thread_names_weave(self, tmp_path):
+        """An inline thread that fails hydration names the weave that defines it."""
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\nthreads:\n'
+            "  - name: t\n    sources:\n      data:\n        type: delta\n"
+            "        alias: raw.c\n    target:\n      path: T/c\n"
+            "    write:\n      mode: bogus\n",
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_valid_weave_and_loom_still_load(self, tmp_path):
+        """Valid children don't change what load_config returns."""
+        self._write(tmp_path, "t.thread", _VALID_THREAD)
+        weave = self._write(
+            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+        )
+        loom = self._write(
+            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
