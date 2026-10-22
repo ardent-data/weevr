@@ -11,6 +11,7 @@ from weevr.errors import (
     ConfigSchemaError,
     ConfigVersionError,
     ModelValidationError,
+    ReferenceResolutionError,
     VariableResolutionError,
 )
 from weevr.model import Loom, Thread, Weave
@@ -725,3 +726,171 @@ connections:
         msg = str(exc_info.value)
         assert "workspace_id" in msg
         assert "bronze_to_silver.weave" in msg
+
+
+_VALID_THREAD = """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  path: Tables/customers
+"""
+
+
+class TestLoadConfigErrorFileAttribution:
+    """Errors raised while loading a file name that file in ``file_path``."""
+
+    def test_schema_error_names_file(self, tmp_path):
+        """A schema-shape error carries the loaded file's path."""
+        thread = tmp_path / "shape.thread"
+        thread.write_text(
+            'config_version: "1.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n'
+        )
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+        assert f"in {thread}" in str(exc_info.value)
+
+    def test_version_error_names_file(self, tmp_path):
+        """An unsupported config_version carries the loaded file's path."""
+        thread = tmp_path / "ver.thread"
+        thread.write_text(_VALID_THREAD.replace('"1.0"', '"9.0"'))
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_variable_error_names_file_and_keeps_key(self, tmp_path):
+        """An unresolved variable carries the file's path and its config key."""
+        thread = tmp_path / "vars.thread"
+        thread.write_text(_VALID_THREAD.replace("raw.customers", "${env.missing}"))
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+        assert exc_info.value.config_key == "env.missing"
+
+    def test_foreach_error_names_file(self, tmp_path):
+        """A malformed foreach block carries the loaded file's path."""
+        thread = tmp_path / "macro.thread"
+        thread.write_text(
+            _VALID_THREAD
+            + "steps:\n  - foreach:\n      values: []\n      as: col\n"
+            + '      steps:\n        - filter:\n            expr: "x > 0"\n'
+        )
+        with pytest.raises(ConfigError, match="foreach") as exc_info:
+            load_config(thread)
+        assert exc_info.value.file_path == str(thread)
+
+
+class TestLoadConfigReferencedFileAttribution:
+    """Errors in referenced files name the referenced file, not the caller."""
+
+    @staticmethod
+    def _write(root: Path, name: str, text: str) -> Path:
+        path = root / name
+        path.write_text(text)
+        return path
+
+    def _weave_of(self, root: Path, name: str, *entries: str) -> Path:
+        body = "".join(f"  - {e}\n" for e in entries)
+        return self._write(root, name, f'config_version: "1.0"\nthreads:\n{body}')
+
+    def _loom_of(self, root: Path, *entries: str) -> Path:
+        body = "".join(f"  - {e}\n" for e in entries)
+        return self._write(root, "top.loom", f'config_version: "1.0"\nweaves:\n{body}')
+
+    def test_referenced_thread_schema_error_names_thread(self, tmp_path):
+        """A schema error in a ref'd thread names the thread."""
+        thread = self._write(
+            tmp_path,
+            "shape.thread",
+            'config_version: "1.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n',
+        )
+        weave = self._weave_of(tmp_path, "w.weave", "ref: shape.thread")
+        with pytest.raises(ConfigSchemaError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_referenced_thread_variable_error_names_thread(self, tmp_path):
+        """An unresolved variable in a ref'd thread names the thread."""
+        thread = self._write(
+            tmp_path, "vars.thread", _VALID_THREAD.replace("raw.customers", "${env.missing}")
+        )
+        weave = self._weave_of(tmp_path, "w.weave", "ref: vars.thread")
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_referenced_thread_version_error_names_thread(self, tmp_path):
+        """An unsupported version in a ref'd thread names the thread."""
+        thread = self._write(tmp_path, "ver.thread", _VALID_THREAD.replace('"1.0"', '"9.0"'))
+        weave = self._weave_of(tmp_path, "w.weave", "ref: ver.thread")
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_loom_weave_thread_error_names_thread(self, tmp_path):
+        """Two levels down, the thread's error still names the thread."""
+        thread = self._write(
+            tmp_path, "vars.thread", _VALID_THREAD.replace("raw.customers", "${env.missing}")
+        )
+        self._weave_of(tmp_path, "w.weave", "ref: vars.thread")
+        loom = self._loom_of(tmp_path, "ref: w.weave")
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_loom_referenced_weave_error_names_weave(self, tmp_path):
+        """An error in a ref'd weave names the weave, not the loom."""
+        weave = self._write(tmp_path, "w.weave", 'config_version: "9.0"\nthreads: []\n')
+        loom = self._loom_of(tmp_path, "ref: w.weave")
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_convention_weave_error_names_weave(self, tmp_path):
+        """A weave found by name convention names its own file."""
+        weave = self._write(tmp_path, "w.weave", 'config_version: "9.0"\nthreads: []\n')
+        loom = self._loom_of(tmp_path, "w")
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_entry_params_error_names_weave(self, tmp_path):
+        """An unresolvable entry params expression belongs to the weave."""
+        self._write(tmp_path, "t.thread", _VALID_THREAD)
+        weave = self._weave_of(tmp_path, "w.weave", "ref: t.thread\n    params:\n      x: ${nope}")
+        loom = self._loom_of(tmp_path, "ref: w.weave")
+        with pytest.raises(VariableResolutionError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_duplicate_effective_name_names_weave(self, tmp_path):
+        """A duplicate effective thread name belongs to the weave."""
+        self._write(tmp_path, "a.thread", _VALID_THREAD)
+        self._write(tmp_path, "b.thread", _VALID_THREAD)
+        weave = self._weave_of(
+            tmp_path, "w.weave", "ref: a.thread\n    as: x", "ref: b.thread\n    as: x"
+        )
+        loom = self._loom_of(tmp_path, "ref: w.weave")
+        with pytest.raises(ConfigError, match="Duplicate effective thread name") as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_inline_thread_missing_name_names_weave(self, tmp_path):
+        """An inline thread definition without a name belongs to the weave."""
+        weave = self._weave_of(tmp_path, "w.weave", "sources: {}")
+        loom = self._loom_of(tmp_path, "ref: w.weave")
+        with pytest.raises(ConfigError, match="requires a 'name'") as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(weave)
+
+    def test_missing_referenced_file_keeps_target_path(self, tmp_path):
+        """A missing ref still names the missing target, not the referencing file."""
+        weave = self._weave_of(tmp_path, "w.weave", "ref: gone.thread")
+        loom = self._loom_of(tmp_path, "ref: w.weave")
+        with pytest.raises(ReferenceResolutionError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(tmp_path / "gone.thread")
+        assert exc_info.value.file_path != str(weave)
