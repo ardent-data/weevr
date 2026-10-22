@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pyspark.sql import SparkSession
 
 from weevr.model.export import Export
@@ -92,6 +93,7 @@ class TestResolveExports:
         assert resolved[0].alias == "db.copy"
 
 
+@pytest.mark.spark
 class TestWriteExport:
     """Test write_export() for each format."""
 

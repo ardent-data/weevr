@@ -10,6 +10,8 @@ from weevr.engine.executor import execute_thread
 from weevr.errors import SchemaDriftError
 from weevr.model.thread import Thread
 
+pytestmark = pytest.mark.spark
+
 
 def _make_thread(
     name: str = "test_thread",
