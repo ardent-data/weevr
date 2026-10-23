@@ -216,6 +216,7 @@ class TestDuplicateWeaveNames:
         assert "a/main.weave" in str(exc.value)
         assert "b/main.weave" in str(exc.value)
         assert "name:" in str(exc.value)
+        assert exc.value.file_path == str(project / "all.loom")
 
     def test_load_config_rejects_too(self, tmp_path: Path) -> None:
         project = self._project(tmp_path, "  - ref: a/main.weave\n  - ref: b/main.weave\n")

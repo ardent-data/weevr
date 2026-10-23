@@ -15,7 +15,7 @@ import logging
 import shutil
 import types
 import typing
-from importlib.metadata import version
+from importlib.metadata import distribution, version
 from pathlib import Path
 
 import pytest
@@ -102,7 +102,17 @@ def test_thread_fields_read() -> None:
     assert {"qualified_key", "load", "write"} <= set(Thread.model_fields)
     load_fields = set(_field_model(Thread, "load").model_fields)  # type: ignore[attr-defined]
     assert {"mode", "watermark_inclusive", "watermark_column", "cdc"} <= load_fields
+    cdc_model = _field_model(_field_model(Thread, "load"), "cdc")
+    assert callable(getattr(cdc_model, "model_dump", None))
     assert "mode" in _field_model(Thread, "write").model_fields  # type: ignore[attr-defined]
+
+
+def test_engine_registers_no_weevr_command() -> None:
+    """weevr-cli owns the ``weevr`` console script."""
+    for dist in ("weevr", "weevr-core"):
+        entry_points = distribution(dist).entry_points
+        scripts = {ep.name for ep in entry_points if ep.group == "console_scripts"}
+        assert "weevr" not in scripts
 
 
 def test_validate_incremental_config_shape() -> None:
