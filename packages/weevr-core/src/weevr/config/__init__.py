@@ -4,8 +4,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import weevr.config.loader as _loader
 from weevr.config.attribution import attribute_errors
-from weevr.config.loader import COMPONENT_TYPES, hydrate_resolved, load_resolved, resolve_config
+from weevr.config.loader import load_resolved
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.model import Loom, Thread, Weave
 
@@ -69,10 +70,12 @@ def load_config(
     else:
         root = LocalConfigLocation(Path(project_root))
     with attribute_errors(file_path):
-        resolved = resolve_config(file_path, runtime_params=runtime_params, project_root=root)
-        if resolved.config_type not in COMPONENT_TYPES:
+        resolved = _loader.resolve_config(
+            file_path, runtime_params=runtime_params, project_root=root
+        )
+        if resolved.config_type not in _loader.COMPONENT_TYPES:
             return resolved.data
-        loaded = hydrate_resolved(resolved)
+        loaded = _loader.hydrate_resolved(resolved)
     for warning in loaded.warnings:
         logger.warning(warning)
     return loaded.model
