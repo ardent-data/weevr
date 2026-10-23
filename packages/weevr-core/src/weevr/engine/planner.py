@@ -563,16 +563,19 @@ def _infer_lookup_dependencies(
         else:
             lookup_producer[lk_name] = producers[0] if producers else None
 
-    # Find which threads consume each lookup
+    # Find which threads consume each lookup: through a lookup-bound source,
+    # or by name in a resolve step. A resolve name that is a bound source
+    # alias is that source's lookup, already counted. A thread-level lookup
+    # shadowing a weave lookup still counts here (the planner sees only weave
+    # lookups) — a harmless over-dependency.
     lookup_consumers: dict[str, list[str]] = {lk: [] for lk in lookups}
     for thread_name, thread in threads.items():
-        for source in thread.sources.values():
-            if (
-                source.lookup is not None
-                and source.lookup in lookup_consumers
-                and thread_name not in lookup_consumers[source.lookup]
-            ):
-                lookup_consumers[source.lookup].append(thread_name)
+        bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
+        used = {src.lookup for src in thread.sources.values() if src.lookup is not None}
+        used |= resolve_lookup_names(thread) - bound
+        for lk_name in sorted(used):
+            if lk_name in lookup_consumers and thread_name not in lookup_consumers[lk_name]:
+                lookup_consumers[lk_name].append(thread_name)
 
     # Build implicit deps: consumer depends on producer(s)
     lookup_deps: dict[str, list[str]] = {name: [] for name in threads}

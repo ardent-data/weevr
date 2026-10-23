@@ -225,3 +225,28 @@ class TestUndefined:
         _weave(project)
         assert project.run("w.weave") == ("success", [])
         assert project.resolved() == {"a": -1, "b": -1}
+
+
+class TestProducerOrdering:
+    """A by-name resolve consumer runs after the thread that writes the lookup's table."""
+
+    def test_consumer_waits_for_producer(self, project: Project) -> None:
+        produced = str(project.root / "produced_dim")
+        project.write(
+            "producer.thread",
+            {
+                "sources": {"raw": {"type": "delta", "alias": project.dim}},
+                "target": {"path": produced},
+                "write": {"mode": "overwrite"},
+            },
+        )
+        project.thread(project.src, [{"resolve": RESOLVE}])
+        project.write(
+            "w.weave",
+            {
+                "lookups": {"dim_codes": project.lookup(produced)},
+                "threads": [{"ref": "fact.thread"}, {"ref": "producer.thread"}],
+            },
+        )
+        assert project.run("w.weave") == ("success", [])
+        assert project.resolved() == {"a": 1, "b": 2}
