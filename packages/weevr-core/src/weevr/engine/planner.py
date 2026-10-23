@@ -9,6 +9,7 @@ from weevr.config.onelake import resolve_connection_path
 from weevr.errors.exceptions import ConfigError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
+from weevr.model.pipeline import ResolveStep
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry
 
@@ -479,6 +480,27 @@ def _analyze_cache_targets(
         if len(dependents.get(name, [])) >= 2:
             targets.append(name)
     return sorted(targets)
+
+
+def resolve_lookup_names(thread: Thread) -> set[str]:
+    """Lookup names a thread's ``resolve`` steps reference.
+
+    Covers single-mode and batch-item lookups in the main pipeline and in
+    every ``with:`` sub-pipeline. A name may also be a lookup-bound source
+    alias of the thread; callers decide how to treat those.
+    """
+    steps = list(thread.steps)
+    for sub in (thread.with_ or {}).values():
+        steps.extend(sub.steps)
+    names: set[str] = set()
+    for step in steps:
+        if not isinstance(step, ResolveStep):
+            continue
+        if step.resolve.lookup is not None:
+            names.add(step.resolve.lookup)
+        for item in step.resolve.batch or []:
+            names.add(item.lookup)
+    return names
 
 
 def _infer_lookup_dependencies(
