@@ -15,6 +15,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from weevr.context import Context
+from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.operations.readers import read_source
 
 pytestmark = pytest.mark.spark
@@ -60,14 +61,17 @@ class Project:
 
     def run(self, config: str) -> tuple[str, list[str]]:
         result = Context(spark=self.spark, project=str(self.dir)).run(config)
-        errors: list[str] = []
         detail = result.detail
-        weave_results = getattr(detail, "weave_results", None) or [detail]
-        for weave in weave_results:
-            for thread in getattr(weave, "thread_results", None) or []:
-                if thread.error:
-                    errors.append(thread.error)
-        return result.status, errors
+        if isinstance(detail, LoomResult):
+            threads = [t for weave in detail.weave_results for t in weave.thread_results]
+        elif isinstance(detail, WeaveResult):
+            threads = list(detail.thread_results)
+        elif isinstance(detail, ThreadResult):
+            threads = [detail]
+        else:
+            raise TypeError(f"unexpected run detail: {type(detail).__name__}")
+        assert threads, "the run produced no thread results"
+        return result.status, [t.error for t in threads if t.error]
 
     def resolved(self) -> dict[str, Any]:
         rows = self.spark.read.format("delta").load(self.target).collect()
@@ -104,6 +108,15 @@ class TestByNameThreadAndWeave:
         )
         _weave(project)
         assert project.run("w.weave") == ("success", [])
+        assert project.resolved() == {"a": 1, "b": 2}
+
+    def test_standalone_thread_lookup_by_name(self, project: Project) -> None:
+        project.thread(
+            project.src,
+            [{"resolve": RESOLVE}],
+            lookups={"dim_codes": project.lookup(project.dim)},
+        )
+        assert project.run("fact.thread") == ("success", [])
         assert project.resolved() == {"a": 1, "b": 2}
 
     def test_batch_items_by_name(self, project: Project) -> None:
@@ -328,3 +341,35 @@ class TestLoomLookups:
         _loom(project, {"dim_codes": project.lookup(project.dim, materialize=True)}, ["w.weave"])
         assert project.run("l.loom") == ("success", [])
         assert project.resolved() == {"a": 100, "b": 200}
+
+
+class TestShadowedLookupFacts:
+    """A narrower lookup doesn't inherit a wider lookup's unique-key result."""
+
+    @staticmethod
+    def _unique(project: Project) -> dict[str, Any]:
+        return project.lookup(project.dim, materialize=True, key=["code"], unique_key=True)
+
+    @staticmethod
+    def _dupes(project: Project) -> dict[str, Any]:
+        table = project.table("dupes", [("a", 10), ("a", 11), ("b", 20)], ["code", "sk"])
+        return project.lookup(table)
+
+    def test_weave_lookup_over_loom_lookup(self, project: Project) -> None:
+        project.thread(project.src, [{"resolve": {**RESOLVE, "on_duplicate": "error"}}])
+        _weave(project, {"dim_codes": self._dupes(project)})
+        _loom(project, {"dim_codes": self._unique(project)}, ["w.weave"])
+        status, errors = project.run("l.loom")
+        assert status == "failure"
+        assert any("duplicate" in e.lower() for e in errors)
+
+    def test_thread_lookup_over_weave_lookup(self, project: Project) -> None:
+        project.thread(
+            project.src,
+            [{"resolve": {**RESOLVE, "on_duplicate": "error"}}],
+            lookups={"dim_codes": self._dupes(project)},
+        )
+        _weave(project, {"dim_codes": self._unique(project)})
+        status, errors = project.run("w.weave")
+        assert status == "failure"
+        assert any("duplicate" in e.lower() for e in errors)

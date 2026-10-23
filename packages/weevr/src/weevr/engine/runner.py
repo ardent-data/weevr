@@ -221,6 +221,15 @@ def execute_weave(
         else lookups
     )
 
+    # Parent facts describe the parent's frame; a weave lookup of the same
+    # name gets none of them (its own materialization results, if any, are
+    # added per submit from all_lookup_results).
+    inherited_meta = (
+        {name: meta for name, meta in pre_lookup_meta.items() if name not in (lookups or {})}
+        if pre_lookup_meta
+        else None
+    )
+
     def _thread_frames() -> dict[str, Any] | None:
         """Cached frames for threads, minus parent frames a weave lookup shadows.
 
@@ -457,7 +466,7 @@ def execute_weave(
                                 parent_span_id=weave_span_id,
                                 cached_lookups=_thread_frames(),
                                 lookup_meta=build_lookup_meta(
-                                    all_lookup_results, base=pre_lookup_meta
+                                    all_lookup_results, base=inherited_meta
                                 )
                                 or None,
                                 capture_samples=(
@@ -482,7 +491,7 @@ def execute_weave(
                                 threads[name],
                                 cached_lookups=_thread_frames(),
                                 lookup_meta=build_lookup_meta(
-                                    all_lookup_results, base=pre_lookup_meta
+                                    all_lookup_results, base=inherited_meta
                                 )
                                 or None,
                                 capture_samples=(
