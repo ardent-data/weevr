@@ -12,7 +12,7 @@ runtime settings that cascade down through weaves to threads.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
-| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave references. Strings are shorthand for `{ name: "<value>" }` (inline definitions). Use `ref` for external file references. |
+| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave entries. Strings are shorthand for `{ name: "<value>" }`. Use `ref` for an external file, `name` alone for `<name>.weave` in the project root, or `name` plus a weave body for an inline weave. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`, `capture_samples`. Merges field-level with weave blocks (weave-set fields win). See the [Execution Settings guide](../../guides/execution-settings.md). |
@@ -30,13 +30,20 @@ runtime settings that cascade down through weaves to threads.
 ## weaves (WeaveEntry)
 
 Each entry in the `weaves` list is either a plain string (shorthand) or a
-`WeaveEntry` object. Use `ref` to reference an external `.weave` file, or
-`name` for inline weave definitions within the loom.
+`WeaveEntry` object. An entry takes one of three forms:
+
+- **`ref`** — an external `.weave` file, relative to the project root.
+- **`name` alone** — the weave file `<name>.weave` in the project root. If
+  that file does not exist, loading fails with an error naming it.
+- **`name` plus a weave body** — an inline weave defined in the loom. The body
+  takes the same keys as a `.weave` file, including `config_version` and
+  `threads`; threads can be inline or use `ref`. Errors in an inline weave
+  name the loom file.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with inline `name`. |
-| `name` | `string` | no | `""` | Weave name. Required for inline definitions; derived from filename stem when using `ref`. |
+| `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with `name`. |
+| `name` | `string` | no | `""` | Weave name. Without `ref`, names `<name>.weave` in the project root or an inline weave; derived from the filename stem when using `ref`. |
 | `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
 
 ### weaves.condition (ConditionSpec)
@@ -168,8 +175,8 @@ naming:
 
 ### Shorthand weave syntax
 
-Weave entries can be plain strings for inline definitions that need no
-condition:
+Weave entries can be plain strings when the weave lives in `<name>.weave`
+in the project root and needs no condition:
 
 ```yaml
 weaves:
@@ -194,4 +201,29 @@ weaves:
   - ref: ingest_raw.weave
   - ref: build_curated.weave
   - ref: publish_marts.weave
+```
+
+### Inline weave
+
+An inline weave keeps a small weave in the loom file itself:
+
+```yaml
+weaves:
+  - ref: ingest_raw.weave
+  - name: ops_audit
+    config_version: "1.0"
+    condition:
+      when: "table_exists('ops.audit_events')"
+    threads:
+      - ref: threads/audit_events.thread
+      - name: audit_summary
+        config_version: "1.0"
+        sources:
+          events:
+            type: delta
+            alias: ops.audit_events
+        target:
+          alias: ops.audit_summary
+        dependencies:
+          - audit_events
 ```
