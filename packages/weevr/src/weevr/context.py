@@ -443,7 +443,7 @@ class Context:
         filtered_weaves: dict[str, Weave] = {}
         filtered_threads: dict[str, dict[str, Thread]] = {}
         for weave_entry in model.weaves:
-            weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
+            weave_name = weave_entry.effective_name
             weave = resolved.weaves.get(weave_name)
             if weave is None:
                 continue
@@ -575,9 +575,7 @@ class Context:
             if not isinstance(model, Loom):
                 raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
-                weave_name = weave_entry.name or (
-                    Path(weave_entry.ref).stem if weave_entry.ref else ""
-                )
+                weave_name = weave_entry.effective_name
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     validation_errors.append(f"Weave '{weave_name}' not found")
@@ -718,9 +716,7 @@ class Context:
             if not isinstance(model, Loom):
                 raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
-                weave_name = weave_entry.name or (
-                    Path(weave_entry.ref).stem if weave_entry.ref else ""
-                )
+                weave_name = weave_entry.effective_name
                 weave = resolved.weaves.get(weave_name)
                 if weave is None:
                     continue

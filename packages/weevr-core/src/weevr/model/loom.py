@@ -1,5 +1,6 @@
 """Loom domain model."""
 
+from pathlib import PurePath
 from typing import Any
 
 from pydantic import Field, model_validator
@@ -46,6 +47,17 @@ class WeaveEntry(FrozenBase):
         default=None,
         description="Optional condition for conditional execution.",
     )
+
+    @property
+    def effective_name(self) -> str:
+        """The name this weave is known by downstream (planner, runner, results).
+
+        An explicit ``name`` wins; a ref-only entry falls back to the file
+        stem. Anything keyed by weave name MUST use this.
+        """
+        if self.name:
+            return self.name
+        return PurePath(self.ref).stem if self.ref else ""
 
 
 class Loom(FrozenBase):
