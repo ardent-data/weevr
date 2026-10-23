@@ -1427,3 +1427,62 @@ class TestReadCdcSourceWatermarkFormat:
         df, new_hwm = read_cdc_source(spark, source, cdf_config, last_version=0)
         assert new_hwm is None
         assert "_change_type" in df.columns
+
+
+class TestReadersRequireWatermarkType:
+    """Incremental readers fail loudly instead of skipping the watermark filter.
+
+    A LoadConfig with a watermark column but no type is rejected by validation;
+    these configs are built with ``model_construct`` to cover paths that bypass it.
+    """
+
+    @staticmethod
+    def _source(spark: SparkSession, tmp_delta_path, name: str) -> Source:
+        path = tmp_delta_path(name)
+        create_delta_table(
+            spark,
+            path,
+            [
+                {"id": 1, "OPFLAG": "I", "ts": "2026-01-01 10:00:00"},
+                {"id": 2, "OPFLAG": "U", "ts": "2026-01-02 10:00:00"},
+            ],
+        )
+        return Source(type="delta", alias=path)
+
+    @pytest.mark.parametrize("has_prior_state", [False, True])
+    def test_incremental_read_without_watermark_type_raises(
+        self, spark: SparkSession, tmp_delta_path, has_prior_state: bool
+    ) -> None:
+        """read_source_incremental raises on first and later runs alike."""
+        source = self._source(spark, tmp_delta_path, f"no_wm_type_{has_prior_state}")
+        load = LoadConfig.model_construct(
+            mode="incremental_watermark", watermark_column="ts", watermark_type=None
+        )
+        with pytest.raises(ExecutionError, match="watermark_type"):
+            read_source_incremental(
+                spark,
+                "s",
+                source,
+                load,
+                _watermark_state("2026-01-01 10:00:00") if has_prior_state else None,
+            )
+
+    def test_generic_cdc_read_without_watermark_type_raises(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Generic-CDC read_cdc_source raises when the column has no type."""
+        source = self._source(spark, tmp_delta_path, "cdc_no_wm_type")
+        load = LoadConfig.model_construct(
+            mode="cdc",
+            cdc=_generic_cdc_config(),
+            watermark_column="ts",
+            watermark_type=None,
+        )
+        with pytest.raises(ExecutionError, match="watermark_type"):
+            read_cdc_source(
+                spark,
+                source,
+                load.cdc,  # type: ignore[arg-type]
+                load_config=load,
+                prior_state=_watermark_state("2026-01-01 10:00:00"),
+            )
