@@ -202,6 +202,8 @@ assert [p.execution_order for p in weave.execution_plan] == [[["a"], ["b"]]]
 loom = load_resolved(root / "l.loom", project_root=root)
 assert list(loom.resolved_weaves) == ["w"]
 assert [p.weave_name for p in loom.execution_plan] == ["w"]
+assert weave.validate_plans() == ()
+assert loom.validate_plans() == ()
 
 assert "pyspark" not in sys.modules
 """
@@ -212,7 +214,7 @@ def test_core_only_install_loads_resolved_children(
     wheels: tuple[Path, Path],
     tmp_path: Path,
 ) -> None:
-    """``load_resolved`` loads and plans a weave and a loom in a core-only install."""
+    """``load_resolved`` loads, plans, and validates a weave and a loom in a core-only install."""
     _, core = wheels
     python = _make_venv(tmp_path / "core_only_load")
     _pip_install(python, str(core))

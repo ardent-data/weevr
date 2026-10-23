@@ -516,43 +516,15 @@ class Context:
         """Validate config, DAG, and source existence without executing."""
         validation_errors: list[str] = []
 
-        if loaded.config_type == "weave":
-            model = loaded.model
-            if not isinstance(model, Weave):
-                raise TypeError(f"Expected Weave, got {type(model).__name__}")
-            wt = loaded.resolved_threads.get(loaded.config_name, {})
-            try:
-                build_plan(
-                    weave_name=loaded.config_name,
-                    threads=wt,
-                    thread_entries=list(model.threads),
-                    lookups=dict(model.lookups) if model.lookups else None,
+        for issue in loaded.validate_plans():
+            if issue.error is None:
+                validation_errors.append(issue.message)
+            elif loaded.config_type == "weave":
+                validation_errors.append(f"DAG validation failed: {issue.message}")
+            else:
+                validation_errors.append(
+                    f"DAG validation failed for weave '{issue.weave_name}': {issue.message}"
                 )
-            except Exception as exc:
-                validation_errors.append(f"DAG validation failed: {exc}")
-
-        elif loaded.config_type == "loom":
-            model = loaded.model
-            if not isinstance(model, Loom):
-                raise TypeError(f"Expected Loom, got {type(model).__name__}")
-            for weave_entry in model.weaves:
-                weave_name = weave_entry.effective_name
-                weave = loaded.resolved_weaves.get(weave_name)
-                if weave is None:
-                    validation_errors.append(f"Weave '{weave_name}' not found")
-                    continue
-                wt = loaded.resolved_threads.get(weave_name, {})
-                try:
-                    build_plan(
-                        weave_name=weave_name,
-                        threads=wt,
-                        thread_entries=list(weave.threads),
-                        lookups=dict(weave.lookups) if weave.lookups else None,
-                    )
-                except Exception as exc:
-                    validation_errors.append(
-                        f"DAG validation failed for weave '{weave_name}': {exc}"
-                    )
 
         all_threads = self._collect_all_threads(loaded)
         source_errors = self._check_source_existence(all_threads)
