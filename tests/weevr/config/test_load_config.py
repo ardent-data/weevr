@@ -1181,3 +1181,29 @@ class TestLoadConfigInlineWeaves:
         loom = self._loom(tmp_path, "  - missing\n")
         with pytest.raises(ReferenceResolutionError, match=r"missing\.weave"):
             load_config(loom, project_root=tmp_path)
+
+
+class TestLoadConfigRelativePathAttribution:
+    """A relative path passed to load_config is reported as given."""
+
+    _BAD_THREAD = (
+        'config_version: "1.0"\nsources:\n  d:\n    type: delta\n    alias: raw.x\n'
+        "target:\n  alias: out\nwrite:\n  mode: bogus\n"
+    )
+
+    def test_thread_failure_names_relative_path(self, tmp_path, monkeypatch):
+        """A model failure in a directly loaded thread names the path as passed."""
+        (tmp_path / "bad.thread").write_text(self._BAD_THREAD)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config("bad.thread")
+        assert exc_info.value.file_path == "bad.thread"
+
+    def test_child_failure_names_relative_path(self, tmp_path, monkeypatch):
+        """A model failure in a referenced thread names that thread's relative path."""
+        (tmp_path / "bad.thread").write_text(self._BAD_THREAD)
+        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: bad.thread\n')
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config("w.weave")
+        assert exc_info.value.file_path == "bad.thread"

@@ -1,0 +1,18 @@
+config_version: "1.0"
+
+defaults:
+  write:
+    mode: append
+
+threads:
+  - ref: threads/stg_orders.thread
+  - ref: threads/regional.thread
+    as: orders_east
+    params:
+      region: east
+  - ref: threads/regional.thread
+    as: orders_west
+    params:
+      region: west
+    dependencies:
+      - stg_orders

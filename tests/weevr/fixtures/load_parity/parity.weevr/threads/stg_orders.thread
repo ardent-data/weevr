@@ -1,0 +1,22 @@
+config_version: "1.0"
+
+sources:
+  orders:
+    type: csv
+    path: data/orders.csv
+    options:
+      header: true
+
+steps:
+  - foreach:
+      values: [order_id, customer_id]
+      as: col
+      steps:
+        - filter:
+            expr: "{col} is not null"
+
+target:
+  alias: stg.orders
+
+execution:
+  log_level: minimal

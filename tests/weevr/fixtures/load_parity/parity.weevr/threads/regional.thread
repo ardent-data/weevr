@@ -1,0 +1,19 @@
+config_version: "1.0"
+
+params:
+  region:
+    name: region
+    type: string
+    required: true
+
+sources:
+  orders:
+    type: delta
+    alias: stg.orders
+
+steps:
+  - filter:
+      expr: "region = '${param.region}'"
+
+target:
+  alias: "gold.orders_${param.region}"

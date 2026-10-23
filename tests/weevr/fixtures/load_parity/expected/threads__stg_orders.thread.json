@@ -1,0 +1,93 @@
+{
+  "config_name": "stg_orders",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": null,
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": {
+      "capture_samples": false,
+      "log_level": "minimal",
+      "max_parallel_threads": null,
+      "trace": true
+    },
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "stg_orders",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "threads/stg_orders.thread",
+    "sources": {
+      "orders": {
+        "alias": null,
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {
+          "header": true
+        },
+        "path": "<root>/data/orders.csv",
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "csv"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "order_id is not null"
+        }
+      },
+      {
+        "filter": {
+          "expr": "customer_id is not null"
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "stg.orders",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": null,
+    "with_": null,
+    "write": null
+  },
+  "threads": {},
+  "weaves": {}
+}

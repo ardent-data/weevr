@@ -1,0 +1,586 @@
+{
+  "config_name": "nightly",
+  "config_type": "loom",
+  "execution_order": [
+    [
+      [
+        "stg_orders"
+      ],
+      [
+        "orders_east",
+        "orders_west"
+      ]
+    ],
+    [
+      [
+        "ops_audit"
+      ],
+      [
+        "ops_summary"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": {
+      "execution": {
+        "log_level": "debug"
+      }
+    },
+    "execution": null,
+    "lookups": null,
+    "name": "nightly",
+    "naming": null,
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "nightly.loom",
+    "variables": null,
+    "weaves": [
+      {
+        "condition": null,
+        "name": "",
+        "ref": "weaves/sales.weave"
+      },
+      {
+        "condition": null,
+        "name": "inline_ops",
+        "ref": null
+      }
+    ]
+  },
+  "threads": {
+    "inline_ops": {
+      "ops_audit": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "debug",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "ops_audit",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/ops_audit.thread",
+        "sources": {
+          "events": {
+            "alias": "raw.events",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": "ops.audit",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/ops_audit.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      },
+      "ops_summary": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "debug",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "ops_summary",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "ops_summary",
+        "sources": {
+          "audit": {
+            "alias": "ops.audit",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": "ops.audit_summary",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    },
+    "sales": {
+      "orders_east": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "debug",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "orders_east",
+        "params": {
+          "region": {
+            "default": null,
+            "description": "",
+            "name": "region",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/regional.thread",
+        "sources": {
+          "orders": {
+            "alias": "stg.orders",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "region = 'east'"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.orders_east",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/regional.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "orders_west": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "debug",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "orders_west",
+        "params": {
+          "region": {
+            "default": null,
+            "description": "",
+            "name": "region",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/regional.thread",
+        "sources": {
+          "orders": {
+            "alias": "stg.orders",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "region = 'west'"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.orders_west",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/regional.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "stg_orders": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "minimal",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "stg_orders",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/stg_orders.thread",
+        "sources": {
+          "orders": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {
+              "header": true
+            },
+            "path": "<root>/data/orders.csv",
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "order_id is not null"
+            }
+          },
+          {
+            "filter": {
+              "expr": "customer_id is not null"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "stg.orders",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/stg_orders.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      }
+    }
+  },
+  "weaves": {
+    "inline_ops": {
+      "audit_templates": null,
+      "column_sets": null,
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": {
+        "audit_table": "ops.audit"
+      },
+      "execution": null,
+      "lookups": null,
+      "name": "inline_ops",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "inline_ops",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "",
+          "params": null,
+          "ref": "threads/ops_audit.thread"
+        },
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": [
+            "ops_audit"
+          ],
+          "name": "ops_summary",
+          "params": null,
+          "ref": null
+        }
+      ],
+      "variables": null
+    },
+    "sales": {
+      "audit_templates": null,
+      "column_sets": null,
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": {
+        "write": {
+          "mode": "append"
+        }
+      },
+      "execution": null,
+      "lookups": null,
+      "name": "sales",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "weaves/sales.weave",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "",
+          "params": null,
+          "ref": "threads/stg_orders.thread"
+        },
+        {
+          "as_": "orders_east",
+          "condition": null,
+          "dependencies": null,
+          "name": "",
+          "params": {
+            "region": "east"
+          },
+          "ref": "threads/regional.thread"
+        },
+        {
+          "as_": "orders_west",
+          "condition": null,
+          "dependencies": [
+            "stg_orders"
+          ],
+          "name": "",
+          "params": {
+            "region": "west"
+          },
+          "ref": "threads/regional.thread"
+        }
+      ],
+      "variables": null
+    }
+  }
+}
