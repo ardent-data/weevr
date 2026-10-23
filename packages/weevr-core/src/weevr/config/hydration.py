@@ -155,6 +155,7 @@ def hydrate_children(
         weave's hydrated threads by weave name. Both are empty for a thread.
 
     Raises:
+        ConfigError: If two weave entries in a loom resolve to the same name.
         ModelValidationError: If any child fails model validation. The error
             names the child's own file, or the enclosing file for inline
             definitions.
