@@ -8,8 +8,9 @@ from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
+from weevr import Context
 from weevr.engine.executor import execute_thread
-from weevr.errors.exceptions import ExecutionError, StateError
+from weevr.errors.exceptions import ExecutionError, ModelValidationError, StateError
 from weevr.model.load import LoadConfig, WatermarkStoreConfig
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -359,3 +360,55 @@ class TestWatermarkTimestamp:
         assert result2.telemetry is not None
         assert result2.telemetry.watermark_first_run is False
         assert "2024-12-01" in (result2.telemetry.watermark_new_value or "")
+
+
+class TestWatermarkTypeRequiredEndToEnd:
+    """An incremental_watermark thread must declare its watermark type.
+
+    Without one the watermark filter was silently skipped, so every run
+    re-read the full source and append writes duplicated rows.
+    """
+
+    @staticmethod
+    def _project(tmp_path, spark: SparkSession, *, watermark_type: str | None):
+        source = str(tmp_path / "src")
+        target = tmp_path / "tgt"
+        create_delta_table(spark, source, [{"id": 1, "ts": 1}, {"id": 2, "ts": 2}])
+        type_line = f"  watermark_type: {watermark_type}\n" if watermark_type else ""
+        project = tmp_path / "wm.weevr"
+        project.mkdir()
+        thread = project / "t.thread"
+        thread.write_text(
+            'config_version: "1.0"\n'
+            f'sources:\n  s:\n    type: delta\n    alias: "{source}"\n'
+            f'target:\n  path: "{target}"\n'
+            "load:\n  mode: incremental_watermark\n  watermark_column: ts\n"
+            + type_line
+            + "write:\n  mode: append\n"
+        )
+        return project, thread, target
+
+    def test_reruns_over_unchanged_source_do_not_duplicate(
+        self, spark: SparkSession, tmp_path
+    ) -> None:
+        """Three runs over an unchanged source leave the target at the source count."""
+        project, _, target = self._project(tmp_path, spark, watermark_type="int")
+        ctx = Context(spark=spark, project=str(project))
+        counts = []
+        for _ in range(3):
+            result = ctx.run("t.thread")
+            assert result.status == "success"
+            counts.append(spark.read.format("delta").load(str(target)).count())
+        assert counts == [2, 2, 2]
+
+    @pytest.mark.parametrize("mode", ["execute", "validate"])
+    def test_missing_watermark_type_is_rejected_before_reading(
+        self, spark: SparkSession, tmp_path, mode: str
+    ) -> None:
+        """Without a type the thread is rejected at load and the target is never written."""
+        project, thread, target = self._project(tmp_path, spark, watermark_type=None)
+        ctx = Context(spark=spark, project=str(project))
+        with pytest.raises(ModelValidationError, match="watermark_type") as exc_info:
+            ctx.run("t.thread", mode=mode)
+        assert exc_info.value.file_path == str(thread)
+        assert not target.exists()
