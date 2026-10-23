@@ -2338,6 +2338,9 @@ class TestLoomResourceLifecycle:
         assert pre_cached is not None
         assert "ref" in pre_cached
         assert pre_cached["ref"] is mock_df
+        # Definitions travel separately: visible to threads, not re-materialized
+        assert set(call_kwargs["inherited_lookups"]) == {"ref"}
+        assert call_kwargs["lookups"] is None
 
     @patch("weevr.engine.runner.execute_thread")
     @patch("weevr.engine.runner.cleanup_lookups")

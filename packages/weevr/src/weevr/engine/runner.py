@@ -106,6 +106,7 @@ def execute_weave(
     pre_lookup_meta: dict[str, LookupMeta] | None = None,
     pre_resolved_column_sets: dict[str, dict[str, str]] | None = None,
     pre_column_set_results: list[ColumnSetResult] | None = None,
+    inherited_lookups: dict[str, Lookup] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -165,6 +166,10 @@ def execute_weave(
             re-resolves them). Merged under weave-level resolutions.
         pre_column_set_results: Resolution results for the pre-resolved
             sets, carried into weave telemetry for value parity.
+        inherited_lookups: Lookup definitions from the parent scope (the
+            loom), visible to this weave's threads under the weave's own
+            (weave wins on a name clash). Not materialized or scheduled here —
+            the parent materialized them into ``pre_cached_lookups``.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -209,6 +214,26 @@ def execute_weave(
     # name is still released.
     parent_seeded: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
     cached_lookup_dfs: dict[str, Any] = dict(parent_seeded)
+    # What threads see: parent definitions under the weave's own (weave wins).
+    thread_lookup_defs = (
+        merge_resource_dicts(inherited_lookups, lookups, "lookup", "loom", "weave")
+        if inherited_lookups
+        else lookups
+    )
+
+    def _thread_frames() -> dict[str, Any] | None:
+        """Cached frames for threads, minus parent frames a weave lookup shadows.
+
+        A weave lookup that isn't materialized (or isn't yet) must not be
+        served the parent's frame of the same name.
+        """
+        frames = {
+            name: df
+            for name, df in cached_lookup_dfs.items()
+            if not (name in (lookups or {}) and df is parent_seeded.get(name))
+        }
+        return frames or None
+
     all_hook_results: list[HookResult] = []
     all_lookup_results: list[LookupResult] = []
 
@@ -430,7 +455,7 @@ def execute_weave(
                                 threads[name],
                                 collector=tc,
                                 parent_span_id=weave_span_id,
-                                cached_lookups=cached_lookup_dfs or None,
+                                cached_lookups=_thread_frames(),
                                 lookup_meta=build_lookup_meta(
                                     all_lookup_results, base=pre_lookup_meta
                                 )
@@ -440,7 +465,7 @@ def execute_weave(
                                 ),
                                 cache_registry=cache,
                                 uk_memo=uk_memo,
-                                weave_lookups=lookups,
+                                weave_lookups=thread_lookup_defs,
                                 resolved_params=params,
                                 loom_name=loom_name,
                                 weave_name=weave_name,
@@ -455,7 +480,7 @@ def execute_weave(
                                 execute_thread,
                                 spark,
                                 threads[name],
-                                cached_lookups=cached_lookup_dfs or None,
+                                cached_lookups=_thread_frames(),
                                 lookup_meta=build_lookup_meta(
                                     all_lookup_results, base=pre_lookup_meta
                                 )
@@ -465,7 +490,7 @@ def execute_weave(
                                 ),
                                 cache_registry=cache,
                                 uk_memo=uk_memo,
-                                weave_lookups=lookups,
+                                weave_lookups=thread_lookup_defs,
                                 resolved_params=params,
                                 loom_name=loom_name,
                                 weave_name=weave_name,
@@ -897,6 +922,7 @@ def execute_loom(
                     ]
                     or None,
                     pre_cached_lookups=loom_cached_lookup_dfs or None,
+                    inherited_lookups=dict(loom.lookups) if loom.lookups else None,
                     connections=merged_connections or None,
                     execution=effective_execution,
                 )

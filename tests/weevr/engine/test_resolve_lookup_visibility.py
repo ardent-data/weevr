@@ -250,3 +250,81 @@ class TestProducerOrdering:
         )
         assert project.run("w.weave") == ("success", [])
         assert project.resolved() == {"a": 1, "b": 2}
+
+
+def _loom(project: Project, lookups: dict[str, Any], weaves: list[str]) -> None:
+    project.write("l.loom", {"lookups": lookups, "weaves": [{"ref": w} for w in weaves]})
+
+
+class TestLoomLookups:
+    """Threads can use loom lookups, bound or by name; narrower scopes win."""
+
+    @pytest.mark.parametrize("materialize", [False, True])
+    def test_bound_source_to_loom_lookup(self, project: Project, materialize: bool) -> None:
+        project.thread(
+            project.src,
+            [{"resolve": {**RESOLVE, "lookup": "fk_dim"}}],
+            sources={"fk_dim": {"lookup": "dim_codes"}},
+        )
+        _weave(project)
+        _loom(
+            project,
+            {"dim_codes": project.lookup(project.dim, materialize=materialize)},
+            ["w.weave"],
+        )
+        assert project.run("l.loom") == ("success", [])
+        assert project.resolved() == {"a": 1, "b": 2}
+
+    @pytest.mark.parametrize("materialize", [False, True])
+    def test_loom_lookup_by_name(self, project: Project, materialize: bool) -> None:
+        project.thread(project.src, [{"resolve": RESOLVE}])
+        _weave(project)
+        _loom(
+            project,
+            {"dim_codes": project.lookup(project.dim, materialize=materialize)},
+            ["w.weave"],
+        )
+        assert project.run("l.loom") == ("success", [])
+        assert project.resolved() == {"a": 1, "b": 2}
+
+    def test_materialized_loom_lookup_read_once(
+        self, project: Project, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        reads: list[str] = []
+
+        def counting_read(spark: Any, name: str, *args: Any, **kwargs: Any) -> Any:
+            reads.append(name)
+            return read_source(spark, name, *args, **kwargs)
+
+        monkeypatch.setattr("weevr.engine.lookups.read_source", counting_read)
+        project.thread(project.src, [{"resolve": RESOLVE}])
+        _weave(project)
+        project.write("w2.weave", {"threads": [{"ref": "fact.thread"}]})
+        _loom(
+            project,
+            {"dim_codes": project.lookup(project.dim, materialize=True)},
+            ["w.weave", "w2.weave"],
+        )
+        assert project.run("l.loom") == ("success", [])
+        assert reads.count("dim_codes") == 1
+
+    def test_weave_lookup_shadows_loom_lookup(self, project: Project) -> None:
+        weave_dim = project.table("weave_dim", [("a", 10), ("b", 20)], ["code", "sk"])
+        project.thread(project.src, [{"resolve": RESOLVE}])
+        _weave(project, {"dim_codes": project.lookup(weave_dim)})
+        _loom(project, {"dim_codes": project.lookup(project.dim, materialize=True)}, ["w.weave"])
+        assert project.run("l.loom") == ("success", [])
+        assert project.resolved() == {"a": 10, "b": 20}
+
+    def test_thread_lookup_shadows_weave_and_loom(self, project: Project) -> None:
+        weave_dim = project.table("weave_dim", [("a", 10), ("b", 20)], ["code", "sk"])
+        thread_dim = project.table("thread_dim", [("a", 100), ("b", 200)], ["code", "sk"])
+        project.thread(
+            project.src,
+            [{"resolve": RESOLVE}],
+            lookups={"dim_codes": project.lookup(thread_dim)},
+        )
+        _weave(project, {"dim_codes": project.lookup(weave_dim, materialize=True)})
+        _loom(project, {"dim_codes": project.lookup(project.dim, materialize=True)}, ["w.weave"])
+        assert project.run("l.loom") == ("success", [])
+        assert project.resolved() == {"a": 100, "b": 200}

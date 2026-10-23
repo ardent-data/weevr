@@ -231,6 +231,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             if cached_lookups:
                 all_cached.update(cached_lookups)
             all_cached.update(thread_cached_lookups)  # thread wins
+            # A thread lookup that isn't materialized must not be served an
+            # inherited frame of the same name
+            for name in thread.lookups:
+                if name not in thread_cached_lookups:
+                    all_cached.pop(name, None)
             effective_cached_lookups = all_cached or None
             # Thread-scoped materialization facts join the inherited map so
             # resolve steps can reuse unique-key outcomes at every scope
