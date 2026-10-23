@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.2](https://github.com/ardent-data/weevr/compare/weevr-v1.19.1...weevr-v1.19.2) (2026-10-23)
+
+
+### Bug Fixes
+
+* **model:** require watermark_type for incremental_watermark loads ([#240](https://github.com/ardent-data/weevr/issues/240)) ([e8117b3](https://github.com/ardent-data/weevr/commit/e8117b30b94a93bd510ce9bd02517542c80c0211))
+
 ## [1.19.1](https://github.com/ardent-data/weevr/compare/weevr-v1.19.0...weevr-v1.19.1) (2026-10-22)
 
 
