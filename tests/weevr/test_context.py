@@ -159,8 +159,8 @@ class TestRemoteConfigPathRegression:
         assert "abfss://" in str(resolved)
         assert str(resolved) == self.URI_PROJECT + "/silver.loom"
 
-    def test_load_resolved_routes_through_remote_location(self, tmp_path: Path) -> None:
-        """Tier 2 _load_resolved feeds parse_yaml a RemoteConfigLocation, not a Path.
+    def test_load_routes_through_remote_location(self, tmp_path: Path) -> None:
+        """Tier 2 Context.load feeds parse_yaml a RemoteConfigLocation, not a Path.
 
         We patch ``RemoteConfigLocation.read_text`` to return a minimal loom
         YAML and assert the pipeline walks to the qualified-key step
@@ -182,7 +182,7 @@ class TestRemoteConfigPathRegression:
             patch.object(RemoteConfigLocation, "read_text", return_value=loom_yaml),
             patch.object(RemoteConfigLocation, "exists", return_value=True),
         ):
-            resolved = ctx._load_resolved("silver.loom")
+            resolved = ctx.load("silver.loom")
 
         assert resolved.config_type == "loom"
         assert resolved.config_name == "silver"
@@ -214,7 +214,7 @@ class TestRunErrorHandling:
         ctx = Context(spark=mock_spark, project=str(project_dir))
 
         with (
-            patch.object(ctx, "_load_resolved") as mock_load,
+            patch.object(ctx, "_load") as mock_load,
             patch.object(ctx, "_run_execute", side_effect=ExecutionError("Spark write failed")),
         ):
             mock_load.return_value = MagicMock(config_type="thread", config_name="dim_test")
@@ -543,7 +543,7 @@ class TestContextLoadChildForeach:
                 "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
             },
         )
-        thread = self._ctx(project)._load_resolved("w.weave").threads["w"]["fe"]
+        thread = self._ctx(project).load("w.weave").resolved_threads["w"]["fe"]
         assert self._filter_exprs(thread) == ["a > 0", "b > 0"]
 
     def test_loom_expands_referenced_thread_foreach(self, tmp_path: Path) -> None:
@@ -556,8 +556,8 @@ class TestContextLoadChildForeach:
                 "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
             },
         )
-        resolved = self._ctx(project)._load_resolved("top.loom")
-        assert self._filter_exprs(resolved.threads["w"]["fe"]) == ["a > 0", "b > 0"]
+        resolved = self._ctx(project).load("top.loom")
+        assert self._filter_exprs(resolved.resolved_threads["w"]["fe"]) == ["a > 0", "b > 0"]
 
     def test_foreach_values_from_entry_params(self, tmp_path: Path) -> None:
         """foreach values supplied through a weave entry's params expand."""
@@ -570,8 +570,12 @@ class TestContextLoadChildForeach:
                 "    params:\n      cols: [x, y, z]\n",
             },
         )
-        resolved = self._ctx(project)._load_resolved("w.weave")
-        assert self._filter_exprs(resolved.threads["w"]["fe"]) == ["x > 0", "y > 0", "z > 0"]
+        resolved = self._ctx(project).load("w.weave")
+        assert self._filter_exprs(resolved.resolved_threads["w"]["fe"]) == [
+            "x > 0",
+            "y > 0",
+            "z > 0",
+        ]
 
     def test_malformed_foreach_in_referenced_thread_names_thread(self, tmp_path: Path) -> None:
         """A bad foreach block in a referenced thread names that thread."""
@@ -596,9 +600,9 @@ class TestContextLoadChildForeach:
             },
         )
         ctx = self._ctx(project)
-        direct = ctx._load_resolved("fe.thread").model
+        direct = ctx.load("fe.thread").model
         assert isinstance(direct, Thread)
-        via_weave = ctx._load_resolved("w.weave").threads["w"]["fe"]
+        via_weave = ctx.load("w.weave").resolved_threads["w"]["fe"]
         assert via_weave.steps == direct.steps
 
 
@@ -659,14 +663,14 @@ target:
     def test_inline_weave_threads_hydrate(self, tmp_path: Path) -> None:
         """Both the referenced and the inline thread come back hydrated."""
         loaded = self._load(tmp_path)
-        threads = loaded._threads["inline_ops"]
+        threads = loaded.resolved_threads["inline_ops"]
         assert set(threads) == {"orders_east", "ops_audit"}
         assert threads["orders_east"].target.alias == "gold.orders_east"
 
     def test_loom_defaults_cascade_into_inline_weave(self, tmp_path: Path) -> None:
         """Loom defaults reach threads of an inline weave."""
         loaded = self._load(tmp_path)
-        assert loaded._threads["inline_ops"]["ops_audit"].write.mode == "append"
+        assert loaded.resolved_threads["inline_ops"]["ops_audit"].write.mode == "append"
 
     def test_inline_weave_keeps_entry_condition(self, tmp_path: Path) -> None:
         """The weave entry's condition is preserved on the loom model."""
@@ -688,7 +692,7 @@ target:
         project.mkdir()
         (project / "x.loom").write_text(loom)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
-        return ctx.load("x.loom")._threads["inline_ops"]["ops_audit"]
+        return ctx.load("x.loom").resolved_threads["inline_ops"]["ops_audit"]
 
     def test_inline_weave_defaults_resolve_variables(self, tmp_path: Path) -> None:
         """The inline weave's own defaults resolve ${var}; loom defaults still reach it."""

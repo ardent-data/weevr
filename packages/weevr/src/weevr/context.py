@@ -5,38 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from pyspark.sql import SparkSession
 
-from weevr.config.attribution import attribute_errors
-from weevr.config.hydration import hydrate_children, hydrate_model
-from weevr.config.inheritance import apply_inheritance
-from weevr.config.loader import (
-    collect_execution_warnings,
-    compute_qualified_key,
-    resolve_source_paths,
-)
+from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
-from weevr.config.macros import expand_foreach
-from weevr.config.parser import (
-    detect_config_type_from_extension,
-    extract_config_version,
-    parse_yaml,
-    validate_config_version,
-)
-from weevr.config.resolver import (
-    resolve_config_variables,
-    resolve_declared_params,
-    resolve_references,
-    validate_params,
-)
-from weevr.config.validation import (
-    collect_trace_composition_warnings,
-    validate_schema,
-)
 from weevr.delta import delta_table_exists
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
@@ -45,7 +20,6 @@ from weevr.errors import (
     ConfigError,
     DataValidationError,
     ExecutionError,
-    VariableResolutionError,
 )
 from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.loom import Loom
@@ -55,17 +29,6 @@ from weevr.result import ExecutionMode, LoadedConfig, PreviewThreadMetadata, Run
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class _ResolvedConfig:
-    """Intermediate container for resolved config data."""
-
-    config_type: str
-    config_name: str
-    model: Thread | Weave | Loom
-    weaves: dict[str, Weave] = field(default_factory=dict)
-    threads: dict[str, dict[str, Thread]] = field(default_factory=dict)
 
 
 class Context:
@@ -145,7 +108,7 @@ class Context:
             :class:`RemoteConfigLocation` bound to ``self._spark``.
 
         Raises:
-            ConfigError: If the project cannot be resolved.
+            ConfigError: If the project cannot be loaded.
         """
         project_str = str(project)
 
@@ -226,17 +189,11 @@ class Context:
         Returns:
             A :class:`LoadedConfig` wrapping the hydrated model.
         """
-        resolved = self._load_resolved(path)
-        self._apply_effective_log_level(resolved)
-        return LoadedConfig(
-            model=resolved.model,
-            config_type=resolved.config_type,
-            config_name=resolved.config_name,
-            threads=resolved.threads or None,
-            weaves=resolved.weaves or None,
-        )
+        loaded = self._load(path)
+        self._apply_effective_log_level(loaded)
+        return loaded
 
-    def _apply_effective_log_level(self, resolved: _ResolvedConfig) -> None:
+    def _apply_effective_log_level(self, loaded: LoadedConfig) -> None:
         """Apply the effective YAML log level.
 
         No-op when an explicit ``Context(log_level=...)`` argument is in
@@ -247,8 +204,8 @@ class Context:
         if self._explicit_log_level:
             return
         block = None
-        if resolved.config_type in ("loom", "weave"):
-            block = getattr(resolved.model, "execution", None)
+        if loaded.config_type in ("loom", "weave"):
+            block = getattr(loaded.model, "execution", None)
         effective = resolve_effective_execution(None, block).log_level
         if effective != self._log_level:
             self._log_level = effective
@@ -290,30 +247,30 @@ class Context:
             raise ValueError("'tags' and 'threads' are mutually exclusive")
 
         start_ns = time.monotonic_ns()
-        resolved = self._load_resolved(path)
+        loaded = self._load(path)
 
         # Single application point for the effective YAML log level —
         # before mode dispatch, so all four modes behave identically.
-        self._apply_effective_log_level(resolved)
+        self._apply_effective_log_level(loaded)
 
         try:
             if resolved_mode is ExecutionMode.EXECUTE:
-                result = self._run_execute(resolved, tags=tags, thread_names=threads)
+                result = self._run_execute(loaded, tags=tags, thread_names=threads)
             elif resolved_mode is ExecutionMode.VALIDATE:
-                result = self._run_validate(resolved)
+                result = self._run_validate(loaded)
             elif resolved_mode is ExecutionMode.PLAN:
-                result = self._run_plan(resolved, tags=tags, thread_names=threads)
+                result = self._run_plan(loaded, tags=tags, thread_names=threads)
             else:
                 result = self._run_preview(
-                    resolved, tags=tags, thread_names=threads, sample_rows=sample_rows
+                    loaded, tags=tags, thread_names=threads, sample_rows=sample_rows
                 )
         except (ExecutionError, DataValidationError) as exc:
             duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
             return RunResult(
                 status="failure",
                 mode=resolved_mode,
-                config_type=resolved.config_type,
-                config_name=resolved.config_name,
+                config_type=loaded.config_type,
+                config_name=loaded.config_name,
                 duration_ms=duration_ms,
                 warnings=[str(exc)],
             )
@@ -327,14 +284,14 @@ class Context:
 
     def _run_execute(
         self,
-        resolved: _ResolvedConfig,
+        loaded: LoadedConfig,
         *,
         tags: list[str] | None = None,
         thread_names: list[str] | None = None,
     ) -> RunResult:
         """Execute a resolved config and wrap the result."""
-        if resolved.config_type == "thread":
-            model = resolved.model
+        if loaded.config_type == "thread":
+            model = loaded.model
             if not isinstance(model, Thread):
                 raise TypeError(f"Expected Thread, got {type(model).__name__}")
             from weevr.telemetry.collector import SpanCollector
@@ -356,19 +313,19 @@ class Context:
                 status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="thread",
-                config_name=resolved.config_name,
+                config_name=loaded.config_name,
                 detail=engine_result,
                 telemetry=engine_result.telemetry,
                 warnings=self._collect_thread_warnings(engine_result),
             )
-            result._resolved_threads = {resolved.config_name: model}
+            result._resolved_threads = {loaded.config_name: model}
             return result
 
-        if resolved.config_type == "weave":
-            model = resolved.model
+        if loaded.config_type == "weave":
+            model = loaded.model
             if not isinstance(model, Weave):
                 raise TypeError(f"Expected Weave, got {type(model).__name__}")
-            weave_threads = resolved.threads.get(resolved.config_name, {})
+            weave_threads = loaded.resolved_threads.get(loaded.config_name, {})
             weave_threads, warnings = self._filter_threads(
                 weave_threads, tags=tags, thread_names=thread_names
             )
@@ -378,14 +335,14 @@ class Context:
                     status="success",
                     mode=ExecutionMode.EXECUTE,
                     config_type="weave",
-                    config_name=resolved.config_name,
+                    config_name=loaded.config_name,
                     warnings=warnings,
                 )
 
             filtered_entries = [e for e in model.threads if e.name in weave_threads]
             weave_lookups = dict(model.lookups) if model.lookups else None
             plan = build_plan(
-                weave_name=resolved.config_name,
+                weave_name=loaded.config_name,
                 threads=weave_threads,
                 thread_entries=filtered_entries,
                 lookups=weave_lookups,
@@ -430,7 +387,7 @@ class Context:
                 status=engine_result.status,  # type: ignore[arg-type]
                 mode=ExecutionMode.EXECUTE,
                 config_type="weave",
-                config_name=resolved.config_name,
+                config_name=loaded.config_name,
                 detail=engine_result,
                 telemetry=engine_result.telemetry,
                 warnings=warnings + self._collect_thread_warnings(engine_result),
@@ -439,7 +396,7 @@ class Context:
             return result
 
         # loom
-        model = resolved.model
+        model = loaded.model
         if not isinstance(model, Loom):
             raise TypeError(f"Expected Loom, got {type(model).__name__}")
         all_warnings: list[str] = []
@@ -448,10 +405,10 @@ class Context:
         filtered_threads: dict[str, dict[str, Thread]] = {}
         for weave_entry in model.weaves:
             weave_name = weave_entry.effective_name
-            weave = resolved.weaves.get(weave_name)
+            weave = loaded.resolved_weaves.get(weave_name)
             if weave is None:
                 continue
-            wt = resolved.threads.get(weave_name, {})
+            wt = loaded.resolved_threads.get(weave_name, {})
             wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
             all_warnings.extend(warnings)
             if wt:
@@ -463,7 +420,7 @@ class Context:
                 status="success",
                 mode=ExecutionMode.EXECUTE,
                 config_type="loom",
-                config_name=resolved.config_name,
+                config_name=loaded.config_name,
                 warnings=all_warnings,
             )
 
@@ -482,7 +439,7 @@ class Context:
             status=engine_result.status,
             mode=ExecutionMode.EXECUTE,
             config_type="loom",
-            config_name=resolved.config_name,
+            config_name=loaded.config_name,
             detail=engine_result,
             telemetry=engine_result.telemetry,
             warnings=all_warnings + self._collect_thread_warnings(engine_result),
@@ -555,18 +512,18 @@ class Context:
     # Validate mode
     # ------------------------------------------------------------------
 
-    def _run_validate(self, resolved: _ResolvedConfig) -> RunResult:
+    def _run_validate(self, loaded: LoadedConfig) -> RunResult:
         """Validate config, DAG, and source existence without executing."""
         validation_errors: list[str] = []
 
-        if resolved.config_type == "weave":
-            model = resolved.model
+        if loaded.config_type == "weave":
+            model = loaded.model
             if not isinstance(model, Weave):
                 raise TypeError(f"Expected Weave, got {type(model).__name__}")
-            wt = resolved.threads.get(resolved.config_name, {})
+            wt = loaded.resolved_threads.get(loaded.config_name, {})
             try:
                 build_plan(
-                    weave_name=resolved.config_name,
+                    weave_name=loaded.config_name,
                     threads=wt,
                     thread_entries=list(model.threads),
                     lookups=dict(model.lookups) if model.lookups else None,
@@ -574,17 +531,17 @@ class Context:
             except Exception as exc:
                 validation_errors.append(f"DAG validation failed: {exc}")
 
-        elif resolved.config_type == "loom":
-            model = resolved.model
+        elif loaded.config_type == "loom":
+            model = loaded.model
             if not isinstance(model, Loom):
                 raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
                 weave_name = weave_entry.effective_name
-                weave = resolved.weaves.get(weave_name)
+                weave = loaded.resolved_weaves.get(weave_name)
                 if weave is None:
                     validation_errors.append(f"Weave '{weave_name}' not found")
                     continue
-                wt = resolved.threads.get(weave_name, {})
+                wt = loaded.resolved_threads.get(weave_name, {})
                 try:
                     build_plan(
                         weave_name=weave_name,
@@ -597,7 +554,7 @@ class Context:
                         f"DAG validation failed for weave '{weave_name}': {exc}"
                     )
 
-        all_threads = self._collect_all_threads(resolved)
+        all_threads = self._collect_all_threads(loaded)
         source_errors = self._check_source_existence(all_threads)
         validation_errors.extend(source_errors)
 
@@ -605,8 +562,8 @@ class Context:
         return RunResult(
             status=status,
             mode=ExecutionMode.VALIDATE,
-            config_type=resolved.config_type,
-            config_name=resolved.config_name,
+            config_type=loaded.config_type,
+            config_name=loaded.config_name,
             validation_errors=validation_errors if validation_errors else None,
         )
 
@@ -660,16 +617,16 @@ class Context:
             return False
 
     @staticmethod
-    def _collect_all_threads(resolved: _ResolvedConfig) -> dict[str, Thread]:
+    def _collect_all_threads(loaded: LoadedConfig) -> dict[str, Thread]:
         """Flatten all threads from a resolved config into a single dict."""
-        if resolved.config_type == "thread":
-            model = resolved.model
+        if loaded.config_type == "thread":
+            model = loaded.model
             if not isinstance(model, Thread):
                 raise TypeError(f"Expected Thread, got {type(model).__name__}")
-            return {resolved.config_name: model}
+            return {loaded.config_name: model}
 
         result: dict[str, Thread] = {}
-        for thread_map in resolved.threads.values():
+        for thread_map in loaded.resolved_threads.values():
             result.update(thread_map)
         return result
 
@@ -679,7 +636,7 @@ class Context:
 
     def _run_plan(
         self,
-        resolved: _ResolvedConfig,
+        loaded: LoadedConfig,
         *,
         tags: list[str] | None = None,
         thread_names: list[str] | None = None,
@@ -688,43 +645,43 @@ class Context:
         plans: list[Any] = []
         all_warnings: list[str] = []
 
-        if resolved.config_type == "thread":
+        if loaded.config_type == "thread":
             return RunResult(
                 status="success",
                 mode=ExecutionMode.PLAN,
                 config_type="thread",
-                config_name=resolved.config_name,
+                config_name=loaded.config_name,
                 execution_plan=None,
             )
 
-        if resolved.config_type == "weave":
-            model = resolved.model
+        if loaded.config_type == "weave":
+            model = loaded.model
             if not isinstance(model, Weave):
                 raise TypeError(f"Expected Weave, got {type(model).__name__}")
-            wt = resolved.threads.get(resolved.config_name, {})
+            wt = loaded.resolved_threads.get(loaded.config_name, {})
             wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
             all_warnings.extend(warnings)
             if wt:
                 filtered_entries = [e for e in model.threads if e.name in wt]
                 plans.append(
                     build_plan(
-                        weave_name=resolved.config_name,
+                        weave_name=loaded.config_name,
                         threads=wt,
                         thread_entries=filtered_entries,
                         lookups=dict(model.lookups) if model.lookups else None,
                     )
                 )
 
-        elif resolved.config_type == "loom":
-            model = resolved.model
+        elif loaded.config_type == "loom":
+            model = loaded.model
             if not isinstance(model, Loom):
                 raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
                 weave_name = weave_entry.effective_name
-                weave = resolved.weaves.get(weave_name)
+                weave = loaded.resolved_weaves.get(weave_name)
                 if weave is None:
                     continue
-                wt = resolved.threads.get(weave_name, {})
+                wt = loaded.resolved_threads.get(weave_name, {})
                 wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
                 all_warnings.extend(warnings)
                 if wt:
@@ -741,19 +698,19 @@ class Context:
         result = RunResult(
             status="success",
             mode=ExecutionMode.PLAN,
-            config_type=resolved.config_type,
-            config_name=resolved.config_name,
+            config_type=loaded.config_type,
+            config_name=loaded.config_name,
             execution_plan=plans if plans else None,
             warnings=all_warnings,
         )
 
         # Populate resolved threads for explain() thread detail
-        if resolved.config_type == "weave":
-            wt = resolved.threads.get(resolved.config_name, {})
+        if loaded.config_type == "weave":
+            wt = loaded.resolved_threads.get(loaded.config_name, {})
             result._resolved_threads = dict(wt)
-        elif resolved.config_type == "loom":
+        elif loaded.config_type == "loom":
             merged: dict[str, Any] = {}
-            for thread_map in resolved.threads.values():
+            for thread_map in loaded.resolved_threads.values():
                 merged.update(thread_map)
             result._resolved_threads = merged
 
@@ -765,7 +722,7 @@ class Context:
 
     def _run_preview(
         self,
-        resolved: _ResolvedConfig,
+        loaded: LoadedConfig,
         *,
         tags: list[str] | None = None,
         thread_names: list[str] | None = None,
@@ -780,7 +737,7 @@ class Context:
         from weevr.operations.validation import validate_dataframe
         from weevr.operations.writers import apply_target_mapping
 
-        all_threads = self._collect_all_threads(resolved)
+        all_threads = self._collect_all_threads(loaded)
         all_threads, warnings = self._filter_threads(
             all_threads, tags=tags, thread_names=thread_names
         )
@@ -861,8 +818,8 @@ class Context:
         result = RunResult(
             status=status,
             mode=ExecutionMode.PREVIEW,
-            config_type=resolved.config_type,
-            config_name=resolved.config_name,
+            config_type=loaded.config_type,
+            config_name=loaded.config_name,
             preview_data=preview_data if preview_data else None,
             warnings=warnings + errors,
         )
@@ -892,167 +849,29 @@ class Context:
             return LocalConfigLocation(p)
         return self._project_root.join(str(path))
 
-    def _load_resolved(self, path: str | Path) -> _ResolvedConfig:
-        """Run the config pipeline and return the hydrated model with children.
+    def _load(self, path: str | Path) -> LoadedConfig:
+        """Load a config through the shared loader, injecting this context's inputs.
 
-        Replicates the ``load_config`` pipeline but keeps the hydrated child
-        weaves and threads, which ``load_config`` validates and discards.
-
-        Note: Parsing, resolution, and the inheritance cascade are still
-        duplicated from ``load_config``; changes there must be mirrored here.
-        Child hydration is shared through ``weevr.config.hydration``. A future
-        refactor should extract a shared ``_resolve_config_to_dict`` function.
+        Resolves *path* against the project root and passes the context's
+        params and Fabric context to :func:`weevr.config.loader.load_resolved_config`
+        — the same load ``load_config`` and ``load_resolved`` run. Load warnings
+        are logged here.
         """
-        file_path = self._resolve_config_path(path)
-        with attribute_errors(file_path):
-            return self._resolve_and_hydrate(file_path)
-
-    def _resolve_and_hydrate(self, file_path: ConfigLocation) -> _ResolvedConfig:
-        """Run the ``_load_resolved`` pipeline for one resolved location."""
-        project_root = self._project_root
-
-        # Steps 1-3: Parse, version, type
-        raw = parse_yaml(file_path)
-        version = extract_config_version(raw)
-
-        ext_type = detect_config_type_from_extension(file_path)
-        if ext_type is None:
-            raise ConfigError(
-                f"Unsupported extension '{file_path.suffix}'. Expected .thread, .weave, or .loom",
-                file_path=str(file_path),
-            )
-        config_type = ext_type
-        validate_config_version(version, config_type)
-
-        # Step 4: Schema validation
-        validated = validate_schema(raw, config_type)
-        config_dict = validated.model_dump(exclude_unset=True)
-
-        # Step 5: Parameter context (with optional Fabric runtime context)
         from weevr.config.fabric import build_fabric_context
 
-        fabric_ctx = build_fabric_context(self._spark)
-        declared_param_specs = config_dict.get("params")
-        resolved_declared_params = resolve_declared_params(
-            declared_param_specs,
-            self._params,
-            file_path=str(file_path),
+        hydrated = load_resolved_config(
+            self._resolve_config_path(path),
+            runtime_params=self._params,
+            project_root=self._project_root,
+            fabric_context=build_fabric_context(self._spark),
         )
-        # Type validation only — required-missing already raised above.
-        validate_params(declared_param_specs, resolved_declared_params)
-
-        # Step 6: Variable resolution
-        try:
-            resolved = resolve_config_variables(
-                config_dict,
-                config_type,
-                self._params,
-                fabric_context=fabric_ctx,
-                entry_params=resolved_declared_params or None,
-            )
-        except VariableResolutionError as exc:
-            if config_type == "thread" and "param." in str(exc):
-                raise VariableResolutionError(
-                    f"{exc}. This thread may be a template designed for "
-                    f"use with 'as' and 'params' on a ThreadEntry in a weave.",
-                    config_key=getattr(exc, "config_key", None),
-                ) from exc
-            raise
-
-        # Step 7: Resolve child references
-        resolved_with_refs = resolve_references(resolved, config_type, project_root, self._params)
-
-        # Step 8: Apply inheritance cascade. Execution-scope warnings are
-        # collected first, against the PRE-cascade thread dicts — after the
-        # cascade an authored execution block is indistinguishable from one
-        # injected by defaults.execution.
-        execution_warnings = collect_execution_warnings(config_type, resolved_with_refs)
-
-        if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
-            loom_defaults = resolved_with_refs.get("defaults")
-            loom_audit_templates = resolved_with_refs.get("audit_templates")
-            loom_connections = resolved_with_refs.get("connections")
-            for weave in resolved_with_refs["_resolved_weaves"]:
-                if "_resolved_threads" in weave:
-                    weave_defaults = weave.get("defaults")
-                    weave_audit_templates = weave.get("audit_templates")
-                    weave_connections = weave.get("connections")
-                    for i, thread in enumerate(weave["_resolved_threads"]):
-                        merged = apply_inheritance(
-                            loom_defaults,
-                            weave_defaults,
-                            thread,
-                            loom_audit_templates=loom_audit_templates,
-                            weave_audit_templates=weave_audit_templates,
-                            loom_connections=loom_connections,
-                            weave_connections=weave_connections,
-                        )
-                        weave["_resolved_threads"][i] = merged
-
-        elif config_type == "weave" and "_resolved_threads" in resolved_with_refs:
-            weave_defaults = resolved_with_refs.get("defaults")
-            weave_audit_templates = resolved_with_refs.get("audit_templates")
-            weave_connections = resolved_with_refs.get("connections")
-            for i, thread in enumerate(resolved_with_refs["_resolved_threads"]):
-                merged = apply_inheritance(
-                    None,
-                    weave_defaults,
-                    thread,
-                    weave_audit_templates=weave_audit_templates,
-                    weave_connections=weave_connections,
-                )
-                resolved_with_refs["_resolved_threads"][i] = merged
-
-        # Step 8b: Expand foreach macros in thread steps
-        if config_type == "thread" and isinstance(resolved_with_refs.get("steps"), list):
-            resolved_with_refs["steps"] = expand_foreach(resolved_with_refs["steps"])
-
-        # Derive config name from stem and inject
-        config_name = file_path.stem
-        declared_name = resolved_with_refs.get("name", "")
-        if declared_name and declared_name != config_name:
-            raise ConfigError(
-                f"Declared name '{declared_name}' does not match filename stem '{config_name}'",
-                file_path=str(file_path),
-            )
-        if not declared_name:
-            resolved_with_refs["name"] = config_name
-
-        # Compute qualified key for top-level config
-        resolved_with_refs["qualified_key"] = compute_qualified_key(file_path, project_root)
-
-        # Step 8c: Resolve relative source paths against project root
-        if config_type == "thread":
-            resolve_source_paths(resolved_with_refs, self._project_root)
-
-        # Step 9: Hydrate the top-level model and the children it pulls in
-        model = hydrate_model(resolved_with_refs, config_type, file_path)
-        project_root = self._project_root
-        weaves, threads = hydrate_children(
-            config_type,
-            resolved_with_refs,
-            file_path,
-            config_name,
-            prepare=lambda thread_dict: resolve_source_paths(thread_dict, project_root),
-        )
-
-        # Trace composition needs hydrated models (model_fields_set): a
-        # weave's explicit trace: true under a traceless loom is a no-op.
-        if config_type == "loom" and isinstance(model, Loom):
-            execution_warnings.extend(
-                collect_trace_composition_warnings(
-                    model.execution,
-                    {name: w.execution for name, w in weaves.items()},
-                )
-            )
-
-        for warning in execution_warnings:
+        for warning in hydrated.warnings:
             logger.warning(warning)
-
-        return _ResolvedConfig(
-            config_type=config_type,
-            config_name=config_name,
-            model=model,
-            weaves=weaves,
-            threads=threads,
+        return LoadedConfig(
+            model=hydrated.model,
+            config_type=hydrated.config_type,
+            config_name=hydrated.config_name,
+            threads=hydrated.threads or None,
+            weaves=hydrated.weaves or None,
+            warnings=hydrated.warnings,
         )

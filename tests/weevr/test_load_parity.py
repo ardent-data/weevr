@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 from pyspark.sql import SparkSession
 
+from weevr.config import load_resolved
 from weevr.context import Context
 
 FIXTURE_PROJECT = Path(__file__).parent / "fixtures" / "load_parity" / "parity.weevr"
@@ -42,11 +43,11 @@ def _snapshot(loaded: Any, root: Path) -> dict[str, Any]:
         "config_name": loaded.config_name,
         "model": loaded.model.model_dump(mode="json"),
         "weaves": {
-            name: weave.model_dump(mode="json") for name, weave in (loaded._weaves or {}).items()
+            name: weave.model_dump(mode="json") for name, weave in loaded.resolved_weaves.items()
         },
         "threads": {
             weave: {name: thread.model_dump(mode="json") for name, thread in threads.items()}
-            for weave, threads in (loaded._threads or {}).items()
+            for weave, threads in loaded.resolved_threads.items()
         },
         "execution_order": [plan.execution_order for plan in loaded.execution_plan or []],
     }
@@ -158,3 +159,52 @@ class TestValidateWording:
             "DAG validation failed for weave 'cyc': "
             "Circular dependency detected in weave 'cyc': a → b → a"
         ]
+
+
+class TestLoadResolvedMatchesContext:
+    """``load_resolved`` and ``Context.load`` return the same config."""
+
+    @pytest.mark.parametrize("config", PARITY_CONFIGS)
+    def test_same_snapshot(self, project: Path, config: str) -> None:
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        via_context = _snapshot(ctx.load(config), project)
+        direct = _snapshot(load_resolved(project / config, project_root=project), project)
+        assert direct == via_context
+
+    @pytest.mark.parametrize("config", PARITY_CONFIGS)
+    def test_same_warnings(self, project: Path, config: str) -> None:
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        direct = load_resolved(project / config, project_root=project)
+        assert ctx.load(config).warnings == direct.warnings
+
+
+_LOAD_STEPS = (
+    "parse_yaml",
+    "resolve_config_variables",
+    "resolve_variables",
+    "resolve_references",
+    "apply_inheritance",
+    "expand_foreach",
+    "hydrate_children",
+    "hydrate_model",
+)
+
+
+def test_context_has_no_load_steps_of_its_own() -> None:
+    """Context loads only through the shared loader — no step of its own."""
+    import weevr.context as context_module
+
+    source = Path(context_module.__file__).read_text()
+    assert [step for step in _LOAD_STEPS if f"{step}(" in source] == []
+    assert "_ResolvedConfig" not in source
+    assert "_resolve_and_hydrate" not in source
+
+
+def test_context_reads_children_through_resolved_properties() -> None:
+    """Context reads children via ``resolved_*``; ``.threads`` / ``.weaves`` proxy to the model."""
+    import re
+
+    import weevr.context as context_module
+
+    source = Path(context_module.__file__).read_text()
+    assert re.findall(r"\bloaded\.(?:threads|weaves)\b", source) == []
