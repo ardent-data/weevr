@@ -223,6 +223,22 @@ class TestWeaveEntry:
         assert entry.condition.when == "row_count('staging') > 0"
 
 
+class TestWeaveEntryEffectiveName:
+    """WeaveEntry.effective_name is the one rule for naming a loom's weave."""
+
+    def test_name_wins(self) -> None:
+        assert WeaveEntry(name="ops").effective_name == "ops"
+
+    def test_ref_stem_when_no_name(self) -> None:
+        assert WeaveEntry(ref="weaves/sales.weave").effective_name == "sales"
+
+    def test_name_wins_over_ref(self) -> None:
+        assert WeaveEntry(name="ops", ref="weaves/sales.weave").effective_name == "ops"
+
+    def test_empty_when_neither(self) -> None:
+        assert WeaveEntry().effective_name == ""
+
+
 class TestLoomConnectionsField:
     """Tests for the Loom.connections field."""
 

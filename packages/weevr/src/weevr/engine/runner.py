@@ -6,7 +6,6 @@ import logging
 import time
 from collections.abc import Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any, Literal
 
 from pyspark.sql import SparkSession
@@ -789,7 +788,7 @@ def execute_loom(
             )
 
         for weave_entry in loom.weaves:
-            weave_name = weave_entry.name or (Path(weave_entry.ref).stem if weave_entry.ref else "")
+            weave_name = weave_entry.effective_name
 
             # Evaluate weave-level condition. Deliberately memo-less:
             # each weave's condition runs once, with weave executions in

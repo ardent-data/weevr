@@ -1,0 +1,24 @@
+config_version: "1.0"
+
+defaults:
+  execution:
+    log_level: debug
+
+weaves:
+  - ref: weaves/sales.weave
+  - name: inline_ops
+    config_version: "1.0"
+    defaults:
+      audit_table: ops.audit
+    threads:
+      - ref: threads/ops_audit.thread
+      - name: ops_summary
+        config_version: "1.0"
+        sources:
+          audit:
+            type: delta
+            alias: "${audit_table}"
+        target:
+          alias: ops.audit_summary
+        dependencies:
+          - ops_audit

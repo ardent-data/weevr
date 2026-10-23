@@ -9,12 +9,13 @@ import pytest
 
 from weevr.engine.planner import ExecutionPlan
 from weevr.engine.result import ThreadResult, WeaveResult
+from weevr.errors import ConfigError
 from weevr.model.loom import Loom, WeaveEntry
 from weevr.model.source import Source
 from weevr.model.target import Target
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry, Weave
-from weevr.result import ExecutionMode, FormattedText, LoadedConfig, RunResult
+from weevr.result import ExecutionMode, FormattedText, LoadedConfig, PlanIssue, RunResult
 
 
 class TestFormattedText:
@@ -1656,3 +1657,98 @@ class TestSummaryPreviewMetadata:
         s = result.summary()
         assert "1 cols × 0 rows" in s
         assert "(unavailable)" not in s
+
+
+def _plan_thread(name: str, target: str) -> Thread:
+    return Thread(
+        name=name,
+        config_version="1.0",
+        sources={"main": Source(type="delta", alias=f"raw.{name}")},
+        target=Target(alias=target),
+    )
+
+
+def _cyclic_weave() -> tuple[Weave, dict[str, Thread]]:
+    weave = Weave(
+        name="cyc",
+        config_version="1.0",
+        threads=[
+            ThreadEntry(name="a", dependencies=["b"]),
+            ThreadEntry(name="b", dependencies=["a"]),
+        ],
+    )
+    return weave, {"a": _plan_thread("a", "out.a"), "b": _plan_thread("b", "out.b")}
+
+
+def _conflict_weave() -> tuple[Weave, dict[str, Thread]]:
+    weave = Weave(
+        name="dup",
+        config_version="1.0",
+        threads=[ThreadEntry(name="jan"), ThreadEntry(name="feb")],
+    )
+    return weave, {"jan": _plan_thread("jan", "out.same"), "feb": _plan_thread("feb", "out.same")}
+
+
+class TestValidatePlans:
+    """LoadedConfig.validate_plans reports every weave's plan failure."""
+
+    @staticmethod
+    def _loom(*names: str) -> Loom:
+        return Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": list(names)})
+
+    def test_reports_every_failing_weave_in_loom_order(self) -> None:
+        cyc, cyc_threads = _cyclic_weave()
+        dup, dup_threads = _conflict_weave()
+        loaded = LoadedConfig(
+            model=self._loom("cyc", "dup"),
+            config_type="loom",
+            config_name="l",
+            threads={"cyc": cyc_threads, "dup": dup_threads},
+            weaves={"cyc": cyc, "dup": dup},
+        )
+        issues = loaded.validate_plans()
+        assert [i.weave_name for i in issues] == ["cyc", "dup"]
+        assert all(isinstance(i, PlanIssue) and i.error is not None for i in issues)
+        assert "Circular dependency" in issues[0].message
+        assert "jan" in issues[1].message and "feb" in issues[1].message
+
+    def test_missing_weave_is_an_issue_without_error(self) -> None:
+        loaded = LoadedConfig(
+            model=self._loom("gone", "ok"),
+            config_type="loom",
+            config_name="l",
+            threads={"ok": {"a": _plan_thread("a", "out.a")}},
+            weaves={"ok": Weave(name="ok", config_version="1.0", threads=[ThreadEntry(name="a")])},
+        )
+        assert loaded.validate_plans() == (
+            PlanIssue(weave_name="gone", message="Weave 'gone' not found", error=None),
+        )
+
+    def test_clean_weave_has_no_issues(self) -> None:
+        weave = Weave(name="w", config_version="1.0", threads=[ThreadEntry(name="a")])
+        loaded = LoadedConfig(
+            model=weave,
+            config_type="weave",
+            config_name="w",
+            threads={"w": {"a": _plan_thread("a", "out.a")}},
+        )
+        assert loaded.validate_plans() == ()
+
+    def test_thread_has_no_issues(self) -> None:
+        loaded = LoadedConfig(
+            model=_plan_thread("a", "out.a"), config_type="thread", config_name="a"
+        )
+        assert loaded.validate_plans() == ()
+
+    def test_execution_plan_still_raises_on_first_failure(self) -> None:
+        cyc, cyc_threads = _cyclic_weave()
+        loaded = LoadedConfig(
+            model=cyc, config_type="weave", config_name="cyc", threads={"cyc": cyc_threads}
+        )
+        with pytest.raises(ConfigError, match="Circular dependency"):
+            _ = loaded.execution_plan
+
+    def test_plan_issue_is_frozen(self) -> None:
+        issue = PlanIssue(weave_name="w", message="m", error=None)
+        with pytest.raises(AttributeError):
+            issue.message = "x"  # type: ignore[misc]

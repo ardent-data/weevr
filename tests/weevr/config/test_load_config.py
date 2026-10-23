@@ -1181,3 +1181,74 @@ class TestLoadConfigInlineWeaves:
         loom = self._loom(tmp_path, "  - missing\n")
         with pytest.raises(ReferenceResolutionError, match=r"missing\.weave"):
             load_config(loom, project_root=tmp_path)
+
+
+class TestLoadConfigRelativePathAttribution:
+    """A relative path passed to load_config is reported as given."""
+
+    _BAD_THREAD = (
+        'config_version: "1.0"\nsources:\n  d:\n    type: delta\n    alias: raw.x\n'
+        "target:\n  alias: out\nwrite:\n  mode: bogus\n"
+    )
+
+    def test_thread_failure_names_relative_path(self, tmp_path, monkeypatch):
+        """A model failure in a directly loaded thread names the path as passed."""
+        (tmp_path / "bad.thread").write_text(self._BAD_THREAD)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config("bad.thread")
+        assert exc_info.value.file_path == "bad.thread"
+
+    def test_child_failure_names_relative_path(self, tmp_path, monkeypatch):
+        """A model failure in a referenced thread names that thread's relative path."""
+        (tmp_path / "bad.thread").write_text(self._BAD_THREAD)
+        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: bad.thread\n')
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config("w.weave")
+        assert exc_info.value.file_path == "bad.thread"
+
+
+_FILE_SOURCE_THREAD = (
+    'config_version: "1.0"\nsources:\n  orders:\n    type: csv\n    path: data/orders.csv\n'
+    "target:\n  alias: stg.orders\n"
+)
+
+
+class TestLoadConfigMatchesContext:
+    """load_config behaves like Context.load for typed configs."""
+
+    def test_logs_execution_scope_warning(self, tmp_path, caplog):
+        """A thread's own execution block is warned about on the weevr.config logger."""
+        import logging
+
+        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD + "execution:\n  log_level: debug\n")
+        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: t.thread\n')
+        with caplog.at_level(logging.WARNING, logger="weevr.config"):
+            load_config(tmp_path / "w.weave", project_root=tmp_path)
+        messages = [r.message for r in caplog.records if r.name.startswith("weevr.config")]
+        assert any("thread 't' declares an execution block" in m for m in messages)
+
+    def test_relative_file_source_path_is_absolute(self, tmp_path):
+        """A relative file-Source path resolves against the file's directory."""
+        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
+        thread = load_config(tmp_path / "t.thread")
+        assert isinstance(thread, Thread)
+        assert thread.sources["orders"].path == str(tmp_path / "data" / "orders.csv")
+
+    def test_template_thread_hint(self, tmp_path):
+        """A standalone thread failing on ${param.x} says it may be a template."""
+        (tmp_path / "t.thread").write_text(
+            _FILE_SOURCE_THREAD.replace("stg.orders", "stg.${param.region}")
+        )
+        with pytest.raises(VariableResolutionError, match="may be a template") as exc_info:
+            load_config(tmp_path / "t.thread")
+        assert exc_info.value.config_key == "param.region"
+        assert isinstance(exc_info.value.__cause__, VariableResolutionError)
+
+    def test_qualified_key_without_project_root(self, tmp_path):
+        """A typed file loaded without project_root gets a qualified_key."""
+        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
+        thread = load_config(tmp_path / "t.thread")
+        assert isinstance(thread, Thread)
+        assert thread.qualified_key == "t.thread"

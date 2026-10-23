@@ -44,6 +44,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # Spark-bound __init__.py.
 SHARED_IMPORTS = [
     "from weevr.config import load_config",
+    "from weevr.config import load_resolved",
     "from weevr.model.thread import Thread",
     "from weevr.engine.planner import build_plan",
     "from weevr.engine.formatting import format_duration",
@@ -175,6 +176,65 @@ def test_core_only_install_does_not_pull_pyspark(
         "import sys; assert 'pyspark' not in sys.modules",
     ]
     _run_imports(python, statements, expect_ok=True)
+
+
+_SMOKE_THREAD = """\
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.{name}
+target:
+  alias: out.{name}
+"""
+
+_SMOKE_LOAD = """\
+import sys
+from pathlib import Path
+
+from weevr.config import load_resolved
+
+root = Path(sys.argv[1])
+weave = load_resolved(root / "w.weave", project_root=root)
+assert list(weave.resolved_threads["w"]) == ["a", "b"], dict(weave.resolved_threads)
+assert [p.execution_order for p in weave.execution_plan] == [[["a"], ["b"]]]
+
+loom = load_resolved(root / "l.loom", project_root=root)
+assert list(loom.resolved_weaves) == ["w"]
+assert [p.weave_name for p in loom.execution_plan] == ["w"]
+assert weave.validate_plans() == ()
+assert loom.validate_plans() == ()
+
+assert "pyspark" not in sys.modules
+"""
+
+
+@pytest.mark.install_smoke
+def test_core_only_install_loads_resolved_children(
+    wheels: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    """``load_resolved`` loads, plans, and validates a weave and a loom in a core-only install."""
+    _, core = wheels
+    python = _make_venv(tmp_path / "core_only_load")
+    _pip_install(python, str(core))
+
+    project = tmp_path / "smoke.weevr"
+    project.mkdir()
+    for name in ("a", "b"):
+        (project / f"{name}.thread").write_text(_SMOKE_THREAD.format(name=name))
+    (project / "w.weave").write_text(
+        'config_version: "1.0"\nthreads:\n  - ref: a.thread\n'
+        "  - ref: b.thread\n    dependencies: [a]\n"
+    )
+    (project / "l.loom").write_text('config_version: "1.0"\nweaves:\n  - ref: w.weave\n')
+
+    result = subprocess.run(
+        [str(python), "-c", _SMOKE_LOAD, str(project)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
 
 
 @pytest.mark.install_smoke

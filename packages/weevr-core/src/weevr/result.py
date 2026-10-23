@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from weevr.engine.formatting import format_duration as _format_duration
@@ -11,6 +13,8 @@ from weevr.engine.formatting import format_duration as _format_duration
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+    from weevr.model.thread import Thread
+    from weevr.model.weave import Weave
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
 
 
@@ -509,17 +513,43 @@ class RunResult:
         return lines
 
 
-class LoadedConfig:
-    """Wrapper around a hydrated config model returned by ``Context.load()``.
+def _lookups(weave: Any) -> dict[str, Any] | None:
+    """A weave's Lookups as a plain dict, or ``None`` when it declares none."""
+    return dict(weave.lookups) if weave.lookups else None
 
-    Provides access to the underlying model (Thread, Weave, or Loom) and a
-    lazily-built execution plan for weave/loom configs. Proxies attribute
-    access to the model for convenience.
+
+@dataclass(frozen=True)
+class PlanIssue:
+    """One weave's plan-time failure, from :meth:`LoadedConfig.validate_plans`.
+
+    Attributes:
+        weave_name: The weave whose plan could not be built.
+        message: What went wrong, without the weave prefix.
+        error: The exception the planner raised; ``None`` when the weave itself
+            is missing from the loaded config.
+    """
+
+    weave_name: str
+    message: str
+    error: Exception | None
+
+
+class LoadedConfig:
+    """A hydrated config with its resolved children, returned without executing.
+
+    Returned by ``Context.load()`` and :func:`weevr.config.load_resolved`.
+    Provides the underlying model (Thread, Weave, or Loom), each weave's
+    resolved threads, the load warnings, and a lazily-built execution plan
+    for weave/loom configs. Proxies attribute access to the model for
+    convenience.
 
     Attributes:
         model: The hydrated domain model.
         config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``).
         config_name: Name derived from the config file path.
+        resolved_threads: Each weave's hydrated threads (read-only).
+        resolved_weaves: A loom's hydrated weaves (read-only).
+        warnings: Load warnings.
     """
 
     __slots__ = (
@@ -528,6 +558,9 @@ class LoadedConfig:
         "_config_name",
         "_threads",
         "_weaves",
+        "_resolved_threads",
+        "_resolved_weaves",
+        "_warnings",
         "_execution_plan",
         "_plan_built",
     )
@@ -539,6 +572,7 @@ class LoadedConfig:
         config_name: str,
         threads: dict[str, dict[str, Any]] | None = None,
         weaves: dict[str, Any] | None = None,
+        warnings: list[str] | tuple[str, ...] | None = None,
     ) -> None:
         """Initialize with a hydrated model and its metadata."""
         self._model = model
@@ -546,8 +580,33 @@ class LoadedConfig:
         self._config_name = config_name
         self._threads = threads
         self._weaves = weaves
+        self._resolved_threads: Mapping[str, Mapping[str, Thread]] = MappingProxyType(
+            {name: MappingProxyType(dict(by_name)) for name, by_name in (threads or {}).items()}
+        )
+        self._resolved_weaves: Mapping[str, Weave] = MappingProxyType(dict(weaves or {}))
+        self._warnings: tuple[str, ...] = tuple(warnings or ())
         self._execution_plan: list[Any] | None = None
         self._plan_built = False
+
+    @classmethod
+    def from_hydrated(cls, hydrated: Any) -> LoadedConfig:
+        """Wrap the config loader's result.
+
+        Args:
+            hydrated: A ``weevr.config.loader.HydratedConfig``. Typed ``Any``
+                because importing it here would close an import cycle.
+
+        Returns:
+            The loaded config, with the loader's children and warnings.
+        """
+        return cls(
+            model=hydrated.model,
+            config_type=hydrated.config_type,
+            config_name=hydrated.config_name,
+            threads=hydrated.threads,
+            weaves=hydrated.weaves,
+            warnings=hydrated.warnings,
+        )
 
     @property
     def model(self) -> Any:
@@ -565,6 +624,30 @@ class LoadedConfig:
         return self._config_name
 
     @property
+    def resolved_threads(self) -> Mapping[str, Mapping[str, Thread]]:
+        """Each weave's hydrated threads, by weave name then effective thread name.
+
+        A weave config has one entry (the weave itself); a loom has one per
+        weave; a thread config has none. Read-only. Not to be confused with
+        ``threads``, which proxies to a Weave model's ``ThreadEntry`` list.
+        """
+        return self._resolved_threads
+
+    @property
+    def resolved_weaves(self) -> Mapping[str, Weave]:
+        """A loom's hydrated weaves by name; empty for thread and weave configs.
+
+        Read-only. Not to be confused with ``weaves``, which proxies to a Loom
+        model's ``WeaveEntry`` list.
+        """
+        return self._resolved_weaves
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        """Load warnings (execution-scope, then trace-composition), in emission order."""
+        return self._warnings
+
+    @property
     def execution_plan(self) -> list[Any] | None:
         """Lazily-built execution plans for weave/loom configs.
 
@@ -580,56 +663,78 @@ class LoadedConfig:
             return self._execution_plan
 
         from weevr.engine.planner import build_plan
+
+        plans = [
+            build_plan(weave_name=name, threads=threads, thread_entries=entries, lookups=lookups)
+            for name, weave, threads, entries, lookups in self._plan_inputs()
+            if weave is not None
+        ]
+        self._execution_plan = plans if plans else None
+        return self._execution_plan
+
+    def validate_plans(self) -> tuple[PlanIssue, ...]:
+        """Build every weave's plan and report the ones that fail.
+
+        Unlike :attr:`execution_plan`, which raises on the first failure, this
+        collects one :class:`PlanIssue` per failing weave — dependency cycles,
+        conflicting writers of one target, Lookup problems — in loom order. A
+        loom weave missing from the loaded config is an issue too. Plan-time
+        checks only: nothing reads data or needs Spark.
+
+        Returns:
+            The issues found; empty when every plan builds and for thread configs.
+        """
+        from weevr.engine.planner import build_plan
+
+        issues: list[PlanIssue] = []
+        for name, weave, threads, entries, lookups in self._plan_inputs():
+            if weave is None:
+                issues.append(PlanIssue(name, f"Weave '{name}' not found", None))
+                continue
+            try:
+                build_plan(
+                    weave_name=name, threads=threads, thread_entries=entries, lookups=lookups
+                )
+            except Exception as exc:
+                issues.append(PlanIssue(name, str(exc), exc))
+        return tuple(issues)
+
+    def _plan_inputs(
+        self,
+    ) -> Iterator[tuple[str, Any, dict[str, Any], list[Any], dict[str, Any] | None]]:
+        """Yield each weave's planner inputs: name, model, threads, entries, lookups.
+
+        The model is ``None`` for a loom weave missing from the loaded config.
+        """
         from weevr.model.thread import Thread
         from weevr.model.weave import Weave
 
-        plans: list[Any] = []
+        def typed_threads(weave_name: str) -> dict[str, Thread]:
+            # Callers may construct LoadedConfig with plain dicts.
+            return {
+                name: t if isinstance(t, Thread) else Thread.model_validate(t)
+                for name, t in (self._threads or {}).get(weave_name, {}).items()
+            }
 
         if self._config_type == "weave" and self._threads is not None:
             weave = self._model
-            weave_name = self._config_name
-            thread_map = self._threads.get(weave_name, {})
-            # Ensure Thread objects
-            typed_threads: dict[str, Thread] = {}
-            for name, t in thread_map.items():
-                typed_threads[name] = t if isinstance(t, Thread) else Thread.model_validate(t)
-            weave_lookups = dict(weave.lookups) if weave.lookups else None
-            plans.append(
-                build_plan(
-                    weave_name=weave_name,
-                    threads=typed_threads,
-                    thread_entries=list(weave.threads),
-                    lookups=weave_lookups,
-                )
+            yield (
+                self._config_name,
+                weave,
+                typed_threads(self._config_name),
+                list(weave.threads),
+                _lookups(weave),
             )
-
         elif self._config_type == "loom" and self._weaves is not None and self._threads is not None:
             for weave_entry in self._model.weaves:
-                weave_name = (
-                    getattr(weave_entry, "name", "")
-                    or (Path(weave_entry.ref).stem if getattr(weave_entry, "ref", None) else "")
-                    or str(weave_entry)
-                )
-                weave = self._weaves.get(weave_name)
+                name = weave_entry.effective_name
+                weave = (self._weaves or {}).get(name)
                 if weave is None:
+                    yield name, None, {}, [], None
                     continue
-                weave_obj = weave if isinstance(weave, Weave) else Weave.model_validate(weave)
-                thread_map = self._threads.get(weave_name, {})
-                typed_threads = {}
-                for name, t in thread_map.items():
-                    typed_threads[name] = t if isinstance(t, Thread) else Thread.model_validate(t)
-                lk = dict(weave_obj.lookups) if weave_obj.lookups else None
-                plans.append(
-                    build_plan(
-                        weave_name=weave_name,
-                        threads=typed_threads,
-                        thread_entries=list(weave_obj.threads),
-                        lookups=lk,
-                    )
-                )
-
-        self._execution_plan = plans if plans else None
-        return self._execution_plan
+                if not isinstance(weave, Weave):
+                    weave = Weave.model_validate(weave)
+                yield name, weave, typed_threads(name), list(weave.threads), _lookups(weave)
 
     def flow(self, *, dark: bool | None = None) -> Any:
         """Return a thread flow diagram for thread configs.
