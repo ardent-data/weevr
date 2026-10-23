@@ -6,9 +6,9 @@ that parses, validates, resolves, inherits, and hydrates configuration.
 
 ## Introduction
 
-When you call `Context.run()` or `Context.load()`, weevr runs the full
-config resolution pipeline internally. The stages are designed to fail
-fast — syntax errors are caught before variable resolution, schema errors
+When you call `Context.run()`, `Context.load()`, `load_config()`, or
+`load_resolved()`, weevr runs the same config resolution pipeline. The
+stages are designed to fail fast — syntax errors are caught before variable resolution, schema errors
 before reference loading, and semantic constraints after all values are
 concrete.
 
@@ -146,6 +146,56 @@ the file containing an inline definition.
 Incremental-mode constraints (e.g., CDC requires merge write mode) are
 checked as post-resolution cross-cutting validations.
 
+## Loading without running
+
+`Context` executes; `load_config()` and `load_resolved()` inspect. All three
+run the same pipeline, so a config that loads through one loads the same way
+through the others. The difference is what comes back and what's needed:
+
+| Entry point | Needs Spark | Returns |
+|---|---|---|
+| `Context.load()` | Yes | `LoadedConfig`, with `${fabric.*}` resolved |
+| `load_config()` | No | The `Thread`, `Weave`, or `Loom` model (or a params dict) |
+| `load_resolved()` | No | `LoadedConfig`, with each weave's resolved threads |
+
+`load_resolved()` suits tools that check or plan configs outside the engine,
+such as a CLI or a CI step. It takes `.thread`, `.weave`, and `.loom` files
+and returns the hydrated model, every child thread and weave, the load
+warnings, and the execution plan:
+
+```python
+from pathlib import Path
+
+from weevr.config import load_resolved
+
+project = Path("project.weevr")
+loaded = load_resolved(project / "nightly.loom", project_root=project)
+
+for weave_name, threads in loaded.resolved_threads.items():
+    print(weave_name, list(threads))
+
+for warning in loaded.warnings:
+    print(warning)
+
+for issue in loaded.validate_plans():
+    print(f"{issue.weave_name}: {issue.message}")
+```
+
+`validate_plans()` builds every weave's execution plan and returns one
+`PlanIssue` per weave that fails — a dependency cycle, two threads writing
+the same target without an ordering, or a Lookup problem — instead of
+stopping at the first. `execution_plan` raises on the first failure.
+
+Without Spark there is no Fabric context, so a `${fabric.*}` reference needs
+a default (`${fabric.workspace_id:-local}`) to load through `load_config()` or
+`load_resolved()`. Checks that read data, such as whether a source table
+exists, run only in `Context.run(mode="validate")`.
+
+!!! note
+    `LoadedConfig.threads` and `.weaves` return the model's own entries
+    (`ThreadEntry` / `WeaveEntry`). The resolved models are under
+    `resolved_threads` and `resolved_weaves`.
+
 ## Module map
 
 | Module | Responsibility |
@@ -158,7 +208,8 @@ checked as post-resolution cross-cutting validations.
 | `config/fabric.py` | Builds `${fabric.*}` context from Fabric runtime variables |
 | `config/locations.py` | Filesystem-agnostic location abstraction; routes local paths through pathlib and remote URIs through Hadoop FileSystem |
 | `config/warp.py` | Warp schema contract discovery and drift baseline resolution |
-| `config/__init__.py` | `load_config()` — orchestrates the full pipeline |
+| `config/loader.py` | The shared load: runs every stage for one file; `load_resolved()` |
+| `config/__init__.py` | `load_config()` and `load_resolved()` — the public entry points |
 
 ## Deferred variable namespaces
 
