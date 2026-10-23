@@ -88,7 +88,8 @@ lookups:
     strategy: broadcast
 ```
 
-Threads reference lookups via the `lookup` field on a source:
+Threads reference lookups via the `lookup` field on a source, or by name
+in a `resolve` step:
 
 ```yaml
 # In a thread's sources block
@@ -96,6 +97,10 @@ sources:
   products:
     lookup: dim_product   # resolved from the weave's lookups map
 ```
+
+A thread sees its own lookups, its weave's, and its loom's; the narrowest
+definition of a name wins (thread, then weave, then loom). See
+[Resolve](../../guides/resolve.md#where-the-lookup-comes-from).
 
 ---
 
