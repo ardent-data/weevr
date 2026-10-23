@@ -277,6 +277,23 @@ def build_watermark_filter(
     return typed >= lit_val if inclusive else typed > lit_val
 
 
+def _require_watermark_type(load_config: LoadConfig) -> None:
+    """Fail when a watermark column has no type, rather than reading everything.
+
+    Without a type the watermark filter can't be built, so the read would
+    silently return the full source on every run. Validation rejects such
+    configs; this guards paths that bypass it.
+
+    Raises:
+        ExecutionError: If ``watermark_column`` is set and ``watermark_type`` isn't.
+    """
+    if load_config.watermark_column is not None and load_config.watermark_type is None:
+        raise ExecutionError(
+            f"watermark_column '{load_config.watermark_column}' is set but watermark_type "
+            "is missing; the watermark filter can't be applied"
+        )
+
+
 def read_source_incremental(
     spark: SparkSession,
     alias: str,
@@ -303,7 +320,11 @@ def read_source_incremental(
     Returns:
         Tuple of ``(DataFrame, new_hwm_value)``. ``new_hwm_value`` is
         ``None`` if the source returned zero rows.
+
+    Raises:
+        ExecutionError: If ``watermark_column`` is set without ``watermark_type``.
     """
+    _require_watermark_type(load_config)
     df = _read_raw(spark, source, connections)
 
     # Apply watermark filter if prior state exists
@@ -433,6 +454,8 @@ def read_cdc_source(
         return reader.load(source.alias), None
 
     # Generic CDC: read source normally; change flags are in the data.
+    if load_config is not None:
+        _require_watermark_type(load_config)
     df = _read_raw(spark, source, connections)
 
     # Apply watermark filter on subsequent runs (matches read_source_incremental).

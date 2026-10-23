@@ -284,7 +284,8 @@ Incremental load mode and watermark tracking.
 
 Cross-field rules enforced at parse time:
 
-- `mode == "incremental_watermark"` requires `watermark_column`
+- `mode == "incremental_watermark"` requires `watermark_column` and
+  `watermark_type`
 - `mode == "cdc"` requires `cdc` config
 - `mode == "cdc"` with `cdc.preset == "delta_cdf"` rejects `watermark_column`
   (CDF uses commit-version tracking automatically)

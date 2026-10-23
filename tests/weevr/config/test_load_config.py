@@ -1043,3 +1043,63 @@ class TestLoadConfigChildForeach:
         with pytest.raises(ConfigError, match="foreach block at step index") as exc_info:
             load_config(weave, project_root=tmp_path)
         assert exc_info.value.file_path == str(thread)
+
+
+_INCREMENTAL_THREAD = (
+    'config_version: "1.0"\n'
+    "sources:\n  s:\n    type: delta\n    alias: raw.c\n"
+    "target:\n  path: Tables/c\n"
+    "write:\n  mode: append\n"
+)
+
+
+class TestLoadConfigWatermarkTypeRequired:
+    """incremental_watermark needs watermark_type alongside watermark_column."""
+
+    @staticmethod
+    def _write(root: Path, name: str, text: str) -> Path:
+        path = root / name
+        path.write_text(text)
+        return path
+
+    def test_missing_watermark_type_names_thread(self, tmp_path):
+        """A thread missing watermark_type fails at load, naming the thread."""
+        thread = self._write(
+            tmp_path,
+            "t.thread",
+            _INCREMENTAL_THREAD + "load:\n  mode: incremental_watermark\n  watermark_column: ts\n",
+        )
+        with pytest.raises(ModelValidationError, match="watermark_type") as exc_info:
+            load_config(thread, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)
+
+    def test_watermark_load_inherited_whole_from_defaults(self, tmp_path):
+        """A thread with no load block inherits a typed defaults.load and loads."""
+        self._write(tmp_path, "t.thread", _INCREMENTAL_THREAD)
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\n'
+            "defaults:\n  load:\n    mode: incremental_watermark\n"
+            "    watermark_column: ts\n    watermark_type: timestamp\n"
+            "threads:\n  - ref: t.thread\n",
+        )
+        assert isinstance(load_config(weave, project_root=tmp_path), Weave)
+
+    def test_own_watermark_load_ignores_defaults_watermark_type(self, tmp_path):
+        """A thread's own typeless load block fails even if defaults carry a type."""
+        thread = self._write(
+            tmp_path,
+            "t.thread",
+            _INCREMENTAL_THREAD + "load:\n  mode: incremental_watermark\n  watermark_column: ts\n",
+        )
+        weave = self._write(
+            tmp_path,
+            "w.weave",
+            'config_version: "1.0"\n'
+            "defaults:\n  load:\n    watermark_type: date\n"
+            "threads:\n  - ref: t.thread\n",
+        )
+        with pytest.raises(ModelValidationError, match="watermark_type") as exc_info:
+            load_config(weave, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)

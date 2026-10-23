@@ -104,7 +104,8 @@ class LoadConfig(FrozenBase):
     """Incremental load mode and watermark parameters.
 
     Cross-field validation:
-    - ``mode == "incremental_watermark"`` requires ``watermark_column`` to be set.
+    - ``mode == "incremental_watermark"`` requires ``watermark_column`` and
+      ``watermark_type`` to be set.
     - ``mode == "cdc"`` requires ``cdc`` config to be set.
     - ``mode == "cdc"`` with ``cdc.preset == "delta_cdf"`` rejects
       ``watermark_column`` (CDF uses commit-version tracking automatically).
@@ -162,8 +163,14 @@ class LoadConfig(FrozenBase):
 
     @model_validator(mode="after")
     def _validate_watermark_fields(self) -> LoadConfig:
-        if self.mode == "incremental_watermark" and not self.watermark_column:
-            raise ValueError("incremental_watermark mode requires 'watermark_column' to be set")
+        if self.mode == "incremental_watermark":
+            if not self.watermark_column:
+                raise ValueError("incremental_watermark mode requires 'watermark_column' to be set")
+            if self.watermark_type is None:
+                raise ValueError(
+                    "incremental_watermark mode requires 'watermark_type' to be set "
+                    "alongside 'watermark_column'"
+                )
         return self
 
     @model_validator(mode="after")

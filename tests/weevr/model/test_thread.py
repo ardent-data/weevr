@@ -91,7 +91,11 @@ class TestThreadConstruction:
         """load dict is hydrated into LoadConfig model."""
         data = {
             **_MINIMAL,
-            "load": {"mode": "incremental_watermark", "watermark_column": "modified_at"},
+            "load": {
+                "mode": "incremental_watermark",
+                "watermark_column": "modified_at",
+                "watermark_type": "timestamp",
+            },
         }
         t = Thread.model_validate(data)
         assert isinstance(t.load, LoadConfig)
@@ -138,7 +142,11 @@ class TestThreadConstruction:
             },
             "write": {"mode": "merge", "match_keys": ["id"]},
             "keys": {"business_key": ["id"]},
-            "load": {"mode": "incremental_watermark", "watermark_column": "ts"},
+            "load": {
+                "mode": "incremental_watermark",
+                "watermark_column": "ts",
+                "watermark_type": "timestamp",
+            },
             "validations": [{"rule": "id IS NOT NULL", "name": "r1"}],
             "assertions": [{"type": "unique", "columns": ["id"]}],
             "tags": ["nightly"],
