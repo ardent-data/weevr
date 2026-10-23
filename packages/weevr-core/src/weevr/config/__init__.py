@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
-from weevr.config.loader import COMPONENT_TYPES, hydrate_resolved, resolve_config
+from weevr.config.loader import COMPONENT_TYPES, hydrate_resolved, load_resolved, resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.model import Loom, Thread, Weave
 
 logger = logging.getLogger(__name__)
+
+__all__ = ["load_config", "load_resolved"]
 
 
 def load_config(

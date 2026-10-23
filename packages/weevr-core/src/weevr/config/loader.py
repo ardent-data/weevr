@@ -8,11 +8,13 @@ imported.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from weevr.config.attribution import attribute_errors
 from weevr.config.hydration import hydrate_children, hydrate_model
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
@@ -37,6 +39,11 @@ from weevr.config.validation import (
 )
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
+
+if TYPE_CHECKING:
+    from weevr.result import LoadedConfig
+
+logger = logging.getLogger("weevr.config")
 
 COMPONENT_TYPES = ("thread", "weave", "loom")
 
@@ -242,6 +249,101 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         weaves=weaves,
         threads=threads,
         warnings=warnings,
+    )
+
+
+def load_resolved_config(
+    location: ConfigLocation,
+    *,
+    runtime_params: dict[str, Any] | None = None,
+    project_root: ConfigLocation | None = None,
+    fabric_context: dict[str, Any] | None = None,
+) -> HydratedConfig:
+    """Load a typed thread, weave, or loom file with its resolved children.
+
+    The engine-facing entry point: ``Context`` calls it with its project root
+    and Fabric context. Errors name the file they were found in. Warnings are
+    returned, not logged.
+
+    Args:
+        location: The config file (``.thread``, ``.weave``, or ``.loom``).
+        runtime_params: Runtime parameter overrides.
+        project_root: Root for child references and Source paths. Defaults to
+            the file's directory.
+        fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+
+    Returns:
+        The hydrated config with its weaves, threads, and load warnings.
+    """
+    with attribute_errors(location):
+        return hydrate_resolved(
+            resolve_config(
+                location,
+                runtime_params=runtime_params,
+                project_root=project_root,
+                fabric_context=fabric_context,
+                require_typed_extension=True,
+            )
+        )
+
+
+def load_resolved(
+    path: str | Path | ConfigLocation,
+    runtime_params: dict[str, Any] | None = None,
+    project_root: Path | ConfigLocation | None = None,
+) -> LoadedConfig:
+    """Load a thread, weave, or loom with its resolved child threads and weaves.
+
+    Runs the same load as :func:`load_config` and ``Context.load`` — params,
+    variables, references, the inheritance cascade, ``foreach`` expansion,
+    and model validation of every child — without Spark. Use it to inspect or
+    plan a config: the result exposes the hydrated model, each weave's
+    threads, the load warnings, and the execution plan.
+
+    Only ``.thread``, ``.weave``, and ``.loom`` files are accepted.
+    ``${fabric.x}`` references need a default here, since no Fabric context
+    is available.
+
+    Args:
+        path: The config file. Local paths are wrapped automatically; remote
+            URIs must be supplied as a :class:`RemoteConfigLocation`.
+        runtime_params: Optional runtime parameter overrides.
+        project_root: The ``.weevr`` project directory. Child references,
+            relative file-Source paths, and ``qualified_key`` resolve against
+            it; defaults to the file's directory.
+
+    Returns:
+        A :class:`~weevr.result.LoadedConfig` with ``model``,
+        ``resolved_threads``, ``resolved_weaves``, ``warnings``, and
+        ``execution_plan``. Warnings are also
+        logged on the ``weevr.config`` logger.
+
+    Raises:
+        ConfigError: Unsupported extension or a name/filename mismatch, plus
+            every error :func:`load_config` raises.
+    """
+    from weevr.config.locations import make_location
+
+    # Imported here, not at module level: weevr.result reaches the engine
+    # wheel's weevr.engine package, which needs weevr.config fully imported.
+    from weevr.result import LoadedConfig
+
+    if project_root is None or isinstance(project_root, ConfigLocation):
+        root = project_root
+    else:
+        root = LocalConfigLocation(Path(project_root))
+    hydrated = load_resolved_config(
+        make_location(path), runtime_params=runtime_params, project_root=root
+    )
+    for warning in hydrated.warnings:
+        logger.warning(warning)
+    return LoadedConfig(
+        model=hydrated.model,
+        config_type=hydrated.config_type,
+        config_name=hydrated.config_name,
+        threads=hydrated.threads,
+        weaves=hydrated.weaves,
+        warnings=hydrated.warnings,
     )
 
 

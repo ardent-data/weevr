@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from weevr.engine.formatting import format_duration as _format_duration
@@ -10,6 +12,8 @@ from weevr.engine.formatting import format_duration as _format_duration
 if TYPE_CHECKING:
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+    from weevr.model.thread import Thread
+    from weevr.model.weave import Weave
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
 
 
@@ -509,16 +513,21 @@ class RunResult:
 
 
 class LoadedConfig:
-    """Wrapper around a hydrated config model returned by ``Context.load()``.
+    """A hydrated config with its resolved children, returned without executing.
 
-    Provides access to the underlying model (Thread, Weave, or Loom) and a
-    lazily-built execution plan for weave/loom configs. Proxies attribute
-    access to the model for convenience.
+    Returned by ``Context.load()`` and :func:`weevr.config.load_resolved`.
+    Provides the underlying model (Thread, Weave, or Loom), each weave's
+    resolved threads, the load warnings, and a lazily-built execution plan
+    for weave/loom configs. Proxies attribute access to the model for
+    convenience.
 
     Attributes:
         model: The hydrated domain model.
         config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``).
         config_name: Name derived from the config file path.
+        resolved_threads: Each weave's hydrated threads (read-only).
+        resolved_weaves: A loom's hydrated weaves (read-only).
+        warnings: Load warnings.
     """
 
     __slots__ = (
@@ -565,6 +574,35 @@ class LoadedConfig:
     def config_name(self) -> str:
         """Name derived from the config file path."""
         return self._config_name
+
+    @property
+    def resolved_threads(self) -> Mapping[str, Mapping[str, Thread]]:
+        """Each weave's hydrated threads, by weave name then effective thread name.
+
+        A weave config has one entry (the weave itself); a loom has one per
+        weave; a thread config has none. Read-only. Not to be confused with
+        ``threads``, which proxies to a Weave model's ``ThreadEntry`` list.
+        """
+        return MappingProxyType(
+            {
+                name: MappingProxyType(dict(threads))
+                for name, threads in (self._threads or {}).items()
+            }
+        )
+
+    @property
+    def resolved_weaves(self) -> Mapping[str, Weave]:
+        """A loom's hydrated weaves by name; empty for thread and weave configs.
+
+        Read-only. Not to be confused with ``weaves``, which proxies to a Loom
+        model's ``WeaveEntry`` list.
+        """
+        return MappingProxyType(dict(self._weaves or {}))
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        """Load warnings (execution-scope, then trace-composition), in emission order."""
+        return self._warnings
 
     @property
     def execution_plan(self) -> list[Any] | None:
