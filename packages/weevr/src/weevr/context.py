@@ -14,6 +14,11 @@ from pyspark.sql import SparkSession
 from weevr.config.attribution import attribute_errors
 from weevr.config.hydration import hydrate_children, hydrate_model
 from weevr.config.inheritance import apply_inheritance
+from weevr.config.loader import (
+    collect_execution_warnings,
+    compute_qualified_key,
+    resolve_source_paths,
+)
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
@@ -29,7 +34,6 @@ from weevr.config.resolver import (
     validate_params,
 )
 from weevr.config.validation import (
-    collect_execution_scope_warnings,
     collect_trace_composition_warnings,
     validate_schema,
 )
@@ -962,7 +966,7 @@ class Context:
         # collected first, against the PRE-cascade thread dicts — after the
         # cascade an authored execution block is indistinguishable from one
         # injected by defaults.execution.
-        execution_warnings = self._collect_execution_warnings(config_type, resolved_with_refs)
+        execution_warnings = collect_execution_warnings(config_type, resolved_with_refs)
 
         if config_type == "loom" and "_resolved_weaves" in resolved_with_refs:
             loom_defaults = resolved_with_refs.get("defaults")
@@ -1015,11 +1019,11 @@ class Context:
             resolved_with_refs["name"] = config_name
 
         # Compute qualified key for top-level config
-        resolved_with_refs["qualified_key"] = self._compute_qualified_key(file_path, project_root)
+        resolved_with_refs["qualified_key"] = compute_qualified_key(file_path, project_root)
 
         # Step 8c: Resolve relative source paths against project root
         if config_type == "thread":
-            self._resolve_source_paths(resolved_with_refs, self._project_root)
+            resolve_source_paths(resolved_with_refs, self._project_root)
 
         # Step 9: Hydrate the top-level model and the children it pulls in
         model = hydrate_model(resolved_with_refs, config_type, file_path)
@@ -1029,7 +1033,7 @@ class Context:
             resolved_with_refs,
             file_path,
             config_name,
-            prepare=lambda thread_dict: self._resolve_source_paths(thread_dict, project_root),
+            prepare=lambda thread_dict: resolve_source_paths(thread_dict, project_root),
         )
 
         # Trace composition needs hydrated models (model_fields_set): a
@@ -1052,112 +1056,3 @@ class Context:
             weaves=weaves,
             threads=threads,
         )
-
-    @staticmethod
-    def _collect_execution_warnings(config_type: str, resolved: dict[str, Any]) -> list[str]:
-        """Gather thread-scope execution warnings from pre-cascade dicts."""
-        defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
-        pre_cascade_threads: list[dict[str, Any]] = []
-
-        if config_type == "loom":
-            loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
-            defaults_by_scope.append((loom_label, resolved.get("defaults")))
-            for i, weave in enumerate(resolved.get("_resolved_weaves", [])):
-                weave_label = f"weave '{weave.get('name') or f'#{i}'}'"
-                defaults_by_scope.append((weave_label, weave.get("defaults")))
-                pre_cascade_threads.extend(weave.get("_resolved_threads", []))
-        elif config_type == "weave":
-            weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
-            defaults_by_scope.append((weave_label, resolved.get("defaults")))
-            pre_cascade_threads.extend(resolved.get("_resolved_threads", []))
-        else:  # standalone thread
-            pre_cascade_threads.append(resolved)
-
-        return collect_execution_scope_warnings(defaults_by_scope, pre_cascade_threads)
-
-    @staticmethod
-    def _compute_qualified_key(file_path: ConfigLocation, project_root: ConfigLocation) -> str:
-        """Return ``file_path`` expressed relative to ``project_root``.
-
-        Falls back to the absolute string when the file lies outside the
-        project root.
-        """
-        if isinstance(file_path, LocalConfigLocation) and isinstance(
-            project_root, LocalConfigLocation
-        ):
-            try:
-                rel = file_path.path.resolve().relative_to(project_root.path.resolve())
-                return str(rel)
-            except (OSError, ValueError):
-                return str(file_path)
-        if isinstance(file_path, RemoteConfigLocation) and isinstance(
-            project_root, RemoteConfigLocation
-        ):
-            file_str = str(file_path)
-            root_str = str(project_root).rstrip("/")
-            if file_str.startswith(root_str + "/"):
-                return file_str[len(root_str) + 1 :]
-            return file_str
-        return str(file_path)
-
-    @staticmethod
-    def _resolve_source_paths(
-        thread_dict: dict[str, Any],
-        project_root: ConfigLocation | Path | str,
-    ) -> None:
-        """Resolve relative source file paths against the project root.
-
-        Modifies the thread config dict in place, prepending the project
-        root to any relative ``path`` values in file-based sources (csv,
-        json, parquet, excel).
-
-        Args:
-            thread_dict: Thread configuration dict (pre-hydration).
-            project_root: Resolved project root. Accepts a
-                :class:`ConfigLocation`, :class:`pathlib.Path`, or string
-                for backward compatibility with internal callers.
-        """
-        # Normalize legacy Path/str inputs into ConfigLocation form so the
-        # join logic only has one branch. Strings that look like URIs are
-        # left as plain strings — only the local Path branch needs the FUSE
-        # post-processing below.
-        if isinstance(project_root, ConfigLocation):
-            location: ConfigLocation | None = project_root
-            legacy_str_root: str | None = None
-        elif isinstance(project_root, Path):
-            location = LocalConfigLocation(project_root)
-            legacy_str_root = None
-        else:
-            # Plain string — preserve the original abfss-style concat path
-            # for callers that still hand in a raw URI string.
-            location = None
-            legacy_str_root = project_root
-
-        sources = thread_dict.get("sources")
-        if not sources or not isinstance(sources, dict):
-            return
-        for source_cfg in sources.values():
-            if not isinstance(source_cfg, dict):
-                continue
-            path = source_cfg.get("path")
-            if path is None:
-                continue
-            # Skip already-absolute paths and URIs
-            if os.path.isabs(path) or "://" in path:
-                continue
-
-            if location is not None:
-                joined = location.join(path)
-                resolved = str(joined)
-                # Fabric mount paths (/lakehouse/default/...) are valid for
-                # Python file I/O but not for Spark reads which bypass the
-                # FUSE mount. Strip the mount prefix so Spark gets a
-                # lakehouse-relative path (e.g. "Files/project.weevr/...").
-                if isinstance(location, LocalConfigLocation) and resolved.startswith(
-                    "/lakehouse/default/"
-                ):
-                    resolved = resolved[len("/lakehouse/default/") :]
-                source_cfg["path"] = resolved
-            else:
-                assert legacy_str_root is not None
-                source_cfg["path"] = f"{legacy_str_root.rstrip('/')}/{path}"

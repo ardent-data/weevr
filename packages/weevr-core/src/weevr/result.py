@@ -527,6 +527,7 @@ class LoadedConfig:
         "_config_name",
         "_threads",
         "_weaves",
+        "_warnings",
         "_execution_plan",
         "_plan_built",
     )
@@ -538,6 +539,7 @@ class LoadedConfig:
         config_name: str,
         threads: dict[str, dict[str, Any]] | None = None,
         weaves: dict[str, Any] | None = None,
+        warnings: list[str] | tuple[str, ...] | None = None,
     ) -> None:
         """Initialize with a hydrated model and its metadata."""
         self._model = model
@@ -545,6 +547,7 @@ class LoadedConfig:
         self._config_name = config_name
         self._threads = threads
         self._weaves = weaves
+        self._warnings: tuple[str, ...] = tuple(warnings or ())
         self._execution_plan: list[Any] | None = None
         self._plan_built = False
 
