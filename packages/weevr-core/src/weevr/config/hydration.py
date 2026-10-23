@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from weevr.config.attribution import attribute_errors
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach
-from weevr.errors import ModelValidationError
+from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
 ThreadPreparer = Callable[[dict[str, Any]], None]
@@ -29,6 +29,15 @@ def _entry_name(entry: Any) -> str:
             return Path(entry["ref"]).stem
         return entry.get("name", "") or entry.get("ref", "")
     return str(entry)
+
+
+def _weave_origin(entry: Any) -> str:
+    """Describe where a loom's weave entry comes from, for error messages."""
+    if isinstance(entry, dict) and entry.get("ref"):
+        return f"'{entry['ref']}'"
+    if isinstance(entry, dict) and entry.get("threads") is not None:
+        return "an inline weave"
+    return f"'{_entry_name(entry)}.weave'"
 
 
 def hydrate_model(
@@ -162,12 +171,22 @@ def hydrate_children(
         )
 
     elif config_type == "loom":
+        # Weaves are keyed by name from here on (planner, runner, results),
+        # so a second entry with the same name would silently replace the first.
+        defined_by: dict[str, str] = {}
         for weave_entry, weave_dict in zip(
             resolved.get("weaves", []),
             resolved.get("_resolved_weaves", []),
             strict=True,
         ):
             weave_name = _entry_name(weave_entry)
+            origin = _weave_origin(weave_entry)
+            if weave_name in defined_by:
+                raise ConfigError(
+                    f"Duplicate weave name '{weave_name}' in loom: {defined_by[weave_name]} "
+                    f"and {origin}. Give one entry a unique 'name:'."
+                )
+            defined_by[weave_name] = origin
 
             if not weave_dict.get("name"):
                 weave_dict["name"] = weave_name
