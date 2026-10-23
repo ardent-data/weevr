@@ -149,8 +149,11 @@ checked as post-resolution cross-cutting validations.
 ## Loading without running
 
 `Context` executes; `load_config()` and `load_resolved()` inspect. All three
-run the same pipeline, so a config that loads through one loads the same way
-through the others. The difference is what comes back and what's needed:
+run the same pipeline for `.thread`, `.weave`, and `.loom` files, so a typed
+config loads the same way through each. Two differences: only `load_config()`
+also accepts `.yaml` and params files, and only `Context` has a Fabric context,
+so the other two need a default for every `${fabric.*}` reference. Beyond that,
+the difference is what comes back and what's needed:
 
 | Entry point | Needs Spark | Returns |
 |---|---|---|
