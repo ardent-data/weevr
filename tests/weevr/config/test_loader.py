@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from weevr.config import load_resolved
+from weevr.config import load_config, load_resolved
 from weevr.config.loader import resolve_source_paths
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Thread, Weave
@@ -181,3 +181,75 @@ class TestLoadResolvedRejects:
         )
         with pytest.raises(VariableResolutionError, match="fabric.workspace_id"):
             load_resolved(cfg)
+
+
+_DUP_THREAD = """\
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.{name}
+target:
+  alias: out.{name}
+"""
+
+
+class TestDuplicateWeaveNames:
+    """Two weave entries in a loom with the same effective name fail the load."""
+
+    @staticmethod
+    def _project(tmp_path: Path, weaves: str) -> Path:
+        project = tmp_path / "dup.weevr"
+        for folder, thread in (("a", "x"), ("b", "y")):
+            (project / folder).mkdir(parents=True)
+            (project / folder / f"{thread}.thread").write_text(_DUP_THREAD.format(name=thread))
+            (project / folder / "main.weave").write_text(
+                f'config_version: "1.0"\nthreads:\n  - ref: {folder}/{thread}.thread\n'
+            )
+        (project / "all.loom").write_text(f'config_version: "1.0"\nweaves:\n{weaves}')
+        return project
+
+    def test_same_stem_in_two_folders_rejected(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, "  - ref: a/main.weave\n  - ref: b/main.weave\n")
+        with pytest.raises(ConfigError, match="Duplicate weave name 'main'") as exc:
+            load_resolved(project / "all.loom", project_root=project)
+        assert "a/main.weave" in str(exc.value)
+        assert "b/main.weave" in str(exc.value)
+        assert "name:" in str(exc.value)
+        assert exc.value.file_path == str(project / "all.loom")
+
+    def test_load_config_rejects_too(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, "  - ref: a/main.weave\n  - ref: b/main.weave\n")
+        with pytest.raises(ConfigError, match="Duplicate weave name 'main'"):
+            load_config(project / "all.loom", project_root=project)
+
+    def test_same_file_twice_rejected(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, "  - ref: a/main.weave\n  - ref: a/main.weave\n")
+        with pytest.raises(ConfigError, match="Duplicate weave name 'main'"):
+            load_resolved(project / "all.loom", project_root=project)
+
+    def test_inline_weave_with_same_name_rejected(self, tmp_path: Path) -> None:
+        project = self._project(
+            tmp_path,
+            "  - ref: a/main.weave\n"
+            "  - name: main\n"
+            '    config_version: "1.0"\n'
+            "    threads:\n"
+            "      - ref: b/y.thread\n",
+        )
+        with pytest.raises(ConfigError, match="'a/main.weave' and an inline weave"):
+            load_resolved(project / "all.loom", project_root=project)
+
+    def test_explicit_name_keeps_both(self, tmp_path: Path) -> None:
+        project = self._project(
+            tmp_path, "  - ref: a/main.weave\n    name: staging\n  - ref: b/main.weave\n"
+        )
+        loaded = load_resolved(project / "all.loom", project_root=project)
+        assert {name: list(t) for name, t in loaded.resolved_threads.items()} == {
+            "staging": ["x"],
+            "main": ["y"],
+        }
+        assert [(p.weave_name, p.threads) for p in loaded.execution_plan or []] == [
+            ("staging", ["x"]),
+            ("main", ["y"]),
+        ]

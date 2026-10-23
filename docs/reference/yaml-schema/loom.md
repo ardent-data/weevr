@@ -40,10 +40,22 @@ Each entry in the `weaves` list is either a plain string (shorthand) or a
   `threads`; threads can be inline or use `ref`. Errors in an inline weave
   name the loom file.
 
+Each weave's name must be unique within the loom; a second entry with the same
+name fails the load with an error naming both entries. A `ref` entry takes its
+name from the file stem, so two files with the same stem in different folders
+need an explicit `name` on one of them:
+
+```yaml
+weaves:
+  - ref: staging/main.weave
+    name: staging_main
+  - ref: curated/main.weave
+```
+
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with `name`. |
-| `name` | `string` | no | `""` | Weave name. Without `ref`, names `<name>.weave` in the project root or an inline weave; derived from the filename stem when using `ref`. |
+| `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with an inline weave body. |
+| `name` | `string` | no | `""` | Weave name, unique within the loom. Without `ref`, names `<name>.weave` in the project root or an inline weave. With `ref`, overrides the name taken from the filename stem. |
 | `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
 
 ### weaves.condition (ConditionSpec)
