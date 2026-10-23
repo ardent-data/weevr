@@ -839,11 +839,4 @@ class Context:
         )
         for warning in hydrated.warnings:
             logger.warning(warning)
-        return LoadedConfig(
-            model=hydrated.model,
-            config_type=hydrated.config_type,
-            config_name=hydrated.config_name,
-            threads=hydrated.threads or None,
-            weaves=hydrated.weaves or None,
-            warnings=hydrated.warnings,
-        )
+        return LoadedConfig.from_hydrated(hydrated)

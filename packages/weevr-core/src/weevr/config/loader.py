@@ -12,12 +12,17 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from weevr.config.attribution import attribute_errors
 from weevr.config.hydration import hydrate_children, hydrate_model
 from weevr.config.inheritance import apply_inheritance
-from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
+from weevr.config.locations import (
+    ConfigLocation,
+    LocalConfigLocation,
+    RemoteConfigLocation,
+    make_location,
+)
 from weevr.config.macros import expand_foreach
 from weevr.config.parser import (
     detect_config_type,
@@ -39,9 +44,6 @@ from weevr.config.validation import (
 )
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
-
-if TYPE_CHECKING:
-    from weevr.result import LoadedConfig
 
 logger = logging.getLogger("weevr.config")
 
@@ -212,6 +214,9 @@ def resolve_config(
 def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
     """Hydrate a resolved thread, weave, or loom and the children it pulls in.
 
+    Hydration consumes ``resolved``: child dicts in ``resolved.data`` are
+    prepared in place, so hydrate each resolved config once.
+
     Args:
         resolved: The output of :func:`resolve_config` for a component config.
 
@@ -291,7 +296,7 @@ def load_resolved(
     path: str | Path | ConfigLocation,
     runtime_params: dict[str, Any] | None = None,
     project_root: Path | ConfigLocation | None = None,
-) -> LoadedConfig:
+) -> Any:  # weevr.result.LoadedConfig; importing it here would close an import cycle
     """Load a thread, weave, or loom with its resolved child threads and weaves.
 
     Runs the same load as :func:`load_config` and ``Context.load`` — params,
@@ -322,8 +327,6 @@ def load_resolved(
         ConfigError: Unsupported extension or a name/filename mismatch, plus
             every error :func:`load_config` raises.
     """
-    from weevr.config.locations import make_location
-
     # Imported here, not at module level: weevr.result reaches the engine
     # wheel's weevr.engine package, which needs weevr.config fully imported.
     from weevr.result import LoadedConfig
@@ -337,14 +340,7 @@ def load_resolved(
     )
     for warning in hydrated.warnings:
         logger.warning(warning)
-    return LoadedConfig(
-        model=hydrated.model,
-        config_type=hydrated.config_type,
-        config_name=hydrated.config_name,
-        threads=hydrated.threads,
-        weaves=hydrated.weaves,
-        warnings=hydrated.warnings,
-    )
+    return LoadedConfig.from_hydrated(hydrated)
 
 
 def _apply_cascade(config_type: str, data: dict[str, Any]) -> None:

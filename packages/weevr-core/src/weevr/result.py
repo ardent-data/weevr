@@ -558,6 +558,8 @@ class LoadedConfig:
         "_config_name",
         "_threads",
         "_weaves",
+        "_resolved_threads",
+        "_resolved_weaves",
         "_warnings",
         "_execution_plan",
         "_plan_built",
@@ -578,9 +580,33 @@ class LoadedConfig:
         self._config_name = config_name
         self._threads = threads
         self._weaves = weaves
+        self._resolved_threads: Mapping[str, Mapping[str, Thread]] = MappingProxyType(
+            {name: MappingProxyType(dict(by_name)) for name, by_name in (threads or {}).items()}
+        )
+        self._resolved_weaves: Mapping[str, Weave] = MappingProxyType(dict(weaves or {}))
         self._warnings: tuple[str, ...] = tuple(warnings or ())
         self._execution_plan: list[Any] | None = None
         self._plan_built = False
+
+    @classmethod
+    def from_hydrated(cls, hydrated: Any) -> LoadedConfig:
+        """Wrap the config loader's result.
+
+        Args:
+            hydrated: A ``weevr.config.loader.HydratedConfig``. Typed ``Any``
+                because importing it here would close an import cycle.
+
+        Returns:
+            The loaded config, with the loader's children and warnings.
+        """
+        return cls(
+            model=hydrated.model,
+            config_type=hydrated.config_type,
+            config_name=hydrated.config_name,
+            threads=hydrated.threads,
+            weaves=hydrated.weaves,
+            warnings=hydrated.warnings,
+        )
 
     @property
     def model(self) -> Any:
@@ -605,12 +631,7 @@ class LoadedConfig:
         weave; a thread config has none. Read-only. Not to be confused with
         ``threads``, which proxies to a Weave model's ``ThreadEntry`` list.
         """
-        return MappingProxyType(
-            {
-                name: MappingProxyType(dict(threads))
-                for name, threads in (self._threads or {}).items()
-            }
-        )
+        return self._resolved_threads
 
     @property
     def resolved_weaves(self) -> Mapping[str, Weave]:
@@ -619,7 +640,7 @@ class LoadedConfig:
         Read-only. Not to be confused with ``weaves``, which proxies to a Loom
         model's ``WeaveEntry`` list.
         """
-        return MappingProxyType(dict(self._weaves or {}))
+        return self._resolved_weaves
 
     @property
     def warnings(self) -> tuple[str, ...]:
