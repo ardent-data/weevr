@@ -34,10 +34,20 @@ class TestLoadConfig:
         assert lc.mode == "cdc"
         assert lc.cdc is not None
 
-    def test_watermark_mode_with_column(self):
-        """incremental_watermark with watermark_column is valid."""
-        lc = LoadConfig(mode="incremental_watermark", watermark_column="modified_at")
-        assert lc.watermark_column == "modified_at"
+    def test_watermark_mode_column_without_watermark_type_raises(self):
+        """incremental_watermark with watermark_column but no watermark_type raises."""
+        with pytest.raises(ValidationError, match="incremental_watermark.*watermark_type"):
+            LoadConfig(mode="incremental_watermark", watermark_column="modified_at")
+
+    @pytest.mark.parametrize("watermark_type", ["timestamp", "date", "int", "long"])
+    def test_watermark_mode_with_column_and_watermark_type(self, watermark_type):
+        """incremental_watermark with a column and any supported type is valid."""
+        lc = LoadConfig(
+            mode="incremental_watermark",
+            watermark_column="modified_at",
+            watermark_type=watermark_type,
+        )
+        assert lc.watermark_type == watermark_type
 
     def test_watermark_mode_with_type(self):
         """incremental_watermark can include watermark_type."""
