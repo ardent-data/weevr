@@ -16,10 +16,9 @@ from weevr.config.parser import (
     validate_config_version,
 )
 from weevr.config.resolver import (
-    build_param_context,
+    resolve_config_variables,
     resolve_declared_params,
     resolve_references,
-    resolve_variables,
     validate_params,
 )
 from weevr.config.validation import validate_schema
@@ -114,14 +113,14 @@ def _load_config_file(
     )
     # Type validation only — required-missing already raised above.
     validate_params(declared_param_specs, resolved_declared_params)
-    context = build_param_context(
-        runtime_params,
-        config_dict.get("defaults"),
-        entry_params=resolved_declared_params or None,
-    )
 
     # Step 6: Resolve variables
-    resolved = resolve_variables(config_dict, context)
+    resolved = resolve_config_variables(
+        config_dict,
+        config_type,
+        runtime_params,
+        entry_params=resolved_declared_params or None,
+    )
 
     # Step 7: Resolve references to child configs
     if project_root is None:

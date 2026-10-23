@@ -297,6 +297,68 @@ def resolve_variables(
         return config
 
 
+def _is_inline_weave(entry: Any) -> bool:
+    """Whether a loom weave entry carries an inline weave body."""
+    return (
+        isinstance(entry, dict) and "ref" not in entry and bool(set(entry) - {"name", "condition"})
+    )
+
+
+def resolve_config_variables(
+    config: dict[str, Any],
+    config_type: str,
+    runtime_params: dict[str, Any] | None = None,
+    fabric_context: dict[str, Any] | None = None,
+    entry_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Resolve variable references in a top-level config.
+
+    Builds the parameter context from the config's own ``defaults`` and
+    resolves every ``${...}`` reference. An inline weave in a loom is
+    resolved with its own ``defaults`` layered over the loom's, so it sees
+    the same variables it would as a ``.weave`` file plus the loom's.
+
+    Args:
+        config: Schema-validated config dict.
+        config_type: The config kind (``"thread"``, ``"weave"``, ...).
+        runtime_params: Runtime parameter overrides.
+        fabric_context: Optional Fabric environment values.
+        entry_params: Resolved declared params, exposed as ``${param.x}``.
+
+    Returns:
+        The config dict with variables resolved.
+
+    Raises:
+        VariableResolutionError: If a variable has no value and no default.
+    """
+    defaults = config.get("defaults")
+
+    def resolve(target: Any, scope_defaults: dict[str, Any] | None) -> Any:
+        context = build_param_context(
+            runtime_params,
+            scope_defaults,
+            fabric_context=fabric_context,
+            entry_params=entry_params,
+        )
+        return resolve_variables(target, context)
+
+    weaves = config.get("weaves")
+    if config_type != "loom" or not isinstance(weaves, list):
+        return resolve(config, defaults)
+
+    inline = {i: entry for i, entry in enumerate(weaves) if _is_inline_weave(entry)}
+    if not inline:
+        return resolve(config, defaults)
+
+    shell = {**config, "weaves": [None if i in inline else e for i, e in enumerate(weaves)]}
+    resolved = resolve(shell, defaults)
+    for i, entry in inline.items():
+        own = entry.get("defaults")
+        weave_defaults = {**(defaults or {}), **(own if isinstance(own, dict) else {})}
+        resolved["weaves"][i] = resolve(entry, weave_defaults)
+    return resolved
+
+
 def validate_params(
     param_specs: dict[str, Any] | None,
     context: dict[str, Any],
@@ -624,10 +686,11 @@ def resolve_references(
                             resolved_weaves.append(resolved_child)
                         finally:
                             visited.discard(convention_ref)
-                    elif set(entry) - {"name", "condition"}:
-                        # Inline weave body. Variables were already resolved
-                        # with the loom; validate and resolve its threads the
-                        # way a weave file is.
+                    elif _is_inline_weave(entry):
+                        # Inline weave body. resolve_config_variables already
+                        # resolved its variables with the weave's own defaults;
+                        # validate and resolve its threads the way a weave
+                        # file is.
                         validated = validate_schema(entry, "weave")
                         inline = validated.model_dump(exclude_unset=True)
                         inline["qualified_key"] = weave_name

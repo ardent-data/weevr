@@ -1156,6 +1156,19 @@ class TestLoadConfigInlineWeaves:
             load_config(loom, project_root=tmp_path)
         assert exc_info.value.file_path == str(loom)
 
+    def test_inline_weave_defaults_resolve_variables(self, tmp_path):
+        """A ${var} defined in the inline weave's own defaults resolves."""
+        loom = self._loom(
+            tmp_path,
+            '  - name: inline_ops\n    config_version: "1.0"\n'
+            "    defaults:\n      tbl: ops.from_weave\n    threads:\n"
+            '      - name: ops_audit\n        config_version: "1.0"\n'
+            "        sources:\n          events:\n            type: delta\n"
+            "            alias: raw.events\n        target:\n"
+            '          alias: "${tbl}"\n',
+        )
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
     def test_name_only_weave_without_file_raises(self, tmp_path):
         """A name-only weave entry with no file and no body names the missing file."""
         loom = self._loom(tmp_path, "  - name: missing\n")

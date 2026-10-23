@@ -733,6 +733,43 @@ target:
         loaded = self._load(tmp_path)
         assert loaded.model.weaves[0].condition.when == "true"
 
+    @staticmethod
+    def _load_defaults(tmp_path: Path, loom_defaults: str, params: dict | None = None):
+        loom = (
+            'config_version: "1.0"\n' + loom_defaults + "weaves:\n"
+            '  - name: inline_ops\n    config_version: "1.0"\n'
+            "    defaults:\n      tbl: ops.from_weave\n    threads:\n"
+            '      - name: ops_audit\n        config_version: "1.0"\n'
+            "        sources:\n          events:\n            type: delta\n"
+            '            alias: "${src}"\n        target:\n'
+            '          alias: "${tbl}"\n'
+        )
+        project = tmp_path / "defaults.weevr"
+        project.mkdir()
+        (project / "x.loom").write_text(loom)
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
+        return ctx.load("x.loom")._threads["inline_ops"]["ops_audit"]
+
+    def test_inline_weave_defaults_resolve_variables(self, tmp_path: Path) -> None:
+        """The inline weave's own defaults resolve ${var}; loom defaults still reach it."""
+        thread = self._load_defaults(tmp_path, "defaults:\n  src: raw.events\n")
+        assert thread.target.alias == "ops.from_weave"
+        assert thread.sources["events"].alias == "raw.events"
+
+    def test_inline_weave_defaults_override_loom_defaults(self, tmp_path: Path) -> None:
+        """A weave default wins over a loom default of the same name."""
+        thread = self._load_defaults(
+            tmp_path, "defaults:\n  src: raw.events\n  tbl: ops.from_loom\n"
+        )
+        assert thread.target.alias == "ops.from_weave"
+
+    def test_runtime_param_overrides_inline_weave_default(self, tmp_path: Path) -> None:
+        """Runtime params still take priority over the inline weave's defaults."""
+        thread = self._load_defaults(
+            tmp_path, "defaults:\n  src: raw.events\n", params={"tbl": "ops.from_run"}
+        )
+        assert thread.target.alias == "ops.from_run"
+
     def test_inline_weave_plans(self, tmp_path: Path) -> None:
         """The inline weave gets an execution plan honouring its dependencies."""
         plans = self._load(tmp_path).execution_plan

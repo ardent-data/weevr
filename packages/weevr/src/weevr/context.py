@@ -23,10 +23,9 @@ from weevr.config.parser import (
     validate_config_version,
 )
 from weevr.config.resolver import (
-    build_param_context,
+    resolve_config_variables,
     resolve_declared_params,
     resolve_references,
-    resolve_variables,
     validate_params,
 )
 from weevr.config.validation import (
@@ -941,16 +940,16 @@ class Context:
         )
         # Type validation only — required-missing already raised above.
         validate_params(declared_param_specs, resolved_declared_params)
-        param_context = build_param_context(
-            self._params,
-            config_dict.get("defaults"),
-            fabric_context=fabric_ctx,
-            entry_params=resolved_declared_params or None,
-        )
 
         # Step 6: Variable resolution
         try:
-            resolved = resolve_variables(config_dict, param_context)
+            resolved = resolve_config_variables(
+                config_dict,
+                config_type,
+                self._params,
+                fabric_context=fabric_ctx,
+                entry_params=resolved_declared_params or None,
+            )
         except VariableResolutionError as exc:
             if config_type == "thread" and "param." in str(exc):
                 raise VariableResolutionError(
