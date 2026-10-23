@@ -1635,10 +1635,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.config.build_param_context" class="md-nav__link">
+  <a href="#weevr.config.resolve_config_variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        build_param_context
+        resolve_config_variables
       
     </span>
   </a>
@@ -1661,17 +1661,6 @@
     <span class="md-ellipsis">
       
         resolve_references
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#weevr.config.resolve_variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        resolve_variables
       
     </span>
   </a>
@@ -3962,10 +3951,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.config.build_param_context" class="md-nav__link">
+  <a href="#weevr.config.resolve_config_variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        build_param_context
+        resolve_config_variables
       
     </span>
   </a>
@@ -3988,17 +3977,6 @@
     <span class="md-ellipsis">
       
         resolve_references
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#weevr.config.resolve_variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        resolve_variables
       
     </span>
   </a>
@@ -6443,20 +6421,19 @@ invalid YAML syntax.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="weevr.config.build_param_context" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">build_param_context</span><span class="p">(</span><span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">config_defaults</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fabric_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">entry_params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+<h3 id="weevr.config.resolve_config_variables" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_config_variables</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">config_type</span><span class="p">,</span> <span class="n">runtime_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fabric_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">entry_params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
-<a href="#weevr.config.build_param_context" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#weevr.config.resolve_config_variables" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Build parameter context with proper priority layering.</p>
-<p>Priority order (highest to lowest):
-1. runtime_params
-2. entry_params (nested under <code>param</code> key for <code>${param.x}</code> access)
-3. config_defaults
-4. fabric_context</p>
+        <p>Resolve variable references in a top-level config.</p>
+<p>Builds the parameter context from the config's own <code>defaults</code> and
+resolves every <code>${...}</code> reference. An inline weave in a loom is
+resolved with its own <code>defaults</code> layered over the loom's, so it sees
+the same variables it would as a <code>.weave</code> file plus the loom's.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6470,6 +6447,38 @@ invalid YAML syntax.</p>
         </tr>
       </thead>
       <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Schema-validated config dict.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The config kind (<code>"thread"</code>, <code>"weave"</code>, ...).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
           <tr class="doc-section-item">
             <td>
                 <code>runtime_params</code>
@@ -6488,22 +6497,6 @@ invalid YAML syntax.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>config_defaults</code>
-            </td>
-            <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Default parameters from config.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
                 <code>fabric_context</code>
             </td>
             <td>
@@ -6511,9 +6504,7 @@ invalid YAML syntax.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Fabric environment values keyed as <code>fabric.&lt;field&gt;</code>
-(e.g. <code>fabric.workspace_id</code>). None values are omitted. Lowest
-priority — overridden by config_defaults and runtime_params.</p>
+                <p>Optional Fabric environment values.</p>
               </div>
             </td>
             <td>
@@ -6529,8 +6520,7 @@ priority — overridden by config_defaults and runtime_params.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>ThreadEntry-level parameters injected under the
-<code>param</code> namespace for <code>${param.x}</code> dotted-key resolution.</p>
+                <p>Resolved declared params, exposed as <code>${param.x}</code>.</p>
               </div>
             </td>
             <td>
@@ -6556,7 +6546,30 @@ priority — overridden by config_defaults and runtime_params.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Merged parameter context dictionary with dotted key access support.</p>
+                <p>The config dict with variables resolved.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="VariableResolutionError (weevr.errors.VariableResolutionError)" href="../errors/#weevr.errors.VariableResolutionError">VariableResolutionError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a variable has no value and no default.</p>
               </div>
             </td>
           </tr>
@@ -6883,138 +6896,6 @@ reference detected.</p>
             <td>
               <div class="doc-md-description">
                 <p>If an inline definition is missing a <code>name</code> field.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="weevr.config.resolve_variables" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">resolve_variables</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="n">consumed_keys</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
-
-<a href="#weevr.config.resolve_variables" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Recursively resolve variable references in config.</p>
-<p>Supports:
-- ${var} - simple variable reference (error if not found)
-- ${var:-default} - variable with fallback default</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>config</code>
-            </td>
-            <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | <span title="list">list</span>[<span title="typing.Any">Any</span>] | <span title="str">str</span> | <span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Config structure to resolve (dict, list, str, or primitive)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>context</code>
-            </td>
-            <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Parameter context for variable lookup</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>consumed_keys</code>
-            </td>
-            <td>
-                  <code><span title="set">set</span>[<span title="str">str</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Optional set to track which context keys were consumed
-during resolution. When provided, each resolved dotted key is
-added to the set for post-resolution unused-param analysis.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Config with all variables resolved</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="VariableResolutionError (weevr.errors.VariableResolutionError)" href="../errors/#weevr.errors.VariableResolutionError">VariableResolutionError</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If variable not found and no default provided</p>
               </div>
             </td>
           </tr>

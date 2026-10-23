@@ -1118,6 +1118,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#inline-weave" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline weave
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3057,6 +3068,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#inline-weave" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline weave
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3118,7 +3140,7 @@ runtime settings that cascade down through weaves to threads.</p>
 <td><code>list[WeaveEntry or string]</code></td>
 <td>yes</td>
 <td>--</td>
-<td>Weave references. Strings are shorthand for <code>{ name: "&lt;value&gt;" }</code> (inline definitions). Use <code>ref</code> for external file references.</td>
+<td>Weave entries. Strings are shorthand for <code>{ name: "&lt;value&gt;" }</code>. Use <code>ref</code> for an external file, <code>name</code> alone for <code>&lt;name&gt;.weave</code> in the project root, or <code>name</code> plus a weave body for an inline weave.</td>
 </tr>
 <tr>
 <td><code>defaults</code></td>
@@ -3202,8 +3224,16 @@ runtime settings that cascade down through weaves to threads.</p>
 <hr />
 <h2 id="weaves-weaveentry">weaves (WeaveEntry)<a class="headerlink" href="#weaves-weaveentry" title="Permanent link">&para;</a></h2>
 <p>Each entry in the <code>weaves</code> list is either a plain string (shorthand) or a
-<code>WeaveEntry</code> object. Use <code>ref</code> to reference an external <code>.weave</code> file, or
-<code>name</code> for inline weave definitions within the loom.</p>
+<code>WeaveEntry</code> object. An entry takes one of three forms:</p>
+<ul>
+<li><strong><code>ref</code></strong> — an external <code>.weave</code> file, relative to the project root.</li>
+<li><strong><code>name</code> alone</strong> — the weave file <code>&lt;name&gt;.weave</code> in the project root. If
+  that file does not exist, loading fails with an error naming it.</li>
+<li><strong><code>name</code> plus a weave body</strong> — an inline weave defined in the loom. The body
+  takes the same keys as a <code>.weave</code> file, including <code>config_version</code> and
+  <code>threads</code>; threads can be inline or use <code>ref</code>. Errors in an inline weave
+  name the loom file.</li>
+</ul>
 <table>
 <thead>
 <tr>
@@ -3220,14 +3250,14 @@ runtime settings that cascade down through weaves to threads.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Path to an external <code>.weave</code> file, relative to the project root. Mutually exclusive with inline <code>name</code>.</td>
+<td>Path to an external <code>.weave</code> file, relative to the project root. Mutually exclusive with <code>name</code>.</td>
 </tr>
 <tr>
 <td><code>name</code></td>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>""</code></td>
-<td>Weave name. Required for inline definitions; derived from filename stem when using <code>ref</code>.</td>
+<td>Weave name. Without <code>ref</code>, names <code>&lt;name&gt;.weave</code> in the project root or an inline weave; derived from the filename stem when using <code>ref</code>.</td>
 </tr>
 <tr>
 <td><code>condition</code></td>
@@ -3353,8 +3383,8 @@ weave field wins), and it never applies at thread scope. See the
 <a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="w">  </span><span class="nt">tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">snake_case</span>
 </code></pre></div>
 <h3 id="shorthand-weave-syntax">Shorthand weave syntax<a class="headerlink" href="#shorthand-weave-syntax" title="Permanent link">&para;</a></h3>
-<p>Weave entries can be plain strings for inline definitions that need no
-condition:</p>
+<p>Weave entries can be plain strings when the weave lives in <code>&lt;name&gt;.weave</code>
+in the project root and needs no condition:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">weaves</span><span class="p">:</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingest_raw</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build_curated</span>
@@ -3371,6 +3401,27 @@ condition:</p>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingest_raw.weave</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build_curated.weave</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">publish_marts.weave</span>
+</code></pre></div>
+<h3 id="inline-weave">Inline weave<a class="headerlink" href="#inline-weave" title="Permanent link">&para;</a></h3>
+<p>An inline weave keeps a small weave in the loom file itself:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">weaves</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingest_raw.weave</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ops_audit</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">condition</span><span class="p">:</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="s">"table_exists('ops.audit_events')"</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">threads</span><span class="p">:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">threads/audit_events.thread</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audit_summary</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">        </span><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">        </span><span class="nt">sources</span><span class="p">:</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">          </span><span class="nt">events</span><span class="p">:</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">            </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">            </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ops.audit_events</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">        </span><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">          </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ops.audit_summary</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">        </span><span class="nt">dependencies</span><span class="p">:</span>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audit_events</span>
 </code></pre></div>
 
 
