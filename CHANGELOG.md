@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/ardent-data/weevr/compare/weevr-v1.19.3...weevr-v1.20.0) (2026-10-23)
+
+
+### Features
+
+* **config:** add load_resolved for Spark-free resolved children ([#245](https://github.com/ardent-data/weevr/issues/245)) ([6db4263](https://github.com/ardent-data/weevr/commit/6db4263e1a92a9671930ba702ead38a09e6ee954))
+
 ## [1.19.3](https://github.com/ardent-data/weevr/compare/weevr-v1.19.2...weevr-v1.19.3) (2026-10-23)
 
 
