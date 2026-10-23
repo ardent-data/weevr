@@ -189,15 +189,18 @@ class TestValidateWording:
 
     def test_loom_reports_every_failing_weave(self, tmp_path: Path) -> None:
         errors = self._dag_errors(self._project(tmp_path), "both.loom")
-        assert errors == [
+        cycle = (
             "DAG validation failed for weave 'cyc': "
-            "Circular dependency detected in weave 'cyc': a → b → a",
+            "Circular dependency detected in weave 'cyc': a → b → a"
+        )
+        conflict = (
             "DAG validation failed for weave 'dup': "
             "Threads 'c', 'd' all write target 'out.shared' in weave 'dup' but are not ordered "
             "by explicit dependencies, so concurrent writes would corrupt the target. Declare "
             "explicit dependencies to serialize the writers, give each thread its own target, "
-            "or put a mutually exclusive condition on every writer.",
-        ]
+            "or put a mutually exclusive condition on every writer."
+        )
+        assert errors == [cycle, conflict]
 
     def test_missing_weave_wording(self, tmp_path: Path) -> None:
         # Config loading fails before a loom can lose a weave, so drop one by hand.
