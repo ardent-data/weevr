@@ -1,0 +1,3987 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.20/guides/observability/">
+      
+      
+        <link rel="prev" href="../connections/">
+      
+      
+        <link rel="next" href="../execution-settings/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Observability - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/mkdocs_d2_plugin.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#observability" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Observability
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/yaml-schema/thread/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../release-notes/1.19/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context & Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#structured-json-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured JSON logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#log-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log levels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Log levels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuring-log-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring log level
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution spans
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution spans">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#span-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Span model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#span-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Span events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#span-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Span hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trace-hierarchy-and-serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trace hierarchy and serialization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telemetry-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Telemetry results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#thread-telemetry-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread telemetry fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dimension-merge-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dimension merge metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weave-telemetry-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weave telemetry fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accessing-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessing telemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-lineage-stamps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit lineage stamps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-reporting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress reporting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-logging-handlers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom logging handlers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-telemetry-sinks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom telemetry sinks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-a-failing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging a failing pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../audit-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dimension-modeling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Modeling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fact-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sub-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sub-Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../thread-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../warps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Warps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.19/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.19
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.18/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.18
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.17/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.17
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.16/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.16
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.15/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.15
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.14/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.14
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.13/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.13
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.12
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.11
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.10/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.10
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.9
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#structured-json-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured JSON logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#log-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log levels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Log levels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuring-log-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring log level
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution spans
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution spans">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#span-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Span model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#span-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Span events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#span-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Span hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trace-hierarchy-and-serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trace hierarchy and serialization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telemetry-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Telemetry results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#thread-telemetry-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thread telemetry fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dimension-merge-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dimension merge metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weave-telemetry-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weave telemetry fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accessing-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accessing telemetry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-lineage-stamps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit lineage stamps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-reporting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress reporting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-logging-handlers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom logging handlers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-telemetry-sinks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom telemetry sinks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugging-a-failing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debugging a failing pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h1>
+<p>weevr provides structured telemetry at every level of execution. This guide
+covers logging, execution spans, trace hierarchies, and how to route
+telemetry data to external systems.</p>
+<h2 id="structured-json-logging">Structured JSON logging<a class="headerlink" href="#structured-json-logging" title="Permanent link">&para;</a></h2>
+<p>All log output from weevr is emitted as structured JSON through Python's
+standard <code>logging</code> module. The <code>StructuredJsonFormatter</code> formats each log
+record as a single-line JSON object with OTel-compatible field names:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2025-06-15T14:30:22.451000+00:00"</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"INFO"</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"logger"</span><span class="p">:</span><span class="w"> </span><span class="s2">"weevr.engine.executor"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Thread 'stg_customers' completed: 1204 rows written"</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">"weevr_thread"</span><span class="p">:</span><span class="w"> </span><span class="s2">"stg_customers"</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">"weevr_weave"</span><span class="p">:</span><span class="w"> </span><span class="s2">"staging"</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">"trace_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a1b2c3d4e5f67890a1b2c3d4e5f67890"</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">"span_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"f1e2d3c4b5a67890"</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
+</code></pre></div>
+<p>Each entry includes:</p>
+<ul>
+<li><strong>timestamp</strong> -- ISO 8601 UTC timestamp</li>
+<li><strong>level</strong> -- Python log level (<code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>)</li>
+<li><strong>logger</strong> -- Dotted module path that emitted the record</li>
+<li><strong>message</strong> -- Human-readable description</li>
+<li><strong>weevr_thread</strong>, <strong>weevr_weave</strong>, <strong>weevr_loom</strong> -- Execution context
+  (included when available)</li>
+<li><strong>trace_id</strong>, <strong>span_id</strong> -- Correlation IDs linking the log entry to
+  its execution span</li>
+<li><strong>attributes</strong> -- Optional key-value map with additional context</li>
+</ul>
+<p>Because the output is JSON, it integrates directly with log aggregation
+systems (Azure Monitor, Elasticsearch, Splunk) without custom parsing.</p>
+<h2 id="log-levels">Log levels<a class="headerlink" href="#log-levels" title="Permanent link">&para;</a></h2>
+<p>weevr defines four log levels that map to Python's built-in levels:</p>
+<table>
+<thead>
+<tr>
+<th>weevr level</th>
+<th>Python level</th>
+<th>What it includes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>minimal</code></td>
+<td><code>WARNING</code></td>
+<td>Warnings and errors only</td>
+</tr>
+<tr>
+<td><code>standard</code></td>
+<td><code>INFO</code></td>
+<td>Execution milestones, row counts, timing</td>
+</tr>
+<tr>
+<td><code>verbose</code></td>
+<td><code>DEBUG</code></td>
+<td>Step-level detail, cache events, DAG decisions</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td><code>DEBUG</code></td>
+<td>Full diagnostic output including config dumps</td>
+</tr>
+</tbody>
+</table>
+<p>The default is <code>standard</code>, which provides enough information to confirm
+execution success and diagnose common issues without flooding the output.</p>
+<h3 id="configuring-log-level">Configuring log level<a class="headerlink" href="#configuring-log-level" title="Permanent link">&para;</a></h3>
+<p>Set the log level when constructing a <code>Context</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Context</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="s2">"my-project.weevr"</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="s2">"verbose"</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">)</span>
+</code></pre></div>
+<p>You can also set it in the top-level <code>execution:</code> block of a loom or
+weave:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># nightly.loom</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">execution</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">standard</span>
+</code></pre></div>
+<p>The <code>Context</code> constructor value takes precedence over YAML settings.
+Loom and weave blocks merge field-level; <code>defaults.execution</code> lands at
+thread scope, where execution settings are not applied. See
+<a href="../execution-settings/">Execution Settings</a> for the full precedence and
+merge rules.</p>
+<h2 id="execution-spans">Execution spans<a class="headerlink" href="#execution-spans" title="Permanent link">&para;</a></h2>
+<p>weevr uses an OTel-compatible span model to capture timing, status, and
+metrics for every unit of work. Spans form a hierarchy that mirrors the
+config structure.</p>
+<h3 id="span-model">Span model<a class="headerlink" href="#span-model" title="Permanent link">&para;</a></h3>
+<p>Each span is an <code>ExecutionSpan</code> with the following fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trace_id</code></td>
+<td>32-character hex string identifying the execution trace</td>
+</tr>
+<tr>
+<td><code>span_id</code></td>
+<td>16-character hex string identifying this span</td>
+</tr>
+<tr>
+<td><code>parent_span_id</code></td>
+<td>Parent span's ID, or <code>None</code> for the root span</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>Human-readable label (e.g., <code>"thread:stg_customers"</code>)</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>OK</code>, <code>ERROR</code>, or <code>UNSET</code></td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>UTC timestamp when the span started</td>
+</tr>
+<tr>
+<td><code>end_time</code></td>
+<td>UTC timestamp when the span ended</td>
+</tr>
+<tr>
+<td><code>attributes</code></td>
+<td>Key-value metrics (row counts, durations, etc.)</td>
+</tr>
+<tr>
+<td><code>events</code></td>
+<td>Timestamped events within the span</td>
+</tr>
+</tbody>
+</table>
+<p>Trace IDs and span IDs follow OTel conventions (hex-encoded random bytes),
+making them compatible with tracing backends that accept OTel data.</p>
+<h3 id="span-events">Span events<a class="headerlink" href="#span-events" title="Permanent link">&para;</a></h3>
+<p>Events mark significant moments within a span. Each <code>SpanEvent</code> has a
+<code>name</code>, <code>timestamp</code>, and optional <code>attributes</code> dict. Common events include:</p>
+<ul>
+<li><code>sources_read</code> -- All source DataFrames loaded</li>
+<li><code>pipeline_complete</code> -- Transform steps finished</li>
+<li><code>validation_complete</code> -- Pre-write validation done</li>
+<li><code>write_complete</code> -- Target write finished</li>
+<li><code>watermark_persisted</code> -- High-water mark saved</li>
+</ul>
+<h3 id="span-hierarchy">Span hierarchy<a class="headerlink" href="#span-hierarchy" title="Permanent link">&para;</a></h3>
+<p>A loom execution produces a three-level span tree:</p>
+<div class="d2"><svg data-d2-version="v0.9.0" preserveAspectRatio="xMinYMin meet" viewBox="0 0 1682 795" role="img" aria-label="Diagram"><svg class="d2-62671d8794574f64a94a04df49887f83 d2-svg" width="1682" height="795" viewBox="-89 -89 1682 795"><rect x="-89" y="-89" width="1682" height="795" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-62671d8794574f64a94a04df49887f83 .text {
+	font-family: "d2-62671d8794574f64a94a04df49887f83-font-regular";
+}
+@font-face {
+	font-family: d2-62671d8794574f64a94a04df49887f83-font-regular;
+	src: url("data:application/font-woff;base64,d09GRgABAAAAAAxUAAoAAAAAEyQAAguFAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAAA9AAAAGAAAABgXd/Vo2NtYXAAAAFUAAAAhgAAAK4CmQOrZ2x5ZgAAAdwAAAYLAAAIFBWlXu9oZWFkAAAH6AAAADYAAAA2G4Ue32hoZWEAAAggAAAAJAAAACQKhAXdaG10eAAACEQAAABsAAAAbCy/BUxsb2NhAAAIsAAAADgAAAA4HNQfBm1heHAAAAjoAAAAIAAAACAAMwD2bmFtZQAACQgAAAMrAAAIFAbDVU1wb3N0AAAMNAAAACAAAAAg/9EAMgADAgkBkAAFAAACigJYAAAASwKKAlgAAAFeADIBIwAAAgsFAwMEAwICBGAAAvcAAAADAAAAAAAAAABBREJPAEAAIP//Au7/BgAAA9gBESAAAZ8AAAAAAeYClAAAACAAA3icbMzNacIAGIDhJ03apm3apj9qjg4gDuDdQcST4EFEFHfxB7OHqwjeBIf4RG+CvMcHXiRSCQqZGpVSKtfW0dXTNzAyMbOwjOBOhsam5leJY5zjFIfYRx272MYm1rG6vR+XaGmqPEllnr14lXvz7kPh05dvpR+//vxrcAEAAP//AwBYECAyAAB4nFxVW2wbWRn+z3gyE8d27YlnPHZ8nTnxTGzHl3g8M0nteJrYTt00jl0noZtsGygtdblVECSqooWVKKh9QfShbzywEvuyCGm1WqmstG+LgHBbaSUErECIJ+9Ku0JgIkQFHaOZOMHh6czD+f/v8n//GZiAXQBCJZ6AA5zghWngABRGYJKCLGNaV3Qd8w5dRgy9i/5kPkboUonUNHJh9aPV+y+/jF74BvHk+RfOf6vX++n+vXvmd/ofmkX07oeAYA8A/Zl4DC67HydwCoc5gdtDXzPff/YMLRCP1969+NeLAEBAaXiE3kADmIFZAF6U1JKmlyQJixQta5pSDHAMljFFyUVNVymKYwPvLF/57veYzFx6PZoQb57f7dRph3glgKv4/o2i+9JKZ4eJL+IEuxRIffFF83fnI+lVMf7QW8mnkoAgNzxCr6MBRAAmRMmCs0B42oa02itFTecpCk1fuFNZ+Xy10AiluXx0viFv1cTzgVmh464cdLoHFZHX/MH8zuJWL8rqUcHSkh8eofeJQ/BD4kSL3VxWlRMRunoK9K8X75Zv6Olqgtyq047IRuhCJb4Ukw1pzf3t++2vVGMzW28/X1yKpBo1M8Lntxav3gTC5v9LNIAgxM8o4FiKFgIn7B1CyYJB/MrnqsYt/fpnEGG+NXF1DZfD0Xj7V4g0lpQr7uWDdueg+tIdT8jZusYxGhtD0nqrDQAIYgDIIH57nAms6mpp5BMWOWuezKdWVxuX+LRvOhyp93roB9WJ1vpVJ22491s18zoAOCA7TKCP0QAWYBlap9NVpbHDbqpwOBDgWIrComxbo1hzZynKUdRUWwjHBvzH31iUju/8c/dLkjAdEv1Bubi9wM56XrvF8IVOURY908mF/Z2dyt2N9HIlk6ksa2vbSn77nOCbCV7+S92ILwVI11wknvOQbD2jbqbpCcOnxksbKcYVZvmYvpzdyKM3DFWtVFTVMB8tS+IMSfrTnJyzvekCoN8Th8Ba3igcfZJTxuZKM92uA7eKrYvd+UKynCQO37kl5G9cN3+NUvWqlDRfgeEQGgDwJvGUkCAEABTMvATHvYdH8AfiELzHfjEKcxrJ13Kp7jknSdOuyYB7SSVuP3/iZxCqkqRVB0D8HQ1AsDnxis2JP8OMPj27ddqR2MgsGl5pc/7ype58Tqt35/NaHfXXcH5hPlU6oXvZfGV0nOhGA2DHMcZ112kH3jwVbjc7o3uU37+hAXghfCa/9rzlsXkjb7lnGL1y5bZh3K4YrZZR3dwc7V7loNs5qNR7W9t37mxv9azd6w4V9G80GO3e/9jZqZJknhvlR6RoLhCwDBDamf1Plz+5KNZE4l6lXW7EjVmh+hvizcXI3MMvd79ajc3svIqo3l7nppgYRvjRfADQPhoAM+bB6PU4NiDUTEV5n5v1xmsh1H8hp001SbJYNQ+P6yPDI/QADSBtz1fW7ZVVS5Ik54jTHRtZEOBjhGXLe6V9nErUM4WCoITF1fRuO7sZmQtpiVwmVgjjejbVdssRPSRk4yGRn/IIaqrcTvAlfzAd4aOcyyPoOXl1zsYPDo9Qg7gL/ChfWNV1xV7o05x9tLnc3JhqPHggpD0xt4/Nu/eayFOdePSoZg6yC06ySrvsXm4A9HPUBw+A4lD8gYBluu5XHG+/vnPNxbtIFz917cqPUN/8eLaJcXMWseaMxQGAeIr6IPxf3VgH7JAk68WkHd9/uN2cPEeTkz7n5c6Gk5kkJ730xc1v3lpzep3kpG+qjvrmB2JNFGsiCo19zaAJXE8mG9j8j8V1mLe5hsd91/UztM8Re76o2zfJOlOa1/WTnZuukIt0sVNXOz9m8o33KHKFmChnZ9EH5j/iTVFoJpDn+aCwkbW8WBkewVtwYP3zLF9Lo/B9PYRxKIixG4ejGEfD2LqbH34CfgYHMA3Ay5omUyIeK6mxmQIiKCKIZ0OJ5NoPC35jDkUj4Xgpe+EGWG+HjYX+SMgQAECfBco6j/cTXkV9cNjZZLpd1Lf8Hv6CWAedeGpxY8aAgvF4MBiPE+vRUDAWC4ai8F8AAAD//wMA/Pug2gAAAQAAAAILhcyUlmNfDzz1AAMD6AAAAADYXaChAAAAAN1mLzb+Ov7bCG8DyAAAAAMAAgAAAAAAAAABAAAD2P7vAAAImP46/joIbwABAAAAAAAAAAAAAAAAAAAAGwKNAFkAyAAAAg8AWgH4ADQByAAuAisALwHwAC4BJAAeAfgALQIgAFIA9gBFAP8AUgM9AFICIwBSAh4ALgIrAFIBWwBSAaMAHAFSABgB0wAMAs4AGAHTAAwA+QBBAPkALwD5AEEA9gBSAAD/yQAAACwALABCAHoAqADaAQ4BMAGcAb4BygHmAhgCOgJmApoCugL6AyADPAN2A6YDvAPcA+gD9AQKAAEAAAAbAIwADABmAAcAAQAAAAAAAAAAAAAAAAAEAAN4nJyU32obVxDGf4oltaE0F8UE58acy7Y4KzXYIbGv1nVMlhor1Sr9A6WwltaSkLS77K7kuPQBet236Fvkqs/Rhyi9LjMaKdq0ECxCzLc6M998Z+abA+zyDzvU6veBP5s/GK6x3zw2fI8HzQPDO1w0/jJc34hpMGj8arjJl42u4Y94W//d8Mcc1n82fJ+9+rnhT3hS3zX86Y7jb8MPOOTtEtfgGb8ZrrFHZvgeu/xkeIeHGGetzkPahht8xr7hJvtAjzElU8YkDHFcM2bInJyYgpCYnDHXxAxwBPhMKfXXhEiRY/i/v0aElOREyjiixDElZEpEwcgYf9GslFdaUerkiqSaT8mIiCvNmBCR4EgZkpIQM1GekpKMY1q0KOir3oySAo+CMVM8UnKGtOhwzgU9RowpcJwrkygLSbmm5IZI6zuLkM70iUkoTNWchIHqdKov1uyACxwdMo3dZL6oMBzg+E6zRZvEOL7C0/9uQ1m17kpNxEL7KT28Yqo6b3SCI+241PX5VnHJMW6r/lSVfLhHA1Unsx5zxVznL/OTPFGS4NwePqE6KHSPcJzqd0CoHfmegB4v6fCann77dOnic0mPgBea26GL42s6XHKmGYHi5dm5OuaSH3F8Q6Axwh1bf6Tn8vWGzNwt2sUZco8ZmW6BzFjuL86Pt5qw7FBacUehrujrHkmk7IF0RfYsYmiuyNQVM+3lyhuF9W9gjpDTUmf77ly2YWG7t9riW1LdYcfcNMnkloo+NFXvPc/c6D+PiAEpVxrRJ2VGi5JbvdsrIuZMcZypj1/qlpT46xypc6suiZmpgoBEeXIy/RuZb0LT3q/43tlbIps30x2drG+1TRVhTjZm9Fq7tzoLrcvxxgRaNtXUcmTCwry8qXhfor2K/lDdX+jrlvKYLrG+rjL//D/vwBM82hxyxAkjrSP8CQt7I9r6TrR5zon2YEKsUfJqvtFuCcMRHk854ojnPK1w+pxxSoeTO2hcZnU45cV7J5scbs3ijOcPVdNWvY7H669nW8/r8zv48gsOKi+jKJc9yFkY2zv/XxIxEy1ub7Mv7hHevwAAAP//AwAHW0wwAAADAAAAAAAA/84AMgAAAAAAAAAAAAAAAAAAAAAAAAAA");
+}
+.d2-62671d8794574f64a94a04df49887f83 .text-bold {
+	font-family: "d2-62671d8794574f64a94a04df49887f83-font-bold";
+}
+@font-face {
+	font-family: d2-62671d8794574f64a94a04df49887f83-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}
+.d2-62671d8794574f64a94a04df49887f83 .text-italic {
+	font-family: "d2-62671d8794574f64a94a04df49887f83-font-italic";
+}
+@font-face {
+	font-family: d2-62671d8794574f64a94a04df49887f83-font-italic;
+	src: url("data:application/font-woff;base64,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");
+}</style><style type="text/css">.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-62671d8794574f64a94a04df49887f83 .fill-N1{fill:#0A0F25;}
+		.d2-62671d8794574f64a94a04df49887f83 .fill-N2{fill:#676C7E;}
+		.d2-62671d8794574f64a94a04df49887f83 .fill-N7{fill:#FFFFFF;}
+		.d2-62671d8794574f64a94a04df49887f83 .fill-B1{fill:#0D32B2;}
+		.d2-62671d8794574f64a94a04df49887f83 .fill-B4{fill:#E3E9FD;}
+		.d2-62671d8794574f64a94a04df49887f83 .fill-B5{fill:#EDF0FD;}
+		.d2-62671d8794574f64a94a04df49887f83 .fill-B6{fill:#F7F8FE;}
+		.d2-62671d8794574f64a94a04df49887f83 .stroke-B1{stroke:#0D32B2;}
+		.d2-62671d8794574f64a94a04df49887f83 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}</style><g class="bG9vbQ=="><g class="shape"><rect x="12" y="12" width="800" height="593" stroke="#0D32B2" fill="#E3E9FD" class=" stroke-B1 fill-B4" style="stroke-width:2;" /></g><text x="412" y="35" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:18px">loom:nightly</text></g><g class="bGVnZW5k"><g class="shape"><rect x="832" y="246" width="660" height="124" stroke="transparent" fill="transparent" style="stroke-width:2;" /></g><text x="1162" y="279" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">legend</text></g><g class="bG9vbS53ZWF2ZV9kaW0="><g class="shape"><rect x="62" y="62" width="700" height="166" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="412" y="91" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">weave:dimensions</text></g><g class="bG9vbS53ZWF2ZV9mYWN0cw=="><g class="shape"><rect x="169" y="389" width="485" height="166" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="411.5" y="418" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">weave:facts</text></g><g class="bGVnZW5kLm5vdGU="><g class="shape" /><svg x="882" y="296" width="560" height="24" viewBox="0 0 560 24" overflow="hidden"><g class="md md-native"><text x="0.000" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">Each span carries </text><text x="119.531" y="18.000" class="md-text text-bold fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">trace_id</text><text x="177.812" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">, </text><text x="185.000" y="18.000" class="md-text text-bold fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">span_id</text><text x="240.453" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">, </text><text x="247.641" y="18.000" class="md-text text-bold fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">status</text><text x="291.609" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">, </text><text x="298.797" y="18.000" class="md-text text-bold fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">start_time</text><text x="373.500" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">, </text><text x="380.688" y="18.000" class="md-text text-bold fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">end_time</text><text x="447.844" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">, and </text><text x="483.922" y="18.000" class="md-text text-bold fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">attributes</text><text x="555.172" y="18.000" class="md-text text fill-N1" fill="#0A0F25" font-size="16.000" xml:space="preserve">.</text></g></svg></g><g class="bG9vbS53ZWF2ZV9kaW0udDE="><g class="shape"><rect x="302" y="112" width="201" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="402.5" y="150.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">thread:dim_customer</text></g><g class="bG9vbS53ZWF2ZV9kaW0udDI="><g class="shape"><rect x="523" y="112" width="189" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="617.5" y="150.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">thread:dim_product</text></g><g class="bG9vbS53ZWF2ZV9kaW0udDM="><g class="shape"><rect x="112" y="112" width="170" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="197" y="150.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">thread:dim_store</text></g><g class="bG9vbS53ZWF2ZV9mYWN0cy50NA=="><g class="shape"><rect x="219" y="439" width="179" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="308.5" y="477.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">thread:fact_orders</text></g><g class="bG9vbS53ZWF2ZV9mYWN0cy50NQ=="><g class="shape"><rect x="418" y="439" width="186" height="66" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="511" y="477.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">thread:fact_returns</text></g><g class="bG9vbS4od2VhdmVfZGltIC0mZ3Q7IHdlYXZlX2ZhY3RzKVswXQ=="><marker id="mk-d2-62671d8794574f64a94a04df49887f83-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 412 230 L 412 385" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-62671d8794574f64a94a04df49887f83-3488378134)" mask="url(#d2-62671d8794574f64a94a04df49887f83)" /><text x="412" y="314" fill="#676C7E" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px">sequential</text></g><mask id="d2-62671d8794574f64a94a04df49887f83" maskUnits="userSpaceOnUse" x="-89" y="-89" width="1682" height="795">
+<rect x="-89" y="-89" width="1682" height="795" fill="white" />
+<rect x="375" y="298" width="74" height="21" fill="black" />
+</mask></svg></svg></div>
+<p>Step-level work (read, transform, validate, write, assert) is not
+modeled as child spans — that detail lives in the thread span's
+attributes and events, and in <code>step_stats</code> on <code>ThreadTelemetry</code>.
+Hooks, lookups, column sets, and sub-pipeline CTEs do get their own
+spans, parented to the scope that ran them.</p>
+<p>The <code>parent_span_id</code> on each span links it to its parent, forming a
+navigable tree. The <code>trace_id</code> is shared across all spans in a single
+execution.</p>
+<h3 id="building-spans">Building spans<a class="headerlink" href="#building-spans" title="Permanent link">&para;</a></h3>
+<p>weevr uses <code>SpanCollector</code> and <code>SpanBuilder</code> to construct spans during
+execution:</p>
+<ol>
+<li>A <code>SpanCollector</code> is created for the execution scope and holds the
+   shared <code>trace_id</code>.</li>
+<li><code>collector.start_span("thread:dim_customer", parent_span_id=...)</code>
+   returns a mutable <code>SpanBuilder</code>.</li>
+<li>The builder accumulates attributes and events as the work progresses.</li>
+<li><code>builder.finish(SpanStatus.OK)</code> produces an immutable <code>ExecutionSpan</code>
+   that is added to the collector.</li>
+<li>Thread-level collectors merge into the weave-level collector after
+   thread completion.</li>
+</ol>
+<p>This design avoids contention during concurrent thread execution -- each
+thread operates on its own builder, and merging happens only after the
+thread finishes.</p>
+<h2 id="trace-hierarchy-and-serialization">Trace hierarchy and serialization<a class="headerlink" href="#trace-hierarchy-and-serialization" title="Permanent link">&para;</a></h2>
+<p>Telemetry forms a tree that mirrors the execution hierarchy — the same
+objects returned on <code>RunResult.telemetry</code>:</p>
+<ul>
+<li><code>LoomTelemetry</code> -- Root of the tree, holding per-weave
+  <code>WeaveTelemetry</code> entries keyed by weave name</li>
+<li><code>WeaveTelemetry</code> -- Holds per-thread <code>ThreadTelemetry</code> entries keyed
+  by thread name</li>
+<li><code>ThreadTelemetry</code> -- Leaf carrying the thread's span plus its full
+  metrics (row counts, validation results, watermark state)</li>
+</ul>
+<p>Every level carries its own <code>ExecutionSpan</code>. Walking the tree gives
+hierarchical access; collecting the spans level by level yields a flat
+list suitable for export to any OTel-compatible backend:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Navigate the tree</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">for</span> <span class="n">weave_name</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">telemetry</span><span class="o">.</span><span class="n">weave_telemetry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">for</span> <span class="n">thread_name</span><span class="p">,</span> <span class="n">tt</span> <span class="ow">in</span> <span class="n">wt</span><span class="o">.</span><span class="n">thread_telemetry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">span</span> <span class="o">=</span> <span class="n">tt</span><span class="o">.</span><span class="n">span</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">elapsed</span> <span class="o">=</span> <span class="p">(</span><span class="n">span</span><span class="o">.</span><span class="n">end_time</span> <span class="o">-</span> <span class="n">span</span><span class="o">.</span><span class="n">start_time</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">thread_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">span</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="n">elapsed</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s"</span><span class="p">)</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Flatten the spans for export</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">spans</span> <span class="o">=</span> <span class="p">[</span><span class="n">result</span><span class="o">.</span><span class="n">telemetry</span><span class="o">.</span><span class="n">span</span><span class="p">]</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="k">for</span> <span class="n">wt</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">telemetry</span><span class="o">.</span><span class="n">weave_telemetry</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">spans</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">wt</span><span class="o">.</span><span class="n">span</span><span class="p">)</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="n">spans</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">tt</span><span class="o">.</span><span class="n">span</span> <span class="k">for</span> <span class="n">tt</span> <span class="ow">in</span> <span class="n">wt</span><span class="o">.</span><span class="n">thread_telemetry</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+</code></pre></div>
+<p>See the <a href="../../how-to/implement-custom-telemetry-sink/">custom telemetry sink how-to</a>
+for a complete export example.</p>
+<h2 id="telemetry-results">Telemetry results<a class="headerlink" href="#telemetry-results" title="Permanent link">&para;</a></h2>
+<div class="d2"><svg data-d2-version="v0.9.0" preserveAspectRatio="xMinYMin meet" viewBox="0 0 1903 836" role="img" aria-label="Diagram"><svg class="d2-f2e79070a50b40e98a6ac2944e701b07 d2-svg" width="1903" height="836" viewBox="-89 -89 1903 836"><rect x="-89" y="-89" width="1903" height="836" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-f2e79070a50b40e98a6ac2944e701b07 .text {
+	font-family: "d2-f2e79070a50b40e98a6ac2944e701b07-font-regular";
+}
+@font-face {
+	font-family: d2-f2e79070a50b40e98a6ac2944e701b07-font-regular;
+	src: url("data:application/font-woff;base64,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");
+}
+.d2-f2e79070a50b40e98a6ac2944e701b07 .text-bold {
+	font-family: "d2-f2e79070a50b40e98a6ac2944e701b07-font-bold";
+}
+@font-face {
+	font-family: d2-f2e79070a50b40e98a6ac2944e701b07-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}</style><style type="text/css">.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-f2e79070a50b40e98a6ac2944e701b07 .fill-N1{fill:#0A0F25;}
+		.d2-f2e79070a50b40e98a6ac2944e701b07 .fill-N7{fill:#FFFFFF;}
+		.d2-f2e79070a50b40e98a6ac2944e701b07 .fill-B1{fill:#0D32B2;}
+		.d2-f2e79070a50b40e98a6ac2944e701b07 .fill-B6{fill:#F7F8FE;}
+		.d2-f2e79070a50b40e98a6ac2944e701b07 .stroke-B1{stroke:#0D32B2;}
+		.d2-f2e79070a50b40e98a6ac2944e701b07 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}</style><g class="cnVu"><g class="shape"><rect x="754" y="12" width="216" height="66" stroke="#0D32B2" fill="#E3F2FD" class=" stroke-B1" style="stroke-width:2;" /></g><text x="862" y="50.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">ctx.run("nightly.loom")</text></g><g class="cmVzdWx0"><g class="shape"><rect x="12" y="148" width="1701" height="498" stroke="#0D32B2" fill="#E8F5E9" class=" stroke-B1" style="stroke-width:2;" /></g><text x="862.5" y="181" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">RunResult</text></g><g class="cmVzdWx0LnRlbGVtZXRyeQ=="><g class="shape"><rect x="62" y="198" width="1601" height="398" stroke="#0D32B2" fill="#C8E6C9" class=" stroke-B1" style="stroke-width:2;" /></g><text x="862.5" y="227" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:24px">LoomTelemetry</text></g><g class="cmVzdWx0LnRlbGVtZXRyeS5sb29tX3NwYW4="><g class="shape"><rect x="590" y="356" width="266" height="82" stroke="#0D32B2" fill="#F7F8FE" class=" stroke-B1 fill-B6" style="stroke-width:2;" /></g><text x="723" y="394.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px"><tspan x="723" dy="0">loom span</tspan><tspan x="723" dy="18.5">trace_id, start/end time, status</tspan></text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9kaW0="><g class="shape"><rect x="876" y="248" width="737" height="298" stroke="#0D32B2" fill="#FFF3E0" class=" stroke-B1" style="stroke-width:2;" /></g><text x="1244.5" y="273" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:20px">WeaveTelemetry — dimensions</text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9mYWN0cw=="><g class="shape"><rect x="112" y="306" width="458" height="182" stroke="#0D32B2" fill="#F3E5F5" class=" stroke-B1" style="stroke-width:2;" /></g><text x="341" y="331" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:20px">WeaveTelemetry — facts</text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9kaW0ud2VhdmVfc3Bhbg=="><g class="shape"><rect x="1115" y="364" width="128" height="66" stroke="#0D32B2" fill="#FFFFFF" class=" stroke-B1 fill-N7" style="stroke-width:2;" /></g><text x="1179" y="402.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">weave span</text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9kaW0udDE="><g class="shape"><rect x="1263" y="298" width="300" height="198" stroke="#0D32B2" fill="#FFE0B2" class=" stroke-B1" style="stroke-width:2;" /></g><text x="1413" y="319" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:16px"><tspan x="1413" dy="0">ThreadTelemetry</tspan><tspan x="1413" dy="18.5">dim_customer</tspan></text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9kaW0udDI="><g class="shape"><rect x="926" y="356" width="169" height="82" stroke="#0D32B2" fill="#FFE0B2" class=" stroke-B1" style="stroke-width:2;" /></g><text x="1010.5" y="394.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px"><tspan x="1010.5" dy="0">ThreadTelemetry</tspan><tspan x="1010.5" dy="18.5">dim_product</tspan></text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9mYWN0cy50Mw=="><g class="shape"><rect x="162" y="356" width="169" height="82" stroke="#0D32B2" fill="#E1BEE7" class=" stroke-B1" style="stroke-width:2;" /></g><text x="246.5" y="394.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px"><tspan x="246.5" dy="0">ThreadTelemetry</tspan><tspan x="246.5" dy="18.5">fact_orders</tspan></text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9mYWN0cy50NA=="><g class="shape"><rect x="351" y="356" width="169" height="82" stroke="#0D32B2" fill="#E1BEE7" class=" stroke-B1" style="stroke-width:2;" /></g><text x="435.5" y="394.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px"><tspan x="435.5" dy="0">ThreadTelemetry</tspan><tspan x="435.5" dy="18.5">fact_returns</tspan></text></g><g class="cmVzdWx0LnRlbGVtZXRyeS53ZWF2ZV9kaW0udDEucm93cw=="><g class="shape"><rect x="1313" y="348" width="200" height="98" stroke="#0D32B2" fill="#FFFFFF" class=" stroke-B1 fill-N7" style="stroke-width:2;" /></g><text x="1413" y="386.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px"><tspan x="1413" dy="0">rows_read: 5000</tspan><tspan x="1413" dy="17.666667">rows_written: 4800</tspan><tspan x="1413" dy="17.666667">rows_quarantined: 12</tspan></text></g><g class="KHJ1biAtJmd0OyByZXN1bHQpWzBd"><marker id="mk-d2-f2e79070a50b40e98a6ac2944e701b07-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 862.5 80 L 862.5 144" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-f2e79070a50b40e98a6ac2944e701b07-3488378134)" mask="url(#d2-f2e79070a50b40e98a6ac2944e701b07)" /></g><mask id="d2-f2e79070a50b40e98a6ac2944e701b07" maskUnits="userSpaceOnUse" x="-89" y="-89" width="1903" height="836">
+<rect x="-89" y="-89" width="1903" height="836" fill="white" />
+
+</mask></svg></svg></div>
+<p>Every <code>ctx.run()</code> call in execute mode returns a <code>RunResult</code> with a
+<code>telemetry</code> attribute containing structured telemetry data. The type
+depends on what was executed:</p>
+<table>
+<thead>
+<tr>
+<th>Config type</th>
+<th>Telemetry type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Thread</td>
+<td><code>ThreadTelemetry</code></td>
+<td>Span, validation/assertion results, row counts, watermark state</td>
+</tr>
+<tr>
+<td>Weave</td>
+<td><code>WeaveTelemetry</code></td>
+<td>Span, per-thread telemetry, column set results, lookup results</td>
+</tr>
+<tr>
+<td>Loom</td>
+<td><code>LoomTelemetry</code></td>
+<td>Span, per-weave telemetry keyed by weave name</td>
+</tr>
+</tbody>
+</table>
+<h3 id="thread-telemetry-fields">Thread telemetry fields<a class="headerlink" href="#thread-telemetry-fields" title="Permanent link">&para;</a></h3>
+<p><code>ThreadTelemetry</code> is the most detailed telemetry object. It includes:</p>
+<ul>
+<li><strong>span</strong> -- The thread's execution span</li>
+<li><strong>rows_read</strong>, <strong>rows_written</strong>, <strong>rows_quarantined</strong> -- Row counts.
+  On single-pass write paths, <code>rows_read</code> and <code>rows_written</code> are
+  computed as byproducts of the write itself (query observations and
+  Delta commit metrics) rather than by separate Spark jobs; a
+  quarantine count runs only when validation actually quarantined
+  rows, against the cached quarantine frame. Single-pass commits carry
+  a <a href="#commit-lineage-stamps">lineage stamp</a>, so the engine finds its
+  own commit exactly even when concurrent writers interleave. In the
+  rare case where attribution is truly impossible (the history read
+  itself fails), <code>rows_written</code> is <code>None</code> — unknown, never a false
+  zero — and a warning naming the thread and target is surfaced on
+  <code>RunResult.warnings</code>. Merge-based paths (dimensions, CDC, merge
+  write mode) retain direct counts.</li>
+<li><strong>validation_results</strong> -- Per-rule pass/fail counts and severity</li>
+<li><strong>assertion_results</strong> -- Post-write assertion outcomes</li>
+<li><strong>load_mode</strong> -- The load mode used (full, incremental, CDC)</li>
+<li><strong>watermark_column</strong>, <strong>watermark_previous_value</strong>,
+  <strong>watermark_new_value</strong> -- Watermark state for incremental loads</li>
+<li><strong>cdc_inserts</strong>, <strong>cdc_updates</strong>, <strong>cdc_deletes</strong> -- CDC operation
+  counts</li>
+<li><strong>rows_after_transforms</strong> -- Row count after pipeline transforms,
+  before validation</li>
+<li><strong>audit_columns_applied</strong> -- Names of audit columns injected
+  into the output</li>
+<li><strong>export_results</strong> -- Per-export write results (<code>ExportResult</code>
+  list with name, type, target, rows_written, duration_ms,
+  status, error)</li>
+<li><strong>watermark_persisted</strong> -- Whether the watermark was
+  successfully persisted after write</li>
+<li><strong>watermark_first_run</strong> -- Whether this is the first run with
+  no prior watermark state</li>
+<li><strong>step_stats</strong> -- Per-step pipeline statistics (resolve match
+  rates, validate-mode map counts), keyed <code>&lt;scope&gt;.&lt;step&gt;.&lt;name&gt;</code>.
+  Collected as a byproduct of the write rather than by extra Spark
+  jobs, and harvested best-effort: a failed harvest logs a warning
+  and leaves the field absent, never failing the thread. This field
+  is engine-internal — its key set and value shapes are unstable
+  and may change without notice. In preview mode the values are
+  sample-scoped (they reflect the sampled rows, not the full
+  source), and are present only when sample capture succeeded.</li>
+<li><strong>resolved_params</strong> -- Runtime parameter values that drove this
+  execution (populated on the outermost telemetry object)</li>
+<li><strong>warp_name</strong>, <strong>warp_source</strong>, <strong>warp_enforcement</strong> -- Which warp
+  applied (description), how it was resolved (<code>explicit</code>/<code>auto</code>),
+  and the enforcement mode in force</li>
+<li><strong>drift_detected</strong>, <strong>drift_columns</strong>, <strong>drift_mode</strong>,
+  <strong>drift_action_taken</strong> -- Schema drift outcome for this run; see
+  the <a href="../schema-drift/">Schema Drift guide</a></li>
+</ul>
+<h3 id="dimension-merge-metrics">Dimension merge metrics<a class="headerlink" href="#dimension-merge-metrics" title="Permanent link">&para;</a></h3>
+<p>Internally, dimension writes derive merge outcomes from the Delta
+commit's split update keys — never the conflated
+<code>numTargetRowsUpdated</code> aggregate, which folds soft-delete stamps into
+the same number as version closes:</p>
+<ul>
+<li><code>rows_versioned</code> — current rows closed (a new version was inserted)</li>
+<li><code>rows_inserted</code> — genuinely new entities (new-version inserts are
+  excluded arithmetically)</li>
+<li><code>rows_deleted</code> — hard deletes plus soft-delete stamps from
+  <code>on_no_match_source</code></li>
+</ul>
+<p><code>rows_unchanged</code> is intentionally absent: no Delta metric expresses it
+(<code>numTargetRowsCopied</code> is a file-rewrite artifact, not a logical
+count), and deriving it arithmetically risks a wrong number under
+quarantine and seeding edge cases. When merge metrics cannot be read —
+or a concurrent writer's commit makes attribution unsafe — the fields
+stay zero and a warning is logged. The first write of a dimension is a
+plain save, not a merge: its commit carries the
+<a href="#commit-lineage-stamps">lineage stamp</a>, and an unattributable
+first-write count reports <code>rows_inserted</code> as <code>None</code> (unknown), never
+zero.</p>
+<p>Of these, only the first-write insert count currently reaches the
+telemetry surface (as the thread's <code>rows_written</code>); the per-outcome
+split is not yet exposed on <code>ThreadTelemetry</code>.</p>
+<h3 id="weave-telemetry-fields">Weave telemetry fields<a class="headerlink" href="#weave-telemetry-fields" title="Permanent link">&para;</a></h3>
+<p><code>WeaveTelemetry</code> includes:</p>
+<ul>
+<li><strong>span</strong> -- The weave's execution span</li>
+<li><strong>thread_telemetry</strong> -- Per-thread telemetry keyed by thread name</li>
+<li><strong>hook_results</strong> -- Pre/post hook step outcomes</li>
+<li><strong>lookup_results</strong> -- Lookup materialization outcomes</li>
+<li><strong>column_set_results</strong> -- Column set resolution outcomes
+  (<code>ColumnSetResult</code> list with name, source_type,
+  mappings_loaded, skipped)</li>
+<li><strong>variables</strong> -- Final variable values</li>
+<li><strong>resolved_params</strong> -- Runtime parameter values</li>
+</ul>
+<h3 id="accessing-telemetry">Accessing telemetry<a class="headerlink" href="#accessing-telemetry" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">telemetry</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">telemetry</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">for</span> <span class="n">weave_name</span><span class="p">,</span> <span class="n">weave_telem</span> <span class="ow">in</span> <span class="n">telemetry</span><span class="o">.</span><span class="n">weave_telemetry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Weave: </span><span class="si">{</span><span class="n">weave_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  Duration: </span><span class="si">{</span><span class="n">weave_telem</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">end_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">weave_telem</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">start_time</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="k">for</span> <span class="n">thread_name</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">weave_telem</span><span class="o">.</span><span class="n">thread_telemetry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  Thread: </span><span class="si">{</span><span class="n">thread_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Read:        </span><span class="si">{</span><span class="n">t</span><span class="o">.</span><span class="n">rows_read</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Written:     </span><span class="si">{</span><span class="n">t</span><span class="o">.</span><span class="n">rows_written</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Quarantined: </span><span class="si">{</span><span class="n">t</span><span class="o">.</span><span class="n">rows_quarantined</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<p><code>rows_written</code> is <code>int | None</code>: <code>None</code> means the write succeeded but
+its count could not be attributed (unknown). Sinks and dashboards that
+aggregate counts should sum the known values and treat <code>None</code> as a
+data-quality signal, not as zero.</p>
+<h2 id="commit-lineage-stamps">Commit lineage stamps<a class="headerlink" href="#commit-lineage-stamps" title="Permanent link">&para;</a></h2>
+<p>Every single-pass engine write — overwrite, append, an incremental
+first write, and a dimension's first write — stamps its Delta commit
+with a small JSON document in the commit's <code>userMetadata</code>, visible in
+<code>DESCRIBE HISTORY</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"engine"</span><span class="p">:</span><span class="w"> </span><span class="s2">"weevr"</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">"run_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"5f0c9c8e-...-b2a1"</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">"thread"</span><span class="p">:</span><span class="w"> </span><span class="s2">"dim_customer"</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">"loom"</span><span class="p">:</span><span class="w"> </span><span class="s2">"nightly"</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">"weave"</span><span class="p">:</span><span class="w"> </span><span class="s2">"dimensions"</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"append"</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="p">}</span>
+</code></pre></div>
+<p>The stamp serves two purposes:</p>
+<ul>
+<li><strong>Exact attribution.</strong> After a write, the engine finds its own
+  commit by its stamp rather than assuming the newest commit is its
+  own — so <code>rows_written</code> stays exact no matter how many concurrent
+  writers (ad-hoc appends, <code>OPTIMIZE</code>, other pipelines) interleave.</li>
+<li><strong>Lineage.</strong> The <code>run_id</code> in the stamp is the same run identity
+  carried by audit columns (<code>${run.id}</code>) and telemetry, so a table's
+  Delta history joins back to the run that produced each commit.</li>
+</ul>
+<p>The <strong>stable core</strong> of the stamp is the engine marker (<code>engine</code>),
+<code>run_id</code>, and <code>thread</code> — attribution matches on exactly these, and
+they are safe to build tooling against. The remaining fields (<code>loom</code>,
+<code>weave</code>, <code>mode</code>, <code>version</code>) are best-effort context and may evolve;
+<code>mode</code> records the thread's configured write mode, not the physical
+branch taken (a first write executes as an overwrite regardless).</p>
+<p>Two boundaries to be aware of:</p>
+<ul>
+<li><strong>Merge commits are not stamped.</strong> Delta only honors per-write
+  <code>userMetadata</code> on DataFrameWriter paths; merge commits (dimension
+  merges, CDC routing, merge write mode) would require session-level
+  configuration, which races across parallel threads. Their counts
+  come from eager inputs and guarded merge metrics instead.</li>
+<li><strong>The stamp takes precedence.</strong> If you set a session-level
+  <code>spark.databricks.delta.commitInfo.userMetadata</code>, engine-stamped
+  commits override it with the stamp; commits the engine does not
+  stamp (merges, seeds, warp pre-init) still carry your session value.</li>
+</ul>
+<h2 id="progress-reporting">Progress reporting<a class="headerlink" href="#progress-reporting" title="Permanent link">&para;</a></h2>
+<p>During execution, weevr emits structured log events at key milestones.
+The events you can expect in a typical loom execution include:</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Events emitted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Config loading</td>
+<td>Config parsed, variables resolved, references loaded</td>
+</tr>
+<tr>
+<td>DAG planning</td>
+<td>Dependency graph built, execution order determined</td>
+</tr>
+<tr>
+<td>Weave start</td>
+<td>Weave execution started, thread count logged</td>
+</tr>
+<tr>
+<td>Thread start</td>
+<td>Sources reading, pipeline steps executing</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td>Per-rule pass/fail counts, quarantine row counts</td>
+</tr>
+<tr>
+<td>Write</td>
+<td>Write mode, target path, rows written</td>
+</tr>
+<tr>
+<td>Watermark</td>
+<td>Previous value, new value, persistence status</td>
+</tr>
+<tr>
+<td>Cache</td>
+<td>Persist/unpersist events for cached DataFrames</td>
+</tr>
+<tr>
+<td>Thread complete</td>
+<td>Final row counts, duration, status</td>
+</tr>
+<tr>
+<td>Weave complete</td>
+<td>Aggregate status, thread success/failure counts</td>
+</tr>
+<tr>
+<td>Loom complete</td>
+<td>Overall status, total duration, summary</td>
+</tr>
+</tbody>
+</table>
+<p>At <code>standard</code> log level, you see the start/complete events with row counts
+and timing. At <code>verbose</code>, you see every step-level event. At <code>minimal</code>, you
+see only warnings and errors.</p>
+<h2 id="custom-logging-handlers">Custom logging handlers<a class="headerlink" href="#custom-logging-handlers" title="Permanent link">&para;</a></h2>
+<p>weevr logs through a standard Python logger named <code>"weevr"</code>. To route log
+output to an external system, attach a custom handler:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">weevr_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"weevr"</span><span class="p">)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># Example: send logs to a file</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">file_handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="s2">"/tmp/weevr-execution.log"</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">weevr_logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">file_handler</span><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Example: send logs to Azure Monitor, Datadog, etc.</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="c1"># weevr_logger.addHandler(your_custom_handler)</span>
+</code></pre></div>
+<p>Because weevr uses <code>StructuredJsonFormatter</code>, each record is already a JSON
+string. Custom handlers can parse the JSON for routing, filtering, or
+enrichment.</p>
+<h2 id="custom-telemetry-sinks">Custom telemetry sinks<a class="headerlink" href="#custom-telemetry-sinks" title="Permanent link">&para;</a></h2>
+<p>For more advanced telemetry export -- writing execution metrics to a Delta
+table, pushing spans to a tracing backend, or feeding a monitoring
+dashboard -- see the
+<a href="../../how-to/implement-custom-telemetry-sink/">Implement a Custom Telemetry Sink</a>
+how-to guide. That guide walks through extracting telemetry from a
+<code>RunResult</code>, flattening the hierarchy into rows, and writing to Delta.</p>
+<h2 id="debugging-a-failing-pipeline">Debugging a failing pipeline<a class="headerlink" href="#debugging-a-failing-pipeline" title="Permanent link">&para;</a></h2>
+<p>When a thread fails, use this progression:</p>
+<ol>
+<li><strong>Check <code>result.status</code> and <code>result.summary()</code></strong> -- Quick overview of
+   what failed.</li>
+<li><strong>Set <code>log_level="verbose"</code></strong> -- Rerun with verbose logging to see
+   step-by-step execution detail.</li>
+<li><strong>Inspect telemetry spans</strong> -- Look at the failing thread's span for
+   status, attributes, and events. The span's <code>attributes</code> dict often
+   contains the error message and the step where failure occurred.</li>
+<li><strong>Check validation results</strong> -- If rows were quarantined, review the
+   <code>validation_results</code> on the thread's telemetry to see which rules
+   failed and how many rows were affected.</li>
+<li><strong>Use preview mode</strong> -- Run with <code>mode="preview"</code> to execute transforms
+   against sampled data without writing, isolating whether the issue is
+   in the transform logic or the write step.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">ctx</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="s2">"my-project.weevr"</span><span class="p">,</span> <span class="n">log_level</span><span class="o">=</span><span class="s2">"verbose"</span><span class="p">)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">)</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="s2">"success"</span><span class="p">:</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="c1"># Drill into the failing thread's telemetry</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="k">for</span> <span class="n">weave_name</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">telemetry</span><span class="o">.</span><span class="n">weave_telemetry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="k">for</span> <span class="n">thread_name</span><span class="p">,</span> <span class="n">tt</span> <span class="ow">in</span> <span class="n">wt</span><span class="o">.</span><span class="n">thread_telemetry</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>            <span class="k">if</span> <span class="n">tt</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">"ERROR"</span><span class="p">:</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed: </span><span class="si">{</span><span class="n">thread_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  Events: </span><span class="si">{</span><span class="n">tt</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">events</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../how-to/implement-custom-telemetry-sink/">Implement Custom Telemetry Sink</a>
+  -- Export telemetry to Delta or external systems</li>
+<li><a href="../../concepts/execution-modes/">Execution Modes</a> -- Validate and preview
+  without executing</li>
+<li><a href="../fabric-runtime/">Fabric Runtime</a> -- Environment setup and
+  configuration</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

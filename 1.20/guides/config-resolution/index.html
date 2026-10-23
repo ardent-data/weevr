@@ -1,0 +1,3755 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Configuration-driven execution framework for Spark in Microsoft Fabric">
+      
+      
+      
+        <link rel="canonical" href="https://ardent-data.github.io/weevr/1.20/guides/config-resolution/">
+      
+      
+        <link rel="prev" href="../engine-internals/">
+      
+      
+        <link rel="next" href="../telemetry-architecture/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Config Resolution - weevr</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/mkdocs_d2_plugin.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#config-resolution" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="weevr" class="md-header__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            weevr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Config Resolution
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/your-first-loom/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/add-a-thread/" class="md-tabs__link">
+          
+  
+  
+  How-to Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/yaml-schema/thread/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/why-weevr/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../fabric-runtime/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../release-notes/1.19/" class="md-tabs__link">
+          
+  
+  
+  Release Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="weevr" class="md-nav__button md-logo" aria-label="weevr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    weevr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ardent-data/weevr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ardent-data/weevr
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/your-first-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-to Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-to Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/add-a-thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/add-validation-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Validation Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/implement-custom-telemetry-sink/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implement Custom Telemetry Sink
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/cache-a-lookup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache a Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../how-to/run-from-fabric-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run from Fabric Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    YAML Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/thread/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/weave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weave
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/yaml-schema/loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context & Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/configuration-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/why-weevr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why weevr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/thread-weave-loom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread, Weave, Loom
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/artifacts-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/execution-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/idempotency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fabric-runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fabric Runtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-14-parse-and-validate-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1–4: Parse and validate structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-56-resolve-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5–6: Resolve values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-7-load-child-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 7: Load child configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-89-inherit-and-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 8–9: Inherit and expand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-10-hydrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 10: Hydrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-without-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading without running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deferred-variable-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred variable namespaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameter-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter resolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameter resolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#whole-value-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whole-value resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#embedded-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedded resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inline-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#declared-params-and-the-paramx-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declared params: and the ${param.x} namespace
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../audit-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dimension-modeling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dimension Modeling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fact-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fact Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve Step
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sub-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sub-Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../thread-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../warps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Warps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Release Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.19/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.19
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.18/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.18
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.17/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.17
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.16/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.16
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.15/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.15
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.14/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.14
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.13/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.13
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.12
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.11
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.10/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.10
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.9
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.6/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.6
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-14-parse-and-validate-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1–4: Parse and validate structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-56-resolve-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 5–6: Resolve values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-7-load-child-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 7: Load child configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-89-inherit-and-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 8–9: Inherit and expand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-10-hydrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 10: Hydrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-without-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading without running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deferred-variable-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred variable namespaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameter-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter resolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameter resolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#whole-value-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whole-value resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#embedded-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedded resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inline-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#declared-params-and-the-paramx-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declared params: and the ${param.x} namespace
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="config-resolution">Config Resolution<a class="headerlink" href="#config-resolution" title="Permanent link">&para;</a></h1>
+<p>This guide explains how weevr transforms raw YAML files into validated,
+typed configuration models. The resolution pipeline is a multi-stage process
+that parses, validates, resolves, inherits, and hydrates configuration.</p>
+<h2 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h2>
+<p>When you call <code>Context.run()</code>, <code>Context.load()</code>, <code>load_config()</code>, or
+<code>load_resolved()</code>, weevr runs the same config resolution pipeline. The
+stages are designed to fail fast — syntax errors are caught before variable resolution, schema errors
+before reference loading, and semantic constraints after all values are
+concrete.</p>
+<h2 id="key-concepts">Key concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Variable interpolation</strong> — <code>${var}</code> placeholders in YAML values are
+  replaced with concrete values from runtime parameters or config defaults.
+  Default values use the <code>${var:-default}</code> syntax.</li>
+<li><strong>Reference resolution</strong> — <code>ref:</code> entries in weave and loom configs load
+  child configuration files recursively. Circular references are detected
+  and rejected.</li>
+<li><strong>Inheritance cascade</strong> — Defaults flow downward: loom defaults → weave
+  defaults → thread config. The most specific value wins. Replacement is
+  whole-value, not deep merge.</li>
+<li><strong>Typed extensions</strong> — Files use <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> extensions
+  to declare their config type unambiguously.</li>
+<li><strong>Macro expansion</strong> — <code>foreach</code> blocks in step lists expand into repeated
+  step sequences with variable substitution.</li>
+</ul>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p>The pipeline runs in 10 stages, grouped into three phases:</p>
+<div class="d2"><svg data-d2-version="v0.9.0" preserveAspectRatio="xMinYMin meet" viewBox="0 0 3174 368" role="img" aria-label="Diagram"><svg class="d2-b3d9f411abd94acf9f833708a8a7a950 d2-svg" width="3174" height="368" viewBox="-89 -89 3174 368"><rect x="-89" y="-89" width="3174" height="368" rx="0" fill="#FFFFFF" class=" fill-N7" stroke-width="0" /><style type="text/css">
+.d2-b3d9f411abd94acf9f833708a8a7a950 .text {
+	font-family: "d2-b3d9f411abd94acf9f833708a8a7a950-font-regular";
+}
+@font-face {
+	font-family: d2-b3d9f411abd94acf9f833708a8a7a950-font-regular;
+	src: url("data:application/font-woff;base64,d09GRgABAAAAAAvcAAoAAAAAEmAAAguFAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAAA9AAAAGAAAABgXd/Vo2NtYXAAAAFUAAAAlgAAAMQDsAPWZ2x5ZgAAAewAAAWCAAAHPKCDbFxoZWFkAAAHcAAAADYAAAA2G4Ue32hoZWEAAAeoAAAAJAAAACQKhAXdaG10eAAAB8wAAABsAAAAbCx2BbBsb2NhAAAIOAAAADgAAAA4GbgblG1heHAAAAhwAAAAIAAAACAAMwD2bmFtZQAACJAAAAMrAAAIFAbDVU1wb3N0AAALvAAAACAAAAAg/9EAMgADAgkBkAAFAAACigJYAAAASwKKAlgAAAFeADIBIwAAAgsFAwMEAwICBGAAAvcAAAADAAAAAAAAAABBREJPAEAAIP//Au7/BgAAA9gBESAAAZ8AAAAAAeYClAAAACAAA3icfM29ScQAAIbhJyb+xxj/O8kKYucA1qITiAgKQcHCwk0EUURdQBsLV7E4bpDvuCP18ZZP8aJQKlCr/OJQq9ToHDtx6syFS1eu3erde/SUoHM0+PngN3p3HqaeUcb5z19+8p2vfOYj73nLa17yPLvNq7Brz74DC0qVRUuWrVi1Zl1tQ2NTa8u2HSYAAAD//wMAxA0nbgAAeJxkVFtoI+cVPueXVlqvpLUn1mgkWSNp9Mu6WTdrbl5JllaW7NW6kiVLcRI5ayfbupbbbvfBNF3SpsnDhiQNlLhl31pKHwqlUAilkKYE+hB62d4ChZL0RimliMAGWoSeQndUZmQbe/P0v/x85zvf5cAF6AEQmdwDE0zBNDwGLIDICMy8EI1SqyqqKuVMahQZaw//rh0hXpfMimJeXHmw8vxLL+FTL5J7D2/lX+73f7l75472jcGHWg7f+xAQtgHwT+QIpgw8VmBFljLb+BXtLx9/TI7W/rGm/RUAiP6P2MgR2MCp/xRzLhfrtFDKMGJOkaUIpdvvrN8uvXLr1qef6D75xC45Cm/V+3va/7BeWbumnmIEyRFcBu4MhnWWms7C/KF6UGjXfrD73Tu3m51O8zY5opu1xg6j/QtZ7QH2ylcrEgAAQmI8wv+Q70AK4EIoElVdrgmXSDSaJrKkKGLOxVkjERqysE6Xi+P8hHVaLDiz+uWFHH1GrNT5xcBuYDku7xYKezTlv55Wq0LOuxNZDit7djmZn08VsqGY73LckVjJ5lqpVFjhBSkZiHttsZlUZVHaygEBaTzCH+MQvBAG4EIRWVJUyRhrjRokWIZGqcUSzSmqbNG5vLu8+ca3mYVYYp0Phj6T77VrVlNo00VL9PmbOfv1SnuLCSzRoPOKK/7Fp7X3877ESijw6nQxE58HhPR4hG/iEHzG3pHzm+rwYk5ROYsFH7t6UKx8oZRd9STYDJ9cjXarobwrLLTtxcN257AY4pRZd2ZrqdvnnSov6B7p2L/FIbghcA5dN0pwnSCbBElfD7nK50vlPXXns0i0ty88uUYLc3yg9Ts0l6+Im/blw1b7sPTCgcMz1bzBMorTj5H1ZsvwrgOAH5D7x2lirSc6MQawlel0TLSZa17rJLPzhXly/909IXNzR/s9xmulyLz2PRiPYRUAfkLeIhFwA4AFPC9MctEZj+DP5D5MT9xgROZUkh+m453LU2ar1XbRZb8ik/2H92YZxJLZfMIJh8ecOPETnGpWE904JYWDNXqe07F+/8UhTMPcOf30tugB0DNuxBGnC/1yuV8o7pfL+8Vys1kubWwc+1I87LQPi7V+9/GDg8e7/RO9dnEIzBlux45PiHnqcZ6bsTunA1UPDp5KK5fqZnOupN2faOIbj/AuDiFhaHK2K0ZVHmnKpCh/lHZpPFhbyGYFcS60kui1Uhu+mEcJphf82TlaS8Vb9qhP9QipgCfEXXIIcrzQCnLSrDvh43jW5hDUdHQlZsx3j0e4Sm7rzTc8obKqisaxOfXmwcZyvXFp9e5dIeHw22ecGft2HR2lC6+9VtWGqcUpc8lqM7A+NR7hezgA5yP+MuKkZ/9s1rsL2UghpOsSathv7qCkfVArRRewp3kbsSwg2AHw1zgAB4BoEmddLt1udVY0vfPm1g0bZzPbuEs3Nn+EA+2jcJ3SehidmhdQbwW+gQPjXspIZYFFgQ0g/BsbY8CLSbxTTWpfrxo8WwD4U/KiPkuURYbKiqLqYW9960vJirf8cg3fly9yMw9/VZt4FAbAX5DX9eSIconI0tkT4rRY9JKIbOzZV9aKy7GaLxN7utTbrz7X8C55frb47DefE9W1VDCTlPtbxa++2iLma4DgHY/w5+T1T/pO5ZyiPDrCyhon2fJRYz+Y4DeW8uvRXqPWChXEWJVPzm8vdW9dlfLtpWfsKlX86aty5EqwHFSEjBLmJZraaubXnWZHd2WpkxyPoTIewdv4NxIFLwB+Diz6O8kyfB8HYDKyzHQ6ONC1Hf+GrINK3gIbAGNc0cne7kDA7Q4EyDrvcfv9bg+va2Vgw6H+lzvz92seSj1uSu10jqeUn6PwfwAAAP//AwCzh3zUAAAAAQAAAAILhbt0h1lfDzz1AAMD6AAAAADYXaChAAAAAN1mLzb+Ov7bCG8DyAAAAAMAAgAAAAAAAAABAAAD2P7vAAAImP46/joIbwABAAAAAAAAAAAAAAAAAAAAGwKNAFkAyAAAAe4AWgI2AFoCOQBaAhYAKgH4ADQByAAuAfAALgIgAFIA9gBFAP8AUgIjAFICHgAuAVsAUgGjABwBUgAYAiAASwHTAAwBqQAfAfEATwHxACQB8QAaAPkAQQD2AFIAAP/JAPkAQQAAACwALABAAGIAigDOAQYBNAFoAYoBlgGyAdQCAAIgAmAChgKoAsQC2gLyAxwDWgNmA3IDiAOeAAEAAAAbAIwADABmAAcAAQAAAAAAAAAAAAAAAAAEAAN4nJyU32obVxDGf4oltaE0F8UE58acy7Y4KzXYIbGv1nVMlhor1Sr9A6WwltaSkLS77K7kuPQBet236Fvkqs/Rhyi9LjMaKdq0ECxCzLc6M998Z+abA+zyDzvU6veBP5s/GK6x3zw2fI8HzQPDO1w0/jJc34hpMGj8arjJl42u4Y94W//d8Mcc1n82fJ+9+rnhT3hS3zX86Y7jb8MPOOTtEtfgGb8ZrrFHZvgeu/xkeIeHGGetzkPahht8xr7hJvtAjzElU8YkDHFcM2bInJyYgpCYnDHXxAxwBPhMKfXXhEiRY/i/v0aElOREyjiixDElZEpEwcgYf9GslFdaUerkiqSaT8mIiCvNmBCR4EgZkpIQM1GekpKMY1q0KOir3oySAo+CMVM8UnKGtOhwzgU9RowpcJwrkygLSbmm5IZI6zuLkM70iUkoTNWchIHqdKov1uyACxwdMo3dZL6oMBzg+E6zRZvEOL7C0/9uQ1m17kpNxEL7KT28Yqo6b3SCI+241PX5VnHJMW6r/lSVfLhHA1Unsx5zxVznL/OTPFGS4NwePqE6KHSPcJzqd0CoHfmegB4v6fCann77dOnic0mPgBea26GL42s6XHKmGYHi5dm5OuaSH3F8Q6Axwh1bf6Tn8vWGzNwt2sUZco8ZmW6BzFjuL86Pt5qw7FBacUehrujrHkmk7IF0RfYsYmiuyNQVM+3lyhuF9W9gjpDTUmf77ly2YWG7t9riW1LdYcfcNMnkloo+NFXvPc/c6D+PiAEpVxrRJ2VGi5JbvdsrIuZMcZypj1/qlpT46xypc6suiZmpgoBEeXIy/RuZb0LT3q/43tlbIps30x2drG+1TRVhTjZm9Fq7tzoLrcvxxgRaNtXUcmTCwry8qXhfor2K/lDdX+jrlvKYLrG+rjL//D/vwBM82hxyxAkjrSP8CQt7I9r6TrR5zon2YEKsUfJqvtFuCcMRHk854ojnPK1w+pxxSoeTO2hcZnU45cV7J5scbs3ijOcPVdNWvY7H669nW8/r8zv48gsOKi+jKJc9yFkY2zv/XxIxEy1ub7Mv7hHevwAAAP//AwAHW0wwAAADAAAAAAAA/84AMgAAAAAAAAAAAAAAAAAAAAAAAAAA");
+}
+.d2-b3d9f411abd94acf9f833708a8a7a950 .text-bold {
+	font-family: "d2-b3d9f411abd94acf9f833708a8a7a950-font-bold";
+}
+@font-face {
+	font-family: d2-b3d9f411abd94acf9f833708a8a7a950-font-bold;
+	src: url("data:application/font-woff;base64,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");
+}
+.d2-b3d9f411abd94acf9f833708a8a7a950 .text-italic {
+	font-family: "d2-b3d9f411abd94acf9f833708a8a7a950-font-italic";
+}
+@font-face {
+	font-family: d2-b3d9f411abd94acf9f833708a8a7a950-font-italic;
+	src: url("data:application/font-woff;base64,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");
+}</style><style type="text/css">.shape {
+  shape-rendering: geometricPrecision;
+  stroke-linejoin: round;
+}
+.connection {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.blend {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .fill-N1{fill:#0A0F25;}
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .fill-N2{fill:#676C7E;}
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .fill-N7{fill:#FFFFFF;}
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .fill-B1{fill:#0D32B2;}
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .fill-B5{fill:#EDF0FD;}
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .stroke-B1{stroke:#0D32B2;}
+		.d2-b3d9f411abd94acf9f833708a8a7a950 .stroke-B2{stroke:#0D32B2;}.appendix text.text{fill:#0A0F25}.md{--color-fg-default:#0A0F25;--color-fg-muted:#676C7E;--color-fg-subtle:#9499AB;--color-canvas-default:#FFFFFF;--color-canvas-subtle:#EEF1F8;--color-border-default:#0D32B2;--color-border-muted:#0D32B2;--color-neutral-muted:#EEF1F8;--color-accent-fg:#0D32B2;--color-accent-emphasis:#0D32B2;--color-attention-subtle:#676C7E;--color-danger-fg:red;}.light-code{display: block}.dark-code{display: none}</style><g class="c3RydWN0dXJl"><g class="shape"><rect x="12" y="12" width="941" height="166" stroke="#0D32B2" fill="#E3F2FD" class=" stroke-B1" style="stroke-width:2;" /></g><text x="482.5" y="45" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">Phase 1: Structure</text></g><g class="cmVzb2x2ZQ=="><g class="shape"><rect x="1158" y="12" width="827" height="166" stroke="#0D32B2" fill="#E8F5E9" class=" stroke-B1" style="stroke-width:2;" /></g><text x="1571.5" y="45" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">Phase 2: Resolve</text></g><g class="ZmluYWxpemU="><g class="shape"><rect x="2212" y="12" width="772" height="166" stroke="#0D32B2" fill="#FFF3E0" class=" stroke-B1" style="stroke-width:2;" /></g><text x="2598" y="45" fill="#0A0F25" class="text fill-N1" style="text-anchor:middle;font-size:28px">Phase 3: Finalize</text></g><g class="c3RydWN0dXJlLnBhcnNl"><g class="shape"><rect x="62" y="62" width="142" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="133" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">1. Parse YAML</text></g><g class="c3RydWN0dXJlLnZlcnNpb24="><g class="shape"><rect x="274" y="62" width="169" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="358.5" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">2. Extract version</text></g><g class="c3RydWN0dXJlLmRldGVjdA=="><g class="shape"><rect x="513" y="62" width="143" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="584.5" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">3. Detect type</text></g><g class="c3RydWN0dXJlLnNjaGVtYQ=="><g class="shape"><rect x="726" y="62" width="177" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="814.5" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">4. Validate schema</text></g><g class="cmVzb2x2ZS5wYXJhbV9jdHg="><g class="shape"><rect x="1208" y="62" width="206" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="1311" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">5. Build param context</text></g><g class="cmVzb2x2ZS5yZXNvbHZlX3ZhcnM="><g class="shape"><rect x="1484" y="62" width="186" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="1577" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">6. Resolve variables</text></g><g class="cmVzb2x2ZS5yZXNvbHZlX3JlZnM="><g class="shape"><rect x="1740" y="62" width="195" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="1837.5" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">7. Resolve references</text></g><g class="ZmluYWxpemUuaW5oZXJpdA=="><g class="shape"><rect x="2262" y="62" width="187" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2355.5" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">8. Apply inheritance</text></g><g class="ZmluYWxpemUuZXhwYW5k"><g class="shape"><rect x="2519" y="62" width="170" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2604" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">9. Expand macros</text></g><g class="ZmluYWxpemUuaHlkcmF0ZQ=="><g class="shape"><rect x="2759" y="62" width="175" height="66" stroke="#0D32B2" fill="#EDF0FD" class=" stroke-B1 fill-B5" style="stroke-width:2;" /></g><text x="2846.5" y="100.5" fill="#0A0F25" class="text-bold fill-N1" style="text-anchor:middle;font-size:16px">10. Hydrate model</text></g><g class="c3RydWN0dXJlLihwYXJzZSAtJmd0OyB2ZXJzaW9uKVswXQ=="><marker id="mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#0D32B2" class="connection fill-B1" stroke-width="2" /> </marker><path d="M 206 95 L 270 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="c3RydWN0dXJlLih2ZXJzaW9uIC0mZ3Q7IGRldGVjdClbMF0="><path d="M 445 95 L 509 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="c3RydWN0dXJlLihkZXRlY3QgLSZndDsgc2NoZW1hKVswXQ=="><path d="M 658 95 L 722 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="cmVzb2x2ZS4ocGFyYW1fY3R4IC0mZ3Q7IHJlc29sdmVfdmFycylbMF0="><path d="M 1416 95 L 1480 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="cmVzb2x2ZS4ocmVzb2x2ZV92YXJzIC0mZ3Q7IHJlc29sdmVfcmVmcylbMF0="><path d="M 1672 95 L 1736 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="ZmluYWxpemUuKGluaGVyaXQgLSZndDsgZXhwYW5kKVswXQ=="><path d="M 2451 95 L 2515 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="ZmluYWxpemUuKGV4cGFuZCAtJmd0OyBoeWRyYXRlKVswXQ=="><path d="M 2691 95 L 2755 95" stroke="#0D32B2" fill="none" class="connection stroke-B1" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3488378134)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /></g><g class="KHN0cnVjdHVyZSAtJmd0OyByZXNvbHZlKVswXQ=="><marker id="mk-d2-b3d9f411abd94acf9f833708a8a7a950-3143868635" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#4A90D9" class="connection" stroke-width="2" /> </marker><path d="M 955 95 L 1154 95" stroke="#4A90D9" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-3143868635)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /><text x="1055.5" y="93" fill="#676C7E" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px"><tspan x="1055.5" dy="0">all strings</tspan><tspan x="1055.5" dy="18.5">concrete</tspan></text></g><g class="KHJlc29sdmUgLSZndDsgZmluYWxpemUpWzBd"><marker id="mk-d2-b3d9f411abd94acf9f833708a8a7a950-487057793" markerWidth="10" markerHeight="12" refX="7" refY="6" viewBox="0 0 10 12" orient="auto" markerUnits="userSpaceOnUse"> <polygon points="0,0 10,6 0,12" fill="#2E7D32" class="connection" stroke-width="2" /> </marker><path d="M 1987 95 L 2208 95" stroke="#2E7D32" fill="none" class="connection" style="stroke-width:2;" marker-end="url(#mk-d2-b3d9f411abd94acf9f833708a8a7a950-487057793)" mask="url(#d2-b3d9f411abd94acf9f833708a8a7a950)" /><text x="2098.5" y="93" fill="#676C7E" class="text-italic fill-N2" style="text-anchor:middle;font-size:16px"><tspan x="2098.5" dy="0">refs loaded,</tspan><tspan x="2098.5" dy="18.5">vars resolved</tspan></text></g><mask id="d2-b3d9f411abd94acf9f833708a8a7a950" maskUnits="userSpaceOnUse" x="-89" y="-89" width="3174" height="368">
+<rect x="-89" y="-89" width="3174" height="368" fill="white" />
+<rect x="1021" y="77" width="69" height="37" fill="black" />
+<rect x="2053" y="77" width="91" height="37" fill="black" />
+</mask></svg></svg></div>
+<h3 id="stage-14-parse-and-validate-structure">Stage 1–4: Parse and validate structure<a class="headerlink" href="#stage-14-parse-and-validate-structure" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Parse YAML</strong> — Read the file and produce a raw dictionary. File-not-found
+   and YAML syntax errors raise <code>ConfigParseError</code>.</li>
+<li><strong>Extract version</strong> — Read <code>config_version</code> and parse into a <code>(major, minor)</code>
+   tuple. Unsupported versions raise <code>ConfigVersionError</code>.</li>
+<li><strong>Detect type</strong> — Determine whether the file is a thread, weave, loom, or
+   params file. Typed extensions (<code>.thread</code>, <code>.weave</code>, <code>.loom</code>) are checked
+   first; if the extension is <code>.yaml</code> or <code>.yml</code>, the structure is inspected.</li>
+<li><strong>Validate schema</strong> — Run the raw dictionary through a Pydantic model for
+   loose structural validation. At this stage, <code>${var}</code> placeholders are
+   permitted (the schema uses <code>extra="allow"</code>), so unresolved variables do not
+   cause errors.</li>
+</ol>
+<h3 id="stage-56-resolve-values">Stage 5–6: Resolve values<a class="headerlink" href="#stage-56-resolve-values" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Build parameter context</strong> — Merge runtime parameters (highest
+   priority) over the <code>param.*</code> namespace over config-declared
+   defaults over fabric context (lowest priority) into a flat
+   context dictionary. The <code>param.*</code> namespace is populated from
+   either the loom/weave's own declared <code>params:</code> block (for
+   top-level loads only; child configs loaded via <code>ref:</code> do not
+   resolve their own <code>params:</code> block at this stage) or from a
+   <code>ThreadEntry</code>'s <code>params:</code> (for thread templates) — see
+   <a href="#declared-params-and-the-paramx-namespace">Declared <code>params:</code> and the <code>${param.x}</code> namespace</a>
+   below and <a href="../thread-templates/">Thread Templates</a>. The
+   <code>${fabric.*}</code> namespace comes from the fabric layer. Dotted
+   keys like <code>env.lakehouse</code> support nested access.</li>
+<li><strong>Resolve variables</strong> — Recursively walk all values in the config and
+   resolve <code>${var}</code> references from the parameter context. Whole-value
+   references return the native type; embedded references coerce to
+   string (see <a href="#parameter-resolution">Parameter resolution</a> below).
+   Unresolved variables without defaults raise
+   <code>VariableResolutionError</code>.</li>
+</ol>
+<h3 id="stage-7-load-child-configs">Stage 7: Load child configs<a class="headerlink" href="#stage-7-load-child-configs" title="Permanent link">&para;</a></h3>
+<p><strong>Resolve references</strong> — For looms and weaves, load child config files:</p>
+<ul>
+<li>Loom → loads referenced weaves</li>
+<li>Weave → loads referenced threads</li>
+</ul>
+<p>Each child is itself run through the full pipeline (recursion). A <code>visited</code>
+set tracks loaded paths to detect circular references. Entry-level
+overrides like <code>dependencies</code> and <code>condition</code> are preserved alongside the
+loaded config.</p>
+<h3 id="stage-89-inherit-and-expand">Stage 8–9: Inherit and expand<a class="headerlink" href="#stage-89-inherit-and-expand" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Apply inheritance</strong> — For multi-level configs, cascade defaults:<ul>
+<li>Loom defaults merge into weave defaults</li>
+<li>Merged defaults merge into each thread config</li>
+<li>Thread values always win (most specific)</li>
+</ul>
+</li>
+</ol>
+<p>Naming configuration cascades separately as a whole block rather
+   than per-field. Audit columns (<code>audit_columns</code>), <strong>exports</strong>, and
+   <strong>connections</strong> also cascade separately using <strong>additive merge</strong> —
+   each level extends the set, and same-named entries at a lower
+   level override the definition from the higher level. Exports
+   with <code>enabled: false</code> are removed after merge.</p>
+<ol>
+<li><strong>Expand macros</strong> — <code>foreach</code> blocks in thread step lists are expanded
+   into repeated sequences. This applies to a thread loaded directly and
+   to every thread a weave or loom references, which expand during
+   hydration (Stage 10). Expansion happens after variable resolution so
+   that <code>foreach.values</code> can reference parameters, including values a
+   weave passes in through a thread entry's <code>params</code>.</li>
+</ol>
+<h3 id="stage-10-hydrate">Stage 10: Hydrate<a class="headerlink" href="#stage-10-hydrate" title="Permanent link">&para;</a></h3>
+<p><strong>Validate name and hydrate model</strong> — The config <code>name</code> field is
+validated against the filename stem (mismatch raises <code>ConfigError</code>;
+missing name is injected from the stem). The fully resolved dictionary
+is then validated through the typed Pydantic model (<code>Thread</code>, <code>Weave</code>,
+or <code>Loom</code>). Semantic errors at this stage raise <code>ModelValidationError</code>.
+For a weave or loom, every child it pulls in, whether referenced or
+inline, is hydrated and validated the same way, so a broken child fails
+the whole load. The error's <code>file_path</code> names the child's own file, or
+the file containing an inline definition.
+Incremental-mode constraints (e.g., CDC requires merge write mode) are
+checked as post-resolution cross-cutting validations.</p>
+<h2 id="loading-without-running">Loading without running<a class="headerlink" href="#loading-without-running" title="Permanent link">&para;</a></h2>
+<p><code>Context</code> executes; <code>load_config()</code> and <code>load_resolved()</code> inspect. All three
+run the same pipeline for <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> files, so a typed
+config loads the same way through each. Two differences: only <code>load_config()</code>
+also accepts <code>.yaml</code> and params files, and only <code>Context</code> has a Fabric context,
+so the other two need a default for every <code>${fabric.*}</code> reference. Beyond that,
+the difference is what comes back and what's needed:</p>
+<table>
+<thead>
+<tr>
+<th>Entry point</th>
+<th>Needs Spark</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Context.load()</code></td>
+<td>Yes</td>
+<td><code>LoadedConfig</code>, with <code>${fabric.*}</code> resolved</td>
+</tr>
+<tr>
+<td><code>load_config()</code></td>
+<td>No</td>
+<td>The <code>Thread</code>, <code>Weave</code>, or <code>Loom</code> model (or a params dict)</td>
+</tr>
+<tr>
+<td><code>load_resolved()</code></td>
+<td>No</td>
+<td><code>LoadedConfig</code>, with each weave's resolved threads</td>
+</tr>
+</tbody>
+</table>
+<p><code>load_resolved()</code> suits tools that check or plan configs outside the engine,
+such as a CLI or a CI step. It takes <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> files
+and returns the hydrated model, every child thread and weave, the load
+warnings, and the execution plan:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">weevr.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_resolved</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">project</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"project.weevr"</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">loaded</span> <span class="o">=</span> <span class="n">load_resolved</span><span class="p">(</span><span class="n">project</span> <span class="o">/</span> <span class="s2">"nightly.loom"</span><span class="p">,</span> <span class="n">project_root</span><span class="o">=</span><span class="n">project</span><span class="p">)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="k">for</span> <span class="n">weave_name</span><span class="p">,</span> <span class="n">threads</span> <span class="ow">in</span> <span class="n">loaded</span><span class="o">.</span><span class="n">resolved_threads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">weave_name</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">threads</span><span class="p">))</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="k">for</span> <span class="n">warning</span> <span class="ow">in</span> <span class="n">loaded</span><span class="o">.</span><span class="n">warnings</span><span class="p">:</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">for</span> <span class="n">issue</span> <span class="ow">in</span> <span class="n">loaded</span><span class="o">.</span><span class="n">validate_plans</span><span class="p">():</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">issue</span><span class="o">.</span><span class="n">weave_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">issue</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<p><code>validate_plans()</code> builds every weave's execution plan and returns one
+<code>PlanIssue</code> per weave that fails — a dependency cycle, two threads writing
+the same target without an ordering, or a Lookup problem — instead of
+stopping at the first. <code>execution_plan</code> raises on the first failure.</p>
+<p>Without Spark there is no Fabric context, so a <code>${fabric.*}</code> reference needs
+a default (<code>${fabric.workspace_id:-local}</code>) to load through <code>load_config()</code> or
+<code>load_resolved()</code>. Checks that read data, such as whether a source table
+exists, run only in <code>Context.run(mode="validate")</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>LoadedConfig.threads</code> and <code>.weaves</code> return the model's own entries
+(<code>ThreadEntry</code> / <code>WeaveEntry</code>). The resolved models are under
+<code>resolved_threads</code> and <code>resolved_weaves</code>.</p>
+</div>
+<h2 id="module-map">Module map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config/parser.py</code></td>
+<td>YAML parsing, version extraction, typed extension detection</td>
+</tr>
+<tr>
+<td><code>config/resolver.py</code></td>
+<td>Variable interpolation, reference loading, circular dependency detection</td>
+</tr>
+<tr>
+<td><code>config/inheritance.py</code></td>
+<td>Three-level cascade: loom → weave → thread</td>
+</tr>
+<tr>
+<td><code>config/validation.py</code></td>
+<td>Pre-resolution schema validation, post-resolution constraint checks</td>
+</tr>
+<tr>
+<td><code>config/macros.py</code></td>
+<td><code>foreach</code> block expansion in step lists</td>
+</tr>
+<tr>
+<td><code>config/fabric.py</code></td>
+<td>Builds <code>${fabric.*}</code> context from Fabric runtime variables</td>
+</tr>
+<tr>
+<td><code>config/locations.py</code></td>
+<td>Filesystem-agnostic location abstraction; routes local paths through pathlib and remote URIs through Hadoop FileSystem</td>
+</tr>
+<tr>
+<td><code>config/warp.py</code></td>
+<td>Warp schema contract discovery and drift baseline resolution</td>
+</tr>
+<tr>
+<td><code>config/loader.py</code></td>
+<td>The shared load: runs every stage for one file; <code>load_resolved()</code></td>
+</tr>
+<tr>
+<td><code>config/__init__.py</code></td>
+<td><code>load_config()</code> and <code>load_resolved()</code> — the public entry points</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deferred-variable-namespaces">Deferred variable namespaces<a class="headerlink" href="#deferred-variable-namespaces" title="Permanent link">&para;</a></h2>
+<p>Some variable namespaces are <strong>not</strong> resolved during config loading. They are
+preserved as literal <code>${...}</code> placeholders and resolved later at execution time:</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Resolved at</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>${var.*}</code></td>
+<td>Weave execution (VariableContext)</td>
+<td>Thread steps, sources</td>
+</tr>
+<tr>
+<td><code>${run.timestamp}</code></td>
+<td>Thread execution</td>
+<td>Audit columns, export paths</td>
+</tr>
+<tr>
+<td><code>${run.id}</code></td>
+<td>Thread execution</td>
+<td>Audit columns, export paths</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>run.*</code> namespace provides per-execution context: <code>${run.timestamp}</code> is an
+ISO 8601 UTC timestamp and <code>${run.id}</code> is a UUID4, both generated once per
+<code>execute_thread()</code> call. They are available in audit column expressions and
+export path templates.</p>
+<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Pre-resolution loose schema</strong> — Schema validation runs before variable
+  resolution, using <code>extra="allow"</code> to tolerate <code>${...}</code> placeholders. This
+  catches structural errors early without requiring all parameters to be
+  available.</li>
+<li><strong>Whole-value replacement</strong> — Inheritance uses simple replacement, not deep
+  merge. A thread-level <code>write</code> block replaces the entire inherited <code>write</code>
+  block, not individual fields within it. This keeps behavior predictable.</li>
+<li><strong>Typed extensions</strong> — <code>.thread</code>, <code>.weave</code>, and <code>.loom</code> extensions eliminate
+  ambiguity about config type without inspecting file contents.</li>
+<li><strong>Foreach after resolution</strong> — Macro expansion happens after variable
+  resolution so that the <code>values</code> list can come from parameters, but before
+  model hydration so that expanded steps are fully validated.</li>
+</ul>
+<h2 id="parameter-resolution">Parameter resolution<a class="headerlink" href="#parameter-resolution" title="Permanent link">&para;</a></h2>
+<h3 id="whole-value-resolution">Whole-value resolution<a class="headerlink" href="#whole-value-resolution" title="Permanent link">&para;</a></h3>
+<p>When an entire YAML value is a single <code>${param}</code> reference (no surrounding
+text), the resolver returns the native Python type of the referenced value.
+The result is not cast to string.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">match_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${pk_columns}</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># pk_columns: ["mandt", "color"] → list[str]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${flag}</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># flag: true → bool</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${max_rows}</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># max_rows: 1000 → int</span>
+</code></pre></div>
+<p>A whole-value reference that resolves to <code>None</code> returns <code>null</code> rather than
+the string <code>"None"</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">optional_param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${value}</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># value: null → None</span>
+</code></pre></div>
+<h3 id="embedded-resolution">Embedded resolution<a class="headerlink" href="#embedded-resolution" title="Permanent link">&para;</a></h3>
+<p>When <code>${param}</code> appears inside a larger string, standard string interpolation
+applies. The resolved value is coerced to string and substituted in place.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="s">"SAP.${table_name}"</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># table_name: "MARA" → "SAP.MARA"</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"/mnt/${env}/data/${table_name}"</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># env: "prod", table_name: "MARA" → "/mnt/prod/data/MARA"</span>
+</code></pre></div>
+<p>Embedded references that resolve to <code>None</code> produce the string <code>"None"</code>.
+Use whole-value references when you need null pass-through.</p>
+<h3 id="inline-defaults">Inline defaults<a class="headerlink" href="#inline-defaults" title="Permanent link">&para;</a></h3>
+<p>The <code>${param:-default}</code> fallback syntax always returns the default as
+a <strong>string</strong>, even in a whole-value position. For example,
+<code>limit: ${max_rows:-100}</code> returns the string <code>"100"</code> when <code>max_rows</code>
+is missing — not the integer <code>100</code>. To use a typed default, supply
+the parameter value explicitly at runtime rather than relying on the
+inline <code>:-</code> fallback.</p>
+<h3 id="declared-params-and-the-paramx-namespace">Declared <code>params:</code> and the <code>${param.x}</code> namespace<a class="headerlink" href="#declared-params-and-the-paramx-namespace" title="Permanent link">&para;</a></h3>
+<p>A loom or weave that declares a <code>params:</code> block exposes each declared
+name under the <code>${param.x}</code> namespace, scoped to that file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># silver.loom</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">weaves</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bronze_to_silver.weave</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nt">params</span><span class="p">:</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">workspace_id</span><span class="p">:</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">workspace_id</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="nt">region</span><span class="p">:</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">eastus</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="nt">connections</span><span class="p">:</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="nt">bronze</span><span class="p">:</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">onelake</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.workspace_id}"</span><span class="w">   </span><span class="c1"># required → from runtime</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">    </span><span class="nt">lakehouse</span><span class="p">:</span><span class="w"> </span><span class="s">"lh-${param.region}"</span><span class="w">      </span><span class="c1"># default → "lh-eastus"</span>
+</code></pre></div>
+<p>Per-param resolution precedence:</p>
+<ol>
+<li>Runtime value supplied via <code>Context(params=...)</code> or
+   <code>load_config(runtime_params=...)</code>.</li>
+<li>The <code>default</code> declared on the <code>ParamSpec</code>.</li>
+<li><code>ConfigSchemaError</code> if the param is <code>required: true</code>.</li>
+</ol>
+<p>Declared params in a loom or weave are reachable as <code>${param.x}</code> only
+<strong>within the same file's scope</strong>, and only when the file is loaded at
+the top level (via <code>load_config(...)</code> or <code>Context(config=...)</code>). Two
+related limitations follow from this:</p>
+<ol>
+<li><strong>Cross-scope inheritance</strong> — child weaves and threads do not
+   automatically inherit a parent loom's declared params; a reference
+   to <code>${param.x}</code> in a child without a local declaration raises a
+   <code>VariableResolutionError</code>.</li>
+<li><strong>Child-config own-scope</strong> — a weave that declares its own
+   <code>params:</code> and is loaded as a child via a parent loom's <code>ref:</code> does
+   not have that <code>params:</code> block wired into <code>${param.x}</code> either. The
+   fix that wires declared <code>params:</code> into the <code>${param.x}</code> namespace
+   applies only to top-level loads, not to child configs resolved
+   during reference-loading.</li>
+</ol>
+<p>Cross-scope cascade and child-config own-scope wiring are planned
+follow-ups; until then, declare the param in each top-level scope that
+references it, or use <code>${var.x}</code> / <code>defaults:</code> for cascading values.</p>
+<p><code>${param.x}</code> references inside a thread template instantiated via
+<code>ThreadEntry.params</code> (the <code>as:</code> + <code>params:</code> form on a weave's <code>threads:</code>
+list) are unaffected by this rule — they resolve from the entry's
+params block as before.</p>
+<hr />
+<h2 id="further-reading">Further reading<a class="headerlink" href="#further-reading" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../reference/configuration-keys/">Configuration Keys</a> — Complete field
+  reference for all config models</li>
+<li><a href="../../concepts/thread-weave-loom/">Thread, Weave, Loom</a> — The three-level
+  hierarchy and inheritance model</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

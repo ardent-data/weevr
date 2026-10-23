@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1303 124" width="1303" height="124"><style>
+  .flow-bg{fill:#ffffff}
+  .flow-source{fill:#f7fafc;stroke:#a0aec0;stroke-width:1.5}
+  .flow-join{fill:#fefcbf;stroke:#d69e2e;stroke-width:1.5}
+  .flow-transform{fill:#f0fff4;stroke:#48bb78;stroke-width:1.5}
+  .flow-target{fill:#ebf8ff;stroke:#3182ce;stroke-width:2}
+  .flow-label{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central}
+  .flow-sublabel{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central;opacity:0.7}}
+  .flow-badge{fill:#e2e8f0;rx:8}
+  .flow-edge{stroke:#a0aec0;stroke-width:1.5;fill:none}
+  .flow-arrow{fill:#a0aec0}
+  @media(prefers-color-scheme:dark){
+    .flow-bg{fill:#1a202c}
+    .flow-source{fill:#2d3748;stroke:#718096}
+    .flow-join{fill:#744210;stroke:#d69e2e}
+    .flow-transform{fill:#22543d;stroke:#48bb78}
+    .flow-target{fill:#2a4365;stroke:#63b3ed}
+    .flow-label{fill:#e2e8f0}
+    .flow-sublabel{fill:#e2e8f0}
+    .flow-badge{fill:#4a5568}
+    .flow-edge{stroke:#718096}
+    .flow-arrow{fill:#718096}
+  }
+</style><defs><marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto-start-reverse"><polygon points="0 0, 8 4, 0 8" class="flow-arrow"/></marker></defs><rect width="1303" height="124" class="flow-bg"/><line x1="106.8" y1="86.0" x2="146.8" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="356.0" y1="56.0" x2="356.0" y2="68.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="564.7" y1="56.0" x2="564.7" y2="68.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="233.6" y1="86.0" x2="273.6" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="438.4" y1="86.0" x2="478.4" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="651.0" y1="86.0" x2="691.0" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="809.0" y1="86.0" x2="849.0" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="935.8" y1="86.0" x2="975.8" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><line x1="1062.6" y1="86.0" x2="1102.6" y2="86.0" class="flow-edge" marker-end="url(#flow-arrow)"/><rect x="20.0" y="68.0" width="86.8" height="36" rx="6" class="flow-source"/><text x="63.4" y="81.0" class="flow-label">orders</text><text x="63.4" y="94.0" class="flow-sublabel">delta</text><rect x="304.8" y="20.0" width="102.4" height="36" rx="6" class="flow-source"/><text x="356.0" y="33.0" class="flow-label">products</text><text x="356.0" y="46.0" class="flow-sublabel">delta</text><rect x="509.6" y="20.0" width="110.2" height="36" rx="6" class="flow-source"/><text x="564.7" y="33.0" class="flow-label">customers</text><text x="564.7" y="46.0" class="flow-sublabel">delta</text><rect x="146.8" y="68.0" width="86.8" height="36" rx="6" class="flow-transform"/><text x="190.2" y="86.0" class="flow-label">filter</text><polygon points="285.6,68.0 426.4,68.0 438.4,86.0 426.4,104.0 285.6,104.0 273.6,86.0" class="flow-join"/><text x="356.0" y="86.0" class="flow-label">left(product_id)</text><polygon points="490.4,68.0 639.0,68.0 651.0,86.0 639.0,104.0 490.4,104.0 478.4,86.0" class="flow-join"/><text x="564.7" y="86.0" class="flow-label">left(customer_id)</text><rect x="691.0" y="68.0" width="118.0" height="36" rx="6" class="flow-transform"/><text x="750.0" y="86.0" class="flow-label">derive (2)</text><rect x="849.0" y="68.0" width="86.8" height="36" rx="6" class="flow-transform"/><text x="892.4" y="86.0" class="flow-label">rename</text><rect x="975.8" y="68.0" width="86.8" height="36" rx="6" class="flow-transform"/><text x="1019.2" y="86.0" class="flow-label">select</text><rect x="1102.6" y="68.0" width="180.4" height="36" rx="6" class="flow-target"/><rect x="1105.6" y="71.0" width="174.4" height="30" rx="4" class="flow-target" style="fill:none"/><text x="1192.8" y="81.0" class="flow-label">silver.fact_orders</text><text x="1192.8" y="94.0" class="flow-sublabel">merge</text></svg>
