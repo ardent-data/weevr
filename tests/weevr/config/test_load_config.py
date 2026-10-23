@@ -1103,3 +1103,68 @@ class TestLoadConfigWatermarkTypeRequired:
         with pytest.raises(ModelValidationError, match="watermark_type") as exc_info:
             load_config(weave, project_root=tmp_path)
         assert exc_info.value.file_path == str(thread)
+
+
+_INLINE_THREAD_BODY = (
+    '      - name: ops_audit\n        config_version: "1.0"\n'
+    "        sources:\n          events:\n            type: delta\n"
+    "            alias: raw.events\n        target:\n          alias: ops.audit\n"
+)
+
+_REF_THREAD = (
+    'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+    "    alias: raw.orders\ntarget:\n  alias: stg.orders\n"
+)
+
+
+class TestLoadConfigInlineWeaves:
+    """A loom's inline weave resolves like a weave file."""
+
+    @staticmethod
+    def _loom(tmp_path: Path, weaves: str) -> Path:
+        loom = tmp_path / "x.loom"
+        loom.write_text('config_version: "1.0"\nweaves:\n' + weaves)
+        return loom
+
+    def test_inline_weave_with_inline_thread_loads(self, tmp_path):
+        """An inline weave defining its thread inline loads."""
+        loom = self._loom(
+            tmp_path,
+            '  - name: inline_ops\n    config_version: "1.0"\n    threads:\n' + _INLINE_THREAD_BODY,
+        )
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+    def test_inline_weave_with_referenced_thread_loads(self, tmp_path):
+        """An inline weave referencing a thread file loads."""
+        (tmp_path / "orders.thread").write_text(_REF_THREAD)
+        loom = self._loom(
+            tmp_path,
+            '  - name: inline_ops\n    config_version: "1.0"\n    threads:\n'
+            "      - ref: orders.thread\n",
+        )
+        assert isinstance(load_config(loom, project_root=tmp_path), Loom)
+
+    def test_inline_weave_thread_failure_names_loom(self, tmp_path):
+        """An invalid inline thread in an inline weave names the loom file."""
+        loom = self._loom(
+            tmp_path,
+            '  - name: inline_ops\n    config_version: "1.0"\n    threads:\n'
+            + _INLINE_THREAD_BODY
+            + "        write:\n          mode: bogus\n",
+        )
+        with pytest.raises(ModelValidationError) as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(loom)
+
+    def test_name_only_weave_without_file_raises(self, tmp_path):
+        """A name-only weave entry with no file and no body names the missing file."""
+        loom = self._loom(tmp_path, "  - name: missing\n")
+        with pytest.raises(ReferenceResolutionError, match=r"missing\.weave") as exc_info:
+            load_config(loom, project_root=tmp_path)
+        assert exc_info.value.file_path == str(loom)
+
+    def test_string_weave_entry_without_file_raises(self, tmp_path):
+        """The string shorthand for a weave entry with no file also raises."""
+        loom = self._loom(tmp_path, "  - missing\n")
+        with pytest.raises(ReferenceResolutionError, match=r"missing\.weave"):
+            load_config(loom, project_root=tmp_path)

@@ -624,11 +624,30 @@ def resolve_references(
                             resolved_weaves.append(resolved_child)
                         finally:
                             visited.discard(convention_ref)
+                    elif set(entry) - {"name", "condition"}:
+                        # Inline weave body. Variables were already resolved
+                        # with the loom; validate and resolve its threads the
+                        # way a weave file is.
+                        validated = validate_schema(entry, "weave")
+                        inline = validated.model_dump(exclude_unset=True)
+                        inline["qualified_key"] = weave_name
+                        if "condition" in entry:
+                            inline["condition"] = entry["condition"]
+                        resolved_weaves.append(
+                            resolve_references(
+                                inline,
+                                "weave",
+                                project_root,
+                                runtime_params,
+                                visited.copy(),
+                            )
+                        )
                     else:
-                        # Truly inline — pass through as-is
-                        inline = entry.copy()
-                        inline["qualified_key"] = entry.get("name", "")
-                        resolved_weaves.append(inline)
+                        raise ReferenceResolutionError(
+                            f"Weave '{weave_name}' has no definition: expected "
+                            f"'{convention_ref}' in the project root or an inline "
+                            f"weave body (threads) in the loom",
+                        )
 
         result["_resolved_weaves"] = resolved_weaves
 
