@@ -12,14 +12,21 @@ sources:
     type: delta
     alias: raw.sales
 
-# Lookups referenced by resolve steps (defined at weave level)
-# lookups:
-#   dim_plant:
-#     source: curated.dim_plant
-#   dim_customer:
-#     source: curated.dim_customer
-#   dim_product:
-#     source: curated.dim_product
+# Lookups referenced by resolve steps. Defined here on the thread; they can
+# equally live on the weave or loom (the narrowest definition wins).
+lookups:
+  dim_plant:
+    source:
+      type: delta
+      alias: curated.dim_plant
+  dim_customer:
+    source:
+      type: delta
+      alias: curated.dim_customer
+  dim_product:
+    source:
+      type: delta
+      alias: curated.dim_product
 
 steps:
   # --- Single FK resolve (simple match) ---
