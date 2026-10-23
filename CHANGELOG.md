@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.3](https://github.com/ardent-data/weevr/compare/weevr-v1.19.2...weevr-v1.19.3) (2026-10-23)
+
+
+### Bug Fixes
+
+* **config:** resolve inline weaves defined in a loom ([#243](https://github.com/ardent-data/weevr/issues/243)) ([209803f](https://github.com/ardent-data/weevr/commit/209803f1cb14e9cce7a80dc91154a3999400d6a1))
+
 ## [1.19.2](https://github.com/ardent-data/weevr/compare/weevr-v1.19.1...weevr-v1.19.2) (2026-10-23)
 
 
