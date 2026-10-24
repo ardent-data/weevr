@@ -458,23 +458,63 @@ def resolve_thread_lookups(
             raise LookupResolutionError(
                 f"Thread source '{alias}' references undefined lookup '{lookup_name}'"
             )
-
-        if lookup_name in cached_dfs:
-            resolved[alias] = cached_dfs[lookup_name]
-        else:
-            lookup_def = weave_lookups[lookup_name]
-            df = read_source(spark, lookup_name, lookup_def.source, connections=connections)
-            if uk_memo is not None:
-                # Narrow without the inline check; the memo validates
-                # exactly once per weave (first consumer wins, others —
-                # including concurrent group-mates — reuse the outcome)
-                df, _, _, _ = _apply_narrow_pipeline(
-                    df, lookup_def, lookup_name, run_unique_check=False
-                )
-                uk_memo.validate(lookup_name, df, lookup_def)
-            else:
-                # Direct callers keep today's inline per-call check
-                df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
-            resolved[alias] = df
+        resolved[alias] = _lookup_frame(
+            lookup_name, weave_lookups[lookup_name], cached_dfs, spark, connections, uk_memo
+        )
 
     return resolved
+
+
+def resolve_named_lookups(
+    names: set[str],
+    lookups: dict[str, Lookup],
+    cached_dfs: dict[str, DataFrame],
+    spark: SparkSession,
+    connections: dict[str, OneLakeConnection] | None = None,
+    uk_memo: UniqueKeyMemo | None = None,
+) -> dict[str, DataFrame]:
+    """Resolve lookups referenced by name (``resolve`` steps) to DataFrames.
+
+    Names with no definition in ``lookups`` are skipped — the step's
+    ``on_failure`` decides what happens to them.
+
+    Args:
+        names: Lookup names to resolve.
+        lookups: Lookup definitions visible to the thread, by name.
+        cached_dfs: Pre-materialized DataFrames by lookup name.
+        spark: Active SparkSession for on-demand reads.
+        connections: Named connection declarations forwarded to on-demand reads.
+        uk_memo: Per-weave unique-key memo, as for :func:`resolve_thread_lookups`.
+
+    Returns:
+        Mapping of lookup name to resolved DataFrame.
+    """
+    return {
+        name: _lookup_frame(name, lookups[name], cached_dfs, spark, connections, uk_memo)
+        for name in sorted(names)
+        if name in lookups
+    }
+
+
+def _lookup_frame(
+    lookup_name: str,
+    lookup_def: Lookup,
+    cached_dfs: dict[str, DataFrame],
+    spark: SparkSession,
+    connections: dict[str, OneLakeConnection] | None,
+    uk_memo: UniqueKeyMemo | None,
+) -> DataFrame:
+    """The cached frame for a lookup, else an on-demand read through its narrow pipeline."""
+    if lookup_name in cached_dfs:
+        return cached_dfs[lookup_name]
+    df = read_source(spark, lookup_name, lookup_def.source, connections=connections)
+    if uk_memo is not None:
+        # Narrow without the inline check; the memo validates
+        # exactly once per weave (first consumer wins, others —
+        # including concurrent group-mates — reuse the outcome)
+        df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name, run_unique_check=False)
+        uk_memo.validate(lookup_name, df, lookup_def)
+    else:
+        # Direct callers keep today's inline per-call check
+        df, _, _, _ = _apply_narrow_pipeline(df, lookup_def, lookup_name)
+    return df

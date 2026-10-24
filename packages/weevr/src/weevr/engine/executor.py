@@ -22,8 +22,10 @@ from weevr.engine.lookups import (
     build_lookup_meta,
     cleanup_lookups,
     materialize_lookups,
+    resolve_named_lookups,
     resolve_thread_lookups,
 )
+from weevr.engine.planner import resolve_lookup_names
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
 from weevr.engine.target_identity import resolve_target_identity
@@ -229,6 +231,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             if cached_lookups:
                 all_cached.update(cached_lookups)
             all_cached.update(thread_cached_lookups)  # thread wins
+            # A thread lookup that isn't materialized must not be served an
+            # inherited frame of the same name
+            for name in thread.lookups:
+                if name not in thread_cached_lookups:
+                    all_cached.pop(name, None)
             effective_cached_lookups = all_cached or None
             # Thread-scoped materialization facts join the inherited map so
             # resolve steps can reuse unique-key outcomes at every scope
@@ -351,16 +358,34 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 )
 
             # --- Step 3: Resolve lookup-based sources ---
+            # lookup_dfs: frames for lookup-bound sources, by source alias.
+            # resolve_lookups: what resolve steps see — every visible lookup
+            # they name, by lookup name, with bound aliases winning a clash.
             lookup_dfs: dict[str, Any] = {}
+            resolve_lookups: dict[str, Any] = {}
+            resolve_meta = lookup_meta
             if effective_cached_lookups is not None or effective_weave_lookups is not None:
-                lookup_dfs = resolve_thread_lookups(
-                    thread.sources,
-                    effective_weave_lookups or {},
+                definitions = effective_weave_lookups or {}
+                bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
+                by_name = resolve_named_lookups(
+                    resolve_lookup_names(thread) - bound,
+                    definitions,
                     effective_cached_lookups or {},
                     spark,
                     connections=connections,
                     uk_memo=uk_memo,
                 )
+                # Frames read by name are reused for bound sources (one read each)
+                lookup_dfs = resolve_thread_lookups(
+                    thread.sources,
+                    definitions,
+                    {**(effective_cached_lookups or {}), **by_name},
+                    spark,
+                    connections=connections,
+                    uk_memo=uk_memo,
+                )
+                resolve_lookups = {**by_name, **lookup_dfs}
+                resolve_meta = _meta_for_resolve(thread, lookup_meta)
 
             # --- Step 4: Read sources ---
             if load_mode == "incremental_watermark" and thread.load is not None:
@@ -501,7 +526,8 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     collector=collector if span_builder else None,
                     parent_span_id=span_builder.span_id if span_builder else None,
                     observations=obs_registry,
-                    lookup_meta=lookup_meta,
+                    lookup_meta=resolve_meta,
+                    lookups=resolve_lookups or None,
                 )
 
             # Step 5 — primary DataFrame is the first declared source
@@ -520,9 +546,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 sources_map,
                 effective_column_sets,
                 effective_column_set_defs,
-                lookups=lookup_dfs or None,
+                lookups=resolve_lookups or None,
                 observations=obs_registry,
-                lookup_meta=lookup_meta,
+                lookup_meta=resolve_meta,
             )
 
             # Intermediate row count for waterfall visualization. On
@@ -1054,6 +1080,27 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 quarantine_df_persisted.unpersist()
 
 
+def _meta_for_resolve(
+    thread: Thread, lookup_meta: dict[str, LookupMeta] | None
+) -> dict[str, LookupMeta] | None:
+    """Lookup facts keyed the way resolve steps look them up.
+
+    Resolve steps fetch facts by the name they reference. A lookup-bound
+    source alias that shadows a definition of the same name serves a
+    different lookup's frame, so the definition's facts must not apply.
+    """
+    if not lookup_meta:
+        return lookup_meta
+    shadowing = {
+        alias
+        for alias, src in thread.sources.items()
+        if src.lookup is not None and src.lookup != alias and alias in lookup_meta
+    }
+    if not shadowing:
+        return lookup_meta
+    return {name: meta for name, meta in lookup_meta.items() if name not in shadowing}
+
+
 def _resolve_with_block(
     thread: Thread,
     sources_map: dict[str, Any],
@@ -1061,6 +1108,7 @@ def _resolve_with_block(
     parent_span_id: str | None = None,
     observations: ObservationRegistry | None = None,
     lookup_meta: dict[str, LookupMeta] | None = None,
+    lookups: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resolve with: block CTEs, registering each result in the source registry.
 
@@ -1079,6 +1127,7 @@ def _resolve_with_block(
         observations: Thread-level registry; each CTE's observations attach
             under its own scope and merge in for plan-wide unique names.
         lookup_meta: Materialization-time lookup facts for resolve steps.
+        lookups: Lookup DataFrames visible to resolve steps, by name.
 
     Returns:
         An enriched copy of ``sources_map`` with each CTE result registered
@@ -1102,6 +1151,7 @@ def _resolve_with_block(
             cte_df,
             cte.steps,
             enriched,
+            lookups=lookups,
             observations=cte_registry,
             lookup_meta=lookup_meta,
         )

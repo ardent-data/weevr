@@ -6,7 +6,7 @@ from dicts using model_validate with controlled source and target paths.
 
 import pytest
 
-from weevr.engine.planner import ExecutionPlan, build_plan
+from weevr.engine.planner import ExecutionPlan, build_plan, resolve_lookup_names
 from weevr.errors.exceptions import ConfigError
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
@@ -575,6 +575,108 @@ class TestLookupDependencyInference:
 # ---------------------------------------------------------------------------
 # Duplicate-target detection tests
 # ---------------------------------------------------------------------------
+
+
+def _make_resolving_thread(
+    name: str,
+    lookup_name: str,
+    *,
+    batch: bool = False,
+    in_with: bool = False,
+    bound: dict[str, str] | None = None,
+    own_lookups: dict[str, Lookup] | None = None,
+) -> Thread:
+    """A thread that uses ``lookup_name`` only through a resolve step."""
+    params: dict = {"name": "sk", "match": "code", "pk": "sk"}
+    resolve = (
+        {"batch": [{**params, "lookup": lookup_name}]}
+        if batch
+        else {**params, "lookup": lookup_name}
+    )
+    sources: dict = {"main": {"type": "delta", "alias": f"raw.{name}"}}
+    for alias, lk in (bound or {}).items():
+        sources[alias] = {"lookup": lk}
+    data: dict = {
+        "name": name,
+        "config_version": "1.0",
+        "sources": sources,
+        "target": {"alias": f"test.{name}"},
+    }
+    if in_with:
+        data["with"] = {"keyed": {"from": "main", "steps": [{"resolve": resolve}]}}
+    else:
+        data["steps"] = [{"resolve": resolve}]
+    if own_lookups:
+        data["lookups"] = own_lookups
+    return Thread.model_validate(data)
+
+
+class TestResolveLookupConsumers:
+    """A thread that names a lookup only in resolve is still that lookup's consumer."""
+
+    @staticmethod
+    def _plan(consumer: Thread) -> ExecutionPlan:
+        threads = {"A": _make_thread("A", target_alias="silver.dim_customer"), "B": consumer}
+        lookups = {"cust_lookup": _make_lookup("silver.dim_customer")}
+        return build_plan("w", threads, _entries("A", "B"), lookups=lookups)
+
+    @pytest.mark.parametrize(
+        "kwargs", [{}, {"batch": True}, {"in_with": True}], ids=["single", "batch", "with"]
+    )
+    def test_resolve_by_name_depends_on_producer(self, kwargs: dict) -> None:
+        plan = self._plan(_make_resolving_thread("B", "cust_lookup", **kwargs))
+        assert "A" in plan.dependencies["B"]
+        assert plan.execution_order == [["A"], ["B"]]
+        assert plan.lookup_consumers == {"cust_lookup": ["B"]}
+        assert plan.lookup_schedule is not None
+        assert "cust_lookup" in plan.lookup_schedule[1]
+
+    def test_resolve_naming_a_bound_alias_counts_the_bound_lookup(self) -> None:
+        consumer = _make_resolving_thread("B", "fk", bound={"fk": "cust_lookup"})
+        plan = self._plan(consumer)
+        assert plan.lookup_consumers == {"cust_lookup": ["B"]}
+        assert "A" in plan.dependencies["B"]
+
+    def test_unknown_resolve_name_is_not_a_lookup(self) -> None:
+        plan = self._plan(_make_resolving_thread("B", "nope"))
+        assert plan.lookup_consumers == {"cust_lookup": []}
+        assert "A" not in plan.dependencies["B"]
+
+    def test_thread_lookup_shadowing_weave_lookup_still_waits(self) -> None:
+        """Over-dependency by design: the planner sees only weave lookups."""
+        consumer = _make_resolving_thread(
+            "B", "cust_lookup", own_lookups={"cust_lookup": _make_lookup("external.other")}
+        )
+        assert "A" in self._plan(consumer).dependencies["B"]
+
+
+class TestResolveLookupNames:
+    def test_collects_single_batch_and_with_names(self) -> None:
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": "raw.t"}},
+                "steps": [
+                    {"resolve": {"name": "a", "lookup": "one", "match": "c", "pk": "sk"}},
+                    {
+                        "resolve": {
+                            "batch": [{"name": "b", "lookup": "two", "match": "c", "pk": "sk"}]
+                        }
+                    },
+                ],
+                "with": {
+                    "w": {
+                        "from": "main",
+                        "steps": [
+                            {"resolve": {"name": "c", "lookup": "three", "match": "c", "pk": "sk"}}
+                        ],
+                    }
+                },
+                "target": {"alias": "test.t"},
+            }
+        )
+        assert resolve_lookup_names(thread) == {"one", "two", "three"}
 
 
 class TestDuplicateTargets:

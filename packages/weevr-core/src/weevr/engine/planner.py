@@ -9,6 +9,7 @@ from weevr.config.onelake import resolve_connection_path
 from weevr.errors.exceptions import ConfigError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
+from weevr.model.pipeline import ResolveStep
 from weevr.model.thread import Thread
 from weevr.model.weave import ThreadEntry
 
@@ -481,6 +482,27 @@ def _analyze_cache_targets(
     return sorted(targets)
 
 
+def resolve_lookup_names(thread: Thread) -> set[str]:
+    """Lookup names a thread's ``resolve`` steps reference.
+
+    Covers single-mode and batch-item lookups in the main pipeline and in
+    every ``with:`` sub-pipeline. A name may also be a lookup-bound source
+    alias of the thread; callers decide how to treat those.
+    """
+    steps = list(thread.steps)
+    for sub in (thread.with_ or {}).values():
+        steps.extend(sub.steps)
+    names: set[str] = set()
+    for step in steps:
+        if not isinstance(step, ResolveStep):
+            continue
+        if step.resolve.lookup is not None:
+            names.add(step.resolve.lookup)
+        for item in step.resolve.batch or []:
+            names.add(item.lookup)
+    return names
+
+
 def _infer_lookup_dependencies(
     threads: dict[str, Thread],
     lookups: dict[str, Lookup],
@@ -541,16 +563,19 @@ def _infer_lookup_dependencies(
         else:
             lookup_producer[lk_name] = producers[0] if producers else None
 
-    # Find which threads consume each lookup
+    # Find which threads consume each lookup: through a lookup-bound source,
+    # or by name in a resolve step. A resolve name that is a bound source
+    # alias is that source's lookup, already counted. A thread-level lookup
+    # shadowing a weave lookup still counts here (the planner sees only weave
+    # lookups) — a harmless over-dependency.
     lookup_consumers: dict[str, list[str]] = {lk: [] for lk in lookups}
     for thread_name, thread in threads.items():
-        for source in thread.sources.values():
-            if (
-                source.lookup is not None
-                and source.lookup in lookup_consumers
-                and thread_name not in lookup_consumers[source.lookup]
-            ):
-                lookup_consumers[source.lookup].append(thread_name)
+        bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
+        used = {src.lookup for src in thread.sources.values() if src.lookup is not None}
+        used |= resolve_lookup_names(thread) - bound
+        for lk_name in sorted(used):
+            if lk_name in lookup_consumers and thread_name not in lookup_consumers[lk_name]:
+                lookup_consumers[lk_name].append(thread_name)
 
     # Build implicit deps: consumer depends on producer(s)
     lookup_deps: dict[str, list[str]] = {name: [] for name in threads}

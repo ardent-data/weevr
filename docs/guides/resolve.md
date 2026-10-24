@@ -53,6 +53,37 @@ match:
   region: region_code
 ```
 
+## Where the lookup comes from
+
+`lookup` names a lookup defined on the thread, its weave, or its loom.
+When more than one defines the same name, the narrowest wins: thread,
+then weave, then loom.
+
+```yaml
+# In the weave
+lookups:
+  dim_plant:
+    source:
+      type: delta
+      alias: curated.dim_plant
+    materialize: true
+
+# In the thread — no source entry needed
+steps:
+  - resolve:
+      name: plant_id
+      lookup: dim_plant
+      match: plant_code
+      pk: id
+```
+
+`lookup` can also name a source of the thread that is bound to a lookup
+(`sources: {plants: {lookup: dim_plant}}` with `lookup: plants`). A bound
+source wins over a lookup definition of the same name.
+
+A thread that resolves against a lookup runs after the thread that writes
+the lookup's table, the same as a thread that reads the lookup as a source.
+
 ## Sentinel values
 
 Rows with incomplete or unmatched BKs receive sentinel values
