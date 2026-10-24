@@ -159,7 +159,8 @@ def execute_weave(
             ``max_parallel_threads`` caps each group's pool; unset means
             the pool is sized to the group.
         pre_lookup_meta: Materialization-time lookup facts from the parent
-            scope (loom), merged under weave-level facts at dispatch.
+            scope (loom), merged under weave-level facts at dispatch. Facts
+            for a lookup name the weave defines itself are not inherited.
         pre_resolved_column_sets: Loom-level column sets already resolved
             once at loom start (the ``pre_cached_lookups`` analogue —
             overridden keys excluded by the caller so weave precedence
