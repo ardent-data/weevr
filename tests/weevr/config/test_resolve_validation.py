@@ -1,6 +1,7 @@
 """Tests for resolve step lookup name validation."""
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -14,6 +15,9 @@ from weevr.context import Context
 from weevr.errors import ConfigError
 
 from .conftest import MakeProject
+
+ProjectBuilder = Callable[..., Path]
+"""Builds a project from a thread body plus optional weave/loom lookups."""
 
 
 class TestValidateResolveLookups:
@@ -139,7 +143,7 @@ class TestResolveLookupsOnLoad:
     """A resolve step naming a lookup its thread can't see is caught at load."""
 
     @pytest.fixture
-    def project(self, make_project: MakeProject) -> Any:
+    def project(self, make_project: MakeProject) -> ProjectBuilder:
         """``make_project`` with weave- and loom-level lookups as keywords."""
 
         def build(
@@ -153,7 +157,7 @@ class TestResolveLookupsOnLoad:
 
         return build
 
-    def test_standalone_undefined_rejected(self, project: Any) -> None:
+    def test_standalone_undefined_rejected(self, project: ProjectBuilder) -> None:
         proj = project(_thread([{"resolve": _RESOLVE}]))
         with pytest.raises(ConfigError, match="undefined lookup 'dim_codes'") as exc:
             load_config(proj / "fact.thread")
@@ -167,11 +171,11 @@ class TestResolveLookupsOnLoad:
         ],
         ids=["own-lookup", "bound-alias"],
     )
-    def test_standalone_visible_loads(self, project: Any, extra: dict) -> None:
+    def test_standalone_visible_loads(self, project: ProjectBuilder, extra: dict) -> None:
         proj = project(_thread([{"resolve": _RESOLVE}], **extra))
         load_config(proj / "fact.thread")
 
-    def test_weave_only_lookup_not_visible_standalone(self, project: Any) -> None:
+    def test_weave_only_lookup_not_visible_standalone(self, project: ProjectBuilder) -> None:
         proj = project(_thread([{"resolve": _RESOLVE}]), weave_lookups={"dim_codes": _LOOKUP})
         with pytest.raises(ConfigError, match="undefined lookup 'dim_codes'"):
             load_config(proj / "fact.thread")
@@ -179,7 +183,9 @@ class TestResolveLookupsOnLoad:
     @pytest.mark.parametrize(
         ("config", "level"), [("w.weave", "weave"), ("l.loom", "loom"), ("l.loom", "weave")]
     )
-    def test_weave_and_loom_lookups_visible(self, project: Any, config: str, level: str) -> None:
+    def test_weave_and_loom_lookups_visible(
+        self, project: ProjectBuilder, config: str, level: str
+    ) -> None:
         lookups = {"dim_codes": _LOOKUP}
         proj = project(
             _thread([{"resolve": _RESOLVE}]),
@@ -189,7 +195,9 @@ class TestResolveLookupsOnLoad:
         load_resolved(proj / config, project_root=proj)
 
     @pytest.mark.parametrize("config", ["w.weave", "l.loom"])
-    def test_undefined_in_weave_or_loom_rejected(self, project: Any, config: str) -> None:
+    def test_undefined_in_weave_or_loom_rejected(
+        self, project: ProjectBuilder, config: str
+    ) -> None:
         proj = project(
             _thread([{"resolve": {**_RESOLVE, "lookup": "nope"}}]),
             weave_lookups={"dim_codes": _LOOKUP},
@@ -199,14 +207,14 @@ class TestResolveLookupsOnLoad:
         assert exc.value.file_path == str(proj / "fact.thread")
         assert "dim_codes" in str(exc.value)
 
-    def test_batch_undefined_rejected_even_with_warn(self, project: Any) -> None:
+    def test_batch_undefined_rejected_even_with_warn(self, project: ProjectBuilder) -> None:
         batch = {"on_failure": "warn", "batch": [{**_RESOLVE, "lookup": "nope"}]}
         proj = project(_thread([{"resolve": batch}]))
         with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
             load_resolved(proj / "w.weave", project_root=proj)
 
     def test_single_warn_loads_with_a_warning(
-        self, project: Any, caplog: pytest.LogCaptureFixture
+        self, project: ProjectBuilder, caplog: pytest.LogCaptureFixture
     ) -> None:
         step = {**_RESOLVE, "lookup": "nope", "on_failure": "warn"}
         proj = project(_thread([{"resolve": step}]))
@@ -216,7 +224,7 @@ class TestResolveLookupsOnLoad:
             load_config(proj / "w.weave", project_root=proj)
         assert any("nope" in r.getMessage() for r in caplog.records)
 
-    def test_foreach_expanded_steps_checked(self, project: Any) -> None:
+    def test_foreach_expanded_steps_checked(self, project: ProjectBuilder) -> None:
         foreach = {
             "foreach": {
                 "values": ["dim_codes", "nope"],
@@ -228,7 +236,7 @@ class TestResolveLookupsOnLoad:
         with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
             load_resolved(proj / "w.weave", project_root=proj)
 
-    def test_context_validate_reports_it(self, project: Any) -> None:
+    def test_context_validate_reports_it(self, project: ProjectBuilder) -> None:
         proj = project(_thread([{"resolve": {**_RESOLVE, "lookup": "nope"}}]))
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(proj))
         with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
