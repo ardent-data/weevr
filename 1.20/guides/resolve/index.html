@@ -3462,6 +3462,10 @@ after all FKs complete.</p>
 </code></pre></div>
 <p>In batch mode, a missing lookup always aborts regardless of
 <code>on_failure</code>.</p>
+<p>A <code>lookup</code> that names nothing the thread can see is caught when the
+config loads, before any data is read: the load fails, naming the thread's
+file and the lookups that are available. A single-mode step with
+<code>on_failure: warn</code> loads instead, with a load warning, and runs as above.</p>
 <h2 id="fk_sentinel_rate-assertion">fk_sentinel_rate assertion<a class="headerlink" href="#fk_sentinel_rate-assertion" title="Permanent link">&para;</a></h2>
 <p>Post-write assertion that checks FK sentinel rates:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">assertions</span><span class="p">:</span>

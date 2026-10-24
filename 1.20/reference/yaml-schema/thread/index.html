@@ -6633,11 +6633,12 @@ for detailed examples.</p>
 <div class="admonition note">
 <p class="admonition-title">write/keys interaction</p>
 <p>When <code>dimension:</code> is present, <code>write.match_keys</code>,
-<code>write.on_match</code>, <code>keys.business_key</code>,
+<code>write.on_match</code>, <code>write.mode</code>, <code>keys.business_key</code>,
 <code>keys.surrogate_key</code>, and <code>keys.change_detection</code> are
 forbidden — the engine derives these from the dimension
-block. <code>write.on_no_match_source</code> and
-<code>write.on_no_match_target</code> remain available as overrides.</p>
+block, and setting one on the thread fails the config load.
+<code>write.on_no_match_source</code> and <code>write.on_no_match_target</code>
+remain available as overrides.</p>
 </div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nt">target</span><span class="p">:</span>
 <a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/dim_customer</span>

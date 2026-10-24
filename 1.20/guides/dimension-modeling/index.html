@@ -3367,10 +3367,15 @@ members are always excluded from both actions.</p>
 <ul>
 <li><code>write.match_keys</code> — derived from <code>business_key</code></li>
 <li><code>write.on_match</code> — derived from change detection</li>
+<li><code>write.mode</code> — dimension targets always merge</li>
 <li><code>keys.business_key</code> — declared in <code>dimension:</code></li>
 <li><code>keys.surrogate_key</code> — declared in <code>dimension:</code></li>
 <li><code>keys.change_detection</code> — declared in <code>dimension:</code></li>
 </ul>
+<p>Setting any of them on a dimension thread fails the config load, with an
+error naming the field and the thread's file. The check applies to what
+the thread declares itself: <code>write:</code> or <code>keys:</code> defaults inherited from a
+loom or weave don't trip it, since they don't apply to dimension targets.</p>
 <h2 id="scd-type-mapping">SCD Type Mapping<a class="headerlink" href="#scd-type-mapping" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
