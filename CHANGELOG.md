@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.20.1](https://github.com/ardent-data/weevr/compare/weevr-v1.20.0...weevr-v1.20.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **config:** enforce dimension and resolve lookup rules at load ([#255](https://github.com/ardent-data/weevr/issues/255)) ([7fb8908](https://github.com/ardent-data/weevr/commit/7fb89083247f8d5df62145a81546c1785d98e95c))
+* **config:** reject duplicate weave names in a loom ([#252](https://github.com/ardent-data/weevr/issues/252)) ([a62e6b2](https://github.com/ardent-data/weevr/commit/a62e6b2f2c48a9f54cf2c3a2037b5b426ccaa7a1))
+* **config:** skip unrelated src dirs in the partial-install warning ([#256](https://github.com/ardent-data/weevr/issues/256)) ([60744a9](https://github.com/ardent-data/weevr/commit/60744a9da33aad064e33364a3a18fef08ef76be8))
+* **engine:** resolve lookups by name at thread, weave, and loom level ([#254](https://github.com/ardent-data/weevr/issues/254)) ([97393cd](https://github.com/ardent-data/weevr/commit/97393cd6f9ad1bba5f3ce4937279bf88ddd3e1e1))
+
 ## [1.20.0](https://github.com/ardent-data/weevr/compare/weevr-v1.19.3...weevr-v1.20.0) (2026-10-23)
 
 
