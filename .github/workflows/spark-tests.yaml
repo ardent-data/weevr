@@ -74,7 +74,8 @@ jobs:
 
       - name: Spark tests with coverage
         # Two workers fit the 4-vCPU runner: each runs its own local[2]
-        # Spark session, and more workers lose to JVM contention.
+        # Spark session, and more workers lose to JVM contention. The empty
+        # --cov-report= skips the per-job report; the spark-tests job reports.
         env:
           COVERAGE_FILE: .coverage.spark
         run: uv run pytest -m spark -n 2 --cov=weevr --cov-report=
@@ -107,6 +108,8 @@ jobs:
         run: uv sync --locked --dev
 
       # Default selection: everything except Spark and install-smoke tests.
+      # Code Quality runs the same selection on every PR; it runs again here
+      # because this path-filtered workflow needs its coverage for the gate.
       - name: Fast tests with coverage
         env:
           COVERAGE_FILE: .coverage.fast
@@ -122,8 +125,8 @@ jobs:
   spark-tests:
     needs: [spark-suite, fast-coverage]
     # Run even when a test job fails, so a failure reports here as a failed
-    # gate rather than a skipped one.
-    if: always()
+    # gate rather than a skipped one; skip only when the run is cancelled.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
 
     steps:
@@ -155,4 +158,4 @@ jobs:
       - name: Combine coverage and enforce the gate
         run: |
           uvx coverage@7.13.3 combine coverage-data/.coverage.spark coverage-data/.coverage.fast
-          uvx coverage@7.13.3 report --fail-under=90
+          uvx coverage@7.13.3 report --fail-under=90 --show-missing --skip-covered
