@@ -3548,13 +3548,23 @@ must have type annotations.</p>
 <p>Tests live in <code>tests/weevr/</code> and mirror the source layout under
 <code>packages/weevr/src/weevr/</code> and <code>packages/weevr-core/src/weevr/</code> (both
 wheels share the <code>weevr</code> namespace package; tests stay flat under
-<code>tests/weevr/</code>). Tests marked with <code>@pytest.mark.spark</code> are excluded
-by default (they require PySpark and Delta Lake). Run them explicitly
-with:</p>
+<code>tests/weevr/</code>). Two marked groups are excluded by default. Tests
+marked with <code>@pytest.mark.spark</code> require PySpark and Delta Lake. Run
+them explicitly with:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>spark
 </code></pre></div>
+<p>Tests marked with <code>@pytest.mark.install_smoke</code> build both wheels and
+install them into isolated virtual environments. The release workflow
+runs them before publishing; run them locally with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>install_smoke
+</code></pre></div>
+<p>The default suite runs faster across all CPU cores with <code>-n auto</code>.
+Keep the Spark tests at one or two workers
+(<code>-m spark -n 2</code>): each worker starts its own Spark session and JVM.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-n<span class="w"> </span>auto
+</code></pre></div>
 <p>For verbose output and coverage:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-v<span class="w"> </span>--cov
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-v<span class="w"> </span>--cov
 </code></pre></div>
 <h2 id="branching-model">Branching model<a class="headerlink" href="#branching-model" title="Permanent link">&para;</a></h2>
 <p>Create feature branches from <code>main</code>. Never commit directly to <code>main</code>.</p>
@@ -3592,14 +3602,14 @@ with:</p>
 <h2 id="commit-sign-off-dco">Commit sign-off (DCO)<a class="headerlink" href="#commit-sign-off-dco" title="Permanent link">&para;</a></h2>
 <p>Every commit must include a <code>Signed-off-by</code> line. This is enforced by a
 GitHub App and is a required status check.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"feat(config): add variable interpolation"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"feat(config): add variable interpolation"</span>
 </code></pre></div>
 <p>To automatically sign off all commits:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>format.signoff<span class="w"> </span><span class="nb">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>format.signoff<span class="w"> </span><span class="nb">true</span>
 </code></pre></div>
 <p>If you forget the sign-off, amend the commit:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w"> </span>--signoff
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git<span class="w"> </span>push<span class="w"> </span>--force-with-lease
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w"> </span>--signoff
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>git<span class="w"> </span>push<span class="w"> </span>--force-with-lease
 </code></pre></div>
 <h2 id="pull-request-guidelines">Pull request guidelines<a class="headerlink" href="#pull-request-guidelines" title="Permanent link">&para;</a></h2>
 <h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
@@ -3610,15 +3620,15 @@ GitHub App and is a required status check.</p>
 <h3 id="pr-title-format">PR title format<a class="headerlink" href="#pr-title-format" title="Permanent link">&para;</a></h3>
 <p>PR titles must follow <strong>Conventional Commits</strong> syntax. This project uses
 Release Please for versioning, and PR titles become changelog entries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>feat(engine): add parallel thread execution
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>fix(config): resolve variable substitution in nested maps
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>chore(ci): pin ruff version in workflow
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>docs(guides): add observability guide
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>feat(engine): add parallel thread execution
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>fix(config): resolve variable substitution in nested maps
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>chore(ci): pin ruff version in workflow
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>docs(guides): add observability guide
 </code></pre></div>
 <p>Always include the component scope in parentheses.</p>
 <h3 id="breaking-changes">Breaking changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
 <p>Indicate breaking changes with <code>!</code> after the type:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>feat(model)!: rename thread execution fields
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>feat(model)!: rename thread execution fields
 </code></pre></div>
 <p>Or include a <code>BREAKING CHANGE:</code> section in the PR description.</p>
 <h3 id="merge-strategy">Merge strategy<a class="headerlink" href="#merge-strategy" title="Permanent link">&para;</a></h3>
@@ -3677,13 +3687,13 @@ and API references are generated by
 <a href="https://mkdocstrings.github.io/">mkdocstrings</a>.</p>
 <h3 id="serving-docs-locally">Serving docs locally<a class="headerlink" href="#serving-docs-locally" title="Permanent link">&para;</a></h3>
 <p>Start a local development server with hot reload:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>serve
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>serve
 </code></pre></div>
 <p>This serves the site at <code>http://127.0.0.1:8000</code> and automatically rebuilds
 when you save changes to any Markdown file or <code>mkdocs.yml</code>.</p>
 <h3 id="building-docs">Building docs<a class="headerlink" href="#building-docs" title="Permanent link">&para;</a></h3>
 <p>Run a strict build to catch warnings and broken links:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uv<span class="w"> </span>run<span class="w"> </span>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
 </code></pre></div>
 <p>The <code>--strict</code> flag treats warnings as errors. CI runs this same command,
 so fix any warnings locally before pushing.</p>
@@ -3697,18 +3707,18 @@ so fix any warnings locally before pushing.</p>
 Pages not listed in <code>nav</code> are still accessible by URL but will not appear
 in navigation.</p>
 <h3 id="documentation-structure">Documentation structure<a class="headerlink" href="#documentation-structure" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docs/
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  index.md                          -- Home page
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  tutorials/                        -- Step-by-step learning guides
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  how-to/                           -- Task-oriented recipes
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  reference/                        -- YAML schema, API docs, config keys
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    yaml-schema/
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    api/
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>  concepts/                         -- Architecture and design explanations
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>  guides/                           -- Operational guides (Fabric, observability)
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>  faq.md                            -- Frequently asked questions
-<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>  contributing.md                   -- This page
-<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>  release-notes/                    -- Per-version release notes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docs/
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>  index.md                          -- Home page
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  tutorials/                        -- Step-by-step learning guides
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>  how-to/                           -- Task-oriented recipes
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  reference/                        -- YAML schema, API docs, config keys
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    yaml-schema/
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    api/
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>  concepts/                         -- Architecture and design explanations
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>  guides/                           -- Operational guides (Fabric, observability)
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>  faq.md                            -- Frequently asked questions
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>  contributing.md                   -- This page
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>  release-notes/                    -- Per-version release notes
 </code></pre></div>
 <p>This follows the <a href="https://diataxis.fr/">Diataxis</a> documentation framework:
 tutorials, how-to guides, reference, and explanation.</p>
@@ -3718,17 +3728,17 @@ tutorials, how-to guides, reference, and explanation.</p>
   sections, <code>###</code> for subsections.</li>
 <li>
 <p><strong>Admonitions</strong> -- Use MkDocs Material admonitions for callouts:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>!!! note "Title"
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    Admonition body text.
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>!!! tip
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    Tip without a custom title.
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>!!! warning
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>
-<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>    Warning about a common pitfall.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>!!! note "Title"
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    Admonition body text.
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>!!! tip
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    Tip without a custom title.
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>!!! warning
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>    Warning about a common pitfall.
 </code></pre></div>
 </li>
 <li>
@@ -3749,7 +3759,7 @@ docs against the current version.</p>
 <h3 id="api-documentation">API documentation<a class="headerlink" href="#api-documentation" title="Permanent link">&para;</a></h3>
 <p>API reference pages in <code>docs/reference/api/</code> use mkdocstrings to render
 docstrings from source code:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>::: weevr.context.Context
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>::: weevr.context.Context
 </code></pre></div>
 <p>When you add or modify a public class or function, ensure it has a
 Google-style docstring. mkdocstrings will automatically pick up the
@@ -3794,18 +3804,18 @@ changes.</p>
 <h2 id="project-structure">Project structure<a class="headerlink" href="#project-structure" title="Permanent link">&para;</a></h2>
 <p>weevr ships as two PyPI distributions sharing the <code>weevr</code> namespace
 package, declared as a uv workspace at the repository root.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>packages/
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>  weevr-core/             -- Pure-Python validation, planner, telemetry contracts
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    src/weevr/            -- Namespace contributions (no shared __init__.py)
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    pyproject.toml        -- name = "weevr-core"
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  weevr/                  -- Spark engine and runtime helpers
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    src/weevr/            -- Namespace contributions, owns weevr/__init__.py
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    pyproject.toml        -- name = "weevr"; depends on weevr-core
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>tests/weevr/              -- Tests (flat; mirrors both packages' src layouts)
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>docs/                     -- Documentation source (MkDocs)
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>.github/                  -- Workflows, templates, CODEOWNERS
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>mkdocs.yml                -- MkDocs configuration
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>pyproject.toml            -- Workspace declaration + per-tool config
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>packages/
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>  weevr-core/             -- Pure-Python validation, planner, telemetry contracts
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    src/weevr/            -- Namespace contributions (no shared __init__.py)
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    pyproject.toml        -- name = "weevr-core"
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>  weevr/                  -- Spark engine and runtime helpers
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    src/weevr/            -- Namespace contributions, owns weevr/__init__.py
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>    pyproject.toml        -- name = "weevr"; depends on weevr-core
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>tests/weevr/              -- Tests (flat; mirrors both packages' src layouts)
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>docs/                     -- Documentation source (MkDocs)
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>.github/                  -- Workflows, templates, CODEOWNERS
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>mkdocs.yml                -- MkDocs configuration
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>pyproject.toml            -- Workspace declaration + per-tool config
 </code></pre></div>
 <p>The decision rule for new modules: a module belongs in <code>weevr-core</code>
 <em>only if its concern could sensibly exist outside an engine run</em>
