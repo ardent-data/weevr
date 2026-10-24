@@ -12,6 +12,8 @@ from weevr.config.validation import validate_dimension_overrides
 from weevr.context import Context
 from weevr.errors import ConfigError
 
+from .conftest import MakeProject
+
 
 class TestValidateDimensionOverrides:
     """Test validate_dimension_overrides diagnostics."""
@@ -226,54 +228,42 @@ class TestDimensionRulesOnLoad:
         cfg = _write(tmp_path / "dim.thread", _dim_thread(**extra))
         assert load_config(cfg).write.on_no_match_source == "soft_delete"
 
-    @staticmethod
-    def _weave_project(tmp_path: Path, thread: dict, **weave: object) -> Path:
-        project = tmp_path / "p.weevr"
-        project.mkdir()
-        _write(project / "dim.thread", thread)
-        _write(
-            project / "w.weave",
-            {"config_version": "1.0", "threads": [{"ref": "dim.thread"}], **weave},
-        )
-        _write(project / "l.loom", {"config_version": "1.0", "weaves": [{"ref": "w.weave"}]})
-        return project
-
     @pytest.mark.parametrize("config", ["w.weave", "l.loom"])
-    def test_child_thread_rejected(self, tmp_path: Path, config: str) -> None:
-        project = self._weave_project(tmp_path, _dim_thread(write={"match_keys": ["id"]}))
+    def test_child_thread_rejected(self, make_project: MakeProject, config: str) -> None:
+        project = make_project(_dim_thread(write={"match_keys": ["id"]}), thread_file="dim.thread")
         with pytest.raises(ConfigError, match=r"write\.match_keys") as exc:
             load_resolved(project / config, project_root=project)
         assert exc.value.file_path == str(project / "dim.thread")
 
-    def test_inherited_defaults_are_not_the_threads_own(self, tmp_path: Path) -> None:
-        project = self._weave_project(
-            tmp_path,
+    def test_inherited_defaults_are_not_the_threads_own(self, make_project: MakeProject) -> None:
+        project = make_project(
             _dim_thread(),
-            defaults={"write": {"mode": "overwrite", "match_keys": ["id"]}},
+            thread_file="dim.thread",
+            weave={"defaults": {"write": {"mode": "overwrite", "match_keys": ["id"]}}},
         )
         loaded = load_resolved(project / "w.weave", project_root=project)
         assert loaded.resolved_threads["w"]["dim"].target.dimension is not None
 
-    def test_template_entry_rejected(self, tmp_path: Path) -> None:
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+    def test_template_entry_rejected(self, make_project: MakeProject) -> None:
         thread = _dim_thread(
             params={"region": {"type": "string"}},
             write={"match_keys": ["customer_id"]},
         )
-        _write(project / "dim.thread", thread)
-        _write(
-            project / "w.weave",
-            {
-                "config_version": "1.0",
-                "threads": [{"ref": "dim.thread", "as": "dim_east", "params": {"region": "east"}}],
-            },
-        )
+        entry = {"ref": "dim.thread", "as": "dim_east", "params": {"region": "east"}}
+        project = make_project(thread, thread_file="dim.thread", weave={"threads": [entry]})
         with pytest.raises(ConfigError, match=r"write\.match_keys"):
             load_resolved(project / "w.weave", project_root=project)
 
-    def test_context_validate_reports_it(self, tmp_path: Path) -> None:
-        project = self._weave_project(tmp_path, _dim_thread(keys={"business_key": ["id"]}))
+    def test_inline_thread_in_inline_weave_rejected(self, make_project: MakeProject) -> None:
+        inline_thread = {"name": "dim", **_dim_thread(write={"mode": "overwrite"})}
+        inline_weave = {"name": "inl", "config_version": "1.0", "threads": [inline_thread]}
+        project = make_project(loom={"weaves": [inline_weave]})
+        with pytest.raises(ConfigError, match=r"write\.mode") as exc:
+            load_resolved(project / "l.loom", project_root=project)
+        assert exc.value.file_path == str(project / "l.loom")
+
+    def test_context_validate_reports_it(self, make_project: MakeProject) -> None:
+        project = make_project(_dim_thread(keys={"business_key": ["id"]}), thread_file="dim.thread")
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
         with pytest.raises(ConfigError, match=r"keys\.business_key"):
             ctx.run("w.weave", mode="validate")

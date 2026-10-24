@@ -308,7 +308,8 @@ def validate_resolve_lookups(
     """
     diagnostics: list[str] = []
     steps = list(thread_config.get("steps") or [])
-    sub_pipelines = thread_config.get("with") or {}
+    # Resolved dicts carry the block as ``with_`` (the model field); raw YAML as ``with``
+    sub_pipelines = thread_config.get("with_") or thread_config.get("with") or {}
     if isinstance(sub_pipelines, dict):
         for sub in sub_pipelines.values():
             if isinstance(sub, dict) and isinstance(sub.get("steps"), list):
