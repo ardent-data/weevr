@@ -24,6 +24,8 @@ def spark(tmp_path_factory: pytest.TempPathFactory) -> Generator[SparkSession, N
     Test tables hold a handful of rows, so default parallelism only adds
     scheduling overhead: Delta alone replays the transaction log across 50
     snapshot partitions per read. Everything is pinned to one partition.
+    Whole-stage code generation is off for the same reason: compiling
+    generated code costs more than it saves on a handful of rows.
 
     Under pytest-xdist each worker gets its own session, so each also gets
     its own warehouse directory to keep default-catalog tables apart.
@@ -42,6 +44,7 @@ def spark(tmp_path_factory: pytest.TempPathFactory) -> Generator[SparkSession, N
         .config("spark.default.parallelism", "1")
         .config("spark.databricks.delta.snapshotPartitions", "1")
         .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
+        .config("spark.sql.codegen.wholeStage", "false")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.driver.memory", "3g")
         .config("spark.ui.enabled", "false")
