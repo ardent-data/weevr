@@ -67,12 +67,28 @@ uv run pytest
 Tests live in `tests/weevr/` and mirror the source layout under
 `packages/weevr/src/weevr/` and `packages/weevr-core/src/weevr/` (both
 wheels share the `weevr` namespace package; tests stay flat under
-`tests/weevr/`). Tests marked with `@pytest.mark.spark` are excluded
-by default (they require PySpark and Delta Lake). Run them explicitly
-with:
+`tests/weevr/`). Two marked groups are excluded by default. Tests
+marked with `@pytest.mark.spark` require PySpark and Delta Lake. Run
+them explicitly with:
 
 ```bash
 uv run pytest -m spark
+```
+
+Tests marked with `@pytest.mark.install_smoke` build both wheels and
+install them into isolated virtual environments. The release workflow
+runs them before publishing; run them locally with:
+
+```bash
+uv run pytest -m install_smoke
+```
+
+The default suite runs faster across all CPU cores with `-n auto`.
+Keep the Spark tests at one or two workers
+(`-m spark -n 2`): each worker starts its own Spark session and JVM.
+
+```bash
+uv run pytest -n auto
 ```
 
 For verbose output and coverage:

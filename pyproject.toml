@@ -68,7 +68,7 @@ extraPaths = ["packages/weevr-core/src", "packages/weevr/src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -m 'not spark'"
+addopts = "-q -m 'not spark and not install_smoke'"
 markers = [
     "spark: marks tests that require PySpark and Delta Lake (deselected by default)",
     "install_smoke: builds wheels and installs into isolated venvs (deselected by default)",
