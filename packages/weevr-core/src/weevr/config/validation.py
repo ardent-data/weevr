@@ -7,8 +7,9 @@ validation happens as the final step of ``load_config()`` via
 ``model_validate()``.
 
 Post-resolution cross-cutting validators run after variable substitution on
-resolved thread config dicts: ``validate_dimension_overrides`` during the shared
-config load (on each thread's own fields, before the inheritance cascade), and
+resolved thread config dicts: ``validate_dimension_overrides`` and
+``validate_resolve_lookups`` during the shared config load (the dimension rules on
+each thread's own fields, before the inheritance cascade), and
 ``validate_incremental_config`` at executor entry.
 """
 
@@ -288,21 +289,30 @@ def validate_resolve_lookups(
     *,
     available_lookups: set[str],
 ) -> list[str]:
-    """Validate that resolve steps reference defined lookup names.
+    """Validate that resolve steps reference lookup names the thread can see.
 
-    Called after variable resolution on the full thread config dict.
+    Called during the shared config load on each resolved thread dict, after
+    ``foreach`` expansion. Covers the main pipeline and every ``with:``
+    sub-pipeline.
 
     Args:
         thread_config: Resolved thread configuration dictionary.
-        available_lookups: Set of lookup names available from
-            weave, loom, and thread levels.
+        available_lookups: Names a resolve step can use: the thread's,
+            weave's, and loom's lookups plus the thread's lookup-bound
+            source aliases.
 
     Returns:
-        List of diagnostic messages. ``"ERROR:"`` prefixed entries
-        are fatal.
+        List of diagnostic messages. ``"ERROR:"`` prefixed entries are
+        fatal; a single-mode step with ``on_failure: warn`` gets a ``"WARN:"``
+        instead, since it runs on and assigns ``on_unknown`` to every row.
     """
     diagnostics: list[str] = []
-    steps = thread_config.get("steps") or []
+    steps = list(thread_config.get("steps") or [])
+    sub_pipelines = thread_config.get("with") or {}
+    if isinstance(sub_pipelines, dict):
+        for sub in sub_pipelines.values():
+            if isinstance(sub, dict) and isinstance(sub.get("steps"), list):
+                steps.extend(sub["steps"])
 
     for step in steps:
         if not isinstance(step, dict) or "resolve" not in step:
@@ -312,25 +322,21 @@ def validate_resolve_lookups(
         if not isinstance(resolve, dict):
             continue
 
-        # Collect all lookup names referenced by this resolve step
-        lookup_names: list[str] = []
-
-        # Single-mode lookup
+        # (name, level): a single-mode warn step runs on; batch always aborts
+        references: list[tuple[str, str]] = []
         if "lookup" in resolve and isinstance(resolve["lookup"], str):
-            lookup_names.append(resolve["lookup"])
-
-        # Batch-mode lookups
+            level = "WARN" if resolve.get("on_failure") == "warn" else "ERROR"
+            references.append((resolve["lookup"], level))
         batch = resolve.get("batch")
         if isinstance(batch, list):
             for item in batch:
                 if isinstance(item, dict) and "lookup" in item:
-                    lookup_names.append(item["lookup"])
+                    references.append((item["lookup"], "ERROR"))
 
-        # Validate each referenced lookup
-        for name in lookup_names:
+        for name, level in references:
             if name not in available_lookups:
                 diagnostics.append(
-                    f"ERROR: resolve step references undefined lookup "
+                    f"{level}: resolve step references undefined lookup "
                     f"'{name}'; available lookups: "
                     f"{sorted(available_lookups) or '(none)'}"
                 )

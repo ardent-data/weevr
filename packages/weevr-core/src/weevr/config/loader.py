@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
-from weevr.config.hydration import hydrate_children, hydrate_model
+from weevr.config.hydration import check_resolve_lookups, hydrate_children, hydrate_model
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.locations import (
     ConfigLocation,
@@ -231,6 +231,12 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
     Raises:
         ModelValidationError: If the config or any child fails model validation.
     """
+    lookup_warnings: list[str] = []
+    if resolved.config_type == "thread":
+        # A standalone thread sees only its own lookups at run time
+        check_resolve_lookups(
+            resolved.data, set(), resolved.location, resolved.config_name, lookup_warnings
+        )
     model = hydrate_model(resolved.data, resolved.config_type, resolved.location)
     root = resolved.project_root
     weaves, threads = hydrate_children(
@@ -239,6 +245,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         resolved.location,
         resolved.config_name,
         prepare=lambda thread_dict: resolve_source_paths(thread_dict, root),
+        warnings=lookup_warnings,
     )
 
     warnings = list(resolved.warnings)
@@ -251,6 +258,8 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
                 {name: w.execution for name, w in weaves.items()},
             )
         )
+
+    warnings.extend(lookup_warnings)
 
     return HydratedConfig(
         model=model,

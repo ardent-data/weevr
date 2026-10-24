@@ -644,7 +644,7 @@ class LoadedConfig:
 
     @property
     def warnings(self) -> tuple[str, ...]:
-        """Load warnings (execution-scope, then trace-composition), in emission order."""
+        """Load warnings (execution-scope, trace-composition, then resolve-lookup), in order."""
         return self._warnings
 
     @property

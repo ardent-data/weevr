@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from weevr.config.attribution import attribute_errors
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach
+from weevr.config.validation import validate_resolve_lookups
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
@@ -38,6 +39,39 @@ def _weave_origin(entry: Any) -> str:
     if isinstance(entry, dict) and entry.get("threads") is not None:
         return "an inline weave"
     return f"'{_entry_name(entry)}.weave'"
+
+
+def check_resolve_lookups(
+    thread_dict: dict[str, Any],
+    visible: set[str],
+    source: ConfigLocation | str,
+    name: str,
+    warnings: list[str] | None,
+) -> None:
+    """Check a thread's resolve steps against the lookups it can see at run time.
+
+    ``visible`` holds the enclosing weave's and loom's lookup names; the
+    thread's own lookups and lookup-bound source aliases are added here.
+
+    Raises:
+        ConfigError: For a lookup no scope defines (single mode with
+            ``on_failure: warn`` adds a warning to ``warnings`` instead).
+    """
+    sources = thread_dict.get("sources") or {}
+    available = set(visible) | set(thread_dict.get("lookups") or {})
+    available |= {
+        alias for alias, src in sources.items() if isinstance(src, dict) and src.get("lookup")
+    }
+    diagnostics = validate_resolve_lookups(thread_dict, available_lookups=available)
+    errors = [d.removeprefix("ERROR: ") for d in diagnostics if d.startswith("ERROR:")]
+    if errors:
+        raise ConfigError("; ".join(errors), file_path=str(source))
+    if warnings is not None:
+        warnings.extend(
+            f"WARN: thread '{name}': {d.removeprefix('WARN: ')}"
+            for d in diagnostics
+            if d.startswith("WARN:")
+        )
 
 
 def hydrate_model(
@@ -71,6 +105,8 @@ def hydrate_threads(
     resolved: list[dict[str, Any]],
     source: ConfigLocation | str,
     prepare: ThreadPreparer | None = None,
+    visible_lookups: set[str] | None = None,
+    warnings: list[str] | None = None,
 ) -> dict[str, Thread]:
     """Hydrate a weave's resolved threads into a name-to-Thread mapping.
 
@@ -83,11 +119,15 @@ def hydrate_threads(
         resolved: Resolved thread dicts from reference resolution.
         source: The weave's file.
         prepare: Optional hook applied to each thread dict before validation.
+        visible_lookups: Lookup names the enclosing weave and loom define;
+            each thread's resolve steps are checked against them.
+        warnings: Collects load warnings from those checks.
 
     Returns:
         Hydrated threads keyed by effective name (``as`` > name > stem).
 
     Raises:
+        ConfigError: If a resolve step names a lookup no scope defines.
         ModelValidationError: If a thread fails model validation.
     """
     result: dict[str, Thread] = {}
@@ -116,6 +156,10 @@ def hydrate_threads(
             with attribute_errors(thread_source):
                 thread_dict["steps"] = expand_foreach(steps)
 
+        check_resolve_lookups(
+            thread_dict, visible_lookups or set(), thread_source, effective_name, warnings
+        )
+
         if prepare is not None:
             prepare(thread_dict)
 
@@ -136,6 +180,7 @@ def hydrate_children(
     source: ConfigLocation | str,
     name: str,
     prepare: ThreadPreparer | None = None,
+    warnings: list[str] | None = None,
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
     """Hydrate the weaves and threads a weave or loom pulls in.
 
@@ -149,13 +194,15 @@ def hydrate_children(
         source: The top-level config's file.
         name: The top-level config's name, used as the weave key for a weave.
         prepare: Optional hook applied to each thread dict before validation.
+        warnings: Collects load warnings from the children's checks.
 
     Returns:
         ``(weaves, threads)``: hydrated weaves by name (looms only), and each
         weave's hydrated threads by weave name. Both are empty for a thread.
 
     Raises:
-        ConfigError: If two weave entries in a loom resolve to the same name.
+        ConfigError: If two weave entries in a loom resolve to the same name,
+            or a child thread's resolve step names a lookup no scope defines.
         ModelValidationError: If any child fails model validation. The error
             names the child's own file, or the enclosing file for inline
             definitions.
@@ -169,6 +216,8 @@ def hydrate_children(
             resolved.get("_resolved_threads", []),
             source,
             prepare,
+            visible_lookups=set(resolved.get("lookups") or {}),
+            warnings=warnings,
         )
 
     elif config_type == "loom":
@@ -203,6 +252,9 @@ def hydrate_children(
                 weave_dict.get("_resolved_threads", []),
                 weave_source,
                 prepare,
+                visible_lookups=set(resolved.get("lookups") or {})
+                | set(weave_dict.get("lookups") or {}),
+                warnings=warnings,
             )
 
     return weaves, threads
