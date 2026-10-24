@@ -52,7 +52,10 @@ def _extend_namespace_path() -> None:
     src_entries_seen = 0
     candidates_added = 0
     for entry in sys.path:
-        if not entry or osp.basename(entry) != "src":
+        # Only weevr's own src-layout roots count: an unrelated src directory
+        # on the path (another editable package, PYTHONPATH=src) says nothing
+        # about whether this workspace is partially installed.
+        if not entry or osp.basename(entry) != "src" or not osp.isdir(osp.join(entry, "weevr")):
             continue
         src_entries_seen += 1
         candidate = osp.join(entry, *components)

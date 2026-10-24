@@ -159,6 +159,27 @@ def test_core_only_install(
 
 
 @pytest.mark.install_smoke
+def test_core_only_install_quiet_with_unrelated_src(
+    wheels: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    """An unrelated ``src`` directory on the path doesn't trigger the partial-workspace warning."""
+    _, core = wheels
+    python = _make_venv(tmp_path / "core_only_unrelated_src")
+    _pip_install(python, str(core))
+    unrelated = tmp_path / "unrelated" / "src"
+    unrelated.mkdir(parents=True)
+    result = subprocess.run(
+        [str(python), "-W", "error:weevr federated namespace", "-c", "import weevr.config"],
+        env={**os.environ, "PYTHONPATH": str(unrelated)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.install_smoke
 def test_core_only_install_does_not_pull_pyspark(
     wheels: tuple[Path, Path],
     tmp_path: Path,
