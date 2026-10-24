@@ -88,8 +88,9 @@ def load_config(
 # installs each wheel's src/ is a separate sys.path entry, so we extend
 # __path__ to pull engine-side contributions into the import-time view.
 # In a real install both wheels' files merge into a single
-# site-packages/weevr/config/ directory and the loop is a no-op. The
-# basename(p) == "src" gate scopes the scan to src-layout package roots.
+# site-packages/weevr/config/ directory and the loop is a no-op. Only
+# src-layout roots that hold a weevr/ package count; other src entries
+# on sys.path are ignored.
 def _extend_namespace_path() -> None:
     """Append sibling weevr.config/ directories on sys.path to ``__path__``."""
     import os.path as osp
@@ -99,7 +100,13 @@ def _extend_namespace_path() -> None:
     src_entries_seen = 0
     candidates_added = 0
     for entry in sys.path:
-        if not entry or osp.basename(entry) != "src":
+        # Only weevr's own src-layout roots count: an unrelated src directory
+        # on the path (another editable package, PYTHONPATH=src) says nothing
+        # about whether this workspace is partially installed.
+        own_root = (
+            bool(entry) and osp.basename(entry) == "src" and osp.isdir(osp.join(entry, "weevr"))
+        )
+        if not own_root:
             continue
         src_entries_seen += 1
         candidate = osp.join(entry, *components)
