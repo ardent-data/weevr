@@ -3210,7 +3210,7 @@ runtime settings that cascade down through weaves to threads.</p>
 <td><code>dict[string, Lookup]</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Loom-level lookup definitions. Merged with weave-level lookups (weave wins on name collision). See <a href="../weave/#lookups">Weave schema: lookups</a> for field details.</td>
+<td>Loom-level lookup definitions, available to every thread in the loom's weaves as a lookup source or by name in <code>resolve</code>. Merged with weave-level lookups (weave wins on name collision); a materialized loom lookup is read once per loom run. See <a href="../weave/#lookups">Weave schema: lookups</a> for field details.</td>
 </tr>
 <tr>
 <td><code>variables</code></td>
