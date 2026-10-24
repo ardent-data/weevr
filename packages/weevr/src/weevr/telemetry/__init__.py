@@ -21,7 +21,10 @@ def _extend_namespace_path() -> None:
         # Only weevr's own src-layout roots count: an unrelated src directory
         # on the path (another editable package, PYTHONPATH=src) says nothing
         # about whether this workspace is partially installed.
-        if not entry or osp.basename(entry) != "src" or not osp.isdir(osp.join(entry, "weevr")):
+        own_root = (
+            bool(entry) and osp.basename(entry) == "src" and osp.isdir(osp.join(entry, "weevr"))
+        )
+        if not own_root:
             continue
         src_entries_seen += 1
         candidate = osp.join(entry, *components)

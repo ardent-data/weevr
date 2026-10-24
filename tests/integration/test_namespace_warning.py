@@ -1,8 +1,8 @@
 """The federated-namespace warning fires only for a partial weevr workspace.
 
 Each case runs a fresh interpreter whose ``sys.path`` has the workspace's
-editable ``src`` roots removed and a copied package tree put first, so the
-three layouts can be exercised from the dev environment:
+editable ``src`` roots removed and a copied package tree put first, so these
+layouts can be exercised from the dev environment:
 
 * a regular install (package tree in a ``site-packages``-style directory) with
   an unrelated ``src`` directory on the path — must stay quiet;
@@ -21,8 +21,8 @@ CORE_TREE = REPO_ROOT / "packages" / "weevr-core" / "src" / "weevr"
 ENGINE_TREE = REPO_ROOT / "packages" / "weevr" / "src" / "weevr"
 
 _SCRIPT = """
-import sys, warnings
-sys.path[:] = [p for p in sys.path if p.rstrip("/").rsplit("/", 1)[-1] != "src"]
+import os, sys, warnings
+sys.path[:] = [p for p in sys.path if os.path.basename(p) != "src"]
 sys.path[0:0] = {extra!r}
 warnings.filterwarnings("error", message="weevr federated namespace")
 {imports}

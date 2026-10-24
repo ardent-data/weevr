@@ -38,9 +38,10 @@ def __getattr__(name: str) -> object:
 # an editable workspace install each wheel adds its own src/ to sys.path
 # separately, so we extend __path__ to pull sibling weevr/ directories
 # (notably weevr-core's contributions) into the import-time view. The
-# basename(p) == "src" gate restricts the scan to src-layout package
-# roots so unrelated sys.path entries (test fixtures, scripts, …) do
-# not get mistaken for additional weevr namespace contributions. The
+# scan counts only src-layout roots that hold a weevr/ package, so
+# unrelated sys.path entries (test fixtures, scripts, other editable
+# src-layout packages, PYTHONPATH=src) are neither mistaken for weevr
+# contributions nor read as a partial install. The
 # same pattern is mirrored in every federated sub-package's __init__.py
 # (weevr.config, weevr.engine, weevr.telemetry).
 def _extend_namespace_path() -> None:
@@ -55,7 +56,10 @@ def _extend_namespace_path() -> None:
         # Only weevr's own src-layout roots count: an unrelated src directory
         # on the path (another editable package, PYTHONPATH=src) says nothing
         # about whether this workspace is partially installed.
-        if not entry or osp.basename(entry) != "src" or not osp.isdir(osp.join(entry, "weevr")):
+        own_root = (
+            bool(entry) and osp.basename(entry) == "src" and osp.isdir(osp.join(entry, "weevr"))
+        )
+        if not own_root:
             continue
         src_entries_seen += 1
         candidate = osp.join(entry, *components)
