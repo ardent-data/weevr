@@ -344,6 +344,17 @@ def validate_resolve_lookups(
     return diagnostics
 
 
+def split_diagnostics(diagnostics: list[str]) -> tuple[list[str], list[str]]:
+    """Split validator diagnostics into ``(errors, warnings)``, prefixes removed.
+
+    Validators report ``"ERROR: …"`` (fatal) and ``"WARN: …"`` (advisory)
+    strings; anything else is ignored.
+    """
+    errors = [d.removeprefix("ERROR:").lstrip() for d in diagnostics if d.startswith("ERROR:")]
+    warnings = [d.removeprefix("WARN:").lstrip() for d in diagnostics if d.startswith("WARN:")]
+    return errors, warnings
+
+
 def collect_execution_scope_warnings(
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]],
     threads: list[dict[str, Any]],

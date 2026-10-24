@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from weevr.config.attribution import attribute_errors
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach
-from weevr.config.validation import validate_resolve_lookups
+from weevr.config.validation import split_diagnostics, validate_resolve_lookups
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
@@ -62,16 +62,13 @@ def check_resolve_lookups(
     available |= {
         alias for alias, src in sources.items() if isinstance(src, dict) and src.get("lookup")
     }
-    diagnostics = validate_resolve_lookups(thread_dict, available_lookups=available)
-    errors = [d.removeprefix("ERROR: ") for d in diagnostics if d.startswith("ERROR:")]
+    errors, advisories = split_diagnostics(
+        validate_resolve_lookups(thread_dict, available_lookups=available)
+    )
     if errors:
         raise ConfigError("; ".join(errors), file_path=str(source))
     if warnings is not None:
-        warnings.extend(
-            f"WARN: thread '{name}': {d.removeprefix('WARN: ')}"
-            for d in diagnostics
-            if d.startswith("WARN:")
-        )
+        warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
 
 
 def hydrate_model(
