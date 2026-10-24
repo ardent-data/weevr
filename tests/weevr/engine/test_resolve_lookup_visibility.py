@@ -16,6 +16,7 @@ from pyspark.sql import SparkSession
 
 from weevr.context import Context
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+from weevr.errors import ConfigError
 from weevr.operations.readers import read_source
 
 pytestmark = pytest.mark.spark
@@ -223,14 +224,13 @@ class TestReadOnce:
 
 
 class TestUndefined:
-    """A name visible nowhere keeps its on_failure behaviour."""
+    """A name visible nowhere: abort fails the load, warn runs with on_unknown."""
 
-    def test_abort(self, project: Project) -> None:
+    def test_abort_fails_the_load(self, project: Project) -> None:
         project.thread(project.src, [{"resolve": {**RESOLVE, "lookup": "nope"}}])
         _weave(project, {"dim_codes": project.lookup(project.dim)})
-        status, errors = project.run("w.weave")
-        assert status == "failure"
-        assert any("Lookup 'nope' not found" in e for e in errors)
+        with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
+            project.run("w.weave")
 
     def test_warn_assigns_unknown(self, project: Project) -> None:
         step = {**RESOLVE, "lookup": "nope", "on_failure": "warn"}
