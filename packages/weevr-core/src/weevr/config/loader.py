@@ -40,6 +40,7 @@ from weevr.config.resolver import (
 from weevr.config.validation import (
     collect_execution_scope_warnings,
     collect_trace_composition_warnings,
+    validate_dimension_overrides,
     validate_schema,
 )
 from weevr.errors import ConfigError, VariableResolutionError
@@ -180,6 +181,10 @@ def resolve_config(
     warnings = (
         collect_execution_warnings(config_type, data) if config_type in COMPONENT_TYPES else []
     )
+    # Dimension override rules apply to what each thread declares itself, so
+    # they also run before the cascade adds loom/weave write and keys defaults.
+    if config_type in COMPONENT_TYPES:
+        check_dimension_overrides(config_type, data, location)
     _apply_cascade(config_type, data)
 
     if config_type == "thread" and isinstance(data.get("steps"), list):
@@ -377,6 +382,35 @@ def _apply_cascade(config_type: str, data: dict[str, Any]) -> None:
                 weave_audit_templates=weave_audit_templates,
                 weave_connections=weave_connections,
             )
+
+
+def check_dimension_overrides(
+    config_type: str, resolved: dict[str, Any], location: ConfigLocation
+) -> None:
+    """Reject forbidden write/keys fields on dimension threads, from pre-cascade dicts.
+
+    Raises:
+        ConfigError: Naming the field and the thread's own file (the enclosing
+            file for an inline thread).
+    """
+    threads: list[tuple[dict[str, Any], str]] = []
+    if config_type == "loom":
+        for weave in resolved.get("_resolved_weaves", []):
+            weave_source = weave.get("_source_path") or str(location)
+            threads.extend((t, weave_source) for t in weave.get("_resolved_threads", []))
+    elif config_type == "weave":
+        threads.extend((t, str(location)) for t in resolved.get("_resolved_threads", []))
+    else:
+        threads.append((resolved, str(location)))
+
+    for thread, enclosing in threads:
+        errors = [
+            d.removeprefix("ERROR: ")
+            for d in validate_dimension_overrides(thread)
+            if d.startswith("ERROR:")
+        ]
+        if errors:
+            raise ConfigError("; ".join(errors), file_path=thread.get("_source_path") or enclosing)
 
 
 def collect_execution_warnings(config_type: str, resolved: dict[str, Any]) -> list[str]:

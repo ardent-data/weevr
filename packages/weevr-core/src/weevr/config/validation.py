@@ -6,9 +6,10 @@ They intentionally use ``dict[str, Any]`` and ``extra="allow"`` so that
 validation happens as the final step of ``load_config()`` via
 ``model_validate()``.
 
-Post-resolution cross-cutting validators (``validate_incremental_config``,
-``validate_dimension_overrides``) run after variable substitution on the
-resolved thread config dict.
+Post-resolution cross-cutting validators run after variable substitution on
+resolved thread config dicts: ``validate_dimension_overrides`` during the shared
+config load (on each thread's own fields, before the inheritance cascade), and
+``validate_incremental_config`` at executor entry.
 """
 
 from __future__ import annotations
@@ -263,8 +264,8 @@ def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
 
     if "mode" in write and write["mode"] != "merge":
         diagnostics.append(
-            f"ERROR: write.mode must be 'merge' when target.dimension is present, "
-            f"got '{write['mode']}'"
+            f"ERROR: write.mode '{write['mode']}' cannot be set when target.dimension is "
+            f"present (dimension targets always merge); remove write.mode"
         )
 
     for field in _DIMENSION_FORBIDDEN_KEYS_FIELDS:

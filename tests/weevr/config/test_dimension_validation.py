@@ -1,6 +1,16 @@
 """Tests for dimension write/keys override validation."""
 
+import json
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+from pyspark.sql import SparkSession
+
+from weevr.config import load_config, load_resolved
 from weevr.config.validation import validate_dimension_overrides
+from weevr.context import Context
+from weevr.errors import ConfigError
 
 
 class TestValidateDimensionOverrides:
@@ -153,3 +163,117 @@ class TestValidateDimensionOverrides:
         config["write"] = {"mode": "merge"}
         diags = validate_dimension_overrides(config)
         assert len(diags) == 0
+
+
+# ---------------------------------------------------------------------------
+# Enforced on every load
+# ---------------------------------------------------------------------------
+
+_DIMENSION = {
+    "business_key": ["customer_id"],
+    "surrogate_key": {"name": "customer_sk", "columns": ["customer_id"]},
+}
+
+
+def _dim_thread(**extra: object) -> dict:
+    return {
+        "config_version": "1.0",
+        "sources": {"src": {"type": "delta", "alias": "raw.customers"}},
+        "target": {"alias": "gold.dim_customer", "dimension": _DIMENSION},
+        **extra,
+    }
+
+
+def _write(path: Path, body: dict) -> Path:
+    path.write_text(json.dumps(body))
+    return path
+
+
+class TestDimensionRulesOnLoad:
+    """Forbidden write/keys fields on a dimension thread fail the load."""
+
+    @pytest.mark.parametrize(
+        ("extra", "field"),
+        [
+            ({"write": {"match_keys": ["customer_id"]}}, "write.match_keys"),
+            ({"write": {"on_match": "ignore"}}, "write.on_match"),
+            ({"write": {"mode": "overwrite"}}, "write.mode"),
+            ({"keys": {"business_key": ["customer_id"]}}, "keys.business_key"),
+            (
+                {"keys": {"surrogate_key": {"name": "sk", "columns": ["customer_id"]}}},
+                "keys.surrogate_key",
+            ),
+            (
+                {"keys": {"change_detection": {"name": "h", "columns": ["customer_id"]}}},
+                "keys.change_detection",
+            ),
+        ],
+    )
+    def test_standalone_thread_rejected(self, tmp_path: Path, extra: dict, field: str) -> None:
+        cfg = _write(tmp_path / "dim.thread", _dim_thread(**extra))
+        with pytest.raises(ConfigError, match=field.replace(".", r"\.")) as exc:
+            load_config(cfg)
+        assert exc.value.file_path == str(cfg)
+
+    def test_clean_dimension_thread_loads(self, tmp_path: Path) -> None:
+        cfg = _write(tmp_path / "dim.thread", _dim_thread())
+        assert load_config(cfg).target.dimension is not None
+
+    def test_no_match_overrides_still_allowed(self, tmp_path: Path) -> None:
+        extra = {
+            "write": {"on_no_match_source": "soft_delete", "soft_delete_column": "_is_deleted"}
+        }
+        cfg = _write(tmp_path / "dim.thread", _dim_thread(**extra))
+        assert load_config(cfg).write.on_no_match_source == "soft_delete"
+
+    @staticmethod
+    def _weave_project(tmp_path: Path, thread: dict, **weave: object) -> Path:
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        _write(project / "dim.thread", thread)
+        _write(
+            project / "w.weave",
+            {"config_version": "1.0", "threads": [{"ref": "dim.thread"}], **weave},
+        )
+        _write(project / "l.loom", {"config_version": "1.0", "weaves": [{"ref": "w.weave"}]})
+        return project
+
+    @pytest.mark.parametrize("config", ["w.weave", "l.loom"])
+    def test_child_thread_rejected(self, tmp_path: Path, config: str) -> None:
+        project = self._weave_project(tmp_path, _dim_thread(write={"match_keys": ["id"]}))
+        with pytest.raises(ConfigError, match=r"write\.match_keys") as exc:
+            load_resolved(project / config, project_root=project)
+        assert exc.value.file_path == str(project / "dim.thread")
+
+    def test_inherited_defaults_are_not_the_threads_own(self, tmp_path: Path) -> None:
+        project = self._weave_project(
+            tmp_path,
+            _dim_thread(),
+            defaults={"write": {"mode": "overwrite", "match_keys": ["id"]}},
+        )
+        loaded = load_resolved(project / "w.weave", project_root=project)
+        assert loaded.resolved_threads["w"]["dim"].target.dimension is not None
+
+    def test_template_entry_rejected(self, tmp_path: Path) -> None:
+        project = tmp_path / "p.weevr"
+        project.mkdir()
+        thread = _dim_thread(
+            params={"region": {"type": "string"}},
+            write={"match_keys": ["customer_id"]},
+        )
+        _write(project / "dim.thread", thread)
+        _write(
+            project / "w.weave",
+            {
+                "config_version": "1.0",
+                "threads": [{"ref": "dim.thread", "as": "dim_east", "params": {"region": "east"}}],
+            },
+        )
+        with pytest.raises(ConfigError, match=r"write\.match_keys"):
+            load_resolved(project / "w.weave", project_root=project)
+
+    def test_context_validate_reports_it(self, tmp_path: Path) -> None:
+        project = self._weave_project(tmp_path, _dim_thread(keys={"business_key": ["id"]}))
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        with pytest.raises(ConfigError, match=r"keys\.business_key"):
+            ctx.run("w.weave", mode="validate")
