@@ -971,11 +971,12 @@ for detailed examples.
 
 !!! note "write/keys interaction"
     When `dimension:` is present, `write.match_keys`,
-    `write.on_match`, `keys.business_key`,
+    `write.on_match`, `write.mode`, `keys.business_key`,
     `keys.surrogate_key`, and `keys.change_detection` are
     forbidden — the engine derives these from the dimension
-    block. `write.on_no_match_source` and
-    `write.on_no_match_target` remain available as overrides.
+    block, and setting one on the thread fails the config load.
+    `write.on_no_match_source` and `write.on_no_match_target`
+    remain available as overrides.
 
 ```yaml
 target:

@@ -229,9 +229,15 @@ Forbidden fields when `dimension:` is present:
 
 - `write.match_keys` — derived from `business_key`
 - `write.on_match` — derived from change detection
+- `write.mode` — dimension targets always merge
 - `keys.business_key` — declared in `dimension:`
 - `keys.surrogate_key` — declared in `dimension:`
 - `keys.change_detection` — declared in `dimension:`
+
+Setting any of them on a dimension thread fails the config load, with an
+error naming the field and the thread's file. The check applies to what
+the thread declares itself: `write:` or `keys:` defaults inherited from a
+loom or weave don't trip it, since they don't apply to dimension targets.
 
 ## SCD Type Mapping
 

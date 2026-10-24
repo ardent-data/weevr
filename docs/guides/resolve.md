@@ -271,6 +271,11 @@ on_failure: warn    # assign on_unknown to all rows, continue
 In batch mode, a missing lookup always aborts regardless of
 `on_failure`.
 
+A `lookup` that names nothing the thread can see is caught when the
+config loads, before any data is read: the load fails, naming the thread's
+file and the lookups that are available. A single-mode step with
+`on_failure: warn` loads instead, with a load warning, and runs as above.
+
 ## fk_sentinel_rate assertion
 
 Post-write assertion that checks FK sentinel rates:
