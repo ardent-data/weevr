@@ -82,6 +82,7 @@ class Project:
 
 @pytest.fixture(scope="module")
 def shared_tables(spark: SparkSession, module_delta_path) -> tuple[str, str]:
+    """Write the read-only ``dim`` and ``src`` tables once per module; return their paths."""
     dim = module_delta_path("dim")
     spark.createDataFrame([("a", 1), ("b", 2)], ["code", "sk"]).write.format("delta").save(dim)
     src = module_delta_path("src")

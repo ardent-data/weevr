@@ -806,9 +806,8 @@ def id_val_src(spark: SparkSession, module_delta_path) -> str:
 class TestContextLoad:
     def test_load_thread(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt_path = str(tmp_path / "tgt_data")
-        src_path = one_row_src
 
-        thread_yaml = _create_thread_yaml(tmp_path, "dim_test", src_path, tgt_path)
+        thread_yaml = _create_thread_yaml(tmp_path, "dim_test", one_row_src, tgt_path)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         loaded = ctx.load(thread_yaml)
 
@@ -818,10 +817,9 @@ class TestContextLoad:
 
     def test_load_weave(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_w")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "t1", src, tgt)
+        _create_thread_yaml(project, "t1", one_row_src, tgt)
         weave_yaml = _create_weave_yaml(project, "test_weave", ["t1"])
         ctx = Context(spark=spark, project=project)
         loaded = ctx.load(weave_yaml)
@@ -832,10 +830,9 @@ class TestContextLoad:
 
     def test_load_loom(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_l")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "t1", src, tgt)
+        _create_thread_yaml(project, "t1", one_row_src, tgt)
         _create_weave_yaml(project, "w1", ["t1"])
         loom_yaml = _create_loom_yaml(project, "test_loom", ["w1"])
         ctx = Context(spark=spark, project=project)
@@ -850,9 +847,8 @@ class TestContextLoad:
 class TestContextRunExecute:
     def test_run_execute_thread(self, spark: SparkSession, tmp_path: Path, id_val_src: str) -> None:
         tgt = str(tmp_path / "tgt_exec")
-        src = id_val_src
 
-        thread_yaml = _create_thread_yaml(tmp_path, "t_exec", src, tgt)
+        thread_yaml = _create_thread_yaml(tmp_path, "t_exec", id_val_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(thread_yaml)
 
@@ -870,12 +866,11 @@ class TestContextRunExecute:
         from weevr.operations.target_handle import TargetHandle
 
         tgt = str(tmp_path / "tgt_unattr")
-        src = id_val_src
         monkeypatch.setattr(
             TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
         )
 
-        thread_yaml = _create_thread_yaml(tmp_path, "t_unattr", src, tgt)
+        thread_yaml = _create_thread_yaml(tmp_path, "t_unattr", id_val_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(thread_yaml)
         monkeypatch.undo()
@@ -892,10 +887,9 @@ class TestContextRunExecute:
         conditions are keyed by effective name, not raw entry name."""
         tgt = str(tmp_path / "tgt_alias_cond")
         absent_gate = str(tmp_path / "gate_never_created")
-        src = id_val_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "t_base", src, tgt)
+        _create_thread_yaml(project, "t_base", id_val_src, tgt)
         weave_dir = project / "weaves"
         weave_dir.mkdir(parents=True, exist_ok=True)
         weave_yaml = weave_dir / "walias.weave"
@@ -921,10 +915,9 @@ threads:
 
     def test_run_execute_weave(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_wexec")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "tw1", src, tgt)
+        _create_thread_yaml(project, "tw1", one_row_src, tgt)
         weave_yaml = _create_weave_yaml(project, "wexec", ["tw1"])
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml)
@@ -936,10 +929,9 @@ threads:
 
     def test_run_execute_loom(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_lexec")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "tl1", src, tgt)
+        _create_thread_yaml(project, "tl1", one_row_src, tgt)
         _create_weave_yaml(project, "wl1", ["tl1"])
         loom_yaml = _create_loom_yaml(project, "lexec", ["wl1"])
         ctx = Context(spark=spark, project=project)
@@ -953,10 +945,9 @@ threads:
     def test_context_reusable(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt1 = str(tmp_path / "tgt_reuse1")
         tgt2 = str(tmp_path / "tgt_reuse2")
-        src = one_row_src
 
-        yaml1 = _create_thread_yaml(tmp_path / "proj1", "r1", src, tgt1)
-        yaml2 = _create_thread_yaml(tmp_path / "proj2", "r2", src, tgt2)
+        yaml1 = _create_thread_yaml(tmp_path / "proj1", "r1", one_row_src, tgt1)
+        yaml2 = _create_thread_yaml(tmp_path / "proj2", "r2", one_row_src, tgt2)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
 
         r1 = ctx.run(yaml1)
@@ -972,11 +963,10 @@ threads:
         """Weave-level lookups are forwarded from context to execute_weave."""
         tgt = str(tmp_path / "tgt_lkp")
         lkp = str(tmp_path / "lkp_src")
-        src = one_row_src
         spark.createDataFrame([{"id": 1, "label": "test"}]).write.format("delta").save(lkp)
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "tw_lkp", src, tgt)
+        _create_thread_yaml(project, "tw_lkp", one_row_src, tgt)
 
         # Create a weave with a lookups section
         weave_dir = project / "weaves"
@@ -1002,10 +992,9 @@ threads:
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
         tgt = str(tmp_path / "tgt_filt")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "tf1", src, tgt)
+        _create_thread_yaml(project, "tf1", one_row_src, tgt)
         weave_yaml = _create_weave_yaml(project, "wfilt", ["tf1"])
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, threads=["nonexistent"])
@@ -1020,9 +1009,8 @@ class TestValidateMode:
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
         tgt = str(tmp_path / "tgt_val")
-        src = one_row_src
 
-        yaml_path = _create_thread_yaml(tmp_path, "vt1", src, tgt)
+        yaml_path = _create_thread_yaml(tmp_path, "vt1", one_row_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="validate")
 
@@ -1034,10 +1022,9 @@ class TestValidateMode:
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
         tgt = str(tmp_path / "tgt_vw")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "vt2", src, tgt)
+        _create_thread_yaml(project, "vt2", one_row_src, tgt)
         weave_yaml = _create_weave_yaml(project, "vw1", ["vt2"])
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, mode="validate")
@@ -1050,11 +1037,10 @@ class TestValidateMode:
     ) -> None:
         """Two unordered threads writing one target fail validation, not execution."""
         tgt = str(tmp_path / "tgt_dup")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "load_jan", src, tgt)
-        _create_thread_yaml(project, "load_feb", src, tgt)
+        _create_thread_yaml(project, "load_jan", one_row_src, tgt)
+        _create_thread_yaml(project, "load_feb", one_row_src, tgt)
         weave_yaml = _create_weave_yaml(project, "vdup", ["load_jan", "load_feb"])
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, mode="validate")
@@ -1082,11 +1068,10 @@ class TestValidateMode:
         """Writers of one target all carrying conditions validate cleanly —
         the conditions assert mutual exclusion."""
         tgt = str(tmp_path / "tgt_cdup")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "load_full", src, tgt)
-        _create_thread_yaml(project, "load_incr", src, tgt)
+        _create_thread_yaml(project, "load_full", one_row_src, tgt)
+        _create_thread_yaml(project, "load_incr", one_row_src, tgt)
         weave_dir = project / "weaves"
         weave_dir.mkdir(parents=True, exist_ok=True)
         weave_yaml = weave_dir / "vcdup.weave"
@@ -1113,9 +1098,8 @@ threads:
 class TestPlanMode:
     def test_plan_thread(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_pt")
-        src = one_row_src
 
-        yaml_path = _create_thread_yaml(tmp_path, "pt1", src, tgt)
+        yaml_path = _create_thread_yaml(tmp_path, "pt1", one_row_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="plan")
 
@@ -1125,10 +1109,9 @@ class TestPlanMode:
 
     def test_plan_weave(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_pw")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "pw1", src, tgt)
+        _create_thread_yaml(project, "pw1", one_row_src, tgt)
         weave_yaml = _create_weave_yaml(project, "wpln", ["pw1"])
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, mode="plan")
@@ -1140,10 +1123,9 @@ class TestPlanMode:
 
     def test_plan_loom(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_pl")
-        src = one_row_src
 
         project = _project_dir(tmp_path)
-        _create_thread_yaml(project, "pl1", src, tgt)
+        _create_thread_yaml(project, "pl1", one_row_src, tgt)
         _create_weave_yaml(project, "wpl1", ["pl1"])
         loom_yaml = _create_loom_yaml(project, "lpln", ["wpl1"])
         ctx = Context(spark=spark, project=project)
@@ -1174,9 +1156,8 @@ class TestPreviewMode:
 
     def test_preview_no_writes(self, spark: SparkSession, tmp_path: Path, one_row_src: str) -> None:
         tgt = str(tmp_path / "tgt_nw")
-        src = one_row_src
 
-        yaml_path = _create_thread_yaml(tmp_path, "prev2", src, tgt)
+        yaml_path = _create_thread_yaml(tmp_path, "prev2", one_row_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         ctx.run(yaml_path, mode="preview")
 
@@ -1597,9 +1578,8 @@ write:
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
         tgt = str(tmp_path / "tgt_pnostats")
-        src = one_row_src
 
-        yaml_path = _create_thread_yaml(tmp_path, "pnostats", src, tgt)
+        yaml_path = _create_thread_yaml(tmp_path, "pnostats", one_row_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="preview")
 
@@ -1677,7 +1657,6 @@ class TestValidateModeSourceProbes:
     def test_validate_mode_probe_matrix(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
-        delta_src = one_row_src
         csv_src = tmp_path / "probe.csv"
         csv_src.write_text("id,val\n1,a\n")
         json_src = tmp_path / "probe.json"
@@ -1686,7 +1665,7 @@ class TestValidateModeSourceProbes:
 
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         present = {
-            "d": self._thread_with_source("delta", delta_src, tgt),
+            "d": self._thread_with_source("delta", one_row_src, tgt),
             "c": self._thread_with_source("csv", str(csv_src), tgt),
             "j": self._thread_with_source("json", str(json_src), tgt),
         }
@@ -1704,7 +1683,6 @@ class TestValidateModeSourceProbes:
     def test_validate_mode_probes_launch_zero_jobs(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str, job_counter
     ) -> None:
-        delta_src = one_row_src
         csv_src = tmp_path / "zerojob.csv"
         csv_src.write_text("id,val\n1,a\n2,b\n")
         json_src = tmp_path / "zerojob.json"
@@ -1713,7 +1691,7 @@ class TestValidateModeSourceProbes:
 
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         threads = {
-            "d": self._thread_with_source("delta", delta_src, tgt),
+            "d": self._thread_with_source("delta", one_row_src, tgt),
             "c": self._thread_with_source("csv", str(csv_src), tgt),
             "j": self._thread_with_source("json", str(json_src), tgt),
         }
@@ -1774,8 +1752,7 @@ class TestPreviewRenderPurity:
         from pyspark.sql import DataFrame
 
         tgt = str(tmp_path / "tgt_degrade")
-        src = id_val_src
-        yaml_path = _create_thread_yaml(tmp_path, "prevd1", src, tgt)
+        yaml_path = _create_thread_yaml(tmp_path, "prevd1", id_val_src, tgt)
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
 
         def refuse_count(self, *args, **kwargs):
