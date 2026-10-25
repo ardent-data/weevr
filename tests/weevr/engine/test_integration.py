@@ -34,6 +34,23 @@ from weevr.model.write import WriteConfig
 
 pytestmark = pytest.mark.spark
 
+
+@pytest.fixture(scope="module")
+def one_row_src(spark: SparkSession, module_delta_path) -> str:
+    """Read-only one-row Delta source shared across the module."""
+    path = module_delta_path("one_row_src")
+    create_delta_table(spark, path, [{"id": 1}])
+    return path
+
+
+@pytest.fixture(scope="module")
+def fact_src(spark: SparkSession, module_delta_path) -> str:
+    """Read-only fact source with a valid foreign key, shared across the module."""
+    path = module_delta_path("fact_src")
+    create_delta_table(spark, path, [{"sk_customer": 1, "amount": 100}])
+    return path
+
+
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "threads"
 
 
@@ -108,11 +125,12 @@ class TestYamlLoadToExecute:
         assert "amount" not in written.columns
         assert "doubled" not in written.columns
 
-    def test_name_derived_from_file_path(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_name_derived_from_file_path(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
         """Thread.name is derived from the YAML file path."""
-        src = tmp_delta_path("ec014_src")
         tgt = tmp_delta_path("ec014_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
+        src = one_row_src
 
         thread = load_config(
             _FIXTURE_DIR / "thread_simple.thread",
@@ -306,11 +324,10 @@ class TestPipelineStepTypes:
         ids = [r["id"] for r in written.collect()]
         assert ids == sorted(ids)
 
-    def test_pipeline_union_step(self, spark: SparkSession, tmp_delta_path) -> None:
-        src_a = tmp_delta_path("union_a")
+    def test_pipeline_union_step(self, spark: SparkSession, tmp_delta_path, one_row_src) -> None:
         src_b = tmp_delta_path("union_b")
         tgt = tmp_delta_path("union_tgt")
-        create_delta_table(spark, src_a, [{"id": 1}])
+        src_a = one_row_src
         create_delta_table(spark, src_b, [{"id": 2}])
 
         steps: list = [UnionStep(union=UnionParams(sources=["right"], mode="by_name"))]
@@ -563,12 +580,13 @@ class TestWriteModes:
         written = spark.read.format("delta").load(tgt)
         assert written.count() == 3  # 1 existing + 2 appended
 
-    def test_overwrite_replaces_existing_rows(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_overwrite_replaces_existing_rows(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
         """Overwrite mode replaces all existing content."""
-        src = tmp_delta_path("ow_src")
         tgt = tmp_delta_path("ow_tgt")
         create_delta_table(spark, tgt, [{"id": 99}, {"id": 100}])
-        create_delta_table(spark, src, [{"id": 1}])
+        src = one_row_src
 
         thread = _thread("ow_wrt", src, tgt, write=WriteConfig(mode="overwrite"))
         execute_thread(spark, thread)
@@ -600,12 +618,11 @@ class TestFactValidation:
         )
 
     def test_missing_fk_column_aborts_before_write(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, fact_src
     ) -> None:
         """A missing FK column raises ExecutionError and nothing is written."""
-        src = tmp_delta_path("fact_err_src")
         tgt = tmp_delta_path("fact_err_tgt")
-        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        src = fact_src
 
         thread = self._fact_thread("fact_err", src, tgt, ["sk_customer", "sk_product"])
         with pytest.raises(ExecutionError) as exc_info:
@@ -615,12 +632,11 @@ class TestFactValidation:
         assert not (Path(tgt) / "_delta_log").exists()
 
     def test_sentinel_advisory_warns_after_successful_write(
-        self, spark: SparkSession, tmp_delta_path, caplog
+        self, spark: SparkSession, tmp_delta_path, fact_src, caplog
     ) -> None:
         """A sentinel-free fact still writes; the advisory WARN fires post-write."""
-        src = tmp_delta_path("fact_warn_src")
         tgt = tmp_delta_path("fact_warn_tgt")
-        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        src = fact_src
 
         thread = self._fact_thread("fact_warn", src, tgt, ["sk_customer"])
         with caplog.at_level(logging.WARNING, logger="weevr.operations.fact"):
@@ -631,17 +647,16 @@ class TestFactValidation:
         assert any("contains no sentinel values" in r.message for r in caplog.records)
 
     def test_advisory_evaluates_written_table_not_pipeline_frame(
-        self, spark: SparkSession, tmp_delta_path, caplog
+        self, spark: SparkSession, tmp_delta_path, fact_src, caplog
     ) -> None:
         """Appending sentinel-free rows onto history that has sentinels → no WARN.
 
         The advisory reads the written table; the in-flight DataFrame alone
         (no sentinels) would have WARNed under pre-write checking.
         """
-        src = tmp_delta_path("fact_hist_src")
         tgt = tmp_delta_path("fact_hist_tgt")
         create_delta_table(spark, tgt, [{"sk_customer": -1, "amount": 0}])
-        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        src = fact_src
 
         thread = self._fact_thread(
             "fact_hist", src, tgt, ["sk_customer"], write=WriteConfig(mode="append")
@@ -653,12 +668,11 @@ class TestFactValidation:
         assert not any("contains no sentinel values" in r.message for r in caplog.records)
 
     def test_sentinel_advisory_fires_for_alias_target(
-        self, spark: SparkSession, tmp_delta_path, caplog
+        self, spark: SparkSession, tmp_delta_path, fact_src, caplog
     ) -> None:
         """The post-write advisory reads table-alias targets via the
         metastore, not just filesystem paths."""
-        src = tmp_delta_path("fact_alias_src")
-        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        src = fact_src
         alias = "fact_alias_advisory_tgt"
 
         try:
@@ -682,15 +696,14 @@ class TestFactValidation:
             spark.sql(f"DROP TABLE IF EXISTS {alias}")
 
     def test_advisory_read_failure_never_fails_run(
-        self, spark: SparkSession, tmp_delta_path, caplog, monkeypatch
+        self, spark: SparkSession, tmp_delta_path, fact_src, caplog, monkeypatch
     ) -> None:
         """A failing post-write table read degrades to a debug log; the
         run still succeeds."""
         import weevr.engine.executor as executor_mod
 
-        src = tmp_delta_path("fact_boom_src")
         tgt = tmp_delta_path("fact_boom_tgt")
-        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        src = fact_src
 
         def _unreadable(*args, **kwargs):
             raise RuntimeError("table unreadable")
@@ -706,13 +719,12 @@ class TestFactValidation:
         assert not any("contains no sentinel values" in r.message for r in caplog.records)
 
     def test_advisory_skips_fk_dropped_by_mapping(
-        self, spark: SparkSession, tmp_delta_path, caplog
+        self, spark: SparkSession, tmp_delta_path, fact_src, caplog
     ) -> None:
         """An FK dropped by explicit mapping is absent post-write — the run
         still succeeds and no advisory fires for it."""
-        src = tmp_delta_path("fact_map_src")
         tgt = tmp_delta_path("fact_map_tgt")
-        create_delta_table(spark, src, [{"sk_customer": 1, "amount": 100}])
+        src = fact_src
 
         target = Target(
             path=tgt,
@@ -734,14 +746,13 @@ class TestErrorWrapping:
     """Errors are wrapped as ExecutionError with thread context."""
 
     def test_invalid_filter_expression_raises_execution_error(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Invalid Spark expression in a filter step → ExecutionError with thread_name."""
         from weevr.model.pipeline import FilterParams, FilterStep
 
-        src = tmp_delta_path("err_src")
         tgt = tmp_delta_path("err_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
+        src = one_row_src
 
         steps: list = [
             FilterStep(filter=FilterParams(expr=SparkExpr("NOT_A_VALID_COLUMN_XYZ > 0")))
