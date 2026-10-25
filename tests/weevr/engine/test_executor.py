@@ -173,38 +173,27 @@ class TestUnknownRowsWritten:
 class TestExecuteThreadResult:
     """ThreadResult fields populated correctly by execute_thread."""
 
-    def test_returns_thread_result_on_success(
-        self, spark: SparkSession, tmp_delta_path, two_row_src
-    ) -> None:
-        tgt = tmp_delta_path("exec_tgt")
-        src = two_row_src
+    def test_success_result_fields(self, spark: SparkSession, tmp_delta_path) -> None:
+        """One plain run populates every ThreadResult field.
 
-        thread = _make_thread("my_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert isinstance(result, ThreadResult)
-        assert result.status == "success"
-
-    def test_result_thread_name_matches(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        tgt = tmp_delta_path("name_tgt")
-        src = one_row_src
-
-        thread = _make_thread("named_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.thread_name == "named_thread"
-
-    def test_result_rows_written_matches_source(self, spark: SparkSession, tmp_delta_path) -> None:
+        The thread has no lookups, exports, resources, or connections, so this
+        also covers the plain path those features must leave unchanged.
+        """
         src = tmp_delta_path("rows_src")
         tgt = tmp_delta_path("rows_tgt")
         create_delta_table(spark, src, [{"id": i} for i in range(5)])
 
-        thread = _make_thread("rows_thread", src, tgt)
+        thread = _make_thread("my_thread", src, tgt)  # no explicit write mode
         result = execute_thread(spark, thread)
 
+        assert isinstance(result, ThreadResult)
+        assert result.status == "success"
+        assert result.thread_name == "my_thread"
         assert result.rows_written == 5
+        assert result.write_mode == "overwrite"  # the default
+        assert result.target_path == tgt
+        assert result.telemetry is not None
+        assert result.telemetry.export_results == []
 
     def test_result_write_mode_overwrite(
         self, spark: SparkSession, tmp_delta_path, one_row_src
@@ -216,28 +205,6 @@ class TestExecuteThreadResult:
         result = execute_thread(spark, thread)
 
         assert result.write_mode == "overwrite"
-
-    def test_result_write_mode_defaults_to_overwrite(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        tgt = tmp_delta_path("default_tgt")
-        src = one_row_src
-
-        thread = _make_thread("default_mode", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.write_mode == "overwrite"
-
-    def test_result_target_path_populated(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        tgt = tmp_delta_path("path_tgt")
-        src = one_row_src
-
-        thread = _make_thread("path_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.target_path == tgt
 
 
 class TestExecuteThreadWrites:
@@ -521,19 +488,6 @@ class TestExecuteThreadLookups:
         assert isinstance(exc_info.value.__cause__, LookupResolutionError)
         assert "nonexistent" in str(exc_info.value.__cause__)
 
-    def test_no_lookups_backward_compatible(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        """Thread without lookups works as before (no cached_lookups / weave_lookups)."""
-        tgt = tmp_delta_path("lkp_compat_tgt")
-        src = one_row_src
-
-        thread = _make_thread("compat_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.rows_written == 1
-
 
 class TestExecuteThreadExports:
     """Test export execution in execute_thread."""
@@ -597,20 +551,6 @@ class TestExecuteThreadExports:
         thread = _make_thread("abort_thread", src, tgt, exports=exports)
         with pytest.raises(ExportError, match="critical"):
             execute_thread(spark, thread)
-
-    def test_no_exports_backward_compatible(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        """Thread without exports works as before."""
-        tgt = tmp_delta_path("noexp_tgt")
-        src = one_row_src
-
-        thread = _make_thread("no_export_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.telemetry is not None
-        assert result.telemetry.export_results == []
 
     def test_multiple_exports(self, spark: SparkSession, tmp_delta_path) -> None:
         """Thread with multiple exports writes all of them."""
@@ -850,35 +790,9 @@ class TestThreadResourceLifecycle:
         log_messages = [str(call) for call in mock_logger.log.call_args_list]
         assert any("var=hello-from-thread" in msg for msg in log_messages)
 
-    def test_thread_without_resources_backward_compatible(
-        self, spark: SparkSession, tmp_delta_path, two_row_src
-    ) -> None:
-        """Threads without any resource fields still work as before."""
-        tgt = tmp_delta_path("norc_tgt")
-        src = two_row_src
-
-        thread = _make_thread("norc_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.rows_written == 2
-
 
 class TestExecuteThreadConnections:
     """Connection resolution integration in execute_thread."""
-
-    def test_thread_without_connections_backward_compatible(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        """Thread with path-based source and target works when no connections passed."""
-        tgt = tmp_delta_path("conn_compat_tgt")
-        src = one_row_src
-
-        thread = _make_thread("compat_conn_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.rows_written == 1
 
     def test_target_connection_undefined_raises_execution_error(
         self, spark: SparkSession, tmp_delta_path, one_row_src
