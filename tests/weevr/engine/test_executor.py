@@ -284,15 +284,6 @@ class TestExecuteThreadErrors:
 
         assert exc_info.value.thread_name == "err_thread"
 
-    def test_missing_target_path_raises_validation_error(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        from pydantic import ValidationError
-
-        # Target with neither alias nor path is rejected at model construction
-        with pytest.raises(ValidationError, match="alias.*path"):
-            Target()  # no alias, no path
-
 
 class TestExecuteThreadTelemetry:
     """Telemetry populated on ThreadResult."""

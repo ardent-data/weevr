@@ -20,8 +20,6 @@ from weevr.operations.hashing import (
     resolve_auto_columns,
 )
 
-pytestmark = pytest.mark.spark
-
 
 @pytest.fixture()
 def people_df(spark: SparkSession):
@@ -35,6 +33,7 @@ def people_df(spark: SparkSession):
     )
 
 
+@pytest.mark.spark
 class TestSurrogateKey:
     """Tests for surrogate key generation via compute_keys."""
 
@@ -209,6 +208,7 @@ class TestSurrogateKey:
         assert result.schema["sk"].dataType == StringType()
 
 
+@pytest.mark.spark
 class TestChangeDetection:
     """Tests for change detection hash via compute_keys."""
 
@@ -362,6 +362,7 @@ class TestChangeDetection:
         assert result.schema["ch"].dataType == StringType()
 
 
+@pytest.mark.spark
 class TestComputeKeysCombined:
     """Tests for combined key configs."""
 
@@ -434,6 +435,7 @@ class TestResolveAutoColumns:
         assert result == ["a", "c"]
 
 
+@pytest.mark.spark
 class TestComputeNamedGroupHashes:
     """Tests for compute_named_group_hashes."""
 
@@ -527,6 +529,7 @@ class TestComputeNamedGroupHashes:
         assert "hash2" in result.columns
 
 
+@pytest.mark.spark
 class TestComputeAdditionalKeys:
     """Tests for compute_additional_keys."""
 
@@ -562,6 +565,7 @@ class TestComputeAdditionalKeys:
         assert null_count == 0
 
 
+@pytest.mark.spark
 class TestComputeDimensionKeys:
     """Tests for compute_dimension_keys — the top-level dimension hashing function."""
 
