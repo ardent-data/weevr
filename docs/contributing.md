@@ -75,6 +75,12 @@ them explicitly with:
 uv run pytest -m spark
 ```
 
+Mark only the tests that start a Spark session: the default suite runs
+without a JVM, so a file-level `pytestmark = pytest.mark.spark` keeps
+Spark-free tests out of it. For a Delta table that tests only read, use
+the module-scoped `module_delta_path` fixture so it is written once per
+module; keep targets and any table a test writes on `tmp_delta_path`.
+
 Tests marked with `@pytest.mark.install_smoke` build both wheels and
 install them into isolated virtual environments. The release workflow
 runs them before publishing; run them locally with:
