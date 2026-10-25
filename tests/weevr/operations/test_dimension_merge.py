@@ -315,7 +315,7 @@ class TestVersionedLifecycle:
         assert v2["_prev_name"] == "Alicia"
         assert v3["_prev_name"] is None
 
-    def test_history_filter_false_matches_default_outcome(
+    def test_history_filter_false_matches_default_and_reruns_as_no_op(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
         change_detection = {"names": {"columns": ["name"], "on_change": "version"}}
@@ -351,26 +351,15 @@ class TestVersionedLifecycle:
         # ruled out by the single True above
         assert len({r["_sk"] for r in nofilter_rows}) == 1
 
-    def test_history_filter_false_idempotent_rerun(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        path = tmp_delta_path("dim_lifecycle_nofilter_rerun")
-        dim = _make_dim(
-            track_history=True,
-            history_filter=False,
-            change_detection={  # type: ignore[arg-type]
-                "names": {"columns": ["name"], "on_change": "version"},
-            },
-        )
-        self._run_three_writes(spark, path, dim)
         # Rerun the latest state unchanged — must be a no-op
-        self._write(spark, path, dim, [{"customer_id": "C1", "name": "Alize"}], "2026-04-01")
-
-        target = spark.read.format("delta").load(path)
-        assert target.count() == 3
-        current = target.filter(F.col("_is_current") == True)  # noqa: E712
-        assert current.count() == 1
-        assert current.collect()[0]["_valid_to"] == "9999-12-31"
+        self._write(
+            spark,
+            nofilter_path,
+            nofilter_dim,
+            [{"customer_id": "C1", "name": "Alize"}],
+            "2026-04-01",
+        )
+        assert read_scd_rows(nofilter_path) == nofilter_rows
 
 
 @pytest.mark.spark
