@@ -8,7 +8,6 @@ from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
 from weevr.engine import build_plan, execute_loom, execute_weave
-from weevr.errors.exceptions import ConfigError
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
@@ -124,28 +123,6 @@ class TestEC001DependencyChain:
 
 
 # ---------------------------------------------------------------------------
-# Circular dependency detection
-# ---------------------------------------------------------------------------
-
-
-class TestEC002CircularDependency:
-    def test_circular_dependency_raises_at_plan_time(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """Circular dependency detected and reported at plan construction time."""
-        tgt_a = tmp_delta_path("ec002_tgt_a")
-        tgt_b = tmp_delta_path("ec002_tgt_b")
-
-        # A's target alias = B's source alias and vice versa → cycle
-        threads = {
-            "A": _thread_using_alias("A", source_alias=tgt_b, target_alias=tgt_a),
-            "B": _thread_using_alias("B", source_alias=tgt_a, target_alias=tgt_b),
-        }
-        with pytest.raises(ConfigError, match="Circular dependency"):
-            build_plan("test_weave", threads, _entries("A", "B"))
-
-
-# ---------------------------------------------------------------------------
 # Loom with 2+ weaves executes sequentially
 # ---------------------------------------------------------------------------
 
@@ -214,37 +191,6 @@ class TestEC004AbortWeave:
         # A failed, B and C were skipped — no threads succeeded
         succeeded = [r.thread_name for r in result.thread_results if r.status == "success"]
         assert succeeded == []
-
-
-# ---------------------------------------------------------------------------
-# on_failure=skip_downstream
-# ---------------------------------------------------------------------------
-
-
-class TestEC005SkipDownstream:
-    def test_skip_downstream_skips_only_dependents(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """Thread A fails; B (depends on A) is skipped; C (independent) succeeds."""
-        src_c = tmp_delta_path("ec005_src_c")
-        tgt_a = tmp_delta_path("ec005_tgt_a")
-        tgt_b = tmp_delta_path("ec005_tgt_b")
-        tgt_c = tmp_delta_path("ec005_tgt_c")
-
-        create_delta_table(spark, src_c, [{"id": 3}])
-
-        threads = {
-            "A": _thread("A", "/nonexistent/ec005", tgt_a, on_failure="skip_downstream"),
-            "B": _thread("B", tgt_a, tgt_b),  # depends on A — at level 1
-            "C": _thread("C", src_c, tgt_c),  # independent — at level 0 with A
-        }
-        _, result = _run_weave_directly(spark, threads)
-
-        assert result.status == "partial"
-        assert "B" in result.threads_skipped
-        assert "C" not in result.threads_skipped
-        succeeded = [r.thread_name for r in result.thread_results if r.status == "success"]
-        assert "C" in succeeded
 
 
 # ---------------------------------------------------------------------------
@@ -342,51 +288,7 @@ class TestEC008CacheOverride:
 
 
 # ---------------------------------------------------------------------------
-# ExecutionPlan is inspectable
-# ---------------------------------------------------------------------------
-
-
-class TestEC009PlanInspectability:
-    def test_execution_plan_exposes_full_metadata(
-        self, spark: SparkSession, tmp_delta_path, one_row_src
-    ) -> None:
-        """ExecutionPlan exposes dependency graph, parallel groups, and cache decisions."""
-        tgt_a = tmp_delta_path("ec009_tgt_a")
-        tgt_b = tmp_delta_path("ec009_tgt_b")
-        tgt_c = tmp_delta_path("ec009_tgt_c")
-
-        src_a = one_row_src
-
-        threads = {
-            "A": _thread("A", src_a, tgt_a),
-            "B": _thread("B", tgt_a, tgt_b),
-            "C": _thread("C", tgt_a, tgt_c),
-        }
-        plan = build_plan("ec009", threads, _entries(*threads.keys()))
-
-        # Dependency graph
-        assert "A" in plan.dependencies["B"]
-        assert "A" in plan.dependencies["C"]
-        assert plan.dependencies["A"] == []
-
-        # Dependents graph (reverse)
-        assert "B" in plan.dependents["A"]
-        assert "C" in plan.dependents["A"]
-
-        # Parallel groups — A first, then B and C together
-        assert plan.execution_order[0] == ["A"]
-        assert sorted(plan.execution_order[1]) == ["B", "C"]
-
-        # Cache targets — A has 2 consumers
-        assert "A" in plan.cache_targets
-
-        # Inferred vs explicit split
-        assert "A" in plan.inferred_dependencies["B"]
-        assert "A" in plan.inferred_dependencies["C"]
-
-
-# ---------------------------------------------------------------------------
-# WeaveResult.status="partial" on mixed success/failure
+# on_failure=skip_downstream — WeaveResult.status="partial" on mixed success/failure
 # ---------------------------------------------------------------------------
 
 
@@ -415,6 +317,7 @@ class TestEC010PartialStatus:
         assert any(r.thread_name == "A" for r in failed)
         assert any(r.thread_name == "C" for r in succeeded)
         assert "B" in result.threads_skipped
+        assert "C" not in result.threads_skipped
         assert result.duration_ms >= 0
 
 

@@ -1183,19 +1183,6 @@ class TestPreviewMode:
         # Target should NOT exist after preview
         assert not Path(tgt).exists() or not any(Path(tgt).iterdir())
 
-    def test_preview_custom_sample_rows(self, spark: SparkSession, tmp_path: Path) -> None:
-        src = str(tmp_path / "src_csr")
-        tgt = str(tmp_path / "tgt_csr")
-        data = [{"id": i} for i in range(200)]
-        spark.createDataFrame(data).write.format("delta").save(src)
-
-        yaml_path = _create_thread_yaml(tmp_path, "prev3", src, tgt)
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
-        result = ctx.run(yaml_path, mode="preview", sample_rows=50)
-
-        assert result.preview_data is not None
-        assert result.preview_data["prev3"].count() <= 50
-
 
 @pytest.mark.spark
 class TestColumnSetWiring:

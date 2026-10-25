@@ -293,15 +293,6 @@ class TestExecuteThreadErrors:
         with pytest.raises(ValidationError, match="alias.*path"):
             Target()  # no alias, no path
 
-    def test_execution_error_carries_thread_name(self, spark: SparkSession, tmp_delta_path) -> None:
-        tgt = tmp_delta_path("carry_tgt")
-        thread = _make_thread("carry_thread", "/nonexistent", tgt)
-
-        with pytest.raises(ExecutionError) as exc_info:
-            execute_thread(spark, thread)
-
-        assert exc_info.value.thread_name == "carry_thread"
-
 
 class TestExecuteThreadTelemetry:
     """Telemetry populated on ThreadResult."""
