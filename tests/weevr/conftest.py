@@ -110,6 +110,24 @@ def tmp_delta_path(tmp_path: Path):
     return _make_path
 
 
+@pytest.fixture(scope="module")
+def module_delta_path(tmp_path_factory: pytest.TempPathFactory):
+    """Module-scoped factory for Delta source paths shared across a module's tests.
+
+    For read-only sources only: tests in the module share the table, so a test
+    that writes to a path from this factory leaks into its neighbours. Targets
+    and any table a test mutates belong in ``tmp_delta_path``.
+    """
+    root = tmp_path_factory.mktemp("module_delta")
+
+    def _make_path(name: str) -> str:
+        table_path = root / name
+        table_path.mkdir(parents=True, exist_ok=True)
+        return str(table_path)
+
+    return _make_path
+
+
 @pytest.fixture()
 def job_counter(spark: SparkSession):
     """Count Spark jobs executed inside a ``with`` block.
