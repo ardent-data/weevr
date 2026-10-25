@@ -13,6 +13,7 @@ from pyspark.sql.types import (
 
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import ResolveParams, Step
+from weevr.operations.pipeline import ObservationRegistry, StepResult
 from weevr.operations.pipeline.resolve import apply_resolve
 
 pytestmark = pytest.mark.spark
@@ -26,6 +27,17 @@ pytestmark = pytest.mark.spark
 def _fact_schema(*cols: str) -> StructType:
     """Build a fact StructType with string source columns."""
     return StructType([StructField(c, StringType(), True) for c in cols])
+
+
+def _resolve(fact: Any, params: ResolveParams, lookup: Any, **kwargs: Any) -> StepResult:
+    """Run ``apply_resolve`` with an observation registry, as the engine does.
+
+    Skips the eager statistics job the standalone path runs. For tests that
+    assert on the output frame; tests of ``resolve_stats`` metadata call
+    ``apply_resolve`` directly.
+    """
+    registry = ObservationRegistry(scope="test")
+    return apply_resolve(fact, params, lookup, observations=registry, **kwargs)
 
 
 def _dim_df(spark: SparkSession):
@@ -59,7 +71,7 @@ class TestApplyResolveSingleFK:
             match={"bk": "natural_id"},
             pk="id",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = {r["bk"]: r["plant_id"] for r in result.df.collect()}
         assert rows == {"A": 1, "B": 2, "C": 3}
 
@@ -74,7 +86,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             on_unknown=-1,
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = {r["bk"]: r["plant_id"] for r in result.df.collect()}
         assert rows["A"] == 1
         assert rows["Z"] == -1
@@ -90,7 +102,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             on_invalid=-4,
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = result.df.collect()
         valid = [r for r in rows if r["bk"] == "A"]
         invalid = [r for r in rows if r["bk"] is None]
@@ -108,7 +120,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             on_invalid=-4,
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = result.df.collect()
         blank = [r for r in rows if r["bk"] is not None and r["bk"].strip() == ""]
         assert blank[0]["plant_id"] == -4
@@ -140,7 +152,7 @@ class TestApplyResolveSingleFK:
             match={"region": "region_code", "plant": "plant_code"},
             pk="id",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = {r["region"]: r["plant_id"] for r in result.df.collect()}
         assert rows == {"X": 10, "Y": 20}
 
@@ -164,7 +176,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             include=["description"],
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["plant_id"] == 1
         assert row["description"] == "Plant Alpha"
@@ -189,7 +201,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             include={"description": "plant_desc"},
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert "plant_desc" in result.df.columns
         assert row["plant_desc"] == "Plant Alpha"
@@ -215,7 +227,7 @@ class TestApplyResolveSingleFK:
             include=["description"],
             include_prefix="dim_",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         assert "dim_description" in result.df.columns
 
     def test_drop_source_columns(self, spark: SparkSession):
@@ -229,7 +241,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             drop_source_columns=True,
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         assert "bk" not in result.df.columns
         assert "plant_id" in result.df.columns
 
@@ -252,7 +264,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             normalize="trim_lower",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["plant_id"] == 1
 
@@ -275,7 +287,7 @@ class TestApplyResolveSingleFK:
             pk="id",
             on_duplicate="first",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = result.df.collect()
         assert len(rows) == 1
         assert rows[0]["plant_id"] in (1, 2)
@@ -300,7 +312,7 @@ class TestApplyResolveSingleFK:
             on_duplicate="error",
         )
         with pytest.raises(Exception, match="[Dd]uplicate"):
-            apply_resolve(fact, params, dim)
+            _resolve(fact, params, dim)
 
     def test_metadata_stats(self, spark: SparkSession):
         """Result metadata contains resolution stats."""
@@ -330,7 +342,7 @@ class TestApplyResolveSingleFK:
             match={"bk": "natural_id"},
             pk="id",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         assert result.df.count() == 4
 
     def test_lookup_bk_columns_dropped(self, spark: SparkSession):
@@ -343,7 +355,7 @@ class TestApplyResolveSingleFK:
             match={"bk": "natural_id"},
             pk="id",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         assert "natural_id" not in result.df.columns
 
 
@@ -370,7 +382,7 @@ class TestApplyResolveEffective:
             effective={"current": "is_current"},  # type: ignore[arg-type]
             on_duplicate="first",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 1
 
@@ -395,7 +407,7 @@ class TestApplyResolveEffective:
             effective={"current": {"column": "is_current", "value": "Y"}},  # type: ignore[arg-type]
             on_duplicate="first",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 1
 
@@ -442,7 +454,7 @@ class TestApplyResolveEffective:
                 "on_duplicate": "first",
             }
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 2
 
@@ -489,7 +501,7 @@ class TestApplyResolveEffective:
                 "on_duplicate": "first",
             }
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 2
 
@@ -514,7 +526,7 @@ class TestApplyResolveEffective:
             where="status = 'active'",
             on_duplicate="first",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 1
 
@@ -538,7 +550,7 @@ class TestApplyResolveEffective:
             where="region = 'us'",
             on_duplicate="first",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         row = result.df.collect()[0]
         assert row["fk"] == 1
 
@@ -742,7 +754,7 @@ class TestResolveEdgeCases:
             pk="id",
             on_unknown=-1,
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = result.df.collect()
         assert len(rows) == 2
         assert all(r["fk"] == -1 for r in rows)
@@ -799,7 +811,7 @@ class TestResolveEdgeCases:
             match={"bk": "natural_id"},
             pk="id",
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         assert result.df.count() == 1
         assert result.df.collect()[0]["fk"] == 99
 
@@ -831,7 +843,7 @@ class TestResolveEdgeCases:
             pk="id",
             on_invalid=-4,
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         rows = result.df.collect()
         partial_null = [r for r in rows if r["plant"] is None]
         matched = [r for r in rows if r["plant"] == "1"]
@@ -867,7 +879,7 @@ class TestResolveEdgeCases:
             include=["description"],
         )
         with pytest.raises(ExecutionError, match="[Cc]ollid"):
-            apply_resolve(fact, params, dim)
+            _resolve(fact, params, dim)
 
 
 # ---------------------------------------------------------------------------
@@ -999,7 +1011,7 @@ class TestDuplicateGateSemantics:
     @pytest.mark.parametrize("mode", ["error", "warn", "first"])
     def test_clean_lookup_never_triggers(self, spark: SparkSession, mode: str) -> None:
         fact = spark.createDataFrame([("A",), ("C",)], _fact_schema("bk"))
-        result = apply_resolve(fact, self._params(mode), _dim_df(spark))
+        result = _resolve(fact, self._params(mode), _dim_df(spark))
         by_bk = {r["bk"]: r["fk"] for r in result.df.collect()}
         assert by_bk == {"A": 1, "C": 3}
 
@@ -1007,7 +1019,7 @@ class TestDuplicateGateSemantics:
         # The lookup carries duplicated 'B' keys, but no fact row references
         # 'B' — error must NOT fire; 'A' resolves normally.
         fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
-        result = apply_resolve(fact, self._params("error"), self._dup_dim(spark))
+        result = _resolve(fact, self._params("error"), self._dup_dim(spark))
         rows = result.df.collect()
         assert len(rows) == 1
         assert rows[0]["fk"] == 1
@@ -1015,11 +1027,11 @@ class TestDuplicateGateSemantics:
     def test_error_fires_on_matched_duplicate(self, spark: SparkSession) -> None:
         fact = spark.createDataFrame([("B",)], _fact_schema("bk"))
         with pytest.raises(Exception, match="[Dd]uplicate"):
-            apply_resolve(fact, self._params("error"), self._dup_dim(spark))
+            _resolve(fact, self._params("error"), self._dup_dim(spark))
 
     def test_warn_takes_first_and_keeps_row_count(self, spark: SparkSession) -> None:
         fact = spark.createDataFrame([("A",), ("B",)], _fact_schema("bk"))
-        result = apply_resolve(fact, self._params("warn"), self._dup_dim(spark))
+        result = _resolve(fact, self._params("warn"), self._dup_dim(spark))
         rows = result.df.collect()
         assert len(rows) == 2
         by_bk = {r["bk"]: r["fk"] for r in rows}
@@ -1028,7 +1040,7 @@ class TestDuplicateGateSemantics:
 
     def test_first_silent_on_matched_duplicate(self, spark: SparkSession) -> None:
         fact = spark.createDataFrame([("B",), ("B",)], _fact_schema("bk"))
-        result = apply_resolve(fact, self._params("first"), self._dup_dim(spark))
+        result = _resolve(fact, self._params("first"), self._dup_dim(spark))
         rows = result.df.collect()
         assert len(rows) == 2
         assert all(r["fk"] == 2 for r in rows)
@@ -1064,7 +1076,7 @@ class TestDuplicateGateSemantics:
             on_duplicate="error",
             effective=EffectiveConfig(date_column="event_date", **{"from": "vf", "to": "vt"}),
         )
-        result = apply_resolve(fact, params, dim)
+        result = _resolve(fact, params, dim)
         by_date = {r["event_date"]: r["fk"] for r in result.df.collect()}
         assert by_date == {"2026-01-15": 1, "2026-03-01": 2}
 
@@ -1088,7 +1100,7 @@ class TestDuplicateGatePathSelection:
 
     def test_clean_lookup_plan_has_no_window(self, spark: SparkSession) -> None:
         fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
-        result = apply_resolve(fact, self._params(), _dim_df(spark))
+        result = _resolve(fact, self._params(), _dim_df(spark))
         assert "row_number" not in self._analyzed_plan(result.df)
 
     def test_dup_lookup_plan_keeps_window(self, spark: SparkSession) -> None:
@@ -1102,7 +1114,7 @@ class TestDuplicateGatePathSelection:
             ),
         )
         fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
-        result = apply_resolve(fact, self._params(on_duplicate="first"), dup_dim)
+        result = _resolve(fact, self._params(on_duplicate="first"), dup_dim)
         assert "row_number" in self._analyzed_plan(result.df)
 
     def test_valid_reuse_skips_precheck(self, spark: SparkSession, spark_action_counter) -> None:
@@ -1172,7 +1184,7 @@ class TestBroadcastPolicy:
 
     def _resolve_with_meta(self, spark: SparkSession, meta):  # type: ignore[no-untyped-def]
         fact = spark.createDataFrame([("A",)], _fact_schema("bk"))
-        return apply_resolve(fact, self._params(), _dim_df(spark), lookup_meta=meta)
+        return _resolve(fact, self._params(), _dim_df(spark), lookup_meta=meta)
 
     def test_declared_broadcast_hints(self, spark: SparkSession) -> None:
         from weevr.operations.pipeline import LookupMeta
@@ -1202,8 +1214,8 @@ class TestBroadcastPolicy:
         from weevr.operations.pipeline import LookupMeta
 
         fact = spark.createDataFrame([("A",), ("C",), (None,)], _fact_schema("bk"))
-        plain = apply_resolve(fact, self._params(), _dim_df(spark))
-        hinted = apply_resolve(
+        plain = _resolve(fact, self._params(), _dim_df(spark))
+        hinted = _resolve(
             fact, self._params(), _dim_df(spark), lookup_meta=LookupMeta(size_in_bytes=1)
         )
         assert sorted(map(str, plain.df.collect())) == sorted(map(str, hinted.df.collect()))
@@ -1302,14 +1314,14 @@ class TestDuplicateGateEffectiveDateModes:
 
     def test_warn_takes_first_in_overlap(self, spark: SparkSession) -> None:
         fact = spark.createDataFrame([("A", "2026-02-15")], _fact_schema("bk", "event_date"))
-        result = apply_resolve(fact, self._params("warn"), self._overlapping_dim(spark))
+        result = _resolve(fact, self._params("warn"), self._overlapping_dim(spark))
         rows = result.df.collect()
         assert len(rows) == 1
         assert rows[0]["fk"] == 1  # asc_nulls_last: lowest pk wins
 
     def test_first_silent_in_overlap(self, spark: SparkSession) -> None:
         fact = spark.createDataFrame([("A", "2026-02-15")], _fact_schema("bk", "event_date"))
-        result = apply_resolve(fact, self._params("first"), self._overlapping_dim(spark))
+        result = _resolve(fact, self._params("first"), self._overlapping_dim(spark))
         rows = result.df.collect()
         assert len(rows) == 1
         assert rows[0]["fk"] == 1
