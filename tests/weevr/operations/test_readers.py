@@ -24,9 +24,8 @@ from weevr.operations.readers import (
 )
 from weevr.state.watermark import WatermarkState
 
-pytestmark = pytest.mark.spark
 
-
+@pytest.mark.spark
 class TestDeltaSource:
     """Tests for Delta source reading."""
 
@@ -60,6 +59,7 @@ class TestDeltaSource:
         assert err.source_name == "missing"
 
 
+@pytest.mark.spark
 class TestFileSource:
     """Tests for CSV, JSON, and Parquet source reading."""
 
@@ -134,6 +134,7 @@ class TestFileSource:
             read_source(spark, "bad_type", source)
 
 
+@pytest.mark.spark
 class TestSourceDedup:
     """Tests for source-level deduplication."""
 
@@ -222,6 +223,7 @@ class TestSourceDedup:
         assert df.count() == 3
 
 
+@pytest.mark.spark
 class TestReadSources:
     """Tests for the read_sources multi-source function."""
 
@@ -384,6 +386,7 @@ class TestConnectionBasedRead:
         assert result is mock_df
 
 
+@pytest.mark.spark
 class TestDateSequenceSource:
     """Tests for date_sequence generated source reading."""
 
@@ -512,6 +515,7 @@ class TestDateSequenceSource:
         assert df.count() == 5
 
 
+@pytest.mark.spark
 class TestIntSequenceSource:
     """Tests for int_sequence generated source reading."""
 
@@ -574,6 +578,7 @@ class TestIntSequenceSource:
         assert isinstance(df.schema["n"].dataType, LongType)
 
 
+@pytest.mark.spark
 class TestGeneratedSourceIntegration:
     """Integration tests: generated sources in pipelines and as join inputs."""
 
@@ -736,6 +741,7 @@ def _cdc_load_config(
     )
 
 
+@pytest.mark.spark
 class TestReadCdcSourceGenericWatermark:
     """Unit tests for ``read_cdc_source`` generic CDC + watermark composition.
 
@@ -1036,6 +1042,7 @@ class TestReadCdcSourceGenericWatermark:
         assert new_hwm is None
 
 
+@pytest.mark.spark
 class TestTypedWatermarkCol:
     """Unit tests for the ``typed_watermark_col`` helper."""
 
@@ -1068,6 +1075,7 @@ class TestTypedWatermarkCol:
             typed_watermark_col("col", bad_type, "yyyy-MM-dd")
 
 
+@pytest.mark.spark
 class TestBuildWatermarkFilter:
     """Unit tests for ``build_watermark_filter`` parameter shape."""
 
@@ -1121,6 +1129,7 @@ def _string_ts_load_config() -> LoadConfig:
     )
 
 
+@pytest.mark.spark
 class TestReadSourceIncrementalWatermarkFormat:
     """Integration tests for ``read_source_incremental`` + ``watermark_format``."""
 
@@ -1296,6 +1305,7 @@ def _cdc_string_ts_load_config() -> LoadConfig:
     )
 
 
+@pytest.mark.spark
 class TestReadCdcSourceWatermarkFormat:
     """Integration tests for ``read_cdc_source`` generic CDC + ``watermark_format``."""
 
@@ -1429,6 +1439,7 @@ class TestReadCdcSourceWatermarkFormat:
         assert "_change_type" in df.columns
 
 
+@pytest.mark.spark
 class TestReadersRequireWatermarkType:
     """Incremental readers fail loudly instead of skipping the watermark filter.
 

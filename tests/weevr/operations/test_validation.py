@@ -7,8 +7,6 @@ from weevr.model.types import SparkExpr
 from weevr.model.validation import ValidationRule
 from weevr.operations.validation import ValidationOutcome, validate_dataframe
 
-pytestmark = pytest.mark.spark
-
 
 @pytest.fixture()
 def sample_df(spark: SparkSession):
@@ -23,6 +21,7 @@ def sample_df(spark: SparkSession):
     )
 
 
+@pytest.mark.spark
 class TestValidateDataframeNoRules:
     def test_no_rules_returns_original(self, sample_df):
         outcome = validate_dataframe(sample_df, [])
@@ -32,6 +31,7 @@ class TestValidateDataframeNoRules:
         assert outcome.has_fatal is False
 
 
+@pytest.mark.spark
 class TestValidateDataframeSingleRule:
     def test_all_pass(self, spark: SparkSession):
         df = spark.createDataFrame([{"id": 1}, {"id": 2}])
@@ -72,6 +72,7 @@ class TestValidateDataframeSingleRule:
         assert vr.applied is True
 
 
+@pytest.mark.spark
 class TestValidateDataframeFatal:
     def test_fatal_aborts(self, sample_df):
         rules = [
@@ -91,6 +92,7 @@ class TestValidateDataframeFatal:
         assert outcome.has_fatal is False
 
 
+@pytest.mark.spark
 class TestValidateDataframeMixedSeverities:
     def test_info_warn_stay_in_clean(self, sample_df):
         """Info and warn rules log but don't quarantine."""
@@ -130,6 +132,7 @@ class TestValidateDataframeMixedSeverities:
         assert outcome.quarantine_df is not None
 
 
+@pytest.mark.spark
 class TestValidateDataframeMultipleErrors:
     def test_row_fails_two_rules(self, spark: SparkSession):
         """Row failing two error rules produces two quarantine rows."""
@@ -152,6 +155,7 @@ class TestValidateDataframeMultipleErrors:
         assert rule_names == {"a_positive", "b_positive"}
 
 
+@pytest.mark.spark
 class TestValidateDataframeUnappliedRule:
     def test_invalid_expression(self, sample_df):
         """Invalid SQL expression marks rule as unapplied."""

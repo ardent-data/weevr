@@ -10,10 +10,10 @@ from weevr.operations.assertions import evaluate_assertions
 pytestmark = pytest.mark.spark
 
 
-@pytest.fixture()
-def target_df(spark: SparkSession, tmp_delta_path):
-    """Write a sample Delta table and return its path."""
-    path = tmp_delta_path("assertion_target")
+@pytest.fixture(scope="module")
+def target_df(spark: SparkSession, module_delta_path):
+    """Write a sample Delta table once per module and return its path (read-only)."""
+    path = module_delta_path("assertion_target")
     df = spark.createDataFrame(
         [
             {"id": 1, "name": "alice", "amount": 100},
@@ -25,10 +25,10 @@ def target_df(spark: SparkSession, tmp_delta_path):
     return path
 
 
-@pytest.fixture()
-def dup_target_df(spark: SparkSession, tmp_delta_path):
-    """Write a Delta table with duplicate rows and return its path."""
-    path = tmp_delta_path("dup_target")
+@pytest.fixture(scope="module")
+def dup_target_df(spark: SparkSession, module_delta_path):
+    """Write a Delta table with duplicate rows once per module (read-only)."""
+    path = module_delta_path("dup_target")
     df = spark.createDataFrame(
         [
             {"id": 1, "name": "alice"},
@@ -158,10 +158,10 @@ class TestEvaluationError:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def fk_target_df(spark: SparkSession, tmp_delta_path):
-    """Write a fact table with FK sentinel values and return its path."""
-    path = tmp_delta_path("fk_assertion_target")
+@pytest.fixture(scope="module")
+def fk_target_df(spark: SparkSession, module_delta_path):
+    """Write a fact table with FK sentinel values once per module (read-only)."""
+    path = module_delta_path("fk_assertion_target")
     df = spark.createDataFrame(
         [
             {"plant_id": 1, "company_id": 10},

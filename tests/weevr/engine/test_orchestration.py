@@ -8,12 +8,19 @@ from pyspark.sql import SparkSession
 
 from spark_helpers import create_delta_table
 from weevr.engine import build_plan, execute_loom, execute_weave
-from weevr.errors.exceptions import ConfigError
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, ThreadEntry, Weave
 
 pytestmark = pytest.mark.spark
+
+
+@pytest.fixture(scope="module")
+def one_row_src(spark: SparkSession, module_delta_path) -> str:
+    """Read-only one-row Delta source shared across the module."""
+    path = module_delta_path("one_row_src")
+    create_delta_table(spark, path, [{"id": 1}])
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -116,41 +123,19 @@ class TestEC001DependencyChain:
 
 
 # ---------------------------------------------------------------------------
-# Circular dependency detection
-# ---------------------------------------------------------------------------
-
-
-class TestEC002CircularDependency:
-    def test_circular_dependency_raises_at_plan_time(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """Circular dependency detected and reported at plan construction time."""
-        tgt_a = tmp_delta_path("ec002_tgt_a")
-        tgt_b = tmp_delta_path("ec002_tgt_b")
-
-        # A's target alias = B's source alias and vice versa → cycle
-        threads = {
-            "A": _thread_using_alias("A", source_alias=tgt_b, target_alias=tgt_a),
-            "B": _thread_using_alias("B", source_alias=tgt_a, target_alias=tgt_b),
-        }
-        with pytest.raises(ConfigError, match="Circular dependency"):
-            build_plan("test_weave", threads, _entries("A", "B"))
-
-
-# ---------------------------------------------------------------------------
 # Loom with 2+ weaves executes sequentially
 # ---------------------------------------------------------------------------
 
 
 class TestEC003LoomSequential:
-    def test_loom_two_weaves_run_sequentially(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_loom_two_weaves_run_sequentially(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
         """Loom executes weave1 then weave2; LoomResult contains both WeaveResults."""
-        src1 = tmp_delta_path("ec003_src1")
         tgt1 = tmp_delta_path("ec003_tgt1")
         src2 = tmp_delta_path("ec003_src2")
         tgt2 = tmp_delta_path("ec003_tgt2")
 
-        create_delta_table(spark, src1, [{"id": 1}])
         create_delta_table(spark, src2, [{"id": 2}])
 
         loom = Loom.model_validate(
@@ -165,7 +150,7 @@ class TestEC003LoomSequential:
             ),
         }
         threads = {
-            "weave1": {"t1": _thread("t1", src1, tgt1)},
+            "weave1": {"t1": _thread("t1", one_row_src, tgt1)},
             "weave2": {"t2": _thread("t2", src2, tgt2)},
         }
 
@@ -205,37 +190,6 @@ class TestEC004AbortWeave:
         # A failed, B and C were skipped — no threads succeeded
         succeeded = [r.thread_name for r in result.thread_results if r.status == "success"]
         assert succeeded == []
-
-
-# ---------------------------------------------------------------------------
-# on_failure=skip_downstream
-# ---------------------------------------------------------------------------
-
-
-class TestEC005SkipDownstream:
-    def test_skip_downstream_skips_only_dependents(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """Thread A fails; B (depends on A) is skipped; C (independent) succeeds."""
-        src_c = tmp_delta_path("ec005_src_c")
-        tgt_a = tmp_delta_path("ec005_tgt_a")
-        tgt_b = tmp_delta_path("ec005_tgt_b")
-        tgt_c = tmp_delta_path("ec005_tgt_c")
-
-        create_delta_table(spark, src_c, [{"id": 3}])
-
-        threads = {
-            "A": _thread("A", "/nonexistent/ec005", tgt_a, on_failure="skip_downstream"),
-            "B": _thread("B", tgt_a, tgt_b),  # depends on A — at level 1
-            "C": _thread("C", src_c, tgt_c),  # independent — at level 0 with A
-        }
-        _, result = _run_weave_directly(spark, threads)
-
-        assert result.status == "partial"
-        assert "B" in result.threads_skipped
-        assert "C" not in result.threads_skipped
-        succeeded = [r.thread_name for r in result.thread_results if r.status == "success"]
-        assert "C" in succeeded
 
 
 # ---------------------------------------------------------------------------
@@ -310,18 +264,15 @@ class TestEC007AutoCache:
 
 class TestEC008CacheOverride:
     def test_cache_false_excludes_thread_from_cache_targets(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Thread A with cache=False is not in cache_targets even with 2 consumers."""
-        src_a = tmp_delta_path("ec008_src_a")
         tgt_a = tmp_delta_path("ec008_tgt_a")
         tgt_b = tmp_delta_path("ec008_tgt_b")
         tgt_c = tmp_delta_path("ec008_tgt_c")
 
-        create_delta_table(spark, src_a, [{"id": 1}])
-
         threads = {
-            "A": _thread("A", src_a, tgt_a, cache=False),
+            "A": _thread("A", one_row_src, tgt_a, cache=False),
             "B": _thread("B", tgt_a, tgt_b),
             "C": _thread("C", tgt_a, tgt_c),
         }
@@ -334,52 +285,7 @@ class TestEC008CacheOverride:
 
 
 # ---------------------------------------------------------------------------
-# ExecutionPlan is inspectable
-# ---------------------------------------------------------------------------
-
-
-class TestEC009PlanInspectability:
-    def test_execution_plan_exposes_full_metadata(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """ExecutionPlan exposes dependency graph, parallel groups, and cache decisions."""
-        src_a = tmp_delta_path("ec009_src_a")
-        tgt_a = tmp_delta_path("ec009_tgt_a")
-        tgt_b = tmp_delta_path("ec009_tgt_b")
-        tgt_c = tmp_delta_path("ec009_tgt_c")
-
-        create_delta_table(spark, src_a, [{"id": 1}])
-
-        threads = {
-            "A": _thread("A", src_a, tgt_a),
-            "B": _thread("B", tgt_a, tgt_b),
-            "C": _thread("C", tgt_a, tgt_c),
-        }
-        plan = build_plan("ec009", threads, _entries(*threads.keys()))
-
-        # Dependency graph
-        assert "A" in plan.dependencies["B"]
-        assert "A" in plan.dependencies["C"]
-        assert plan.dependencies["A"] == []
-
-        # Dependents graph (reverse)
-        assert "B" in plan.dependents["A"]
-        assert "C" in plan.dependents["A"]
-
-        # Parallel groups — A first, then B and C together
-        assert plan.execution_order[0] == ["A"]
-        assert sorted(plan.execution_order[1]) == ["B", "C"]
-
-        # Cache targets — A has 2 consumers
-        assert "A" in plan.cache_targets
-
-        # Inferred vs explicit split
-        assert "A" in plan.inferred_dependencies["B"]
-        assert "A" in plan.inferred_dependencies["C"]
-
-
-# ---------------------------------------------------------------------------
-# WeaveResult.status="partial" on mixed success/failure
+# on_failure=skip_downstream — WeaveResult.status="partial" on mixed success/failure
 # ---------------------------------------------------------------------------
 
 
@@ -408,6 +314,7 @@ class TestEC010PartialStatus:
         assert any(r.thread_name == "A" for r in failed)
         assert any(r.thread_name == "C" for r in succeeded)
         assert "B" in result.threads_skipped
+        assert "C" not in result.threads_skipped
         assert result.duration_ms >= 0
 
 
@@ -418,18 +325,16 @@ class TestEC010PartialStatus:
 
 class TestConditionMemoScope:
     def test_same_builtin_shared_within_group(
-        self, spark: SparkSession, tmp_delta_path, monkeypatch
+        self, spark: SparkSession, tmp_delta_path, one_row_src, monkeypatch
     ) -> None:
         """Two same-group threads with the same builtin probe share one scan."""
         from weevr import delta as delta_mod
         from weevr.engine import conditions as conditions_mod
 
-        src_c = tmp_delta_path("memo_group_src_c")
         src_d = tmp_delta_path("memo_group_src_d")
         gate = tmp_delta_path("memo_group_gate")
         tgt_c = tmp_delta_path("memo_group_tgt_c")
         tgt_d = tmp_delta_path("memo_group_tgt_d")
-        create_delta_table(spark, src_c, [{"id": 1}])
         create_delta_table(spark, src_d, [{"id": 2}])
         create_delta_table(spark, gate, [{"id": 9}])
 
@@ -443,7 +348,7 @@ class TestConditionMemoScope:
         monkeypatch.setattr(conditions_mod, "read_delta", counting)
 
         threads = {
-            "C": _thread("C", src_c, tgt_c),
+            "C": _thread("C", one_row_src, tgt_c),
             "D": _thread("D", src_d, tgt_d),
         }
         plan = build_plan("test_weave", threads, _entries("C", "D"))
@@ -460,7 +365,7 @@ class TestConditionMemoScope:
         assert calls["n"] == 1
 
     def test_group_two_condition_observes_group_one_write(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """The stale-memo trap: a later group's condition must evaluate fresh.
 
@@ -469,16 +374,14 @@ class TestConditionMemoScope:
         written it and must run. A memo outliving the group batch would
         replay C's zero and wrongly skip B.
         """
-        src_a = tmp_delta_path("memo_stale_src_a")
         src_c = tmp_delta_path("memo_stale_src_c")
         tgt_a = tmp_delta_path("memo_stale_tgt_a")
         tgt_b = tmp_delta_path("memo_stale_tgt_b")
         tgt_c = tmp_delta_path("memo_stale_tgt_c")
-        create_delta_table(spark, src_a, [{"id": 1}])
         create_delta_table(spark, src_c, [{"id": 3}])
 
         threads = {
-            "A": _thread("A", src_a, tgt_a),
+            "A": _thread("A", one_row_src, tgt_a),
             "B": _thread("B", tgt_a, tgt_b),
             "C": _thread("C", src_c, tgt_c),
         }
@@ -499,14 +402,12 @@ class TestConditionMemoScope:
         assert statuses["B"] == "success"
 
     def test_weave_condition_observes_earlier_weave_write(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """The loom-level site carries no memo: each weave probes fresh."""
-        src1 = tmp_delta_path("memo_loom_src1")
         tgt1 = tmp_delta_path("memo_loom_tgt1")
         src2 = tmp_delta_path("memo_loom_src2")
         tgt2 = tmp_delta_path("memo_loom_tgt2")
-        create_delta_table(spark, src1, [{"id": 1}])
         create_delta_table(spark, src2, [{"id": 2}])
 
         loom = Loom.model_validate(
@@ -528,7 +429,7 @@ class TestConditionMemoScope:
             ),
         }
         threads = {
-            "weave1": {"t1": _thread("t1", src1, tgt1)},
+            "weave1": {"t1": _thread("t1", one_row_src, tgt1)},
             "weave2": {"t2": _thread("t2", src2, tgt2)},
         }
 
@@ -572,17 +473,17 @@ class TestConditionalSharedTarget:
         plan = build_plan("test_weave", threads, entries)
         return threads, plan, shared, tgt_out
 
-    def test_disjoint_conditions_one_writer_runs(self, spark: SparkSession, tmp_delta_path) -> None:
-        gate_a = tmp_delta_path("csd_gate_a")
+    def test_disjoint_conditions_one_writer_runs(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
         gate_b = tmp_delta_path("csd_gate_b")  # never created — B's condition is False
-        create_delta_table(spark, gate_a, [{"id": 1}])
         threads, plan, shared, tgt_out = self._setup(spark, tmp_delta_path, "csd")
 
         result = execute_weave(
             spark,
             plan,
             threads,
-            thread_conditions={"A": self._cond(gate_a), "B": self._cond(gate_b)},
+            thread_conditions={"A": self._cond(one_row_src), "B": self._cond(gate_b)},
         )
 
         assert result.status == "success"
@@ -594,17 +495,15 @@ class TestConditionalSharedTarget:
         assert [r["who"] for r in out_rows] == ["A"]
 
     def test_same_group_overlap_aborts_before_any_write(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
-        gate = tmp_delta_path("cso_gate")
-        create_delta_table(spark, gate, [{"id": 1}])
         threads, plan, shared, tgt_out = self._setup(spark, tmp_delta_path, "cso")
 
         result = execute_weave(
             spark,
             plan,
             threads,
-            thread_conditions={"A": self._cond(gate), "B": self._cond(gate)},
+            thread_conditions={"A": self._cond(one_row_src), "B": self._cond(one_row_src)},
         )
 
         assert result.status == "failure"
@@ -621,10 +520,8 @@ class TestConditionalSharedTarget:
         assert delta_table_exists(spark, tgt_out) is False
 
     def test_cross_group_overlap_aborts_before_second_write(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
-        gate = tmp_delta_path("cxg_gate")
-        create_delta_table(spark, gate, [{"id": 1}])
         src_a = tmp_delta_path("cxg_src_a")
         src_b = tmp_delta_path("cxg_src_b")
         src_x = tmp_delta_path("cxg_src_x")
@@ -650,7 +547,7 @@ class TestConditionalSharedTarget:
             spark,
             plan,
             threads,
-            thread_conditions={"A": self._cond(gate), "B": self._cond(gate)},
+            thread_conditions={"A": self._cond(one_row_src), "B": self._cond(one_row_src)},
         )
 
         # A succeeded before the overlap was detectable, so the weave
@@ -667,12 +564,10 @@ class TestConditionalSharedTarget:
         assert [r["who"] for r in rows] == ["A"]
 
     def test_failed_first_writer_is_not_reported_as_written(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """A first survivor that FAILED at execution may never have written
         the target — the overlap abort must not claim its write stands."""
-        gate = tmp_delta_path("cff_gate")
-        create_delta_table(spark, gate, [{"id": 1}])
         src_b = tmp_delta_path("cff_src_b")
         src_x = tmp_delta_path("cff_src_x")
         shared = tmp_delta_path("cff_shared")
@@ -697,7 +592,7 @@ class TestConditionalSharedTarget:
             spark,
             plan,
             threads,
-            thread_conditions={"A": self._cond(gate), "B": self._cond(gate)},
+            thread_conditions={"A": self._cond(one_row_src), "B": self._cond(one_row_src)},
         )
 
         backstop = [
@@ -712,10 +607,8 @@ class TestConditionalSharedTarget:
         assert delta_table_exists(spark, shared) is False  # A failed before writing
 
     def test_three_true_conditions_abort_before_any_write(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
-        gate = tmp_delta_path("c3_gate")
-        create_delta_table(spark, gate, [{"id": 1}])
         srcs = {}
         for n in ("A", "B", "C"):
             srcs[n] = tmp_delta_path(f"c3_src_{n}")
@@ -732,7 +625,7 @@ class TestConditionalSharedTarget:
             spark,
             plan,
             threads,
-            thread_conditions={n: self._cond(gate) for n in ("A", "B", "C")},
+            thread_conditions={n: self._cond(one_row_src) for n in ("A", "B", "C")},
         )
 
         assert result.status == "failure"
@@ -743,20 +636,18 @@ class TestConditionalSharedTarget:
         assert failures and shared in (failures[0].error or "")
 
     def test_backstop_unaffected_by_max_parallel_threads(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """The backstop runs before the pool is built — pool sizing is moot."""
         from weevr.model.execution import ExecutionConfig
 
-        gate = tmp_delta_path("cmp_gate")
-        create_delta_table(spark, gate, [{"id": 1}])
         threads, plan, shared, tgt_out = self._setup(spark, tmp_delta_path, "cmp")
 
         result = execute_weave(
             spark,
             plan,
             threads,
-            thread_conditions={"A": self._cond(gate), "B": self._cond(gate)},
+            thread_conditions={"A": self._cond(one_row_src), "B": self._cond(one_row_src)},
             execution=ExecutionConfig(max_parallel_threads=1),
         )
 

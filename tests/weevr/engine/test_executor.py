@@ -27,6 +27,22 @@ from weevr.model.write import WriteConfig
 pytestmark = pytest.mark.spark
 
 
+@pytest.fixture(scope="module")
+def one_row_src(spark: SparkSession, module_delta_path) -> str:
+    """Read-only one-row Delta source shared across the module."""
+    path = module_delta_path("one_row_src")
+    create_delta_table(spark, path, [{"id": 1}])
+    return path
+
+
+@pytest.fixture(scope="module")
+def two_row_src(spark: SparkSession, module_delta_path) -> str:
+    """Read-only two-row Delta source shared across the module."""
+    path = module_delta_path("two_row_src")
+    create_delta_table(spark, path, [{"id": 1}, {"id": 2}])
+    return path
+
+
 def _make_thread(
     name: str,
     source_path: str,
@@ -85,7 +101,7 @@ class TestCommitStampIntegration:
         assert result.rows_written == 3
 
     def test_stamp_run_id_matches_audit_run_identity(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """The stamp's run_id is the same run identity audit columns carry —
         the join key between table history and telemetry."""
@@ -93,14 +109,12 @@ class TestCommitStampIntegration:
 
         from weevr.delta import resolve_delta_table
 
-        src = tmp_delta_path("stampid_src")
         tgt = tmp_delta_path("stampid_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         thread = Thread(
             name="stamp_identity",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt, audit_columns={"_run_id": "'${run.id}'"}),
         )
@@ -120,19 +134,17 @@ class TestUnknownRowsWritten:
     """Attribution failure surfaces as an unknown count plus a warning."""
 
     def test_attribution_failure_surfaces_unknown_with_warning(
-        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+        self, spark: SparkSession, tmp_delta_path, two_row_src, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from weevr.operations.target_handle import TargetHandle
 
-        src = tmp_delta_path("unknown_src")
         tgt = tmp_delta_path("unknown_tgt")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
         create_delta_table(spark, tgt, [{"id": 0}])
         monkeypatch.setattr(
             TargetHandle, "commit_metrics_after", lambda self, pre, stamp=None: None
         )
 
-        thread = _make_thread("unknown_rows", src, tgt, write=WriteConfig(mode="append"))
+        thread = _make_thread("unknown_rows", two_row_src, tgt, write=WriteConfig(mode="append"))
         result = execute_thread(spark, thread)
         monkeypatch.undo()
 
@@ -144,13 +156,11 @@ class TestUnknownRowsWritten:
         assert any("unknown_rows" in w and tgt in w for w in result.warnings)
 
     def test_success_path_reports_exact_int_without_warning(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, two_row_src
     ) -> None:
-        src = tmp_delta_path("known_src")
         tgt = tmp_delta_path("known_tgt")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
 
-        thread = _make_thread("known_rows", src, tgt)
+        thread = _make_thread("known_rows", two_row_src, tgt)
         result = execute_thread(spark, thread)
 
         assert result.rows_written == 2
@@ -160,68 +170,37 @@ class TestUnknownRowsWritten:
 class TestExecuteThreadResult:
     """ThreadResult fields populated correctly by execute_thread."""
 
-    def test_returns_thread_result_on_success(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("exec_src")
-        tgt = tmp_delta_path("exec_tgt")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
+    def test_success_result_fields(self, spark: SparkSession, tmp_delta_path) -> None:
+        """One plain run populates every ThreadResult field.
 
-        thread = _make_thread("my_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert isinstance(result, ThreadResult)
-        assert result.status == "success"
-
-    def test_result_thread_name_matches(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("name_src")
-        tgt = tmp_delta_path("name_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("named_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.thread_name == "named_thread"
-
-    def test_result_rows_written_matches_source(self, spark: SparkSession, tmp_delta_path) -> None:
+        The thread has no lookups, exports, resources, or connections, so this
+        also covers the plain path those features must leave unchanged.
+        """
         src = tmp_delta_path("rows_src")
         tgt = tmp_delta_path("rows_tgt")
         create_delta_table(spark, src, [{"id": i} for i in range(5)])
 
-        thread = _make_thread("rows_thread", src, tgt)
+        thread = _make_thread("my_thread", src, tgt)  # no explicit write mode
         result = execute_thread(spark, thread)
 
+        assert isinstance(result, ThreadResult)
+        assert result.status == "success"
+        assert result.thread_name == "my_thread"
         assert result.rows_written == 5
-
-    def test_result_write_mode_overwrite(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("mode_src")
-        tgt = tmp_delta_path("mode_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("mode_thread", src, tgt, write=WriteConfig(mode="overwrite"))
-        result = execute_thread(spark, thread)
-
-        assert result.write_mode == "overwrite"
-
-    def test_result_write_mode_defaults_to_overwrite(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        src = tmp_delta_path("default_src")
-        tgt = tmp_delta_path("default_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("default_mode", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.write_mode == "overwrite"
-
-    def test_result_target_path_populated(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("path_src")
-        tgt = tmp_delta_path("path_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("path_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
+        assert result.write_mode == "overwrite"  # the default
         assert result.target_path == tgt
+        assert result.telemetry is not None
+        assert result.telemetry.export_results == []
+
+    def test_result_write_mode_overwrite(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
+        tgt = tmp_delta_path("mode_tgt")
+
+        thread = _make_thread("mode_thread", one_row_src, tgt, write=WriteConfig(mode="overwrite"))
+        result = execute_thread(spark, thread)
+
+        assert result.write_mode == "overwrite"
 
 
 class TestExecuteThreadWrites:
@@ -273,13 +252,13 @@ class TestExecuteThreadWrites:
         written = spark.read.format("delta").load(tgt)
         assert "sk" in written.columns
 
-    def test_append_mode_accumulates_rows(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("append_src")
+    def test_append_mode_accumulates_rows(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
         tgt = tmp_delta_path("append_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
         create_delta_table(spark, tgt, [{"id": 0}])
 
-        thread = _make_thread("append_thread", src, tgt, write=WriteConfig(mode="append"))
+        thread = _make_thread("append_thread", one_row_src, tgt, write=WriteConfig(mode="append"))
         execute_thread(spark, thread)
 
         written = spark.read.format("delta").load(tgt)
@@ -300,34 +279,16 @@ class TestExecuteThreadErrors:
 
         assert exc_info.value.thread_name == "err_thread"
 
-    def test_missing_target_path_raises_validation_error(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        from pydantic import ValidationError
-
-        # Target with neither alias nor path is rejected at model construction
-        with pytest.raises(ValidationError, match="alias.*path"):
-            Target()  # no alias, no path
-
-    def test_execution_error_carries_thread_name(self, spark: SparkSession, tmp_delta_path) -> None:
-        tgt = tmp_delta_path("carry_tgt")
-        thread = _make_thread("carry_thread", "/nonexistent", tgt)
-
-        with pytest.raises(ExecutionError) as exc_info:
-            execute_thread(spark, thread)
-
-        assert exc_info.value.thread_name == "carry_thread"
-
 
 class TestExecuteThreadTelemetry:
     """Telemetry populated on ThreadResult."""
 
-    def test_telemetry_populated_without_rules(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("tel_src")
+    def test_telemetry_populated_without_rules(
+        self, spark: SparkSession, tmp_delta_path, two_row_src
+    ) -> None:
         tgt = tmp_delta_path("tel_tgt")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
 
-        thread = _make_thread("tel_thread", src, tgt)
+        thread = _make_thread("tel_thread", two_row_src, tgt)
         result = execute_thread(spark, thread)
 
         assert result.telemetry is not None
@@ -378,13 +339,13 @@ class TestExecuteThreadValidation:
 class TestExecuteThreadAssertions:
     """Assertion integration in execute_thread."""
 
-    def test_passing_assertions_recorded(self, spark: SparkSession, tmp_delta_path) -> None:
-        src = tmp_delta_path("assert_src")
+    def test_passing_assertions_recorded(
+        self, spark: SparkSession, tmp_delta_path, two_row_src
+    ) -> None:
         tgt = tmp_delta_path("assert_tgt")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
 
         assertions = [Assertion(type="row_count", min=1, max=10)]
-        thread = _make_thread("assert_thread", src, tgt, assertions=assertions)
+        thread = _make_thread("assert_thread", two_row_src, tgt, assertions=assertions)
         result = execute_thread(spark, thread)
 
         assert result.telemetry is not None
@@ -450,19 +411,19 @@ class TestExecuteThreadLookups:
         assert result.status == "success"
         assert result.rows_written == 1
 
-    def test_mixed_lookup_and_normal_sources(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_mixed_lookup_and_normal_sources(
+        self, spark: SparkSession, tmp_delta_path, two_row_src
+    ) -> None:
         """Thread with both a normal source and a lookup source works correctly."""
-        normal_src = tmp_delta_path("lkp_mix_normal")
         lookup_src = tmp_delta_path("lkp_mix_lookup")
         tgt = tmp_delta_path("lkp_mix_tgt")
-        create_delta_table(spark, normal_src, [{"id": 1}, {"id": 2}])
         create_delta_table(spark, lookup_src, [{"id": 100}])
 
         thread = Thread(
             name="mixed_thread",
             config_version="1",
             sources={
-                "main": Source(type="delta", alias=normal_src),
+                "main": Source(type="delta", alias=two_row_src),
                 "ref": Source(lookup="ref_lookup"),
             },
             steps=[],
@@ -501,31 +462,17 @@ class TestExecuteThreadLookups:
         assert isinstance(exc_info.value.__cause__, LookupResolutionError)
         assert "nonexistent" in str(exc_info.value.__cause__)
 
-    def test_no_lookups_backward_compatible(self, spark: SparkSession, tmp_delta_path) -> None:
-        """Thread without lookups works as before (no cached_lookups / weave_lookups)."""
-        src = tmp_delta_path("lkp_compat_src")
-        tgt = tmp_delta_path("lkp_compat_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("compat_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.rows_written == 1
-
 
 class TestExecuteThreadExports:
     """Test export execution in execute_thread."""
 
-    def test_exports_write_data(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_exports_write_data(self, spark: SparkSession, tmp_delta_path, two_row_src) -> None:
         """Thread with exports writes to secondary destinations."""
-        src = tmp_delta_path("exp_src")
         tgt = tmp_delta_path("exp_tgt")
         exp_path = tmp_delta_path("exp_parquet")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
 
         exports = [Export(name="archive", type="parquet", path=exp_path)]
-        thread = _make_thread("export_thread", src, tgt, exports=exports)
+        thread = _make_thread("export_thread", two_row_src, tgt, exports=exports)
         result = execute_thread(spark, thread)
 
         assert result.status == "success"
@@ -539,11 +486,9 @@ class TestExecuteThreadExports:
         exported = spark.read.parquet(exp_path)
         assert exported.count() == 2
 
-    def test_export_warn_continues(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_export_warn_continues(self, spark: SparkSession, tmp_delta_path, one_row_src) -> None:
         """Export with on_failure=warn logs error but thread succeeds."""
-        src = tmp_delta_path("warn_src")
         tgt = tmp_delta_path("warn_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         exports = [
             Export(
@@ -553,7 +498,7 @@ class TestExecuteThreadExports:
                 on_failure="warn",
             )
         ]
-        thread = _make_thread("warn_thread", src, tgt, exports=exports)
+        thread = _make_thread("warn_thread", one_row_src, tgt, exports=exports)
         result = execute_thread(spark, thread)
 
         assert result.status == "success"
@@ -562,11 +507,9 @@ class TestExecuteThreadExports:
         assert result.telemetry.export_results[0].status == "warned"
         assert result.telemetry.export_results[0].error is not None
 
-    def test_export_abort_raises(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_export_abort_raises(self, spark: SparkSession, tmp_delta_path, one_row_src) -> None:
         """Export with on_failure=abort raises ExportError."""
-        src = tmp_delta_path("abort_src")
         tgt = tmp_delta_path("abort_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         exports = [
             Export(
@@ -576,22 +519,9 @@ class TestExecuteThreadExports:
                 on_failure="abort",
             )
         ]
-        thread = _make_thread("abort_thread", src, tgt, exports=exports)
+        thread = _make_thread("abort_thread", one_row_src, tgt, exports=exports)
         with pytest.raises(ExportError, match="critical"):
             execute_thread(spark, thread)
-
-    def test_no_exports_backward_compatible(self, spark: SparkSession, tmp_delta_path) -> None:
-        """Thread without exports works as before."""
-        src = tmp_delta_path("noexp_src")
-        tgt = tmp_delta_path("noexp_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("no_export_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.telemetry is not None
-        assert result.telemetry.export_results == []
 
     def test_multiple_exports(self, spark: SparkSession, tmp_delta_path) -> None:
         """Thread with multiple exports writes all of them."""
@@ -621,12 +551,10 @@ class TestThreadResourceLifecycle:
     """Thread-level resource lifecycle in execute_thread."""
 
     def test_thread_pre_steps_run_before_execution(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Thread pre_steps execute before the core read/transform/write pipeline."""
-        src = tmp_delta_path("pre_src")
         tgt = tmp_delta_path("pre_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         # Use a log_message pre_step; verify via mock logging
         from unittest.mock import patch
@@ -639,7 +567,7 @@ class TestThreadResourceLifecycle:
         thread = Thread(
             name="pre_thread",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt),
             pre_steps=pre_steps,
@@ -654,12 +582,10 @@ class TestThreadResourceLifecycle:
         assert any("thread-pre-fired" in msg for msg in log_messages)
 
     def test_thread_post_steps_run_after_execution(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Thread post_steps execute after the core pipeline completes."""
-        src = tmp_delta_path("post_src")
         tgt = tmp_delta_path("post_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         from unittest.mock import patch
 
@@ -671,7 +597,7 @@ class TestThreadResourceLifecycle:
         thread = Thread(
             name="post_thread",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt),
             post_steps=post_steps,
@@ -685,13 +611,11 @@ class TestThreadResourceLifecycle:
         assert any("thread-post-fired" in msg for msg in log_messages)
 
     def test_thread_lookups_materialize_and_merge(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Thread-level lookups are materialized and merged with weave-level cached lookups."""
-        src = tmp_delta_path("tlkp_src")
         tgt = tmp_delta_path("tlkp_tgt")
         thread_lookup_src = tmp_delta_path("tlkp_ref")
-        create_delta_table(spark, src, [{"id": 1}])
         create_delta_table(spark, thread_lookup_src, [{"ref_id": 10, "val": "x"}])
 
         # Thread with a source that references a thread-level lookup
@@ -699,7 +623,7 @@ class TestThreadResourceLifecycle:
             name="tlkp_thread",
             config_version="1",
             sources={
-                "main": Source(type="delta", alias=src),
+                "main": Source(type="delta", alias=one_row_src),
                 "ref": Source(lookup="thread_ref"),
             },
             steps=[],
@@ -795,11 +719,11 @@ class TestThreadResourceLifecycle:
         # Thread-level column_set should be used (new_name, not weave_renamed)
         assert "new_name" in written.columns
 
-    def test_thread_variables_merged_with_weave(self, spark: SparkSession, tmp_delta_path) -> None:
+    def test_thread_variables_merged_with_weave(
+        self, spark: SparkSession, tmp_delta_path, one_row_src
+    ) -> None:
         """Thread-level variables create a VariableContext for hook step resolution."""
-        src = tmp_delta_path("tvar_src")
         tgt = tmp_delta_path("tvar_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         from unittest.mock import patch
 
@@ -810,7 +734,7 @@ class TestThreadResourceLifecycle:
         thread = Thread(
             name="tvar_thread",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt),
             variables={
@@ -833,49 +757,19 @@ class TestThreadResourceLifecycle:
         log_messages = [str(call) for call in mock_logger.log.call_args_list]
         assert any("var=hello-from-thread" in msg for msg in log_messages)
 
-    def test_thread_without_resources_backward_compatible(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """Threads without any resource fields still work as before."""
-        src = tmp_delta_path("norc_src")
-        tgt = tmp_delta_path("norc_tgt")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
-
-        thread = _make_thread("norc_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.rows_written == 2
-
 
 class TestExecuteThreadConnections:
     """Connection resolution integration in execute_thread."""
 
-    def test_thread_without_connections_backward_compatible(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
-        """Thread with path-based source and target works when no connections passed."""
-        src = tmp_delta_path("conn_compat_src")
-        tgt = tmp_delta_path("conn_compat_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
-
-        thread = _make_thread("compat_conn_thread", src, tgt)
-        result = execute_thread(spark, thread)
-
-        assert result.status == "success"
-        assert result.rows_written == 1
-
     def test_target_connection_undefined_raises_execution_error(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, one_row_src
     ) -> None:
         """Target referencing an undefined connection raises ExecutionError."""
-        src = tmp_delta_path("conn_undef_src")
-        create_delta_table(spark, src, [{"id": 1}])
 
         thread = Thread(
             name="undef_conn_thread",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(connection="missing_conn", table="my_table"),
         )
@@ -884,13 +778,10 @@ class TestExecuteThreadConnections:
             execute_thread(spark, thread)
 
     def test_target_connection_resolved_to_abfss_path(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, two_row_src
     ) -> None:
         """Target with a connection resolves to an abfss:// path and writes there."""
         from unittest.mock import patch
-
-        src = tmp_delta_path("conn_tgt_src")
-        create_delta_table(spark, src, [{"id": 1}, {"id": 2}])
 
         conn = OneLakeConnection(
             type="onelake",
@@ -902,7 +793,7 @@ class TestExecuteThreadConnections:
         thread = Thread(
             name="conn_tgt_thread",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=two_row_src)},
             steps=[],
             target=Target(connection="my_conn", table="sales"),
         )
@@ -925,14 +816,9 @@ class TestExecuteThreadConnections:
         assert len(captured_paths) == 1
         assert captured_paths[0] == expected_path
 
-    def test_target_connection_with_schema_override(
-        self, spark: SparkSession, tmp_delta_path
-    ) -> None:
+    def test_target_connection_with_schema_override(self, spark: SparkSession, one_row_src) -> None:
         """Target with connection and schema override includes schema in resolved path."""
         from unittest.mock import patch
-
-        src = tmp_delta_path("conn_schema_src")
-        create_delta_table(spark, src, [{"id": 1}])
 
         conn = OneLakeConnection(
             type="onelake",
@@ -944,7 +830,7 @@ class TestExecuteThreadConnections:
         thread = Thread(
             name="schema_conn_thread",
             config_version="1",
-            sources={"main": Source(type="delta", alias=src)},
+            sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(connection="silver_conn", schema_override="silver", table="customers"),  # type: ignore[call-arg]
         )
@@ -968,12 +854,10 @@ class TestExecuteThreadConnections:
         assert captured_paths[0] == expected_path
 
     def test_export_connection_undefined_raises_export_error(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Export referencing an undefined connection raises ExportError."""
-        src = tmp_delta_path("exp_conn_undef_src")
         tgt = tmp_delta_path("exp_conn_undef_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         exports = [
             Export(
@@ -984,20 +868,18 @@ class TestExecuteThreadConnections:
                 on_failure="abort",
             )
         ]
-        thread = _make_thread("exp_conn_undef_thread", src, tgt, exports=exports)
+        thread = _make_thread("exp_conn_undef_thread", one_row_src, tgt, exports=exports)
 
         with pytest.raises(ExportError, match="nonexistent_conn"):
             execute_thread(spark, thread, connections={})
 
     def test_export_connection_resolved_to_abfss_path(
-        self, spark: SparkSession, tmp_delta_path
+        self, spark: SparkSession, tmp_delta_path, one_row_src
     ) -> None:
         """Export with connection resolves to abfss:// path when writing."""
         from unittest.mock import patch
 
-        src = tmp_delta_path("exp_conn_src")
         tgt = tmp_delta_path("exp_conn_tgt")
-        create_delta_table(spark, src, [{"id": 1}])
 
         conn = OneLakeConnection(
             type="onelake",
@@ -1015,7 +897,7 @@ class TestExecuteThreadConnections:
                 on_failure="abort",
             )
         ]
-        thread = _make_thread("exp_conn_thread", src, tgt, exports=exports)
+        thread = _make_thread("exp_conn_thread", one_row_src, tgt, exports=exports)
 
         expected_path = "abfss://ws-exp@onelake.dfs.fabric.microsoft.com/lh-exp/Tables/archive"
 

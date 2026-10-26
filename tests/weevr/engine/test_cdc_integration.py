@@ -909,33 +909,6 @@ class TestCdcWatermarkComposition:
         target_rows = {r["id"] for r in spark.read.format("delta").load(tgt).collect()}
         assert target_rows == {1, 2, 3}
 
-    def test_executor_unpacks_hwm_single_run(self, spark: SparkSession, tmp_delta_path) -> None:
-        """Lightweight executor smoke test: single run persists CDC HWM.
-
-        Asserts the tuple-unpack contract from read_cdc_source is wired
-        through the executor and reaches save_watermark. Heavier
-        steady-state and recovery scenarios live in the other tests in
-        this class.
-        """
-        src = tmp_delta_path("cdc_wm_smoke_src")
-        tgt = tmp_delta_path("cdc_wm_smoke_tgt")
-        wm = tmp_delta_path("cdc_wm_smoke_store")
-
-        self._seed_cdc_source(
-            spark,
-            src,
-            [(1, "I", "2026-01-01T10:00:00")],
-        )
-
-        thread = _make_cdc_watermark_thread("cdc_wm_smoke_t1", src, tgt, wm_store_path=wm)
-        result = execute_thread(spark, thread)
-        assert result.status == "success"
-
-        store = MetadataTableStore(wm)
-        state = store.read(spark, "cdc_wm_smoke_t1")
-        assert state is not None
-        assert state.last_value is not None
-
     def test_inclusive_filter_rereads_boundary_row(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:

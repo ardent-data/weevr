@@ -160,6 +160,15 @@ class TestCycleDetection:
         with pytest.raises(ConfigError, match="Circular dependency"):
             build_plan("w", threads, entries)
 
+    def test_alias_inferred_cycle_raises_config_error(self):
+        """Each thread reads the other's target — a cycle from inference alone."""
+        threads = {
+            "A": _make_thread("A", source_aliases=["out_b"], target_alias="out_a"),
+            "B": _make_thread("B", source_aliases=["out_a"], target_alias="out_b"),
+        }
+        with pytest.raises(ConfigError, match="Circular dependency"):
+            build_plan("w", threads, _entries("A", "B"))
+
     def test_indirect_cycle_raises_config_error(self):
         """A → B → C → A raises ConfigError."""
         threads = {

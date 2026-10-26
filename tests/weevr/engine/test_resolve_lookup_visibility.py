@@ -2,7 +2,8 @@
 
 Each test writes a small project (thread, weave, optionally a loom) over local
 Delta tables and runs it through ``Context.run``, so the full runner →
-executor → pipeline path is exercised.
+executor → pipeline path is exercised. The ``dim`` and ``src`` tables are
+read-only and shared across the module; targets and extra tables stay per test.
 """
 
 from __future__ import annotations
@@ -27,14 +28,14 @@ RESOLVE = {"name": "code_sk", "lookup": "dim_codes", "match": "code", "pk": "sk"
 class Project:
     """A throwaway project over local Delta tables."""
 
-    def __init__(self, spark: SparkSession, root: Path) -> None:
+    def __init__(self, spark: SparkSession, root: Path, dim: str, src: str) -> None:
         self.spark = spark
         self.root = root
         self.dir = root / "p.weevr"
         self.dir.mkdir()
         self.target = str(root / "tgt")
-        self.dim = self.table("dim", [("a", 1), ("b", 2)], ["code", "sk"])
-        self.src = self.table("src", [("a",), ("b",)], ["code"])
+        self.dim = dim
+        self.src = src
 
     def table(self, name: str, rows: list[tuple[Any, ...]], columns: list[str]) -> str:
         path = str(self.root / name)
@@ -79,9 +80,19 @@ class Project:
         return {r["code"]: r["code_sk"] for r in rows}
 
 
+@pytest.fixture(scope="module")
+def shared_tables(spark: SparkSession, module_delta_path) -> tuple[str, str]:
+    """Write the read-only ``dim`` and ``src`` tables once per module; return their paths."""
+    dim = module_delta_path("dim")
+    spark.createDataFrame([("a", 1), ("b", 2)], ["code", "sk"]).write.format("delta").save(dim)
+    src = module_delta_path("src")
+    spark.createDataFrame([("a",), ("b",)], ["code"]).write.format("delta").save(src)
+    return dim, src
+
+
 @pytest.fixture
-def project(spark: SparkSession, tmp_path: Path) -> Project:
-    return Project(spark, tmp_path)
+def project(spark: SparkSession, tmp_path: Path, shared_tables: tuple[str, str]) -> Project:
+    return Project(spark, tmp_path, *shared_tables)
 
 
 def _weave(project: Project, lookups: dict[str, Any] | None = None) -> None:

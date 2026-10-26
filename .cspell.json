@@ -64,6 +64,7 @@
     "pyright",
     "pyspark",
     "pytest",
+    "pytestmark",
     "pyyaml",
     "relicensing",
     "relinks",
