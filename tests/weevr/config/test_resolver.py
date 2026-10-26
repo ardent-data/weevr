@@ -1,9 +1,16 @@
 """Tests for variable resolver."""
 
+import dataclasses
 from pathlib import Path
 
 import pytest
 
+from weevr.config.audit_templates import (
+    CONTEXT_VARIABLE_FIELDS,
+    HIERARCHY_CONTEXT_KEYS,
+    AuditContext,
+    resolve_context_variables,
+)
 from weevr.config.resolver import (
     build_param_context,
     resolve_declared_params,
@@ -1534,7 +1541,17 @@ class TestHierarchyVariableDeferral:
         config = {"path": f"/archive/${{{name}}}/data"}
         assert resolve_variables(config, {}) == config
 
-    @pytest.mark.parametrize("name", ["thread.name", "weave.name", "loom.name"])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "thread.name",
+            "thread.qualified_key",
+            "thread.source",
+            "thread.sources",
+            "weave.name",
+            "loom.name",
+        ],
+    )
     def test_whole_value_reference_preserved(self, name: str) -> None:
         config = {"label": f"${{{name}}}"}
         assert resolve_variables(config, {}) == config
@@ -1561,12 +1578,6 @@ class TestHierarchyVariableDeferral:
 
     def test_every_deferred_name_resolves_at_execution(self) -> None:
         """Nothing deferred at load is left unresolved by the execution-time resolver."""
-        from weevr.config.audit_templates import (
-            HIERARCHY_CONTEXT_KEYS,
-            AuditContext,
-            resolve_context_variables,
-        )
-
         ctx = AuditContext(
             thread_name="t",
             thread_qualified_key="w.t",
@@ -1576,6 +1587,9 @@ class TestHierarchyVariableDeferral:
             loom_name="l",
         )
         assert HIERARCHY_CONTEXT_KEYS
+        assert set(CONTEXT_VARIABLE_FIELDS.values()) <= {
+            f.name for f in dataclasses.fields(AuditContext)
+        }
         for name in HIERARCHY_CONTEXT_KEYS:
             assert "${" not in resolve_context_variables(f"${{{name}}}", ctx), name
 
