@@ -97,6 +97,22 @@ audit_templates:
     _run_id: "${param.run_id}"
 ```
 
+The flat form above is shorthand. The same template can be nested under
+`columns`, which loads identically:
+
+```yaml
+audit_templates:
+  lineage:
+    columns:
+      _source_system: "${param.source_system}"
+      _load_ts: "current_timestamp()"
+      _run_id: "${param.run_id}"
+```
+
+Because a template with a `columns` key is read as the nested form, a flat
+template cannot define an audit column named `columns`. Use the nested form
+for that column.
+
 ### Applying a template to a thread
 
 Reference a template by name in `target.audit_template`:
