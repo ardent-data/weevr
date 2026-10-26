@@ -4,6 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from weevr.model.audit import AuditTemplate
+from weevr.model.loom import Loom
+from weevr.model.thread import Thread
+from weevr.model.weave import Weave
 
 
 class TestAuditTemplate:
@@ -63,3 +66,24 @@ class TestAuditTemplateFlatShorthand:
         """The nested form keeps ignoring unknown keys alongside columns."""
         at = AuditTemplate.model_validate({"columns": {"ts": "now()"}, "note": "x"})
         assert at == AuditTemplate(columns={"ts": "now()"})
+
+
+class TestAuditTemplateJsonSchema:
+    """The published JSON schema accepts both audit template forms."""
+
+    def _schema(self, model: type) -> dict:
+        return model.model_json_schema()["$defs"]["AuditTemplate"]
+
+    @pytest.mark.parametrize("model", [Loom, Weave, Thread])
+    def test_any_of_nested_and_flat(self, model):
+        """Each top-level schema offers the nested and the flat form."""
+        nested, flat = self._schema(model)["anyOf"]
+        assert nested["required"] == ["columns"]
+        assert nested["properties"]["columns"]["additionalProperties"] == {"type": "string"}
+        assert flat == {"type": "object", "additionalProperties": {"type": "string"}}
+
+    def test_title_and_description_kept(self):
+        """The definition keeps its title and docstring description."""
+        schema = self._schema(Loom)
+        assert schema["title"] == "AuditTemplate"
+        assert schema["description"].startswith("A named set of audit columns")

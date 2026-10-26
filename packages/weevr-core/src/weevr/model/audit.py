@@ -2,7 +2,9 @@
 
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, GetJsonSchemaHandler, model_validator
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 from weevr.model.base import FrozenBase
 
@@ -44,3 +46,14 @@ class AuditTemplate(FrozenBase):
         if isinstance(data, dict) and "columns" not in data:
             return {"columns": data}
         return data
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Advertise both the nested and the flat form in the JSON schema."""
+        nested = dict(handler.resolve_ref_schema(handler(core_schema)))
+        title = nested.pop("title", None)
+        description = nested.pop("description", None)
+        flat = {"type": "object", "additionalProperties": {"type": "string"}}
+        return {"title": title, "description": description, "anyOf": [nested, flat]}

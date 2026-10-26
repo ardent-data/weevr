@@ -1,22 +1,32 @@
 {
   "$defs": {
     "AuditTemplate": {
-      "description": "A named set of audit columns applied during data shaping.\n\nA template is written either nested under ``columns`` or as a flat mapping\nof column names to expressions. A mapping with a ``columns`` key is read as\nthe nested form, so a flat template cannot define a column named\n``columns``.\n\nAttributes:\n    columns: Mapping of column names to Spark SQL expressions. Each entry\n        defines a column that will be appended to the output dataset.\n\nExample:\n    >>> template = AuditTemplate(\n    ...     columns={\n    ...         \"created_at\": \"current_timestamp()\",\n    ...         \"created_by\": \"current_user()\",\n    ...     }\n    ... )\n    >>> AuditTemplate.model_validate({\"created_at\": \"current_timestamp()\"}).columns\n    {'created_at': 'current_timestamp()'}",
-      "properties": {
-        "columns": {
+      "anyOf": [
+        {
+          "properties": {
+            "columns": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Mapping of column names to Spark SQL expressions. Each entry defines a column that will be appended to the output dataset.",
+              "title": "Columns",
+              "type": "object"
+            }
+          },
+          "required": [
+            "columns"
+          ],
+          "type": "object"
+        },
+        {
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Mapping of column names to Spark SQL expressions. Each entry defines a column that will be appended to the output dataset.",
-          "title": "Columns",
           "type": "object"
         }
-      },
-      "required": [
-        "columns"
       ],
-      "title": "AuditTemplate",
-      "type": "object"
+      "description": "A named set of audit columns applied during data shaping.\n\nA template is written either nested under ``columns`` or as a flat mapping\nof column names to expressions. A mapping with a ``columns`` key is read as\nthe nested form, so a flat template cannot define a column named\n``columns``.\n\nAttributes:\n    columns: Mapping of column names to Spark SQL expressions. Each entry\n        defines a column that will be appended to the output dataset.\n\nExample:\n    >>> template = AuditTemplate(\n    ...     columns={\n    ...         \"created_at\": \"current_timestamp()\",\n    ...         \"created_by\": \"current_user()\",\n    ...     }\n    ... )\n    >>> AuditTemplate.model_validate({\"created_at\": \"current_timestamp()\"}).columns\n    {'created_at': 'current_timestamp()'}",
+      "title": "AuditTemplate"
     },
     "ColumnSet": {
       "description": "A named column set that defines an external column mapping.\n\nColumn sets describe where to find a mapping of incoming column names to\noutgoing column names.  The mapping data can come from a Delta table, a\nYAML file, or a runtime notebook parameter.  Exactly one of ``source`` or\n``param`` must be provided.\n\nAttributes:\n    source: Source definition pointing to the mapping data.\n    param: Name of a runtime notebook parameter that supplies the mapping\n        at execution time.\n    on_unmapped: Behaviour when an input column has no mapping entry.\n        ``\"pass_through\"`` keeps the column unchanged; ``\"error\"`` aborts.\n    on_extra: Behaviour when the mapping contains entries for columns not\n        present in the input. ``\"ignore\"`` silently skips; ``\"warn\"`` logs\n        a warning; ``\"error\"`` aborts.\n    on_failure: Behaviour when the column set cannot be resolved (e.g.\n        source unavailable). ``\"abort\"`` raises; ``\"warn\"`` logs and\n        continues; ``\"skip\"`` silently skips the rename step.",
