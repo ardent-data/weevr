@@ -1961,3 +1961,20 @@ exports:
         assert [r["_weave"] for r in spark.read.format("delta").load(tgt).collect()] == ["daily"]
         assert spark.read.parquet(str(archive / "w=daily" / "orders")).count() == 1
         assert self._stamp(spark, tgt)["weave"] == "daily"
+
+    def test_standalone_thread_run_has_no_weave(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        tgt = str(tmp_path / "tgt_thread_run")
+        archive = tmp_path / "archive"
+        self._orders_thread(project, one_row_src, tgt, archive)
+
+        result = Context(spark=spark, project=project).run(project / "threads" / "orders.thread")
+
+        assert result.status == "success"
+        assert [r["_weave"] for r in spark.read.format("delta").load(tgt).collect()] == [""]
+        assert spark.read.parquet(str(archive / "w=" / "orders")).count() == 1
+        stamp = self._stamp(spark, tgt)
+        assert "weave" not in stamp
+        assert "loom" not in stamp

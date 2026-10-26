@@ -643,7 +643,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 run_id=run_id,
                 thread=thread.name,
                 loom=loom_name or None,
-                weave=_effective_weave_name(thread, weave_name) or None,
+                weave=weave_name or None,
                 mode=write_mode,
             )
 
@@ -1257,18 +1257,6 @@ def _build_thread_variable_context(thread: Thread) -> VariableContext:
     return VariableContext(None)
 
 
-def _effective_weave_name(thread: Thread, weave_name: str) -> str:
-    """The weave name as carried by run identity surfaces.
-
-    Falls back to the prefix of the thread's qualified key when no
-    weave name was passed (standalone thread runs). Shared by audit
-    context and the commit lineage stamp so the two never drift.
-    """
-    if weave_name:
-        return weave_name
-    return thread.qualified_key.rsplit(".", 1)[0] if "." in thread.qualified_key else ""
-
-
 def _build_audit_context(
     thread: Thread,
     weave_name: str,
@@ -1276,8 +1264,11 @@ def _build_audit_context(
     run_timestamp: str,
     run_id: str,
 ) -> AuditContext:
-    """Build an AuditContext for context variable resolution."""
-    effective_weave = _effective_weave_name(thread, weave_name)
+    """Build an AuditContext for context variable resolution.
+
+    ``weave_name`` and ``loom_name`` are empty when the thread runs outside
+    a weave or loom; the commit lineage stamp uses the same values.
+    """
     primary_alias = next(iter(thread.sources))
     primary_source = thread.sources[primary_alias]
     return AuditContext(
@@ -1285,7 +1276,7 @@ def _build_audit_context(
         thread_qualified_key=thread.qualified_key,
         thread_source=primary_source.alias,
         thread_sources_json=build_sources_json(thread.sources),
-        weave_name=effective_weave,
+        weave_name=weave_name,
         loom_name=loom_name,
         run_timestamp=run_timestamp,
         run_id=run_id,
