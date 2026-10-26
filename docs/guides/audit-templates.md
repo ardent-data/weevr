@@ -53,6 +53,33 @@ pipeline parameters are not available.
 | `_weevr_run_id` | `${param.run_id}` |
 | `_weevr_thread` | `${thread.name}` |
 
+## Context variables
+
+Audit column expressions — in custom templates and inline `audit_columns` alike — can
+use the same execution context variables as the presets. They are resolved when the
+thread runs, not when the config loads:
+
+| Variable | Value |
+|----------|-------|
+| `${thread.name}` | Thread name |
+| `${thread.qualified_key}` | Thread qualified key |
+| `${thread.source}` | Alias of the thread's first source |
+| `${thread.sources}` | JSON array of the thread's sources |
+| `${weave.name}` | Weave name |
+| `${loom.name}` | Loom name |
+| `${run.timestamp}` | ISO 8601 UTC timestamp of execution start |
+| `${run.id}` | UUID4 unique per execution |
+
+The value is substituted as text into the Spark SQL expression, so quote it to get a
+string literal:
+
+```yaml
+target:
+  alias: curated.orders
+  audit_columns:
+    _source_thread: "'${thread.name}'"
+```
+
 ## Configuration
 
 ### Declaring a custom template
