@@ -253,3 +253,45 @@ class TestDuplicateWeaveNames:
             ("staging", ["x"]),
             ("main", ["y"]),
         ]
+
+
+_HIERARCHY_THREAD = """\
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.orders
+target:
+  alias: out.orders
+  audit_columns:
+    _src_thread: "'${thread.name}'"
+exports:
+  - name: archive
+    type: parquet
+    path: /archive/${loom.name}/${weave.name}/${thread.name}/${run.timestamp}/
+"""
+
+
+class TestHierarchyVariablesLoad:
+    """Execution-time hierarchy variables in exports and audit columns load intact."""
+
+    PATH = "/archive/${loom.name}/${weave.name}/${thread.name}/${run.timestamp}/"
+
+    def test_standalone_thread_loads(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "orders.thread"
+        cfg.write_text(_HIERARCHY_THREAD)
+        thread = load_config(cfg, project_root=tmp_path)
+        assert isinstance(thread, Thread)
+        assert thread.exports is not None
+        assert thread.exports[0].path == self.PATH
+        assert thread.target.audit_columns == {"_src_thread": "'${thread.name}'"}
+
+    def test_weave_referenced_thread_loads(self, tmp_path: Path) -> None:
+        (tmp_path / "orders.thread").write_text(_HIERARCHY_THREAD)
+        cfg = tmp_path / "daily.weave"
+        cfg.write_text('config_version: "1.0"\nthreads:\n  - ref: orders.thread\n')
+        loaded = load_resolved(cfg, project_root=tmp_path)
+        assert isinstance(loaded.model, Weave)
+        thread = loaded.resolved_threads["daily"]["orders"]
+        assert thread.exports is not None
+        assert thread.exports[0].path == self.PATH

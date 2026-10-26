@@ -22,6 +22,8 @@ __all__ = [
     "BUILTIN_AUDIT_PRESETS",
     "AuditContext",
     "CONTEXT_VAR_PATTERN",
+    "CONTEXT_VARIABLE_FIELDS",
+    "HIERARCHY_CONTEXT_KEYS",
     "resolve_audit_columns",
     "apply_audit_exclusions",
     "resolve_template_columns",
@@ -84,6 +86,24 @@ class AuditContext:
 
 # Pattern matching ${namespace.property} context variables.
 CONTEXT_VAR_PATTERN = re.compile(r"\$\{(thread|weave|loom|run)\.([a-z_]+)\}")
+
+# Context variable name -> AuditContext attribute supplying its value at execution.
+CONTEXT_VARIABLE_FIELDS: dict[str, str] = {
+    "thread.name": "thread_name",
+    "thread.qualified_key": "thread_qualified_key",
+    "thread.source": "thread_source",
+    "thread.sources": "thread_sources_json",
+    "weave.name": "weave_name",
+    "loom.name": "loom_name",
+    "run.timestamp": "run_timestamp",
+    "run.id": "run_id",
+}
+
+# Config-hierarchy variables known only at execution; config-load resolution leaves
+# them in place (``run.*`` is deferred as a whole namespace).
+HIERARCHY_CONTEXT_KEYS: frozenset[str] = frozenset(
+    name for name in CONTEXT_VARIABLE_FIELDS if not name.startswith("run.")
+)
 
 
 def resolve_audit_columns(
@@ -275,32 +295,14 @@ def resolve_context_variables(expression: str, context: AuditContext) -> str:
     Returns:
         Expression with context variables replaced by their values.
     """
-    lookup: dict[str, dict[str, str | None]] = {
-        "thread": {
-            "name": context.thread_name,
-            "qualified_key": context.thread_qualified_key,
-            "source": context.thread_source,
-            "sources": context.thread_sources_json,
-        },
-        "weave": {
-            "name": context.weave_name,
-        },
-        "loom": {
-            "name": context.loom_name,
-        },
-        "run": {
-            "timestamp": context.run_timestamp,
-            "id": context.run_id,
-        },
-    }
 
     def _replace(match: re.Match[str]) -> str:
         namespace = match.group(1)
         prop = match.group(2)
-        ns_lookup = lookup.get(namespace, {})
-        if prop not in ns_lookup:
+        field = CONTEXT_VARIABLE_FIELDS.get(f"{namespace}.{prop}")
+        if field is None:
             return match.group(0)  # Unknown property — leave unresolved
-        value = ns_lookup[prop]
+        value: str | None = getattr(context, field)
         if value is None:
             logger.warning(
                 "Audit column context variable ${%s.%s} resolved to None, "
