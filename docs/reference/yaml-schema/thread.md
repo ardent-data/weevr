@@ -1226,6 +1226,8 @@ Load-mode rules are enforced in two places:
       `mode` is `cdc`.
     - In `cdc` mode, `watermark_column` requires `watermark_type` and is
       rejected with `preset: delta_cdf`.
+    - `watermark_format` requires `watermark_column`, and `watermark_type`
+      of `timestamp` or `date`.
 - **When the thread starts executing** — not reported by `load_config` or
   `mode="validate"`; the run fails with an `ExecutionError`:
     - `cdc` requires `write.mode: merge`.
@@ -1523,8 +1525,8 @@ at multiple levels, the most-specific level wins.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | yes | -- | Connection type. Currently only `"onelake"` is supported. |
-| `workspace` | `string` | yes | -- | OneLake workspace GUID or `${fabric.workspace_id}` variable. |
-| `lakehouse` | `string` | yes | -- | OneLake lakehouse GUID or `${fabric.lakehouse_id}` variable. |
+| `workspace` | `string` | yes | -- | OneLake workspace GUID, a `${param.*}` reference to a declared param, or `${fabric.workspace_id}`. |
+| `lakehouse` | `string` | yes | -- | OneLake lakehouse GUID, a `${param.*}` reference to a declared param, or `${fabric.lakehouse_id}`. |
 | `default_schema` | `string` | no | `null` | Default schema for tables in this connection. Can be overridden per-source or per-target with `schema:`. |
 
 `${fabric.workspace_id}`, `${fabric.lakehouse_id}`, and

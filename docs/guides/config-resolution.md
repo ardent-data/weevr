@@ -22,7 +22,8 @@ concrete.
   and rejected.
 - **Inheritance cascade** — Defaults flow downward: loom defaults → weave
   defaults → thread config. The most specific value wins. Replacement is
-  whole-value, not deep merge.
+  whole-value, not deep merge, except for the special cascades described in
+  Stage 8 (naming, audit columns, exports, connections, target policies).
 - **Typed extensions** — Files use `.thread`, `.weave`, and `.loom` extensions
   to declare their config type unambiguously.
 - **Macro expansion** — `foreach` blocks in step lists expand into repeated
@@ -266,6 +267,7 @@ fails at load.
 - **Whole-value replacement** — Inheritance uses simple replacement, not deep
   merge. A thread-level `write` block replaces the entire inherited `write`
   block, not individual fields within it. This keeps behavior predictable.
+  The special cascades in Stage 8 are the deliberate exceptions.
 - **Typed extensions** — `.thread`, `.weave`, and `.loom` extensions eliminate
   ambiguity about config type without inspecting file contents.
 - **Foreach after resolution** — Macro expansion happens after variable

@@ -216,14 +216,12 @@ gradually.
 sources:
   orders:
     type: delta
-    alias: >-
-      abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/
-      bbbbbbbb-0000-0000-0000-000000000002/Tables/raw/orders
+    alias: "abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/\
+      bbbbbbbb-0000-0000-0000-000000000002/Tables/raw/orders"
 
 target:
-  path: >-
-    abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/
-    bbbbbbbb-0000-0000-0000-000000000002/Tables/curated/fact_orders
+  path: "abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/\
+    bbbbbbbb-0000-0000-0000-000000000002/Tables/curated/fact_orders"
 ```
 
 **After:**

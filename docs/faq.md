@@ -160,9 +160,10 @@ result = ctx.run("nightly.loom")
 ```
 
 At `verbose` level, weevr logs every step of execution -- source reads,
-transform steps, validation outcomes, and write operations. You can also
-inspect the execution span on the thread's telemetry object, which
-contains timing, status, and error attributes.
+transform steps, validation outcomes, and write operations. The failure
+message for each failed thread is in its `ThreadResult.error` (under
+`result.detail`); a failed thread has no telemetry entry. See
+[Debugging a failing pipeline](guides/observability.md#debugging-a-failing-pipeline).
 
 For transform logic issues, use preview mode to run against sampled data
 without writing:

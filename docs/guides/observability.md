@@ -154,8 +154,8 @@ legend: {
 ```
 
 Step-level work (read, transform, validate, write, assert) is not
-modeled as child spans — that detail lives in the thread span's
-attributes and events, and in `step_stats` on `ThreadTelemetry`.
+modeled as child spans — that detail lives in the `ThreadTelemetry`
+fields and its `step_stats`.
 Hooks, lookups, column sets, and sub-pipeline CTEs do get their own
 spans, parented to the scope that ran them.
 
