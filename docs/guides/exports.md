@@ -74,6 +74,9 @@ path: /archive/${loom.name}/${thread.name}/${run.timestamp}/
 ```
 
 These variables are resolved at execution time, not at config load time.
+`${weave.name}` and `${loom.name}` are empty when the thread runs outside a weave
+or loom, which leaves an empty segment in the path (for example
+`/archive//orders/`).
 
 ## Cascade Inheritance
 

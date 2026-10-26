@@ -380,6 +380,7 @@ class Context:
                 column_set_defs=dict(model.column_sets) if model.column_sets else None,
                 connections=dict(model.connections) if model.connections else None,
                 execution=standalone_execution,
+                weave_name=loaded.config_name,
             )
             if engine_result.status not in ("success", "failure", "partial"):
                 raise ExecutionError(f"Unexpected weave execution status: '{engine_result.status}'")

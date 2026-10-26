@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from weevr.context import Context
+from weevr.delta import resolve_delta_table
 from weevr.errors import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -1907,3 +1909,70 @@ exports:
         assert [r["_src_thread"] for r in written] == ["orders"]
         exported = spark.read.parquet(str(archive / "nightly" / "daily" / "orders"))
         assert exported.count() == 1
+
+
+@pytest.mark.spark
+class TestRunNamesOutsideLoom:
+    """Weave and loom names a thread sees when run outside a loom."""
+
+    @staticmethod
+    def _orders_thread(project: Path, src: str, tgt: str, archive: Path) -> None:
+        thread_dir = project / "threads"
+        thread_dir.mkdir(parents=True, exist_ok=True)
+        (thread_dir / "orders.thread").write_text(
+            f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{src}"
+target:
+  path: "{tgt}"
+  audit_columns:
+    _weave: "'${{weave.name}}'"
+write:
+  mode: overwrite
+exports:
+  - name: archive
+    type: parquet
+    path: "{archive}/w=${{weave.name}}/${{thread.name}}"
+"""
+        )
+
+    @staticmethod
+    def _stamp(spark: SparkSession, path: str) -> dict:
+        raw = resolve_delta_table(spark, path).history(1).select("userMetadata").collect()[0][0]
+        return json.loads(raw)
+
+    def test_standalone_weave_run_uses_the_weave_name(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        tgt = str(tmp_path / "tgt_weave_run")
+        archive = tmp_path / "archive"
+        self._orders_thread(project, one_row_src, tgt, archive)
+        weave_yaml = _create_weave_yaml(project, "daily", ["orders"])
+
+        result = Context(spark=spark, project=project).run(weave_yaml)
+
+        assert result.status == "success"
+        assert [r["_weave"] for r in spark.read.format("delta").load(tgt).collect()] == ["daily"]
+        assert spark.read.parquet(str(archive / "w=daily" / "orders")).count() == 1
+        assert self._stamp(spark, tgt)["weave"] == "daily"
+
+    def test_standalone_thread_run_has_no_weave(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        tgt = str(tmp_path / "tgt_thread_run")
+        archive = tmp_path / "archive"
+        self._orders_thread(project, one_row_src, tgt, archive)
+
+        result = Context(spark=spark, project=project).run(project / "threads" / "orders.thread")
+
+        assert result.status == "success"
+        assert [r["_weave"] for r in spark.read.format("delta").load(tgt).collect()] == [""]
+        assert spark.read.parquet(str(archive / "w=" / "orders")).count() == 1
+        stamp = self._stamp(spark, tgt)
+        assert "weave" not in stamp
+        assert "loom" not in stamp
