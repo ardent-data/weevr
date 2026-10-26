@@ -132,7 +132,8 @@ class LoadConfig(FrozenBase):
     watermark_type: Literal["timestamp", "date", "int", "long"] | None = Field(
         default=None,
         description=(
-            "Data type of the watermark column. Required whenever watermark_column is set."
+            "Data type of the watermark column. Required for incremental_watermark, "
+            "and in cdc mode whenever watermark_column is set."
         ),
     )
     watermark_inclusive: bool = Field(

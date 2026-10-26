@@ -2095,7 +2095,7 @@
             }
           ],
           "default": null,
-          "description": "Data type of the watermark column. Required whenever watermark_column is set.",
+          "description": "Data type of the watermark column. Required for incremental_watermark, and in cdc mode whenever watermark_column is set.",
           "title": "Watermark Type"
         },
         "watermark_inclusive": {
