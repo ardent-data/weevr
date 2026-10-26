@@ -51,7 +51,13 @@ class AuditTemplate(FrozenBase):
     def __get_pydantic_json_schema__(
         cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
     ) -> JsonSchemaValue:
-        """Advertise both the nested and the flat form in the JSON schema."""
+        """Advertise both the nested and the flat form in the JSON schema.
+
+        Serialization schemas keep the nested form only, since dumps always
+        emit ``columns``.
+        """
+        if handler.mode == "serialization":
+            return handler(core_schema)
         nested = dict(handler.resolve_ref_schema(handler(core_schema)))
         title = nested.pop("title", None)
         description = nested.pop("description", None)

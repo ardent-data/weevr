@@ -87,3 +87,9 @@ class TestAuditTemplateJsonSchema:
         schema = self._schema(Loom)
         assert schema["title"] == "AuditTemplate"
         assert schema["description"].startswith("A named set of audit columns")
+
+    def test_serialization_schema_is_nested_only(self):
+        """Dumps are always nested, so the serialization schema omits the flat form."""
+        schema = Loom.model_json_schema(mode="serialization")["$defs"]["AuditTemplate"]
+        assert "anyOf" not in schema
+        assert schema["required"] == ["columns"]
