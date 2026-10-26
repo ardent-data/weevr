@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.20.2](https://github.com/ardent-data/weevr/compare/weevr-v1.20.1...weevr-v1.20.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* **config:** defer thread, weave, and loom variables to execution ([#259](https://github.com/ardent-data/weevr/issues/259)) ([e531e98](https://github.com/ardent-data/weevr/commit/e531e9800ae954f491ea69607835a538a5b21903))
+* **engine:** report the real weave name outside loom runs ([#261](https://github.com/ardent-data/weevr/issues/261)) ([6733bad](https://github.com/ardent-data/weevr/commit/6733badddc60f2f73a376286eeb6b59fdc2c5e61))
+
 ## [1.20.1](https://github.com/ardent-data/weevr/compare/weevr-v1.20.0...weevr-v1.20.1) (2026-10-24)
 
 
