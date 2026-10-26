@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from weevr.context import Context
+from weevr.delta import resolve_delta_table
 from weevr.errors import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -1939,10 +1941,6 @@ exports:
 
     @staticmethod
     def _stamp(spark: SparkSession, path: str) -> dict:
-        import json
-
-        from weevr.delta import resolve_delta_table
-
         raw = resolve_delta_table(spark, path).history(1).select("userMetadata").collect()[0][0]
         return json.loads(raw)
 
