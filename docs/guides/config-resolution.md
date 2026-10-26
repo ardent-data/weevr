@@ -122,16 +122,16 @@ loaded config.
     - Merged defaults merge into each thread config
     - Thread values always win (most specific)
 
-   Naming configuration cascades separately as a whole block rather
-   than per-field. Audit columns (`audit_columns`), **exports**, and
-   **connections** also cascade separately using **additive merge** —
-   each level extends the set, and same-named entries at a lower
-   level override the definition from the higher level. Exports
-   with `enabled: false` are removed after merge.
+    Naming configuration cascades separately as a whole block rather
+    than per-field. Audit columns (`audit_columns`), **exports**, and
+    **connections** also cascade separately using **additive merge** —
+    each level extends the set, and same-named entries at a lower
+    level override the definition from the higher level. Exports
+    with `enabled: false` are removed after merge.
 
-   Target policies — `schema_drift`, `on_drift`, and `warp_enforcement`
-   under `defaults.target` — cascade per key from loom to weave to the
-   thread's target, and the most specific level wins.
+    Target policies — `schema_drift`, `on_drift`, and `warp_enforcement`
+    under `defaults.target` — cascade per key from loom to weave to the
+    thread's target, and the most specific level wins.
 
 - **Stage 9 — Expand macros.** `foreach` blocks in thread step lists are expanded
    into repeated sequences. This applies to a thread loaded directly and
@@ -222,7 +222,7 @@ exists, run only in `Context.run(mode="validate")`.
 | `config/parser.py` | YAML parsing, version extraction, typed extension detection |
 | `config/resolver.py` | Variable interpolation, reference loading, circular dependency detection |
 | `config/inheritance.py` | Three-level cascade: loom → weave → thread |
-| `config/validation.py` | Pre-resolution schema validation, post-resolution constraint checks |
+| `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); incremental cross-field checks (run when a thread starts executing) |
 | `config/macros.py` | `foreach` block expansion in step lists |
 | `config/hydration.py` | Hydrates resolved dicts into typed models, including referenced and inline children |
 | `config/attribution.py` | Attaches the source file to config errors raised while loading it |
