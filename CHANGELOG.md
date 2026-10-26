@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.3](https://github.com/ardent-data/weevr/compare/weevr-v1.20.2...weevr-v1.20.3) (2026-10-26)
+
+
+### Bug Fixes
+
+* **model:** accept the flat audit_templates shorthand ([#263](https://github.com/ardent-data/weevr/issues/263)) ([6d4930c](https://github.com/ardent-data/weevr/commit/6d4930c2d62eb37ae4f202dc1c3eb3363c9a8599))
+
 ## [1.20.2](https://github.com/ardent-data/weevr/compare/weevr-v1.20.1...weevr-v1.20.2) (2026-10-26)
 
 
