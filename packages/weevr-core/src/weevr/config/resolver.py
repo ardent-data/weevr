@@ -213,6 +213,17 @@ VARIABLE_PATTERN = re.compile(r"\$\{([^}:]+?)(?::-(.*?))?\}")
 WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-(.*?))?\}$")
 
 
+def _resolved_at_execution(var_name: str) -> bool:
+    """Whether an unresolved ``${var_name}`` is left in place for execution time.
+
+    True for the hierarchy variables the execution-time resolver supplies
+    (``HIERARCHY_CONTEXT_KEYS``). Callers apply it only after the load-context
+    lookup and any ``:-default`` have missed, so configs that resolve at load
+    are unaffected.
+    """
+    return var_name in HIERARCHY_CONTEXT_KEYS
+
+
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
     context: dict[str, Any],
@@ -265,8 +276,8 @@ def resolve_variables(
                 except KeyError as exc:
                     if default_value is not None:
                         return default_value
-                    if var_name in HIERARCHY_CONTEXT_KEYS:
-                        return config  # resolved at execution time
+                    if _resolved_at_execution(var_name):
+                        return config
                     raise VariableResolutionError(
                         _unresolved_variable_message(var_name, context),
                         config_key=var_name,
@@ -291,8 +302,8 @@ def resolve_variables(
             except KeyError as exc:
                 if default_value is not None:
                     return default_value
-                if var_name in HIERARCHY_CONTEXT_KEYS:
-                    return match.group(0)  # resolved at execution time
+                if _resolved_at_execution(var_name):
+                    return match.group(0)
                 raise VariableResolutionError(
                     _unresolved_variable_message(var_name, context),
                     config_key=var_name,
