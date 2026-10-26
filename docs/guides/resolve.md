@@ -183,9 +183,10 @@ Bring additional columns from the lookup into the fact:
     include_prefix: "plant_"
 ```
 
-`include` supports list (keep names), dict (rename), or
-string sugar (single column). `include_prefix` prepends a
-string to all included column names.
+`include` supports list (keep names), dict (rename), a list of
+`{column, as}` objects (rename), or string sugar (single column).
+`include_prefix` prepends a string to every included column's final
+name, after any rename, and requires `include`.
 
 ## Normalization
 

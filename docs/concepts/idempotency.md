@@ -175,18 +175,25 @@ for correct idempotent behavior:
 ## Null-safe key handling
 
 Null values in key columns are a common source of silent data quality
-issues in Spark. weevr applies **opinionated null-safe defaults** across
-all key operations:
+issues in Spark. weevr applies **opinionated null-safe defaults** to key
+hashing, joins, and dimension merges:
 
 | Operation | Standard Spark behavior | weevr behavior |
 |---|---|---|
 | **Surrogate keys** | `hash(NULL)` produces inconsistent results | Null → sentinel before hashing; keys always non-null |
 | **Join keys** | `NULL = NULL` → `NULL` (row dropped) | Null-safe `<=>` equality; null keys participate in joins |
-| **Change detection** | `hash(NULL)` masks null↔value changes | Null → type-appropriate sentinel before hashing |
-| **Merge match keys** | `NULL = NULL` → no match (row orphaned) | Null-safe comparison; null keys match correctly |
+| **Change detection** | `hash(NULL)` masks null↔value changes | Null → `__NULL__` sentinel before hashing |
+| **Dimension merge keys** | `NULL = NULL` → no match (row orphaned) | Business keys compared null-safely; null keys match correctly |
 
 These defaults prevent the most common Spark null-related pitfalls without
 requiring authors to add defensive logic to every thread.
+
+!!! warning "Standard merge match keys are not null-safe"
+    `write.mode: merge` outside a dimension target compares `match_keys`
+    with standard `=` equality. A source row whose match key is null never
+    matches a target row, so it is inserted again on every run. Fill or
+    filter null match keys before the write (for example with `fill_null`
+    or `filter`).
 
 ## Next steps
 
