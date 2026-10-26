@@ -3188,7 +3188,10 @@ fails and follows the <code>on_failure</code> behavior.</p>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/archive/${loom.name}/${thread.name}/${run.timestamp}/</span>
 </code></pre></div>
-<p>These variables are resolved at execution time, not at config load time.</p>
+<p>These variables are resolved at execution time, not at config load time.
+<code>${weave.name}</code> and <code>${loom.name}</code> are empty when the thread runs outside a weave
+or loom, which leaves an empty segment in the path (for example
+<code>/archive//orders/</code>).</p>
 <h2 id="cascade-inheritance">Cascade Inheritance<a class="headerlink" href="#cascade-inheritance" title="Permanent link">&para;</a></h2>
 <p>Exports cascade additively through loom → weave → thread:</p>
 <ul>
