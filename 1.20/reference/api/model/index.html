@@ -1224,6 +1224,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="AuditTemplate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.AuditTemplate.__get_pydantic_json_schema__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __get_pydantic_json_schema__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3804,6 +3821,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="AuditTemplate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.AuditTemplate.__get_pydantic_json_schema__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __get_pydantic_json_schema__
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -4782,6 +4816,10 @@ strings.</p>
 
 
         <p>A named set of audit columns applied during data shaping.</p>
+<p>A template is written either nested under <code>columns</code> or as a flat mapping
+of column names to expressions. A mapping with a <code>columns</code> key is read as
+the nested form, so a flat template cannot define a column named
+<code>columns</code>.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -4815,12 +4853,13 @@ defines a column that will be appended to the output dataset.</p>
   <blockquote>
 <blockquote>
 <blockquote>
-<p>template = AuditTemplate(
+<p _created_at_:="'created_at':" _current_timestamp_="'current_timestamp()'">template = AuditTemplate(
 ...     columns={
 ...         "created_at": "current_timestamp()",
 ...         "created_by": "current_user()",
 ...     }
-... )</p>
+... )
+AuditTemplate.model_validate({"created_at": "current_timestamp()"}).columns</p>
 </blockquote>
 </blockquote>
 </blockquote>
@@ -4845,6 +4884,30 @@ defines a column that will be appended to the output dataset.</p>
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.model.AuditTemplate.__get_pydantic_json_schema__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">__get_pydantic_json_schema__</span><span class="p">(</span><span class="n">core_schema</span><span class="p">,</span> <span class="n">handler</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#weevr.model.AuditTemplate.__get_pydantic_json_schema__" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Advertise both the nested and the flat form in the JSON schema.</p>
+<p>Serialization schemas keep the nested form only, since dumps always
+emit <code>columns</code>.</p>
+
+
+    </div>
+
+</div>
 
 
 

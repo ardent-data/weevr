@@ -3390,29 +3390,41 @@ thread-local templates.</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">_load_ts</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
 </code></pre></div>
+<p>The flat form above is shorthand. The same template can be nested under
+<code>columns</code>, which loads identically:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">audit_templates</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">lineage</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">_source_system</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.source_system}"</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">_load_ts</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
+</code></pre></div>
+<p>Because a template with a <code>columns</code> key is read as the nested form, a flat
+template cannot define an audit column named <code>columns</code>. Use the nested form
+for that column.</p>
 <h3 id="applying-a-template-to-a-thread">Applying a template to a thread<a class="headerlink" href="#applying-a-template-to-a-thread" title="Permanent link">&para;</a></h3>
 <p>Reference a template by name in <code>target.audit_template</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># In a thread file</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lineage</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># In a thread file</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lineage</span>
 </code></pre></div>
 <h3 id="using-a-built-in-preset">Using a built-in preset<a class="headerlink" href="#using-a-built-in-preset" title="Permanent link">&para;</a></h3>
 <p>Built-in presets are referenced the same way — no declaration needed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fabric</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fabric</span>
 </code></pre></div>
 <h2 id="composition-template-inline-columns">Composition: template + inline columns<a class="headerlink" href="#composition-template-inline-columns" title="Permanent link">&para;</a></h2>
 <p>When a thread specifies both <code>audit_template</code> and inline <code>audit_columns</code>, the
 two sets are merged additively. Inline entries take precedence over same-named
 template entries:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">minimal</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">_weevr_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.custom_run_id}"</span><span class="w">   </span><span class="c1"># overrides minimal preset</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">_domain</span><span class="p">:</span><span class="w"> </span><span class="s">"'orders'"</span><span class="w">                        </span><span class="c1"># additional column</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">minimal</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">_weevr_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.custom_run_id}"</span><span class="w">   </span><span class="c1"># overrides minimal preset</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="nt">_domain</span><span class="p">:</span><span class="w"> </span><span class="s">"'orders'"</span><span class="w">                        </span><span class="c1"># additional column</span>
 </code></pre></div>
 <p>The resolved set here would be <code>_weevr_loaded_at</code> and <code>_weevr_thread</code> from the
 preset, plus <code>_weevr_run_id</code> and <code>_domain</code> from the inline block (the inline
@@ -3421,13 +3433,13 @@ preset, plus <code>_weevr_run_id</code> and <code>_domain</code> from the inline
 <p><code>audit_template</code> accepts either a single string or a list. When a list is
 given, templates are merged left to right — later entries override earlier ones
 on name collision. Inline <code>audit_columns</code> always win over any template.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lineage</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="nt">_override</span><span class="p">:</span><span class="w"> </span><span class="s">"'manual'"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lineage</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="nt">_override</span><span class="p">:</span><span class="w"> </span><span class="s">"'manual'"</span>
 </code></pre></div>
 <h2 id="inheritance-cascade-behavior">Inheritance: cascade behavior<a class="headerlink" href="#inheritance-cascade-behavior" title="Permanent link">&para;</a></h2>
 <p>Template <em>definitions</em> (<code>audit_templates</code> blocks) from all levels are
@@ -3438,12 +3450,12 @@ inheritance settings.</p>
 <code>audit_columns</code> cascade additively from loom → weave → thread. To
 suppress inherited references and inline columns from parent levels,
 set <code>audit_template_inherit: false</code> on the target:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.reference_data</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">audit_template_inherit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom_local</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.reference_data</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">audit_template_inherit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom_local</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
 </code></pre></div>
 <p>This suppresses inherited template references and inline columns
 from loom and weave. The thread's own <code>audit_template</code> and
@@ -3453,12 +3465,12 @@ levels remain available for resolution.</p>
 <p>To suppress specific columns from a resolved template without replacing the
 whole template, use <code>target.audit_columns_exclude</code>. This accepts a list of
 exact column names or glob patterns:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fabric</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">audit_columns_exclude</span><span class="p">:</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_batch_version</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_pipeline_*</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curated.orders</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">audit_template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fabric</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">audit_columns_exclude</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_batch_version</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_pipeline_*</span>
 </code></pre></div>
 <p>The <code>_pipeline_*</code> pattern matches <code>_pipeline_id</code>, <code>_pipeline_name</code>,
 and any other columns matching the glob. Exclusions are applied after
@@ -3468,20 +3480,20 @@ are subject to exclusion regardless of origin.</p>
 <p>weevr logs a warning at configuration load time when a user-defined
 template name matches a built-in preset name. This catches accidental
 shadowing of shipped defaults:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>WARN User-defined template 'fabric' shadows built-in preset
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>     with the same name
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>WARN User-defined template 'fabric' shadows built-in preset
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>     with the same name
 </code></pre></div>
 <p>The user-defined template always takes precedence. The warning is
 informational — it confirms that the built-in preset is not in use.</p>
 <h2 id="migration-defaultsaudit_columns">Migration: <code>defaults.audit_columns</code><a class="headerlink" href="#migration-defaultsaudit_columns" title="Permanent link">&para;</a></h2>
 <p>Configurations written before v1.8 may use <code>defaults.target.audit_columns</code> to
 cascade audit columns from the loom or weave level:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Legacy pattern (still supported)</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">defaults</span><span class="p">:</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">      </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Legacy pattern (still supported)</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">defaults</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">audit_columns</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
 </code></pre></div>
 <p>This pattern continues to work. However, <code>audit_templates</code> offers a cleaner
 separation: the column definitions live in a named block rather than being
