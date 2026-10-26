@@ -109,11 +109,20 @@ modification.
 
 Thread execution is orchestrated at two levels:
 
-**Loom level** (`execute_loom`) — Iterates weaves in declared order. Each weave
-gets its own plan and executor pass. Weave-level conditions are evaluated before
-planning; a false condition skips the entire weave. If a weave's status is
-`"failure"`, the loom stops executing further weaves — remaining weaves are
-skipped.
+**Loom level** (`execute_loom`) — Runs the loom lifecycle around its weaves:
+
+1. **Initialize variables** — A loom `VariableContext` is created from the
+   loom's `variables` declarations.
+2. **Pre-steps** — Loom `pre_steps` hooks run.
+3. **Shared resources** — Loom-level column sets are resolved and loom-level
+   lookups are materialized once, then shared by every weave.
+4. **Weaves** — Weaves run in declared order. Each weave gets its own plan
+   and executor pass. Weave-level conditions are evaluated before planning;
+   a false condition skips the entire weave. If a weave's status is
+   `"failure"`, the loom stops executing further weaves — remaining weaves
+   are skipped.
+5. **Post-steps** — Loom `post_steps` hooks run, including after a weave failure
+   stops the loop. Loom lookup caches are released at the end, even on error.
 
 **Weave level** (`execute_weave`) — Orchestrates the full weave lifecycle:
 
@@ -179,7 +188,8 @@ After each thread completes:
 - Thread-level telemetry collectors are merged into the weave collector.
 
 **Thread level** (`execute_thread`) — A single thread runs through an 18-step
-pipeline:
+pipeline, plus conditional sub-steps for warps, dimensions, facts, and seeds
+(listed with the step they belong to):
 
 ```d2
 direction: down
@@ -233,7 +243,10 @@ transforms -> write
 write -> finalize
 ```
 
-1. Initialize thread-level resources (variables, lookups, column_sets)
+1. Initialize thread-level resources (variables, lookups, column_sets).
+   When the target references a warp by name, the warp is resolved here,
+   and with `warp_init: true` the target table is pre-initialized from it
+   (dimension SCD columns are not known yet, so declare them in the warp)
 2. Run thread-level `pre_steps`
 3. Resolve lookup-based sources from cached or on-demand DataFrames
 4. Read all remaining declared sources (with watermark/CDC filtering if
@@ -261,12 +274,17 @@ write -> finalize
    `rename`, `revert`, and `drop`. See
    [configuration keys](../reference/configuration-keys.md#reservedwordconfig)
    for details.
-9. Compute business keys and change detection hashes
-10. Resolve the target write path
+9. Compute business keys and change detection hashes. For a dimension
+   target, the SCD columns are injected next
+10. Resolve the target write path. For a fact target, the target schema is
+    then validated (schema only, no Spark action)
 11. Apply target column mapping
 12. Inject audit columns (bypasses mapping mode; applied for all write modes)
-13. Write to the Delta target (standard write or CDC merge routing).
-    For fact targets, the sentinel advisory then runs against the
+13. Write to the Delta target (standard write, dimension merge, or CDC merge
+    routing). Before the write, warp enforcement and drift detection run;
+    configured seed rows (`seed:` rows and, for dimensions with
+    `seed_system_members`, the system member rows) are written before the
+    data. For fact targets, the sentinel advisory then runs against the
     written table in a single pass (warnings only — never blocking)
 14. Persist watermark or CDC state
 15. Run post-write assertions
@@ -404,7 +422,10 @@ file lives in.
 | `engine/conditions.py` | `weevr` | Condition evaluation: parameter resolution, built-in functions, boolean parsing |
 | `engine/hooks.py` | `weevr` | Pre/post hook step execution: quality gates, SQL statements, log messages |
 | `engine/lookups.py` | `weevr` | Lookup materialization: pre-read, narrow projection, caching/broadcast |
-| `engine/variables.py` | `weevr` | Weave-scoped variable binding and resolution |
+| `engine/column_sets.py` | `weevr` | Column set resolution: builds named column mappings from Delta, YAML, or parameter sources |
+| `engine/resources.py` | `weevr` | Runtime resource merges across loom → weave → thread (lookups, column sets, variables, hook lists); the inner level wins on name conflicts |
+| `engine/target_identity.py` | `weevr` | Canonical target identity, so cache registration and lookup agree on one key per physical table |
+| `engine/variables.py` | `weevr` | Variable binding and resolution for loom, weave, and thread variables |
 | `engine/display.py` | `weevr` | SVG visualization (DAG, flow, timeline, waterfall) and HTML result rendering for notebooks |
 
 ## Design decisions

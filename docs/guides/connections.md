@@ -11,7 +11,7 @@ it by a short name.
 | Pattern | Use this |
 |---------|----------|
 | Single-lakehouse thread, tables registered in the metastore | `alias:` |
-| Single-lakehouse thread, raw OneLake path | `path:` |
+| Single-lakehouse thread, raw OneLake path | `alias:` for Delta sources, `path:` for targets and file sources |
 | Reading from or writing to a different workspace or lakehouse | `connections:` |
 | Multiple threads sharing the same remote lakehouse | `connections:` at weave or loom level |
 | Portability across environments without changing GUIDs | `connections:` with `${fabric.*}` |
@@ -206,8 +206,9 @@ same name as a loom-level connection replaces it entirely for that thread.
 
 ## Migration from manual `abfss://` paths
 
-If you have existing threads using hardcoded `abfss://` paths in `source.path`
-or `target.path`, you can migrate to connections gradually.
+If you have existing threads using hardcoded `abfss://` paths in a Delta
+source's `alias` or in `target.path`, you can migrate to connections
+gradually.
 
 **Before:**
 
@@ -215,7 +216,7 @@ or `target.path`, you can migrate to connections gradually.
 sources:
   orders:
     type: delta
-    path: >-
+    alias: >-
       abfss://aaaaaaaa-0000-0000-0000-000000000001@onelake.dfs.fabric.microsoft.com/
       bbbbbbbb-0000-0000-0000-000000000002/Tables/raw/orders
 

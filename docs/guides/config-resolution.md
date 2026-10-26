@@ -66,21 +66,21 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 
 ### Stage 1–4: Parse and validate structure
 
-1. **Parse YAML** — Read the file and produce a raw dictionary. File-not-found
+- **Stage 1 — Parse YAML.** Read the file and produce a raw dictionary. File-not-found
    and YAML syntax errors raise `ConfigParseError`.
-2. **Extract version** — Read `config_version` and parse into a `(major, minor)`
+- **Stage 2 — Extract version.** Read `config_version` and parse into a `(major, minor)`
    tuple. Unsupported versions raise `ConfigVersionError`.
-3. **Detect type** — Determine whether the file is a thread, weave, loom, or
+- **Stage 3 — Detect type.** Determine whether the file is a thread, weave, loom, or
    params file. Typed extensions (`.thread`, `.weave`, `.loom`) are checked
    first; if the extension is `.yaml` or `.yml`, the structure is inspected.
-4. **Validate schema** — Run the raw dictionary through a Pydantic model for
+- **Stage 4 — Validate schema.** Run the raw dictionary through a Pydantic model for
    loose structural validation. At this stage, `${var}` placeholders are
    permitted (the schema uses `extra="allow"`), so unresolved variables do not
    cause errors.
 
 ### Stage 5–6: Resolve values
 
-1. **Build parameter context** — Merge runtime parameters (highest
+- **Stage 5 — Build parameter context.** Merge runtime parameters (highest
    priority) over the `param.*` namespace over config-declared
    defaults over fabric context (lowest priority) into a flat
    context dictionary. The `param.*` namespace is populated from
@@ -92,7 +92,7 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
    below and [Thread Templates](thread-templates.md). The
    `${fabric.*}` namespace comes from the fabric layer. Dotted
    keys like `env.lakehouse` support nested access.
-2. **Resolve variables** — Recursively walk all values in the config and
+- **Stage 6 — Resolve variables.** Recursively walk all values in the config and
    resolve `${var}` references from the parameter context. Whole-value
    references return the native type; embedded references coerce to
    string (see [Parameter resolution](#parameter-resolution) below).
@@ -113,10 +113,13 @@ loaded config.
 
 ### Stage 8–9: Inherit and expand
 
-1. **Apply inheritance** — For multi-level configs, cascade defaults:
-     - Loom defaults merge into weave defaults
-     - Merged defaults merge into each thread config
-     - Thread values always win (most specific)
+- **Stage 8 — Apply inheritance.** First, each thread's own `write` and
+  `keys` blocks are checked against the dimension override rules, before
+  any loom or weave defaults are merged in, so inherited defaults never
+  trip them. Then, for multi-level configs, cascade defaults:
+    - Loom defaults merge into weave defaults
+    - Merged defaults merge into each thread config
+    - Thread values always win (most specific)
 
    Naming configuration cascades separately as a whole block rather
    than per-field. Audit columns (`audit_columns`), **exports**, and
@@ -125,7 +128,11 @@ loaded config.
    level override the definition from the higher level. Exports
    with `enabled: false` are removed after merge.
 
-2. **Expand macros** — `foreach` blocks in thread step lists are expanded
+   Target policies — `schema_drift`, `on_drift`, and `warp_enforcement`
+   under `defaults.target` — cascade per key from loom to weave to the
+   thread's target, and the most specific level wins.
+
+- **Stage 9 — Expand macros.** `foreach` blocks in thread step lists are expanded
    into repeated sequences. This applies to a thread loaded directly and
    to every thread a weave or loom references, which expand during
    hydration (Stage 10). Expansion happens after variable resolution so
@@ -136,7 +143,10 @@ loaded config.
 
 **Validate name and hydrate model** — The config `name` field is
 validated against the filename stem (mismatch raises `ConfigError`;
-missing name is injected from the stem). The fully resolved dictionary
+missing name is injected from the stem), and `qualified_key` is set to the
+file's path relative to the project root. For a thread, relative `path`
+values on file sources (CSV, JSON, Parquet, Excel) are resolved against
+the project root. The fully resolved dictionary
 is then validated through the typed Pydantic model (`Thread`, `Weave`,
 or `Loom`). Semantic errors at this stage raise `ModelValidationError`.
 For a weave or loom, every child it pulls in, whether referenced or
@@ -213,7 +223,13 @@ exists, run only in `Context.run(mode="validate")`.
 | `config/inheritance.py` | Three-level cascade: loom → weave → thread |
 | `config/validation.py` | Pre-resolution schema validation, post-resolution constraint checks |
 | `config/macros.py` | `foreach` block expansion in step lists |
-| `config/fabric.py` | Builds `${fabric.*}` context from Fabric runtime variables |
+| `config/hydration.py` | Hydrates resolved dicts into typed models, including referenced and inline children |
+| `config/attribution.py` | Attaches the source file to config errors raised while loading it |
+| `config/audit_templates.py` | Audit template presets, context variables, and template merge helpers |
+| `config/onelake.py` | Spark-free OneLake path construction shared by the runtime and the planner |
+| `config/duration.py` | Re-exports the duration string parser for backward compatibility |
+| `config/fabric.py` | Engine wheel. Builds `${fabric.*}` context from Fabric runtime variables |
+| `config/paths.py` | Engine wheel. OneLake path utilities, including translating `/lakehouse/` FUSE mount paths to `abfss://` URIs |
 | `config/locations.py` | Filesystem-agnostic location abstraction; routes local paths through pathlib and remote URIs through Hadoop FileSystem |
 | `config/warp.py` | Warp schema contract discovery and drift baseline resolution |
 | `config/loader.py` | The shared load: runs every stage for one file; `load_resolved()` |
@@ -345,7 +361,7 @@ Per-param resolution precedence:
 
 Declared params in a loom or weave are reachable as `${param.x}` only
 **within the same file's scope**, and only when the file is loaded at
-the top level (via `load_config(...)` or `Context(config=...)`). Two
+the top level (via `load_config(...)`, `ctx.load(...)`, or `ctx.run(...)`). Two
 related limitations follow from this:
 
 1. **Cross-scope inheritance** — child weaves and threads do not

@@ -55,6 +55,16 @@ keys:
 | `description` | No | — | Human-readable column description |
 | `discovered` | No | `false` | Set by adaptive drift auto-gen |
 
+### Top-level fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `config_version` | Yes | — | Schema version (`"1.0"`) |
+| `description` | No | — | Human-readable description of the contract |
+| `columns` | Yes | — | Column declarations (see above) |
+| `keys` | No | — | Surrogate and business key metadata (see below) |
+| `auto_generated` | No | `false` | Set to `true` on warps weevr generates from pipeline output |
+
 ### Keys section
 
 The `keys` section is documentation metadata. It identifies

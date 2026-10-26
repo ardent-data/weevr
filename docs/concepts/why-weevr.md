@@ -187,10 +187,12 @@ every default can be overridden at the thread level.
   concerns (Fabric pipelines, Apache Airflow, etc.).
 - **Not a code generator.** Configuration is interpreted at runtime. No
   PySpark source code is generated from YAML.
-- **Not opinionated about data modeling.** Kimball, Data Vault, and other
-  modeling patterns are supported through the
-  [stitch system](../reference/yaml-schema/thread.md), not baked into the
-  engine.
+- **Not opinionated about data modeling.** Kimball dimensions and facts
+  have first-class support through the target's
+  [`dimension`](../guides/dimension-modeling.md) and
+  [`fact`](../guides/fact-tables.md) blocks, but nothing requires a
+  particular approach; other patterns are built from the same steps and
+  write modes.
 
 ## Next steps
 

@@ -54,8 +54,8 @@ spark = (
 )
 ```
 
-The same YAML configs work in both local Spark and Fabric. Use parameter
-files to swap environment-specific paths. See the
+The same YAML configs work in both local Spark and Fabric. Pass
+environment-specific paths through `Context(..., params={...})`. See the
 [Fabric Runtime](guides/fabric-runtime.md) guide for details.
 
 ---
@@ -68,10 +68,12 @@ Configuration cascades through three levels: **Loom** > **Weave** >
 A loom can define default write modes, execution settings, and audit
 columns. A weave can override any of those. A thread can override
 anything the weave set. Scalar values are replaced outright; collections
-(lists, maps) are also replaced entirely, not merged. The exceptions are
-`audit_columns` and `exports`, which use **additive merge** -- each
-level extends the set, and same-named entries at a lower level override
-those from the higher level.
+(lists, maps) are replaced entirely by default. The exceptions use
+**additive merge** -- each level extends the set, and same-named entries
+at a lower level override those from the higher level:
+`audit_columns`, `exports`, and `connections` (merged when the config
+loads), plus `lookups` and `column_sets` (merged at run time across loom,
+weave, and thread) and loom and weave `variables`.
 
 ```text
 Loom default:   write.mode = overwrite
@@ -131,17 +133,12 @@ Supported watermark types: `timestamp`, `date`, `int`, `long`.
 
 ## Can I mix Python code with YAML configuration?
 
-Yes. weevr supports two extension points for custom logic:
-
-- **Helper functions** -- Registered Python functions that can be called
-  from Spark SQL expressions in your YAML config (e.g., in `derive`,
-  `filter`, or `condition` expressions).
-- **UDFs** -- User-defined functions registered with Spark that can be
-  used in any expression context.
-
-Both are registered through the project-level configuration and are
-available across all threads in a loom execution. Custom helpers and UDFs
-live in your integration project alongside the YAML configs.
+Not through weevr configuration: there is no helper or UDF registry, and
+no step type runs Python. Expressions in YAML are Spark SQL evaluated in
+your Spark session, so a function you register with Spark
+(`spark.udf.register(...)`) before calling `ctx.run` can be called from
+`derive`, `filter`, and other expressions. Any other Python runs in the
+notebook before or after `ctx.run`.
 
 ---
 

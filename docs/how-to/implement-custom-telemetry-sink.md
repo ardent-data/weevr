@@ -95,8 +95,8 @@ ctx = Context(spark, "my-project.weevr", log_level="verbose")
 
 Available levels: `minimal`, `standard` (default), `verbose`, `debug`. Each log
 entry is a JSON object with fields including `timestamp`, `level`, `logger`,
-`message`, and optional context attributes (`thread_name`, `weave_name`,
-`trace_id`).
+`message`, and optional context attributes (`weevr_thread`, `weevr_weave`,
+`weevr_loom`, `trace_id`, `span_id`).
 
 To route these logs to an external system, attach a custom Python logging
 handler to the `weevr` logger:
