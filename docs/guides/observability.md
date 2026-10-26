@@ -412,6 +412,7 @@ The **stable core** of the stamp is the engine marker (`engine`),
 `run_id`, and `thread` — attribution matches on exactly these, and
 they are safe to build tooling against. The remaining fields (`loom`,
 `weave`, `mode`, `version`) are best-effort context and may evolve;
+`loom` and `weave` appear only when the thread ran under a loom or weave;
 `mode` records the thread's configured write mode, not the physical
 branch taken (a first write executes as an overwrite regardless).
 

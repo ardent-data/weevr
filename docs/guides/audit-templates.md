@@ -65,8 +65,8 @@ thread runs, not when the config loads:
 | `${thread.qualified_key}` | Thread qualified key |
 | `${thread.source}` | Alias of the thread's first source |
 | `${thread.sources}` | JSON array of the thread's sources |
-| `${weave.name}` | Weave name |
-| `${loom.name}` | Loom name |
+| `${weave.name}` | Weave name (empty when the thread runs outside a weave) |
+| `${loom.name}` | Loom name (empty when the thread runs outside a loom) |
 | `${run.timestamp}` | ISO 8601 UTC timestamp of execution start |
 | `${run.id}` | UUID4 unique per execution |
 
