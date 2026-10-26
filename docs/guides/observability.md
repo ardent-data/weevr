@@ -97,7 +97,7 @@ Each span is an `ExecutionSpan` with the following fields:
 | `status`         | `OK`, `ERROR`, or `UNSET` |
 | `start_time`     | UTC timestamp when the span started |
 | `end_time`       | UTC timestamp when the span ended |
-| `attributes`     | Key-value metrics (row counts, durations, etc.) |
+| `attributes`     | Key-value attributes (for example a lookup's row count) |
 | `events`         | Timestamped events within the span |
 
 Trace IDs and span IDs follow OTel conventions (hex-encoded random bytes),
@@ -106,13 +106,17 @@ making them compatible with tracing backends that accept OTel data.
 ### Span events
 
 Events mark significant moments within a span. Each `SpanEvent` has a
-`name`, `timestamp`, and optional `attributes` dict. Common events include:
+`name`, `timestamp`, and optional `attributes` dict. weevr emits events on
+these spans:
 
-- `sources_read` -- All source DataFrames loaded
-- `pipeline_complete` -- Transform steps finished
-- `validation_complete` -- Pre-write validation done
-- `write_complete` -- Target write finished
-- `watermark_persisted` -- High-water mark saved
+- **Hook step spans** -- `log` (a `log_message` step, with `message` and
+  `level`), `warning`, and `error` (a failed hook step, with `message`)
+- **Lookup materialization and column set spans** -- `error`, with
+  `message`, when the lookup or column set fails
+
+Thread, weave, and loom spans carry no events. A thread's metrics (rows
+read and written, durations, validation results) are on its
+`ThreadTelemetry`, not on the span.
 
 ### Span hierarchy
 
@@ -150,8 +154,8 @@ legend: {
 ```
 
 Step-level work (read, transform, validate, write, assert) is not
-modeled as child spans — that detail lives in the thread span's
-attributes and events, and in `step_stats` on `ThreadTelemetry`.
+modeled as child spans — that detail lives in the `ThreadTelemetry`
+fields and its `step_stats`.
 Hooks, lookups, column sets, and sub-pipeline CTEs do get their own
 spans, parented to the scope that ran them.
 
@@ -490,9 +494,10 @@ When a thread fails, use this progression:
    what failed.
 2. **Set `log_level="verbose"`** -- Rerun with verbose logging to see
    step-by-step execution detail.
-3. **Inspect telemetry spans** -- Look at the failing thread's span for
-   status, attributes, and events. The span's `attributes` dict often
-   contains the error message and the step where failure occurred.
+3. **Read the thread's error** -- Each failed thread's `ThreadResult` in
+   `result.detail` carries the failure message in `error`. A failed
+   thread has no `ThreadTelemetry` entry, so look for it in the results,
+   not in `thread_telemetry`.
 4. **Check validation results** -- If rows were quarantined, review the
    `validation_results` on the thread's telemetry to see which rules
    failed and how many rows were affected.
@@ -506,12 +511,12 @@ result = ctx.run("nightly.loom")
 
 if result.status != "success":
     print(result.summary())
-    # Drill into the failing thread's telemetry
-    for weave_name, wt in result.telemetry.weave_telemetry.items():
-        for thread_name, tt in wt.thread_telemetry.items():
-            if tt.span.status.value == "ERROR":
-                print(f"Failed: {thread_name}")
-                print(f"  Events: {tt.span.events}")
+    # result.detail is a LoomResult for a loom run
+    for weave_result in result.detail.weave_results:
+        for thread_result in weave_result.thread_results:
+            if thread_result.status == "failure":
+                print(f"Failed: {thread_result.thread_name}")
+                print(f"  Error: {thread_result.error}")
 ```
 
 ## Next steps

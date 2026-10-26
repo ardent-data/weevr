@@ -38,8 +38,11 @@ exports:
 |-------|----------|---------|-------------|
 | `name` | Yes | — | Unique identifier (valid Python identifier). |
 | `type` | Yes | — | Output format: `delta`, `parquet`, `csv`, `json`, `orc`. |
-| `path` | Conditional | — | OneLake path. Required when `alias` is not set. Supports variables. |
-| `alias` | Conditional | — | Metastore alias. Delta type only, mutually exclusive with `path`. |
+| `path` | Conditional | — | OneLake path. Supports variables. |
+| `alias` | Conditional | — | Metastore alias. Delta type only. |
+| `connection` | Conditional | — | Name of a connection declared in `connections:`. Delta type only; requires `table`. |
+| `schema` | No | — | Schema override within the connection's lakehouse. |
+| `table` | Conditional | — | Table name within the connection's lakehouse; requires `connection`. |
 | `description` | No | — | Human-readable label shown in `explain()` output. |
 | `mode` | No | `overwrite` | Write mode. Only `overwrite` in v1. |
 | `partition_by` | No | — | Partition columns, independent of primary target. |
@@ -49,8 +52,10 @@ exports:
 
 ## Format Notes
 
-- **Delta**: use `alias` for a metastore-registered table or `path` for
-  a direct OneLake path. Exactly one must be set. Auto-creates tables on
+- **Delta**: use `alias` for a metastore-registered table, `path` for a
+  direct OneLake path, or `connection` with `table` for a table in another
+  lakehouse. Exactly one destination must be set (this applies to every
+  enabled export; non-Delta formats use `path`). Auto-creates tables on
   first write.
 - **Parquet**: use `options.compression` for compression codec (snappy, gzip, etc.).
 - **CSV**: common options include `header`, `delimiter`, `quote`, `escape`.

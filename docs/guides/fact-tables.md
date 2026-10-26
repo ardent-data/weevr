@@ -89,7 +89,8 @@ Accumulating snapshot patterns use `fact:` combined with
 config_version: "1.0"
 sources:
   orders:
-    path: Tables/stg_orders
+    type: delta
+    alias: Tables/stg_orders
 steps:
   - derive:
       columns:

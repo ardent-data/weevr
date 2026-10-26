@@ -27,7 +27,8 @@ The simplest form filters a source before joining it in the main pipeline:
 ```yaml
 sources:
   orders:
-    path: Tables/stg_orders
+    type: delta
+    alias: Tables/stg_orders
 
 with:
   filtered_orders:
@@ -176,8 +177,9 @@ same source multiple times or when column names overlap:
 ```
 
 `prefix` and `rename` compose: `prefix` applies first, then `rename` maps
-the prefixed names. `include` and `exclude` are mutually exclusive — use
-one or the other on a given join.
+the prefixed names. `include` and `exclude` compose too: `include` keeps
+the matching columns, then `exclude` drops matches from what is left. The
+full order is `include` → `exclude` → `prefix` → `rename`.
 
 ## Self-join with column control
 
@@ -188,7 +190,8 @@ make each alias explicit:
 ```yaml
 sources:
   product_dim:
-    path: Tables/dim_product
+    type: delta
+    alias: Tables/dim_product
 
 with:
   product_member:

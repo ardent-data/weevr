@@ -65,7 +65,8 @@ class AuditContext:
 
     Attributes:
         thread_name: Thread name (e.g. ``stg_orders``).
-        thread_qualified_key: Fully qualified key (e.g. ``staging.stg_orders``).
+        thread_qualified_key: Thread file path relative to the project root
+            (e.g. ``threads/orders.thread``).
         thread_source: Primary source alias (first declared source).
         thread_sources_json: JSON array of all sources with type metadata.
         weave_name: Weave name (e.g. ``staging``).

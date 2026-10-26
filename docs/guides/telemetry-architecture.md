@@ -59,8 +59,9 @@ immutable -> collect: stored in collector
    `trace_id`.
 2. `collector.start_span("thread:dim_customer", parent_span_id=...)` returns
    a mutable `SpanBuilder` with an auto-generated `span_id`.
-3. During execution, the builder accumulates attributes (row counts, durations)
-   and events (sources_read, write_complete).
+3. During execution, the builder accumulates attributes (for example a
+   lookup's row count) and events (for example a hook step's `log` or a
+   failed step's `error`).
 4. `builder.finish(SpanStatus.OK)` stamps the end time and produces an
    immutable `ExecutionSpan`. The builder cannot be used after this call.
 5. The finished span is added to the collector.
@@ -169,7 +170,7 @@ Spark-bound runtime helpers ship in the **weevr** engine package.
 | `telemetry/span.py` | weevr-core | `ExecutionSpan`, `SpanEvent`, `SpanStatus`, ID generators |
 | `telemetry/collector.py` | weevr | `SpanBuilder` (mutable), `SpanCollector` (accumulator) |
 | `telemetry/trace.py` | weevr-core | Legacy tree wrappers — not constructed by the engine; use the telemetry tree |
-| `telemetry/logging.py` | weevr | `StructuredJsonFormatter`, `configure_logging`, `LogLevel` |
+| `telemetry/logging.py` | weevr | `StructuredJsonFormatter`, `configure_logging`, and the `LogLevel` → Python level mapping (`LogLevel` itself is defined in `weevr.model.execution` and re-exported from `weevr.telemetry`) |
 | `telemetry/results.py` | weevr-core | `ThreadTelemetry`, `WeaveTelemetry`, `LoomTelemetry`, `ValidationResult`, `AssertionResult`, `ExportResult`, `ColumnSetResult` |
 | `telemetry/events.py` | weevr-core | `LogEvent` model, `create_log_event` factory |
 

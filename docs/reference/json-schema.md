@@ -44,11 +44,11 @@ Schemas are committed as static files and verified by CI.
 To regenerate after model changes:
 
 ```bash
-python scripts/generate_schema.py
+uv run python scripts/generate_schema.py
 ```
 
 To check if schemas are up-to-date without writing:
 
 ```bash
-python scripts/generate_schema.py --check
+uv run python scripts/generate_schema.py --check
 ```

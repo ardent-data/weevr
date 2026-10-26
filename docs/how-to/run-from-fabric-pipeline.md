@@ -119,7 +119,7 @@ if result.status == "partial":
 
 ## Step 5 -- Pass runtime parameters
 
-Override parameter file values or inject execution-specific values through the
+Pass environment-specific and execution-specific values through the
 `params` argument:
 
 ```python

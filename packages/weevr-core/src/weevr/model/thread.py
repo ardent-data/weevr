@@ -43,7 +43,10 @@ class Thread(FrozenBase):
     )
     qualified_key: str = Field(
         default="",
-        description="Dot-separated namespace key, derived from directory path.",
+        description=(
+            "Path of the thread file relative to the project root "
+            "(e.g. threads/orders.thread). Set by the loader."
+        ),
     )
     template_ref: str | None = Field(
         default=None,

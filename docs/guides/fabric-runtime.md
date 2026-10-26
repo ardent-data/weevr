@@ -83,11 +83,12 @@ Fabric provides several ways to reference Lakehouse tables:
 target:
   path: Tables/dim_customer
 
-# Absolute abfss:// path — cross-Lakehouse or cross-workspace
+# Absolute abfss:// path — cross-Lakehouse or cross-workspace.
+# Delta sources take the table alias or the path in `alias`.
 sources:
   raw_orders:
     type: delta
-    path: "abfss://workspace@onelake.dfs.fabric.microsoft.com/lakehouse.Lakehouse/Tables/raw_orders"
+    alias: "abfss://workspace@onelake.dfs.fabric.microsoft.com/lakehouse.Lakehouse/Tables/raw_orders"
 ```
 
 !!! tip "Use variables for environment portability"
@@ -109,7 +110,7 @@ config_version: "1.0"
 sources:
   raw_customers:
     type: delta
-    path: "${bronze_base}/customers"
+    alias: "${bronze_base}/customers"
 
 target:
   path: "${silver_base}/stg_customers"
@@ -179,21 +180,21 @@ local: Local Development {
   style.fill: "#E3F2FD"
   spark_local: "SparkSession\nmaster('local[*]')" {style.fill: "#BBDEFB"}
   delta_local: "Delta Lake\n(filesystem)" {style.fill: "#BBDEFB"}
-  params_dev: "params_dev.yaml\nbronze_base: ./data/bronze\nsilver_base: ./data/silver" {style.fill: "#BBDEFB"}
+  params_dev: "Context(params=...)\nbronze_base: ./data/bronze\nsilver_base: ./data/silver" {style.fill: "#BBDEFB"}
 }
 
 staging: Staging Workspace {
   style.fill: "#FFF3E0"
   spark_stg: "Fabric Spark\n(managed session)" {style.fill: "#FFE0B2"}
   delta_stg: "Delta Lake\n(OneLake)" {style.fill: "#FFE0B2"}
-  params_stg: "params_stg.yaml\nbronze_base: abfss://stg-ws@...\nsilver_base: abfss://stg-ws@..." {style.fill: "#FFE0B2"}
+  params_stg: "Context(params=...)\nbronze_base: abfss://stg-ws@...\nsilver_base: abfss://stg-ws@..." {style.fill: "#FFE0B2"}
 }
 
 prod: Production Workspace {
   style.fill: "#E8F5E9"
   spark_prod: "Fabric Spark\n(managed session)" {style.fill: "#C8E6C9"}
   delta_prod: "Delta Lake\n(OneLake)" {style.fill: "#C8E6C9"}
-  params_prod: "params_prod.yaml\nbronze_base: abfss://prod-ws@...\nsilver_base: abfss://prod-ws@..." {style.fill: "#C8E6C9"}
+  params_prod: "Context(params=...)\nbronze_base: abfss://prod-ws@...\nsilver_base: abfss://prod-ws@..." {style.fill: "#C8E6C9"}
 }
 
 yaml: Same YAML Configs {
@@ -201,13 +202,13 @@ yaml: Same YAML Configs {
   note: |md
     Thread, weave, and loom configs
     are **identical** across environments.
-    Only parameter files differ.
+    Only the params passed to Context differ.
   |
 }
 
-yaml -> local: params_dev
-yaml -> staging: params_stg
-yaml -> prod: params_prod
+yaml -> local: dev params
+yaml -> staging: staging params
+yaml -> prod: prod params
 
 local -> staging: promote {style.stroke-dash: 3}
 staging -> prod: promote {style.stroke-dash: 3}
@@ -232,8 +233,9 @@ spark = (
 )
 ```
 
-Local Delta tables write to the filesystem. Use relative paths in your dev
-parameter file so that `Tables/stg_customers` resolves to a local directory.
+Local Delta tables write to the filesystem. Pass relative paths in the
+`params` you give `Context` for local runs, so that `Tables/stg_customers`
+resolves to a local directory.
 
 This approach lets you run the full weevr pipeline -- threads, weaves, and
 looms -- without a Fabric workspace. The same YAML configs work in both

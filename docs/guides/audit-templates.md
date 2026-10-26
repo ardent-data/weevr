@@ -62,7 +62,7 @@ thread runs, not when the config loads:
 | Variable | Value |
 |----------|-------|
 | `${thread.name}` | Thread name |
-| `${thread.qualified_key}` | Thread qualified key |
+| `${thread.qualified_key}` | Thread file path relative to the project root (e.g. `threads/orders.thread`) |
 | `${thread.source}` | Alias of the thread's first source |
 | `${thread.sources}` | JSON array of the thread's sources |
 | `${weave.name}` | Weave name (empty when the thread runs outside a weave) |
@@ -231,11 +231,21 @@ informational — it confirms that the built-in preset is not in use.
 
 ## Migration: `defaults.audit_columns`
 
-Configurations written before v1.8 may use `defaults.target.audit_columns` to
-cascade audit columns from the loom or weave level:
+Older configurations may cascade audit columns from the loom or weave level
+with `defaults.audit_columns`. That path is deprecated: it still works, but
+each load logs a deprecation warning. Move the block under
+`defaults.target.audit_columns`:
 
 ```yaml
-# Legacy pattern (still supported)
+# Deprecated (logs a warning)
+defaults:
+  audit_columns:
+    _loaded_at: "current_timestamp()"
+    _run_id: "${param.run_id}"
+```
+
+```yaml
+# Current
 defaults:
   target:
     audit_columns:
@@ -243,7 +253,7 @@ defaults:
       _run_id: "${param.run_id}"
 ```
 
-This pattern continues to work. However, `audit_templates` offers a cleaner
+`defaults.target.audit_columns` is fully supported. However, `audit_templates` offers a cleaner
 separation: the column definitions live in a named block rather than being
 embedded inside a `defaults.target` path. Consider migrating long-running
 configurations to templates when you need to reference the same set from

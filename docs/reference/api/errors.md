@@ -83,11 +83,13 @@ the entry. A `ReferenceResolutionError` for a missing file names the
 file that couldn't be found.
 
 ```python
+from pathlib import Path
+
 from weevr.config import load_config
 from weevr.errors import ConfigError
 
 try:
-    load_config("nightly.weave", project_root="project.weevr")
+    load_config("project.weevr/nightly.weave", project_root=Path("project.weevr"))
 except ConfigError as e:
     print(f"{e.file_path}: {e.message}")
 ```
@@ -252,8 +254,8 @@ default value.
 
 **Resolution:**
 
-1. Supply the missing parameter at runtime:
-   `ctx.run("daily.loom", params={"env": "prod"})`
+1. Supply the missing parameter at runtime through the context:
+   `Context(spark, "my-project.weevr", params={"env": "prod"})`
 2. Add a default value in the config: `${env:-dev}`
 3. Check for typos in the variable name
 
@@ -348,9 +350,13 @@ result = ctx.run("daily.loom", mode="validate")
 
 ### LookupResolutionError
 
-Raised when a thread references a lookup name that is not defined in the
-weave's `lookups` map. This is a fail-fast validation error caught during
-config resolution, before any data is read.
+Raised while a thread runs when a lookup can't be used: a source's
+`lookup` names a lookup the weave doesn't provide, a lookup's declared
+columns are missing from its source, a `unique_key` check fails with
+`on_failure: abort`, or `values` / `unique_key` is set without `key`.
+An undefined source `lookup` is not caught when the config loads (unlike
+a `resolve` step's `lookup`, which fails the load with a `ConfigError`),
+so it surfaces when the thread runs.
 
 **Common causes:**
 
@@ -608,7 +614,8 @@ the extra columns found.
 **Attributes:**
 
 - `drift_report` — `DriftReport` instance with `extra_columns`,
-  `action_taken`, `drift_mode`, and `baseline_source`
+  `action_taken`, `drift_mode`, `baseline_source`, and `findings` (one
+  entry per extra column, with `column` and `action`)
 - `thread_name` — name of the thread that failed
 
 **Common causes:**

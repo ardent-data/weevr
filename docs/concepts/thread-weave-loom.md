@@ -105,8 +105,8 @@ execution) belong to the weave level.
 !!! note "One target per thread"
 
     A thread always writes to exactly one primary target. If you need the
-    same data in multiple locations, use mirror outputs rather than
-    duplicating threads.
+    same data in multiple locations, use
+    [exports](../guides/exports.md) rather than duplicating threads.
 
 ## Weave -- a dependency graph over threads
 
@@ -164,6 +164,7 @@ execution:
   log_level: standard
 params:
   run_date:
+    name: run_date
     type: date
     required: true
 ```
@@ -190,8 +191,12 @@ For any property, the lowest-level declaration takes precedence:
 | Thread | That thread uses its own value, ignoring loom/weave defaults |
 
 Scalar values are replaced outright -- a thread value replaces a weave or
-loom value. Collection values (lists, maps) are also replaced entirely, not
-merged.
+loom value. Collection values (lists, maps) are replaced entirely by
+default. The exceptions merge by name -- each level extends the set, and a
+same-named entry at a lower level replaces the higher one:
+`audit_columns`, `exports`, and `connections` (merged when the config
+loads), plus `lookups` and `column_sets` (merged at run time across loom,
+weave, and thread) and loom and weave `variables`.
 
 !!! tip "Inheritance reduces repetition"
 

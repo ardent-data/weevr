@@ -24,7 +24,8 @@ validate_phase: Validate {
   parse: Parse
   resolve: Resolve
   check: Check DAG
-  parse -> resolve -> check
+  exists: Check sources exist
+  parse -> resolve -> check -> exists
 }
 
 plan_phase: Plan {
@@ -79,7 +80,7 @@ preview_phase -> preview_stop: {style.stroke-dash: 3; style.stroke: "#6A1B9A"}
 | Mode | What happens | Result contains |
 |------|-------------|-----------------|
 | `execute` | Full execution: read, transform, write (default) | Status, row counts, telemetry |
-| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets) — no data touched | `validation_errors` list |
+| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets), and check that every source exists (a metadata probe — no data is read) | `validation_errors` list |
 | `plan` | Build the execution plan and return it without running | `execution_plan` list, `summary()` with cache markers, `explain()` for detailed breakdown |
 | `preview` | Run transforms against sampled data, skip writes | `preview_data` DataFrames |
 
@@ -209,10 +210,11 @@ the same target state.
 
 !!! tip "SCD patterns"
 
-    SCD Type 1 and SCD Type 2 are not separate write modes. They are
-    delivered as reusable stitches that compose on top of the core merge
-    mode. See the [YAML Schema Reference](../reference/yaml-schema/thread.md)
-    for stitch usage.
+    SCD Type 1 and SCD Type 2 are not separate write modes. They come
+    from the target's `dimension` block, which builds on merge:
+    `track_history: true` versions changed rows (Type 2), and a change
+    detection group with `on_change: overwrite` updates rows in place
+    (Type 1). See the [Dimension Modeling guide](../guides/dimension-modeling.md).
 
 ## Load modes
 
@@ -288,9 +290,10 @@ subsequent runs, only rows where `modified_date` exceeds the stored
 watermark are read.
 
 Watermark loads require an explicit `write.mode` of `append` or `merge`.
-The default (`overwrite`) is rejected at validation time: each run would
-replace the whole target with only the incremental slice, silently
-discarding all previously loaded history.
+The default (`overwrite`) is rejected when the thread starts executing
+(not by `mode="validate"`): each run would replace the whole target with
+only the incremental slice, silently discarding all previously loaded
+history.
 
 The watermark is persisted in a configurable state store -- either as a
 Delta table property on the target or in a dedicated metadata table.
@@ -306,9 +309,11 @@ load:
 
 params:
   start_date:
+    name: start_date
     type: date
     required: true
   end_date:
+    name: end_date
     type: date
     required: true
 ```

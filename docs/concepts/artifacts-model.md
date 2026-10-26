@@ -100,7 +100,7 @@ to a physical location through variable injection:
 sources:
   customers:
     type: delta
-    alias: raw.customers       # resolved via params to a full path
+    alias: ${env.lakehouse}.customers   # env is a param you pass to Context
   orders_file:
     type: csv
     path: ${env.files_path}/orders/
@@ -112,9 +112,12 @@ File sources use a **path** that resolves to a OneLake file location.
 
 !!! tip "Environment-agnostic config"
 
-    By using `${env.*}` variables for lakehouse and path references,
-    the same thread configuration works across dev, staging, and prod.
-    Only the parameter files differ between environments.
+    `env` is not a built-in namespace; it is a nested parameter you pass,
+    for example `Context(spark, project, params={"env": {"lakehouse":
+    "bronze", "files_path": "Files/raw"}})`. With lakehouse and path
+    references written this way, the same thread configuration works
+    across dev, staging, and prod; only the params passed to `Context`
+    differ between environments.
 
 ## Target path resolution
 
@@ -141,8 +144,8 @@ Thread: fact_orders   →  Delta table: silver.fact_orders
 ```
 
 If the same target data needs to exist in multiple locations (cross-lakehouse
-replication, file exports), use mirror outputs on the thread rather than
-creating duplicate threads.
+replication, file exports), use [exports](../guides/exports.md) on the
+thread rather than creating duplicate threads.
 
 ## Next steps
 
