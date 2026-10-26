@@ -16,6 +16,8 @@ Threads can be used as **parameterized templates** via `as` and `params` on
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable thread name. Typically set by the weave that references this thread. |
+| `qualified_key` | `string` | -- | set by loader | Read-only. The thread file's path relative to the project root (for example `threads/orders.thread`). Populated at load; not set in YAML. |
+| `template_ref` | `string` | -- | set by loader | Read-only. The `ref` of the weave entry that loaded this thread, for telemetry and display. Populated at load; not set in YAML. |
 | `sources` | `dict[string, Source]` | yes | -- | Named data sources keyed by alias. Must contain at least one entry. |
 | `with` | `dict[string, SubPipeline]` | no | `null` | Named sub-pipelines (CTEs) resolved before the main steps pipeline. |
 | `steps` | `list[Step]` | no | `[]` | Ordered transformation pipeline |
@@ -55,7 +57,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
 | `dedup` | `DedupConfig` | no | `null` | Deduplication applied immediately after reading |
-| `connection` | `string` | conditional | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. |
+| `connection` | `string` | conditional | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. Connection sources read Delta tables only: omit `type` or set it to `"delta"`. |
 | `schema` | `string` | no | `null` | Schema override within the connection's lakehouse. Overrides `connection.default_schema`. |
 | `table` | `string` | conditional | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
 | `start` | `string` \| `int` | conditional | -- | Range start (inclusive). Required for generated types (`date_sequence`, `int_sequence`). |
@@ -173,6 +175,10 @@ object:
 - CTEs can chain: a later CTE's `from:` may name an earlier CTE.
 - Unused CTEs (not referenced by any join, union, or the main `steps`
   pipeline) produce a validation warning at parse time.
+- [`foreach`](#foreach) blocks are expanded only in the thread's
+  top-level `steps`. A `foreach` inside a `with:` sub-pipeline is not
+  expanded and fails the config load; write the steps out explicitly
+  there.
 
 ```yaml
 sources:
@@ -226,8 +232,9 @@ steps:
 
 An ordered list of transformation steps. Each step is a single-key object
 where the key identifies the step type. weevr supports 23 step types.
-In addition, [`foreach`](#foreach) macro blocks are accepted and expanded
-before model hydration.
+In addition, [`foreach`](#foreach) macro blocks are accepted in the
+top-level `steps` list and expanded before model hydration (not inside
+`with:` sub-pipelines).
 
 ### filter
 
@@ -804,8 +811,28 @@ item.
   ```
 
 `include_prefix` applies after all three forms and prepends a string
-to every included column name. `include_prefix` and dict/object rename
-are mutually exclusive per column.
+to every included column's final name — the renamed name when a dict or
+object rename is used (`region_name: region` with `include_prefix: dim_`
+produces `dim_region`). `include_prefix` requires `include` to be set.
+
+`on_invalid` and `on_unknown` must be different values; equal sentinels
+are rejected because they would make the resolution stats ambiguous.
+
+**`effective` (EffectiveConfig):** narrows the lookup to the matching SCD2
+row. Use exactly one of the two modes:
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `date_column` | `string` | cond. | `null` | Fact date column checked against the lookup's validity range |
+| `from` | `string` | cond. | `null` | Lookup column holding the range start (inclusive) |
+| `to` | `string` | cond. | `null` | Lookup column holding the range end (exclusive) |
+| `current` | `string` or `{column, value}` | cond. | `null` | Current-row flag: a column name (matches `true`), or `{column, value}` for a custom value |
+
+Date-range mode sets `date_column`, `from`, and `to` together (all or
+none) and checks the half-open interval `[from, to)`; a null `to` marks
+the open-ended current row. Current-flag mode
+sets only `current`. Setting both modes, or neither, fails the config
+load.
 
 See the [Resolve Step guide](../../guides/resolve.md) for
 detailed examples of all modes and features.
@@ -942,11 +969,11 @@ for detailed examples.
 | `track_history` | `bool` | no | `false` | Enable SCD versioning (close-and-insert) |
 | `change_detection` | `dict[string, GroupConfig]` | no | auto | Named change detection groups. Defaults to a single auto group (`on_change: version` if `track_history`, else `overwrite`). |
 | `previous_columns` | `dict[string, string]` | no | `null` | Map of output → source for prior-value tracking |
-| `additional_keys` | `dict[string, KeyConfig]` | no | `null` | Secondary hash key definitions |
+| `additional_keys` | `dict[string, AdditionalKeyConfig]` | no | `null` | Secondary hash key definitions (see below) |
 | `columns` | `ScdColumnConfig` | no | defaults | SCD column names: `valid_from` (`_valid_from`), `valid_to` (`_valid_to`), `is_current` (`_is_current`) |
 | `dates` | `ScdDateConfig` | no | defaults | SCD boundary dates: `min` (`1970-01-01`), `max` (`9999-12-31`) |
 | `seed_system_members` | `bool` | no | `false` | Insert Kimball sentinel rows on first write |
-| `system_members` | `list[SystemMember]` | no | defaults | Custom sentinel rows (`sk`, `code`, `label`). `sk` must be a negative integer. Defaults: -1/unknown, -2/not_applicable |
+| `system_members` | `list[SystemMemberConfig]` | no | defaults | Custom sentinel rows (`sk`, `code`, `label`). `sk` must be a negative integer. Defaults: -1/unknown, -2/not_applicable |
 | `label_column` | `string` | no | `null` | Column for system member labels |
 | `history_filter` | `bool` | no | `true` | No effect; merges always scope to current rows |
 
@@ -964,10 +991,27 @@ for detailed examples.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `name` | `string` | no | dict key | Output hash column name |
-| `algorithm` | `string` | no | `"sha256"` | Hash algorithm |
+| `algorithm` | `string` | no | `null` | Hash algorithm; when omitted the engine uses `sha256` |
 | `columns` | `list[string]` or `"auto"` | yes | -- | Columns to hash. `"auto"` selects remaining data columns. |
 | `on_change` | `string` | yes | -- | `"version"`, `"overwrite"`, or `"static"` |
 | `output` | `string` | no | `"native"` | Output type |
+
+**dimension.additional_keys entry:**
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | `string` | yes | -- | Output column name for the generated key |
+| `columns` | `list[string]` | yes | -- | Source columns to hash |
+| `algorithm` | `string` | no | `"sha256"` | Hash algorithm |
+| `output` | `string` | no | `"native"` | Output type: `"native"` or `"string"` |
+
+**dimension.system_members entry:**
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `sk` | `int` | yes | -- | Surrogate key value; must be negative |
+| `code` | `string` | yes | -- | Short business code (for example `UNKNOWN`) |
+| `label` | `string` | yes | -- | Human-readable label |
 
 !!! note "write/keys interaction"
     When `dimension:` is present, `write.match_keys`,
@@ -1130,7 +1174,7 @@ Incremental load configuration with watermark tracking.
 |-----|------|----------|---------|-------------|
 | `mode` | `string` | no | `"full"` | Load mode: `"full"`, `"incremental_watermark"`, `"incremental_parameter"`, `"cdc"` |
 | `watermark_column` | `string` | no | `null` | Column for watermark comparison. Required for `incremental_watermark`. May be combined with `cdc` mode when `cdc.operation_column` is set, to narrow the read window for append-only CDC history tables; rejected when `cdc.preset` is `"delta_cdf"`. |
-| `watermark_type` | `string` | no | `null` | Data type of the watermark column: `"timestamp"`, `"date"`, `"int"`, `"long"`. Required whenever `watermark_column` is set. |
+| `watermark_type` | `string` | no | `null` | Data type of the watermark column: `"timestamp"`, `"date"`, `"int"`, `"long"`. Required for `incremental_watermark`, and in `cdc` mode whenever `watermark_column` is set. |
 | `watermark_inclusive` | `bool` | no | `false` | Include rows equal to the last watermark value (use with merge/overwrite for idempotency) |
 | `watermark_store` | `WatermarkStoreConfig` | no | `null` | Watermark persistence backend |
 | `cdc` | `CdcConfig` | no | `null` | CDC configuration. Required when `mode` is `"cdc"`. |
@@ -1170,6 +1214,29 @@ delete rows participate in advancing the window.
 The `cdc.preset: delta_cdf` path is unchanged — it relies on Delta Change
 Data Feed's commit-version tracking and rejects `watermark_column` because
 the two mechanisms are redundant.
+
+### When load rules are checked
+
+Load-mode rules are enforced in two places:
+
+- **At config load** (`load_config`, `load_resolved`, `Context.load`, and
+  `mode="validate"`):
+    - `incremental_watermark` requires `watermark_column` and `watermark_type`.
+    - `cdc` requires a `cdc` block, and a `cdc` block is only valid when
+      `mode` is `cdc`.
+    - In `cdc` mode, `watermark_column` requires `watermark_type` and is
+      rejected with `preset: delta_cdf`.
+- **When the thread starts executing** — not reported by `load_config` or
+  `mode="validate"`; the run fails with an `ExecutionError`:
+    - `cdc` requires `write.mode: merge`.
+    - `cdc` with an explicit mapping that sets `update_value` or
+      `delete_value` requires `watermark_column`, so same-key changes have a
+      defined order (insert-only mappings and `delta_cdf` are exempt).
+    - `incremental_watermark` requires `write.mode` of `append` or `merge`;
+      the default `overwrite` is rejected because each run would replace the
+      target with only the new slice.
+    - `watermark_inclusive: true` with `write.mode: append` logs a warning
+      (re-read rows can duplicate).
 
 ```yaml
 # Incremental watermark load

@@ -288,9 +288,10 @@ subsequent runs, only rows where `modified_date` exceeds the stored
 watermark are read.
 
 Watermark loads require an explicit `write.mode` of `append` or `merge`.
-The default (`overwrite`) is rejected at validation time: each run would
-replace the whole target with only the incremental slice, silently
-discarding all previously loaded history.
+The default (`overwrite`) is rejected when the thread starts executing
+(not by `mode="validate"`): each run would replace the whole target with
+only the incremental slice, silently discarding all previously loaded
+history.
 
 The watermark is persisted in a configurable state store -- either as a
 Delta table property on the target or in a dedicated metadata table.

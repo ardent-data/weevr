@@ -143,8 +143,13 @@ For a weave or loom, every child it pulls in, whether referenced or
 inline, is hydrated and validated the same way, so a broken child fails
 the whole load. The error's `file_path` names the child's own file, or
 the file containing an inline definition.
-Incremental-mode constraints (e.g., CDC requires merge write mode) are
-checked as post-resolution cross-cutting validations.
+Incremental-mode constraints that span `load` and `write` (for example,
+CDC requires merge write mode, and watermark loads reject the default
+`overwrite`) are not part of the load. They are checked when the thread
+starts executing, so `load_config`, `load_resolved`, and
+`mode="validate"` do not report them; a violating config fails its run
+with an `ExecutionError`. See
+[When load rules are checked](../reference/yaml-schema/thread.md#when-load-rules-are-checked).
 
 ## Loading without running
 

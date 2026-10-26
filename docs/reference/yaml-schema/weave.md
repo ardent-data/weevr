@@ -335,8 +335,8 @@ Supported patterns: `snake_case`, `camelCase`, `PascalCase`,
 
 !!! warning "kebab-case requires backtick-quoting"
     Column names with hyphens must be backtick-quoted in Spark SQL
-    expressions (e.g., `` `my-column` ``). A validation warning is
-    emitted when `kebab-case` is selected.
+    expressions (e.g., `` `my-column` ``). A warning is logged at
+    runtime, when the naming step applies `kebab-case`.
 
 ### naming.reserved_words (ReservedWordConfig)
 

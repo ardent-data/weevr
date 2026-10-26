@@ -109,6 +109,8 @@ The top-level configuration unit for a single data pipeline.
 |-------|------|---------|-------------|
 | `config_version` | `str` | *required* | Schema version identifier |
 | `name` | `str` | `""` | Thread name |
+| `qualified_key` | `str` | set by loader | Read-only: the thread file's path relative to the project root |
+| `template_ref` | `str` | set by loader | Read-only: the `ref` of the weave entry that loaded this thread |
 | `sources` | `dict[str, Source]` | *required* | Named data sources |
 | `steps` | `list[Step]` | `[]` | Ordered transformation pipeline |
 | `target` | `Target` | *required* | Output destination |
@@ -145,13 +147,19 @@ same post-mapping, audit-injected DataFrame as the primary target.
 | `name` | `str` | *required* | Unique identifier (valid Python identifier) |
 | `description` | `str` | `None` | Human-readable label shown in `explain()` |
 | `type` | `str` | *required* | Output format: `delta`, `parquet`, `csv`, `json`, `orc` |
-| `path` | `str` | `None` | OneLake path. Required when `alias` is not set. Supports context variables. |
-| `alias` | `str` | `None` | Metastore alias. Delta type only, mutually exclusive with `path`. |
+| `path` | `str` | `None` | OneLake path. Supports context variables. |
+| `alias` | `str` | `None` | Metastore alias. Delta type only. |
+| `connection` | `str` | `None` | Name of a connection declared in `connections:`. Delta type only; requires `table`. |
+| `schema` | `str` | `None` | Schema override within the connection's lakehouse |
+| `table` | `str` | `None` | Table name within the connection's lakehouse; requires `connection` |
 | `mode` | `str` | `"overwrite"` | Write mode (only `overwrite` in v1) |
 | `partition_by` | `list[str]` | `None` | Partition columns (independent of primary target) |
 | `on_failure` | `str` | `"warn"` | `abort` fails the thread; `warn` logs and continues |
 | `enabled` | `bool` | `True` | Set to `false` to suppress an inherited export |
 | `options` | `dict[str, str]` | `None` | Format-specific Spark DataFrameWriter options |
+
+When an export is enabled, exactly one destination must be set: `path`,
+`alias`, or `connection` with `table`.
 
 **Related:** [Exports guide](../guides/exports.md)
 
@@ -206,7 +214,7 @@ set to `date_sequence` or `int_sequence`).
 | `path` | `str` | `None` | File path (required for file-based types) |
 | `options` | `dict[str, Any]` | `{}` | Spark reader options |
 | `dedup` | `DedupConfig` | `None` | Post-read deduplication |
-| `connection` | `str` | `None` | Named connection reference. Requires `table`. |
+| `connection` | `str` | `None` | Named connection reference. Requires `table`. Delta only: omit `type` or set it to `delta`. |
 | `schema` | `str` | `None` | Schema override within the connection's lakehouse |
 | `table` | `str` | `None` | Table name (required when `connection` is set) |
 | `start` | `str \| int` | `None` | Range start, inclusive (required for generated types) |
@@ -287,8 +295,8 @@ Incremental load mode and watermark tracking.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | `"full" \| "incremental_watermark" \| "incremental_parameter" \| "cdc"` | `"full"` | Load strategy |
-| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; required for generic `cdc` mappings that declare `update_value` or `delete_value` (orders same-key changes; insert-only mappings exempt); rejected when `cdc.preset` is `"delta_cdf"`. |
-| `watermark_type` | `"timestamp" \| "date" \| "int" \| "long"` | `None` | Watermark column data type. Required whenever `watermark_column` is set. |
+| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; required for generic `cdc` mappings that declare `update_value` or `delete_value` (orders same-key changes; insert-only mappings exempt; checked when the thread starts executing); rejected when `cdc.preset` is `"delta_cdf"`. |
+| `watermark_type` | `"timestamp" \| "date" \| "int" \| "long"` | `None` | Watermark column data type. Required for `incremental_watermark`, and in `cdc` mode whenever `watermark_column` is set. |
 | `watermark_inclusive` | `bool` | `False` | Include rows equal to last watermark |
 | `watermark_store` | `WatermarkStoreConfig` | `None` | Watermark persistence backend |
 | `cdc` | `CdcConfig` | `None` | CDC configuration |
@@ -307,6 +315,17 @@ Cross-field rules enforced at parse time:
   is set in cdc mode
 - `watermark_format` requires `watermark_column` and requires
   `watermark_type` to be `"timestamp"` or `"date"`
+- a `cdc` block is only valid when `mode == "cdc"`
+
+Cross-field rules enforced when the thread starts executing (not reported
+by `load_config` or `mode="validate"`; the run fails with an
+`ExecutionError`):
+
+- `mode == "cdc"` requires `write.mode: merge`
+- `mode == "cdc"` with a generic mapping that sets `update_value` or
+  `delete_value` requires `watermark_column`
+- `mode == "incremental_watermark"` requires `write.mode` of `append` or
+  `merge`; the default `overwrite` is rejected
 
 ### WatermarkStoreConfig
 
@@ -566,6 +585,8 @@ A collection of threads with shared lookups, hooks, and defaults.
 |-------|------|---------|-------------|
 | `name` | `str` | `""` | Thread name (required for inline definitions) |
 | `ref` | `str` | `None` | Path to an external `.thread` file |
+| `as` | `str` | `None` | Alias overriding the thread's effective name. Required when the same `ref` appears more than once. |
+| `params` | `dict[str, Any]` | `None` | Values injected into the thread's `${param.x}` namespace for this entry |
 | `dependencies` | `list[str]` | `None` | Explicit upstream thread names |
 | `condition` | `ConditionSpec` | `None` | Conditional execution gate |
 
@@ -621,9 +642,10 @@ and cascaded through the standard merge rules.
 | `lakehouse` | `str` | *required* | OneLake lakehouse GUID or `${param.*}` variable reference |
 | `default_schema` | `str` | `None` | Default schema applied to tables in this connection when none is set |
 
-`workspace` and `lakehouse` both support `${param.*}` and
-`${variable.*}` substitution so one declaration can serve multiple
-environments.
+`workspace` and `lakehouse` both accept `${param.*}` references to declared
+params, and the `${fabric.*}` runtime context (`${fabric.workspace_id}`,
+`${fabric.lakehouse_id}`) when running in Fabric, so one declaration can serve
+multiple environments.
 
 ---
 
@@ -662,7 +684,8 @@ loom or weave). The two modes are mutually exclusive.
 
 ## Lookup
 
-A weave-level named data definition referenced by threads via `source.lookup`.
+A named data definition declared at loom, weave, or thread level and referenced
+by threads via `source.lookup`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -680,7 +703,7 @@ A weave-level named data definition referenced by threads via `source.lookup`.
 ## HookStep
 
 Discriminated union of hook step types, dispatched on the `type` field.
-Used in weave `pre_steps` and `post_steps`.
+Used in `pre_steps` and `post_steps` at loom, weave, or thread level.
 
 ### QualityGateStep
 
@@ -726,7 +749,7 @@ Used in weave `pre_steps` and `post_steps`.
 
 ## VariableSpec
 
-Weave-scoped variable declaration. Set by hook steps via `set_var`,
+Variable declaration at loom, weave, or thread level. Set by hook steps via `set_var`,
 referenced as `${var.name}` in config expressions.
 
 | Field | Type | Default | Description |

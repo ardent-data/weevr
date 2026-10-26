@@ -121,8 +121,9 @@ On the first run, all rows are read. On subsequent runs, weevr reads only
 rows where the watermark column exceeds the stored high-water mark. The
 watermark state is persisted either as a Delta table property or in a
 dedicated metadata table. An explicit `write.mode` of `append` or `merge`
-is required — the `overwrite` default fails validation because it would
-replace the target with each incremental slice.
+is required — with the `overwrite` default the run fails when the thread
+starts executing, because each run would replace the target with only the
+incremental slice. `mode="validate"` does not catch this.
 
 Supported watermark types: `timestamp`, `date`, `int`, `long`.
 
