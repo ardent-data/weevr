@@ -224,11 +224,17 @@ preserved as literal `${...}` placeholders and resolved later at execution time:
 | `${var.*}` | Weave execution (VariableContext) | Thread steps, sources |
 | `${run.timestamp}` | Thread execution | Audit columns, export paths |
 | `${run.id}` | Thread execution | Audit columns, export paths |
+| `${thread.name}`, `${thread.qualified_key}`, `${thread.source}`, `${thread.sources}` | Thread execution | Audit columns, export paths |
+| `${weave.name}`, `${loom.name}` | Thread execution | Audit columns, export paths |
 
 The `run.*` namespace provides per-execution context: `${run.timestamp}` is an
 ISO 8601 UTC timestamp and `${run.id}` is a UUID4, both generated once per
 `execute_thread()` call. They are available in audit column expressions and
 export path templates.
+
+The hierarchy variables are deferred only when the parameter context doesn't supply
+them and no `:-default` is given; an unknown property such as `${thread.nme}` still
+fails at load.
 
 ## Design decisions
 

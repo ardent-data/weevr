@@ -7,6 +7,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from weevr.config.audit_templates import HIERARCHY_CONTEXT_KEYS
 from weevr.config.locations import ConfigLocation
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
@@ -212,6 +213,17 @@ VARIABLE_PATTERN = re.compile(r"\$\{([^}:]+?)(?::-(.*?))?\}")
 WHOLE_VALUE_PATTERN = re.compile(r"^\$\{([^}:]+?)(?::-(.*?))?\}$")
 
 
+def _resolved_at_execution(var_name: str) -> bool:
+    """Whether an unresolved ``${var_name}`` is left in place for execution time.
+
+    True for the hierarchy variables the execution-time resolver supplies
+    (``HIERARCHY_CONTEXT_KEYS``). Callers apply it only after the load-context
+    lookup and any ``:-default`` have missed, so configs that resolve at load
+    are unaffected.
+    """
+    return var_name in HIERARCHY_CONTEXT_KEYS
+
+
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
     context: dict[str, Any],
@@ -222,6 +234,11 @@ def resolve_variables(
     Supports:
     - ${var} - simple variable reference (error if not found)
     - ${var:-default} - variable with fallback default
+
+    Left in place for execution time: ``${var.*}`` and ``${run.*}``, and the known
+    hierarchy variables (``${thread.name}``, ``${weave.name}``, ``${loom.name}``, and
+    the rest of ``HIERARCHY_CONTEXT_KEYS``) when the context doesn't supply them and no
+    default is given.
 
     Args:
         config: Config structure to resolve (dict, list, str, or primitive)
@@ -259,11 +276,12 @@ def resolve_variables(
                 except KeyError as exc:
                     if default_value is not None:
                         return default_value
-                    else:
-                        raise VariableResolutionError(
-                            _unresolved_variable_message(var_name, context),
-                            config_key=var_name,
-                        ) from exc
+                    if _resolved_at_execution(var_name):
+                        return config
+                    raise VariableResolutionError(
+                        _unresolved_variable_message(var_name, context),
+                        config_key=var_name,
+                    ) from exc
             # var.* / run.* fall through to the existing sub() path below
 
         # Find all variable references in the string
@@ -284,11 +302,12 @@ def resolve_variables(
             except KeyError as exc:
                 if default_value is not None:
                     return default_value
-                else:
-                    raise VariableResolutionError(
-                        _unresolved_variable_message(var_name, context),
-                        config_key=var_name,
-                    ) from exc
+                if _resolved_at_execution(var_name):
+                    return match.group(0)
+                raise VariableResolutionError(
+                    _unresolved_variable_message(var_name, context),
+                    config_key=var_name,
+                ) from exc
 
         return VARIABLE_PATTERN.sub(replace_var, config)
 

@@ -1861,3 +1861,49 @@ class TestPreviewPartialMetadata:
         html_out = result._repr_html_()
         assert html_out is not None
         assert ">3<" in html_out
+
+
+@pytest.mark.spark
+class TestHierarchyVariablesAtExecution:
+    """Hierarchy variables in a YAML config load, then resolve when the thread runs.
+
+    Runs through a loom, which supplies loom, weave, and thread names to the thread.
+    """
+
+    def test_export_path_and_audit_column_resolve(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        tgt = str(tmp_path / "tgt_hier")
+        archive = tmp_path / "archive"
+        thread_dir = project / "threads"
+        thread_dir.mkdir()
+        (thread_dir / "orders.thread").write_text(
+            f"""\
+config_version: "1.0"
+sources:
+  main:
+    type: delta
+    alias: "{one_row_src}"
+target:
+  path: "{tgt}"
+  audit_columns:
+    _src_thread: "'${{thread.name}}'"
+write:
+  mode: overwrite
+exports:
+  - name: archive
+    type: parquet
+    path: "{archive}/${{loom.name}}/${{weave.name}}/${{thread.name}}"
+"""
+        )
+        _create_weave_yaml(project, "daily", ["orders"])
+        loom_yaml = _create_loom_yaml(project, "nightly", ["daily"])
+
+        result = Context(spark=spark, project=project).run(loom_yaml)
+
+        assert result.status == "success"
+        written = spark.read.format("delta").load(tgt).collect()
+        assert [r["_src_thread"] for r in written] == ["orders"]
+        exported = spark.read.parquet(str(archive / "nightly" / "daily" / "orders"))
+        assert exported.count() == 1

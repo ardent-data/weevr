@@ -1,9 +1,16 @@
 """Tests for variable resolver."""
 
+import dataclasses
 from pathlib import Path
 
 import pytest
 
+from weevr.config.audit_templates import (
+    CONTEXT_VARIABLE_FIELDS,
+    HIERARCHY_CONTEXT_KEYS,
+    AuditContext,
+    resolve_context_variables,
+)
 from weevr.config.resolver import (
     build_param_context,
     resolve_declared_params,
@@ -1514,6 +1521,77 @@ class TestRunVariableSkip:
         config = {"path": "/lakehouse/${env}/${run.timestamp}"}
         result = resolve_variables(config, {"env": "prod"})
         assert result["path"] == "/lakehouse/prod/${run.timestamp}"
+
+
+class TestHierarchyVariableDeferral:
+    """Execution-time hierarchy variables survive config-load resolution."""
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "thread.name",
+            "thread.qualified_key",
+            "thread.source",
+            "thread.sources",
+            "weave.name",
+            "loom.name",
+        ],
+    )
+    def test_embedded_reference_preserved(self, name: str) -> None:
+        config = {"path": f"/archive/${{{name}}}/data"}
+        assert resolve_variables(config, {}) == config
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "thread.name",
+            "thread.qualified_key",
+            "thread.source",
+            "thread.sources",
+            "weave.name",
+            "loom.name",
+        ],
+    )
+    def test_whole_value_reference_preserved(self, name: str) -> None:
+        config = {"label": f"${{{name}}}"}
+        assert resolve_variables(config, {}) == config
+
+    def test_mixed_with_params_and_run_vars(self) -> None:
+        config = {"path": "/${env}/${loom.name}/${thread.name}/${run.timestamp}"}
+        result = resolve_variables(config, {"env": "prod"})
+        assert result["path"] == "/prod/${loom.name}/${thread.name}/${run.timestamp}"
+
+    def test_unknown_property_still_raises(self) -> None:
+        with pytest.raises(VariableResolutionError, match="thread.nme"):
+            resolve_variables({"path": "/archive/${thread.nme}"}, {})
+
+    def test_default_still_resolves_at_load(self) -> None:
+        config = {"path": "/archive/${thread.name:-fallback}", "label": "${weave.name:-w}"}
+        result = resolve_variables(config, {})
+        assert result == {"path": "/archive/fallback", "label": "w"}
+
+    def test_load_context_value_still_wins(self) -> None:
+        """A context that supplies the name resolves it at load, as before."""
+        config = {"path": "/archive/${thread.name}", "label": "${thread.name}"}
+        result = resolve_variables(config, {"thread": {"name": "from_params"}})
+        assert result == {"path": "/archive/from_params", "label": "from_params"}
+
+    def test_every_deferred_name_resolves_at_execution(self) -> None:
+        """Nothing deferred at load is left unresolved by the execution-time resolver."""
+        ctx = AuditContext(
+            thread_name="t",
+            thread_qualified_key="w.t",
+            thread_source="src",
+            thread_sources_json="[]",
+            weave_name="w",
+            loom_name="l",
+        )
+        assert HIERARCHY_CONTEXT_KEYS
+        assert set(CONTEXT_VARIABLE_FIELDS.values()) <= {
+            f.name for f in dataclasses.fields(AuditContext)
+        }
+        for name in HIERARCHY_CONTEXT_KEYS:
+            assert "${" not in resolve_context_variables(f"${{{name}}}", ctx), name
 
 
 class TestThreadParameterizationE2E:
