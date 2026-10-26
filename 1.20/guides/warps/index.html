@@ -2094,6 +2094,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#top-level-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#keys-section" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3026,6 +3037,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#top-level-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#keys-section" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3251,6 +3273,49 @@ a list of column declarations.</p>
 <td>No</td>
 <td><code>false</code></td>
 <td>Set by adaptive drift auto-gen</td>
+</tr>
+</tbody>
+</table>
+<h3 id="top-level-fields">Top-level fields<a class="headerlink" href="#top-level-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config_version</code></td>
+<td>Yes</td>
+<td>—</td>
+<td>Schema version (<code>"1.0"</code>)</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>No</td>
+<td>—</td>
+<td>Human-readable description of the contract</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td>Yes</td>
+<td>—</td>
+<td>Column declarations (see above)</td>
+</tr>
+<tr>
+<td><code>keys</code></td>
+<td>No</td>
+<td>—</td>
+<td>Surrogate and business key metadata (see below)</td>
+</tr>
+<tr>
+<td><code>auto_generated</code></td>
+<td>No</td>
+<td><code>false</code></td>
+<td>Set to <code>true</code> on warps weevr generates from pipeline output</td>
 </tr>
 </tbody>
 </table>

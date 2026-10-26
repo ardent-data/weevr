@@ -4174,8 +4174,8 @@ settings override these.</p>
 <div class="admonition warning">
 <p class="admonition-title">kebab-case requires backtick-quoting</p>
 <p>Column names with hyphens must be backtick-quoted in Spark SQL
-expressions (e.g., <code>`my-column`</code>). A validation warning is
-emitted when <code>kebab-case</code> is selected.</p>
+expressions (e.g., <code>`my-column`</code>). A warning is logged at
+runtime, when the naming step applies <code>kebab-case</code>.</p>
 </div>
 <h3 id="namingreserved_words-reservedwordconfig">naming.reserved_words (ReservedWordConfig)<a class="headerlink" href="#namingreserved_words-reservedwordconfig" title="Permanent link">&para;</a></h3>
 <table>

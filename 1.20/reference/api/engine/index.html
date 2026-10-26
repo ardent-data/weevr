@@ -3590,17 +3590,19 @@
 <p>The <code>weevr.engine</code> module contains the execution planner and executor. It
 resolves the thread dependency DAG, schedules execution order, and runs each
 thread through its read-transform-write lifecycle. The engine also handles
-pre/post weave hooks, lookup pre-materialization, conditional thread
-execution, and weave-scoped variable binding.</p>
+pre/post hooks, lookup pre-materialization, conditional execution, and
+variable binding at loom, weave, and thread level.</p>
 <div class="admonition note">
 <p class="admonition-title">Wheel provenance</p>
 <p><code>weevr.engine</code> is <em>federated</em> across both PyPI distributions.
-<code>ExecutionPlan</code> and <code>build_plan</code> (along with the duration and
-column-name formatters) ship from <strong><code>weevr-core</code></strong> and import without
-PySpark — useful for tools that visualize a plan without running it.
-The remaining symbols on this page (executor, runner, cache, display,
-hooks, lookups, conditions, column sets, resources, result, variables)
-ship from <strong><code>weevr</code></strong> and require Spark at runtime.</p>
+<code>ExecutionPlan</code> and <code>build_plan</code> ship from <strong><code>weevr-core</code></strong> and
+import without PySpark — useful for tools that visualize a plan
+without running it. The other symbols on this page
+(<code>execute_thread</code>, <code>execute_weave</code>, <code>execute_loom</code>, the
+<code>ThreadResult</code> / <code>WeaveResult</code> / <code>LoomResult</code> models, <code>CacheManager</code>,
+<code>DAGDiagram</code>, and <code>FlowDiagram</code>) ship from <strong><code>weevr</code></strong> and require
+Spark at runtime. Hooks, lookups, conditions, and variables run
+inside the executor and runner and are not part of the public API.</p>
 </div>
 
 

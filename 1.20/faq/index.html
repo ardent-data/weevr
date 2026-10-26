@@ -3243,8 +3243,8 @@ extension:</p>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
 </code></pre></div>
-<p>The same YAML configs work in both local Spark and Fabric. Use parameter
-files to swap environment-specific paths. See the
+<p>The same YAML configs work in both local Spark and Fabric. Pass
+environment-specific paths through <code>Context(..., params={...})</code>. See the
 <a href="../guides/fabric-runtime/">Fabric Runtime</a> guide for details.</p>
 <hr />
 <h2 id="how-does-configuration-inheritance-work">How does configuration inheritance work?<a class="headerlink" href="#how-does-configuration-inheritance-work" title="Permanent link">&para;</a></h2>
@@ -3253,10 +3253,12 @@ files to swap environment-specific paths. See the
 <p>A loom can define default write modes, execution settings, and audit
 columns. A weave can override any of those. A thread can override
 anything the weave set. Scalar values are replaced outright; collections
-(lists, maps) are also replaced entirely, not merged. The exceptions are
-<code>audit_columns</code> and <code>exports</code>, which use <strong>additive merge</strong> -- each
-level extends the set, and same-named entries at a lower level override
-those from the higher level.</p>
+(lists, maps) are replaced entirely by default. The exceptions use
+<strong>additive merge</strong> -- each level extends the set, and same-named entries
+at a lower level override those from the higher level:
+<code>audit_columns</code>, <code>exports</code>, and <code>connections</code> (merged when the config
+loads), plus <code>lookups</code> and <code>column_sets</code> (merged at run time across loom,
+weave, and thread) and loom and weave <code>variables</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Loom default:   write.mode = overwrite
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  └─ Weave:     write.mode = merge       ← overrides loom
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>       └─ Thread A: (inherits merge)
@@ -3309,22 +3311,18 @@ watermark column and type on the thread's load block:</p>
 rows where the watermark column exceeds the stored high-water mark. The
 watermark state is persisted either as a Delta table property or in a
 dedicated metadata table. An explicit <code>write.mode</code> of <code>append</code> or <code>merge</code>
-is required — the <code>overwrite</code> default fails validation because it would
-replace the target with each incremental slice.</p>
+is required — with the <code>overwrite</code> default the run fails when the thread
+starts executing, because each run would replace the target with only the
+incremental slice. <code>mode="validate"</code> does not catch this.</p>
 <p>Supported watermark types: <code>timestamp</code>, <code>date</code>, <code>int</code>, <code>long</code>.</p>
 <hr />
 <h2 id="can-i-mix-python-code-with-yaml-configuration">Can I mix Python code with YAML configuration?<a class="headerlink" href="#can-i-mix-python-code-with-yaml-configuration" title="Permanent link">&para;</a></h2>
-<p>Yes. weevr supports two extension points for custom logic:</p>
-<ul>
-<li><strong>Helper functions</strong> -- Registered Python functions that can be called
-  from Spark SQL expressions in your YAML config (e.g., in <code>derive</code>,
-  <code>filter</code>, or <code>condition</code> expressions).</li>
-<li><strong>UDFs</strong> -- User-defined functions registered with Spark that can be
-  used in any expression context.</li>
-</ul>
-<p>Both are registered through the project-level configuration and are
-available across all threads in a loom execution. Custom helpers and UDFs
-live in your integration project alongside the YAML configs.</p>
+<p>Not through weevr configuration: there is no helper or UDF registry, and
+no step type runs Python. Expressions in YAML are Spark SQL evaluated in
+your Spark session, so a function you register with Spark
+(<code>spark.udf.register(...)</code>) before calling <code>ctx.run</code> can be called from
+<code>derive</code>, <code>filter</code>, and other expressions. Any other Python runs in the
+notebook before or after <code>ctx.run</code>.</p>
 <hr />
 <h2 id="how-do-i-debug-a-failing-thread">How do I debug a failing thread?<a class="headerlink" href="#how-do-i-debug-a-failing-thread" title="Permanent link">&para;</a></h2>
 <p>Start by checking the <code>RunResult</code>:</p>
@@ -3337,9 +3335,10 @@ live in your integration project alongside the YAML configs.</p>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">)</span>
 </code></pre></div>
 <p>At <code>verbose</code> level, weevr logs every step of execution -- source reads,
-transform steps, validation outcomes, and write operations. You can also
-inspect the execution span on the thread's telemetry object, which
-contains timing, status, and error attributes.</p>
+transform steps, validation outcomes, and write operations. The failure
+message for each failed thread is in its <code>ThreadResult.error</code> (under
+<code>result.detail</code>); a failed thread has no telemetry entry. See
+<a href="../guides/observability/#debugging-a-failing-pipeline">Debugging a failing pipeline</a>.</p>
 <p>For transform logic issues, use preview mode to run against sampled data
 without writing:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"preview"</span><span class="p">)</span>

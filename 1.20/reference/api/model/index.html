@@ -4665,10 +4665,14 @@
 
 
 <h1 id="model-api">Model API<a class="headerlink" href="#model-api" title="Permanent link">&para;</a></h1>
-<p>The <code>weevr.model</code> package contains all Pydantic domain models that represent
+<p>The <code>weevr.model</code> package exports the Pydantic domain models that represent
 the configuration structure -- threads, weaves, looms, pipeline steps, sources,
 targets, hooks, lookups, exports, variables, failure configuration, and
-supporting types.</p>
+supporting types. The warp contract models (<code>.warp</code> files and the drift
+report) are not exported here: see the <a href="../../../guides/warps/">Warps guide</a>
+for the <code>.warp</code> format, and
+<a href="../errors/#schemadrifterror"><code>SchemaDriftError</code></a> for the drift report's
+fields.</p>
 
 
 <div class="doc doc-object doc-module">

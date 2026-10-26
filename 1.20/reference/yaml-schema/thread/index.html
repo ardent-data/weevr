@@ -1482,6 +1482,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#when-load-rules-are-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When load rules are checked
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4046,6 +4057,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#when-load-rules-are-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When load rules are checked
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4225,6 +4247,20 @@ target. This page documents every key accepted inside a thread YAML file.</p>
 <td>no</td>
 <td><code>""</code></td>
 <td>Human-readable thread name. Typically set by the weave that references this thread.</td>
+</tr>
+<tr>
+<td><code>qualified_key</code></td>
+<td><code>string</code></td>
+<td>--</td>
+<td>set by loader</td>
+<td>Read-only. The thread file's path relative to the project root (for example <code>threads/orders.thread</code>). Populated at load; not set in YAML.</td>
+</tr>
+<tr>
+<td><code>template_ref</code></td>
+<td><code>string</code></td>
+<td>--</td>
+<td>set by loader</td>
+<td>Read-only. The <code>ref</code> of the weave entry that loaded this thread, for telemetry and display. Populated at load; not set in YAML.</td>
 </tr>
 <tr>
 <td><code>sources</code></td>
@@ -4451,7 +4487,7 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <td><code>string</code></td>
 <td>conditional</td>
 <td><code>null</code></td>
-<td>Name of a connection declared in <code>connections:</code>. Requires <code>table</code>. Mutually exclusive with <code>alias</code>.</td>
+<td>Name of a connection declared in <code>connections:</code>. Requires <code>table</code>. Mutually exclusive with <code>alias</code>. Connection sources read Delta tables only: omit <code>type</code> or set it to <code>"delta"</code>.</td>
 </tr>
 <tr>
 <td><code>schema</code></td>
@@ -4712,6 +4748,10 @@ object:</p>
 <li>CTEs can chain: a later CTE's <code>from:</code> may name an earlier CTE.</li>
 <li>Unused CTEs (not referenced by any join, union, or the main <code>steps</code>
   pipeline) produce a validation warning at parse time.</li>
+<li><a href="#foreach"><code>foreach</code></a> blocks are expanded only in the thread's
+  top-level <code>steps</code>. A <code>foreach</code> inside a <code>with:</code> sub-pipeline is not
+  expanded and fails the config load; write the steps out explicitly
+  there.</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">sources</span><span class="p">:</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">invoices</span><span class="p">:</span>
@@ -4761,8 +4801,9 @@ object:</p>
 <h2 id="steps">steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
 <p>An ordered list of transformation steps. Each step is a single-key object
 where the key identifies the step type. weevr supports 23 step types.
-In addition, <a href="#foreach"><code>foreach</code></a> macro blocks are accepted and expanded
-before model hydration.</p>
+In addition, <a href="#foreach"><code>foreach</code></a> macro blocks are accepted in the
+top-level <code>steps</code> list and expanded before model hydration (not inside
+<code>with:</code> sub-pipelines).</p>
 <h3 id="filter">filter<a class="headerlink" href="#filter" title="Permanent link">&para;</a></h3>
 <p>Filter rows using a Spark SQL expression.</p>
 <table>
@@ -6087,8 +6128,59 @@ item.</p>
 <a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> column</span><span class="p">:</span><span class="w"> </span><span class="nv">country_code</span><span class="p p-Indicator">,</span><span class="nt"> as</span><span class="p">:</span><span class="w"> </span><span class="nv">iso_country</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p><code>include_prefix</code> applies after all three forms and prepends a string
-to every included column name. <code>include_prefix</code> and dict/object rename
-are mutually exclusive per column.</p>
+to every included column's final name — the renamed name when a dict or
+object rename is used (<code>region_name: region</code> with <code>include_prefix: dim_</code>
+produces <code>dim_region</code>). <code>include_prefix</code> requires <code>include</code> to be set.</p>
+<p><code>on_invalid</code> and <code>on_unknown</code> must be different values; equal sentinels
+are rejected because they would make the resolution stats ambiguous.</p>
+<p><strong><code>effective</code> (EffectiveConfig):</strong> narrows the lookup to the matching SCD2
+row. Use exactly one of the two modes:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>date_column</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td><code>null</code></td>
+<td>Fact date column checked against the lookup's validity range</td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td><code>null</code></td>
+<td>Lookup column holding the range start (inclusive)</td>
+</tr>
+<tr>
+<td><code>to</code></td>
+<td><code>string</code></td>
+<td>cond.</td>
+<td><code>null</code></td>
+<td>Lookup column holding the range end (exclusive)</td>
+</tr>
+<tr>
+<td><code>current</code></td>
+<td><code>string</code> or <code>{column, value}</code></td>
+<td>cond.</td>
+<td><code>null</code></td>
+<td>Current-row flag: a column name (matches <code>true</code>), or <code>{column, value}</code> for a custom value</td>
+</tr>
+</tbody>
+</table>
+<p>Date-range mode sets <code>date_column</code>, <code>from</code>, and <code>to</code> together (all or
+none) and checks the half-open interval <code>[from, to)</code>; a null <code>to</code> marks
+the open-ended current row. Current-flag mode
+sets only <code>current</code>. Setting both modes, or neither, fails the config
+load.</p>
 <p>See the <a href="../../../guides/resolve/">Resolve Step guide</a> for
 detailed examples of all modes and features.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>
@@ -6490,10 +6582,10 @@ for detailed examples.</p>
 </tr>
 <tr>
 <td><code>additional_keys</code></td>
-<td><code>dict[string, KeyConfig]</code></td>
+<td><code>dict[string, AdditionalKeyConfig]</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Secondary hash key definitions</td>
+<td>Secondary hash key definitions (see below)</td>
 </tr>
 <tr>
 <td><code>columns</code></td>
@@ -6518,7 +6610,7 @@ for detailed examples.</p>
 </tr>
 <tr>
 <td><code>system_members</code></td>
-<td><code>list[SystemMember]</code></td>
+<td><code>list[SystemMemberConfig]</code></td>
 <td>no</td>
 <td>defaults</td>
 <td>Custom sentinel rows (<code>sk</code>, <code>code</code>, <code>label</code>). <code>sk</code> must be a negative integer. Defaults: -1/unknown, -2/not_applicable</td>
@@ -6604,8 +6696,8 @@ for detailed examples.</p>
 <td><code>algorithm</code></td>
 <td><code>string</code></td>
 <td>no</td>
-<td><code>"sha256"</code></td>
-<td>Hash algorithm</td>
+<td><code>null</code></td>
+<td>Hash algorithm; when omitted the engine uses <code>sha256</code></td>
 </tr>
 <tr>
 <td><code>columns</code></td>
@@ -6627,6 +6719,83 @@ for detailed examples.</p>
 <td>no</td>
 <td><code>"native"</code></td>
 <td>Output type</td>
+</tr>
+</tbody>
+</table>
+<p><strong>dimension.additional_keys entry:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Output column name for the generated key</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>list[string]</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Source columns to hash</td>
+</tr>
+<tr>
+<td><code>algorithm</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"sha256"</code></td>
+<td>Hash algorithm</td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>string</code></td>
+<td>no</td>
+<td><code>"native"</code></td>
+<td>Output type: <code>"native"</code> or <code>"string"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>dimension.system_members entry:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sk</code></td>
+<td><code>int</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Surrogate key value; must be negative</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Short business code (for example <code>UNKNOWN</code>)</td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td><code>string</code></td>
+<td>yes</td>
+<td>--</td>
+<td>Human-readable label</td>
 </tr>
 </tbody>
 </table>
@@ -7008,7 +7177,7 @@ types with different fields.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Data type of the watermark column: <code>"timestamp"</code>, <code>"date"</code>, <code>"int"</code>, <code>"long"</code>. Required whenever <code>watermark_column</code> is set.</td>
+<td>Data type of the watermark column: <code>"timestamp"</code>, <code>"date"</code>, <code>"int"</code>, <code>"long"</code>. Required for <code>incremental_watermark</code>, and in <code>cdc</code> mode whenever <code>watermark_column</code> is set.</td>
 </tr>
 <tr>
 <td><code>watermark_inclusive</code></td>
@@ -7138,6 +7307,34 @@ delete rows participate in advancing the window.</p>
 <p>The <code>cdc.preset: delta_cdf</code> path is unchanged — it relies on Delta Change
 Data Feed's commit-version tracking and rejects <code>watermark_column</code> because
 the two mechanisms are redundant.</p>
+<h3 id="when-load-rules-are-checked">When load rules are checked<a class="headerlink" href="#when-load-rules-are-checked" title="Permanent link">&para;</a></h3>
+<p>Load-mode rules are enforced in two places:</p>
+<ul>
+<li><strong>At config load</strong> (<code>load_config</code>, <code>load_resolved</code>, <code>Context.load</code>, and
+  <code>mode="validate"</code>):<ul>
+<li><code>incremental_watermark</code> requires <code>watermark_column</code> and <code>watermark_type</code>.</li>
+<li><code>cdc</code> requires a <code>cdc</code> block, and a <code>cdc</code> block is only valid when
+  <code>mode</code> is <code>cdc</code>.</li>
+<li>In <code>cdc</code> mode, <code>watermark_column</code> requires <code>watermark_type</code> and is
+  rejected with <code>preset: delta_cdf</code>.</li>
+<li><code>watermark_format</code> requires <code>watermark_column</code>, and <code>watermark_type</code>
+  of <code>timestamp</code> or <code>date</code>.</li>
+</ul>
+</li>
+<li><strong>When the thread starts executing</strong> — not reported by <code>load_config</code> or
+  <code>mode="validate"</code>; the run fails with an <code>ExecutionError</code>:<ul>
+<li><code>cdc</code> requires <code>write.mode: merge</code>.</li>
+<li><code>cdc</code> with an explicit mapping that sets <code>update_value</code> or
+  <code>delete_value</code> requires <code>watermark_column</code>, so same-key changes have a
+  defined order (insert-only mappings and <code>delta_cdf</code> are exempt).</li>
+<li><code>incremental_watermark</code> requires <code>write.mode</code> of <code>append</code> or <code>merge</code>;
+  the default <code>overwrite</code> is rejected because each run would replace the
+  target with only the new slice.</li>
+<li><code>watermark_inclusive: true</code> with <code>write.mode: append</code> logs a warning
+  (re-read rows can duplicate).</li>
+</ul>
+</li>
+</ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="c1"># Incremental watermark load</span>
 <a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="nt">load</span><span class="p">:</span>
 <a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_watermark</span>
@@ -7578,14 +7775,14 @@ at multiple levels, the most-specific level wins.</p>
 <td><code>string</code></td>
 <td>yes</td>
 <td>--</td>
-<td>OneLake workspace GUID or <code>${fabric.workspace_id}</code> variable.</td>
+<td>OneLake workspace GUID, a <code>${param.*}</code> reference to a declared param, or <code>${fabric.workspace_id}</code>.</td>
 </tr>
 <tr>
 <td><code>lakehouse</code></td>
 <td><code>string</code></td>
 <td>yes</td>
 <td>--</td>
-<td>OneLake lakehouse GUID or <code>${fabric.lakehouse_id}</code> variable.</td>
+<td>OneLake lakehouse GUID, a <code>${param.*}</code> reference to a declared param, or <code>${fabric.lakehouse_id}</code>.</td>
 </tr>
 <tr>
 <td><code>default_schema</code></td>

@@ -3399,9 +3399,10 @@ filters apply when present together.</p>
 <a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">category</span>
 <a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">include_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">"plant_"</span>
 </code></pre></div>
-<p><code>include</code> supports list (keep names), dict (rename), or
-string sugar (single column). <code>include_prefix</code> prepends a
-string to all included column names.</p>
+<p><code>include</code> supports list (keep names), dict (rename), a list of
+<code>{column, as}</code> objects (rename), or string sugar (single column).
+<code>include_prefix</code> prepends a string to every included column's final
+name, after any rename, and requires <code>include</code>.</p>
 <h2 id="normalization">Normalization<a class="headerlink" href="#normalization" title="Permanent link">&para;</a></h2>
 <p>Normalize both source and lookup BK columns before joining:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">resolve</span><span class="p">:</span>

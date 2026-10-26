@@ -3090,8 +3090,10 @@
 
 <h1 id="state-api">State API<a class="headerlink" href="#state-api" title="Permanent link">&para;</a></h1>
 <p>The <code>weevr.state</code> module manages watermark persistence for incremental loads.
-It supports multiple storage backends including Delta table properties and
-dedicated metadata tables.</p>
+<code>resolve_store</code> returns the <code>WatermarkStore</code> for a thread's <code>load</code> config:
+Delta table properties on the target (the default) or a dedicated metadata
+table (<code>watermark_store.type: metadata_table</code>). The concrete store classes
+are internal; use the <code>WatermarkStore</code> interface.</p>
 
 
 <div class="doc doc-object doc-module">

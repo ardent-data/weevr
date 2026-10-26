@@ -3343,7 +3343,7 @@ thread runs, not when the config loads:</p>
 </tr>
 <tr>
 <td><code>${thread.qualified_key}</code></td>
-<td>Thread qualified key</td>
+<td>Thread file path relative to the project root (e.g. <code>threads/orders.thread</code>)</td>
 </tr>
 <tr>
 <td><code>${thread.source}</code></td>
@@ -3486,16 +3486,24 @@ shadowing of shipped defaults:</p>
 <p>The user-defined template always takes precedence. The warning is
 informational — it confirms that the built-in preset is not in use.</p>
 <h2 id="migration-defaultsaudit_columns">Migration: <code>defaults.audit_columns</code><a class="headerlink" href="#migration-defaultsaudit_columns" title="Permanent link">&para;</a></h2>
-<p>Configurations written before v1.8 may use <code>defaults.target.audit_columns</code> to
-cascade audit columns from the loom or weave level:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Legacy pattern (still supported)</span>
+<p>Older configurations may cascade audit columns from the loom or weave level
+with <code>defaults.audit_columns</code>. That path is deprecated: it still works, but
+each load logs a deprecation warning. Move the block under
+<code>defaults.target.audit_columns</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Deprecated (logs a warning)</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">defaults</span><span class="p">:</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">audit_columns</span><span class="p">:</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">audit_columns</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
 </code></pre></div>
-<p>This pattern continues to work. However, <code>audit_templates</code> offers a cleaner
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Current</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">defaults</span><span class="p">:</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">audit_columns</span><span class="p">:</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="nt">_loaded_at</span><span class="p">:</span><span class="w"> </span><span class="s">"current_timestamp()"</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="nt">_run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"${param.run_id}"</span>
+</code></pre></div>
+<p><code>defaults.target.audit_columns</code> is fully supported. However, <code>audit_templates</code> offers a cleaner
 separation: the column definitions live in a named block rather than being
 embedded inside a <code>defaults.target</code> path. Consider migrating long-running
 configurations to templates when you need to reference the same set from

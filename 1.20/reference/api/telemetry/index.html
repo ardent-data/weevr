@@ -3854,8 +3854,10 @@
 
 <h1 id="telemetry-api">Telemetry API<a class="headerlink" href="#telemetry-api" title="Permanent link">&para;</a></h1>
 <p>The <code>weevr.telemetry</code> module provides structured logging, execution span
-tracking, and progress reporting. Telemetry settings cascade through the
-loom/weave/thread hierarchy via <code>ExecutionConfig</code>.</p>
+tracking, and the telemetry result types attached to a run
+(<code>ThreadTelemetry</code>, <code>WeaveTelemetry</code>, <code>LoomTelemetry</code>, with their
+validation, assertion, and export results). Telemetry settings cascade
+through the loom/weave/thread hierarchy via <code>ExecutionConfig</code>.</p>
 
 
 <div class="doc doc-object doc-module">

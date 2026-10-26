@@ -3120,13 +3120,31 @@ post-write assertions.</p>
 <td><code>path</code></td>
 <td>Conditional</td>
 <td>—</td>
-<td>OneLake path. Required when <code>alias</code> is not set. Supports variables.</td>
+<td>OneLake path. Supports variables.</td>
 </tr>
 <tr>
 <td><code>alias</code></td>
 <td>Conditional</td>
 <td>—</td>
-<td>Metastore alias. Delta type only, mutually exclusive with <code>path</code>.</td>
+<td>Metastore alias. Delta type only.</td>
+</tr>
+<tr>
+<td><code>connection</code></td>
+<td>Conditional</td>
+<td>—</td>
+<td>Name of a connection declared in <code>connections:</code>. Delta type only; requires <code>table</code>.</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td>No</td>
+<td>—</td>
+<td>Schema override within the connection's lakehouse.</td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td>Conditional</td>
+<td>—</td>
+<td>Table name within the connection's lakehouse; requires <code>connection</code>.</td>
 </tr>
 <tr>
 <td><code>description</code></td>
@@ -3168,8 +3186,10 @@ post-write assertions.</p>
 </table>
 <h2 id="format-notes">Format Notes<a class="headerlink" href="#format-notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Delta</strong>: use <code>alias</code> for a metastore-registered table or <code>path</code> for
-  a direct OneLake path. Exactly one must be set. Auto-creates tables on
+<li><strong>Delta</strong>: use <code>alias</code> for a metastore-registered table, <code>path</code> for a
+  direct OneLake path, or <code>connection</code> with <code>table</code> for a table in another
+  lakehouse. Exactly one destination must be set (this applies to every
+  enabled export; non-Delta formats use <code>path</code>). Auto-creates tables on
   first write.</li>
 <li><strong>Parquet</strong>: use <code>options.compression</code> for compression codec (snappy, gzip, etc.).</li>
 <li><strong>CSV</strong>: common options include <code>header</code>, <code>delimiter</code>, <code>quote</code>, <code>escape</code>.</li>

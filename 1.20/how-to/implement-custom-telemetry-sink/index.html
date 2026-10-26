@@ -3108,8 +3108,8 @@ controlled via the <code>Context</code> constructor:</p>
 </code></pre></div>
 <p>Available levels: <code>minimal</code>, <code>standard</code> (default), <code>verbose</code>, <code>debug</code>. Each log
 entry is a JSON object with fields including <code>timestamp</code>, <code>level</code>, <code>logger</code>,
-<code>message</code>, and optional context attributes (<code>thread_name</code>, <code>weave_name</code>,
-<code>trace_id</code>).</p>
+<code>message</code>, and optional context attributes (<code>weevr_thread</code>, <code>weevr_weave</code>,
+<code>weevr_loom</code>, <code>trace_id</code>, <code>span_id</code>).</p>
 <p>To route these logs to an external system, attach a custom Python logging
 handler to the <code>weevr</code> logger:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>

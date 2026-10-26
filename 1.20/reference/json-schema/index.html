@@ -3024,10 +3024,10 @@ raw GitHub URL for the relevant schema file:</p>
 <h2 id="regenerating">Regenerating<a class="headerlink" href="#regenerating" title="Permanent link">&para;</a></h2>
 <p>Schemas are committed as static files and verified by CI.
 To regenerate after model changes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>scripts/generate_schema.py
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate_schema.py
 </code></pre></div>
 <p>To check if schemas are up-to-date without writing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>scripts/generate_schema.py<span class="w"> </span>--check
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/generate_schema.py<span class="w"> </span>--check
 </code></pre></div>
 
 
