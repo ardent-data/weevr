@@ -1,10 +1,11 @@
 """Integration tests for full config loading pipeline."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from weevr.config import load_config
+from weevr.config import load_config, load_resolved
 from weevr.errors import (
     ConfigError,
     ConfigParseError,
@@ -1252,3 +1253,53 @@ class TestLoadConfigMatchesContext:
         thread = load_config(tmp_path / "t.thread")
         assert isinstance(thread, Thread)
         assert thread.qualified_key == "t.thread"
+
+
+class TestLoadConfigFlatAuditTemplates:
+    """The flat audit_templates shorthand loads like the nested columns form."""
+
+    COLUMNS = {"_load_ts": "current_timestamp()", "_source": "'erp'"}
+
+    @staticmethod
+    def _thread(**extra: Any) -> dict[str, Any]:
+        return {
+            "config_version": "1.0",
+            "sources": {"src": {"type": "delta", "alias": "lh.raw"}},
+            "target": {"path": "/data/out", "audit_template": "lineage"},
+            **extra,
+        }
+
+    def _templates(self, form: str) -> dict[str, Any]:
+        if form == "flat":
+            return {"lineage": dict(self.COLUMNS)}
+        return {"lineage": {"columns": dict(self.COLUMNS)}}
+
+    @pytest.mark.parametrize("level", ["loom", "weave", "thread"])
+    def test_flat_template_loads_at_each_level(self, make_project, level):
+        """A flat template declared at loom, weave, or thread level loads."""
+        templates = {"audit_templates": self._templates("flat")}
+        thread = self._thread(**templates) if level == "thread" else self._thread()
+        project = make_project(
+            thread,
+            weave=templates if level == "weave" else None,
+            loom=templates if level == "loom" else None,
+        )
+        files = {"loom": "l.loom", "weave": "w.weave", "thread": "fact.thread"}
+        model = load_config(project / files[level], project_root=project)
+        assert model.audit_templates is not None
+        assert model.audit_templates["lineage"].columns == self.COLUMNS
+
+    @pytest.mark.parametrize("form", ["flat", "nested"])
+    @pytest.mark.parametrize("level", ["loom", "weave"])
+    def test_referenced_template_resolves_same_columns(self, make_project, level, form):
+        """A thread referencing a loom or weave template gets its columns in either form."""
+        templates = {"audit_templates": self._templates(form)}
+        project = make_project(
+            self._thread(),
+            weave=templates if level == "weave" else None,
+            loom=templates if level == "loom" else None,
+        )
+        loaded = load_resolved(project / "l.loom", project_root=project)
+        audit = loaded.resolved_threads["w"]["fact"].target.audit_columns
+        assert audit is not None
+        assert {k: audit[k] for k in self.COLUMNS} == self.COLUMNS

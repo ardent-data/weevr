@@ -160,16 +160,28 @@ same post-mapping, audit-injected DataFrame as the primary target.
 ## AuditTemplate
 
 A named set of audit columns defined under `audit_templates` at loom, weave,
-or thread level. Each template is a `dict[str, str]` mapping column names to
-Spark SQL expressions.
+or thread level. Each template maps column names to Spark SQL expressions,
+written either flat or nested under `columns`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `columns` | `dict[str, str]` | required (nested form) | Column name to Spark SQL expression |
 
 ```yaml
 audit_templates:
+  # Flat form
   lineage:
     _source_system: "${param.source_system}"
     _load_ts: "current_timestamp()"
     _run_id: "${param.run_id}"
+  # Nested form, equivalent
+  load_info:
+    columns:
+      _load_ts: "current_timestamp()"
 ```
+
+A template with a `columns` key is read as the nested form, so a flat template
+cannot define an audit column named `columns`; use the nested form for that.
 
 Templates are referenced by name in `target.audit_template`. The built-in
 presets `fabric` and `minimal` do not require a declaration.
