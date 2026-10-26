@@ -325,10 +325,12 @@ class ExportError(ExecutionError):
 
 
 class LookupResolutionError(ConfigError):
-    """Raised when a thread references a lookup not defined in the weave.
+    """Raised while a thread runs when one of its lookups can't be used.
 
-    This is a fail-fast validation error caught during config resolution,
-    before any data is read or threads are executed.
+    Covers a source ``lookup`` the weave doesn't provide, declared lookup
+    columns missing from the lookup's source, a failed ``unique_key`` check
+    with ``on_failure: abort``, and ``values`` or ``unique_key`` set without
+    ``key``. An undefined source ``lookup`` is not caught at config load.
     """
 
     pass
