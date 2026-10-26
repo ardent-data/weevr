@@ -3553,6 +3553,11 @@ marked with <code>@pytest.mark.spark</code> require PySpark and Delta Lake. Run
 them explicitly with:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>spark
 </code></pre></div>
+<p>Mark only the tests that start a Spark session: the default suite runs
+without a JVM, so a file-level <code>pytestmark = pytest.mark.spark</code> keeps
+Spark-free tests out of it. For a Delta table that tests only read, use
+the module-scoped <code>module_delta_path</code> fixture so it is written once per
+module; keep targets and any table a test writes on <code>tmp_delta_path</code>.</p>
 <p>Tests marked with <code>@pytest.mark.install_smoke</code> build both wheels and
 install them into isolated virtual environments. The release workflow
 runs them before publishing; run them locally with:</p>
