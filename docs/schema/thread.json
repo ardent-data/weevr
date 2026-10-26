@@ -4661,7 +4661,7 @@
     },
     "qualified_key": {
       "default": "",
-      "description": "Dot-separated namespace key, derived from directory path.",
+      "description": "Path of the thread file relative to the project root (e.g. threads/orders.thread). Set by the loader.",
       "title": "Qualified Key",
       "type": "string"
     },
