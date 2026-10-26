@@ -1,8 +1,10 @@
 # State API
 
 The `weevr.state` module manages watermark persistence for incremental loads.
-It supports multiple storage backends including Delta table properties and
-dedicated metadata tables.
+`resolve_store` returns the `WatermarkStore` for a thread's `load` config:
+Delta table properties on the target (the default) or a dedicated metadata
+table (`watermark_store.type: metadata_table`). The concrete store classes
+are internal; use the `WatermarkStore` interface.
 
 ::: weevr.state
     options:

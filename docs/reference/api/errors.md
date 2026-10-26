@@ -83,11 +83,13 @@ the entry. A `ReferenceResolutionError` for a missing file names the
 file that couldn't be found.
 
 ```python
+from pathlib import Path
+
 from weevr.config import load_config
 from weevr.errors import ConfigError
 
 try:
-    load_config("nightly.weave", project_root="project.weevr")
+    load_config("project.weevr/nightly.weave", project_root=Path("project.weevr"))
 except ConfigError as e:
     print(f"{e.file_path}: {e.message}")
 ```
@@ -252,8 +254,8 @@ default value.
 
 **Resolution:**
 
-1. Supply the missing parameter at runtime:
-   `ctx.run("daily.loom", params={"env": "prod"})`
+1. Supply the missing parameter at runtime through the context:
+   `Context(spark, "my-project.weevr", params={"env": "prod"})`
 2. Add a default value in the config: `${env:-dev}`
 3. Check for typos in the variable name
 
