@@ -16,7 +16,7 @@ import yaml
 
 from weevr.config import load_config, load_resolved
 from weevr.config.warp import resolve_warp
-from weevr.errors import ConfigError
+from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 from weevr.model.warp import WarpConfig
 
@@ -26,8 +26,15 @@ FABCON_DIR = EXAMPLES_DIR / "fabcon"
 CONFIG_FILES = sorted(
     p for ext in ("*.thread", "*.weave", "*.loom") for p in EXAMPLES_DIR.rglob(ext)
 )
-THREAD_FILES = [p for p in CONFIG_FILES if p.suffix == ".thread"]
 WARP_FILES = sorted(EXAMPLES_DIR.rglob("*.warp"))
+
+
+def _names_warp(path: Path) -> bool:
+    target = (yaml.safe_load(path.read_text()) or {}).get("target") or {}
+    return isinstance(target.get("warp"), str)
+
+
+WARP_NAMING_THREADS = [p for p in CONFIG_FILES if p.suffix == ".thread" and _names_warp(p)]
 
 # Required params per example, keyed by path relative to examples/. A required
 # param missing here fails the load instead of silently defaulting.
@@ -57,6 +64,7 @@ def test_examples_discovered() -> None:
     """The globs find example configs and warps to check."""
     assert CONFIG_FILES, "no example configs found"
     assert WARP_FILES, "no example warps found"
+    assert WARP_NAMING_THREADS, "no example thread names a warp"
 
 
 @pytest.mark.parametrize("path", CONFIG_FILES, ids=_rel)
@@ -71,14 +79,13 @@ def test_warp_validates(path: Path) -> None:
     WarpConfig.model_validate(yaml.safe_load(path.read_text()))
 
 
-@pytest.mark.parametrize("path", THREAD_FILES, ids=_rel)
+@pytest.mark.parametrize("path", WARP_NAMING_THREADS, ids=_rel)
 def test_named_warp_reference_resolves(path: Path) -> None:
     """A thread that names its warp can find it from the project root."""
     thread = _load(path)
     assert isinstance(thread, Thread)
     warp = thread.target.warp
-    if not isinstance(warp, str):
-        pytest.skip("thread names no warp")
+    assert isinstance(warp, str)
     assert resolve_warp(warp, path.parent, _project_root(path)) is not None
 
 
@@ -155,12 +162,12 @@ class TestBrokenExamplesFail:
             "target:\n  alias: cur.s\n"
         )
         root = self._project(tmp_path, {"t.thread": body})
-        with pytest.raises(ConfigError):
+        with pytest.raises(ModelValidationError, match=r"steps\.0[\s\S]*expected tags"):
             load_config(root / "t.thread", project_root=root)
 
     def test_weave_entry_without_file_or_body(self, tmp_path: Path) -> None:
         """A weave entry that names a thread with no file and no inline body fails."""
         body = 'config_version: "1.0"\nthreads:\n  - name: ghost\n'
         root = self._project(tmp_path, {"w.weave": body})
-        with pytest.raises(ConfigError):
+        with pytest.raises(ModelValidationError, match="Thread hydration failed for 'ghost'"):
             load_config(root / "w.weave", project_root=root)
