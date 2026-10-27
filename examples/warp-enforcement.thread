@@ -1,3 +1,7 @@
+# Warp enforcement — the output is checked against the dim_customer.warp
+# schema contract and violations fail the thread (`warp_enforcement: enforce`);
+# extra columns are dropped with a warning (`schema_drift: strict`, `on_drift: warn`).
+
 config_version: "1.0"
 name: warp-enforcement
 
@@ -7,12 +11,12 @@ sources:
     alias: bronze.raw_customers
 
 steps:
-  - operation: select
-    columns:
-      - customer_id
-      - customer_name
-      - email
-      - region
+  - select:
+      columns:
+        - customer_id
+        - customer_name
+        - email
+        - region
 
 target:
   alias: gold.dim_customer

@@ -6,6 +6,7 @@ name: dim_contacts
 
 sources:
   raw_contacts:
+    type: delta
     alias: raw_contacts
 
 steps:

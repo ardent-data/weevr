@@ -1,3 +1,6 @@
+# Warp auto-generation — with `warp_mode: auto` and `schema_drift: adaptive`,
+# the engine writes and evolves a .warp schema contract from the thread output.
+
 config_version: "1.0"
 name: warp-auto
 
@@ -7,12 +10,12 @@ sources:
     alias: bronze.raw_orders
 
 steps:
-  - operation: select
-    columns:
-      - order_id
-      - customer_id
-      - amount
-      - order_date
+  - select:
+      columns:
+        - order_id
+        - customer_id
+        - amount
+        - order_date
 
 target:
   alias: gold.fact_orders
