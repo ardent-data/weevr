@@ -274,18 +274,30 @@ def resolve_thread(name: str, config: dict[str, Any]) -> Thread:
 
 ## Adding examples
 
-Example YAML configurations live in `examples/`. Each example should be a valid weevr config that includes at minimum:
+Example YAML configurations live in `examples/`. Each example must be a complete,
+valid weevr config that loads on its own. A thread, for example, needs at minimum:
 
 ```yaml
+# examples/my_example.thread
 config_version: "1.0"
-name: my-example
+name: my_example   # must match the filename stem, or omit it
+sources:
+  source_table:
+    type: delta
+    alias: raw.source_table
+target:
+  alias: curated.my_example
 ```
 
 ### Guidelines
 
 * Keep examples focused on a single concept or use case
 * Include inline comments explaining non-obvious settings
-* Examples are validated in CI via `tests/weevr/test_examples.py`
+* Name the file after the config's `name` (the loader rejects a mismatch)
+* Keep weave and loom examples self-contained: define their threads (and the loom's
+  weaves) inline rather than referring to files that don't exist in `examples/`
+* `tests/weevr/test_examples.py` loads every example through the real config loader
+  in CI; if an example needs a required param, add it to `REQUIRED_PARAMS` in that test
 * When adding a new example, update `examples/README.md` with a short description
 
 ## A note on documentation contributions

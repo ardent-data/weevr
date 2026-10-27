@@ -1,0 +1,54 @@
+# Multi-Thread Weave Example
+#
+# Orchestrates three threads with explicit dependencies:
+#   staging_customers (no deps) -> dim_customer -> fact_customer_orders
+#
+# The DAG ensures threads execute in the correct order. The threads are defined
+# inline so the example is self-contained; in a project they would usually live
+# in their own .thread files and be listed with `ref:`.
+
+config_version: "1.0"
+name: customer_pipeline
+
+threads:
+  - name: staging_customers
+    config_version: "1.0"
+    sources:
+      raw_customers:
+        type: delta
+        alias: raw.customers
+    target:
+      alias: staging.customers
+
+  - name: dim_customer
+    dependencies:
+      - staging_customers
+    config_version: "1.0"
+    sources:
+      customers:
+        type: delta
+        alias: staging.customers
+    target:
+      alias: curated.dim_customer
+
+  - name: fact_customer_orders
+    dependencies:
+      - dim_customer
+    config_version: "1.0"
+    sources:
+      orders:
+        type: delta
+        alias: raw.orders
+      customers:
+        type: delta
+        alias: curated.dim_customer
+    steps:
+      - join:
+          source: customers
+          type: left
+          on: [customer_id]
+    target:
+      alias: curated.fact_customer_orders
+
+execution:
+  log_level: verbose

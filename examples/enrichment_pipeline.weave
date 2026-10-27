@@ -1,0 +1,66 @@
+# Hooks & Lookups Example
+#
+# Demonstrates weave-level named lookups:
+#   - "country_codes" is materialized with broadcast strategy — read once,
+#     broadcast to all executors before threads start.
+#   - "region_mapping" is non-materialized — each thread reads it on demand.
+#
+# Threads reference lookups via the `lookup` key in their sources block
+# (instead of a direct `type` + `alias` reference).
+
+config_version: "1.0"
+name: enrichment_pipeline
+
+lookups:
+  country_codes:
+    source:
+      type: delta
+      alias: ref.country_codes
+    materialize: true
+    strategy: broadcast
+
+  region_mapping:
+    source:
+      type: delta
+      alias: ref.region_mapping
+    materialize: false
+
+# The threads are defined inline so the example is self-contained; in a project
+# they would usually live in their own .thread files and be listed with `ref:`.
+threads:
+  - name: enrich_customers
+    config_version: "1.0"
+    sources:
+      customers:
+        type: delta
+        alias: raw.customers
+      countries:
+        lookup: country_codes      # materialized: broadcast once, reused
+    steps:
+      - join:
+          source: countries
+          type: left
+          on: [country_code]
+    target:
+      alias: curated.customers_enriched
+
+  - name: enrich_orders
+    dependencies:
+      - enrich_customers
+    config_version: "1.0"
+    sources:
+      orders:
+        type: delta
+        alias: raw.orders
+      regions:
+        lookup: region_mapping     # on demand: read when this thread runs
+    steps:
+      - join:
+          source: regions
+          type: left
+          on: [region_id]
+    target:
+      alias: curated.orders_enriched
+
+execution:
+  log_level: verbose

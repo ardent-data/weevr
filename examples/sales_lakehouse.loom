@@ -7,11 +7,38 @@
 config_version: "1.0"
 name: sales_lakehouse
 
+# The weaves (and their threads) are defined inline so the example is
+# self-contained; in a project they would usually live in their own .weave and
+# .thread files and be listed with `ref:`.
 weaves:
   - name: dimensions
+    config_version: "1.0"
+    threads:
+      - name: dim_customer
+        config_version: "1.0"
+        sources:
+          customers:
+            type: delta
+            alias: staging.customers
+        target:
+          path: "${param.lakehouse_path}/curated/dim_customer"
+
   - name: facts
     condition:
       when: "table_exists('curated.dim_customer')"
+    config_version: "1.0"
+    threads:
+      - name: fact_orders
+        config_version: "1.0"
+        sources:
+          orders:
+            type: delta
+            alias: staging.orders
+        steps:
+          - filter:
+              expr: "order_date >= '${param.load_date}'"
+        target:
+          path: "${param.lakehouse_path}/curated/fact_orders"
 
 # Shared defaults inherited by all weaves and threads
 defaults:

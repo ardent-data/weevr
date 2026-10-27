@@ -60,11 +60,28 @@ post_steps:
     message: "Orders pipeline complete at ${var.batch_ts}"
     level: info
 
+# The threads are defined inline so the example is self-contained; in a project
+# they would usually live in their own .thread files and be listed with `ref:`.
 threads:
   - name: staging_orders
+    config_version: "1.0"
+    sources:
+      raw_orders:
+        type: delta
+        alias: raw.orders
+    target:
+      alias: staging.orders
+
   - name: fact_orders
     dependencies:
       - staging_orders
+    config_version: "1.0"
+    sources:
+      orders:
+        type: delta
+        alias: staging.orders
+    target:
+      alias: curated.fact_orders
 
 execution:
   log_level: verbose
