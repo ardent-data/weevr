@@ -242,7 +242,7 @@ Write destination with column mapping and partitioning.
 | `connection` | `str` | `None` | Named connection reference. Requires `table`. Mutually exclusive with `alias`. |
 | `schema` | `str` | `None` | Schema override within the connection's lakehouse |
 | `table` | `str` | `None` | Table name within the connection's lakehouse. Requires `connection`. |
-| `mapping_mode` | `"auto" \| "explicit"` | `"auto"` | Column mapping strategy |
+| `mapping_mode` | `"auto" \| "explicit"` | `"auto"` | Column mapping strategy. `auto` passes every column to a new table and keeps an existing table's columns (`schema_drift: adaptive` adds new ones) |
 | `columns` | `dict[str, ColumnMapping]` | `None` | Per-column mapping |
 | `partition_by` | `list[str]` | `None` | Partition columns |
 | `audit_columns` | `dict[str, str]` | `None` | Audit column definitions as name-expression pairs |

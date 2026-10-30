@@ -315,9 +315,10 @@ depends on what was executed:
 - **warp_name**, **warp_source**, **warp_enforcement** -- Which warp
   applied (description), how it was resolved (`explicit`/`auto`),
   and the enforcement mode in force
-- **drift_detected**, **drift_columns**, **drift_mode**,
-  **drift_action_taken** -- Schema drift outcome for this run; see
-  the [Schema Drift guide](schema-drift.md)
+- **drift_detected**, **drift_columns**, **drift_missing_columns**,
+  **drift_mode**, **drift_action_taken** -- Schema drift outcome for
+  this run (extra and missing columns); see the
+  [Schema Drift guide](schema-drift.md)
 
 ### Dimension merge metrics
 

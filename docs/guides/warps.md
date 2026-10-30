@@ -73,14 +73,23 @@ output. Keys are not enforced at runtime.
 
 ## Discovery
 
-weevr uses hybrid discovery to find warp files for a thread:
+weevr resolves a thread's warp when the config is loaded, from the
+thread file's directory and the project root. A thread pulled in by a
+weave or loom uses its own file's directory; an inline thread uses the
+directory of the file that defines it. This works the same for
+projects on the local filesystem and in OneLake, and for every target
+kind (alias, path, `abfss://` path, or connection).
 
 1. **Explicit reference** — set `target.warp` to the warp file
    name (with or without `.warp` extension). Searched in the
-   thread directory first, then the config root.
+   thread file's directory first, then the project root. A name
+   containing `/` resolves relative to the project root. A missing
+   file fails the config load, naming the locations searched.
 2. **Auto-discovery** — when `target.warp` is not set, weevr
-   looks for a `.warp` file matching the target alias (last
-   dot segment) in the thread directory and config root.
+   looks for `<target name>.warp` in the thread file's directory,
+   then the project root. The target name is the alias's last dot
+   segment, the path's last segment, or the connection target's
+   `table`. Nothing found means no warp — not an error.
 3. **Opt-out** — set `target.warp: false` to disable discovery.
 
 ```yaml
@@ -98,6 +107,13 @@ target:
   alias: gold.dim_customer
   warp: false
 ```
+
+!!! note "Threads built in code"
+    A `Thread` constructed directly and passed to `execute_thread`,
+    without the config loader, has no thread file or project root. For
+    such threads an explicit `target.warp` is looked up beside the
+    target path, and no auto-discovery happens. Load configs through
+    `Context` or `load_config` to get the resolution above.
 
 ## Enforcement
 
@@ -152,6 +168,14 @@ Engine columns are excluded from enforcement checks.
 Set `warp_mode: auto` to write or update the `.warp` file after
 each successful run. The generated file includes `auto_generated:
 true` as a marker.
+
+- If the thread loaded a warp (explicitly or by discovery), that file
+  is rewritten in place — including a hand-written warp you
+  referenced.
+- Otherwise weevr writes `<target name>.warp` in the thread file's
+  directory, where the next run discovers it.
+- For projects loaded from OneLake, auto-generation is skipped with a
+  warning: the engine does not write into remote project folders.
 
 ```yaml
 target:
