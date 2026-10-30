@@ -117,3 +117,32 @@ def hwm_literal(df: DataFrame, typed: Column, watermark_type: str, last_value: s
 def _column_type(df: DataFrame, typed: Column) -> DataType:
     """Resolve the data type of a column expression without running a job."""
     return df.select(typed.alias("__hwm")).schema["__hwm"].dataType
+
+
+def hwm_is_newer(candidate: str, current: str, watermark_type: str) -> bool:
+    """Whether HWM *candidate* is past *current* for the watermark type.
+
+    Args:
+        candidate: A stored or stamped HWM.
+        current: The HWM to compare against.
+        watermark_type: One of ``timestamp``, ``date``, ``int``, ``long``.
+
+    Returns:
+        True when *candidate* is strictly later; False when it isn't or
+        either value can't be parsed.
+    """
+    try:
+        if watermark_type == "timestamp":
+            return parse_timestamp_hwm(candidate) > parse_timestamp_hwm(current)
+        if watermark_type == "date":
+            return candidate.strip() > current.strip()
+        return int(candidate) > int(current)
+    except ValueError:
+        return False
+
+
+def as_utc(value: datetime) -> datetime:
+    """Treat a naive datetime as driver-local (how PySpark collects them) and convert to UTC."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=_driver_tz())
+    return value.astimezone(UTC)

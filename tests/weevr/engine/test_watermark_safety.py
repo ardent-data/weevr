@@ -209,3 +209,113 @@ class TestGenericCdcWatermark:
         assert execute_thread(spark, thread).status == "success"
         state = MetadataTableStore(store).read(spark, "cdc")
         assert state is not None and state.last_value == "2024-01-01T17:00:00.000000Z"
+
+
+def _int_thread(src: str, tgt: str, store: str, *, write: dict[str, Any] | None = None) -> Thread:
+    return Thread.model_validate(
+        {
+            "name": "t",
+            "config_version": "1.0",
+            "sources": {"main": {"type": "delta", "alias": src}},
+            "target": {"path": tgt},
+            "write": write or {"mode": "append"},
+            "load": {
+                "mode": "incremental_watermark",
+                "watermark_column": "seq",
+                "watermark_type": "long",
+                "watermark_store": {"type": "metadata_table", "table_path": store},
+            },
+        }
+    )
+
+
+class TestFailedSaveRecovery:
+    """A failed watermark save never makes the next run re-append."""
+
+    def test_next_run_recovers_from_the_commit_stamp(self, spark: SparkSession, tmp_path, caplog):
+        import logging
+
+        from weevr.errors import StateError
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq union all select 2, 20L")
+        thread = _int_thread(src, tgt, store)
+        with (
+            patch.object(MetadataTableStore, "write", side_effect=RuntimeError("store down")),
+            pytest.raises(StateError),
+        ):
+            execute_thread(spark, thread)
+        assert spark.read.format("delta").load(tgt).count() == 2
+
+        with caplog.at_level(logging.INFO, logger="weevr.engine.executor"):
+            result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 2  # no duplicates
+        assert any("commit" in m and "20" in m for m in caplog.messages)
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is None or state.last_value == "20"
+
+    def test_append_commit_carries_the_hwm(self, spark: SparkSession, tmp_path):
+        import json
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq")
+        assert execute_thread(spark, _int_thread(src, tgt, store)).status == "success"
+        latest = spark.sql(f"DESCRIBE HISTORY delta.`{tgt}` LIMIT 1").first()
+        assert latest is not None
+        meta = json.loads(latest["userMetadata"])
+        assert meta["engine"] == "weevr" and meta["thread"] == "t" and meta["hwm"] == "10"
+
+    def test_manual_reset_after_the_commit_wins(self, spark: SparkSession, tmp_path):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq union all select 2, 20L")
+        thread = _int_thread(src, tgt, store)
+        assert execute_thread(spark, thread).status == "success"
+        # Reset back to 10 to reprocess seq 20 — made after the stamped commit
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column="seq",
+                watermark_type="long",
+                last_value="10",
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success"
+        assert spark.read.format("delta").load(tgt).filter("seq = 20").count() == 2
+
+
+class TestFirstRunGuard:
+    """A first run never re-appends onto an already-populated target."""
+
+    def test_non_empty_target_without_state_fails_before_writing(
+        self, spark: SparkSession, tmp_path
+    ):
+        from weevr.errors import StateError
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq")
+        _append(spark, tgt, "select 99 as id, 5L as seq")
+        with pytest.raises(StateError, match="seed-or-reset-a-watermark") as exc:
+            execute_thread(spark, _int_thread(src, tgt, store))
+        assert "'t'" in str(exc.value) and tgt in str(exc.value)
+        assert spark.read.format("delta").load(tgt).count() == 1
+
+    def test_empty_target_proceeds(self, spark: SparkSession, tmp_path):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq")
+        spark.sql("select 1 as id, 1L as seq").limit(0).write.format("delta").save(tgt)
+        assert execute_thread(spark, _int_thread(src, tgt, store)).status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 1
+
+    def test_merge_mode_is_not_guarded(self, spark: SparkSession, tmp_path):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq")
+        _append(spark, tgt, "select 1 as id, 5L as seq")
+        thread = _int_thread(src, tgt, store, write={"mode": "merge", "match_keys": ["id"]})
+        assert execute_thread(spark, thread).status == "success"
+        row = spark.read.format("delta").load(tgt).first()
+        assert row is not None and row.seq == 10
