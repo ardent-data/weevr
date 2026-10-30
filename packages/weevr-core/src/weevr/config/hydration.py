@@ -14,9 +14,10 @@ from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
 ThreadPreparer = Callable[[dict[str, Any]], None]
-# Called with each hydrated thread and the file it came from (path or URI).
-ThreadBinder = Callable[[Thread, str], None]
 """Hook applied to each child thread dict just before validation."""
+
+ThreadBinder = Callable[[Thread, str], None]
+"""Hook called with each hydrated thread and the file it came from (path or URI)."""
 
 _MODELS: dict[str, type[Thread | Weave | Loom]] = {
     "thread": Thread,

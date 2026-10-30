@@ -11,6 +11,7 @@ from weevr.config.locations import (
     RemoteConfigLocation,
     _normalize_uri_path,
     _split_scheme,
+    location_like,
     make_location,
 )
 
@@ -416,3 +417,20 @@ class TestMakeLocation:
     def test_iso_concrete_classes_implement_abc(self) -> None:
         assert issubclass(LocalConfigLocation, ConfigLocation)
         assert issubclass(RemoteConfigLocation, ConfigLocation)
+
+
+class TestLocationLike:
+    """location_like rebuilds a location of the same kind from its string form."""
+
+    def test_local_reference_gives_local_location(self, tmp_path):
+        loc = location_like(str(tmp_path / "a.thread"), LocalConfigLocation(tmp_path))
+        assert isinstance(loc, LocalConfigLocation)
+        assert str(loc) == str(tmp_path / "a.thread")
+
+    def test_remote_reference_shares_its_session(self):
+        session = object()
+        root = RemoteConfigLocation("abfss://ws@host/lh/Files/p.weevr", session)  # type: ignore[arg-type]
+        loc = location_like("abfss://ws@host/lh/Files/p.weevr/threads/a.thread", root)
+        assert isinstance(loc, RemoteConfigLocation)
+        assert loc.uri == "abfss://ws@host/lh/Files/p.weevr/threads/a.thread"
+        assert loc.with_path("abfss://ws@host/x").uri == "abfss://ws@host/x"

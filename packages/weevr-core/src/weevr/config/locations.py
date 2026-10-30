@@ -295,6 +295,17 @@ class RemoteConfigLocation(ConfigLocation):
         """The underlying URI string."""
         return self._uri
 
+    def with_path(self, uri: str) -> RemoteConfigLocation:
+        """Return a location for another URI on the same session.
+
+        Args:
+            uri: A fully qualified URI.
+
+        Returns:
+            A new :class:`RemoteConfigLocation` sharing this session.
+        """
+        return RemoteConfigLocation(uri, self._spark)
+
     # -- JVM helpers --------------------------------------------------------
 
     def _jvm(self) -> Any:
@@ -509,5 +520,5 @@ def location_like(path_or_uri: str, like: ConfigLocation) -> ConfigLocation:
         :class:`LocalConfigLocation`.
     """
     if isinstance(like, RemoteConfigLocation):
-        return RemoteConfigLocation(path_or_uri, like._spark)
+        return like.with_path(path_or_uri)
     return LocalConfigLocation(Path(path_or_uri))
