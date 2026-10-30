@@ -6306,7 +6306,7 @@ step model.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"auto"</code></td>
-<td>Column mapping: <code>"auto"</code> or <code>"explicit"</code></td>
+<td>Column mapping: <code>"auto"</code> or <code>"explicit"</code>. <code>"auto"</code> passes every column to a new table and keeps an existing table's columns; <code>schema_drift: adaptive</code> adds new ones.</td>
 </tr>
 <tr>
 <td><code>columns</code></td>
@@ -6383,14 +6383,14 @@ step model.</p>
 <td><code>string \| false \| null</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Warp schema contract reference. A string names an explicit <code>.warp</code> file; <code>false</code> opts out of auto-discovery; <code>null</code> enables auto-discovery.</td>
+<td>Warp schema contract reference. A string names an explicit <code>.warp</code> file, searched beside the thread file, then at the project root; a missing file fails the load. <code>false</code> opts out of auto-discovery; <code>null</code> discovers a <code>.warp</code> named after the target. See <a href="../../../guides/warps/#discovery">Warps</a>.</td>
 </tr>
 <tr>
 <td><code>warp_mode</code></td>
 <td><code>"auto" \| null</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Warp generation mode. <code>"auto"</code> writes/updates the <code>.warp</code> file after each successful run.</td>
+<td>Warp generation mode. <code>"auto"</code> updates the warp the thread loaded, or writes <code>&lt;target name&gt;.warp</code> beside the thread file, after each successful run. Skipped with a warning for projects loaded from OneLake.</td>
 </tr>
 <tr>
 <td><code>warp_init</code></td>
@@ -6411,18 +6411,26 @@ step model.</p>
 <td><code>"lenient" \| "strict" \| "adaptive"</code></td>
 <td>no</td>
 <td><code>"lenient"</code></td>
-<td>Schema drift handling mode. <code>"lenient"</code> passes extra columns through; <code>"strict"</code> applies <code>on_drift</code> action; <code>"adaptive"</code> passes through and extends auto-generated warps.</td>
+<td>Schema drift handling mode. <code>"lenient"</code> reports drift and writes as configured; <code>"strict"</code> applies the <code>on_drift</code> action to extra and missing columns; <code>"adaptive"</code> adds new columns to the Delta table and extends auto-generated warps. See <a href="../../../guides/schema-drift/">Schema Drift</a>.</td>
 </tr>
 <tr>
 <td><code>on_drift</code></td>
 <td><code>"error" \| "warn" \| "ignore"</code></td>
 <td>no</td>
 <td><code>"warn"</code></td>
-<td>Severity action for strict drift mode. <code>"error"</code> aborts the thread; <code>"warn"</code> drops extra columns with a warning; <code>"ignore"</code> drops silently.</td>
+<td>Severity action for strict drift mode. <code>"error"</code> aborts the thread; <code>"warn"</code> drops extra columns and writes missing ones as null, with a warning; <code>"ignore"</code> does the same silently.</td>
 </tr>
 </tbody>
 </table>
 <p>At least one of <code>alias</code>, <code>path</code>, or <code>connection</code> + <code>table</code> is required.</p>
+<div class="admonition warning">
+<p class="admonition-title">FUSE paths on targets</p>
+<p>A source <code>path</code> or <code>alias</code> that starts with <code>/lakehouse/</code> is rewritten to
+its <code>abfss://</code> OneLake URI. Target and export paths are not rewritten in
+v1, so the same <code>/lakehouse/...</code> path can point at different physical
+locations as a source and as a target. Use an <code>alias</code>, a connection, or an
+<code>abfss://</code> path for targets.</p>
+</div>
 <h3 id="targetcolumns-columnmapping">target.columns (ColumnMapping)<a class="headerlink" href="#targetcolumns-columnmapping" title="Permanent link">&para;</a></h3>
 <table>
 <thead>

@@ -3223,14 +3223,24 @@
 
 
 <h1 id="schema-drift">Schema Drift<a class="headerlink" href="#schema-drift" title="Permanent link">&para;</a></h1>
-<p>Schema drift occurs when extra columns from upstream source
-changes flow through the pipeline to the target boundary. weevr
-detects drift and applies configurable handling at write time.</p>
+<p>Schema drift occurs when the pipeline output no longer matches the
+target: upstream changes add columns, or columns the target has stop
+arriving. weevr detects drift and applies configurable handling at
+write time.</p>
 <h2 id="what-drift-detects">What drift detects<a class="headerlink" href="#what-drift-detects" title="Permanent link">&para;</a></h2>
 <p>Drift detection compares the pipeline output columns against a
-baseline. Extra columns (present in the output but not in the
-baseline) are drift. Missing columns are a separate concern
-handled by warp enforcement.</p>
+baseline, after target column mapping and before the write:</p>
+<ul>
+<li><strong>Extra columns</strong> — present in the output but not in the baseline.</li>
+<li><strong>Missing columns</strong> — present in the existing table but not in the
+  output. Detected only when the existing table is the baseline; with
+  a warp, columns the output lacks are warp-only columns that weevr
+  appends with their defaults, and
+  <a href="../warps/#enforcement">warp enforcement</a> reports them.</li>
+</ul>
+<p>Engine-managed columns never count as drift: audit columns, SCD and
+<code>_weevr_</code> columns, soft-delete columns, and CDC operation and
+change-feed metadata columns.</p>
 <h3 id="baseline-sources">Baseline sources<a class="headerlink" href="#baseline-sources" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3264,56 +3274,65 @@ setting controls the severity for strict mode.</p>
 <th><code>schema_drift</code></th>
 <th><code>on_drift</code></th>
 <th>Extra columns</th>
-<th>Result</th>
+<th>Missing columns</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>lenient</code></td>
 <td>(ignored)</td>
-<td>Pass through</td>
-<td>No change</td>
+<td>Reported; not written to an existing table</td>
+<td>Reported; written as null</td>
 </tr>
 <tr>
 <td><code>strict</code></td>
 <td><code>error</code></td>
-<td>Detected</td>
+<td>Thread fails</td>
 <td>Thread fails</td>
 </tr>
 <tr>
 <td><code>strict</code></td>
 <td><code>warn</code></td>
-<td>Dropped</td>
-<td>Warning logged</td>
+<td>Dropped, warning logged</td>
+<td>Written as null, warning logged</td>
 </tr>
 <tr>
 <td><code>strict</code></td>
 <td><code>ignore</code></td>
-<td>Dropped</td>
-<td>Silent</td>
+<td>Dropped silently</td>
+<td>Written as null silently</td>
 </tr>
 <tr>
 <td><code>adaptive</code></td>
 <td>(ignored)</td>
-<td>Pass through</td>
-<td>Evolve warp</td>
+<td>Added to the Delta table</td>
+<td>Reported; written as null</td>
 </tr>
 </tbody>
 </table>
 <h3 id="lenient-default">lenient (default)<a class="headerlink" href="#lenient-default" title="Permanent link">&para;</a></h3>
-<p>Extra columns pass through to the target unchanged. A drift
-report is populated for visibility but no action is taken.</p>
+<p>Drift is reported for visibility — in the drift report, telemetry, and
+logs — and the write proceeds as configured. With the default
+<code>mapping_mode: auto</code>, an existing table keeps its columns, so a new
+output column is not written until you add it to the table or switch
+to <code>adaptive</code>.</p>
 <h3 id="strict">strict<a class="headerlink" href="#strict" title="Permanent link">&para;</a></h3>
-<p>Extra columns are detected and handled per <code>on_drift</code>:</p>
+<p>Extra and missing columns are handled per <code>on_drift</code>:</p>
 <ul>
-<li><strong>error</strong> — the thread fails with a <code>SchemaDriftError</code></li>
-<li><strong>warn</strong> — extra columns are dropped with a logged warning</li>
-<li><strong>ignore</strong> — extra columns are dropped silently</li>
+<li><strong>error</strong> — the thread fails with a <code>SchemaDriftError</code> naming the
+  columns; nothing is written</li>
+<li><strong>warn</strong> — extra columns are dropped and missing columns are
+  written as null, with a logged warning</li>
+<li><strong>ignore</strong> — the same, silently</li>
 </ul>
 <h3 id="adaptive">adaptive<a class="headerlink" href="#adaptive" title="Permanent link">&para;</a></h3>
-<p>Extra columns pass through to the target. When combined with
-<code>warp_mode: auto</code>, the auto-generated warp file is updated
-with the new columns marked <code>discovered: true</code>.</p>
+<p>New columns are added to the Delta table on append, overwrite, merge,
+CDC merge, and dimension merge. Evolution is additive only — weevr
+never drops columns or changes column types — and is scoped to the
+thread's own write; no session configuration changes. Missing columns
+are reported and written as null. When combined with <code>warp_mode: auto</code>,
+the auto-generated warp file is updated with the new columns marked
+<code>discovered: true</code>.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <p>Set drift mode on the target or cascade from defaults:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">target</span><span class="p">:</span>
@@ -3339,15 +3358,15 @@ because the warp reflects intentional declarations.</p>
 <h2 id="drift-without-warps">Drift without warps<a class="headerlink" href="#drift-without-warps" title="Permanent link">&para;</a></h2>
 <p>When no warp exists, the existing Delta table schema is used as
 the baseline. This provides value even for threads that have not
-adopted warps — any new column from source schema changes is
-detected at the target boundary.</p>
+adopted warps — any new or missing column from source schema changes
+is detected at the target boundary.</p>
 <p>On first write (no table exists yet), there is no baseline, so
 drift detection is skipped.</p>
 <h2 id="adaptive-auto-interaction">Adaptive + auto interaction<a class="headerlink" href="#adaptive-auto-interaction" title="Permanent link">&para;</a></h2>
 <p>When <code>schema_drift: adaptive</code> and <code>warp_mode: auto</code> are both
 active:</p>
 <ol>
-<li>Extra columns pass through to Delta (adaptive behavior)</li>
+<li>New columns are added to the Delta table (adaptive behavior)</li>
 <li>The auto-generated warp file includes the new columns</li>
 <li>New columns are marked <code>discovered: true</code> in the warp</li>
 </ol>
@@ -3358,8 +3377,10 @@ intentional curation.</p>
 <p>Drift events are captured regardless of mode:</p>
 <ul>
 <li><strong>Telemetry</strong> — <code>drift_detected</code>, <code>drift_columns</code>,
-  <code>drift_mode</code>, and <code>drift_action_taken</code> fields on the
-  <code>ThreadTelemetry</code> object</li>
+  <code>drift_missing_columns</code>, <code>drift_mode</code>, and <code>drift_action_taken</code>
+  fields on the <code>ThreadTelemetry</code> object</li>
+<li><strong>Drift report</strong> — <code>ThreadResult.drift_report</code> lists
+  <code>extra_columns</code>, <code>missing_columns</code>, and the action taken</li>
 <li><strong>Notebook output</strong> — drift report section in the
   <code>_repr_html_()</code> display with extra columns and action taken</li>
 <li><strong>Logging</strong> — drift findings logged at the appropriate level</li>

@@ -5315,7 +5315,7 @@ always runs. Execute-mode callers must keep the default.</p>
 
 
 <h3 id="weevr.operations.apply_target_mapping" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">apply_target_mapping</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">spark</span><span class="p">,</span> <span class="n">handle</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">apply_target_mapping</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">spark</span><span class="p">,</span> <span class="n">handle</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">narrow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#weevr.operations.apply_target_mapping" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -5407,6 +5407,24 @@ self-resolves existence (operations stay independently usable).</p>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>narrow</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>When False, auto mode skips narrowing to the existing table's
+columns, so a caller can inspect the extra columns first and
+narrow later with :func:<code>narrow_to_target</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
             </td>
           </tr>
       </tbody>

@@ -3324,14 +3324,23 @@ a list of column declarations.</p>
 surrogate and business keys for downstream tooling and plan
 output. Keys are not enforced at runtime.</p>
 <h2 id="discovery">Discovery<a class="headerlink" href="#discovery" title="Permanent link">&para;</a></h2>
-<p>weevr uses hybrid discovery to find warp files for a thread:</p>
+<p>weevr resolves a thread's warp when the config is loaded, from the
+thread file's directory and the project root. A thread pulled in by a
+weave or loom uses its own file's directory; an inline thread uses the
+directory of the file that defines it. This works the same for
+projects on the local filesystem and in OneLake, and for every target
+kind (alias, path, <code>abfss://</code> path, or connection).</p>
 <ol>
 <li><strong>Explicit reference</strong> — set <code>target.warp</code> to the warp file
    name (with or without <code>.warp</code> extension). Searched in the
-   thread directory first, then the config root.</li>
+   thread file's directory first, then the project root. A name
+   containing <code>/</code> resolves relative to the project root. A missing
+   file fails the config load, naming the locations searched.</li>
 <li><strong>Auto-discovery</strong> — when <code>target.warp</code> is not set, weevr
-   looks for a <code>.warp</code> file matching the target alias (last
-   dot segment) in the thread directory and config root.</li>
+   looks for <code>&lt;target name&gt;.warp</code> in the thread file's directory,
+   then the project root. The target name is the alias's last dot
+   segment, the path's last segment, or the connection target's
+   <code>table</code>. Nothing found means no warp — not an error.</li>
 <li><strong>Opt-out</strong> — set <code>target.warp: false</code> to disable discovery.</li>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Explicit reference</span>
@@ -3348,6 +3357,16 @@ output. Keys are not enforced at runtime.</p>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gold.dim_customer</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">warp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Threads built in code</p>
+<p>A <code>Thread</code> constructed directly and passed to <code>execute_thread</code>,
+without the config loader, has no thread file or project root. For
+such threads an explicit <code>target.warp</code> is looked up beside the
+target path, no auto-discovery happens, and <code>warp_mode: auto</code> writes
+beside a local path target only (alias and remote targets are skipped
+with a warning). Load configs through <code>Context</code> or <code>load_config</code> to
+get the resolution above.</p>
+</div>
 <h2 id="enforcement">Enforcement<a class="headerlink" href="#enforcement" title="Permanent link">&para;</a></h2>
 <p>Warp enforcement validates the pipeline output against the warp
 contract. Three modes are available:</p>
@@ -3407,6 +3426,15 @@ Engine columns are excluded from enforcement checks.</p>
 <p>Set <code>warp_mode: auto</code> to write or update the <code>.warp</code> file after
 each successful run. The generated file includes <code>auto_generated:
 true</code> as a marker.</p>
+<ul>
+<li>If the thread loaded a warp (explicitly or by discovery), that file
+  is rewritten in place — including a hand-written warp you
+  referenced.</li>
+<li>Otherwise weevr writes <code>&lt;target name&gt;.warp</code> in the thread file's
+  directory, where the next run discovers it.</li>
+<li>For projects loaded from OneLake, auto-generation is skipped with a
+  warning: the engine does not write into remote project folders.</li>
+</ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">target</span><span class="p">:</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gold.dim_customer</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">warp_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>

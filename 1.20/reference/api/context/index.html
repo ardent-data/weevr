@@ -1503,6 +1503,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.RemoteConfigLocation.with_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.RemoteConfigLocation.join" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1714,6 +1725,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Thread">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.Thread.warp_binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp_binding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.Thread.bind_warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bind_warp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2250,6 +2289,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Thread">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.Thread.warp_binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp_binding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.Thread.bind_warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bind_warp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4760,6 +4827,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.RemoteConfigLocation.with_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.RemoteConfigLocation.join" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4971,6 +5049,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Thread">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.Thread.warp_binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp_binding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.Thread.bind_warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bind_warp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -5507,6 +5613,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Thread">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.Thread.warp_binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp_binding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.result.Thread.bind_warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bind_warp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -6924,6 +7058,78 @@ long-lived state outside this object.</p>
 <div class="doc doc-object doc-function">
 
 
+<h4 id="weevr.context.RemoteConfigLocation.with_path" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">with_path</span><span class="p">(</span><span class="n">uri</span><span class="p">)</span></code>
+
+<a href="#weevr.context.RemoteConfigLocation.with_path" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a location for another URI on the same session.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>uri</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A fully qualified URI.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="RemoteConfigLocation (weevr.config.locations.RemoteConfigLocation)" href="#weevr.context.RemoteConfigLocation">RemoteConfigLocation</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new :class:<code>RemoteConfigLocation</code> sharing this session.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h4 id="weevr.context.RemoteConfigLocation.join" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">join</span><span class="p">(</span><span class="n">rel</span><span class="p">)</span></code>
 
@@ -7736,8 +7942,82 @@ of transformation steps, and a single target.</p>
 
 
 
+<div class="doc doc-object doc-attribute">
 
 
+
+<h4 id="weevr.context.Thread.warp_binding" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">warp_binding</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.context.Thread.warp_binding" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The warp the loader resolved for this thread.</p>
+<p><code>None</code> for a thread built without the loader; the executor then
+falls back to looking up an explicit <code>target.warp</code> beside the
+target.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.context.Thread.bind_warp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bind_warp</span><span class="p">(</span><span class="n">binding</span><span class="p">)</span></code>
+
+<a href="#weevr.context.Thread.bind_warp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Attach the loader's warp resolution to this thread.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>binding</code>
+            </td>
+            <td>
+                  <code><span title="weevr.model.warp.WarpBinding">WarpBinding</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The resolved warp and its locations.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 
 
@@ -11792,8 +12072,82 @@ of transformation steps, and a single target.</p>
 
 
 
+<div class="doc doc-object doc-attribute">
 
 
+
+<h4 id="weevr.result.Thread.warp_binding" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">warp_binding</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.result.Thread.warp_binding" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The warp the loader resolved for this thread.</p>
+<p><code>None</code> for a thread built without the loader; the executor then
+falls back to looking up an explicit <code>target.warp</code> beside the
+target.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.result.Thread.bind_warp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bind_warp</span><span class="p">(</span><span class="n">binding</span><span class="p">)</span></code>
+
+<a href="#weevr.result.Thread.bind_warp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Attach the loader's warp resolution to this thread.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>binding</code>
+            </td>
+            <td>
+                  <code><span title="weevr.model.warp.WarpBinding">WarpBinding</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The resolved warp and its locations.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 
 

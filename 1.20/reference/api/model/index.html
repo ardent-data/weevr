@@ -1946,6 +1946,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Thread">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Thread.warp_binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp_binding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Thread.bind_warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bind_warp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -4542,6 +4570,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Thread">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Thread.warp_binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp_binding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.model.Thread.bind_warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bind_warp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -9469,8 +9525,82 @@ of transformation steps, and a single target.</p>
 
 
 
+<div class="doc doc-object doc-attribute">
 
 
+
+<h4 id="weevr.model.Thread.warp_binding" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">warp_binding</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#weevr.model.Thread.warp_binding" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The warp the loader resolved for this thread.</p>
+<p><code>None</code> for a thread built without the loader; the executor then
+falls back to looking up an explicit <code>target.warp</code> beside the
+target.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="weevr.model.Thread.bind_warp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bind_warp</span><span class="p">(</span><span class="n">binding</span><span class="p">)</span></code>
+
+<a href="#weevr.model.Thread.bind_warp" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Attach the loader's warp resolution to this thread.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>binding</code>
+            </td>
+            <td>
+                  <code><span title="weevr.model.warp.WarpBinding">WarpBinding</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The resolved warp and its locations.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
 
 
 
