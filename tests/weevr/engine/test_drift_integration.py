@@ -339,7 +339,8 @@ class TestMissingColumns:
         assert result.status == "success", result.error
         assert spark.read.format("delta").load(path).filter("id = 2").first().region == "n/a"
 
-    def test_cdc_metadata_is_not_drift(self, spark, tmp_path: Path):
+    @pytest.mark.parametrize("on_drift", ["warn", "error"])
+    def test_cdc_metadata_is_not_drift(self, spark, tmp_path: Path, on_drift: str):
         src = str(tmp_path / "cdc_src")
         tgt = str(tmp_path / "cdc_tgt")
         spark.createDataFrame([(1, "a", 0)], ["id", "name", "seq"]).write.format("delta").save(tgt)
@@ -351,7 +352,7 @@ class TestMissingColumns:
                 "name": "cdc",
                 "config_version": "1.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
-                "target": {"path": tgt, "schema_drift": "strict", "on_drift": "warn"},
+                "target": {"path": tgt, "schema_drift": "strict", "on_drift": on_drift},
                 "write": {"mode": "merge", "match_keys": ["id"]},
                 "load": {
                     "mode": "cdc",
