@@ -21,7 +21,8 @@ def _fill_literal(field: StructField, value: Any) -> Column:
 
     ``df.fillna()`` rejects ``date``, ``datetime``, and ``Decimal``
     values, so the no-``where`` branch of :func:`apply_fill_null`
-    falls back to per-column ``withColumn`` for those types. This
+    falls back to per-column ``withColumn`` for those types; the
+    ``where`` branch uses it for every value. This
     helper constructs the right Spark column expression per type:
     parsed ISO literal for Date/Timestamp, scale-matching cast for
     Decimal, plain ``F.lit`` for everything else.
@@ -103,11 +104,16 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
                 # filled column — batching would then read pre-batch values
                 # where the sequential loop read already-filled ones, so any
                 # possible reference falls back to today's per-column loop
+                # Fill values are cast to the column type, as df.fillna() does on
+                # the no-where path — a bare literal would widen the column
                 condition = F.expr(params.where)
+                where_fields = {f.name: f for f in result.schema.fields}
                 fill_exprs = {
                     col_name: F.when(
                         condition & F.col(col_name).isNull(),
-                        F.lit(fill_value),
+                        _fill_literal(where_fields[col_name], fill_value).cast(
+                            where_fields[col_name].dataType
+                        ),
                     ).otherwise(F.col(col_name))
                     for col_name, fill_value in fill_dict.items()
                 }

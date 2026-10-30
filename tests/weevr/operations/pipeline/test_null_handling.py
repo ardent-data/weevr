@@ -514,3 +514,79 @@ class TestFillNullBatching:
         row = apply_fill_null(df, params).df.collect()[0]
         assert row["a"] == "Unknown"
         assert row["b"] is None  # same sequential outcome — case is no escape
+
+
+class TestFillNullWherePreservesTypes:
+    """A where predicate only restricts rows; types and values match the no-where form."""
+
+    _SCHEMA = "d date, ts timestamp, amt decimal(10,2), f float, n int, s string, flag boolean"
+
+    def _df(self, spark: SparkSession):
+        return spark.createDataFrame(
+            [
+                (None, None, None, None, None, None, True),
+                (None, None, None, None, None, None, False),
+            ],
+            self._SCHEMA,
+        )
+
+    @staticmethod
+    def _fill(df, overrides=None, where=None):
+        params = FillNullParams(
+            mode="type_defaults", code="unknown", overrides=overrides, where=where
+        )
+        return apply_fill_null(df, params).df
+
+    def test_defaults_keep_every_column_type(self, spark: SparkSession):
+        df = self._df(spark)
+        assert self._fill(df, where="flag").schema == df.schema
+
+    @pytest.mark.parametrize(
+        ("column", "value"),
+        [
+            ("d", date(2024, 1, 1)),
+            ("ts", datetime(2024, 1, 1, 12, 30)),
+            ("amt", Decimal("1.2345")),
+            ("amt", 7),
+            ("amt", 1.5),
+            ("f", 2),
+            ("n", 2.7),
+            ("n", "x"),
+            ("s", 5),
+        ],
+    )
+    def test_override_matches_no_where_result(self, spark: SparkSession, column, value):
+        df = self._df(spark)
+        expected = self._fill(df.filter("flag"), overrides={column: value})
+        actual = self._fill(df, overrides={column: value}, where="flag")
+        assert actual.schema == df.schema
+        assert actual.filter("flag").select(column).collect() == expected.select(column).collect()
+
+    def test_non_matching_rows_keep_original_values(self, spark: SparkSession):
+        df = self._df(spark)
+        row = self._fill(df, overrides={"amt": 7}, where="flag").filter("not flag").first()
+        assert row is not None
+        assert (row.amt, row.f, row.n, row.s) == (None, None, None, None)
+
+    @pytest.mark.parametrize(
+        ("column", "value"),
+        [
+            ("d", datetime(2024, 1, 1, 12, 30)),
+            ("ts", date(2024, 1, 1)),
+            ("n", Decimal("1.5")),
+        ],
+    )
+    def test_mismatched_override_raises_like_no_where(self, spark: SparkSession, column, value):
+        df = self._df(spark)
+        with pytest.raises(TypeError):
+            self._fill(df, overrides={column: value})
+        with pytest.raises(TypeError):
+            self._fill(df, overrides={column: value}, where="flag")
+
+    def test_sequential_fallback_keeps_types(self, spark: SparkSession):
+        # The predicate names a filled column, so fills apply one column at a time
+        df = spark.createDataFrame([(None, None)], "amt decimal(10,2), f float")
+        out = apply_fill_null(
+            df, FillNullParams(mode="type_defaults", code="unknown", where="amt IS NULL")
+        ).df
+        assert out.schema == df.schema
