@@ -370,3 +370,20 @@ class TestMissingColumns:
         assert result.status == "success", result.error
         assert result.drift_report is None
         assert spark.read.format("delta").load(tgt).first().name == "a2"
+
+
+class TestAliasTargetDrift:
+    """Drift works for alias targets (the usual Fabric case), not only paths."""
+
+    def test_strict_error_sees_new_column_on_alias_target(
+        self, spark: SparkSession, tmp_path: Path, request: pytest.FixtureRequest
+    ):
+        spark.sql(f"CREATE DATABASE b028_drift LOCATION '{tmp_path / 'b028_drift.db'}'")
+        request.addfinalizer(lambda: spark.sql("DROP DATABASE IF EXISTS b028_drift CASCADE"))
+        spark.sql("CREATE TABLE b028_drift.t (id BIGINT, name STRING) USING delta")
+        thread = _thread(
+            {"alias": "b028_drift.t", "schema_drift": "strict", "on_drift": "error"},
+            WRITES["append"],
+        )
+        with pytest.raises(SchemaDriftError, match="email"):
+            _run(spark, thread, spark.createDataFrame([(2, "b", "e")], ["id", "name", "email"]))

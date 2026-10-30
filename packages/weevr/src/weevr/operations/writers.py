@@ -80,7 +80,9 @@ def apply_target_mapping(
 
     # Narrow column set according to mapping mode.
     if target.mapping_mode == "auto":
-        existing_cols = _existing_target_columns(target, spark, handle) if narrow else None
+        existing_cols = (
+            existing_target_columns(spark, target.alias or target.path, handle) if narrow else None
+        )
         if existing_cols is not None:
             keep = [c for c in existing_cols if c in result.columns and c not in cols_to_drop]
             return result.select(keep)
@@ -102,8 +104,7 @@ def apply_target_mapping(
 def narrow_to_target(
     df: DataFrame,
     target: Target,
-    spark: SparkSession,
-    handle: TargetHandle | None = None,
+    existing_columns: list[str] | None,
     keep: list[str] | None = None,
 ) -> DataFrame:
     """Apply auto mapping's narrowing to the existing table's columns.
@@ -116,29 +117,38 @@ def narrow_to_target(
     Args:
         df: DataFrame to narrow.
         target: Target configuration including mapping mode.
-        spark: Active SparkSession (used to probe existing target schema).
-        handle: Pre-resolved target handle.
+        existing_columns: The existing table's columns (see
+            :func:`existing_target_columns`), or None when it doesn't exist.
         keep: Extra columns to keep even though the table lacks them (for
             example engine columns added after mapping).
 
     Returns:
         The narrowed DataFrame.
     """
-    if target.mapping_mode != "auto":
+    if target.mapping_mode != "auto" or existing_columns is None:
         return df
-    existing_cols = _existing_target_columns(target, spark, handle)
-    if existing_cols is None:
-        return df
-    kept = [c for c in existing_cols if c in df.columns]
-    kept += [c for c in df.columns if c in set(keep or ()) and c not in kept]
+    keep_set = set(keep or ())
+    kept = [c for c in existing_columns if c in df.columns]
+    kept += [c for c in df.columns if c in keep_set and c not in kept]
     return df.select(kept)
 
 
-def _existing_target_columns(
-    target: Target, spark: SparkSession, handle: TargetHandle | None
+def existing_target_columns(
+    spark: SparkSession, target_path: str | None, handle: TargetHandle | None = None
 ) -> list[str] | None:
-    """Return the existing target table's columns, or None if it doesn't exist."""
-    target_path = target.alias or target.path
+    """Return the existing target table's columns, or None if it doesn't exist.
+
+    Handles both table aliases and paths, and probes existence first, so a
+    missing table is a quiet None rather than a failed read.
+
+    Args:
+        spark: Active SparkSession.
+        target_path: Table alias or path of the target.
+        handle: Pre-resolved target handle for ``target_path``, if any.
+
+    Returns:
+        Column names in table order, or None.
+    """
     if not target_path:
         return None
     target_present = (

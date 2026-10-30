@@ -74,6 +74,7 @@ from weevr.operations.warp import (
 from weevr.operations.writers import (
     apply_target_mapping,
     execute_cdc_merge,
+    existing_target_columns,
     narrow_to_target,
     write_target,
 )
@@ -739,8 +740,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     resolved_warp,
                     thread,
                     engine_col_names,
-                    spark=spark,
-                    target_path=target_path,
+                    table_columns=existing_target_columns(spark, target_path, target_handle),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -779,7 +779,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     resolved_warp,
                     audit_columns,
                     audit_ctx,
-                    _writer_managed_columns(thread, dim_builder),
+                    _writer_managed_columns(thread, None),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -1238,6 +1238,8 @@ def _shape_for_target(
     Returns:
         ``(df, warp findings, drift report, audit columns applied)``.
     """
+    # One read of the existing table's columns serves drift and narrowing
+    table_columns = existing_target_columns(spark, target_path, target_handle)
     df = apply_target_mapping(df, thread.target, spark, handle=target_handle, narrow=False)
     mapped_cols = set(df.columns)
     audit_applied: list[str] = []
@@ -1251,14 +1253,13 @@ def _shape_for_target(
         resolved_warp,
         thread,
         audit_applied + managed_columns,
-        spark=spark,
-        target_path=target_path,
+        table_columns=table_columns,
     )
     keep = [c for c in df.columns if c not in mapped_cols]
     if thread.target.schema_drift == "adaptive" and drift_report is not None:
         # adaptive keeps new columns; the write adds them to the table
         keep += drift_report.extra_columns
-    df = narrow_to_target(df, thread.target, spark, handle=target_handle, keep=keep)
+    df = narrow_to_target(df, thread.target, table_columns, keep=keep)
     return df, warp_findings, drift_report, audit_applied
 
 
@@ -1313,8 +1314,7 @@ def _apply_warp_and_drift(
     resolved_warp: Any,
     thread: Thread,
     engine_col_names: list[str],
-    spark: SparkSession | None = None,
-    target_path: str | None = None,
+    table_columns: list[str] | None = None,
 ) -> tuple[Any, list[dict[str, str]], Any]:
     """Apply warp enforcement, drift detection, and warp-only append.
 
@@ -1326,13 +1326,13 @@ def _apply_warp_and_drift(
         resolved_warp: Resolved WarpConfig, or None.
         thread: Thread configuration.
         engine_col_names: Engine-managed column names (audit, SCD, etc.).
-        spark: SparkSession for table-based drift baseline fallback.
-        target_path: Target path for table-based drift baseline fallback.
+        table_columns: The existing target table's columns, the drift
+            baseline when there is no warp; None when the table doesn't exist.
 
     Returns:
         Tuple of (modified df, warp findings, drift report).
     """
-    from weevr.config.warp import build_effective_warp, get_drift_baseline
+    from weevr.config.warp import build_effective_warp
 
     warp_findings: list[dict[str, str]] = []
 
@@ -1342,7 +1342,9 @@ def _apply_warp_and_drift(
     all_engine = list(set(engine_col_names + weevr_cols))
 
     # Drift detection (works with or without warp)
-    baseline = get_drift_baseline(warp=resolved_warp, spark=spark, target_path=target_path)
+    baseline = (
+        [col.name for col in resolved_warp.columns] if resolved_warp is not None else table_columns
+    )
     baseline_source = (
         "warp" if resolved_warp is not None else ("table" if baseline is not None else "none")
     )
