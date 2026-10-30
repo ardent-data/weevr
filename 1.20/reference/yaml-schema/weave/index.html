@@ -4157,7 +4157,7 @@ settings override these.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"error"</code></td>
-<td>Behavior when normalization produces duplicate names: <code>"error"</code> or <code>"suffix"</code> (appends <code>_2</code>, <code>_3</code>, etc.)</td>
+<td>Behavior when the final column names (after normalization and reserved word protection) contain duplicates: <code>"error"</code> or <code>"suffix"</code> (the first column in source order keeps the name; later ones get the lowest free <code>_2</code>, <code>_3</code>, etc.)</td>
 </tr>
 <tr>
 <td><code>reserved_words</code></td>

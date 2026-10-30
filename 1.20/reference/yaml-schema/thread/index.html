@@ -5557,7 +5557,7 @@ first, then explicit columns override.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td>--</td>
-<td>Spark SQL predicate for conditional fill. Only valid when <code>mode</code> is set.</td>
+<td>Spark SQL predicate for conditional fill. Only restricts which rows are filled: column types, fill values, and type errors match the same step without <code>where</code>. Only valid when <code>mode</code> is set.</td>
 </tr>
 </tbody>
 </table>
@@ -5963,7 +5963,7 @@ Each key is a target column name with a format specification.</p>
 <td><code>boolean</code></td>
 <td>no</td>
 <td><code>false</code></td>
-<td>Reject type mismatches instead of auto-casting</td>
+<td>Reject type mismatches instead of auto-casting. For <code>number</code>, every numeric type is accepted (including <code>decimal</code>, <code>short</code>, <code>byte</code>) and formatted from its own value</td>
 </tr>
 </tbody>
 </table>
@@ -6503,7 +6503,7 @@ step model.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>"error"</code></td>
-<td>Behavior when normalization produces duplicate names: <code>"error"</code> or <code>"suffix"</code></td>
+<td>Behavior when the final column names (after normalization and reserved word protection) contain duplicates: <code>"error"</code> or <code>"suffix"</code></td>
 </tr>
 <tr>
 <td><code>reserved_words</code></td>
