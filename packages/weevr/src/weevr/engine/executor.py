@@ -1269,7 +1269,8 @@ def _auto_warp_destination(thread: Thread, target_path: str | None) -> tuple[str
     ``<target name>.warp`` beside its config file, where the next load
     discovers it. A thread loaded from a non-local project is skipped with a
     warning, since config locations are read-only there. A thread built
-    without the loader keeps the original destination beside the target.
+    without the loader writes beside a local path target and is skipped with
+    a warning for an alias or remote target.
 
     Args:
         thread: Thread configuration, with the loader's warp binding if any.
@@ -1282,7 +1283,17 @@ def _auto_warp_destination(thread: Thread, target_path: str | None) -> tuple[str
 
     binding = thread.warp_binding
     if binding is None:
-        return (str(Path(target_path).parent) if target_path else ".", thread.name)
+        # Only a local path target has a meaningful directory to write beside;
+        # an alias or a remote URI would land in the working directory or a
+        # mangled path.
+        if thread.target.alias or not target_path or "://" in target_path:
+            logger.warning(
+                "Thread '%s': warp_mode 'auto' skipped — load the config through "
+                "Context or load_config to write the warp beside the thread file",
+                thread.name,
+            )
+            return None
+        return (str(Path(target_path).parent), thread.name)
     if not binding.writable:
         logger.warning(
             "Thread '%s': warp_mode 'auto' skipped — the project location %s is not "
