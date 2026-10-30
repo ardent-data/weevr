@@ -837,14 +837,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             # Auto-generate warp after successful write (all paths)
             if thread.target.warp_mode == "auto":
-                auto_generate_warp(
-                    df,
-                    resolved_warp,
-                    drift_report,
-                    thread.name,
-                    str(Path(target_path).parent) if target_path else ".",
-                    adaptive=thread.target.schema_drift == "adaptive",
-                )
+                destination = _auto_warp_destination(thread, target_path)
+                if destination is not None:
+                    auto_generate_warp(
+                        df,
+                        resolved_warp,
+                        drift_report,
+                        destination[1],
+                        destination[0],
+                        adaptive=thread.target.schema_drift == "adaptive",
+                    )
 
             # Step 14 — persist watermark state
             if (
@@ -1171,6 +1173,41 @@ def _resolve_with_block(
             collector.add_span(span)  # type: ignore[union-attr]
 
     return enriched
+
+
+def _auto_warp_destination(thread: Thread, target_path: str | None) -> tuple[str, str] | None:
+    """Return the ``(directory, file stem)`` an auto-generated warp is written to.
+
+    A loaded thread updates the warp it loaded, else writes
+    ``<target name>.warp`` beside its config file, where the next load
+    discovers it. A thread loaded from a non-local project is skipped with a
+    warning, since config locations are read-only there. A thread built
+    without the loader keeps the original destination beside the target.
+
+    Args:
+        thread: Thread configuration, with the loader's warp binding if any.
+        target_path: Resolved target path or alias.
+
+    Returns:
+        ``(directory, stem)``, or None when nothing should be written.
+    """
+    from weevr.config.warp import target_warp_name
+
+    binding = thread.warp_binding
+    if binding is None:
+        return (str(Path(target_path).parent) if target_path else ".", thread.name)
+    if not binding.writable:
+        logger.warning(
+            "Thread '%s': warp_mode 'auto' skipped — the project location %s is not "
+            "writable from the engine",
+            thread.name,
+            binding.thread_dir,
+        )
+        return None
+    if binding.warp_file is not None:
+        warp_file = Path(binding.warp_file)
+        return (str(warp_file.parent), warp_file.stem)
+    return (binding.thread_dir, target_warp_name(thread.target) or thread.name)
 
 
 def _apply_warp_and_drift(
