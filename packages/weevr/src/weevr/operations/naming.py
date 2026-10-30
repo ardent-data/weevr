@@ -298,6 +298,65 @@ def _apply_reserved_word_protection(
     return strategy_fn(renames, config, effective_words)
 
 
+def _suffix_duplicates(renames: dict[str, str], duplicates: dict[str, list[str]]) -> dict[str, str]:
+    """Rename all but the first column of each duplicate group to a free ``_N`` name.
+
+    The first column in source order keeps the name; each later one takes the
+    lowest ``_N`` (N >= 2) not already used by any output name.
+
+    Args:
+        renames: Mapping of original column name to output name.
+        duplicates: Output name to the source columns that produce it, in
+            source order.
+
+    Returns:
+        Updated renames with unique output names.
+    """
+    updated = dict(renames)
+    taken = set(updated.values())
+    for base_name, source_cols in duplicates.items():
+        for old_col in source_cols[1:]:
+            idx = 2
+            while f"{base_name}_{idx}" in taken:
+                idx += 1
+            suffixed = f"{base_name}_{idx}"
+            taken.add(suffixed)
+            _log.warning(
+                "Column '%s' resolves to '%s' (already taken); renamed to '%s'",
+                old_col,
+                base_name,
+                suffixed,
+            )
+            updated[old_col] = suffixed
+    return updated
+
+
+def _resolve_final_collisions(kept: dict[str, str], on_collision: str) -> dict[str, str]:
+    """Apply ``on_collision`` to duplicate names left after reserved word protection.
+
+    Args:
+        kept: Mapping of original column name to final output name.
+        on_collision: ``"error"`` or ``"suffix"``.
+
+    Returns:
+        Mapping with unique output names.
+
+    Raises:
+        ConfigError: If duplicates remain and ``on_collision`` is ``"error"``.
+    """
+    seen: dict[str, list[str]] = {}
+    for old, new in kept.items():
+        seen.setdefault(new, []).append(old)
+    duplicates = {new: sources for new, sources in seen.items() if len(sources) > 1}
+    if not duplicates:
+        return kept
+
+    if on_collision == "error":
+        details = "; ".join(f"'{new}' from {srcs}" for new, srcs in duplicates.items())
+        raise ConfigError(f"Reserved word protection produces duplicate columns: {details}")
+    return _suffix_duplicates(kept, duplicates)
+
+
 def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
     """Normalize column names in a DataFrame according to the naming config.
 
@@ -336,22 +395,15 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
             details = "; ".join(f"'{new}' from {srcs}" for new, srcs in duplicates.items())
             raise ConfigError(f"Naming normalization produces duplicate columns: {details}")
 
-        # on_collision == "suffix": keep first occurrence, append _2, _3, ... to the rest
-        for base_name, source_cols in duplicates.items():
-            for idx, old_col in enumerate(source_cols[1:], start=2):
-                suffixed = f"{base_name}_{idx}"
-                _log.warning(
-                    "Column '%s' normalises to '%s' (already taken); renamed to '%s'",
-                    old_col,
-                    base_name,
-                    suffixed,
-                )
-                renames[old_col] = suffixed
+        renames = _suffix_duplicates(renames, duplicates)
 
     if config.reserved_words is not None:
         protected = _apply_reserved_word_protection(renames, config.reserved_words)
         # Filter out dropped columns (None sentinel from drop strategy)
         kept = {k: v for k, v in protected.items() if v is not None}
+        # Protection can land a name on another column's name — on_collision
+        # governs the final names, so check again
+        kept = _resolve_final_collisions(kept, config.on_collision)
     else:
         kept = renames
 
