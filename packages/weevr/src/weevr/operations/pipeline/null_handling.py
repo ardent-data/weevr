@@ -103,10 +103,10 @@ def apply_fill_null(df: DataFrame, params: FillNullParams) -> StepResult:
                 # Conditional fill. The shared user `where` may itself name a
                 # filled column — batching would then read pre-batch values
                 # where the sequential loop read already-filled ones, so any
-                # possible reference falls back to today's per-column loop
+                # possible reference falls back to today's per-column loop.
+                condition = F.expr(params.where)
                 # Fill values are cast to the column type, as df.fillna() does on
                 # the no-where path — a bare literal would widen the column
-                condition = F.expr(params.where)
                 where_fields = {f.name: f for f in result.schema.fields}
                 fill_exprs = {
                     col_name: F.when(
