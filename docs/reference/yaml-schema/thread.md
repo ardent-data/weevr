@@ -558,7 +558,7 @@ first, then explicit columns override.
 | `include` | `list[string]` | no | all | Glob patterns restricting which columns are filled. Only valid when `mode` is set. |
 | `exclude` | `list[string]` | no | none | Glob patterns excluding columns from fill. Only valid when `mode` is set. |
 | `overrides` | `dict[string, any]` | no | -- | Per-column overrides for type-based defaults. Only valid when `mode` is set. |
-| `where` | `string` | no | -- | Spark SQL predicate for conditional fill. Only valid when `mode` is set. |
+| `where` | `string` | no | -- | Spark SQL predicate for conditional fill. Only restricts which rows are filled: column types, fill values, and type errors match the same step without `where`. Only valid when `mode` is set. |
 
 At least one of `columns` or `mode` must be set. The `code`, `include`,
 `exclude`, `overrides`, and `where` keys all require `mode` to be set;
@@ -737,7 +737,7 @@ Each key is a target column name with a format specification.
 | `number` | `string` | cond. | -- | Java DecimalFormat pattern |
 | `date` | `string` | cond. | -- | Java SimpleDateFormat pattern |
 | `on_short` | `string` | no | `"null"` | Behavior when source is shorter than pattern: `"null"` or `"partial"` |
-| `strict_types` | `boolean` | no | `false` | Reject type mismatches instead of auto-casting |
+| `strict_types` | `boolean` | no | `false` | Reject type mismatches instead of auto-casting. For `number`, every numeric type is accepted (including `decimal`, `short`, `byte`) and formatted from its own value |
 
 Exactly one of `pattern`, `number`, or `date` must be set
 per column.
@@ -934,7 +934,7 @@ At least one of `alias`, `path`, or `connection` + `table` is required.
 | `columns` | `NamingPattern` | no | `null` | Pattern for column names |
 | `tables` | `NamingPattern` | no | `null` | Pattern for table names |
 | `exclude` | `list[string]` | no | `[]` | Column names or glob patterns to exclude from normalization |
-| `on_collision` | `string` | no | `"error"` | Behavior when normalization produces duplicate names: `"error"` or `"suffix"` |
+| `on_collision` | `string` | no | `"error"` | Behavior when the final column names (after normalization and reserved word protection) contain duplicates: `"error"` or `"suffix"` |
 | `reserved_words` | `ReservedWordConfig` | no | `null` | Reserved word protection. See [Weave schema: naming](../yaml-schema/weave.md#naming-namingconfig) for details. |
 
 Supported patterns: `snake_case`, `camelCase`, `PascalCase`,

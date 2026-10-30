@@ -458,7 +458,7 @@ loom/weave/thread/target.
 | `columns` | `NamingPattern` | `None` | Column naming pattern |
 | `tables` | `NamingPattern` | `None` | Table naming pattern |
 | `exclude` | `list[str]` | `[]` | Names or patterns excluded from normalization |
-| `on_collision` | `Literal["suffix", "error"]` | `"error"` | Duplicate name handling after normalization |
+| `on_collision` | `Literal["suffix", "error"]` | `"error"` | Duplicate name handling for the final column names, after normalization and reserved word protection. `"suffix"` keeps the first column in source order and gives later ones the lowest free `_2`, `_3`, ... |
 | `reserved_words` | `ReservedWordConfig` | `None` | Reserved word protection config |
 
 Supported `NamingPattern` values: `snake_case`, `camelCase`,
