@@ -21,6 +21,7 @@ from weevr.config.locations import (
     ConfigLocation,
     LocalConfigLocation,
     RemoteConfigLocation,
+    location_like,
     make_location,
 )
 from weevr.config.macros import expand_foreach
@@ -44,8 +45,10 @@ from weevr.config.validation import (
     validate_dimension_overrides,
     validate_schema,
 )
+from weevr.config.warp import find_warp
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
+from weevr.model.warp import WarpBinding
 
 logger = logging.getLogger("weevr.config")
 
@@ -240,6 +243,8 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         )
     model = hydrate_model(resolved.data, resolved.config_type, resolved.location)
     root = resolved.project_root
+    if isinstance(model, Thread):
+        bind_thread_warp(model, resolved.location, root)
     weaves, threads = hydrate_children(
         resolved.config_type,
         resolved.data,
@@ -247,6 +252,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         resolved.config_name,
         prepare=lambda thread_dict: resolve_source_paths(thread_dict, root),
         warnings=lookup_warnings,
+        bind=lambda thread, source: bind_thread_warp(thread, location_like(source, root), root),
     )
 
     warnings = list(resolved.warnings)
@@ -269,6 +275,37 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         weaves=weaves,
         threads=threads,
         warnings=warnings,
+    )
+
+
+def bind_thread_warp(thread: Thread, thread_file: ConfigLocation, root: ConfigLocation) -> None:
+    """Resolve a thread's warp from its file's directory and the project root.
+
+    The warp search runs at load so a missing explicit warp fails before any
+    data is read, and so the engine never has to guess config locations
+    from the target path.
+
+    Args:
+        thread: The hydrated thread; receives a :class:`WarpBinding`.
+        thread_file: The thread's config file (the enclosing file for inline
+            threads).
+        root: The project root.
+
+    Raises:
+        ConfigError: If an explicit ``target.warp`` cannot be found.
+    """
+    thread_dir = thread_file.parent
+    found = None
+    if isinstance(thread.target.warp, str):
+        with attribute_errors(thread_file):
+            found = find_warp(thread.target.warp, thread_dir, root)
+    thread.bind_warp(
+        WarpBinding(
+            warp=found[0] if found else None,
+            warp_file=str(found[1]) if found else None,
+            thread_dir=str(thread_dir),
+            writable=isinstance(thread_dir, LocalConfigLocation),
+        )
     )
 
 

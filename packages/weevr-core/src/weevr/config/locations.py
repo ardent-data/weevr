@@ -490,3 +490,24 @@ def make_location(
             raise ValueError(f"Remote config location '{s}' requires an active SparkSession")
         return RemoteConfigLocation(s, spark)
     return LocalConfigLocation(Path(s))
+
+
+def location_like(path_or_uri: str, like: ConfigLocation) -> ConfigLocation:
+    """Build a location of the same kind as ``like`` for a path or URI.
+
+    Lets code that only kept a location's string form (for example a child
+    config's source path) get a usable location back without a SparkSession
+    of its own.
+
+    Args:
+        path_or_uri: The path or URI to wrap.
+        like: An existing location whose kind (and, for remote locations,
+            session) is reused.
+
+    Returns:
+        A :class:`RemoteConfigLocation` when ``like`` is remote, else a
+        :class:`LocalConfigLocation`.
+    """
+    if isinstance(like, RemoteConfigLocation):
+        return RemoteConfigLocation(path_or_uri, like._spark)
+    return LocalConfigLocation(Path(path_or_uri))

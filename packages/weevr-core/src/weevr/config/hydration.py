@@ -14,6 +14,8 @@ from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
 ThreadPreparer = Callable[[dict[str, Any]], None]
+# Called with each hydrated thread and the file it came from (path or URI).
+ThreadBinder = Callable[[Thread, str], None]
 """Hook applied to each child thread dict just before validation."""
 
 _MODELS: dict[str, type[Thread | Weave | Loom]] = {
@@ -104,6 +106,7 @@ def hydrate_threads(
     prepare: ThreadPreparer | None = None,
     visible_lookups: set[str] | None = None,
     warnings: list[str] | None = None,
+    bind: ThreadBinder | None = None,
 ) -> dict[str, Thread]:
     """Hydrate a weave's resolved threads into a name-to-Thread mapping.
 
@@ -119,6 +122,7 @@ def hydrate_threads(
         visible_lookups: Lookup names the enclosing weave and loom define;
             each thread's resolve steps are checked against them.
         warnings: Collects load warnings from those checks.
+        bind: Optional hook called with each hydrated thread and its file.
 
     Returns:
         Hydrated threads keyed by effective name (``as`` > name > stem).
@@ -161,13 +165,16 @@ def hydrate_threads(
             prepare(thread_dict)
 
         try:
-            result[effective_name] = Thread.model_validate(thread_dict)
+            thread = Thread.model_validate(thread_dict)
         except ValidationError as exc:
             raise ModelValidationError(
                 f"Thread hydration failed for '{effective_name}': {exc}",
                 cause=exc,
                 file_path=thread_source,
             ) from exc
+        if bind is not None:
+            bind(thread, thread_source)
+        result[effective_name] = thread
     return result
 
 
@@ -178,6 +185,7 @@ def hydrate_children(
     name: str,
     prepare: ThreadPreparer | None = None,
     warnings: list[str] | None = None,
+    bind: ThreadBinder | None = None,
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
     """Hydrate the weaves and threads a weave or loom pulls in.
 
@@ -192,6 +200,7 @@ def hydrate_children(
         name: The top-level config's name, used as the weave key for a weave.
         prepare: Optional hook applied to each thread dict before validation.
         warnings: Collects load warnings from the children's checks.
+        bind: Optional hook called with each hydrated thread and its file.
 
     Returns:
         ``(weaves, threads)``: hydrated weaves by name (looms only), and each
@@ -215,6 +224,7 @@ def hydrate_children(
             prepare,
             visible_lookups=set(resolved.get("lookups") or {}),
             warnings=warnings,
+            bind=bind,
         )
 
     elif config_type == "loom":
@@ -252,6 +262,7 @@ def hydrate_children(
                 visible_lookups=set(resolved.get("lookups") or {})
                 | set(weave_dict.get("lookups") or {}),
                 warnings=warnings,
+                bind=bind,
             )
 
     return weaves, threads

@@ -317,10 +317,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             warp_findings: list[dict[str, str]] = []
             drift_report = None
 
-            # Only resolve warp when explicitly referenced (string).
-            # Auto-discovery from target_path is unreliable because
-            # alias-based targets are not filesystem paths.
-            if isinstance(thread.target.warp, str):
+            # The loader resolves warps from the thread file and project root.
+            # A thread built without the loader has no binding; it keeps the
+            # original lookup beside the target, explicit references only.
+            if thread.warp_binding is not None:
+                resolved_warp = thread.warp_binding.warp
+            elif isinstance(thread.target.warp, str):
                 from weevr.config.warp import resolve_warp
 
                 thread_dir = Path(target_path).parent if target_path else Path(".")

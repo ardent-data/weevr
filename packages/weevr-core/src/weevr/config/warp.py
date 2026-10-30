@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from weevr.config.locations import ConfigLocation, LocalConfigLocation
 from weevr.config.parser import parse_yaml
 from weevr.config.validation import validate_schema
 from weevr.errors import ConfigError
@@ -15,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 def resolve_warp(
     warp_ref: str | bool | None,
-    thread_dir: Path,
-    config_root: Path,
+    thread_dir: ConfigLocation | Path,
+    config_root: ConfigLocation | Path,
     target_alias: str | None = None,
 ) -> WarpConfig | None:
     """Resolve a warp config from a reference, auto-discovery, or opt-out.
@@ -35,21 +36,58 @@ def resolve_warp(
     Raises:
         ConfigError: If an explicit reference cannot be resolved.
     """
+    found = find_warp(warp_ref, thread_dir, config_root, target_alias)
+    return found[0] if found is not None else None
+
+
+def find_warp(
+    warp_ref: str | bool | None,
+    thread_dir: ConfigLocation | Path,
+    config_root: ConfigLocation | Path,
+    target_alias: str | None = None,
+) -> tuple[WarpConfig, ConfigLocation] | None:
+    """Resolve a warp and return it with the location of its file.
+
+    Same rules as :func:`resolve_warp`.
+
+    Args:
+        warp_ref: Explicit warp name/path (str), opt-out (False), or
+            auto-discover (None).
+        thread_dir: Directory containing the thread config file.
+        config_root: Root directory for the config project.
+        target_alias: Target alias used for auto-discovery.
+
+    Returns:
+        ``(warp, file location)``, or None if opted out or not found.
+
+    Raises:
+        ConfigError: If an explicit reference cannot be resolved.
+    """
+    thread_loc = _as_location(thread_dir)
+    root_loc = _as_location(config_root)
+
     if warp_ref is False:
         return None
 
     if isinstance(warp_ref, str):
-        return _resolve_named(warp_ref, thread_dir, config_root)
+        return _resolve_named(warp_ref, thread_loc, root_loc)
 
     # Auto-discovery: try to find a .warp file matching the target
     if target_alias is not None:
         table_name = _derive_table_name(target_alias)
-        return _auto_discover(table_name, thread_dir, config_root)
+        return _auto_discover(table_name, thread_loc, root_loc)
 
     return None
 
 
-def _resolve_named(name: str, thread_dir: Path, config_root: Path) -> WarpConfig:
+def _as_location(loc: ConfigLocation | Path) -> ConfigLocation:
+    """Wrap a local path; pass a ConfigLocation through."""
+    return loc if isinstance(loc, ConfigLocation) else LocalConfigLocation(Path(loc))
+
+
+def _resolve_named(
+    name: str, thread_dir: ConfigLocation, config_root: ConfigLocation
+) -> tuple[WarpConfig, ConfigLocation]:
     """Resolve an explicitly named warp reference.
 
     Search order:
@@ -63,7 +101,7 @@ def _resolve_named(name: str, thread_dir: Path, config_root: Path) -> WarpConfig
         config_root: Config project root.
 
     Returns:
-        Parsed WarpConfig.
+        Parsed WarpConfig and its file location.
 
     Raises:
         ConfigError: If the named warp cannot be found.
@@ -72,24 +110,26 @@ def _resolve_named(name: str, thread_dir: Path, config_root: Path) -> WarpConfig
     filename = name if has_extension else f"{name}.warp"
     has_separator = "/" in name or "\\" in name
 
-    candidates: list[Path] = []
+    candidates: list[ConfigLocation] = []
 
     if not has_separator:
         # Try thread directory first
-        candidates.append(thread_dir / filename)
+        candidates.append(thread_dir.join(filename))
     # Then config root
-    candidates.append(config_root / filename)
+    candidates.append(config_root.join(filename))
 
     for candidate in candidates:
         if candidate.exists():
-            return _load_warp(candidate)
+            return _load_warp(candidate), candidate
 
     raise ConfigError(
         f"Warp file not found: '{name}'. Searched: " + ", ".join(str(c) for c in candidates),
     )
 
 
-def _auto_discover(table_name: str, thread_dir: Path, config_root: Path) -> WarpConfig | None:
+def _auto_discover(
+    table_name: str, thread_dir: ConfigLocation, config_root: ConfigLocation
+) -> tuple[WarpConfig, ConfigLocation] | None:
     """Auto-discover a .warp file matching the table name.
 
     Search order:
@@ -102,16 +142,16 @@ def _auto_discover(table_name: str, thread_dir: Path, config_root: Path) -> Warp
         config_root: Config project root.
 
     Returns:
-        Parsed WarpConfig if found, None otherwise.
+        Parsed WarpConfig and its file location if found, None otherwise.
     """
     candidates = [
-        thread_dir / f"{table_name}.warp",
-        config_root / f"{table_name}.warp",
+        thread_dir.join(f"{table_name}.warp"),
+        config_root.join(f"{table_name}.warp"),
     ]
     for candidate in candidates:
         if candidate.exists():
             logger.debug("Auto-discovered warp: %s", candidate)
-            return _load_warp(candidate)
+            return _load_warp(candidate), candidate
     return None
 
 
@@ -132,22 +172,19 @@ def _derive_table_name(target_alias: str) -> str:
     return target_alias
 
 
-def _load_warp(path: Path) -> WarpConfig:
-    """Load and validate a warp config from a file path.
+def _load_warp(location: ConfigLocation) -> WarpConfig:
+    """Load and validate a warp config from a file location.
 
     Args:
-        path: Absolute path to the .warp file.
+        location: Location of the .warp file.
 
     Returns:
         Validated WarpConfig instance.
     """
-    from weevr.config.locations import LocalConfigLocation
-
-    location = LocalConfigLocation(path)
     raw = parse_yaml(location)
     result = validate_schema(raw, "warp")
     if not isinstance(result, WarpConfig):
-        raise ConfigError(f"Expected WarpConfig from '{path}', got {type(result).__name__}")
+        raise ConfigError(f"Expected WarpConfig from '{location}', got {type(result).__name__}")
     return result
 
 
