@@ -72,3 +72,38 @@ class TestAliasTargetWarp:
         assert result.status == "success", result.detail
         rows = spark.table("b028_warp.dim_customer").collect()
         assert [(r.id, r.name, r.region) for r in rows] == [(1, "a", "n/a")]
+
+
+class TestWarpDiscovery:
+    """A warp named after the target applies without target.warp."""
+
+    def test_discovered_warp_appends_warp_only_column(self, spark: SparkSession, tmp_path: Path):
+        src = str(tmp_path / "src")
+        spark.createDataFrame([(1, "a")], ["id", "name"]).write.format("delta").save(src)
+        target = str(tmp_path / "Tables" / "dim_customer")
+        project = tmp_path / "p.weevr"
+        _write(project / "dim_customer.warp", WARP)
+        thread = _thread(src, {"path": target})
+        thread["write"] = {"mode": "overwrite"}
+        _write(project / "dim_customer.thread", thread)
+
+        result = Context(spark=spark, project=str(project)).run("dim_customer.thread")
+
+        assert result.status == "success", result.detail
+        rows = spark.read.format("delta").load(target).collect()
+        assert [(r.id, r.name, r.region) for r in rows] == [(1, "a", "n/a")]
+
+    def test_opt_out_ignores_matching_warp(self, spark: SparkSession, tmp_path: Path):
+        src = str(tmp_path / "src")
+        spark.createDataFrame([(1, "a")], ["id", "name"]).write.format("delta").save(src)
+        target = str(tmp_path / "Tables" / "dim_customer")
+        project = tmp_path / "p.weevr"
+        _write(project / "dim_customer.warp", WARP)
+        thread = _thread(src, {"path": target, "warp": False})
+        thread["write"] = {"mode": "overwrite"}
+        _write(project / "dim_customer.thread", thread)
+
+        result = Context(spark=spark, project=str(project)).run("dim_customer.thread")
+
+        assert result.status == "success", result.detail
+        assert spark.read.format("delta").load(target).columns == ["id", "name"]

@@ -9,6 +9,7 @@ from weevr.config.locations import ConfigLocation, LocalConfigLocation
 from weevr.config.parser import parse_yaml
 from weevr.config.validation import validate_schema
 from weevr.errors import ConfigError
+from weevr.model.target import Target
 from weevr.model.warp import EffectiveWarp, WarpColumn, WarpConfig
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,51 @@ def find_warp(
         return _auto_discover(table_name, thread_loc, root_loc)
 
     return None
+
+
+def discover_warp(
+    target: Target,
+    thread_dir: ConfigLocation | Path,
+    config_root: ConfigLocation | Path,
+) -> tuple[WarpConfig, ConfigLocation] | None:
+    """Find a warp named after a target, for a thread with no ``target.warp``.
+
+    Looks for ``<target name>.warp`` in the thread's directory, then the
+    project root (see :func:`target_warp_name`).
+
+    Args:
+        target: The thread's target.
+        thread_dir: Directory containing the thread config file.
+        config_root: Root directory for the config project.
+
+    Returns:
+        ``(warp, file location)``, or None when the target has no usable name
+        or no matching file exists.
+    """
+    name = target_warp_name(target)
+    if name is None:
+        return None
+    return _auto_discover(name, _as_location(thread_dir), _as_location(config_root))
+
+
+def target_warp_name(target: Target) -> str | None:
+    """Return the warp file stem a target maps to.
+
+    The alias's last dot segment, else the path's last segment, else the
+    connection target's ``table``.
+
+    Args:
+        target: The thread's target.
+
+    Returns:
+        The name, or None when the target has none of these.
+    """
+    if target.alias:
+        return _derive_table_name(target.alias)
+    if target.path:
+        segment = target.path.rstrip("/").rsplit("/", maxsplit=1)[-1]
+        return segment or None
+    return target.table
 
 
 def _as_location(loc: ConfigLocation | Path) -> ConfigLocation:

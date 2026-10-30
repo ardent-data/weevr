@@ -45,7 +45,7 @@ from weevr.config.validation import (
     validate_dimension_overrides,
     validate_schema,
 )
-from weevr.config.warp import find_warp
+from weevr.config.warp import discover_warp, find_warp
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
 from weevr.model.warp import WarpBinding
@@ -281,6 +281,9 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
 def bind_thread_warp(thread: Thread, thread_file: ConfigLocation, root: ConfigLocation) -> None:
     """Resolve a thread's warp from its file's directory and the project root.
 
+    An explicit ``target.warp`` is searched by name; with no ``target.warp``
+    a warp named after the target is discovered; ``warp: false`` binds none.
+
     The warp search runs at load so a missing explicit warp fails before any
     data is read, and so the engine never has to guess config locations
     from the target path.
@@ -296,9 +299,11 @@ def bind_thread_warp(thread: Thread, thread_file: ConfigLocation, root: ConfigLo
     """
     thread_dir = thread_file.parent
     found = None
-    if isinstance(thread.target.warp, str):
-        with attribute_errors(thread_file):
+    with attribute_errors(thread_file):
+        if isinstance(thread.target.warp, str):
             found = find_warp(thread.target.warp, thread_dir, root)
+        elif thread.target.warp is None:
+            found = discover_warp(thread.target, thread_dir, root)
     thread.bind_warp(
         WarpBinding(
             warp=found[0] if found else None,

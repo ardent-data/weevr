@@ -146,6 +146,68 @@ class TestChildThreadWarpResolution:
         assert thread.warp_binding.warp.columns[0].name == "beside_weave"
 
 
+class TestWarpAutoDiscovery:
+    """With target.warp unset, a warp named after the target is discovered."""
+
+    @pytest.mark.parametrize(
+        ("target", "warp_name"),
+        [
+            ({"alias": "gold.dim_customer"}, "dim_customer"),
+            ({"alias": "dim_customer"}, "dim_customer"),
+            ({"path": "Tables/dim_customer"}, "dim_customer"),
+            (
+                {"path": "abfss://ws@onelake.dfs.fabric.microsoft.com/lh/Tables/dim_x/"},
+                "dim_x",
+            ),
+            ({"connection": "lh", "table": "dim_conn"}, "dim_conn"),
+        ],
+    )
+    def test_discovers_by_target_name(self, project: Path, target: dict, warp_name: str):
+        _write(project / "threads" / f"{warp_name}.warp", _warp("found"))
+        thread = _thread(target)
+        if "connection" in target:
+            thread["connections"] = {
+                "lh": {"type": "onelake", "workspace": "ws", "lakehouse": "lh"}
+            }
+        path = _write(project / "threads" / "dim_customer.thread", thread)
+        binding = _load_thread(path, project).warp_binding
+        assert binding is not None and binding.warp is not None
+        assert binding.warp_file == str(project / "threads" / f"{warp_name}.warp")
+
+    def test_thread_dir_wins_over_project_root(self, project: Path):
+        _write(project / "threads" / "dim_customer.warp", _warp("thread_dir"))
+        _write(project / "dim_customer.warp", _warp("root"))
+        path = _write(
+            project / "threads" / "dim_customer.thread", _thread({"alias": "gold.dim_customer"})
+        )
+        binding = _load_thread(path, project).warp_binding
+        assert binding.warp.columns[0].name == "thread_dir"
+
+    def test_project_root_used_when_thread_dir_has_none(self, project: Path):
+        _write(project / "dim_customer.warp", _warp("root"))
+        path = _write(
+            project / "threads" / "dim_customer.thread", _thread({"alias": "gold.dim_customer"})
+        )
+        binding = _load_thread(path, project).warp_binding
+        assert binding.warp.columns[0].name == "root"
+
+    def test_nothing_found_is_not_an_error(self, project: Path):
+        path = _write(
+            project / "threads" / "dim_customer.thread", _thread({"alias": "gold.dim_customer"})
+        )
+        binding = _load_thread(path, project).warp_binding
+        assert binding is not None
+        assert binding.warp is None and binding.warp_file is None
+
+    def test_opt_out_skips_discovery(self, project: Path):
+        _write(project / "threads" / "dim_customer.warp", _warp("found"))
+        path = _write(
+            project / "threads" / "dim_customer.thread",
+            _thread({"alias": "gold.dim_customer", "warp": False}),
+        )
+        assert _load_thread(path, project).warp_binding.warp is None
+
+
 class _MemoryLocation(ConfigLocation):
     """Non-local ConfigLocation over an in-memory file map (stands in for OneLake)."""
 
