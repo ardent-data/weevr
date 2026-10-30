@@ -159,6 +159,82 @@ write modes, the result is idempotent incremental processing.
     `watermark_inclusive: true` and pair it with a merge write mode. The
     merge ensures that re-read rows are updated rather than duplicated.
 
+### Stored values
+
+Timestamp watermarks are stored as UTC instants in ISO-8601 form with
+microseconds, such as `2024-03-15T17:00:00.000000Z`, so a watermark means
+the same moment whatever the driver's or the Spark session's time zone.
+`timestamp_ntz` columns, which carry no zone, are stored as their wall-clock
+value. Date watermarks are stored as `2024-03-15` and integer watermarks as
+digits.
+
+Watermarks written by earlier weevr versions (timestamps without the `Z`)
+are still read correctly — they are interpreted in the driver's time zone,
+which is what they encode — and are rewritten in the new form at the next
+run that advances the watermark.
+
+### Deduplication and watermarks
+
+A `dedup` on the watermarked source must keep the latest row per key by the
+watermark column — `order_by: "<watermark_column> DESC"`. The watermark
+advances to the newest value read, so a dedup that keeps an older row per
+key would drop that key's later changes for good. Any other `order_by`
+fails the config load with the required value.
+
+### Recovery after a failed state save
+
+An incremental append records its new watermark in the Delta commit that
+writes the data. If saving the watermark to the state store fails after the
+write, the next run finds the newer value in the target's commit history
+(the latest 100 commits) and continues from it instead of re-appending the
+same rows. A watermark you set in the store after that commit — a manual
+reset — takes precedence.
+
+A first run that finds no stored or recorded watermark, but an append target
+that already holds rows, fails before writing: re-reading the whole source
+would duplicate data. Seed the watermark or truncate the target as
+described below. Merge targets are not affected, since a merge does not
+duplicate rows.
+
+### Seed or reset a watermark
+
+weevr has no command for setting a watermark; set it directly in the state
+store. Use the same value form weevr stores (see [Stored values](#stored-values)).
+
+**`metadata_table` store** — upsert a row for the thread into the table at
+`watermark_store.table_path`:
+
+```sql
+MERGE INTO delta.`<table_path>` AS t
+USING (SELECT 'my_thread' AS thread_name, 'modified_date' AS watermark_column,
+              'timestamp' AS watermark_type,
+              '2024-03-15T00:00:00.000000Z' AS last_value,
+              current_timestamp() AS last_updated, CAST(NULL AS STRING) AS run_id) AS s
+ON t.thread_name = s.thread_name
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+```
+
+Use the table alias instead of ``delta.`<table_path>` `` when the store is a
+lakehouse table.
+
+**`table_properties` store** (the default) — set the thread's properties on
+the target table:
+
+```sql
+ALTER TABLE <target> SET TBLPROPERTIES (
+  'weevr.watermark.my_thread.last_value' = '2024-03-15T00:00:00.000000Z',
+  'weevr.watermark.my_thread.watermark_column' = 'modified_date',
+  'weevr.watermark.my_thread.watermark_type' = 'timestamp',
+  'weevr.watermark.my_thread.last_updated' = '2024-03-15T00:00:00+00:00'
+)
+```
+
+Set `last_updated` to the current time so the seeded value takes precedence
+over a value recorded in an earlier commit. To reload everything into an
+append target instead, truncate the target (and remove any stored
+watermark) before the run.
+
 ## Merge and match keys
 
 The merge write mode depends on `match_keys` to identify which source rows

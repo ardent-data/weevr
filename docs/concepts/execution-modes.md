@@ -296,7 +296,11 @@ only the incremental slice, silently discarding all previously loaded
 history.
 
 The watermark is persisted in a configurable state store -- either as a
-Delta table property on the target or in a dedicated metadata table.
+Delta table property on the target or in a dedicated metadata table. A
+`dedup` on the watermarked (first) source must use
+`order_by: "<watermark_column> DESC"`; see
+[Watermarks and state](idempotency.md#watermarks-and-state) for the stored
+format, recovery after a failed save, and how to seed a watermark.
 
 ### Incremental parameter
 

@@ -70,7 +70,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `keys` | `list[string]` | yes | -- | Columns used for deduplication grouping |
-| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep |
+| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep. On the watermarked source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`. |
 
 ```yaml
 sources:

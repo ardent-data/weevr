@@ -13,6 +13,15 @@ post-mapping and with audit columns applied. They are declared in the
 sequentially after the primary write, watermark persistence, and
 post-write assertions.
 
+!!! warning "Aborted exports are not retried"
+    Because the watermark is saved before exports run, an export with
+    `on_failure: abort` that fails leaves the watermark advanced: the next
+    run reads only newer rows, and the failed batch is never exported.
+    To recover, re-run that export against the target, or reset the
+    watermark to its previous value
+    ([Seed or reset a watermark](../concepts/idempotency.md#seed-or-reset-a-watermark))
+    and re-run the thread.
+
 ## Configuration
 
 ```yaml
