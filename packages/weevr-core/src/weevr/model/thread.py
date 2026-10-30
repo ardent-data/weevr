@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
@@ -23,6 +23,7 @@ from weevr.model.sub_pipeline import SubPipeline
 from weevr.model.target import Target
 from weevr.model.validation import Assertion, ValidationRule
 from weevr.model.variable import VariableSpec
+from weevr.model.warp import WarpBinding
 from weevr.model.write import WriteConfig
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,27 @@ class Thread(FrozenBase):
     sources: dict[str, Source] = Field(
         description="Named data source declarations. At least one entry required.",
     )
+
+    # Set by the config loader; never part of the serialized config.
+    _warp_binding: WarpBinding | None = PrivateAttr(default=None)
+
+    @property
+    def warp_binding(self) -> WarpBinding | None:
+        """The warp the loader resolved for this thread.
+
+        ``None`` for a thread built without the loader; the executor then
+        falls back to looking up an explicit ``target.warp`` beside the
+        target.
+        """
+        return self._warp_binding
+
+    def bind_warp(self, binding: WarpBinding) -> None:
+        """Attach the loader's warp resolution to this thread.
+
+        Args:
+            binding: The resolved warp and its locations.
+        """
+        self._warp_binding = binding
 
     @field_validator("sources")
     @classmethod

@@ -157,15 +157,40 @@ class DriftFinding:
         return f"DriftFinding(column={self.column!r}, action={self.action!r})"
 
 
+@dataclass(frozen=True)
+class WarpBinding:
+    """The warp a config load resolved for a thread, and where it came from.
+
+    Set by the loader, which knows the thread's file and the project root.
+    Paths are plain strings so the model layer stays independent of config
+    locations.
+
+    Attributes:
+        warp: The resolved warp, or ``None`` when none applies (opt-out or
+            nothing found).
+        warp_file: Path or URI of the warp file that was loaded.
+        thread_dir: Directory of the thread's config file (the enclosing
+            file's directory for inline threads).
+        writable: Whether ``thread_dir`` is on the local filesystem, so
+            auto-generated warps can be written there.
+    """
+
+    warp: WarpConfig | None
+    warp_file: str | None
+    thread_dir: str
+    writable: bool
+
+
 @dataclass
 class DriftReport:
     """Result of schema drift detection for a single thread execution.
 
-    Captures which extra columns were found and what action was taken
-    for each.
+    Captures which extra and missing columns were found and what action
+    was taken for each.
     """
 
     extra_columns: list[str] = field(default_factory=list)
+    missing_columns: list[str] = field(default_factory=list)
     action_taken: str = ""
     drift_mode: str = ""
     baseline_source: str = ""
@@ -179,4 +204,4 @@ class DriftReport:
     @property
     def has_drift(self) -> bool:
         """Return whether any drift was detected."""
-        return len(self.extra_columns) > 0
+        return bool(self.extra_columns or self.missing_columns)

@@ -898,7 +898,7 @@ Defines where the thread writes its output.
 | `connection` | `string` | cond. | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. |
 | `schema` | `string` | no | `null` | Schema override within the connection's lakehouse. Overrides `connection.default_schema`. |
 | `table` | `string` | cond. | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
-| `mapping_mode` | `string` | no | `"auto"` | Column mapping: `"auto"` or `"explicit"` |
+| `mapping_mode` | `string` | no | `"auto"` | Column mapping: `"auto"` or `"explicit"`. `"auto"` passes every column to a new table and keeps an existing table's columns; `schema_drift: adaptive` adds new ones. |
 | `columns` | `dict[string, ColumnMapping]` | no | `null` | Per-column mapping specifications |
 | `partition_by` | `list[string]` | no | `null` | Partition columns for the output table |
 | `audit_columns` | `dict[string, string]` | no | `null` | Audit column definitions as name-expression pairs |
@@ -909,14 +909,21 @@ Defines where the thread writes its output.
 | `dimension` | `DimensionConfig` | no | `null` | Dimension target mode with composable SCD flags. Mutually exclusive with `fact`. See [Dimension Modeling guide](../../guides/dimension-modeling.md). |
 | `fact` | `FactConfig` | no | `null` | Fact target mode with FK validation. Mutually exclusive with `dimension`. See [Fact Tables guide](../../guides/fact-tables.md). |
 | `seed` | `SeedConfig` | no | `null` | Seed rows inserted on first write or when table is empty. |
-| `warp` | `string \| false \| null` | no | `null` | Warp schema contract reference. A string names an explicit `.warp` file; `false` opts out of auto-discovery; `null` enables auto-discovery. |
-| `warp_mode` | `"auto" \| null` | no | `null` | Warp generation mode. `"auto"` writes/updates the `.warp` file after each successful run. |
+| `warp` | `string \| false \| null` | no | `null` | Warp schema contract reference. A string names an explicit `.warp` file, searched beside the thread file, then at the project root; a missing file fails the load. `false` opts out of auto-discovery; `null` discovers a `.warp` named after the target. See [Warps](../../guides/warps.md#discovery). |
+| `warp_mode` | `"auto" \| null` | no | `null` | Warp generation mode. `"auto"` updates the warp the thread loaded, or writes `<target name>.warp` beside the thread file, after each successful run. Skipped with a warning for projects loaded from OneLake. |
 | `warp_init` | `bool` | no | `false` | When `true` and a warp exists, create the Delta table from the effective warp before the first pipeline run. |
 | `warp_enforcement` | `"warn" \| "enforce" \| "off"` | no | `"warn"` | Warp contract enforcement mode. `"enforce"` fails the thread on violations; `"warn"` logs findings; `"off"` skips validation. |
-| `schema_drift` | `"lenient" \| "strict" \| "adaptive"` | no | `"lenient"` | Schema drift handling mode. `"lenient"` passes extra columns through; `"strict"` applies `on_drift` action; `"adaptive"` passes through and extends auto-generated warps. |
-| `on_drift` | `"error" \| "warn" \| "ignore"` | no | `"warn"` | Severity action for strict drift mode. `"error"` aborts the thread; `"warn"` drops extra columns with a warning; `"ignore"` drops silently. |
+| `schema_drift` | `"lenient" \| "strict" \| "adaptive"` | no | `"lenient"` | Schema drift handling mode. `"lenient"` reports drift and writes as configured; `"strict"` applies the `on_drift` action to extra and missing columns; `"adaptive"` adds new columns to the Delta table and extends auto-generated warps. See [Schema Drift](../../guides/schema-drift.md). |
+| `on_drift` | `"error" \| "warn" \| "ignore"` | no | `"warn"` | Severity action for strict drift mode. `"error"` aborts the thread; `"warn"` drops extra columns and writes missing ones as null, with a warning; `"ignore"` does the same silently. |
 
 At least one of `alias`, `path`, or `connection` + `table` is required.
+
+!!! warning "FUSE paths on targets"
+    A source `path` or `alias` that starts with `/lakehouse/` is rewritten to
+    its `abfss://` OneLake URI. Target and export paths are not rewritten in
+    v1, so the same `/lakehouse/...` path can point at different physical
+    locations as a source and as a target. Use an `alias`, a connection, or an
+    `abfss://` path for targets.
 
 ### target.columns (ColumnMapping)
 

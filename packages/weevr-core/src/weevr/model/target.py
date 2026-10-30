@@ -72,8 +72,9 @@ class Target(FrozenBase):
     mapping_mode: Literal["auto", "explicit"] = Field(
         default="auto",
         description=(
-            "Column mapping mode. 'auto' passes all source columns through; "
-            "'explicit' requires all output columns to be declared in columns."
+            "Column mapping mode. 'auto' passes all source columns through to a new "
+            "table and keeps an existing table's columns (schema_drift: adaptive adds "
+            "new ones); 'explicit' requires all output columns to be declared in columns."
         ),
     )
     columns: dict[str, ColumnMapping] | None = Field(

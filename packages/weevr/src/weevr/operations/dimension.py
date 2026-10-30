@@ -212,6 +212,7 @@ def execute_dimension_merge(
     run_timestamp: str,
     handle: TargetHandle | None = None,
     stamp: CommitStamp | None = None,
+    evolve: bool = False,
 ) -> DimensionMergeResult:
     """Execute the staged dimension merge against a Delta target.
 
@@ -241,6 +242,8 @@ def execute_dimension_merge(
         stamp: Lineage stamp for the first-write commit (a plain save,
             not a MERGE); enables exact own-commit attribution. Merge
             commits are not stamped.
+        evolve: Add new source columns to the table
+            (``schema_drift: adaptive``).
 
     Returns:
         DimensionMergeResult with row-level metrics.
@@ -274,11 +277,11 @@ def execute_dimension_merge(
 
     if config.track_history and builder.has_version_groups():
         return _execute_versioned_merge(
-            spark, source_df, builder, target_path, run_timestamp, handle=handle
+            spark, source_df, builder, target_path, run_timestamp, handle=handle, evolve=evolve
         )
 
     return _execute_standard_merge(
-        spark, source_df, builder, target_path, run_timestamp, handle=handle
+        spark, source_df, builder, target_path, run_timestamp, handle=handle, evolve=evolve
     )
 
 
@@ -289,6 +292,7 @@ def _execute_versioned_merge(
     target_path: str,
     run_timestamp: str,
     handle: TargetHandle | None = None,
+    evolve: bool = False,
 ) -> DimensionMergeResult:
     """SCD Type 2 staged merge: pre-join to identify changes, then MERGE.
 
@@ -370,6 +374,8 @@ def _execute_versioned_merge(
 
     delta_table = resolve_delta_table(spark, target_path)
     merger = delta_table.alias("target").merge(merged_source.alias("source"), merge_cond)
+    if evolve:
+        merger = merger.withSchemaEvolution()
 
     # Matched + version hash changed → close old row
     if version_hash_cols:
@@ -426,6 +432,7 @@ def _execute_standard_merge(
     target_path: str,
     run_timestamp: str,
     handle: TargetHandle | None = None,
+    evolve: bool = False,
 ) -> DimensionMergeResult:
     """Standard merge for non-versioned dimensions (Type 1)."""
     config = builder.config
@@ -473,6 +480,8 @@ def _execute_standard_merge(
             update_set[prev_col] = F.col(f"target.{quote_identifier(src_col)}")
 
     merger = delta_table.alias("target").merge(source_df.alias("source"), merge_cond)
+    if evolve:
+        merger = merger.withSchemaEvolution()
 
     if update_set:
         merger = merger.whenMatchedUpdate(condition=change_cond, set=update_set)

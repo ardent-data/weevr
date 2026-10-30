@@ -71,8 +71,11 @@ class TestDefaultBehavior:
         assert result.warp_findings is None
         assert result.drift_report is None
 
-    def test_no_warp_no_auto_discovery(self, spark: SparkSession, tmp_delta_path):
-        """Thread with warp=None does not trigger auto-discovery."""
+    def test_hand_built_thread_does_not_auto_discover(self, spark: SparkSession, tmp_delta_path):
+        """A thread built without the loader never auto-discovers a warp.
+
+        Discovery runs at config load, from the thread file and project root.
+        """
         path = tmp_delta_path("no_auto_discover")
         thread = _make_thread(target_alias=path)
         source_df = spark.createDataFrame([(1,)], ["id"])

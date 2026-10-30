@@ -71,7 +71,13 @@ from weevr.operations.warp import (
     enforce_warp,
     pre_initialize_table,
 )
-from weevr.operations.writers import apply_target_mapping, execute_cdc_merge, write_target
+from weevr.operations.writers import (
+    apply_target_mapping,
+    execute_cdc_merge,
+    existing_target_columns,
+    narrow_to_target,
+    write_target,
+)
 from weevr.state import WatermarkState, WatermarkStore, resolve_store
 from weevr.telemetry.collector import SpanBuilder, SpanCollector
 from weevr.telemetry.results import ExportResult, ThreadTelemetry
@@ -317,10 +323,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             warp_findings: list[dict[str, str]] = []
             drift_report = None
 
-            # Only resolve warp when explicitly referenced (string).
-            # Auto-discovery from target_path is unreliable because
-            # alias-based targets are not filesystem paths.
-            if isinstance(thread.target.warp, str):
+            # The loader resolves warps from the thread file and project root.
+            # A thread built without the loader has no binding; it keeps the
+            # original lookup beside the target, explicit references only.
+            if thread.warp_binding is not None:
+                resolved_warp = thread.warp_binding.warp
+            elif isinstance(thread.target.warp, str):
                 from weevr.config.warp import resolve_warp
 
                 thread_dir = Path(target_path).parent if target_path else Path(".")
@@ -649,20 +657,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
-                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
-                if audit_columns and audit_ctx is not None:
-                    df = inject_audit_columns(df, audit_columns, audit_ctx)
-                    audit_columns_applied = list(audit_columns)
-
-                # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied[:]
-                df, warp_findings, drift_report = _apply_warp_and_drift(
+                df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
                     df,
-                    resolved_warp,
                     thread,
-                    engine_col_names,
-                    spark=spark,
-                    target_path=target_path,
+                    spark,
+                    target_handle,
+                    target_path,
+                    resolved_warp,
+                    audit_columns,
+                    audit_ctx,
+                    _writer_managed_columns(thread, dim_builder),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -704,6 +708,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     run_timestamp,
                     handle=target_handle,
                     stamp=commit_stamp,
+                    evolve=thread.target.schema_drift == "adaptive",
                 )
                 # Input-rows semantic. Quarantine-free merges need no new
                 # action: transforms after the eager rows_after_transforms
@@ -729,14 +734,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     audit_columns_applied = list(audit_columns)
 
                 # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied[:]
+                engine_col_names = audit_columns_applied + _writer_managed_columns(thread, None)
                 df, warp_findings, drift_report = _apply_warp_and_drift(
                     df,
                     resolved_warp,
                     thread,
                     engine_col_names,
-                    spark=spark,
-                    target_path=target_path,
+                    table_columns=existing_target_columns(spark, target_path, target_handle),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -760,25 +764,22 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     thread.load.cdc,
                     load_config=thread.load,
                     handle=target_handle,
+                    evolve=thread.target.schema_drift == "adaptive",
                 )
                 rows_written = sum(cdc_counts.values())
 
             else:
                 # Standard write path
-                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
-                if audit_columns and audit_ctx is not None:
-                    df = inject_audit_columns(df, audit_columns, audit_ctx)
-                    audit_columns_applied = list(audit_columns)
-
-                # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied[:]
-                df, warp_findings, drift_report = _apply_warp_and_drift(
+                df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
                     df,
-                    resolved_warp,
                     thread,
-                    engine_col_names,
-                    spark=spark,
-                    target_path=target_path,
+                    spark,
+                    target_handle,
+                    target_path,
+                    resolved_warp,
+                    audit_columns,
+                    audit_ctx,
+                    _writer_managed_columns(thread, None),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -835,14 +836,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             # Auto-generate warp after successful write (all paths)
             if thread.target.warp_mode == "auto":
-                auto_generate_warp(
-                    df,
-                    resolved_warp,
-                    drift_report,
-                    thread.name,
-                    str(Path(target_path).parent) if target_path else ".",
-                    adaptive=thread.target.schema_drift == "adaptive",
-                )
+                destination = _auto_warp_destination(thread, target_path)
+                if destination is not None:
+                    auto_generate_warp(
+                        df,
+                        resolved_warp,
+                        drift_report,
+                        destination[1],
+                        destination[0],
+                        adaptive=thread.target.schema_drift == "adaptive",
+                    )
 
             # Step 14 — persist watermark state
             if (
@@ -980,6 +983,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 warp_enforcement_mode=thread.target.warp_enforcement if resolved_warp else None,
                 drift_detected=drift_report.has_drift if drift_report else False,
                 drift_columns=drift_report.extra_columns if drift_report else None,
+                drift_missing_columns=drift_report.missing_columns if drift_report else None,
                 drift_mode=drift_report.drift_mode if drift_report else None,
                 drift_action_taken=drift_report.action_taken if drift_report else None,
             )
@@ -989,6 +993,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             if drift_report is not None and drift_report.has_drift:
                 drift_report_dict = {
                     "extra_columns": drift_report.extra_columns,
+                    "missing_columns": drift_report.missing_columns,
                     "action_taken": drift_report.action_taken,
                     "drift_mode": drift_report.drift_mode,
                     "baseline_source": drift_report.baseline_source,
@@ -1171,13 +1176,145 @@ def _resolve_with_block(
     return enriched
 
 
+def _writer_managed_columns(thread: Thread, dim_builder: Any) -> list[str]:
+    """Columns the writer adds or consumes itself, which are never drift.
+
+    The soft-delete column (from ``write`` or the dimension's overrides)
+    exists in the table but not in the working DataFrame; CDC operation and
+    change-feed metadata columns exist in the DataFrame but not the table.
+
+    Args:
+        thread: Thread configuration.
+        dim_builder: The dimension merge builder, or None.
+
+    Returns:
+        Column names to exclude from drift detection.
+    """
+    from weevr.operations.writers import resolve_cdc_columns
+
+    managed: list[str] = []
+    if thread.write is not None and thread.write.soft_delete_column:
+        managed.append(thread.write.soft_delete_column)
+    if dim_builder is not None:
+        dim_soft_delete = dim_builder.build_write_config().soft_delete_column
+        if dim_soft_delete:
+            managed.append(dim_soft_delete)
+    if thread.load is not None and thread.load.mode == "cdc" and thread.load.cdc is not None:
+        managed += ["_change_type", "_commit_version", "_commit_timestamp"]
+        op_col = resolve_cdc_columns(thread.load.cdc)["operation_column"]
+        if op_col:
+            managed.append(op_col)
+    return managed
+
+
+def _shape_for_target(
+    df: Any,
+    thread: Thread,
+    spark: SparkSession,
+    target_handle: TargetHandle,
+    target_path: str,
+    resolved_warp: Any,
+    audit_columns: dict[str, str] | None,
+    audit_ctx: Any,
+    managed_columns: list[str],
+) -> tuple[Any, list[dict[str, str]], Any, list[str]]:
+    """Map, audit, and drift-check the working DataFrame for a mapped write.
+
+    Auto mapping's narrowing to the existing table's columns is deferred
+    until after drift handling, so drift sees new output columns on an
+    existing table. Columns added after mapping (audit, warp-only) are kept.
+
+    Args:
+        df: Working DataFrame.
+        thread: Thread configuration.
+        spark: Active SparkSession.
+        target_handle: Pre-resolved target handle.
+        target_path: Resolved target path or alias.
+        resolved_warp: Resolved WarpConfig, or None.
+        audit_columns: Audit column expressions, if configured.
+        audit_ctx: Audit context for expression resolution.
+        managed_columns: Writer-managed columns excluded from drift.
+
+    Returns:
+        ``(df, warp findings, drift report, audit columns applied)``.
+    """
+    # One read of the existing table's columns serves drift and narrowing
+    table_columns = existing_target_columns(spark, target_path, target_handle)
+    df = apply_target_mapping(df, thread.target, spark, handle=target_handle, narrow=False)
+    mapped_cols = set(df.columns)
+    audit_applied: list[str] = []
+    if audit_columns and audit_ctx is not None:
+        df = inject_audit_columns(df, audit_columns, audit_ctx)
+        audit_applied = list(audit_columns)
+
+    # Warp enforcement, drift detection, warp-only append
+    df, warp_findings, drift_report = _apply_warp_and_drift(
+        df,
+        resolved_warp,
+        thread,
+        audit_applied + managed_columns,
+        table_columns=table_columns,
+    )
+    keep = [c for c in df.columns if c not in mapped_cols]
+    if thread.target.schema_drift == "adaptive" and drift_report is not None:
+        # adaptive keeps new columns; the write adds them to the table
+        keep += drift_report.extra_columns
+    df = narrow_to_target(df, thread.target, table_columns, keep=keep)
+    return df, warp_findings, drift_report, audit_applied
+
+
+def _auto_warp_destination(thread: Thread, target_path: str | None) -> tuple[str, str] | None:
+    """Return the ``(directory, file stem)`` an auto-generated warp is written to.
+
+    A loaded thread updates the warp it loaded, else writes
+    ``<target name>.warp`` beside its config file, where the next load
+    discovers it. A thread loaded from a non-local project is skipped with a
+    warning, since config locations are read-only there. A thread built
+    without the loader writes beside a local path target and is skipped with
+    a warning for an alias or remote target.
+
+    Args:
+        thread: Thread configuration, with the loader's warp binding if any.
+        target_path: Resolved target path or alias.
+
+    Returns:
+        ``(directory, stem)``, or None when nothing should be written.
+    """
+    from weevr.config.warp import target_warp_name
+
+    binding = thread.warp_binding
+    if binding is None:
+        # Only a local path target has a meaningful directory to write beside;
+        # an alias or a remote URI would land in the working directory or a
+        # mangled path.
+        if thread.target.alias or not target_path or "://" in target_path:
+            logger.warning(
+                "Thread '%s': warp_mode 'auto' skipped — load the config through "
+                "Context or load_config to write the warp beside the thread file",
+                thread.name,
+            )
+            return None
+        return (str(Path(target_path).parent), thread.name)
+    if not binding.writable:
+        logger.warning(
+            "Thread '%s': warp_mode 'auto' skipped — the project location %s is not "
+            "writable from the engine",
+            thread.name,
+            binding.thread_dir,
+        )
+        return None
+    if binding.warp_file is not None:
+        warp_file = Path(binding.warp_file)
+        return (str(warp_file.parent), warp_file.stem)
+    return (binding.thread_dir, target_warp_name(thread.target) or thread.name)
+
+
 def _apply_warp_and_drift(
     df: Any,
     resolved_warp: Any,
     thread: Thread,
     engine_col_names: list[str],
-    spark: SparkSession | None = None,
-    target_path: str | None = None,
+    table_columns: list[str] | None = None,
 ) -> tuple[Any, list[dict[str, str]], Any]:
     """Apply warp enforcement, drift detection, and warp-only append.
 
@@ -1189,13 +1326,13 @@ def _apply_warp_and_drift(
         resolved_warp: Resolved WarpConfig, or None.
         thread: Thread configuration.
         engine_col_names: Engine-managed column names (audit, SCD, etc.).
-        spark: SparkSession for table-based drift baseline fallback.
-        target_path: Target path for table-based drift baseline fallback.
+        table_columns: The existing target table's columns, the drift
+            baseline when there is no warp; None when the table doesn't exist.
 
     Returns:
         Tuple of (modified df, warp findings, drift report).
     """
-    from weevr.config.warp import build_effective_warp, get_drift_baseline
+    from weevr.config.warp import build_effective_warp
 
     warp_findings: list[dict[str, str]] = []
 
@@ -1205,7 +1342,9 @@ def _apply_warp_and_drift(
     all_engine = list(set(engine_col_names + weevr_cols))
 
     # Drift detection (works with or without warp)
-    baseline = get_drift_baseline(warp=resolved_warp, spark=spark, target_path=target_path)
+    baseline = (
+        [col.name for col in resolved_warp.columns] if resolved_warp is not None else table_columns
+    )
     baseline_source = (
         "warp" if resolved_warp is not None else ("table" if baseline is not None else "none")
     )
@@ -1385,6 +1524,7 @@ def _build_telemetry(
     warp_enforcement_mode: str | None = None,
     drift_detected: bool = False,
     drift_columns: list[str] | None = None,
+    drift_missing_columns: list[str] | None = None,
     drift_mode: str | None = None,
     drift_action_taken: str | None = None,
     step_stats: dict[str, dict[str, Any]] | None = None,
@@ -1429,6 +1569,7 @@ def _build_telemetry(
         warp_enforcement=warp_enforcement_mode,
         drift_detected=drift_detected,
         drift_columns=drift_columns or [],
+        drift_missing_columns=drift_missing_columns or [],
         drift_mode=drift_mode,
         drift_action_taken=drift_action_taken,
         step_stats=step_stats,

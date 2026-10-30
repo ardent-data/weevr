@@ -33,6 +33,7 @@ def apply_target_mapping(
     target: Target,
     spark: SparkSession,
     handle: TargetHandle | None = None,
+    narrow: bool = True,
 ) -> DataFrame:
     """Apply target column mapping to shape the DataFrame for writing.
 
@@ -51,6 +52,9 @@ def apply_target_mapping(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        narrow: When False, auto mode skips narrowing to the existing table's
+            columns, so a caller can inspect the extra columns first and
+            narrow later with :func:`narrow_to_target`.
 
     Returns:
         DataFrame shaped for writing to the target.
@@ -76,20 +80,14 @@ def apply_target_mapping(
 
     # Narrow column set according to mapping mode.
     if target.mapping_mode == "auto":
-        target_path = target.alias or target.path
-        target_present = (
-            handle.exists()
-            if handle is not None and target_path == handle.path
-            else bool(target_path) and delta_table_exists(spark, target_path)
+        existing_cols = (
+            existing_target_columns(spark, target.alias or target.path, handle) if narrow else None
         )
-        if target_path and target_present:
-            if is_table_alias(target_path):
-                existing_cols = spark.read.format("delta").table(target_path).columns
-            else:
-                existing_cols = spark.read.format("delta").load(target_path).columns
+        if existing_cols is not None:
             keep = [c for c in existing_cols if c in result.columns and c not in cols_to_drop]
             return result.select(keep)
-        # New target — pass all columns through, honoring drop markers.
+        # New target (or narrowing deferred) — pass all columns through,
+        # honoring drop markers.
         if cols_to_drop:
             result = result.drop(*cols_to_drop)
         return result
@@ -101,6 +99,68 @@ def apply_target_mapping(
 
     # explicit with no columns declared — nothing to select, return as-is.
     return result
+
+
+def narrow_to_target(
+    df: DataFrame,
+    target: Target,
+    existing_columns: list[str] | None,
+    keep: list[str] | None = None,
+) -> DataFrame:
+    """Apply auto mapping's narrowing to the existing table's columns.
+
+    The deferred half of :func:`apply_target_mapping` with ``narrow=False``:
+    keeps the existing table's columns in table order, then the ``keep``
+    columns in their current order. A no-op for explicit mapping or a target
+    that doesn't exist yet.
+
+    Args:
+        df: DataFrame to narrow.
+        target: Target configuration including mapping mode.
+        existing_columns: The existing table's columns (see
+            :func:`existing_target_columns`), or None when it doesn't exist.
+        keep: Extra columns to keep even though the table lacks them (for
+            example engine columns added after mapping).
+
+    Returns:
+        The narrowed DataFrame.
+    """
+    if target.mapping_mode != "auto" or existing_columns is None:
+        return df
+    keep_set = set(keep or ())
+    kept = [c for c in existing_columns if c in df.columns]
+    kept += [c for c in df.columns if c in keep_set and c not in kept]
+    return df.select(kept)
+
+
+def existing_target_columns(
+    spark: SparkSession, target_path: str | None, handle: TargetHandle | None = None
+) -> list[str] | None:
+    """Return the existing target table's columns, or None if it doesn't exist.
+
+    Handles both table aliases and paths, and probes existence first, so a
+    missing table is a quiet None rather than a failed read.
+
+    Args:
+        spark: Active SparkSession.
+        target_path: Table alias or path of the target.
+        handle: Pre-resolved target handle for ``target_path``, if any.
+
+    Returns:
+        Column names in table order, or None.
+    """
+    if not target_path:
+        return None
+    target_present = (
+        handle.exists()
+        if handle is not None and target_path == handle.path
+        else delta_table_exists(spark, target_path)
+    )
+    if not target_present:
+        return None
+    if is_table_alias(target_path):
+        return spark.read.format("delta").table(target_path).columns
+    return spark.read.format("delta").load(target_path).columns
 
 
 def write_target(
@@ -140,6 +200,8 @@ def write_target(
         ExecutionError: If the write operation fails.
     """
     mode = write_config.mode if write_config else "overwrite"
+    # adaptive drift adds new columns to the table, scoped to this write
+    evolve = target.schema_drift == "adaptive"
     partition_cols = target.partition_by or []
     use_table_api = is_table_alias(target_path)
     if handle is None:
@@ -177,6 +239,8 @@ def write_target(
                     F.lit(write_config.soft_delete_active_value).cast("boolean"),
                 )
             writer = df.write.format("delta").mode("overwrite")
+            if evolve:
+                writer = writer.option("mergeSchema", "true")
             if stamp is not None:
                 writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
@@ -188,6 +252,8 @@ def write_target(
 
         elif mode == "append":
             writer = df.write.format("delta").mode("append")
+            if evolve:
+                writer = writer.option("mergeSchema", "true")
             if stamp is not None:
                 writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
@@ -202,7 +268,7 @@ def write_target(
                 raise ExecutionError("merge mode requires a write_config with match_keys")
             if write_config.match_keys is None:
                 raise ExecutionError("merge mode requires 'match_keys' to be set")
-            _execute_merge(spark, df, write_config, target_path)
+            _execute_merge(spark, df, write_config, target_path, evolve=evolve)
 
         if row_count == -1:
             # Single-pass write: the commit's own numOutputRows — found by
@@ -234,8 +300,12 @@ def _execute_merge(
     df: DataFrame,
     write_config: WriteConfig,
     target_path: str,
+    evolve: bool = False,
 ) -> None:
-    """Execute a Delta merge operation against an existing table."""
+    """Execute a Delta merge operation against an existing table.
+
+    With ``evolve``, new source columns are added to the table.
+    """
     if write_config.match_keys is None:
         raise ExecutionError("merge mode requires 'match_keys' to be set")
     merge_condition = " AND ".join(
@@ -254,6 +324,8 @@ def _execute_merge(
         )
 
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
+    if evolve:
+        merger = merger.withSchemaEvolution()
 
     has_when_clause = False
 
@@ -362,6 +434,7 @@ def execute_cdc_merge(
     *,
     load_config: LoadConfig | None = None,
     handle: TargetHandle | None = None,
+    evolve: bool = False,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
@@ -385,6 +458,8 @@ def execute_cdc_merge(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        evolve: Add new source columns to the table
+            (``schema_drift: adaptive``).
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -510,6 +585,8 @@ def execute_cdc_merge(
             df.select(data_cols + [op_col]).alias("source"),
             merge_condition,
         )
+        if evolve:
+            merger = merger.withSchemaEvolution()
 
         # Route by operation type
         quoted_op = quote_identifier(op_col)

@@ -127,6 +127,7 @@ class ThreadTelemetry(FrozenBase):
     warp_enforcement: str | None = None
     drift_detected: bool = False
     drift_columns: list[str] = []
+    drift_missing_columns: list[str] = []
     drift_mode: str | None = None
     drift_action_taken: str | None = None
     step_stats: dict[str, dict[str, Any]] | None = None
