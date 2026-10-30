@@ -839,3 +839,58 @@ class TestThreadWithBlock:
         assert restored.with_ is not None
         assert "active_customers" in restored.with_
         assert isinstance(restored.with_["active_customers"], SubPipeline)
+
+
+class TestIncrementalDedupRule:
+    """incremental_watermark + primary-source dedup must keep the latest row by watermark."""
+
+    @staticmethod
+    def _thread(
+        dedup: dict | None, *, mode: str = "incremental_watermark", extra: dict | None = None
+    ):
+        sources: dict = {"main": {"type": "delta", "alias": "raw.orders"}}
+        if dedup is not None:
+            sources["main"]["dedup"] = dedup
+        sources.update(extra or {})
+        load = {"mode": mode}
+        if mode == "incremental_watermark":
+            load |= {"watermark_column": "ts", "watermark_type": "timestamp"}
+        return Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": sources,
+                "target": {"path": "Tables/orders"},
+                "write": {"mode": "append"},
+                "load": load,
+            }
+        )
+
+    @pytest.mark.parametrize(
+        "dedup",
+        [
+            {"keys": ["id"]},
+            {"keys": ["id"], "order_by": "ts ASC"},
+            {"keys": ["id"], "order_by": "ts"},
+            {"keys": ["id"], "order_by": "updated_at DESC"},
+            {"keys": ["id"], "order_by": "ts DESC, id"},
+        ],
+    )
+    def test_rejected_forms(self, dedup):
+        with pytest.raises(ValidationError, match=r"order_by: \"ts DESC\""):
+            self._thread(dedup)
+
+    @pytest.mark.parametrize("order_by", ["ts DESC", "ts desc", "  ts   DESC  ", "TS DESC"])
+    def test_latest_by_watermark_accepted(self, order_by):
+        assert self._thread({"keys": ["id"], "order_by": order_by}).sources["main"].dedup
+
+    def test_no_dedup_accepted(self):
+        assert self._thread(None).sources["main"].dedup is None
+
+    def test_non_primary_source_dedup_unaffected(self):
+        extra = {"lk": {"type": "delta", "alias": "raw.lk", "dedup": {"keys": ["id"]}}}
+        assert self._thread(None, extra=extra)
+
+    @pytest.mark.parametrize("mode", ["full", "incremental_parameter"])
+    def test_other_load_modes_unaffected(self, mode):
+        assert self._thread({"keys": ["id"], "order_by": "ts ASC"}, mode=mode)

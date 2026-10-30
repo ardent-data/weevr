@@ -5,7 +5,7 @@ sources:
     alias: raw.customers
     dedup:
       keys: [customer_id]
-      order_by: modified_at
+      order_by: modified_at DESC
   orders:
     type: csv
     path: /data/orders/

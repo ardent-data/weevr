@@ -193,6 +193,30 @@ class Thread(FrozenBase):
     )
 
     @model_validator(mode="after")
+    def _validate_incremental_dedup(self) -> "Thread":
+        """Require incremental dedup to keep the latest row by the watermark column.
+
+        The high-water mark comes from the newest watermark value read; a
+        dedup that keeps any other row per key drops that key's later
+        changes for good, since the next run starts after them.
+        """
+        if self.load is None or self.load.mode != "incremental_watermark":
+            return self
+        wm_col = self.load.watermark_column
+        alias, primary = next(iter(self.sources.items()))
+        if primary.dedup is None or wm_col is None:
+            return self
+        required = f"{wm_col} DESC"
+        actual = " ".join((primary.dedup.order_by or "").split())
+        if actual.lower() != required.lower():
+            raise ValueError(
+                f"source '{alias}' dedups an incremental_watermark read without keeping "
+                f"the latest row by the watermark column, so later changes would be "
+                f'lost; set dedup order_by: "{required}"'
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_with_block(self) -> "Thread":
         """Validate the with: block for name collisions, forward refs, and alias uniqueness."""
         if self.with_ is None:
