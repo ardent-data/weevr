@@ -8,11 +8,14 @@ from typing import Any
 import pyspark.sql.functions as F
 from pyspark.sql import Column, DataFrame
 from pyspark.sql.types import (
+    ByteType,
     DateType,
+    DecimalType,
     DoubleType,
     FloatType,
     IntegerType,
     LongType,
+    ShortType,
     StringType,
     TimestampType,
 )
@@ -109,7 +112,16 @@ def apply_format(df: DataFrame, params: FormatParams) -> StepResult:
             col_exprs[target_name] = _build_pattern_expr(source_col, spec.pattern, spec.on_short)
 
         elif spec.number is not None:
-            numeric_types = (IntegerType, LongType, FloatType, DoubleType)
+            # Decimal must stay Decimal: a double round-trip loses digits
+            numeric_types = (
+                ByteType,
+                ShortType,
+                IntegerType,
+                LongType,
+                FloatType,
+                DoubleType,
+                DecimalType,
+            )
             if not isinstance(source_type, numeric_types):
                 if spec.strict_types:
                     raise ExecutionError(

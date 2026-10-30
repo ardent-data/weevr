@@ -326,7 +326,7 @@ settings override these.
 | `columns` | `NamingPattern` | no | `null` | Column naming pattern |
 | `tables` | `NamingPattern` | no | `null` | Table naming pattern |
 | `exclude` | `list[string]` | no | `[]` | Names or glob patterns excluded from normalization |
-| `on_collision` | `string` | no | `"error"` | Behavior when normalization produces duplicate names: `"error"` or `"suffix"` (appends `_2`, `_3`, etc.) |
+| `on_collision` | `string` | no | `"error"` | Behavior when the final column names (after normalization and reserved word protection) contain duplicates: `"error"` or `"suffix"` (the first column in source order keeps the name; later ones get the lowest free `_2`, `_3`, etc.) |
 | `reserved_words` | `ReservedWordConfig` | no | `null` | Reserved word protection for column and table names |
 
 Supported patterns: `snake_case`, `camelCase`, `PascalCase`,

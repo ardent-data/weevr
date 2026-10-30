@@ -765,6 +765,82 @@ class TestNormalizeColumnsReservedWords:
 
 
 @pytest.mark.spark
+class TestNormalizeColumnsFinalNameCollisions:
+    """on_collision governs the final names, after reserved word protection."""
+
+    @staticmethod
+    def _config(on_collision, **reserved):
+        from weevr.model.column_set import ReservedWordConfig
+
+        return NamingConfig(
+            columns=NamingPattern.SNAKE_CASE,
+            on_collision=on_collision,
+            reserved_words=ReservedWordConfig(**reserved),
+        )
+
+    def test_suffix_strategy_collision_raises_on_error(self, spark):
+        # "order" is protected to "order_col", which already exists
+        df = spark.createDataFrame([(1, 2)], ["order", "order_col"])
+        config = self._config("error", strategy="suffix")
+        with pytest.raises(ConfigError, match=r"duplicate.*order_col.*\['order', 'order_col'\]"):
+            normalize_columns(df, config)
+
+    def test_suffix_strategy_collision_suffixed_in_source_order(self, spark):
+        df = spark.createDataFrame([(1, 2)], ["order", "order_col"])
+        result = normalize_columns(df, self._config("suffix", strategy="suffix"))
+        assert result.columns == ["order_col", "order_col_2"]
+        row = result.collect()[0]
+        assert (row["order_col"], row["order_col_2"]) == (1, 2)
+
+    def test_rename_strategy_collision_raises_on_error(self, spark):
+        df = spark.createDataFrame([(1, 2)], ["select", "select_col"])
+        config = self._config("error", strategy="rename", rename_map={"select": "select_col"})
+        with pytest.raises(ConfigError, match="duplicate"):
+            normalize_columns(df, config)
+
+    def test_rename_strategy_collision_suffixed(self, spark):
+        df = spark.createDataFrame([(1, 2)], ["select", "select_col"])
+        config = self._config("suffix", strategy="rename", rename_map={"select": "select_col"})
+        assert normalize_columns(df, config).columns == ["select_col", "select_col_2"]
+
+    def test_suffix_skips_names_already_taken(self, spark):
+        # order_col_2 exists, so the displaced order_col takes the next free index
+        df = spark.createDataFrame([(1, 2, 3)], ["order", "order_col", "order_col_2"])
+        result = normalize_columns(df, self._config("suffix", strategy="suffix"))
+        assert result.columns == ["order_col", "order_col_3", "order_col_2"]
+
+    def test_normalization_suffix_skips_names_already_taken(self, spark):
+        df = spark.createDataFrame([(1, 2, 3)], ["httpStatus", "http_status", "http_status_2"])
+        config = NamingConfig(columns=NamingPattern.SNAKE_CASE, on_collision="suffix")
+        result = normalize_columns(df, config)
+        assert result.columns == ["http_status", "http_status_3", "http_status_2"]
+
+    def test_dropped_columns_do_not_collide(self, spark):
+        df = spark.createDataFrame([(1, 2)], ["select", "amount"])
+        result = normalize_columns(df, self._config("error", strategy="drop"))
+        assert result.columns == ["amount"]
+
+    def test_unique_names_unchanged_with_suffix_and_drop(self, spark):
+        # Pre-existing behavior: normalization suffix runs before protection
+        df = spark.createDataFrame([(1, 2)], ["select", "select_"])
+        result = normalize_columns(df, self._config("suffix", strategy="drop"))
+        assert result.columns == ["select_2"]
+
+    def test_unique_names_unchanged_with_prefix(self, spark):
+        df = spark.createDataFrame([(1, 2)], ["order", "order_col"])
+        result = normalize_columns(df, self._config("error", strategy="prefix", prefix="x_"))
+        assert result.columns == ["x_order", "order_col"]
+
+    def test_final_suffix_logs_warning(self, spark, caplog):
+        import logging
+
+        df = spark.createDataFrame([(1, 2)], ["order", "order_col"])
+        with caplog.at_level(logging.WARNING, logger="weevr.operations.naming"):
+            normalize_columns(df, self._config("suffix", strategy="suffix"))
+        assert any("order_col_2" in msg for msg in caplog.messages)
+
+
+@pytest.mark.spark
 class TestNormalizeColumnsPresetIntegration:
     """Test reserved word presets with normalize_columns."""
 
