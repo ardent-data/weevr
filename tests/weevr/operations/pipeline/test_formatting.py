@@ -1,5 +1,7 @@
 """Tests for the format step handler."""
 
+from decimal import Decimal
+
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
@@ -10,6 +12,7 @@ from pyspark.sql.types import (
     StructType,
 )
 
+from weevr.errors.exceptions import ExecutionError
 from weevr.model.pipeline import FormatParams, FormatSpec
 from weevr.operations.pipeline.formatting import apply_format
 
@@ -134,3 +137,40 @@ class TestApplyFormat:
         )
         result = apply_format(df, params)
         assert result.df.collect()[0].formatted == "1,234.50"
+
+
+class TestNumberFormatNumericTypes:
+    """Every numeric type formats from its own value, with or without strict_types."""
+
+    def test_wide_decimal_keeps_every_digit(self, spark: SparkSession):
+        df = spark.createDataFrame([(Decimal("12345678901234567.8901"),)], "amt decimal(38,4)")
+        params = FormatParams(columns={"f": FormatSpec(source="amt", number="#,##0.0000")})
+        assert apply_format(df, params).df.collect()[0].f == "12,345,678,901,234,567.8901"
+
+    @pytest.mark.parametrize("strict", [False, True])
+    def test_decimal_short_byte_accepted(self, spark: SparkSession, strict: bool):
+        df = spark.createDataFrame(
+            [(Decimal("1234.50"), 1234, 12)], "d decimal(10,2), s short, b byte"
+        )
+        params = FormatParams(
+            columns={
+                "fd": FormatSpec(source="d", number="#,##0.00", strict_types=strict),
+                "fs": FormatSpec(source="s", number="#,##0", strict_types=strict),
+                "fb": FormatSpec(source="b", number="#,##0", strict_types=strict),
+            }
+        )
+        row = apply_format(df, params).df.collect()[0]
+        assert (row.fd, row.fs, row.fb) == ("1,234.50", "1,234", "12")
+
+    def test_null_decimal_stays_null(self, spark: SparkSession):
+        df = spark.createDataFrame([(None,)], "amt decimal(38,4)")
+        params = FormatParams(columns={"f": FormatSpec(source="amt", number="#,##0.0000")})
+        assert apply_format(df, params).df.collect()[0].f is None
+
+    def test_strict_types_still_rejects_strings(self, spark: SparkSession):
+        df = spark.createDataFrame([("1234.5",)], ["val"])
+        params = FormatParams(
+            columns={"f": FormatSpec(source="val", number="#,##0.00", strict_types=True)}
+        )
+        with pytest.raises(ExecutionError, match="expected numeric"):
+            apply_format(df, params)
