@@ -112,8 +112,10 @@ target:
     A `Thread` constructed directly and passed to `execute_thread`,
     without the config loader, has no thread file or project root. For
     such threads an explicit `target.warp` is looked up beside the
-    target path, and no auto-discovery happens. Load configs through
-    `Context` or `load_config` to get the resolution above.
+    target path, no auto-discovery happens, and `warp_mode: auto` writes
+    beside a local path target only (alias and remote targets are skipped
+    with a warning). Load configs through `Context` or `load_config` to
+    get the resolution above.
 
 ## Enforcement
 
