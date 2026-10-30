@@ -160,3 +160,95 @@ class TestDimensionDrift:
         result = _run(spark, thread, spark.createDataFrame([(1, "a2")], ["id", "name"]))
         assert result.status == "success", result.error
         assert result.drift_report is None
+
+
+class TestAdaptiveEvolution:
+    """schema_drift: adaptive adds new output columns to the table."""
+
+    @pytest.fixture()
+    def target(self, spark: SparkSession, tmp_path: Path) -> str:
+        path = str(tmp_path / "tgt")
+        spark.createDataFrame([(1, "a")], ["id", "name"]).write.format("delta").save(path)
+        return path
+
+    @pytest.mark.parametrize("write", list(WRITES))
+    def test_new_column_added(self, spark, target, write):
+        thread = _thread({"path": target, "schema_drift": "adaptive"}, WRITES[write])
+        output = spark.createDataFrame([(2, "b", "e@x")], ["id", "name", "email"])
+        result = _run(spark, thread, output)
+        assert result.status == "success", result.error
+        table = spark.read.format("delta").load(target)
+        assert table.columns == ["id", "name", "email"]
+        assert table.filter("id = 2").first().email == "e@x"
+
+    def test_explicit_mapping_declaring_new_column(self, spark, target):
+        thread = _thread(
+            {
+                "path": target,
+                "schema_drift": "adaptive",
+                "mapping_mode": "explicit",
+                "columns": {"id": {}, "name": {}, "email": {}},
+            },
+            WRITES["append"],
+        )
+        output = spark.createDataFrame([(2, "b", "e@x")], ["id", "name", "email"])
+        result = _run(spark, thread, output)
+        assert result.status == "success", result.error
+        assert spark.read.format("delta").load(target).columns == ["id", "name", "email"]
+
+    def test_evolved_column_kept_on_next_run(self, spark, target):
+        thread = _thread({"path": target, "schema_drift": "adaptive"}, WRITES["append"])
+        _run(spark, thread, spark.createDataFrame([(2, "b", "e2")], ["id", "name", "email"]))
+        lenient = _thread({"path": target}, WRITES["append"])
+        result = _run(
+            spark, lenient, spark.createDataFrame([(3, "c", "e3")], ["id", "name", "email"])
+        )
+        assert result.status == "success", result.error
+        assert spark.read.format("delta").load(target).filter("id = 3").first().email == "e3"
+
+    def test_dimension_merge_evolves(self, spark, tmp_path: Path):
+        path = str(tmp_path / "dim")
+        first = _thread({"path": path, "dimension": DIMENSION})
+        assert _run(spark, first, spark.createDataFrame([(1, "a")], ["id", "name"])).status == (
+            "success"
+        )
+        thread = _thread({"path": path, "dimension": DIMENSION, "schema_drift": "adaptive"})
+        result = _run(
+            spark, thread, spark.createDataFrame([(2, "b", "e")], ["id", "name", "email"])
+        )
+        assert result.status == "success", result.error
+        table = spark.read.format("delta").load(path)
+        assert "email" in table.columns
+        assert table.filter("id = 2").first().email == "e"
+
+    def test_cdc_merge_evolves(self, spark, tmp_path: Path):
+        src = str(tmp_path / "cdc_src")
+        tgt = str(tmp_path / "cdc_tgt")
+        spark.createDataFrame([(1, "a")], ["id", "name"]).write.format("delta").save(tgt)
+        spark.createDataFrame(
+            [(1, "a2", "e1", "U", 1), (2, "b", "e2", "I", 2)], ["id", "name", "email", "op", "seq"]
+        ).write.format("delta").save(src)
+        thread = Thread.model_validate(
+            {
+                "name": "cdc",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "target": {"path": tgt, "schema_drift": "adaptive"},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+                "load": {
+                    "mode": "cdc",
+                    "cdc": {
+                        "operation_column": "op",
+                        "insert_value": "I",
+                        "update_value": "U",
+                        "delete_value": "D",
+                    },
+                    "watermark_column": "seq",
+                    "watermark_type": "long",
+                },
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+        rows = spark.read.format("delta").load(tgt).orderBy("id").collect()
+        assert [(r.id, r.name, r.email) for r in rows] == [(1, "a2", "e1"), (2, "b", "e2")]

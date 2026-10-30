@@ -190,6 +190,8 @@ def write_target(
         ExecutionError: If the write operation fails.
     """
     mode = write_config.mode if write_config else "overwrite"
+    # adaptive drift adds new columns to the table, scoped to this write
+    evolve = target.schema_drift == "adaptive"
     partition_cols = target.partition_by or []
     use_table_api = is_table_alias(target_path)
     if handle is None:
@@ -227,6 +229,8 @@ def write_target(
                     F.lit(write_config.soft_delete_active_value).cast("boolean"),
                 )
             writer = df.write.format("delta").mode("overwrite")
+            if evolve:
+                writer = writer.option("mergeSchema", "true")
             if stamp is not None:
                 writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
@@ -238,6 +242,8 @@ def write_target(
 
         elif mode == "append":
             writer = df.write.format("delta").mode("append")
+            if evolve:
+                writer = writer.option("mergeSchema", "true")
             if stamp is not None:
                 writer = writer.option("userMetadata", stamp.to_json())
             if partition_cols:
@@ -252,7 +258,7 @@ def write_target(
                 raise ExecutionError("merge mode requires a write_config with match_keys")
             if write_config.match_keys is None:
                 raise ExecutionError("merge mode requires 'match_keys' to be set")
-            _execute_merge(spark, df, write_config, target_path)
+            _execute_merge(spark, df, write_config, target_path, evolve=evolve)
 
         if row_count == -1:
             # Single-pass write: the commit's own numOutputRows — found by
@@ -284,8 +290,12 @@ def _execute_merge(
     df: DataFrame,
     write_config: WriteConfig,
     target_path: str,
+    evolve: bool = False,
 ) -> None:
-    """Execute a Delta merge operation against an existing table."""
+    """Execute a Delta merge operation against an existing table.
+
+    With ``evolve``, new source columns are added to the table.
+    """
     if write_config.match_keys is None:
         raise ExecutionError("merge mode requires 'match_keys' to be set")
     merge_condition = " AND ".join(
@@ -304,6 +314,8 @@ def _execute_merge(
         )
 
     merger = delta_table.alias("target").merge(df.alias("source"), merge_condition)
+    if evolve:
+        merger = merger.withSchemaEvolution()
 
     has_when_clause = False
 
@@ -412,6 +424,7 @@ def execute_cdc_merge(
     *,
     load_config: LoadConfig | None = None,
     handle: TargetHandle | None = None,
+    evolve: bool = False,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
@@ -435,6 +448,8 @@ def execute_cdc_merge(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        evolve: Add new source columns to the table
+            (``schema_drift: adaptive``).
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -560,6 +575,8 @@ def execute_cdc_merge(
             df.select(data_cols + [op_col]).alias("source"),
             merge_condition,
         )
+        if evolve:
+            merger = merger.withSchemaEvolution()
 
         # Route by operation type
         quoted_op = quote_identifier(op_col)

@@ -706,6 +706,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     run_timestamp,
                     handle=target_handle,
                     stamp=commit_stamp,
+                    evolve=thread.target.schema_drift == "adaptive",
                 )
                 # Input-rows semantic. Quarantine-free merges need no new
                 # action: transforms after the eager rows_after_transforms
@@ -762,6 +763,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     thread.load.cdc,
                     load_config=thread.load,
                     handle=target_handle,
+                    evolve=thread.target.schema_drift == "adaptive",
                 )
                 rows_written = sum(cdc_counts.values())
 
@@ -1215,8 +1217,11 @@ def _shape_for_target(
         spark=spark,
         target_path=target_path,
     )
-    added_after_mapping = [c for c in df.columns if c not in mapped_cols]
-    df = narrow_to_target(df, thread.target, spark, handle=target_handle, keep=added_after_mapping)
+    keep = [c for c in df.columns if c not in mapped_cols]
+    if thread.target.schema_drift == "adaptive" and drift_report is not None:
+        # adaptive keeps new columns; the write adds them to the table
+        keep += drift_report.extra_columns
+    df = narrow_to_target(df, thread.target, spark, handle=target_handle, keep=keep)
     return df, warp_findings, drift_report, audit_applied
 
 
