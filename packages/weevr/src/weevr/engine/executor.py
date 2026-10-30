@@ -665,6 +665,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     resolved_warp,
                     audit_columns,
                     audit_ctx,
+                    _writer_managed_columns(thread, dim_builder),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -732,7 +733,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     audit_columns_applied = list(audit_columns)
 
                 # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied[:]
+                engine_col_names = audit_columns_applied + _writer_managed_columns(thread, None)
                 df, warp_findings, drift_report = _apply_warp_and_drift(
                     df,
                     resolved_warp,
@@ -778,6 +779,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     resolved_warp,
                     audit_columns,
                     audit_ctx,
+                    _writer_managed_columns(thread, dim_builder),
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -981,6 +983,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 warp_enforcement_mode=thread.target.warp_enforcement if resolved_warp else None,
                 drift_detected=drift_report.has_drift if drift_report else False,
                 drift_columns=drift_report.extra_columns if drift_report else None,
+                drift_missing_columns=drift_report.missing_columns if drift_report else None,
                 drift_mode=drift_report.drift_mode if drift_report else None,
                 drift_action_taken=drift_report.action_taken if drift_report else None,
             )
@@ -990,6 +993,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             if drift_report is not None and drift_report.has_drift:
                 drift_report_dict = {
                     "extra_columns": drift_report.extra_columns,
+                    "missing_columns": drift_report.missing_columns,
                     "action_taken": drift_report.action_taken,
                     "drift_mode": drift_report.drift_mode,
                     "baseline_source": drift_report.baseline_source,
@@ -1172,6 +1176,37 @@ def _resolve_with_block(
     return enriched
 
 
+def _writer_managed_columns(thread: Thread, dim_builder: Any) -> list[str]:
+    """Columns the writer adds or consumes itself, which are never drift.
+
+    The soft-delete column (from ``write`` or the dimension's overrides)
+    exists in the table but not in the working DataFrame; CDC operation and
+    change-feed metadata columns exist in the DataFrame but not the table.
+
+    Args:
+        thread: Thread configuration.
+        dim_builder: The dimension merge builder, or None.
+
+    Returns:
+        Column names to exclude from drift detection.
+    """
+    from weevr.operations.writers import resolve_cdc_columns
+
+    managed: list[str] = []
+    if thread.write is not None and thread.write.soft_delete_column:
+        managed.append(thread.write.soft_delete_column)
+    if dim_builder is not None:
+        dim_soft_delete = dim_builder.build_write_config().soft_delete_column
+        if dim_soft_delete:
+            managed.append(dim_soft_delete)
+    if thread.load is not None and thread.load.mode == "cdc" and thread.load.cdc is not None:
+        managed += ["_change_type", "_commit_version", "_commit_timestamp"]
+        op_col = resolve_cdc_columns(thread.load.cdc)["operation_column"]
+        if op_col:
+            managed.append(op_col)
+    return managed
+
+
 def _shape_for_target(
     df: Any,
     thread: Thread,
@@ -1181,6 +1216,7 @@ def _shape_for_target(
     resolved_warp: Any,
     audit_columns: dict[str, str] | None,
     audit_ctx: Any,
+    managed_columns: list[str],
 ) -> tuple[Any, list[dict[str, str]], Any, list[str]]:
     """Map, audit, and drift-check the working DataFrame for a mapped write.
 
@@ -1197,6 +1233,7 @@ def _shape_for_target(
         resolved_warp: Resolved WarpConfig, or None.
         audit_columns: Audit column expressions, if configured.
         audit_ctx: Audit context for expression resolution.
+        managed_columns: Writer-managed columns excluded from drift.
 
     Returns:
         ``(df, warp findings, drift report, audit columns applied)``.
@@ -1213,7 +1250,7 @@ def _shape_for_target(
         df,
         resolved_warp,
         thread,
-        audit_applied[:],
+        audit_applied + managed_columns,
         spark=spark,
         target_path=target_path,
     )
@@ -1474,6 +1511,7 @@ def _build_telemetry(
     warp_enforcement_mode: str | None = None,
     drift_detected: bool = False,
     drift_columns: list[str] | None = None,
+    drift_missing_columns: list[str] | None = None,
     drift_mode: str | None = None,
     drift_action_taken: str | None = None,
     step_stats: dict[str, dict[str, Any]] | None = None,
@@ -1518,6 +1556,7 @@ def _build_telemetry(
         warp_enforcement=warp_enforcement_mode,
         drift_detected=drift_detected,
         drift_columns=drift_columns or [],
+        drift_missing_columns=drift_missing_columns or [],
         drift_mode=drift_mode,
         drift_action_taken=drift_action_taken,
         step_stats=step_stats,

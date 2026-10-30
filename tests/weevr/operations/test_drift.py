@@ -72,3 +72,64 @@ class TestHandleDrift:
         )
         assert not report.has_drift
         assert "_loaded_at" in result_df.columns
+
+
+class TestHandleDriftMissingColumns:
+    """Baseline columns missing from the output are drift (table baseline)."""
+
+    @staticmethod
+    def _df(spark: SparkSession):
+        return spark.createDataFrame([(1, "a")], ["id", "name"])
+
+    BASELINE = ["id", "name", "email"]
+
+    def test_strict_error_raises_naming_missing(self, spark: SparkSession):
+        with pytest.raises(SchemaDriftError, match="missing.*email"):
+            handle_drift(self._df(spark), self.BASELINE, "strict", "error", baseline_source="table")
+
+    def test_strict_warn_reports_and_keeps_frame(self, spark: SparkSession, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            df, report = handle_drift(
+                self._df(spark), self.BASELINE, "strict", "warn", baseline_source="table"
+            )
+        assert df.columns == ["id", "name"]
+        assert report.missing_columns == ["email"]
+        assert report.has_drift
+        assert any("email" in m for m in caplog.messages)
+
+    @pytest.mark.parametrize(
+        ("mode", "on_drift"), [("strict", "ignore"), ("lenient", "warn"), ("adaptive", "warn")]
+    )
+    def test_other_modes_report(self, spark: SparkSession, mode: str, on_drift: str):
+        df, report = handle_drift(
+            self._df(spark), self.BASELINE, mode, on_drift, baseline_source="table"
+        )
+        assert df.columns == ["id", "name"]
+        assert report.missing_columns == ["email"]
+        assert report.extra_columns == []
+
+    def test_engine_columns_never_missing(self, spark: SparkSession):
+        _, report = handle_drift(
+            self._df(spark),
+            ["id", "name", "is_deleted"],
+            "strict",
+            "error",
+            engine_columns=["is_deleted"],
+            baseline_source="table",
+        )
+        assert not report.has_drift
+
+    def test_warp_baseline_does_not_report_missing(self, spark: SparkSession):
+        # Warp columns absent from the output are warp-only columns, appended later
+        _, report = handle_drift(
+            self._df(spark), self.BASELINE, "strict", "error", baseline_source="warp"
+        )
+        assert not report.has_drift
+
+    def test_extra_and_missing_both_reported(self, spark: SparkSession):
+        df = spark.createDataFrame([(1, "a", "x")], ["id", "name", "phone"])
+        with pytest.raises(SchemaDriftError) as exc:
+            handle_drift(df, self.BASELINE, "strict", "error", baseline_source="table")
+        assert "phone" in str(exc.value) and "email" in str(exc.value)

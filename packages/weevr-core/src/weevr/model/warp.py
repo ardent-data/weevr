@@ -185,11 +185,12 @@ class WarpBinding:
 class DriftReport:
     """Result of schema drift detection for a single thread execution.
 
-    Captures which extra columns were found and what action was taken
-    for each.
+    Captures which extra and missing columns were found and what action
+    was taken for each.
     """
 
     extra_columns: list[str] = field(default_factory=list)
+    missing_columns: list[str] = field(default_factory=list)
     action_taken: str = ""
     drift_mode: str = ""
     baseline_source: str = ""
@@ -203,4 +204,4 @@ class DriftReport:
     @property
     def has_drift(self) -> bool:
         """Return whether any drift was detected."""
-        return len(self.extra_columns) > 0
+        return bool(self.extra_columns or self.missing_columns)

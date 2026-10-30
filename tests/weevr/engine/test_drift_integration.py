@@ -252,3 +252,121 @@ class TestAdaptiveEvolution:
         assert result.status == "success", result.error
         rows = spark.read.format("delta").load(tgt).orderBy("id").collect()
         assert [(r.id, r.name, r.email) for r in rows] == [(1, "a2", "e1"), (2, "b", "e2")]
+
+
+class TestMissingColumns:
+    """A target column missing from the output is drift."""
+
+    @pytest.fixture()
+    def target(self, spark: SparkSession, tmp_path: Path) -> str:
+        path = str(tmp_path / "tgt")
+        spark.createDataFrame([(1, "a", "e@x")], ["id", "name", "email"]).write.format(
+            "delta"
+        ).save(path)
+        return path
+
+    def test_strict_error_raises_and_writes_nothing(self, spark, target):
+        thread = _thread(
+            {"path": target, "schema_drift": "strict", "on_drift": "error"}, WRITES["append"]
+        )
+        with pytest.raises(SchemaDriftError, match="email"):
+            _run(spark, thread, spark.createDataFrame([(2, "b")], ["id", "name"]))
+        assert spark.read.format("delta").load(target).count() == 1
+
+    def test_strict_warn_writes_null_and_reports(self, spark, target):
+        thread = _thread(
+            {"path": target, "schema_drift": "strict", "on_drift": "warn"}, WRITES["append"]
+        )
+        result = _run(spark, thread, spark.createDataFrame([(2, "b")], ["id", "name"]))
+        assert result.status == "success", result.error
+        assert result.drift_report is not None
+        assert result.drift_report["missing_columns"] == ["email"]
+        assert result.telemetry is not None
+        assert result.telemetry.drift_detected
+        assert result.telemetry.drift_missing_columns == ["email"]
+        assert spark.read.format("delta").load(target).filter("id = 2").first().email is None
+
+    def test_lenient_reports(self, spark, target):
+        result = _run(
+            spark,
+            _thread({"path": target}, WRITES["append"]),
+            spark.createDataFrame([(2, "b")], ["id", "name"]),
+        )
+        assert result.status == "success", result.error
+        assert result.drift_report is not None
+        assert result.drift_report["missing_columns"] == ["email"]
+
+    def test_soft_delete_column_is_not_missing(self, spark, tmp_path: Path):
+        path = str(tmp_path / "sd")
+        write = {
+            "mode": "merge",
+            "match_keys": ["id"],
+            "on_no_match_source": "soft_delete",
+            "soft_delete_column": "is_deleted",
+        }
+        df = spark.createDataFrame([(1, "a")], ["id", "name"])
+        first = _run(spark, _thread({"path": path}, write), df)
+        assert first.status == "success", first.error
+        strict = _thread({"path": path, "schema_drift": "strict", "on_drift": "error"}, write)
+        result = _run(spark, strict, df)
+        assert result.status == "success", result.error
+        assert result.drift_report is None
+
+    def test_warp_only_columns_are_not_missing(self, spark, tmp_path: Path):
+        from weevr.model.warp import WarpBinding, WarpConfig
+
+        path = str(tmp_path / "warped")
+        spark.createDataFrame([(1, "a", "x")], ["id", "name", "region"]).write.format("delta").save(
+            path
+        )
+        warp = WarpConfig.model_validate(
+            {
+                "config_version": "1.0",
+                "columns": [
+                    {"name": "id", "type": "bigint"},
+                    {"name": "name", "type": "string"},
+                    {"name": "region", "type": "string", "default": "n/a"},
+                ],
+            }
+        )
+        thread = _thread(
+            {"path": path, "schema_drift": "strict", "on_drift": "error"}, WRITES["append"]
+        )
+        thread.bind_warp(
+            WarpBinding(warp=warp, warp_file=None, thread_dir=str(tmp_path), writable=True)
+        )
+        result = _run(spark, thread, spark.createDataFrame([(2, "b")], ["id", "name"]))
+        assert result.status == "success", result.error
+        assert spark.read.format("delta").load(path).filter("id = 2").first().region == "n/a"
+
+    def test_cdc_metadata_is_not_drift(self, spark, tmp_path: Path):
+        src = str(tmp_path / "cdc_src")
+        tgt = str(tmp_path / "cdc_tgt")
+        spark.createDataFrame([(1, "a", 0)], ["id", "name", "seq"]).write.format("delta").save(tgt)
+        spark.createDataFrame([(1, "a2", "U", 1)], ["id", "name", "op", "seq"]).write.format(
+            "delta"
+        ).save(src)
+        thread = Thread.model_validate(
+            {
+                "name": "cdc",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "target": {"path": tgt, "schema_drift": "strict", "on_drift": "warn"},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+                "load": {
+                    "mode": "cdc",
+                    "cdc": {
+                        "operation_column": "op",
+                        "insert_value": "I",
+                        "update_value": "U",
+                        "delete_value": "D",
+                    },
+                    "watermark_column": "seq",
+                    "watermark_type": "long",
+                },
+            }
+        )
+        result = execute_thread(spark, thread)
+        assert result.status == "success", result.error
+        assert result.drift_report is None
+        assert spark.read.format("delta").load(tgt).first().name == "a2"
