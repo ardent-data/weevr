@@ -1,0 +1,211 @@
+"""Watermarks never skip or duplicate rows, end to end through ``execute_thread``."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Any
+from unittest.mock import patch
+
+import pytest
+from pyspark.sql import SparkSession
+
+from weevr.engine.executor import execute_thread
+from weevr.model.thread import Thread
+from weevr.state.metadata_table import MetadataTableStore
+from weevr.state.watermark import WatermarkState
+
+pytestmark = pytest.mark.spark
+
+
+@pytest.fixture()
+def new_york_session(spark: SparkSession) -> Iterator[SparkSession]:
+    """Session zone America/New_York while the driver stays on its own zone (UTC in CI)."""
+    previous = spark.conf.get("spark.sql.session.timeZone") or "UTC"
+    spark.conf.set("spark.sql.session.timeZone", "America/New_York")
+    yield spark
+    spark.conf.set("spark.sql.session.timeZone", previous)
+
+
+def _thread(
+    src: str,
+    tgt: str,
+    store: str,
+    *,
+    wm_type: str = "timestamp",
+    wm_col: str = "ts",
+    load_extra: dict[str, Any] | None = None,
+    name: str = "t",
+) -> Thread:
+    return Thread.model_validate(
+        {
+            "name": name,
+            "config_version": "1.0",
+            "sources": {"main": {"type": "delta", "alias": src}},
+            "target": {"path": tgt},
+            "write": {"mode": "append"},
+            "load": {
+                "mode": "incremental_watermark",
+                "watermark_column": wm_col,
+                "watermark_type": wm_type,
+                "watermark_store": {"type": "metadata_table", "table_path": store},
+                **(load_extra or {}),
+            },
+        }
+    )
+
+
+def _append(spark: SparkSession, path: str, sql: str) -> None:
+    spark.sql(sql).write.format("delta").mode("append").save(path)
+
+
+class TestTimestampWatermarkZones:
+    """A stored timestamp HWM denotes the same instant in every zone."""
+
+    def test_new_row_after_run_is_read_when_zones_differ(self, new_york_session, tmp_path):
+        spark = new_york_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(
+            spark,
+            src,
+            "select 1 as id, timestamp'2024-01-01 10:00:00' as ts "
+            "union all select 2, timestamp'2024-01-01 12:00:00'",
+        )
+        thread = _thread(src, tgt, store)
+        assert execute_thread(spark, thread).status == "success"
+        _append(spark, src, "select 3 as id, timestamp'2024-01-01 14:00:00' as ts")
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 3
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is not None
+        # 14:00 New York = 19:00 UTC
+        assert state.last_value == "2024-01-01T19:00:00.000000Z"
+
+    def test_legacy_value_read_in_driver_zone_and_rewritten(self, new_york_session, tmp_path):
+        spark = new_york_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(
+            spark,
+            src,
+            "select 1 as id, timestamp'2024-01-01 12:00:00' as ts "
+            "union all select 2, timestamp'2024-01-01 14:00:00'",
+        )
+        # A pre-fix value: str() of the collected 12:00 NY row on a UTC driver
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column="ts",
+                watermark_type="timestamp",
+                last_value="2024-01-01 17:00:00",
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        with patch("weevr.state.hwm._driver_tz", return_value=UTC):
+            result = execute_thread(spark, _thread(src, tgt, store))
+
+        assert result.status == "success"
+        rows = spark.read.format("delta").load(tgt).collect()
+        assert [r.id for r in rows] == [2]
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is not None and state.last_value.endswith("Z")
+
+    def test_legacy_value_honors_a_non_utc_driver(self, spark: SparkSession, tmp_path):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(
+            spark,
+            src,
+            "select 1 as id, timestamp'2024-01-01 17:00:00' as ts "
+            "union all select 2, timestamp'2024-01-01 18:00:00'",
+        )
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column="ts",
+                watermark_type="timestamp",
+                last_value="2024-01-01 12:00:00",  # 12:00 on a UTC-5 driver = 17:00 UTC
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        with patch("weevr.state.hwm._driver_tz", return_value=timezone(timedelta(hours=-5))):
+            result = execute_thread(spark, _thread(src, tgt, store))
+        assert result.status == "success"
+        assert [r.id for r in spark.read.format("delta").load(tgt).collect()] == [2]
+
+
+class TestOtherWatermarkTypes:
+    """date, numeric, NTZ and formatted-string watermarks keep working."""
+
+    def test_date_watermark_text_unchanged(self, spark: SparkSession, tmp_path):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, date'2024-01-01' as d")
+        thread = _thread(src, tgt, store, wm_type="date", wm_col="d")
+        assert execute_thread(spark, thread).status == "success"
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is not None and state.last_value == "2024-01-01"
+
+    def test_ntz_watermark_round_trip(self, new_york_session, tmp_path):
+        spark = new_york_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, timestamp_ntz'2024-01-01 12:00:00' as ts")
+        thread = _thread(src, tgt, store)
+        assert execute_thread(spark, thread).status == "success"
+        _append(spark, src, "select 2 as id, timestamp_ntz'2024-01-01 14:00:00' as ts")
+        assert execute_thread(spark, thread).status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 2
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is not None and not state.last_value.endswith("Z")
+
+    def test_formatted_string_watermark_round_trip(self, new_york_session, tmp_path):
+        spark = new_york_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, '20240101120000' as ts")
+        thread = _thread(src, tgt, store, load_extra={"watermark_format": "yyyyMMddHHmmss"})
+        assert execute_thread(spark, thread).status == "success"
+        _append(spark, src, "select 2 as id, '20240101140000' as ts")
+        assert execute_thread(spark, thread).status == "success"
+        assert spark.read.format("delta").load(tgt).count() == 2
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is not None and state.last_value == "2024-01-01T19:00:00.000000Z"
+
+
+class TestGenericCdcWatermark:
+    """The generic-CDC HWM uses the same canonical form."""
+
+    def test_cdc_hwm_is_canonical(self, new_york_session, tmp_path):
+        spark = new_york_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, tgt, "select 1 as id, 'a' as name, timestamp'2024-01-01 09:00:00' as ts")
+        _append(
+            spark,
+            src,
+            "select 1 as id, 'a2' as name, 'U' as op, timestamp'2024-01-01 12:00:00' as ts",
+        )
+        thread = Thread.model_validate(
+            {
+                "name": "cdc",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "target": {"path": tgt},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+                "load": {
+                    "mode": "cdc",
+                    "cdc": {
+                        "operation_column": "op",
+                        "insert_value": "I",
+                        "update_value": "U",
+                        "delete_value": "D",
+                    },
+                    "watermark_column": "ts",
+                    "watermark_type": "timestamp",
+                    "watermark_store": {"type": "metadata_table", "table_path": store},
+                },
+            }
+        )
+        assert execute_thread(spark, thread).status == "success"
+        state = MetadataTableStore(store).read(spark, "cdc")
+        assert state is not None and state.last_value == "2024-01-01T17:00:00.000000Z"

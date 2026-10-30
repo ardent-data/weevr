@@ -1,0 +1,119 @@
+"""High-water mark text: the one serializer and parser every watermark uses.
+
+Timestamp HWMs are stored as UTC ISO-8601 instants with microseconds and a
+``Z`` suffix (``2024-01-01T17:00:00.000000Z``). The instant is taken inside
+Spark (``unix_micros``) and read back with ``timestamp_micros``, so neither
+the driver's nor the session's time zone takes part. ``TimestampNTZ``
+columns have no zone and keep their wall-clock text; dates and numbers are
+stored as before.
+
+A stored timestamp without ``Z`` predates this format: it is ``str()`` of a
+datetime PySpark collected in the driver's zone, so it is read in that zone
+and rewritten canonically at the next save.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta, tzinfo
+
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
+from pyspark.sql.types import DataType, TimestampNTZType, TimestampType
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def format_utc_micros(micros: int) -> str:
+    """Format microseconds since the epoch as a canonical UTC HWM.
+
+    Args:
+        micros: Microseconds since 1970-01-01T00:00:00Z.
+
+    Returns:
+        ``YYYY-MM-DDTHH:MM:SS.ffffffZ``.
+    """
+    return (_EPOCH + timedelta(microseconds=micros)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def parse_timestamp_hwm(text: str) -> int:
+    """Parse a stored timestamp HWM to microseconds since the epoch.
+
+    Canonical values (``Z`` suffix) and values with an explicit offset are
+    absolute. A naive value is a legacy HWM in the driver's zone.
+
+    Args:
+        text: The stored HWM.
+
+    Returns:
+        Microseconds since 1970-01-01T00:00:00Z.
+
+    Raises:
+        ValueError: If the text is not a timestamp.
+    """
+    value = datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=_driver_tz())
+    delta = value - _EPOCH
+    return (delta.days * 86_400 + delta.seconds) * 1_000_000 + delta.microseconds
+
+
+def _driver_tz() -> tzinfo:
+    """The driver's local time zone (the zone legacy HWMs were written in)."""
+    local = datetime.now().astimezone().tzinfo
+    return local if local is not None else UTC
+
+
+def max_hwm(df: DataFrame, typed: Column) -> str | None:
+    """Return the serialized maximum of a watermark column, or None when empty.
+
+    Args:
+        df: The (filtered) watermark window.
+        typed: The typed watermark column expression.
+
+    Returns:
+        The HWM text for the column's type, or None if every value is null.
+    """
+    if isinstance(_column_type(df, typed), TimestampType):
+        row = (
+            df.select(typed.alias("__hwm"))
+            .agg(F.expr("unix_micros(max(__hwm))").alias("hwm"))
+            .collect()
+        )
+        if row and row[0]["hwm"] is not None:
+            return format_utc_micros(int(row[0]["hwm"]))
+        return None
+    row = df.agg(F.max(typed).alias("hwm")).collect()
+    if row and row[0]["hwm"] is not None:
+        return str(row[0]["hwm"])
+    return None
+
+
+def hwm_literal(df: DataFrame, typed: Column, watermark_type: str, last_value: str) -> Column:
+    """Return the stored HWM as a literal comparable with the watermark column.
+
+    Args:
+        df: The source DataFrame (used only to resolve the column's type).
+        typed: The typed watermark column expression.
+        watermark_type: One of ``timestamp``, ``date``, ``int``, ``long``.
+        last_value: The stored HWM text.
+
+    Returns:
+        A literal Column of the column's type.
+    """
+    if watermark_type == "timestamp":
+        column_type = _column_type(df, typed)
+        if isinstance(column_type, TimestampType):
+            return F.expr(f"timestamp_micros({parse_timestamp_hwm(last_value)})")
+        if isinstance(column_type, TimestampNTZType):
+            return F.lit(last_value).cast("timestamp_ntz")
+        return F.lit(last_value).cast("timestamp")
+    if watermark_type == "date":
+        return F.lit(last_value).cast("date")
+    if watermark_type == "long":
+        return F.lit(int(last_value)).cast("long")
+    return F.lit(int(last_value))
+
+
+def _column_type(df: DataFrame, typed: Column) -> DataType:
+    """Resolve the data type of a column expression without running a job."""
+    return df.select(typed.alias("__hwm")).schema["__hwm"].dataType

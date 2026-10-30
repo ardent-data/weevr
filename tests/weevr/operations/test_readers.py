@@ -1149,12 +1149,11 @@ class TestReadSourceIncrementalWatermarkFormat:
         df, new_hwm = read_source_incremental(spark, "src", source, load, prior_state=None)
 
         assert df.count() == 3
-        # HWM is captured as a Spark Timestamp converted to a Python str —
-        # *not* the raw source string. The trailing Z and the literal source
-        # text are gone because the typed aggregate produced a real Timestamp.
+        # HWM is the canonical UTC instant of the parsed timestamp — *not*
+        # the raw source string (see weevr.state.hwm).
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-03 10:00:00")
-        assert "Z" not in new_hwm
+        assert new_hwm.startswith("2026-01-03T10:00:00")
+        assert new_hwm.endswith("Z")
 
     def test_subsequent_run_filters_above_prior_hwm(
         self, spark: SparkSession, tmp_delta_path
@@ -1180,7 +1179,7 @@ class TestReadSourceIncrementalWatermarkFormat:
 
         assert df.count() == 1  # only row 3 (strict greater-than)
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-07 10:00:00")
+        assert new_hwm.startswith("2026-01-07T10:00:00")
 
     def test_unparseable_rows_silently_dropped(self, spark: SparkSession, tmp_delta_path) -> None:
         """DEC-003: parseable rows flow through, unparseable rows drop out
@@ -1218,7 +1217,7 @@ class TestReadSourceIncrementalWatermarkFormat:
         # above the prior HWM remains.
         assert df.count() == 1
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-04 10:00:00")
+        assert new_hwm.startswith("2026-01-04T10:00:00")
 
     def test_unparseable_row_above_hwm_still_dropped(
         self, spark: SparkSession, tmp_delta_path
@@ -1253,7 +1252,7 @@ class TestReadSourceIncrementalWatermarkFormat:
         # Only the parseable row above the prior HWM survives.
         assert df.count() == 1
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-03 10:00:00")
+        assert new_hwm.startswith("2026-01-03T10:00:00")
 
     def test_debug_log_emitted_when_format_set(
         self, spark: SparkSession, tmp_delta_path, caplog
@@ -1292,7 +1291,7 @@ class TestReadSourceIncrementalWatermarkFormat:
 
         assert df.count() == 2
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-05 10:00:00")
+        assert new_hwm.startswith("2026-01-05T10:00:00")
 
 
 def _cdc_string_ts_load_config() -> LoadConfig:
@@ -1332,9 +1331,9 @@ class TestReadCdcSourceWatermarkFormat:
 
         assert df.count() == 3
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-03 10:00:00")
+        assert new_hwm.startswith("2026-01-03T10:00:00")
         # Typed parse → canonical Python str of Timestamp, no trailing Z.
-        assert "Z" not in new_hwm
+        assert new_hwm.endswith("Z")
 
     def test_subsequent_run_filters_above_prior_hwm(
         self, spark: SparkSession, tmp_delta_path
@@ -1366,7 +1365,7 @@ class TestReadCdcSourceWatermarkFormat:
 
         assert df.count() == 1  # only row 3 (strict greater-than)
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-07 10:00:00")
+        assert new_hwm.startswith("2026-01-07T10:00:00")
 
     def test_delete_row_at_max_advances_hwm(self, spark: SparkSession, tmp_delta_path) -> None:
         """DEC-003 / M123: D row carries the max — HWM still advances past it."""
@@ -1390,7 +1389,7 @@ class TestReadCdcSourceWatermarkFormat:
         )
 
         assert new_hwm is not None
-        assert new_hwm.startswith("2026-01-10 10:00:00")
+        assert new_hwm.startswith("2026-01-10T10:00:00")
 
     def test_debug_log_emitted_when_format_set(
         self, spark: SparkSession, tmp_delta_path, caplog
