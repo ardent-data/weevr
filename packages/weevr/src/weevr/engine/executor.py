@@ -71,7 +71,12 @@ from weevr.operations.warp import (
     enforce_warp,
     pre_initialize_table,
 )
-from weevr.operations.writers import apply_target_mapping, execute_cdc_merge, write_target
+from weevr.operations.writers import (
+    apply_target_mapping,
+    execute_cdc_merge,
+    narrow_to_target,
+    write_target,
+)
 from weevr.state import WatermarkState, WatermarkStore, resolve_store
 from weevr.telemetry.collector import SpanBuilder, SpanCollector
 from weevr.telemetry.results import ExportResult, ThreadTelemetry
@@ -651,20 +656,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             if dim_config is not None and dim_builder is not None:
                 # Dimension merge routing
-                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
-                if audit_columns and audit_ctx is not None:
-                    df = inject_audit_columns(df, audit_columns, audit_ctx)
-                    audit_columns_applied = list(audit_columns)
-
-                # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied[:]
-                df, warp_findings, drift_report = _apply_warp_and_drift(
+                df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
                     df,
-                    resolved_warp,
                     thread,
-                    engine_col_names,
-                    spark=spark,
-                    target_path=target_path,
+                    spark,
+                    target_handle,
+                    target_path,
+                    resolved_warp,
+                    audit_columns,
+                    audit_ctx,
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -767,20 +767,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             else:
                 # Standard write path
-                df = apply_target_mapping(df, thread.target, spark, handle=target_handle)
-                if audit_columns and audit_ctx is not None:
-                    df = inject_audit_columns(df, audit_columns, audit_ctx)
-                    audit_columns_applied = list(audit_columns)
-
-                # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied[:]
-                df, warp_findings, drift_report = _apply_warp_and_drift(
+                df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
                     df,
-                    resolved_warp,
                     thread,
-                    engine_col_names,
-                    spark=spark,
-                    target_path=target_path,
+                    spark,
+                    target_handle,
+                    target_path,
+                    resolved_warp,
+                    audit_columns,
+                    audit_ctx,
                 )
                 # Exports reuse one compute of the working DataFrame: the
                 # persist anchors here — after warp/drift, before the
@@ -1173,6 +1168,56 @@ def _resolve_with_block(
             collector.add_span(span)  # type: ignore[union-attr]
 
     return enriched
+
+
+def _shape_for_target(
+    df: Any,
+    thread: Thread,
+    spark: SparkSession,
+    target_handle: TargetHandle,
+    target_path: str,
+    resolved_warp: Any,
+    audit_columns: dict[str, str] | None,
+    audit_ctx: Any,
+) -> tuple[Any, list[dict[str, str]], Any, list[str]]:
+    """Map, audit, and drift-check the working DataFrame for a mapped write.
+
+    Auto mapping's narrowing to the existing table's columns is deferred
+    until after drift handling, so drift sees new output columns on an
+    existing table. Columns added after mapping (audit, warp-only) are kept.
+
+    Args:
+        df: Working DataFrame.
+        thread: Thread configuration.
+        spark: Active SparkSession.
+        target_handle: Pre-resolved target handle.
+        target_path: Resolved target path or alias.
+        resolved_warp: Resolved WarpConfig, or None.
+        audit_columns: Audit column expressions, if configured.
+        audit_ctx: Audit context for expression resolution.
+
+    Returns:
+        ``(df, warp findings, drift report, audit columns applied)``.
+    """
+    df = apply_target_mapping(df, thread.target, spark, handle=target_handle, narrow=False)
+    mapped_cols = set(df.columns)
+    audit_applied: list[str] = []
+    if audit_columns and audit_ctx is not None:
+        df = inject_audit_columns(df, audit_columns, audit_ctx)
+        audit_applied = list(audit_columns)
+
+    # Warp enforcement, drift detection, warp-only append
+    df, warp_findings, drift_report = _apply_warp_and_drift(
+        df,
+        resolved_warp,
+        thread,
+        audit_applied[:],
+        spark=spark,
+        target_path=target_path,
+    )
+    added_after_mapping = [c for c in df.columns if c not in mapped_cols]
+    df = narrow_to_target(df, thread.target, spark, handle=target_handle, keep=added_after_mapping)
+    return df, warp_findings, drift_report, audit_applied
 
 
 def _auto_warp_destination(thread: Thread, target_path: str | None) -> tuple[str, str] | None:

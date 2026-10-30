@@ -33,6 +33,7 @@ def apply_target_mapping(
     target: Target,
     spark: SparkSession,
     handle: TargetHandle | None = None,
+    narrow: bool = True,
 ) -> DataFrame:
     """Apply target column mapping to shape the DataFrame for writing.
 
@@ -51,6 +52,9 @@ def apply_target_mapping(
 
         handle: Pre-resolved target handle; when absent the function
             self-resolves existence (operations stay independently usable).
+        narrow: When False, auto mode skips narrowing to the existing table's
+            columns, so a caller can inspect the extra columns first and
+            narrow later with :func:`narrow_to_target`.
 
     Returns:
         DataFrame shaped for writing to the target.
@@ -76,20 +80,12 @@ def apply_target_mapping(
 
     # Narrow column set according to mapping mode.
     if target.mapping_mode == "auto":
-        target_path = target.alias or target.path
-        target_present = (
-            handle.exists()
-            if handle is not None and target_path == handle.path
-            else bool(target_path) and delta_table_exists(spark, target_path)
-        )
-        if target_path and target_present:
-            if is_table_alias(target_path):
-                existing_cols = spark.read.format("delta").table(target_path).columns
-            else:
-                existing_cols = spark.read.format("delta").load(target_path).columns
+        existing_cols = _existing_target_columns(target, spark, handle) if narrow else None
+        if existing_cols is not None:
             keep = [c for c in existing_cols if c in result.columns and c not in cols_to_drop]
             return result.select(keep)
-        # New target — pass all columns through, honoring drop markers.
+        # New target (or narrowing deferred) — pass all columns through,
+        # honoring drop markers.
         if cols_to_drop:
             result = result.drop(*cols_to_drop)
         return result
@@ -101,6 +97,60 @@ def apply_target_mapping(
 
     # explicit with no columns declared — nothing to select, return as-is.
     return result
+
+
+def narrow_to_target(
+    df: DataFrame,
+    target: Target,
+    spark: SparkSession,
+    handle: TargetHandle | None = None,
+    keep: list[str] | None = None,
+) -> DataFrame:
+    """Apply auto mapping's narrowing to the existing table's columns.
+
+    The deferred half of :func:`apply_target_mapping` with ``narrow=False``:
+    keeps the existing table's columns in table order, then the ``keep``
+    columns in their current order. A no-op for explicit mapping or a target
+    that doesn't exist yet.
+
+    Args:
+        df: DataFrame to narrow.
+        target: Target configuration including mapping mode.
+        spark: Active SparkSession (used to probe existing target schema).
+        handle: Pre-resolved target handle.
+        keep: Extra columns to keep even though the table lacks them (for
+            example engine columns added after mapping).
+
+    Returns:
+        The narrowed DataFrame.
+    """
+    if target.mapping_mode != "auto":
+        return df
+    existing_cols = _existing_target_columns(target, spark, handle)
+    if existing_cols is None:
+        return df
+    kept = [c for c in existing_cols if c in df.columns]
+    kept += [c for c in df.columns if c in set(keep or ()) and c not in kept]
+    return df.select(kept)
+
+
+def _existing_target_columns(
+    target: Target, spark: SparkSession, handle: TargetHandle | None
+) -> list[str] | None:
+    """Return the existing target table's columns, or None if it doesn't exist."""
+    target_path = target.alias or target.path
+    if not target_path:
+        return None
+    target_present = (
+        handle.exists()
+        if handle is not None and target_path == handle.path
+        else delta_table_exists(spark, target_path)
+    )
+    if not target_present:
+        return None
+    if is_table_alias(target_path):
+        return spark.read.format("delta").table(target_path).columns
+    return spark.read.format("delta").load(target_path).columns
 
 
 def write_target(
