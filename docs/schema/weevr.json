@@ -4052,7 +4052,7 @@
           },
           "mapping_mode": {
             "default": "auto",
-            "description": "Column mapping mode. 'auto' passes all source columns through; 'explicit' requires all output columns to be declared in columns.",
+            "description": "Column mapping mode. 'auto' passes all source columns through to a new table and keeps an existing table's columns (schema_drift: adaptive adds new ones); 'explicit' requires all output columns to be declared in columns.",
             "enum": [
               "auto",
               "explicit"
