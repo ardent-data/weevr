@@ -70,7 +70,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `keys` | `list[string]` | yes | -- | Columns used for deduplication grouping |
-| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. |
+| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. A primary source of a `cdc` thread can't set `dedup`. |
 
 ```yaml
 sources:
@@ -1240,6 +1240,8 @@ Load-mode rules are enforced in two places:
       of `timestamp` or `date`.
     - In `incremental_watermark` mode, a `dedup` on the primary (first) source
       requires `order_by: "<watermark_column> DESC"`.
+    - In `cdc` mode, the primary (first) source can't set `dedup` (the merge
+      keeps the latest change per key), and `target.dimension` is rejected.
 - **When the thread starts executing** — not reported by `load_config` or
   `mode="validate"`; the run fails with an `ExecutionError`:
     - `cdc` requires `write.mode: merge`.

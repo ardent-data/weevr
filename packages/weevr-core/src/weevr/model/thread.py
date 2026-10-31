@@ -217,6 +217,28 @@ class Thread(FrozenBase):
         return self
 
     @model_validator(mode="after")
+    def _validate_cdc_thread(self) -> "Thread":
+        """Reject what a CDC read would silently ignore or mis-route.
+
+        CDC reads never apply a primary-source dedup, and a dimension target
+        takes the dimension merge, which ignores the operation column.
+        """
+        if self.load is None or self.load.mode != "cdc":
+            return self
+        alias, primary = next(iter(self.sources.items()))
+        if primary.dedup is not None:
+            raise ValueError(
+                f"source '{alias}' sets dedup, which is not supported with load.mode: cdc; "
+                f"remove it, since the CDC merge keeps the latest change per key"
+            )
+        if self.target.dimension is not None:
+            raise ValueError(
+                "target.dimension is not supported with load.mode: cdc; the dimension merge "
+                "ignores the operation column, so deletes would become upserts"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_with_block(self) -> "Thread":
         """Validate the with: block for name collisions, forward refs, and alias uniqueness."""
         if self.with_ is None:

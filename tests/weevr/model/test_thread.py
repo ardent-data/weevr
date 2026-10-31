@@ -894,3 +894,71 @@ class TestIncrementalDedupRule:
     @pytest.mark.parametrize("mode", ["full", "incremental_parameter"])
     def test_other_load_modes_unaffected(self, mode):
         assert self._thread({"keys": ["id"], "order_by": "ts ASC"}, mode=mode)
+
+
+class TestCdcThreadRules:
+    """A CDC thread can't combine with a primary-source dedup or a dimension target."""
+
+    CDF = {"mode": "cdc", "cdc": {"preset": "delta_cdf"}}
+    GENERIC = {
+        "mode": "cdc",
+        "cdc": {"operation_column": "op", "insert_value": "I", "delete_value": "D"},
+    }
+    DIMENSION = {
+        "business_key": ["id"],
+        "surrogate_key": {"name": "sk", "columns": ["id"]},
+        "change_detection": {"attrs": {"columns": ["name"], "on_change": "overwrite"}},
+    }
+
+    @staticmethod
+    def _thread(load: dict, *, dedup: dict | None = None, target: dict | None = None, **sources):
+        primary: dict = {"type": "delta", "alias": "raw.orders"}
+        if dedup is not None:
+            primary["dedup"] = dedup
+        return Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": primary, **sources},
+                "target": {"path": "Tables/orders", **(target or {})},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+                "load": load,
+            }
+        )
+
+    @pytest.mark.parametrize("load", [CDF, GENERIC], ids=["delta_cdf", "generic"])
+    def test_primary_source_dedup_rejected(self, load):
+        with pytest.raises(ValidationError, match="source 'main'.*dedup.*load.mode: cdc"):
+            self._thread(load, dedup={"keys": ["id"]})
+
+    def test_non_primary_source_dedup_allowed(self):
+        codes = {"type": "delta", "alias": "raw.codes", "dedup": {"keys": ["id"]}}
+        assert self._thread(self.GENERIC, codes=codes).sources["codes"].dedup is not None
+
+    def test_cdc_without_dedup_allowed(self):
+        assert self._thread(self.GENERIC).load is not None
+
+    @pytest.mark.parametrize("load", [CDF, GENERIC], ids=["delta_cdf", "generic"])
+    def test_dimension_target_rejected(self, load):
+        with pytest.raises(ValidationError, match=r"target\.dimension.*load\.mode: cdc"):
+            Thread.model_validate(
+                {
+                    "name": "t",
+                    "config_version": "1.0",
+                    "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
+                    "target": {"path": "Tables/orders", "dimension": self.DIMENSION},
+                    "load": load,
+                }
+            )
+
+    def test_dimension_target_allowed_on_other_load_modes(self):
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
+                "target": {"path": "Tables/orders", "dimension": self.DIMENSION},
+                "load": {"mode": "full"},
+            }
+        )
+        assert thread.target.dimension is not None

@@ -338,6 +338,11 @@ load:
     preset: delta_cdf
 ```
 
+A CDC thread fails the config load if its primary (first) source sets
+`dedup`, since the merge already keeps the latest change per key, or if its
+target sets `dimension`, since the dimension merge ignores the operation
+column.
+
 CDC mode supports two configuration styles:
 
 - **Preset** -- Use `delta_cdf` to auto-configure for Delta Change Data
