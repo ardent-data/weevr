@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.4](https://github.com/ardent-data/weevr/compare/weevr-v1.20.3...weevr-v1.20.4) (2026-10-31)
+
+
+### Bug Fixes
+
+* **engine:** make schema drift and warp lookup work as documented ([#269](https://github.com/ardent-data/weevr/issues/269)) ([9ed3347](https://github.com/ardent-data/weevr/commit/9ed334737ffae405164578c6ee715780f5189cdc))
+* **operations:** keep names, digits, and types intact in transforms ([#267](https://github.com/ardent-data/weevr/issues/267)) ([4c64ee8](https://github.com/ardent-data/weevr/commit/4c64ee86a5dd61b1a843069ed6be6c37eb9f610b))
+* **state:** stop watermark state losing or duplicating rows ([#270](https://github.com/ardent-data/weevr/issues/270)) ([86497d1](https://github.com/ardent-data/weevr/commit/86497d12d630664c0375978c4528db008e86d824))
+
 ## [1.20.3](https://github.com/ardent-data/weevr/compare/weevr-v1.20.2...weevr-v1.20.3) (2026-10-26)
 
 
