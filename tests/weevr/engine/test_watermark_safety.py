@@ -29,6 +29,15 @@ def new_york_session(spark: SparkSession) -> Iterator[SparkSession]:
     spark.conf.set("spark.sql.session.timeZone", previous)
 
 
+@pytest.fixture()
+def ansi_session(spark: SparkSession) -> Iterator[SparkSession]:
+    """ANSI mode on, where a bad cast raises instead of returning NULL."""
+    previous = spark.conf.get("spark.sql.ansi.enabled") or "false"
+    spark.conf.set("spark.sql.ansi.enabled", "true")
+    yield spark
+    spark.conf.set("spark.sql.ansi.enabled", previous)
+
+
 def _thread(
     src: str,
     tgt: str,
@@ -416,6 +425,47 @@ class TestCorruptStoredWatermark:
         with pytest.raises(StateError, match=stored) as exc:
             execute_thread(spark, _thread(src, tgt, store, wm_type=wm_type, wm_col=wm_col))
         assert exc.value.thread_name == "t"
+
+    @pytest.mark.parametrize(
+        "wm_type, wm_col, column_sql, stored",
+        [
+            ("date", "d", "date'2024-01-01'", "not-a-date"),
+            ("timestamp", "ts", "timestamp_ntz'2024-01-01 10:00:00'", "not-a-timestamp"),
+            ("timestamp", "ts", "'2024-01-01 10:00:00'", "not-a-timestamp"),
+            ("date", "d", "date'2024-01-01'", "it's-not-a-date"),
+        ],
+        ids=["date", "ntz", "string_timestamp", "quoted_text"],
+    )
+    def test_fails_with_a_state_error_under_ansi(
+        self, ansi_session: SparkSession, tmp_path, wm_type, wm_col, column_sql, stored
+    ):
+        from weevr.errors import StateError
+
+        spark = ansi_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, f"select 1 as id, {column_sql} as {wm_col}")
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column=wm_col,
+                watermark_type=wm_type,
+                last_value=stored,
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        with pytest.raises(StateError, match="not a valid") as exc:
+            execute_thread(spark, _thread(src, tgt, store, wm_type=wm_type, wm_col=wm_col))
+        assert exc.value.thread_name == "t"
+
+    def test_valid_value_still_filters_under_ansi(self, ansi_session: SparkSession, tmp_path):
+        spark = ansi_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, date'2024-01-01' as d")
+        thread = _thread(src, tgt, store, wm_type="date", wm_col="d")
+        assert execute_thread(spark, thread).status == "success"
+        _append(spark, src, "select 2 as id, date'2024-02-01' as d")
+        assert execute_thread(spark, thread).rows_written == 1
 
     def test_string_column_spark_cannot_cast_fails_on_the_next_run(
         self, spark: SparkSession, tmp_path

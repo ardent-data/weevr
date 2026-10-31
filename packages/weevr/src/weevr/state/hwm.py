@@ -146,16 +146,18 @@ def _checked_cast(df: DataFrame, last_value: str, type_name: str) -> Column:
 
     Comparing with a NULL literal matches no rows, so the thread would report
     success and never read new data. Asking Spark keeps every value it can
-    cast working, including forms Python's parsers reject.
+    cast working, including forms Python's parsers reject. ``try_cast`` gives
+    NULL under ANSI mode too, where a plain cast raises instead.
 
     Raises:
         ValueError: If Spark can't cast the text.
     """
-    literal = F.lit(last_value).cast(type_name)
-    row = df.sparkSession.range(1).select(literal.isNull().alias("bad")).first()
+    row = df.sparkSession.sql(
+        f"SELECT try_cast(:value AS {type_name}) IS NULL AS bad", args={"value": last_value}
+    ).first()
     if row is None or row["bad"]:
         raise ValueError(f"not castable to {type_name}: {last_value!r}")
-    return literal
+    return F.lit(last_value).cast(type_name)
 
 
 def _column_type(df: DataFrame, typed: Column) -> DataType:
