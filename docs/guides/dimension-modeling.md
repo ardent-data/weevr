@@ -175,6 +175,10 @@ Seeds run before the data is written, on every write path, including
 `soft_delete_active_value` unless the row sets the column itself, and a change
 to a seed key merges onto it. A seed never changes which data rows land.
 
+Seeds and the first merge commit separately. If a seeded first CDC run fails
+during the merge, drop the target before retrying: a retry sees an existing
+table, so only insert rows land, and update rows for unseen keys are skipped.
+
 A dimension target can't be combined with `load.mode: cdc`: the config load
 fails, since the dimension merge ignores the operation column.
 
