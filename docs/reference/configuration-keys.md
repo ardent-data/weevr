@@ -227,7 +227,7 @@ set to `date_sequence` or `int_sequence`).
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `keys` | `list[str]` | *required* | Deduplication grouping columns |
-| `order_by` | `str` | `None` | Sort expression for row selection |
+| `order_by` | `str` | `None` | Sort expression for row selection. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. |
 
 ---
 
@@ -316,6 +316,8 @@ Cross-field rules enforced at parse time:
 - `watermark_format` requires `watermark_column` and requires
   `watermark_type` to be `"timestamp"` or `"date"`
 - a `cdc` block is only valid when `mode == "cdc"`
+- `mode == "incremental_watermark"` with a `dedup` on the primary (first)
+  source requires `dedup.order_by` to be `"<watermark_column> DESC"`
 
 Cross-field rules enforced when the thread starts executing (not reported
 by `load_config` or `mode="validate"`; the run fails with an

@@ -451,6 +451,10 @@ configured store. Carries optional `store_type` context.
 - Failed to read watermark from table properties or metadata table
 - Failed to write watermark after successful execution
 - Metadata table path is not accessible
+- Metadata table could not be created at `table_path`
+- Stored watermark value can't be parsed for the `watermark_type`
+- First run with no stored or recorded watermark into an append target that
+  already holds rows
 
 **Resolution:**
 
@@ -458,6 +462,9 @@ configured store. Carries optional `store_type` context.
 2. Verify the target Delta table exists and has table properties enabled
 3. For metadata table store, verify the `table_path` is accessible
 4. Check Spark permissions for reading/writing table properties
+5. For an unparseable stored value or a first run into a non-empty append
+   target, [seed or reset the watermark](../../concepts/idempotency.md#seed-or-reset-a-watermark)
+   or truncate the target for a full reload
 
 **Example:**
 

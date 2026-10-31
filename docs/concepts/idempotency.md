@@ -175,11 +175,11 @@ run that advances the watermark.
 
 ### Deduplication and watermarks
 
-A `dedup` on the watermarked source must keep the latest row per key by the
-watermark column — `order_by: "<watermark_column> DESC"`. The watermark
+A `dedup` on the primary (first) source must keep the latest row per key by
+the watermark column — `order_by: "<watermark_column> DESC"`. The watermark
 advances to the newest value read, so a dedup that keeps an older row per
-key would drop that key's later changes for good. Any other `order_by`
-fails the config load with the required value.
+key would drop that key's later changes for good. Any other `order_by`, or
+none, fails the config load with the required value.
 
 ### Recovery after a failed state save
 
@@ -196,10 +196,20 @@ would duplicate data. Seed the watermark or truncate the target as
 described below. Merge targets are not affected, since a merge does not
 duplicate rows.
 
+If that error says the target's commit history can't be read, retry once the
+history is readable before you seed or truncate: the history may hold a
+recorded watermark that the run can recover.
+
 ### Seed or reset a watermark
 
 weevr has no command for setting a watermark; set it directly in the state
 store. Use the same value form weevr stores (see [Stored values](#stored-values)).
+
+A stored value that can't be parsed for the `watermark_type` fails the run
+with a `StateError` rather than being ignored; seed or reset it to continue.
+This includes a string `watermark_column` holding timestamps or dates in a
+format Spark can't cast, which fails on the run after its watermark is
+stored. For that column, set `load.watermark_format`.
 
 **`metadata_table` store** — upsert a row for the thread into the table at
 `watermark_store.table_path`:
@@ -226,12 +236,14 @@ ALTER TABLE <target> SET TBLPROPERTIES (
   'weevr.watermark.my_thread.last_value' = '2024-03-15T00:00:00.000000Z',
   'weevr.watermark.my_thread.watermark_column' = 'modified_date',
   'weevr.watermark.my_thread.watermark_type' = 'timestamp',
-  'weevr.watermark.my_thread.last_updated' = '2024-03-15T00:00:00+00:00'
+  -- Replace with the current UTC time, for example 2026-10-31T09:30:00+00:00
+  'weevr.watermark.my_thread.last_updated' = '<current_utc_time>'
 )
 ```
 
-Set `last_updated` to the current time so the seeded value takes precedence
-over a value recorded in an earlier commit. To reload everything into an
+Set `last_updated` to the current time, not the time in `last_value`: with an
+older `last_updated`, a newer value recorded in an earlier commit overrides
+the seed. To reload everything into an
 append target instead, truncate the target (and remove any stored
 watermark) before the run.
 
