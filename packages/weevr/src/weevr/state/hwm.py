@@ -115,9 +115,11 @@ def hwm_literal(
     try:
         return _parsed_literal(df, typed, watermark_type, last_value)
     except ValueError as exc:
+        remedy = "seed or reset the watermark"
+        if watermark_type in ("timestamp", "date"):
+            remedy += ", or set watermark_format for a string column in another format"
         raise StateError(
-            f"Stored watermark {last_value!r} is not a valid {watermark_type} value; "
-            f"seed or reset the watermark",
+            f"Stored watermark {last_value!r} is not a valid {watermark_type} value; {remedy}",
             cause=exc,
             thread_name=thread_name,
         ) from exc
@@ -130,13 +132,30 @@ def _parsed_literal(df: DataFrame, typed: Column, watermark_type: str, last_valu
         if isinstance(column_type, TimestampType):
             return F.expr(f"timestamp_micros({parse_timestamp_hwm(last_value)})")
         if isinstance(column_type, TimestampNTZType):
-            return F.lit(last_value).cast("timestamp_ntz")
-        return F.lit(last_value).cast("timestamp")
+            return _checked_cast(df, last_value, "timestamp_ntz")
+        return _checked_cast(df, last_value, "timestamp")
     if watermark_type == "date":
-        return F.lit(last_value).cast("date")
+        return _checked_cast(df, last_value, "date")
     if watermark_type == "long":
         return F.lit(int(last_value)).cast("long")
     return F.lit(int(last_value))
+
+
+def _checked_cast(df: DataFrame, last_value: str, type_name: str) -> Column:
+    """Cast stored text by Spark's rules, rejecting text Spark reads as NULL.
+
+    Comparing with a NULL literal matches no rows, so the thread would report
+    success and never read new data. Asking Spark keeps every value it can
+    cast working, including forms Python's parsers reject.
+
+    Raises:
+        ValueError: If Spark can't cast the text.
+    """
+    literal = F.lit(last_value).cast(type_name)
+    row = df.sparkSession.range(1).select(literal.isNull().alias("bad")).first()
+    if row is None or row["bad"]:
+        raise ValueError(f"not castable to {type_name}: {last_value!r}")
+    return literal
 
 
 def _column_type(df: DataFrame, typed: Column) -> DataType:

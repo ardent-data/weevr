@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
 
 from weevr.engine.executor import execute_thread
@@ -58,6 +59,18 @@ def _thread(
 
 def _append(spark: SparkSession, path: str, sql: str) -> None:
     spark.sql(sql).write.format("delta").mode("append").save(path)
+
+
+def _history_scan_fails() -> Any:
+    """Fail the multi-commit scan only; single-commit version and metrics reads still work."""
+    real_history = DeltaTable.history
+
+    def history(self: DeltaTable, limit: int | None = None) -> Any:
+        if limit is not None and limit > 1:
+            raise RuntimeError("log unreadable")
+        return real_history(self, limit)
+
+    return patch.object(DeltaTable, "history", history)
 
 
 class TestTimestampWatermarkZones:
@@ -334,15 +347,13 @@ class TestHistoryReadFailure:
     """An unreadable commit history is reported as that, not as a missing stamp."""
 
     def test_first_run_guard_names_the_unreadable_history(self, spark: SparkSession, tmp_path):
-        from delta.tables import DeltaTable
-
         from weevr.errors import StateError
 
         src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
         _append(spark, src, "select 1 as id, 10L as seq")
         _append(spark, tgt, "select 9 as id, 90L as seq")
         with (
-            patch.object(DeltaTable, "history", side_effect=RuntimeError("log unreadable")),
+            _history_scan_fails(),
             pytest.raises(StateError, match="commit history") as exc,
         ):
             execute_thread(spark, _int_thread(src, tgt, store))
@@ -352,8 +363,6 @@ class TestHistoryReadFailure:
     def test_stored_watermark_run_logs_the_cause(self, spark: SparkSession, tmp_path, caplog):
         import logging
 
-        from delta.tables import DeltaTable
-
         src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
         _append(spark, src, "select 1 as id, 10L as seq")
         thread = _int_thread(src, tgt, store)
@@ -361,7 +370,7 @@ class TestHistoryReadFailure:
 
         _append(spark, src, "select 2 as id, 20L as seq")
         with (
-            patch.object(DeltaTable, "history", side_effect=RuntimeError("log unreadable")),
+            _history_scan_fails(),
             caplog.at_level(logging.WARNING, logger="weevr.operations.target_handle"),
         ):
             assert execute_thread(spark, thread).status == "success"
@@ -380,8 +389,12 @@ class TestCorruptStoredWatermark:
             ("timestamp", "ts", "timestamp'2024-01-01 10:00:00'", "not-a-timestamp"),
             ("long", "seq", "10L", "not-a-number"),
             ("int", "seq", "10", "not-a-number"),
+            ("date", "d", "date'2024-01-01'", "not-a-date"),
+            ("timestamp", "ts", "timestamp_ntz'2024-01-01 10:00:00'", "not-a-timestamp"),
+            ("timestamp", "ts", "'2024-01-01 10:00:00'", "not-a-timestamp"),
+            ("date", "d", "'2024-01-01'", "not-a-date"),
         ],
-        ids=["timestamp", "long", "int"],
+        ids=["timestamp", "long", "int", "date", "ntz", "string_timestamp", "string_date"],
     )
     def test_fails_with_a_state_error(
         self, spark: SparkSession, tmp_path, wm_type, wm_col, column_sql, stored
@@ -403,6 +416,47 @@ class TestCorruptStoredWatermark:
         with pytest.raises(StateError, match=stored) as exc:
             execute_thread(spark, _thread(src, tgt, store, wm_type=wm_type, wm_col=wm_col))
         assert exc.value.thread_name == "t"
+
+    def test_string_column_spark_cannot_cast_fails_on_the_next_run(
+        self, spark: SparkSession, tmp_path
+    ):
+        from weevr.errors import StateError
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, '01/02/2024' as ts")
+        thread = _thread(src, tgt, store)
+        assert execute_thread(spark, thread).status == "success"
+        with pytest.raises(StateError, match="watermark_format"):
+            execute_thread(spark, thread)
+
+    @pytest.mark.parametrize(
+        "wm_col, column_sql, new_sql, wm_type, stored",
+        [
+            ("d", "date'2024-01-01'", "date'2024-02-01'", "date", "2024-1-1"),
+            ("d", "date'2024-01-01'", "date'2024-02-01'", "date", "2024"),
+            ("ts", "'2024-01-01 10:00:00'", "'2024-02-01 10:00:00'", "timestamp", "2024-1-1"),
+        ],
+        ids=["date_short", "date_year", "string_timestamp_short"],
+    )
+    def test_text_spark_can_cast_keeps_working(
+        self, spark: SparkSession, tmp_path, wm_col, column_sql, new_sql, wm_type, stored
+    ):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, f"select 1 as id, {column_sql} as {wm_col}")
+        _append(spark, src, f"select 2 as id, {new_sql} as {wm_col}")
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column=wm_col,
+                watermark_type=wm_type,
+                last_value=stored,
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        thread = _thread(src, tgt, store, wm_type=wm_type, wm_col=wm_col)
+        assert execute_thread(spark, thread).status == "success"
+        assert spark.read.format("delta").load(tgt).filter("id = 2").count() == 1
 
 
 class TestFirstRunGuard:
