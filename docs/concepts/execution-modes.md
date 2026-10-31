@@ -349,6 +349,12 @@ CDC mode supports two configuration styles:
   Feed conventions.
 - **Explicit** -- Declare the operation column and flag values directly.
 
+The first `delta_cdf` run has no stored version, so it reads the source's
+current version as inserts and stores that version. Later runs read only the
+changes after it. The source needs Change Data Feed enabled by the time the
+second run starts. On a first run against a target that already holds rows,
+only new keys insert; existing rows aren't updated.
+
 ```yaml
 load:
   mode: cdc

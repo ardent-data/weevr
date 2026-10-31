@@ -441,8 +441,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 if thread.load.cdc.preset == "delta_cdf" and prior_state is not None:
                     try:
                         last_version = int(prior_state.last_value)
-                    except (ValueError, TypeError):
-                        last_version = None
+                    except (ValueError, TypeError) as exc:
+                        raise StateError(
+                            f"Stored CDF version {prior_state.last_value!r} is not an "
+                            f"integer; seed or reset the watermark",
+                            cause=exc,
+                            thread_name=thread.name,
+                        ) from exc
 
                 primary_df, cdc_new_hwm = read_cdc_source(
                     spark,
