@@ -1747,6 +1747,20 @@ class TestValidateModeSourceProbes:
         assert len(errors) == 1
         assert "undefined connection 'nope'" in errors[0]
 
+    @pytest.mark.parametrize("source_type", ["csv", "delta"])
+    def test_failed_probe_is_not_reported_as_missing(
+        self, spark: SparkSession, tmp_path: Path, source_type: str
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        location = "nosuchscheme://bucket/orders"
+        tgt = str(tmp_path / "tgt")
+        threads = {"t": self._thread_with_source(source_type, location, tgt)}
+        errors = ctx._check_source_existence(threads)
+        assert len(errors) == 1
+        assert "could not be verified" in errors[0]
+        assert "not found" not in errors[0]
+        assert location in errors[0]
+
     def test_shared_connection_location_is_probed_once(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:

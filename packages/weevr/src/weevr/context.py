@@ -13,7 +13,7 @@ from pyspark.sql import SparkSession
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
-from weevr.delta import delta_table_exists
+from weevr.delta import probe_delta_table_exists
 from weevr.engine.executor import execute_thread
 from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import build_plan
@@ -580,7 +580,16 @@ class Context:
                     continue
                 checked.add(resolve_path)
 
-                if not self._source_location_exists(source_type, resolve_path):
+                try:
+                    exists = self._source_location_exists(source_type, resolve_path)
+                except Exception as exc:
+                    logger.warning("Existence probe failed for '%s': %s", resolve_path, exc)
+                    errors.append(
+                        f"Source '{source_name}' in thread '{thread_name}' "
+                        f"could not be verified: {resolve_path}"
+                    )
+                    continue
+                if not exists:
                     errors.append(
                         f"Source '{source_name}' in thread '{thread_name}' "
                         f"not found: {resolve_path}"
@@ -597,18 +606,19 @@ class Context:
         mode answers "is the config pointed at something real", and
         parse problems surface at execution with a better error. Same
         posture as the catalog-vs-Delta-readable gap documented on
-        ``delta_table_exists``.
+        ``probe_delta_table_exists``.
+
+        A failure to ask, such as a permission or storage error, raises
+        rather than answering False, so it isn't reported as a missing
+        source.
         """
-        try:
-            if source_type == "delta":
-                return delta_table_exists(self._spark, resolve_path)
-            jvm: Any = self._spark._jvm  # noqa: SLF001
-            jsc: Any = self._spark._jsc  # noqa: SLF001
-            location = jvm.org.apache.hadoop.fs.Path(resolve_path)
-            fs = location.getFileSystem(jsc.hadoopConfiguration())
-            return bool(fs.exists(location))
-        except Exception:
-            return False
+        if source_type == "delta":
+            return probe_delta_table_exists(self._spark, resolve_path)
+        jvm: Any = self._spark._jvm  # noqa: SLF001
+        jsc: Any = self._spark._jsc  # noqa: SLF001
+        location = jvm.org.apache.hadoop.fs.Path(resolve_path)
+        fs = location.getFileSystem(jsc.hadoopConfiguration())
+        return bool(fs.exists(location))
 
     @staticmethod
     def _collect_all_threads(loaded: LoadedConfig) -> dict[str, Thread]:
