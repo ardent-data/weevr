@@ -2,7 +2,7 @@
 
 import pytest
 
-from weevr.config.macros import expand_foreach
+from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.errors.exceptions import ConfigError
 
 
@@ -153,3 +153,13 @@ class TestExpandForeach:
         result = expand_foreach(steps)
         assert len(result) == 3
         assert result[0] == {"derive": {"columns": {"col_1": "col * 1"}}}
+
+
+class TestRejectForeachInWith:
+    """The check reads either spelling of the sub-pipeline key."""
+
+    @pytest.mark.parametrize("key", ["with", "with_"])
+    def test_both_keys_are_checked(self, key: str) -> None:
+        thread = {key: {"cte": {"steps": [{"foreach": {}}]}}}
+        with pytest.raises(ConfigError, match=r"with\.cte\.steps"):
+            reject_foreach_in_with(thread)

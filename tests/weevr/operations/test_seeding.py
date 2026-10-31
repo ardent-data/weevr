@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from pyspark.sql import SparkSession
@@ -495,6 +496,12 @@ class TestExecuteSeedsOnAliasTargets:
         assert result.triggered is True
         assert spark.catalog.tableExists(alias)
         assert [r.id for r in spark.table(alias).collect()] == [-1]
+
+    def test_leaves_no_relative_directory(self, spark: SparkSession, alias_db: str) -> None:
+        alias = f"{alias_db}.no_stray_dir"
+        config = SeedConfig(on="first_write", rows=[{"id": -1, "label": "unknown"}])
+        execute_seeds(spark, config, alias, self.SCHEMA)
+        assert not Path(alias).exists()
 
     def test_appends_to_an_existing_empty_table(self, spark: SparkSession, alias_db: str) -> None:
         alias = f"{alias_db}.empty"
