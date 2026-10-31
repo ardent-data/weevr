@@ -24,7 +24,7 @@ from weevr.config.locations import (
     location_like,
     make_location,
 )
-from weevr.config.macros import expand_foreach
+from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.parser import (
     detect_config_type,
     detect_config_type_from_extension,
@@ -191,8 +191,10 @@ def resolve_config(
         check_dimension_overrides(config_type, data, location)
     _apply_cascade(config_type, data)
 
-    if config_type == "thread" and isinstance(data.get("steps"), list):
-        data["steps"] = expand_foreach(data["steps"])
+    if config_type == "thread":
+        reject_foreach_in_with(data)
+        if isinstance(data.get("steps"), list):
+            data["steps"] = expand_foreach(data["steps"])
 
     if ext_type is not None:
         declared_name = data.get("name", "")
@@ -239,7 +241,12 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
     if resolved.config_type == "thread":
         # A standalone thread sees only its own lookups at run time
         check_resolve_lookups(
-            resolved.data, set(), resolved.location, resolved.config_name, lookup_warnings
+            resolved.data,
+            set(),
+            resolved.location,
+            resolved.config_name,
+            lookup_warnings,
+            standalone=True,
         )
     model = hydrate_model(resolved.data, resolved.config_type, resolved.location)
     root = resolved.project_root

@@ -69,12 +69,12 @@ class TestValidateDimensionOverrides:
         diags = validate_dimension_overrides(config)
         assert any("ERROR" in d and "mode" in d for d in diags)
 
-    def test_dimension_with_write_mode_merge_allowed(self):
-        """dimension + write.mode=merge is valid (no error)."""
+    def test_dimension_with_write_mode_merge_errors(self):
+        """dimension + write.mode=merge never loaded: merge alone needs match_keys."""
         config = self._base_config()
         config["write"] = {"mode": "merge"}
         diags = validate_dimension_overrides(config)
-        assert not any("ERROR" in d for d in diags)
+        assert any("ERROR" in d and "write.mode" in d for d in diags)
 
     def test_dimension_without_write_mode_allowed(self):
         """dimension without write.mode set is valid (engine defaults to merge)."""
@@ -90,14 +90,14 @@ class TestValidateDimensionOverrides:
     def test_dimension_with_on_no_match_source_soft_delete_allowed(self):
         """dimension + write.on_no_match_source=soft_delete is valid."""
         config = self._base_config()
-        config["write"] = {"on_no_match_source": "soft_delete", "mode": "merge"}
+        config["write"] = {"on_no_match_source": "soft_delete"}
         diags = validate_dimension_overrides(config)
         assert not any("ERROR" in d for d in diags)
 
     def test_dimension_with_on_no_match_target_allowed(self):
         """dimension + write.on_no_match_target is valid."""
         config = self._base_config()
-        config["write"] = {"on_no_match_target": "insert", "mode": "merge"}
+        config["write"] = {"on_no_match_target": "insert"}
         diags = validate_dimension_overrides(config)
         assert not any("ERROR" in d for d in diags)
 
@@ -162,7 +162,7 @@ class TestValidateDimensionOverrides:
     def test_dimension_without_keys_no_error(self):
         """dimension without any keys block produces no error."""
         config = self._base_config()
-        config["write"] = {"mode": "merge"}
+        config["write"] = {"on_no_match_target": "insert"}
         diags = validate_dimension_overrides(config)
         assert len(diags) == 0
 

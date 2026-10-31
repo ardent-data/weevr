@@ -20,6 +20,27 @@ def _substitute_value(obj: Any, var_name: str, value: Any) -> Any:
     return obj
 
 
+def reject_foreach_in_with(thread: dict[str, Any]) -> None:
+    """Reject ``foreach`` in a ``with:`` sub-pipeline, which isn't expanded.
+
+    Args:
+        thread: Raw or resolved thread dict.
+
+    Raises:
+        ConfigError: Naming the sub-pipeline that holds a ``foreach`` block.
+    """
+    sub_pipelines = thread.get("with_") or thread.get("with") or {}
+    if not isinstance(sub_pipelines, dict):
+        return
+    for name, sub_pipeline in sub_pipelines.items():
+        steps = sub_pipeline.get("steps") if isinstance(sub_pipeline, dict) else None
+        if isinstance(steps, list) and any(isinstance(s, dict) and "foreach" in s for s in steps):
+            raise ConfigError(
+                f"foreach is not supported in with.{name}.steps; "
+                f"use it in the thread's top-level steps"
+            )
+
+
 def expand_foreach(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Expand foreach macro blocks into repeated step sequences.
 

@@ -205,6 +205,12 @@ for issue in loaded.validate_plans():
 the same target without an ordering, or a Lookup problem — instead of
 stopping at the first. `execution_plan` raises on the first failure.
 
+A source `lookup:` must name a lookup the thread can see. Through a weave or
+loom, an undefined name fails the load. A thread file loaded on its own can't
+see those parents, so a name it doesn't define itself adds a warning to
+`LoadedConfig.warnings` instead: the thread is valid in a weave that defines
+the lookup, but running it alone fails.
+
 Without Spark there is no Fabric context, so a `${fabric.*}` reference needs
 a default (`${fabric.workspace_id:-local}`) to load through `load_config()` or
 `load_resolved()`. Checks that read data, such as whether a source table

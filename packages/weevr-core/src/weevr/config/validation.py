@@ -242,7 +242,7 @@ def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
 
     - ``write.match_keys`` → ERROR (engine derives from business_key)
     - ``write.on_match`` → ERROR (engine derives from on_change behaviour)
-    - ``write.mode`` not ``"merge"`` → ERROR (dimension requires merge)
+    - ``write.mode`` → ERROR (dimension targets always merge)
     - ``keys.business_key`` → ERROR (declared in dimension block)
     - ``keys.surrogate_key`` → ERROR (declared in dimension block)
     - ``keys.change_detection`` → ERROR (declared in dimension block)
@@ -263,7 +263,7 @@ def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
                 f"(the engine derives it from the dimension block)"
             )
 
-    if "mode" in write and write["mode"] != "merge":
+    if "mode" in write:
         diagnostics.append(
             f"ERROR: write.mode '{write['mode']}' cannot be set when target.dimension is "
             f"present (dimension targets always merge); remove write.mode"
@@ -342,6 +342,44 @@ def validate_resolve_lookups(
                     f"{sorted(available_lookups) or '(none)'}"
                 )
 
+    return diagnostics
+
+
+def validate_source_lookups(
+    thread_config: dict[str, Any],
+    *,
+    available_lookups: set[str],
+    standalone: bool = False,
+) -> list[str]:
+    """Validate that lookup-bound sources name lookups the thread can see.
+
+    Args:
+        thread_config: Resolved thread configuration dictionary.
+        available_lookups: Names defined by the thread and, unless
+            ``standalone``, its weave and loom.
+        standalone: The thread was loaded from its own file, so a weave or
+            loom that defines the lookup can't be seen. Missing names warn
+            instead of failing, since such a thread is valid in its weave.
+
+    Returns:
+        List of diagnostic messages, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+    """
+    diagnostics: list[str] = []
+    sources = thread_config.get("sources") or {}
+    for alias, source in sources.items():
+        name = source.get("lookup") if isinstance(source, dict) else None
+        if name is None or name in available_lookups:
+            continue
+        if standalone:
+            diagnostics.append(
+                f"WARN: source '{alias}' references lookup '{name}', which this thread "
+                f"doesn't define; it must come from a weave or loom"
+            )
+        else:
+            diagnostics.append(
+                f"ERROR: source '{alias}' references undefined lookup '{name}'; "
+                f"available lookups: {sorted(available_lookups) or '(none)'}"
+            )
     return diagnostics
 
 
