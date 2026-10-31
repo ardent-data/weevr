@@ -817,7 +817,7 @@ wheels = [
 
 [[package]]
 name = "weevr"
-version = "1.20.3"
+version = "1.20.4"
 source = { editable = "packages/weevr" }
 dependencies = [
     { name = "pydantic" },
@@ -866,7 +866,7 @@ dev = [
 
 [[package]]
 name = "weevr-core"
-version = "1.20.3"
+version = "1.20.4"
 source = { editable = "packages/weevr-core" }
 dependencies = [
     { name = "pydantic" },
