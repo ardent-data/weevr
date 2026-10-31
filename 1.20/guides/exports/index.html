@@ -3077,6 +3077,16 @@ post-mapping and with audit columns applied. They are declared in the
 <code>exports:</code> key at the thread, weave, or loom level and execute
 sequentially after the primary write, watermark persistence, and
 post-write assertions.</p>
+<div class="admonition warning">
+<p class="admonition-title">Aborted exports are not retried</p>
+<p>Because the watermark is saved before exports run, an export with
+<code>on_failure: abort</code> that fails leaves the watermark advanced: the next
+run reads only newer rows, and the failed batch is never exported.
+To recover, re-run that export against the target, or reset the
+watermark to its previous value
+(<a href="../../concepts/idempotency/#seed-or-reset-a-watermark">Seed or reset a watermark</a>)
+and re-run the thread.</p>
+</div>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">exports</span><span class="p">:</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parquet_archive</span>

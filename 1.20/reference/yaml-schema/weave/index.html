@@ -3354,6 +3354,13 @@ runtime settings.</p>
 <td>Human-readable weave name</td>
 </tr>
 <tr>
+<td><code>qualified_key</code></td>
+<td><code>string</code></td>
+<td>--</td>
+<td>set by loader</td>
+<td>Read-only. The weave file's path relative to the project root (for example <code>weaves/daily.weave</code>); an inline weave uses its name. Populated at load; not set in YAML.</td>
+</tr>
+<tr>
 <td><code>threads</code></td>
 <td><code>list[ThreadEntry or string]</code></td>
 <td>yes</td>

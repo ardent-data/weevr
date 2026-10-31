@@ -3164,6 +3164,13 @@ runtime settings that cascade down through weaves to threads.</p>
 <td>Human-readable loom name</td>
 </tr>
 <tr>
+<td><code>qualified_key</code></td>
+<td><code>string</code></td>
+<td>--</td>
+<td>set by loader</td>
+<td>Read-only. The loom file's path relative to the project root (for example <code>looms/nightly.loom</code>). Populated at load; not set in YAML.</td>
+</tr>
+<tr>
 <td><code>weaves</code></td>
 <td><code>list[WeaveEntry or string]</code></td>
 <td>yes</td>

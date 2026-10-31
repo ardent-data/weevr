@@ -4557,7 +4557,7 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <td><code>string</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Sort expression to determine which row to keep</td>
+<td>Sort expression to determine which row to keep. On the primary (first) source of an <code>incremental_watermark</code> thread it must be <code>"&lt;watermark_column&gt; DESC"</code>; leaving it unset fails the config load.</td>
 </tr>
 </tbody>
 </table>
@@ -6102,9 +6102,12 @@ SCD2 narrowing, batch mode, and include columns.</p>
 </tr>
 </tbody>
 </table>
-<p>*Required in single mode. In batch mode, these fields are optional
-at the top level and serve as shared defaults merged into each batch
-item.</p>
+<p>*Required in single mode. In batch mode, <code>name</code>, <code>lookup</code>, and <code>match</code> are
+rejected at the top level; set them on each batch item. <code>pk</code> is optional at
+the top level. These top-level fields serve as shared defaults merged into
+each batch item: <code>pk</code>, <code>on_invalid</code>, <code>on_unknown</code>, <code>on_duplicate</code>,
+<code>on_failure</code>, <code>normalize</code>, <code>drop_source_columns</code>, <code>include</code>,
+<code>include_prefix</code>, <code>effective</code>, and <code>where</code>.</p>
 <p><strong><code>include</code> syntax:</strong></p>
 <p><code>include</code> accepts three forms:</p>
 <ul>
@@ -7327,6 +7330,8 @@ the two mechanisms are redundant.</p>
   rejected with <code>preset: delta_cdf</code>.</li>
 <li><code>watermark_format</code> requires <code>watermark_column</code>, and <code>watermark_type</code>
   of <code>timestamp</code> or <code>date</code>.</li>
+<li>In <code>incremental_watermark</code> mode, a <code>dedup</code> on the primary (first) source
+  requires <code>order_by: "&lt;watermark_column&gt; DESC"</code>.</li>
 </ul>
 </li>
 <li><strong>When the thread starts executing</strong> — not reported by <code>load_config</code> or
