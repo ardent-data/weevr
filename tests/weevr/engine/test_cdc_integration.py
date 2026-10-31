@@ -1,12 +1,13 @@
 """Spark integration tests for CDC merge operations."""
 
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 from unittest.mock import MagicMock, patch
 
 import pytest
 from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 from spark_helpers import create_delta_table
 from weevr.engine.executor import execute_thread
@@ -1229,6 +1230,207 @@ class TestGenericCdcWindowConsistency:
         hwm = compute_generic_cdc_hwm(window_df, load)
         assert hwm == str(max(r["seq"] for r in processed_rows))
         window_df.unpersist()
+
+
+@pytest.mark.spark
+class TestCdcSeeds:
+    """``target.seed`` runs on the CDC write path."""
+
+    SEED = {"on": "first_write", "rows": [{"id": -1, "name": "unknown"}]}
+
+    @staticmethod
+    def _source(
+        spark: SparkSession, path: str, rows: list[tuple[int, str, str]], seq: int = 1
+    ) -> None:
+        df = spark.createDataFrame(rows, ["id", "name", "OPFLAG"]).withColumn("seq", F.lit(seq))
+        df.write.format("delta").mode("overwrite").save(path)
+
+    @staticmethod
+    def _thread(
+        source: str,
+        target: dict[str, Any],
+        *,
+        seed: dict[str, Any] | None = SEED,
+        on_delete: Literal["hard_delete", "soft_delete"] = "hard_delete",
+        write: dict[str, Any] | None = None,
+    ) -> Thread:
+        return Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": source}},
+                "target": {**target, **({"seed": seed} if seed else {})},
+                "write": {"mode": "merge", "match_keys": ["id"], **(write or {})},
+                "load": {
+                    "mode": "cdc",
+                    "cdc": {
+                        "operation_column": "OPFLAG",
+                        "insert_value": "I",
+                        "update_value": "U",
+                        "delete_value": "D",
+                        "on_delete": on_delete,
+                    },
+                    "watermark_column": "seq",
+                    "watermark_type": "long",
+                },
+            }
+        )
+
+    def test_first_write_seeds_once(self, spark: SparkSession, tmp_delta_path) -> None:
+        src, tgt = tmp_delta_path("seed_src"), tmp_delta_path("seed_tgt")
+        self._source(spark, src, [(1, "a", "I")])
+        thread = self._thread(src, {"path": tgt})
+        assert execute_thread(spark, thread).status == "success"
+        self._source(spark, src, [(2, "b", "I")], seq=2)
+        assert execute_thread(spark, thread).status == "success"
+        written = spark.read.format("delta").load(tgt)
+        assert sorted(r.id for r in written.collect()) == [-1, 1, 2]
+
+    def test_target_has_no_cdc_columns(self, spark: SparkSession, tmp_delta_path) -> None:
+        src, tgt = tmp_delta_path("seed_src"), tmp_delta_path("seed_tgt")
+        self._source(spark, src, [(1, "a", "I")])
+        execute_thread(spark, self._thread(src, {"path": tgt}))
+        assert spark.read.format("delta").load(tgt).columns == ["id", "name", "seq"]
+
+    def test_cdf_preset_seeds_without_metadata_columns(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src, tgt = tmp_delta_path("seed_cdf_src"), tmp_delta_path("seed_cdf_tgt")
+        spark.sql(
+            f"CREATE TABLE delta.`{src}` (id BIGINT, name STRING) USING delta "
+            "TBLPROPERTIES (delta.enableChangeDataFeed = true)"
+        )
+        spark.sql(f"INSERT INTO delta.`{src}` VALUES (1, 'a')")
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "target": {"path": tgt, "seed": self.SEED},
+                "write": {"mode": "merge", "match_keys": ["id"]},
+                "load": {"mode": "cdc", "cdc": {"preset": "delta_cdf"}},
+            }
+        )
+        assert execute_thread(spark, thread).status == "success"
+        written = spark.read.format("delta").load(tgt)
+        assert written.columns == ["id", "name"]
+        assert sorted(r.id for r in written.collect()) == [-1, 1]
+
+    def test_empty_trigger_seeds_an_existing_empty_target(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src, tgt = tmp_delta_path("seed_src"), tmp_delta_path("seed_tgt")
+        spark.sql(f"CREATE TABLE delta.`{tgt}` (id BIGINT, name STRING, seq INT) USING delta")
+        self._source(spark, src, [(1, "a", "I")])
+        seed = {"on": "empty", "rows": [{"id": -1, "name": "unknown"}]}
+        execute_thread(spark, self._thread(src, {"path": tgt}, seed=seed))
+        written = spark.read.format("delta").load(tgt)
+        assert sorted(r.id for r in written.collect()) == [-1, 1]
+
+    def test_seeds_do_not_change_which_data_rows_land(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src = tmp_delta_path("seed_src")
+        rows = [(1, "a", "I"), (2, "b", "U"), (3, "c", "D")]
+        self._source(spark, src, rows)
+        ids: list[list[int]] = []
+        for name, seed in (("plain", None), ("seeded", self.SEED)):
+            tgt = tmp_delta_path(f"seed_tgt_{name}")
+            execute_thread(spark, self._thread(src, {"path": tgt}, seed=seed))
+            written = spark.read.format("delta").load(tgt).filter("id > 0")
+            ids.append(sorted(r.id for r in written.collect()))
+        assert ids[0] == ids[1] == [1, 2]
+
+    def test_change_can_merge_onto_a_seed_key(self, spark: SparkSession, tmp_delta_path) -> None:
+        src, tgt = tmp_delta_path("seed_src"), tmp_delta_path("seed_tgt")
+        self._source(spark, src, [(-1, "renamed", "U")])
+        execute_thread(spark, self._thread(src, {"path": tgt}))
+        written = spark.read.format("delta").load(tgt).collect()
+        assert [(r.id, r.name) for r in written] == [(-1, "renamed")]
+
+    def test_soft_delete_column_matches_an_unseeded_first_write(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src, tgt = tmp_delta_path("seed_src"), tmp_delta_path("seed_tgt")
+        self._source(spark, src, [(1, "a", "I")])
+        write = {"soft_delete_column": "is_deleted", "soft_delete_active_value": False}
+        thread = self._thread(src, {"path": tgt}, on_delete="soft_delete", write=write)
+        assert execute_thread(spark, thread).status == "success"
+        self._source(spark, src, [(-1, "unknown", "D")], seq=2)
+        assert execute_thread(spark, thread).status == "success"
+        written = {r.id: r.is_deleted for r in spark.read.format("delta").load(tgt).collect()}
+        assert written == {-1: True, 1: False}
+
+    def test_seed_row_can_set_the_soft_delete_value(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        src, tgt = tmp_delta_path("seed_src"), tmp_delta_path("seed_tgt")
+        self._source(spark, src, [(1, "a", "I")])
+        write = {"soft_delete_column": "is_deleted", "soft_delete_active_value": False}
+        seed = {"on": "first_write", "rows": [{"id": -1, "name": "x", "is_deleted": True}]}
+        thread = self._thread(src, {"path": tgt}, seed=seed, on_delete="soft_delete", write=write)
+        execute_thread(spark, thread)
+        written = {r.id: r.is_deleted for r in spark.read.format("delta").load(tgt).collect()}
+        assert written == {-1: True, 1: False}
+
+    def test_alias_target(self, spark: SparkSession, tmp_delta_path, tmp_path, request) -> None:
+        spark.sql(f"CREATE DATABASE seed_cdc LOCATION '{tmp_path / 'seed_cdc.db'}'")
+        request.addfinalizer(lambda: spark.sql("DROP DATABASE IF EXISTS seed_cdc CASCADE"))
+        src = tmp_delta_path("seed_src")
+        self._source(spark, src, [(1, "a", "I")])
+        execute_thread(spark, self._thread(src, {"alias": "seed_cdc.t"}))
+        assert sorted(r.id for r in spark.table("seed_cdc.t").collect()) == [-1, 1]
+
+
+@pytest.mark.spark
+class TestSeedsOnAliasTargetsPerWritePath:
+    """Seeds reach an alias target on the plain and dimension paths."""
+
+    def test_plain_append(self, spark: SparkSession, tmp_delta_path, tmp_path, request) -> None:
+        spark.sql(f"CREATE DATABASE seed_plain LOCATION '{tmp_path / 'seed_plain.db'}'")
+        request.addfinalizer(lambda: spark.sql("DROP DATABASE IF EXISTS seed_plain CASCADE"))
+        src = tmp_delta_path("seed_src")
+        spark.createDataFrame([(1, "a")], ["id", "name"]).write.format("delta").save(src)
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "target": {
+                    "alias": "seed_plain.t",
+                    "seed": {"rows": [{"id": -1, "name": "unknown"}]},
+                },
+                "write": {"mode": "append"},
+            }
+        )
+        assert execute_thread(spark, thread).status == "success"
+        assert sorted(r.id for r in spark.table("seed_plain.t").collect()) == [-1, 1]
+
+    def test_dimension(self, spark: SparkSession, tmp_delta_path, tmp_path, request) -> None:
+        spark.sql(f"CREATE DATABASE seed_dim LOCATION '{tmp_path / 'seed_dim.db'}'")
+        request.addfinalizer(lambda: spark.sql("DROP DATABASE IF EXISTS seed_dim CASCADE"))
+        src = tmp_delta_path("seed_src")
+        spark.createDataFrame([(1, "a")], ["id", "name"]).write.format("delta").save(src)
+        thread = Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "target": {
+                    "alias": "seed_dim.t",
+                    "seed": {"rows": [{"id": -1, "name": "unknown"}]},
+                    "dimension": {
+                        "business_key": ["id"],
+                        "surrogate_key": {"name": "sk", "columns": ["id"]},
+                        "change_detection": {
+                            "attrs": {"columns": ["name"], "on_change": "overwrite"}
+                        },
+                    },
+                },
+            }
+        )
+        assert execute_thread(spark, thread).status == "success"
+        assert sorted(r.id for r in spark.table("seed_dim.t").collect()) == [-1, 1]
 
 
 @pytest.mark.spark

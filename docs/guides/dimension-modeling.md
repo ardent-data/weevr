@@ -170,6 +170,11 @@ Trigger conditions:
 - `first_write` — insert when the table does not exist
 - `empty` — insert when the table is empty or missing
 
+Seeds run before the data is written, on every write path, including
+`load.mode: cdc`. On a CDC target with `on_delete: soft_delete`, seed rows take
+`soft_delete_active_value` unless the row sets the column itself, and a change
+to a seed key merges onto it. A seed never changes which data rows land.
+
 ## Additional Keys
 
 Generate secondary hash columns alongside the primary SK:

@@ -76,6 +76,7 @@ from weevr.operations.writers import (
     execute_cdc_merge,
     existing_target_columns,
     narrow_to_target,
+    seed_cdc_target,
     write_target,
 )
 from weevr.state import WatermarkState, WatermarkStore, resolve_store
@@ -774,6 +775,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
+                seeded_first_write = seed_config is not None and seed_cdc_target(
+                    spark,
+                    df,
+                    seed_config,
+                    target_path,
+                    cdc_write,
+                    thread.load.cdc,
+                    target_handle,
+                )
                 cdc_counts = execute_cdc_merge(
                     spark,
                     df,
@@ -783,6 +793,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     load_config=thread.load,
                     handle=target_handle,
                     evolve=thread.target.schema_drift == "adaptive",
+                    seeded_first_write=seeded_first_write,
                 )
                 rows_written = sum(cdc_counts.values())
 

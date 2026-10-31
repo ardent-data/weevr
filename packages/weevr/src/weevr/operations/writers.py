@@ -6,14 +6,17 @@ import logging
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.types import BooleanType, StructField, StructType
 from pyspark.sql.window import Window
 
 from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.load import CdcConfig, LoadConfig
+from weevr.model.seed import SeedConfig
 from weevr.model.target import Target
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import typed_watermark_col
+from weevr.operations.seeding import execute_seeds
 from weevr.operations.target_handle import CommitStamp, TargetHandle
 
 logger = logging.getLogger(__name__)
@@ -425,6 +428,58 @@ def _reduce_to_latest_per_key(
     )
 
 
+def _cdc_data_columns(df: DataFrame, op_col: str) -> list[str]:
+    """The columns of a CDC frame that reach the target."""
+    meta_cols = {"_change_type", "_commit_version", "_commit_timestamp", op_col}
+    return [c for c in df.columns if c not in meta_cols]
+
+
+def seed_cdc_target(
+    spark: SparkSession,
+    df: DataFrame,
+    seed_config: SeedConfig,
+    target_path: str,
+    write_config: WriteConfig,
+    cdc_config: CdcConfig,
+    handle: TargetHandle,
+) -> bool:
+    """Run a CDC target's seeds, shaping them like a first CDC write.
+
+    Args:
+        spark: Active SparkSession.
+        df: Source DataFrame containing CDC rows with operation column.
+        seed_config: The target's seed configuration.
+        target_path: Path or alias of the Delta target.
+        write_config: Write configuration, for the soft-delete column.
+        cdc_config: CDC configuration (preset or explicit mapping).
+        handle: Pre-resolved target handle.
+
+    Returns:
+        Whether the seeds created the target, so this run's merge is its
+        first CDC write.
+    """
+    op_col = resolve_cdc_columns(cdc_config)["operation_column"]
+    data_cols = set(_cdc_data_columns(df, op_col or ""))
+    fields = [field for field in df.schema.fields if field.name in data_cols]
+    rows = seed_config.rows
+    soft_delete_col = write_config.soft_delete_column
+    if cdc_config.on_delete == "soft_delete" and soft_delete_col:
+        fields.append(StructField(soft_delete_col, BooleanType()))
+        active = write_config.soft_delete_active_value
+        rows = [{soft_delete_col: active, **row} for row in rows]
+
+    was_absent = not handle.exists()
+    result = execute_seeds(
+        spark,
+        seed_config.model_copy(update={"rows": rows}),
+        target_path,
+        StructType(fields),
+        handle=handle,
+    )
+    handle.refresh()
+    return was_absent and result.triggered
+
+
 def execute_cdc_merge(
     spark: SparkSession,
     df: DataFrame,
@@ -435,6 +490,7 @@ def execute_cdc_merge(
     load_config: LoadConfig | None = None,
     handle: TargetHandle | None = None,
     evolve: bool = False,
+    seeded_first_write: bool = False,
 ) -> dict[str, int]:
     """Execute a CDC merge operation, routing rows by operation type.
 
@@ -460,6 +516,8 @@ def execute_cdc_merge(
             self-resolves existence (operations stay independently usable).
         evolve: Add new source columns to the table
             (``schema_drift: adaptive``).
+        seeded_first_write: Seeds created the target this run, so insert
+            every non-delete row, as a first write to a missing target does.
 
     Returns:
         Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
@@ -484,11 +542,7 @@ def execute_cdc_merge(
         for k in write_config.match_keys
     )
 
-    # Drop CDC metadata columns before writing to target
-    cdc_meta_cols: set[str] = {"_change_type", "_commit_version", "_commit_timestamp"}
-    if op_col:
-        cdc_meta_cols.add(op_col)
-    data_cols = [c for c in df.columns if c not in cdc_meta_cols]
+    data_cols = _cdc_data_columns(df, op_col)
 
     # Filter to recognized operation values only (e.g., exclude CDF update_preimage)
     recognized_ops = [v for v in (insert_val, update_val, delete_val) if v]
@@ -625,8 +679,7 @@ def execute_cdc_merge(
                     set={write_config.soft_delete_column: F.lit(write_config.soft_delete_value)},
                 )
 
-        if insert_val:
-            escaped_ins = insert_val.replace("'", "''")
+        if insert_val or seeded_first_write:
             insert_set: dict[str, str | Column] = {
                 c: F.col(f"source.{quote_identifier(c)}") for c in data_cols
             }
@@ -638,10 +691,13 @@ def execute_cdc_merge(
                 insert_set[write_config.soft_delete_column] = F.lit(
                     write_config.soft_delete_active_value
                 )
-            merger = merger.whenNotMatchedInsert(
-                condition=f"source.{quoted_op} = '{escaped_ins}'",
-                values=insert_set,
-            )
+            if seeded_first_write:
+                escaped_del = (delete_val or "").replace("'", "''")
+                insert_condition = f"source.{quoted_op} != '{escaped_del}'" if delete_val else None
+            else:
+                escaped_ins = (insert_val or "").replace("'", "''")
+                insert_condition = f"source.{quoted_op} = '{escaped_ins}'"
+            merger = merger.whenNotMatchedInsert(condition=insert_condition, values=insert_set)
 
         merger.execute()
         if handle is not None:

@@ -474,3 +474,31 @@ class TestEmptyProbeIsCheap:
         monkeypatch.setattr(DataFrame, "count", no_full_count)
         config = SeedConfig(on="empty", rows=[{"id": 99}])
         assert check_seed_trigger(spark, path, config) is False
+
+
+@pytest.mark.spark
+class TestExecuteSeedsOnAliasTargets:
+    """Seeds on a catalog alias land in that table, not a relative directory."""
+
+    SCHEMA = StructType([StructField("id", LongType()), StructField("label", StringType())])
+
+    @pytest.fixture()
+    def alias_db(self, spark: SparkSession, tmp_path, request) -> str:
+        spark.sql(f"CREATE DATABASE seed_alias LOCATION '{tmp_path / 'seed_alias.db'}'")
+        request.addfinalizer(lambda: spark.sql("DROP DATABASE IF EXISTS seed_alias CASCADE"))
+        return "seed_alias"
+
+    def test_creates_the_catalog_table(self, spark: SparkSession, alias_db: str) -> None:
+        alias = f"{alias_db}.created"
+        config = SeedConfig(on="first_write", rows=[{"id": -1, "label": "unknown"}])
+        result = execute_seeds(spark, config, alias, self.SCHEMA)
+        assert result.triggered is True
+        assert spark.catalog.tableExists(alias)
+        assert [r.id for r in spark.table(alias).collect()] == [-1]
+
+    def test_appends_to_an_existing_empty_table(self, spark: SparkSession, alias_db: str) -> None:
+        alias = f"{alias_db}.empty"
+        spark.sql(f"CREATE TABLE {alias} (id BIGINT, label STRING) USING delta")
+        config = SeedConfig(on="empty", rows=[{"id": -1, "label": "unknown"}])
+        assert execute_seeds(spark, config, alias, self.SCHEMA).triggered is True
+        assert spark.table(alias).count() == 1
