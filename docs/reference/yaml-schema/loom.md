@@ -12,6 +12,7 @@ runtime settings that cascade down through weaves to threads.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
+| `qualified_key` | `string` | -- | set by loader | Read-only. The loom file's path relative to the project root (for example `looms/nightly.loom`). Populated at load; not set in YAML. |
 | `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave entries. Strings are shorthand for `{ name: "<value>" }`. Use `ref` for an external file, `name` alone for `<name>.weave` in the project root, or `name` plus a weave body for an inline weave. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |

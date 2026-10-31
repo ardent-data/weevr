@@ -779,9 +779,12 @@ SCD2 narrowing, batch mode, and include columns.
 | `where` | `string` | no | `null` | SQL predicate filter on lookup |
 | `batch` | `list[ResolveBatchItem]` | no | `null` | Batch FK specs (mutually exclusive with name/lookup/match) |
 
-*Required in single mode. In batch mode, these fields are optional
-at the top level and serve as shared defaults merged into each batch
-item.
+*Required in single mode. In batch mode, `name`, `lookup`, and `match` are
+rejected at the top level; set them on each batch item. `pk` is optional at
+the top level. These top-level fields serve as shared defaults merged into
+each batch item: `pk`, `on_invalid`, `on_unknown`, `on_duplicate`,
+`on_failure`, `normalize`, `drop_source_columns`, `include`,
+`include_prefix`, `effective`, and `where`.
 
 **`include` syntax:**
 
