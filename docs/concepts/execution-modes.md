@@ -98,6 +98,13 @@ print(result.explain())  # detailed: dependencies, cache targets, thread detail
 result = ctx.run("nightly.loom", mode="preview")
 ```
 
+Preview limits every source, including lookup-bound sources, to `sample_rows`
+(100 by default). A `resolve` step matches those rows against the full lookup,
+so foreign keys look as they do in a real run; each lookup a previewed thread
+names is read once. Lookups come from the same places as in execution, with
+thread lookups over weave lookups over loom lookups. Validate mode never reads
+a lookup.
+
 In notebooks, results render automatically as styled HTML when you
 evaluate the result in a cell. Each mode gets a tailored report:
 

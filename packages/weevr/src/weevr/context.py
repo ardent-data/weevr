@@ -15,7 +15,9 @@ from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteCo
 from weevr.config.onelake import resolve_connection_path
 from weevr.delta import delta_table_exists
 from weevr.engine.executor import execute_thread
+from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import build_plan
+from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
     ConfigError,
@@ -23,6 +25,7 @@ from weevr.errors import (
     ExecutionError,
 )
 from weevr.model.execution import LogLevel, resolve_effective_execution
+from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
@@ -621,6 +624,29 @@ class Context:
             result.update(thread_map)
         return result
 
+    @staticmethod
+    def _inherited_lookups(loaded: LoadedConfig) -> dict[str, dict[str, Lookup]]:
+        """Map each thread name to the lookups its weave and loom define.
+
+        Weave lookups win over loom lookups, as they do at execution. A
+        thread name shared across weaves takes the last weave's lookups,
+        matching :meth:`_collect_all_threads`.
+        """
+        loom_lookups: dict[str, Lookup] | None = None
+        if isinstance(loaded.model, Loom) and loaded.model.lookups:
+            loom_lookups = dict(loaded.model.lookups)
+
+        result: dict[str, dict[str, Lookup]] = {}
+        for weave_name, threads in loaded.resolved_threads.items():
+            weave = loaded.model if isinstance(loaded.model, Weave) else None
+            if isinstance(loaded.model, Loom):
+                weave = loaded.resolved_weaves.get(weave_name)
+            weave_lookups = dict(weave.lookups) if weave and weave.lookups else None
+            merged = merge_resource_dicts(loom_lookups, weave_lookups, "lookup", "loom", "weave")
+            for thread_name in threads:
+                result[thread_name] = merged or {}
+        return result
+
     # ------------------------------------------------------------------
     # Plan mode
     # ------------------------------------------------------------------
@@ -732,6 +758,7 @@ class Context:
         all_threads, warnings = self._filter_threads(
             all_threads, tags=tags, thread_names=thread_names
         )
+        inherited_lookups = self._inherited_lookups(loaded)
 
         preview_data: dict[str, Any] = {}
         preview_metadata: dict[str, PreviewThreadMetadata] = {}
@@ -739,17 +766,39 @@ class Context:
 
         for thread_name, thread in all_threads.items():
             try:
-                sources_map = read_sources(
+                # Resolve steps get full lookup frames: matching sampled rows
+                # against a sampled lookup would miss most valid keys.
+                visible_lookups = merge_resource_dicts(
+                    inherited_lookups.get(thread_name),
+                    dict(thread.lookups) if thread.lookups else None,
+                    "lookup",
+                    "weave",
+                    "thread",
+                )
+                lookup_dfs, resolve_lookups = resolve_lookup_frames(
+                    thread,
+                    visible_lookups or {},
+                    {},
                     self._spark,
-                    thread.sources,
                     connections=thread.connections,
                 )
-                for key in sources_map:
-                    sources_map[key] = sources_map[key].limit(sample_rows)
+                read_dfs = read_sources(
+                    self._spark,
+                    {k: v for k, v in thread.sources.items() if k not in lookup_dfs},
+                    connections=thread.connections,
+                )
+                frames = {**read_dfs, **lookup_dfs}
+                sources_map = {key: frames[key].limit(sample_rows) for key in thread.sources}
 
                 df = next(iter(sources_map.values()))
                 obs_registry = ObservationRegistry(scope="main")
-                df = run_pipeline(df, thread.steps, sources_map, observations=obs_registry)
+                df = run_pipeline(
+                    df,
+                    thread.steps,
+                    sources_map,
+                    lookups=resolve_lookups or None,
+                    observations=obs_registry,
+                )
 
                 if thread.validations:
                     # Preview discards the per-rule results, so skip their
