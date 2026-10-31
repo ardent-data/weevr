@@ -1701,6 +1701,64 @@ class TestValidateModeSourceProbes:
             assert ctx._check_source_existence(threads) == []
         assert jc.jobs == 0
 
+    @staticmethod
+    def _connection_thread(tgt: str, *, connection: str = "lake") -> Thread:
+        return Thread.model_validate(
+            {
+                "name": "probe_t",
+                "config_version": "1",
+                "connections": {
+                    "lake": {"type": "onelake", "workspace": "ws", "lakehouse": "lh"},
+                },
+                "sources": {"main": {"connection": connection, "table": "orders"}},
+                "target": {"path": tgt},
+            }
+        )
+
+    def test_connection_source_that_exists_passes(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str, job_counter
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {"t": self._connection_thread(str(tmp_path / "tgt"))}
+        with (
+            patch("weevr.context.resolve_connection_path", return_value=one_row_src),
+            job_counter() as jc,
+        ):
+            assert ctx._check_source_existence(threads) == []
+        assert jc.jobs == 0
+
+    def test_missing_connection_table_is_reported(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        missing = str(tmp_path / "no_table")
+        threads = {"t": self._connection_thread(str(tmp_path / "tgt"))}
+        with patch("weevr.context.resolve_connection_path", return_value=missing):
+            errors = ctx._check_source_existence(threads)
+        assert len(errors) == 1
+        assert all(text in errors[0] for text in ("'main'", "'t'", "not found", missing))
+
+    def test_undefined_connection_is_reported_not_raised(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
+        errors = ctx._check_source_existence({"t": thread})
+        assert len(errors) == 1
+        assert "undefined connection 'nope'" in errors[0]
+
+    def test_shared_connection_location_is_probed_once(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        thread = self._connection_thread(str(tmp_path / "tgt"))
+        with (
+            patch("weevr.context.resolve_connection_path", return_value=one_row_src),
+            patch.object(ctx, "_source_location_exists", return_value=True) as probe,
+        ):
+            ctx._check_source_existence({"a": thread, "b": thread})
+        probe.assert_called_once_with("delta", one_row_src)
+
     def test_validate_mode_existing_but_empty_directory_counts_as_present(
         self, spark: SparkSession, tmp_path: Path
     ) -> None:

@@ -12,6 +12,7 @@ from pyspark.sql import SparkSession
 
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
+from weevr.config.onelake import resolve_connection_path
 from weevr.delta import delta_table_exists
 from weevr.engine.executor import execute_thread
 from weevr.engine.planner import build_plan
@@ -543,23 +544,40 @@ class Context:
     def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
         """Check that all sources referenced by threads exist.
 
-        Existence is a metadata question: Delta sources go through the
-        catalog or Delta-log check, file sources through a filesystem
-        probe — no reads, no schema inference, no Spark jobs.
+        Existence is a metadata question: Delta sources, including
+        connection-form ones, go through the catalog or Delta-log check,
+        file sources through a filesystem probe — no reads, no schema
+        inference, no Spark jobs.
         """
         errors: list[str] = []
         checked: set[str] = set()
 
         for thread_name, thread in threads.items():
             for source_name, source in thread.sources.items():
-                if source.lookup is not None or source.type is None:
+                if source.lookup is not None:
                     continue
-                resolve_path = source.alias if source.type == "delta" else source.path
+                if source.connection:
+                    source_type = "delta"
+                    try:
+                        resolve_path = resolve_connection_path(
+                            source.connection,
+                            source.table,
+                            source.schema_override,
+                            thread.connections,
+                        )
+                    except ValueError as exc:
+                        errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
+                        continue
+                elif source.type is None:
+                    continue
+                else:
+                    source_type = source.type
+                    resolve_path = source.alias if source.type == "delta" else source.path
                 if resolve_path is None or resolve_path in checked:
                     continue
                 checked.add(resolve_path)
 
-                if not self._source_location_exists(source.type, resolve_path):
+                if not self._source_location_exists(source_type, resolve_path):
                     errors.append(
                         f"Source '{source_name}' in thread '{thread_name}' "
                         f"not found: {resolve_path}"
