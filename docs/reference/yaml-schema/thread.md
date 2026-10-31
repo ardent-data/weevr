@@ -1146,6 +1146,14 @@ Key management for business keys, surrogate keys, and change detection hashes.
     Spark major versions. Neither is recommended for high-cardinality
     surrogate key use cases.
 
+!!! warning "Separator collisions"
+    Key and change-detection columns are joined with `|` before hashing, so
+    value sets that join to the same text hash identically: `('a|b', 'c')`
+    and `('a', 'b|c')` get the same key, and those rows are treated as one
+    entity. This applies to `keys.surrogate_key`, `keys.change_detection`,
+    and their `dimension` equivalents. If a key column can contain `|`,
+    replace or strip it in a pipeline step first.
+
 !!! info "keys vs dimension surrogate key"
     `keys.surrogate_key` uses `SurrogateKeyConfig` (hash-based, no
     `columns` field). `target.dimension.surrogate_key` uses
