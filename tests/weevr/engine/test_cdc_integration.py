@@ -1100,8 +1100,8 @@ class TestCdcWatermarkComposition:
         tp_store = TablePropertiesStore(tgt)
         state1 = tp_store.read(spark, "cdc_wm_fmt_t1")
         assert state1 is not None
-        assert state1.last_value.startswith("2026-01-02 10:00:00")
-        assert "Z" not in state1.last_value  # source-format Z stripped
+        assert state1.last_value.startswith("2026-01-02T10:00:00")
+        assert state1.last_value.endswith("Z")  # canonical UTC instant
         assert state1.watermark_column == "AEDATTM"
         assert state1.watermark_type == "timestamp"
 

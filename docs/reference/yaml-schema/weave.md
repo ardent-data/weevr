@@ -12,6 +12,7 @@ runtime settings.
 |-----|------|----------|---------|-------------|
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
+| `qualified_key` | `string` | -- | set by loader | Read-only. The weave file's path relative to the project root (for example `weaves/daily.weave`); an inline weave uses its name. Populated at load; not set in YAML. |
 | `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (local name references). Use `ref` for external file references. |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Named lookup sources shared across threads in this weave |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets for bulk rename from external dictionaries. Shared across threads in this weave. |

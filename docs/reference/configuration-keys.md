@@ -131,7 +131,7 @@ The top-level configuration unit for a single data pipeline.
 | `variables` | `dict[str, VariableSpec]` | `None` | Thread-level variable declarations |
 | `pre_steps` | `list[HookStep]` | `None` | Hook steps run before thread execution |
 | `post_steps` | `list[HookStep]` | `None` | Hook steps run after thread execution |
-| `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates available to all targets |
+| `audit_templates` | `dict[str, AuditTemplate]` | `None` | Named audit column templates available to all targets |
 | `connections` | `dict[str, OneLakeConnection]` | `None` | Named connection definitions |
 | `with` | `dict[str, SubPipeline]` | `None` | Named sub-pipelines (CTEs) resolved before main steps |
 
@@ -227,7 +227,7 @@ set to `date_sequence` or `int_sequence`).
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `keys` | `list[str]` | *required* | Deduplication grouping columns |
-| `order_by` | `str` | `None` | Sort expression for row selection |
+| `order_by` | `str` | `None` | Sort expression for row selection. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. |
 
 ---
 
@@ -316,6 +316,8 @@ Cross-field rules enforced at parse time:
 - `watermark_format` requires `watermark_column` and requires
   `watermark_type` to be `"timestamp"` or `"date"`
 - a `cdc` block is only valid when `mode == "cdc"`
+- `mode == "incremental_watermark"` with a `dedup` on the primary (first)
+  source requires `dedup.order_by` to be `"<watermark_column> DESC"`
 
 Cross-field rules enforced when the thread starts executing (not reported
 by `load_config` or `mode="validate"`; the run fails with an
@@ -566,6 +568,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 |-------|------|---------|-------------|
 | `config_version` | `str` | *required* | Schema version identifier |
 | `name` | `str` | `""` | Weave name |
+| `qualified_key` | `str` | set by loader | Read-only: the weave file's path relative to the project root, or the name of an inline weave |
 | `threads` | `list[ThreadEntry]` | *required* | Thread references |
 | `lookups` | `dict[str, Lookup]` | `None` | Named lookup sources shared across threads |
 | `variables` | `dict[str, VariableSpec]` | `None` | Weave-scoped typed variables |
@@ -576,7 +579,7 @@ A collection of threads with shared lookups, hooks, and defaults.
 | `execution` | `ExecutionConfig` | `None` | Runtime settings; field-level merge with the loom block |
 | `naming` | `NamingConfig` | `None` | Naming normalization cascaded to threads |
 | `column_sets` | `dict[str, ColumnSet]` | `None` | Named column sets for bulk rename |
-| `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to threads |
+| `audit_templates` | `dict[str, AuditTemplate]` | `None` | Named audit column templates cascaded to threads |
 | `connections` | `dict[str, OneLakeConnection]` | `None` | Named connection definitions cascaded to threads |
 
 ### ThreadEntry
@@ -606,6 +609,7 @@ Deployment unit grouping one or more weaves.
 |-------|------|---------|-------------|
 | `config_version` | `str` | *required* | Schema version identifier |
 | `name` | `str` | `""` | Loom name |
+| `qualified_key` | `str` | set by loader | Read-only: the loom file's path relative to the project root |
 | `weaves` | `list[WeaveEntry]` | *required* | Weave references |
 | `defaults` | `dict[str, Any]` | `None` | Default values cascaded to weaves and threads |
 | `params` | `dict[str, ParamSpec]` | `None` | Parameter declarations |
@@ -616,7 +620,7 @@ Deployment unit grouping one or more weaves.
 | `variables` | `dict[str, VariableSpec]` | `None` | Loom-level variable declarations |
 | `pre_steps` | `list[HookStep]` | `None` | Hook steps run before any weave executes |
 | `post_steps` | `list[HookStep]` | `None` | Hook steps run after all weaves complete |
-| `audit_templates` | `dict[str, dict[str, str]]` | `None` | Named audit column templates cascaded to weaves and threads |
+| `audit_templates` | `dict[str, AuditTemplate]` | `None` | Named audit column templates cascaded to weaves and threads |
 | `connections` | `dict[str, OneLakeConnection]` | `None` | Named connection definitions cascaded to weaves and threads |
 
 ### WeaveEntry

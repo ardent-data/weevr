@@ -248,7 +248,11 @@ write -> finalize
    and with `warp_init: true` the target table is pre-initialized from it
    (dimension SCD columns are not known yet, so declare them in the warp)
 2. Run thread-level `pre_steps`
-3. Resolve lookup-based sources from cached or on-demand DataFrames
+3. Load prior watermark or CDC state. For an `incremental_watermark` append,
+   the state is reconciled with the target's commit history: a newer stamped
+   watermark is recovered, and a first run with none into a target that
+   already holds rows fails with a `StateError`. Lookup-based sources are
+   then resolved from cached or on-demand DataFrames
 4. Read all remaining declared sources (with watermark/CDC filtering if
    applicable). For `mode: incremental_watermark`, the primary source
    is filtered against the prior HWM and the new HWM is captured from

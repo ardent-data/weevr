@@ -59,18 +59,35 @@ class MetadataTableStore(WatermarkStore):
             table_ref = self._table_path
         else:
             table_ref = f"delta.`{self._table_path}`"
-        spark.sql(f"""
-            CREATE TABLE IF NOT EXISTS {table_ref} (
-                thread_name STRING,
-                watermark_column STRING,
-                watermark_type STRING,
-                last_value STRING,
-                last_updated TIMESTAMP,
-                run_id STRING
-            )
-            USING DELTA
-        """)
+        try:
+            spark.sql(f"""
+                CREATE TABLE IF NOT EXISTS {table_ref} (
+                    thread_name STRING,
+                    watermark_column STRING,
+                    watermark_type STRING,
+                    last_value STRING,
+                    last_updated TIMESTAMP,
+                    run_id STRING
+                )
+                USING DELTA
+            """)
+        except Exception as exc:
+            # Threads sharing a store race on first use: IF NOT EXISTS isn't
+            # atomic, so a loser can fail while the winner's table appears.
+            if not self._table_exists(spark):
+                raise StateError(
+                    f"Failed to create the watermark table at '{self._table_path}'",
+                    cause=exc,
+                ) from exc
         self._table_ensured = True
+
+    def _table_exists(self, spark: SparkSession) -> bool:
+        """Whether the watermark table exists (re-checked once after a failed create)."""
+        try:
+            columns = read_delta(spark, self._table_path).columns
+        except Exception:
+            return False
+        return "thread_name" in columns
 
     def read(self, spark: SparkSession, thread_name: str) -> WatermarkState | None:
         """Load watermark state for a thread from the metadata table."""

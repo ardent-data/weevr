@@ -356,6 +356,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
                 watermark_store = resolve_store(thread.load, target_path)
                 prior_state = watermark_store.read(spark, thread.name)
+                if (
+                    load_mode == "incremental_watermark"
+                    and thread.write is not None
+                    and thread.write.mode == "append"
+                ):
+                    prior_state = _reconcile_stamped_hwm(
+                        spark, thread, prior_state, target_handle, target_path
+                    )
                 watermark_first_run = prior_state is None
                 logger.debug(
                     "Thread '%s': load_mode=%s, first_run=%s, prior_value=%s",
@@ -653,6 +661,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 loom=loom_name or None,
                 weave=weave_name or None,
                 mode=write_mode,
+                # An incremental append records its new HWM atomically with the
+                # data, so a failed state save is recoverable from the commit
+                hwm=new_hwm
+                if load_mode == "incremental_watermark" and write_mode == "append"
+                else None,
             )
 
             if dim_config is not None and dim_builder is not None:
@@ -1174,6 +1187,96 @@ def _resolve_with_block(
             collector.add_span(span)  # type: ignore[union-attr]
 
     return enriched
+
+
+SEED_WATERMARK_DOCS = (
+    "https://ardent-data.github.io/weevr/concepts/idempotency/#seed-or-reset-a-watermark"
+)
+
+
+def _reconcile_stamped_hwm(
+    spark: SparkSession,
+    thread: Thread,
+    prior_state: WatermarkState | None,
+    target_handle: TargetHandle,
+    target_path: str,
+) -> WatermarkState | None:
+    """Recover the HWM from the target's commit when the state store lags it.
+
+    An incremental append stamps its new HWM into the commit. When the
+    state save after that commit failed, the store is older than the commit
+    and its value is behind; the stamped value is used instead. A store
+    updated after the commit (a normal run, or a manual reset) wins.
+
+    A first run with no stored and no stamped HWM into a target that already
+    holds rows would re-append everything, so it fails before writing.
+
+    Args:
+        spark: Active SparkSession.
+        thread: Thread configuration (incremental_watermark, append).
+        prior_state: The state store's value, or None.
+        target_handle: Pre-resolved target handle.
+        target_path: Resolved target path or alias.
+
+    Returns:
+        The state to read from.
+
+    Raises:
+        StateError: On a first run into a non-empty target with no HWM.
+    """
+    from weevr.state.hwm import as_utc, hwm_is_newer
+
+    load = thread.load
+    if load is None or not target_handle.exists():
+        return prior_state
+    wm_type = load.watermark_type or "timestamp"
+    stamped = target_handle.latest_stamped_hwm(thread.name)
+    if stamped is not None:
+        value, committed_at = stamped
+        if prior_state is None or (
+            as_utc(committed_at) > as_utc(prior_state.last_updated)
+            and hwm_is_newer(value, prior_state.last_value, wm_type)
+        ):
+            logger.info(
+                "Thread '%s': watermark recovered from the target commit at %s: %s "
+                "(state store had %s)",
+                thread.name,
+                committed_at,
+                value,
+                prior_state.last_value if prior_state else None,
+            )
+            return WatermarkState(
+                thread_name=thread.name,
+                watermark_column=load.watermark_column or "",
+                watermark_type=wm_type,
+                last_value=value,
+                last_updated=as_utc(committed_at),
+            )
+        return prior_state
+    if prior_state is None and _target_has_rows(spark, target_path):
+        history_note = (
+            " Its commit history can't be read, so a stamped watermark may exist; retry "
+            "once the history is readable. Otherwise:"
+            if target_handle.history_read_failed()
+            else ""
+        )
+        raise StateError(
+            f"Thread '{thread.name}' has no stored watermark, but its append target "
+            f"'{target_path}' already holds rows; a first run would re-append the whole "
+            f"source.{history_note} Seed the watermark, or truncate the target for a full "
+            f"reload: {SEED_WATERMARK_DOCS}",
+            thread_name=thread.name,
+        )
+    return prior_state
+
+
+def _target_has_rows(spark: SparkSession, target_path: str) -> bool:
+    """Whether the target table holds at least one row (a one-row probe)."""
+    from weevr.delta import is_table_alias
+
+    reader = spark.read.format("delta")
+    table = reader.table(target_path) if is_table_alias(target_path) else reader.load(target_path)
+    return table.limit(1).count() > 0
 
 
 def _writer_managed_columns(thread: Thread, dim_builder: Any) -> list[str]:

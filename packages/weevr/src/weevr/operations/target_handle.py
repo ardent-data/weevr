@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from pyspark.sql import SparkSession
@@ -44,6 +45,9 @@ class CommitStamp:
         mode: The thread's configured write mode. Best-effort intent,
             not the physical branch taken — a first write executes as
             overwrite regardless of the configured mode.
+        hwm: The watermark this write advances to, for an incremental append.
+            Recorded atomically with the data so a failed state save can be
+            recovered from the commit.
     """
 
     run_id: str
@@ -51,6 +55,7 @@ class CommitStamp:
     loom: str | None = None
     weave: str | None = None
     mode: str | None = None
+    hwm: str | None = None
 
     def to_json(self) -> str:
         """Serialize to the compact JSON written as commit userMetadata."""
@@ -66,6 +71,8 @@ class CommitStamp:
             payload["weave"] = self.weave
         if self.mode:
             payload["mode"] = self.mode
+        if self.hwm is not None:
+            payload["hwm"] = self.hwm
         return json.dumps(payload, separators=(",", ":"))
 
     def matches(self, user_metadata: str | None) -> bool:
@@ -90,6 +97,31 @@ class CommitStamp:
         )
 
 
+def stamped_hwm(user_metadata: str | None, thread: str) -> str | None:
+    """Return the HWM an engine stamp from *thread* recorded, from any run.
+
+    Args:
+        user_metadata: A commit's ``userMetadata``.
+        thread: Thread name to match.
+
+    Returns:
+        The stamped HWM, or None when the commit isn't the thread's own
+        stamped write.
+    """
+    if not user_metadata:
+        return None
+    try:
+        data = json.loads(user_metadata)
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or data.get("engine") != STAMP_ENGINE_MARKER:
+        return None
+    if data.get("thread") != thread:
+        return None
+    hwm = data.get("hwm")
+    return hwm if isinstance(hwm, str) else None
+
+
 class TargetHandle:
     """Cached target existence resolution for one thread execution.
 
@@ -105,6 +137,7 @@ class TargetHandle:
         self._exists: bool | None = None
         self._exists_uncertain = False
         self._version_read_failed = False
+        self._history_read_failed = False
 
     def exists(self) -> bool:
         """Whether a Delta table exists at the target (cached until refresh).
@@ -127,6 +160,43 @@ class TargetHandle:
         """True when the cached False came from a failed probe, not a clean answer."""
         self.exists()
         return self._exists_uncertain
+
+    def latest_stamped_hwm(self, thread: str, limit: int = 100) -> tuple[str, datetime] | None:
+        """Newest HWM *thread* stamped into the target's recent commits.
+
+        Scans the latest ``limit`` commits, newest first.
+
+        Args:
+            thread: Thread name to match.
+            limit: Number of most recent commits to scan.
+
+        Returns:
+            ``(hwm, commit timestamp)``, or None when none of the scanned
+            commits carries the thread's HWM or the history can't be read
+            (recorded on :meth:`history_read_failed`).
+        """
+        self._history_read_failed = False
+        try:
+            table = _delta.resolve_delta_table(self._spark, self.path)
+            rows = table.history(limit).select("version", "timestamp", "userMetadata").collect()
+        except Exception:
+            logger.warning(
+                "Commit history unavailable for '%s'; a watermark stamped by a failed save "
+                "can't be recovered",
+                self.path,
+                exc_info=True,
+            )
+            self._history_read_failed = True
+            return None
+        for row in sorted(rows, key=lambda r: r["version"], reverse=True):
+            hwm = stamped_hwm(row["userMetadata"], thread)
+            if hwm is not None:
+                return hwm, row["timestamp"]
+        return None
+
+    def history_read_failed(self) -> bool:
+        """True when the last stamped-HWM lookup couldn't read the commit history."""
+        return self._history_read_failed
 
     def refresh(self) -> None:
         """Invalidate the cached existence after an engine-internal commit.

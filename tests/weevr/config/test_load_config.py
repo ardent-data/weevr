@@ -1303,3 +1303,22 @@ class TestLoadConfigFlatAuditTemplates:
         audit = loaded.resolved_threads["w"]["fact"].target.audit_columns
         assert audit is not None
         assert {k: audit[k] for k in self.COLUMNS} == self.COLUMNS
+
+
+class TestLoadConfigIncrementalDedupRule:
+    """The incremental dedup rule surfaces at load, as weevr validate sees it."""
+
+    def test_non_latest_dedup_fails_at_load(self, tmp_path):
+        thread = tmp_path / "t.thread"
+        thread.write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  s:\n    type: delta\n    alias: raw.c\n"
+            "    dedup:\n      keys: [id]\n      order_by: ts ASC\n"
+            "target:\n  path: Tables/c\n"
+            "write:\n  mode: append\n"
+            "load:\n  mode: incremental_watermark\n  watermark_column: ts\n"
+            "  watermark_type: timestamp\n"
+        )
+        with pytest.raises(ModelValidationError, match="ts DESC") as exc_info:
+            load_config(thread, project_root=tmp_path)
+        assert exc_info.value.file_path == str(thread)

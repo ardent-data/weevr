@@ -13,6 +13,7 @@ from weevr.errors.exceptions import ExecutionError
 from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.source import DedupConfig, Source
+from weevr.state.hwm import hwm_literal, max_hwm
 from weevr.state.watermark import WatermarkState
 
 logger = logging.getLogger(__name__)
@@ -250,6 +251,8 @@ def build_watermark_filter(
     last_value: str,
     inclusive: bool = False,
     watermark_format: str | None = None,
+    df: DataFrame | None = None,
+    thread_name: str | None = None,
 ) -> Column:
     """Build a Spark Column filter expression for watermark-based incremental reads.
 
@@ -263,11 +266,18 @@ def build_watermark_filter(
             the column is parsed with ``to_timestamp``/``to_date(col, fmt)``
             before the comparison. Only valid with ``timestamp``/``date``
             watermark types; ignored for numeric types.
+        df: The DataFrame the filter applies to. When given, the stored value
+            is read per the column's actual type (canonical UTC instant, NTZ
+            wall clock, or legacy driver-zone text; see :mod:`weevr.state.hwm`).
+        thread_name: The thread the stored value belongs to, for error context.
 
     Returns:
         A Spark Column expression suitable for ``df.filter()``.
     """
     typed = typed_watermark_col(watermark_column, watermark_type, watermark_format)
+    if df is not None:
+        lit_val = hwm_literal(df, typed, watermark_type, last_value, thread_name)
+        return typed >= lit_val if inclusive else typed > lit_val
     if watermark_type in ("timestamp", "date"):
         lit_val = F.lit(last_value).cast(watermark_type)
     elif watermark_type == "long":
@@ -339,6 +349,8 @@ def read_source_incremental(
             last_value=prior_state.last_value,
             inclusive=load_config.watermark_inclusive,
             watermark_format=load_config.watermark_format,
+            df=df,
+            thread_name=prior_state.thread_name,
         )
         df = df.filter(filter_expr)
 
@@ -350,9 +362,7 @@ def read_source_incremental(
             load_config.watermark_type,
             load_config.watermark_format,
         )
-        hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
-        if hwm_row and hwm_row[0]["hwm"] is not None:
-            new_hwm = str(hwm_row[0]["hwm"])
+        new_hwm = max_hwm(df, typed)
 
         if load_config.watermark_format is not None:
             logger.debug(
@@ -383,10 +393,7 @@ def compute_generic_cdc_hwm(df: DataFrame, load_config: LoadConfig) -> str | Non
         load_config.watermark_type,
         load_config.watermark_format,
     )
-    hwm_row = df.agg(F.max(typed).alias("hwm")).collect()
-    if hwm_row and hwm_row[0]["hwm"] is not None:
-        return str(hwm_row[0]["hwm"])
-    return None
+    return max_hwm(df, typed)
 
 
 def read_cdc_source(
@@ -471,6 +478,8 @@ def read_cdc_source(
             last_value=prior_state.last_value,
             inclusive=load_config.watermark_inclusive,
             watermark_format=load_config.watermark_format,
+            df=df,
+            thread_name=prior_state.thread_name,
         )
         df = df.filter(filter_expr)
 

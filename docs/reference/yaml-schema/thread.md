@@ -70,7 +70,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `keys` | `list[string]` | yes | -- | Columns used for deduplication grouping |
-| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep |
+| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. |
 
 ```yaml
 sources:
@@ -779,9 +779,12 @@ SCD2 narrowing, batch mode, and include columns.
 | `where` | `string` | no | `null` | SQL predicate filter on lookup |
 | `batch` | `list[ResolveBatchItem]` | no | `null` | Batch FK specs (mutually exclusive with name/lookup/match) |
 
-*Required in single mode. In batch mode, these fields are optional
-at the top level and serve as shared defaults merged into each batch
-item.
+*Required in single mode. In batch mode, `name`, `lookup`, and `match` are
+rejected at the top level; set them on each batch item. `pk` is optional at
+the top level. These top-level fields serve as shared defaults merged into
+each batch item: `pk`, `on_invalid`, `on_unknown`, `on_duplicate`,
+`on_failure`, `normalize`, `drop_source_columns`, `include`,
+`include_prefix`, `effective`, and `where`.
 
 **`include` syntax:**
 
@@ -1235,6 +1238,8 @@ Load-mode rules are enforced in two places:
       rejected with `preset: delta_cdf`.
     - `watermark_format` requires `watermark_column`, and `watermark_type`
       of `timestamp` or `date`.
+    - In `incremental_watermark` mode, a `dedup` on the primary (first) source
+      requires `order_by: "<watermark_column> DESC"`.
 - **When the thread starts executing** — not reported by `load_config` or
   `mode="validate"`; the run fails with an `ExecutionError`:
     - `cdc` requires `write.mode: merge`.

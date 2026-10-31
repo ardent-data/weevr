@@ -187,3 +187,58 @@ class TestEnsureDdlOnce:
 
         second = MetadataTableStore(path)
         assert second.read(spark, "t1") is not None
+
+
+@pytest.mark.spark
+class TestConcurrentTableCreation:
+    """Threads sharing a fresh store path all create it successfully."""
+
+    def test_concurrent_first_use_succeeds(self, spark, tmp_path):
+        import threading
+
+        path = str(tmp_path / "shared_wm")
+        barrier = threading.Barrier(4)
+        errors: list[Exception] = []
+
+        def create() -> None:
+            barrier.wait()
+            try:
+                MetadataTableStore(path)._ensure_table_exists(spark)
+            except Exception as exc:  # collected and asserted below
+                errors.append(exc)
+
+        workers = [threading.Thread(target=create) for _ in range(4)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+
+        assert errors == []
+        assert spark.read.format("delta").load(path).columns[0] == "thread_name"
+
+    def test_create_failure_with_table_present_is_success(self, spark, tmp_path):
+        from unittest.mock import patch
+
+        store = MetadataTableStore(str(tmp_path / "lost_race"))
+        real_sql = spark.sql
+
+        def create_then_fail(statement: str) -> None:
+            real_sql(statement)
+            raise RuntimeError("lost the create race")
+
+        with patch.object(spark, "sql", side_effect=create_then_fail):
+            store._ensure_table_exists(spark)
+
+        assert store._table_ensured
+
+    def test_create_failure_without_table_raises_state_error(self, spark, tmp_path):
+        from unittest.mock import patch
+
+        from weevr.errors import StateError
+
+        store = MetadataTableStore(str(tmp_path / "never_created"))
+        with (
+            patch.object(spark, "sql", side_effect=RuntimeError("storage unavailable")),
+            pytest.raises(StateError, match="watermark table"),
+        ):
+            store._ensure_table_exists(spark)
