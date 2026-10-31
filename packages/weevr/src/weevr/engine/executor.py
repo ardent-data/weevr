@@ -359,7 +359,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 if (
                     load_mode == "incremental_watermark"
                     and thread.write is not None
-                    and (thread.write.mode == "append")
+                    and thread.write.mode == "append"
                 ):
                     prior_state = _reconcile_stamped_hwm(
                         spark, thread, prior_state, target_handle, target_path
@@ -1254,11 +1254,17 @@ def _reconcile_stamped_hwm(
             )
         return prior_state
     if prior_state is None and _target_has_rows(spark, target_path):
+        history_note = (
+            " Its commit history can't be read, so a stamped watermark may exist; retry "
+            "once the history is readable. Otherwise:"
+            if target_handle.history_read_failed()
+            else ""
+        )
         raise StateError(
             f"Thread '{thread.name}' has no stored watermark, but its append target "
             f"'{target_path}' already holds rows; a first run would re-append the whole "
-            f"source. Seed the watermark, or truncate the target for a full reload: "
-            f"{SEED_WATERMARK_DOCS}",
+            f"source.{history_note} Seed the watermark, or truncate the target for a full "
+            f"reload: {SEED_WATERMARK_DOCS}",
             thread_name=thread.name,
         )
     return prior_state

@@ -13,6 +13,7 @@ from pyspark.sql import SparkSession
 from weevr.engine.executor import execute_thread
 from weevr.model.thread import Thread
 from weevr.state.metadata_table import MetadataTableStore
+from weevr.state.table_properties import TablePropertiesStore
 from weevr.state.watermark import WatermarkState
 
 pytestmark = pytest.mark.spark
@@ -256,6 +257,47 @@ class TestFailedSaveRecovery:
         state = MetadataTableStore(store).read(spark, "t")
         assert state is None or state.last_value == "20"
 
+    @pytest.mark.parametrize(
+        "store_cls, store_config",
+        [
+            (MetadataTableStore, None),
+            (TablePropertiesStore, {"watermark_store": {"type": "table_properties"}}),
+        ],
+        ids=["metadata_table", "table_properties"],
+    )
+    def test_failed_save_on_a_later_run_recovers(
+        self, new_york_session, tmp_path, store_cls, store_config
+    ):
+        from weevr.errors import StateError
+
+        spark = new_york_session
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        thread = _thread(src, tgt, store, load_extra=store_config)
+
+        def add(row_id: int, hour: int) -> None:
+            _append(spark, src, f"select {row_id} as id, timestamp'2024-01-01 {hour}:00:00' as ts")
+
+        def target_rows() -> int:
+            return spark.read.format("delta").load(tgt).count()
+
+        add(1, 10)
+        assert execute_thread(spark, thread).status == "success"
+
+        add(2, 12)
+        with (
+            patch.object(store_cls, "write", side_effect=RuntimeError("store down")),
+            pytest.raises(StateError),
+        ):
+            execute_thread(spark, thread)
+        assert target_rows() == 2
+
+        assert execute_thread(spark, thread).status == "success"
+        assert target_rows() == 2  # no duplicates
+
+        add(3, 14)
+        assert execute_thread(spark, thread).status == "success"
+        assert target_rows() == 3  # only the new row
+
     def test_append_commit_carries_the_hwm(self, spark: SparkSession, tmp_path):
         import json
 
@@ -286,6 +328,81 @@ class TestFailedSaveRecovery:
         result = execute_thread(spark, thread)
         assert result.status == "success"
         assert spark.read.format("delta").load(tgt).filter("seq = 20").count() == 2
+
+
+class TestHistoryReadFailure:
+    """An unreadable commit history is reported as that, not as a missing stamp."""
+
+    def test_first_run_guard_names_the_unreadable_history(self, spark: SparkSession, tmp_path):
+        from delta.tables import DeltaTable
+
+        from weevr.errors import StateError
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq")
+        _append(spark, tgt, "select 9 as id, 90L as seq")
+        with (
+            patch.object(DeltaTable, "history", side_effect=RuntimeError("log unreadable")),
+            pytest.raises(StateError, match="commit history") as exc,
+        ):
+            execute_thread(spark, _int_thread(src, tgt, store))
+        assert "seed-or-reset-a-watermark" in str(exc.value)
+        assert spark.read.format("delta").load(tgt).count() == 1
+
+    def test_stored_watermark_run_logs_the_cause(self, spark: SparkSession, tmp_path, caplog):
+        import logging
+
+        from delta.tables import DeltaTable
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, 10L as seq")
+        thread = _int_thread(src, tgt, store)
+        assert execute_thread(spark, thread).status == "success"
+
+        _append(spark, src, "select 2 as id, 20L as seq")
+        with (
+            patch.object(DeltaTable, "history", side_effect=RuntimeError("log unreadable")),
+            caplog.at_level(logging.WARNING, logger="weevr.operations.target_handle"),
+        ):
+            assert execute_thread(spark, thread).status == "success"
+
+        assert spark.read.format("delta").load(tgt).count() == 2
+        warned = [r for r in caplog.records if "can't be recovered" in r.getMessage()]
+        assert warned and warned[0].exc_info is not None
+
+
+class TestCorruptStoredWatermark:
+    """Unparseable stored text fails naming the thread and the value."""
+
+    @pytest.mark.parametrize(
+        "wm_type, wm_col, column_sql, stored",
+        [
+            ("timestamp", "ts", "timestamp'2024-01-01 10:00:00'", "not-a-timestamp"),
+            ("long", "seq", "10L", "not-a-number"),
+            ("int", "seq", "10", "not-a-number"),
+        ],
+        ids=["timestamp", "long", "int"],
+    )
+    def test_fails_with_a_state_error(
+        self, spark: SparkSession, tmp_path, wm_type, wm_col, column_sql, stored
+    ):
+        from weevr.errors import StateError
+
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, f"select 1 as id, {column_sql} as {wm_col}")
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column=wm_col,
+                watermark_type=wm_type,
+                last_value=stored,
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        with pytest.raises(StateError, match=stored) as exc:
+            execute_thread(spark, _thread(src, tgt, store, wm_type=wm_type, wm_col=wm_col))
+        assert exc.value.thread_name == "t"
 
 
 class TestFirstRunGuard:

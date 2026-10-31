@@ -216,6 +216,21 @@ class TestConcurrentTableCreation:
         assert errors == []
         assert spark.read.format("delta").load(path).columns[0] == "thread_name"
 
+    def test_create_failure_with_table_present_is_success(self, spark, tmp_path):
+        from unittest.mock import patch
+
+        store = MetadataTableStore(str(tmp_path / "lost_race"))
+        real_sql = spark.sql
+
+        def create_then_fail(statement: str) -> None:
+            real_sql(statement)
+            raise RuntimeError("lost the create race")
+
+        with patch.object(spark, "sql", side_effect=create_then_fail):
+            store._ensure_table_exists(spark)
+
+        assert store._table_ensured
+
     def test_create_failure_without_table_raises_state_error(self, spark, tmp_path):
         from unittest.mock import patch
 

@@ -20,6 +20,8 @@ from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import DataType, TimestampNTZType, TimestampType
 
+from weevr.errors.exceptions import StateError
+
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
@@ -88,7 +90,13 @@ def max_hwm(df: DataFrame, typed: Column) -> str | None:
     return None
 
 
-def hwm_literal(df: DataFrame, typed: Column, watermark_type: str, last_value: str) -> Column:
+def hwm_literal(
+    df: DataFrame,
+    typed: Column,
+    watermark_type: str,
+    last_value: str,
+    thread_name: str | None = None,
+) -> Column:
     """Return the stored HWM as a literal comparable with the watermark column.
 
     Args:
@@ -96,10 +104,27 @@ def hwm_literal(df: DataFrame, typed: Column, watermark_type: str, last_value: s
         typed: The typed watermark column expression.
         watermark_type: One of ``timestamp``, ``date``, ``int``, ``long``.
         last_value: The stored HWM text.
+        thread_name: The thread the HWM belongs to, for error context.
 
     Returns:
         A literal Column of the column's type.
+
+    Raises:
+        StateError: If the stored text can't be parsed for the watermark type.
     """
+    try:
+        return _parsed_literal(df, typed, watermark_type, last_value)
+    except ValueError as exc:
+        raise StateError(
+            f"Stored watermark {last_value!r} is not a valid {watermark_type} value; "
+            f"seed or reset the watermark",
+            cause=exc,
+            thread_name=thread_name,
+        ) from exc
+
+
+def _parsed_literal(df: DataFrame, typed: Column, watermark_type: str, last_value: str) -> Column:
+    """Build the literal for ``hwm_literal``; a ValueError means unparseable text."""
     if watermark_type == "timestamp":
         column_type = _column_type(df, typed)
         if isinstance(column_type, TimestampType):

@@ -252,6 +252,7 @@ def build_watermark_filter(
     inclusive: bool = False,
     watermark_format: str | None = None,
     df: DataFrame | None = None,
+    thread_name: str | None = None,
 ) -> Column:
     """Build a Spark Column filter expression for watermark-based incremental reads.
 
@@ -268,13 +269,14 @@ def build_watermark_filter(
         df: The DataFrame the filter applies to. When given, the stored value
             is read per the column's actual type (canonical UTC instant, NTZ
             wall clock, or legacy driver-zone text; see :mod:`weevr.state.hwm`).
+        thread_name: The thread the stored value belongs to, for error context.
 
     Returns:
         A Spark Column expression suitable for ``df.filter()``.
     """
     typed = typed_watermark_col(watermark_column, watermark_type, watermark_format)
     if df is not None:
-        lit_val = hwm_literal(df, typed, watermark_type, last_value)
+        lit_val = hwm_literal(df, typed, watermark_type, last_value, thread_name)
         return typed >= lit_val if inclusive else typed > lit_val
     if watermark_type in ("timestamp", "date"):
         lit_val = F.lit(last_value).cast(watermark_type)
@@ -348,6 +350,7 @@ def read_source_incremental(
             inclusive=load_config.watermark_inclusive,
             watermark_format=load_config.watermark_format,
             df=df,
+            thread_name=prior_state.thread_name,
         )
         df = df.filter(filter_expr)
 
@@ -476,6 +479,7 @@ def read_cdc_source(
             inclusive=load_config.watermark_inclusive,
             watermark_format=load_config.watermark_format,
             df=df,
+            thread_name=prior_state.thread_name,
         )
         df = df.filter(filter_expr)
 

@@ -137,6 +137,7 @@ class TargetHandle:
         self._exists: bool | None = None
         self._exists_uncertain = False
         self._version_read_failed = False
+        self._history_read_failed = False
 
     def exists(self) -> bool:
         """Whether a Delta table exists at the target (cached until refresh).
@@ -171,19 +172,31 @@ class TargetHandle:
 
         Returns:
             ``(hwm, commit timestamp)``, or None when none of the scanned
-            commits carries the thread's HWM or the history can't be read.
+            commits carries the thread's HWM or the history can't be read
+            (recorded on :meth:`history_read_failed`).
         """
+        self._history_read_failed = False
         try:
             table = _delta.resolve_delta_table(self._spark, self.path)
             rows = table.history(limit).select("version", "timestamp", "userMetadata").collect()
         except Exception:
-            logger.warning("Commit history unavailable for '%s'", self.path)
+            logger.warning(
+                "Commit history unavailable for '%s'; a watermark stamped by a failed save "
+                "can't be recovered",
+                self.path,
+                exc_info=True,
+            )
+            self._history_read_failed = True
             return None
         for row in sorted(rows, key=lambda r: r["version"], reverse=True):
             hwm = stamped_hwm(row["userMetadata"], thread)
             if hwm is not None:
                 return hwm, row["timestamp"]
         return None
+
+    def history_read_failed(self) -> bool:
+        """True when the last stamped-HWM lookup couldn't read the commit history."""
+        return self._history_read_failed
 
     def refresh(self) -> None:
         """Invalidate the cached existence after an engine-internal commit.
