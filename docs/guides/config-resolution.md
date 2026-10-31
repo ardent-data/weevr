@@ -209,7 +209,8 @@ A source `lookup:` must name a lookup the thread can see. Through a weave or
 loom, an undefined name fails the load. A thread file loaded on its own can't
 see those parents, so a name it doesn't define itself adds a warning to
 `LoadedConfig.warnings` instead: the thread is valid in a weave that defines
-the lookup, but running it alone fails.
+the lookup, but running it alone fails. A `resolve` step's `lookup` is stricter:
+it fails the load even when the thread is loaded on its own.
 
 Without Spark there is no Fabric context, so a `${fabric.*}` reference needs
 a default (`${fabric.workspace_id:-local}`) to load through `load_config()` or
@@ -228,8 +229,8 @@ exists, run only in `Context.run(mode="validate")`.
 | `config/parser.py` | YAML parsing, version extraction, typed extension detection |
 | `config/resolver.py` | Variable interpolation, reference loading, circular dependency detection |
 | `config/inheritance.py` | Three-level cascade: loom → weave → thread |
-| `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); incremental cross-field checks (run when a thread starts executing) |
-| `config/macros.py` | `foreach` block expansion in step lists |
+| `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); lookup reference checks for `resolve` steps and sources (run during hydration); incremental cross-field checks (run when a thread starts executing) |
+| `config/macros.py` | `foreach` block expansion in step lists; rejects `foreach` in `with:` sub-pipelines |
 | `config/hydration.py` | Hydrates resolved dicts into typed models, including referenced and inline children |
 | `config/attribution.py` | Attaches the source file to config errors raised while loading it |
 | `config/audit_templates.py` | Audit template presets, context variables, and template merge helpers |

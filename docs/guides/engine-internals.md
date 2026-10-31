@@ -175,7 +175,8 @@ Thread execution is orchestrated at two levels:
    prevent the second write, not to undo the first. Remaining
    threads are then submitted to a `ThreadPoolExecutor` for
    concurrent execution. Threads reference lookups via
-   `source.lookup` and receive the cached DataFrame.
+   `source.lookup` or a `resolve` step and receive the cached DataFrame,
+   or read a non-materialized lookup on demand.
 6. **Post-steps** — After all threads complete, `post_steps` hook
    steps run. Failures with `on_failure: abort` mark the weave
    as failed.
@@ -251,8 +252,10 @@ write -> finalize
 3. Load prior watermark or CDC state. For an `incremental_watermark` append,
    the state is reconciled with the target's commit history: a newer stamped
    watermark is recovered, and a first run with none into a target that
-   already holds rows fails with a `StateError`. Lookup-based sources are
-   then resolved from cached or on-demand DataFrames
+   already holds rows fails with a `StateError`. Lookup-bound sources and
+   the lookups `resolve` steps name, including in `with:` sub-pipelines, are
+   then resolved from cached or on-demand DataFrames; a bound source alias
+   wins a name clash
 4. Read all remaining declared sources (with watermark/CDC filtering if
    applicable). For `mode: incremental_watermark`, the primary source
    is filtered against the prior HWM and the new HWM is captured from

@@ -175,6 +175,9 @@ Seeds run before the data is written, on every write path, including
 `soft_delete_active_value` unless the row sets the column itself, and a change
 to a seed key merges onto it. A seed never changes which data rows land.
 
+A dimension target can't be combined with `load.mode: cdc`: the config load
+fails, since the dimension merge ignores the operation column.
+
 !!! warning "Key values containing `|`"
     Surrogate key and change detection hashes join their columns with `|`,
     so `('a|b', 'c')` and `('a', 'b|c')` hash identically. See

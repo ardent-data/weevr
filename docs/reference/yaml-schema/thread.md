@@ -52,7 +52,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. |
-| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. |
+| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. An undefined name fails the config load; see [Loading without running](../../guides/config-resolution.md#loading-without-running) for a thread loaded on its own. |
 | `alias` | `string` | conditional | `null` | Lakehouse table alias. Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
 | `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
@@ -1030,7 +1030,8 @@ for detailed examples.
     forbidden — the engine derives these from the dimension
     block, and setting one on the thread fails the config load.
     `write.on_no_match_source` and `write.on_no_match_target`
-    remain available as overrides.
+    remain available as overrides. A dimension target can't be
+    combined with `load.mode: cdc`.
 
 ```yaml
 target:
