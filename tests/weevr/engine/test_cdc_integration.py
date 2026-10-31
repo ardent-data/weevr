@@ -1543,3 +1543,23 @@ class TestCdfFirstRun:
         )
         with pytest.raises(StateError, match="not-a-version"):
             execute_thread(spark, self._thread(src, tgt, store))
+
+    def test_stored_version_ahead_of_the_source_fails(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        from weevr.errors.exceptions import ExecutionError
+
+        src, tgt, store = (tmp_delta_path(n) for n in ("cdf7_src", "cdf7_tgt", "cdf7_wm"))
+        self._source(spark, src)
+        MetadataTableStore(store).write(
+            spark,
+            WatermarkState(
+                thread_name="t",
+                watermark_column="_commit_version",
+                watermark_type="long",
+                last_value="500",
+                last_updated=datetime.now(UTC),
+            ),
+        )
+        with pytest.raises(ExecutionError, match=r"500.*ahead.*latest version 1"):
+            execute_thread(spark, self._thread(src, tgt, store))

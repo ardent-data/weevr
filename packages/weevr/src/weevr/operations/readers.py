@@ -478,7 +478,13 @@ def read_cdc_source(
             raise ExecutionError(f"Delta source '{source.alias}' has no commit history")
         if last_version is None:
             return _read_cdf_snapshot(spark, source.alias, latest), None
-        if last_version >= latest["version"]:
+        if last_version > latest["version"]:
+            raise ExecutionError(
+                f"Stored version {last_version} for Delta source '{source.alias}' is ahead of "
+                f"its latest version {latest['version']}. The source was likely recreated or "
+                "restored; seed or reset the thread's watermark before running it again."
+            )
+        if last_version == latest["version"]:
             # Delta rejects a starting version past the latest commit
             return _read_cdf_snapshot(spark, source.alias, latest).limit(0), None
         reader = (

@@ -362,6 +362,11 @@ changes after it. The source needs Change Data Feed enabled by the time the
 second run starts. On a first run against a target that already holds rows,
 only new keys insert; existing rows aren't updated.
 
+A stored version ahead of the source's latest version fails the run, since the
+source was recreated or restored and its history no longer holds that version.
+[Seed or reset the watermark](idempotency.md#seed-or-reset-a-watermark) to
+continue.
+
 ```yaml
 load:
   mode: cdc
