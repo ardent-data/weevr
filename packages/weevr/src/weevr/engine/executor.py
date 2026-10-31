@@ -22,10 +22,8 @@ from weevr.engine.lookups import (
     build_lookup_meta,
     cleanup_lookups,
     materialize_lookups,
-    resolve_named_lookups,
-    resolve_thread_lookups,
+    resolve_lookup_frames,
 )
-from weevr.engine.planner import resolve_lookup_names
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
 from weevr.engine.target_identity import resolve_target_identity
@@ -382,26 +380,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             resolve_lookups: dict[str, Any] = {}
             resolve_meta = lookup_meta
             if effective_cached_lookups is not None or effective_weave_lookups is not None:
-                definitions = effective_weave_lookups or {}
-                bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
-                by_name = resolve_named_lookups(
-                    resolve_lookup_names(thread) - bound,
-                    definitions,
+                lookup_dfs, resolve_lookups = resolve_lookup_frames(
+                    thread,
+                    effective_weave_lookups or {},
                     effective_cached_lookups or {},
                     spark,
                     connections=connections,
                     uk_memo=uk_memo,
                 )
-                # Frames read by name are reused for bound sources (one read each)
-                lookup_dfs = resolve_thread_lookups(
-                    thread.sources,
-                    definitions,
-                    {**(effective_cached_lookups or {}), **by_name},
-                    spark,
-                    connections=connections,
-                    uk_memo=uk_memo,
-                )
-                resolve_lookups = {**by_name, **lookup_dfs}
                 resolve_meta = _meta_for_resolve(thread, lookup_meta)
 
             # --- Step 4: Read sources ---
