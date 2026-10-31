@@ -198,13 +198,13 @@ class TestConcurrentTableCreation:
 
         path = str(tmp_path / "shared_wm")
         barrier = threading.Barrier(4)
-        errors: list[BaseException] = []
+        errors: list[Exception] = []
 
         def create() -> None:
             barrier.wait()
             try:
                 MetadataTableStore(path)._ensure_table_exists(spark)
-            except BaseException as exc:  # collected and asserted below
+            except Exception as exc:  # collected and asserted below
                 errors.append(exc)
 
         workers = [threading.Thread(target=create) for _ in range(4)]
