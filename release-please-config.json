@@ -24,6 +24,10 @@
         {
           "path": "packages/weevr-core/pyproject.toml",
           "type": "generic"
+        },
+        {
+          "path": "docs/reference/compatibility.md",
+          "type": "generic"
         }
       ]
     }

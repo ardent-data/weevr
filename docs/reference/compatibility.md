@@ -3,7 +3,7 @@
 weevr is designed to run within the Microsoft Fabric runtime. The table below
 lists the tested and supported versions for each dependency.
 
-Last validated against weevr **1.20.3**.
+Last validated against weevr **1.20.6**. <!-- x-release-please-version -->
 
 ## Runtime matrix
 
