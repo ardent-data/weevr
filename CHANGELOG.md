@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.6](https://github.com/ardent-data/weevr/compare/weevr-v1.20.5...weevr-v1.20.6) (2026-11-01)
+
+
+### Bug Fixes
+
+* **engine:** run with blocks in preview and drop case-variant columns ([#275](https://github.com/ardent-data/weevr/issues/275)) ([0e2b207](https://github.com/ardent-data/weevr/commit/0e2b2077cd2e09ffb4bfce07571f150fa830efcb))
+
 ## [1.20.5](https://github.com/ardent-data/weevr/compare/weevr-v1.20.4...weevr-v1.20.5) (2026-11-01)
 
 
