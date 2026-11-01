@@ -85,13 +85,15 @@ uv run ruff check .
 ### Formatting
 
 ```bash
-uv run ruff format .
+uv run ruff format --check .
 ```
+
+Drop `--check` to apply the formatting.
 
 ### Type checking
 
 ```bash
-uv run pyright .
+uv run pyright
 ```
 
 ### Tests
@@ -332,25 +334,30 @@ This repository uses **Release Please** for versioning and changelog generation.
 
 Pull request titles **must** follow Conventional Commit style:
 
-* `feat: <summary>` – new feature
-* `fix: <summary>` – bug fix
-* `docs: <summary>` – documentation only
-* `chore: <summary>` – maintenance or tooling
-* `refactor: <summary>` – refactoring without behavior change
-* `test: <summary>` – tests only
-* `ci: <summary>` – CI or GitHub workflow changes
+* `feat(<scope>): <summary>` – new feature
+* `fix(<scope>): <summary>` – bug fix
+* `chore(<scope>): <summary>` – maintenance or tooling
+* `refactor(<scope>): <summary>` – refactoring without behavior change
+* `test(<scope>): <summary>` – tests only
+* `ci(<scope>): <summary>` – CI or GitHub workflow changes
+
+Documentation-only changes use `chore(docs): <summary>`, not `docs:`, because
+Release Please cuts a patch release for `docs:` titles.
+
+Scopes: `config`, `engine`, `model`, `operations`, `state`, `telemetry`, `errors`,
+`ci`, `deps`, `build`, `meta`, `docs`, `examples`, `devcontainer`.
 
 Examples:
 
-* `feat: add compile command scaffolding`
-* `fix: pin python version in CI`
-* `chore: add Release Please workflow`
+* `feat(engine): add parallel thread execution`
+* `fix(config): resolve variables in nested maps`
+* `chore(docs): add observability guide`
 
 ### Breaking changes
 
 If a change introduces a breaking change, indicate it explicitly using one of the following:
 
-* Add `!` after the type: `feat!: <summary>` or `fix!: <summary>`
+* Add `!` after the scope: `feat(<scope>)!: <summary>` or `fix(<scope>)!: <summary>`
 * Include a `BREAKING CHANGE:` section in the pull request description
 
 ### Merge strategy
