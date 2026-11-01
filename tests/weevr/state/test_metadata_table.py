@@ -47,19 +47,29 @@ class TestCreateRaceRecovery:
             patch("weevr.state.metadata_table._CREATE_RACE_WAIT_SECONDS", 0.05),
             patch("weevr.state.metadata_table._CREATE_RACE_POLL_SECONDS", 0.01),
             patch.object(store, "_table_exists", return_value=False),
-            pytest.raises(StateError, match="watermark table"),
+            pytest.raises(StateError, match="not empty"),
         ):
             store._ensure_table_exists(spark)
         assert not store._table_ensured
+
+    def test_logs_the_wait(self, caplog: pytest.LogCaptureFixture) -> None:
+        store, spark = self._store_failing_create(self.RACE_ERROR)
+        with (
+            caplog.at_level("INFO", logger="weevr.state.metadata_table"),
+            patch.object(store, "_table_exists", return_value=True),
+        ):
+            store._ensure_table_exists(spark)
+        assert store.table_path in caplog.text
 
     def test_other_create_failures_are_checked_once(self) -> None:
         store, spark = self._store_failing_create("storage unavailable")
         with (
             patch.object(store, "_table_exists", return_value=False) as exists,
-            pytest.raises(StateError, match="watermark table"),
+            pytest.raises(StateError, match="watermark table") as raised,
         ):
             store._ensure_table_exists(spark)
         exists.assert_called_once()
+        assert "not empty" not in raised.value.message
 
 
 @pytest.mark.spark

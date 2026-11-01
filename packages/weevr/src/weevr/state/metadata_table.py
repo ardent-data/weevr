@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,10 @@ from weevr.state.watermark import WatermarkState, WatermarkStore
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
+logger = logging.getLogger(__name__)
+
+# Read from the exception text, where Spark renders the error class. If it's ever
+# missing, a lost race just falls back to the single check other failures get.
 _CREATE_RACE_ERROR = "DELTA_CREATE_TABLE_WITH_NON_EMPTY_LOCATION"
 _CREATE_RACE_WAIT_SECONDS = 10.0
 _CREATE_RACE_POLL_SECONDS = 0.1
@@ -77,14 +82,16 @@ class MetadataTableStore(WatermarkStore):
                 USING DELTA
             """)
         except Exception as exc:
-            if not self._table_appears(spark, exc):
+            lost_race = _CREATE_RACE_ERROR in str(exc)
+            if not self._table_appears(spark, wait=lost_race):
+                detail = "; the location is not empty and isn't a Delta table" if lost_race else ""
                 raise StateError(
-                    f"Failed to create the watermark table at '{self._table_path}'",
+                    f"Failed to create the watermark table at '{self._table_path}'{detail}",
                     cause=exc,
                 ) from exc
         self._table_ensured = True
 
-    def _table_appears(self, spark: SparkSession, create_error: Exception) -> bool:
+    def _table_appears(self, spark: SparkSession, *, wait: bool) -> bool:
         """Whether the table appears after a failed create.
 
         Threads sharing a store race on first use: IF NOT EXISTS isn't
@@ -92,8 +99,9 @@ class MetadataTableStore(WatermarkStore):
         the table only reads as Delta once the winner commits. Any other
         create failure gets one check, so a real fault doesn't wait.
         """
-        wait = _CREATE_RACE_WAIT_SECONDS if _CREATE_RACE_ERROR in str(create_error) else 0.0
-        deadline = time.monotonic() + wait
+        if wait:
+            logger.info("Waiting for a concurrent create of '%s' to commit", self._table_path)
+        deadline = time.monotonic() + (_CREATE_RACE_WAIT_SECONDS if wait else 0.0)
         while not self._table_exists(spark):
             if time.monotonic() >= deadline:
                 return False
