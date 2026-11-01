@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from pyspark.sql import functions as F
 
+from weevr.engine.planner import resolve_lookup_names
 from weevr.errors.exceptions import LookupResolutionError
 from weevr.model.base import FrozenBase
 from weevr.model.connection import OneLakeConnection
@@ -22,6 +23,7 @@ from weevr.telemetry.span import SpanStatus
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
 
+    from weevr.model.thread import Thread
     from weevr.telemetry.collector import SpanCollector
 
 logger = logging.getLogger("weevr.engine.lookups")
@@ -494,6 +496,53 @@ def resolve_named_lookups(
         for name in sorted(names)
         if name in lookups
     }
+
+
+def resolve_lookup_frames(
+    thread: Thread,
+    lookups: dict[str, Lookup],
+    cached_dfs: dict[str, DataFrame],
+    spark: SparkSession,
+    connections: dict[str, OneLakeConnection] | None = None,
+    uk_memo: UniqueKeyMemo | None = None,
+) -> tuple[dict[str, DataFrame], dict[str, DataFrame]]:
+    """Resolve every lookup a thread uses, for lookup-bound sources and ``resolve`` steps.
+
+    Args:
+        thread: The thread whose sources and ``resolve`` steps name lookups.
+        lookups: Lookup definitions visible to the thread, by name.
+        cached_dfs: Pre-materialized DataFrames by lookup name.
+        spark: Active SparkSession for on-demand reads.
+        connections: Named connection declarations forwarded to on-demand reads.
+        uk_memo: Per-weave unique-key memo, as for :func:`resolve_thread_lookups`.
+
+    Returns:
+        Frames for lookup-bound sources by source alias, and what ``resolve``
+        steps see: every visible lookup they name by lookup name, with bound
+        aliases winning a clash.
+
+    Raises:
+        LookupResolutionError: If a bound source names an undefined lookup.
+    """
+    bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
+    by_name = resolve_named_lookups(
+        resolve_lookup_names(thread) - bound,
+        lookups,
+        cached_dfs,
+        spark,
+        connections=connections,
+        uk_memo=uk_memo,
+    )
+    # Frames read by name are reused for bound sources (one read each)
+    lookup_dfs = resolve_thread_lookups(
+        thread.sources,
+        lookups,
+        {**cached_dfs, **by_name},
+        spark,
+        connections=connections,
+        uk_memo=uk_memo,
+    )
+    return lookup_dfs, {**by_name, **lookup_dfs}
 
 
 def _lookup_frame(

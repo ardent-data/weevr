@@ -316,8 +316,9 @@ print(result.validation_errors)
 ```
 
 Validate mode parses the config, resolves variables and references, checks
-the DAG for cycles, and verifies that source paths exist -- all without
-reading or writing any data. Use it in CI or as a pre-flight check before
+the DAG for cycles, and verifies that sources exist (tables and paths,
+including connection-form sources; lookup-bound sources are skipped) -- all
+without reading or writing any data. Use it in CI or as a pre-flight check before
 production runs.
 
 You can also use plan mode to see the execution order without running:

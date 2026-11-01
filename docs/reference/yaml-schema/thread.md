@@ -52,7 +52,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. |
-| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. |
+| `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. An undefined name fails the config load; see [Loading without running](../../guides/config-resolution.md#loading-without-running) for a thread loaded on its own. |
 | `alias` | `string` | conditional | `null` | Lakehouse table alias. Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
 | `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
@@ -70,7 +70,7 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `keys` | `list[string]` | yes | -- | Columns used for deduplication grouping |
-| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. |
+| `order_by` | `string` | no | `null` | Sort expression to determine which row to keep. On the primary (first) source of an `incremental_watermark` thread it must be `"<watermark_column> DESC"`; leaving it unset fails the config load. A primary source of a `cdc` thread can't set `dedup`. |
 
 ```yaml
 sources:
@@ -1030,7 +1030,8 @@ for detailed examples.
     forbidden — the engine derives these from the dimension
     block, and setting one on the thread fails the config load.
     `write.on_no_match_source` and `write.on_no_match_target`
-    remain available as overrides.
+    remain available as overrides. A dimension target can't be
+    combined with `load.mode: cdc`.
 
 ```yaml
 target:
@@ -1146,6 +1147,14 @@ Key management for business keys, surrogate keys, and change detection hashes.
     Spark major versions. Neither is recommended for high-cardinality
     surrogate key use cases.
 
+!!! warning "Separator collisions"
+    Key and change-detection columns are joined with `|` before hashing, so
+    value sets that join to the same text hash identically: `('a|b', 'c')`
+    and `('a', 'b|c')` get the same key, and those rows are treated as one
+    entity. This applies to `keys.surrogate_key`, `keys.change_detection`,
+    and their `dimension` equivalents. If a key column can contain `|`,
+    replace or strip it in a pipeline step first.
+
 !!! info "keys vs dimension surrogate key"
     `keys.surrogate_key` uses `SurrogateKeyConfig` (hash-based, no
     `columns` field). `target.dimension.surrogate_key` uses
@@ -1240,6 +1249,8 @@ Load-mode rules are enforced in two places:
       of `timestamp` or `date`.
     - In `incremental_watermark` mode, a `dedup` on the primary (first) source
       requires `order_by: "<watermark_column> DESC"`.
+    - In `cdc` mode, the primary (first) source can't set `dedup` (the merge
+      keeps the latest change per key), and `target.dimension` is rejected.
 - **When the thread starts executing** — not reported by `load_config` or
   `mode="validate"`; the run fails with an `ExecutionError`:
     - `cdc` requires `write.mode: merge`.

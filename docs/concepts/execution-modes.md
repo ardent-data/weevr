@@ -98,6 +98,13 @@ print(result.explain())  # detailed: dependencies, cache targets, thread detail
 result = ctx.run("nightly.loom", mode="preview")
 ```
 
+Preview limits every source, including lookup-bound sources, to `sample_rows`
+(100 by default). A `resolve` step matches those rows against the full lookup,
+so foreign keys look as they do in a real run; each lookup a previewed thread
+names is read once. Lookups come from the same places as in execution, with
+thread lookups over weave lookups over loom lookups. Validate mode never reads
+a lookup.
+
 In notebooks, results render automatically as styled HTML when you
 evaluate the result in a cell. Each mode gets a tailored report:
 
@@ -338,11 +345,27 @@ load:
     preset: delta_cdf
 ```
 
+A CDC thread fails the config load if its primary (first) source sets
+`dedup`, since the merge already keeps the latest change per key, or if its
+target sets `dimension`, since the dimension merge ignores the operation
+column.
+
 CDC mode supports two configuration styles:
 
 - **Preset** -- Use `delta_cdf` to auto-configure for Delta Change Data
   Feed conventions.
 - **Explicit** -- Declare the operation column and flag values directly.
+
+The first `delta_cdf` run has no stored version, so it reads the source's
+current version as inserts and stores that version. Later runs read only the
+changes after it. The source needs Change Data Feed enabled by the time the
+second run starts. On a first run against a target that already holds rows,
+only new keys insert; existing rows aren't updated.
+
+A stored version ahead of the source's latest version fails the run, since the
+source was recreated or restored and its history no longer holds that version.
+[Seed or reset the watermark](idempotency.md#seed-or-reset-a-watermark) to
+continue.
 
 ```yaml
 load:

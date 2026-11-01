@@ -170,6 +170,23 @@ Trigger conditions:
 - `first_write` — insert when the table does not exist
 - `empty` — insert when the table is empty or missing
 
+Seeds run before the data is written, on every write path, including
+`load.mode: cdc`. On a CDC target with `on_delete: soft_delete`, seed rows take
+`soft_delete_active_value` unless the row sets the column itself, and a change
+to a seed key merges onto it. A seed never changes which data rows land.
+
+Seeds and the first merge commit separately. If a seeded first CDC run fails
+during the merge, drop the target before retrying: a retry sees an existing
+table, so only insert rows land, and update rows for unseen keys are skipped.
+
+A dimension target can't be combined with `load.mode: cdc`: the config load
+fails, since the dimension merge ignores the operation column.
+
+!!! warning "Key values containing `|`"
+    Surrogate key and change detection hashes join their columns with `|`,
+    so `('a|b', 'c')` and `('a', 'b|c')` hash identically. See
+    [Separator collisions](../reference/yaml-schema/thread.md#keyssurrogate_key).
+
 ## Additional Keys
 
 Generate secondary hash columns alongside the primary SK:

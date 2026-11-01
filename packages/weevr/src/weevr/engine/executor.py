@@ -22,10 +22,8 @@ from weevr.engine.lookups import (
     build_lookup_meta,
     cleanup_lookups,
     materialize_lookups,
-    resolve_named_lookups,
-    resolve_thread_lookups,
+    resolve_lookup_frames,
 )
-from weevr.engine.planner import resolve_lookup_names
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
 from weevr.engine.target_identity import resolve_target_identity
@@ -76,6 +74,7 @@ from weevr.operations.writers import (
     execute_cdc_merge,
     existing_target_columns,
     narrow_to_target,
+    seed_cdc_target,
     write_target,
 )
 from weevr.state import WatermarkState, WatermarkStore, resolve_store
@@ -381,26 +380,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             resolve_lookups: dict[str, Any] = {}
             resolve_meta = lookup_meta
             if effective_cached_lookups is not None or effective_weave_lookups is not None:
-                definitions = effective_weave_lookups or {}
-                bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
-                by_name = resolve_named_lookups(
-                    resolve_lookup_names(thread) - bound,
-                    definitions,
+                lookup_dfs, resolve_lookups = resolve_lookup_frames(
+                    thread,
+                    effective_weave_lookups or {},
                     effective_cached_lookups or {},
                     spark,
                     connections=connections,
                     uk_memo=uk_memo,
                 )
-                # Frames read by name are reused for bound sources (one read each)
-                lookup_dfs = resolve_thread_lookups(
-                    thread.sources,
-                    definitions,
-                    {**(effective_cached_lookups or {}), **by_name},
-                    spark,
-                    connections=connections,
-                    uk_memo=uk_memo,
-                )
-                resolve_lookups = {**by_name, **lookup_dfs}
                 resolve_meta = _meta_for_resolve(thread, lookup_meta)
 
             # --- Step 4: Read sources ---
@@ -441,8 +428,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 if thread.load.cdc.preset == "delta_cdf" and prior_state is not None:
                     try:
                         last_version = int(prior_state.last_value)
-                    except (ValueError, TypeError):
-                        last_version = None
+                    except (ValueError, TypeError) as exc:
+                        raise StateError(
+                            f"Stored CDF version {prior_state.last_value!r} is not an "
+                            f"integer; seed or reset the watermark",
+                            cause=exc,
+                            thread_name=thread.name,
+                        ) from exc
 
                 primary_df, cdc_new_hwm = read_cdc_source(
                     spark,
@@ -769,6 +761,15 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     with contextlib.suppress(Exception):
                         output_sample = df.limit(10).toPandas().to_dict("records")
                 cdc_write = _validate_cdc_write_config(thread)
+                seeded_first_write = seed_config is not None and seed_cdc_target(
+                    spark,
+                    df,
+                    seed_config,
+                    target_path,
+                    cdc_write,
+                    thread.load.cdc,
+                    target_handle,
+                )
                 cdc_counts = execute_cdc_merge(
                     spark,
                     df,
@@ -778,6 +779,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     load_config=thread.load,
                     handle=target_handle,
                     evolve=thread.target.schema_drift == "adaptive",
+                    seeded_first_write=seeded_first_write,
                 )
                 rows_written = sum(cdc_counts.values())
 

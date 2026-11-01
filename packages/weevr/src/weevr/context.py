@@ -12,9 +12,12 @@ from pyspark.sql import SparkSession
 
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
-from weevr.delta import delta_table_exists
+from weevr.config.onelake import resolve_connection_path
+from weevr.delta import probe_delta_table_exists
 from weevr.engine.executor import execute_thread
+from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import build_plan
+from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
     ConfigError,
@@ -22,6 +25,7 @@ from weevr.errors import (
     ExecutionError,
 )
 from weevr.model.execution import LogLevel, resolve_effective_execution
+from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
@@ -543,23 +547,49 @@ class Context:
     def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
         """Check that all sources referenced by threads exist.
 
-        Existence is a metadata question: Delta sources go through the
-        catalog or Delta-log check, file sources through a filesystem
-        probe — no reads, no schema inference, no Spark jobs.
+        Existence is a metadata question: Delta sources, including
+        connection-form ones, go through the catalog or Delta-log check,
+        file sources through a filesystem probe — no reads, no schema
+        inference, no Spark jobs.
         """
         errors: list[str] = []
         checked: set[str] = set()
 
         for thread_name, thread in threads.items():
             for source_name, source in thread.sources.items():
-                if source.lookup is not None or source.type is None:
+                if source.lookup is not None:
                     continue
-                resolve_path = source.alias if source.type == "delta" else source.path
+                if source.connection:
+                    source_type = "delta"
+                    try:
+                        resolve_path = resolve_connection_path(
+                            source.connection,
+                            source.table,
+                            source.schema_override,
+                            thread.connections,
+                        )
+                    except ValueError as exc:
+                        errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
+                        continue
+                elif source.type is None:
+                    continue
+                else:
+                    source_type = source.type
+                    resolve_path = source.alias if source.type == "delta" else source.path
                 if resolve_path is None or resolve_path in checked:
                     continue
                 checked.add(resolve_path)
 
-                if not self._source_location_exists(source.type, resolve_path):
+                try:
+                    exists = self._source_location_exists(source_type, resolve_path)
+                except Exception as exc:
+                    logger.warning("Existence probe failed for '%s': %s", resolve_path, exc)
+                    errors.append(
+                        f"Source '{source_name}' in thread '{thread_name}' "
+                        f"could not be verified: {resolve_path}"
+                    )
+                    continue
+                if not exists:
                     errors.append(
                         f"Source '{source_name}' in thread '{thread_name}' "
                         f"not found: {resolve_path}"
@@ -576,18 +606,19 @@ class Context:
         mode answers "is the config pointed at something real", and
         parse problems surface at execution with a better error. Same
         posture as the catalog-vs-Delta-readable gap documented on
-        ``delta_table_exists``.
+        ``probe_delta_table_exists``.
+
+        A failure to ask, such as a permission or storage error, raises
+        rather than answering False, so it isn't reported as a missing
+        source.
         """
-        try:
-            if source_type == "delta":
-                return delta_table_exists(self._spark, resolve_path)
-            jvm: Any = self._spark._jvm  # noqa: SLF001
-            jsc: Any = self._spark._jsc  # noqa: SLF001
-            location = jvm.org.apache.hadoop.fs.Path(resolve_path)
-            fs = location.getFileSystem(jsc.hadoopConfiguration())
-            return bool(fs.exists(location))
-        except Exception:
-            return False
+        if source_type == "delta":
+            return probe_delta_table_exists(self._spark, resolve_path)
+        jvm: Any = self._spark._jvm  # noqa: SLF001
+        jsc: Any = self._spark._jsc  # noqa: SLF001
+        location = jvm.org.apache.hadoop.fs.Path(resolve_path)
+        fs = location.getFileSystem(jsc.hadoopConfiguration())
+        return bool(fs.exists(location))
 
     @staticmethod
     def _collect_all_threads(loaded: LoadedConfig) -> dict[str, Thread]:
@@ -601,6 +632,29 @@ class Context:
         result: dict[str, Thread] = {}
         for thread_map in loaded.resolved_threads.values():
             result.update(thread_map)
+        return result
+
+    @staticmethod
+    def _inherited_lookups(loaded: LoadedConfig) -> dict[str, dict[str, Lookup]]:
+        """Map each thread name to the lookups its weave and loom define.
+
+        Weave lookups win over loom lookups, as they do at execution. A
+        thread name shared across weaves takes the last weave's lookups,
+        matching :meth:`_collect_all_threads`.
+        """
+        loom_lookups: dict[str, Lookup] | None = None
+        if isinstance(loaded.model, Loom) and loaded.model.lookups:
+            loom_lookups = dict(loaded.model.lookups)
+
+        result: dict[str, dict[str, Lookup]] = {}
+        for weave_name, threads in loaded.resolved_threads.items():
+            weave = loaded.model if isinstance(loaded.model, Weave) else None
+            if isinstance(loaded.model, Loom):
+                weave = loaded.resolved_weaves.get(weave_name)
+            weave_lookups = dict(weave.lookups) if weave and weave.lookups else None
+            merged = merge_resource_dicts(loom_lookups, weave_lookups, "lookup", "loom", "weave")
+            for thread_name in threads:
+                result[thread_name] = merged or {}
         return result
 
     # ------------------------------------------------------------------
@@ -714,6 +768,7 @@ class Context:
         all_threads, warnings = self._filter_threads(
             all_threads, tags=tags, thread_names=thread_names
         )
+        inherited_lookups = self._inherited_lookups(loaded)
 
         preview_data: dict[str, Any] = {}
         preview_metadata: dict[str, PreviewThreadMetadata] = {}
@@ -721,17 +776,39 @@ class Context:
 
         for thread_name, thread in all_threads.items():
             try:
-                sources_map = read_sources(
+                # Resolve steps get full lookup frames: matching sampled rows
+                # against a sampled lookup would miss most valid keys.
+                visible_lookups = merge_resource_dicts(
+                    inherited_lookups.get(thread_name),
+                    dict(thread.lookups) if thread.lookups else None,
+                    "lookup",
+                    "weave",
+                    "thread",
+                )
+                lookup_dfs, resolve_lookups = resolve_lookup_frames(
+                    thread,
+                    visible_lookups or {},
+                    {},
                     self._spark,
-                    thread.sources,
                     connections=thread.connections,
                 )
-                for key in sources_map:
-                    sources_map[key] = sources_map[key].limit(sample_rows)
+                read_dfs = read_sources(
+                    self._spark,
+                    {k: v for k, v in thread.sources.items() if k not in lookup_dfs},
+                    connections=thread.connections,
+                )
+                frames = {**read_dfs, **lookup_dfs}
+                sources_map = {key: frames[key].limit(sample_rows) for key in thread.sources}
 
                 df = next(iter(sources_map.values()))
                 obs_registry = ObservationRegistry(scope="main")
-                df = run_pipeline(df, thread.steps, sources_map, observations=obs_registry)
+                df = run_pipeline(
+                    df,
+                    thread.steps,
+                    sources_map,
+                    lookups=resolve_lookups or None,
+                    observations=obs_registry,
+                )
 
                 if thread.validations:
                     # Preview discards the per-rule results, so skip their

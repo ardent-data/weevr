@@ -1322,3 +1322,141 @@ class TestLoadConfigIncrementalDedupRule:
         with pytest.raises(ModelValidationError, match="ts DESC") as exc_info:
             load_config(thread, project_root=tmp_path)
         assert exc_info.value.file_path == str(thread)
+
+
+class TestLoadConfigCdcRules:
+    """CDC rules surface at load, including for a load cascaded from a parent."""
+
+    CDC = {
+        "mode": "cdc",
+        "cdc": {"operation_column": "op", "insert_value": "I", "delete_value": "D"},
+    }
+    DIMENSION = {
+        "business_key": ["id"],
+        "surrogate_key": {"name": "sk", "columns": ["id"]},
+        "change_detection": {"attrs": {"columns": ["name"], "on_change": "overwrite"}},
+    }
+
+    @staticmethod
+    def _thread(**overrides: Any) -> dict[str, Any]:
+        return {
+            "config_version": "1.0",
+            "sources": {"s": {"type": "delta", "alias": "raw.c"}},
+            "target": {"path": "Tables/c"},
+            **overrides,
+        }
+
+    def _dedup_thread(self, **overrides: Any) -> dict[str, Any]:
+        source = {"type": "delta", "alias": "raw.c", "dedup": {"keys": ["id"]}}
+        return self._thread(sources={"s": source}, **overrides)
+
+    def _dimension_thread(self, **overrides: Any) -> dict[str, Any]:
+        return self._thread(target={"path": "Tables/c", "dimension": self.DIMENSION}, **overrides)
+
+    def test_dedup_fails_on_the_thread_itself(self, make_project):
+        write = {"mode": "merge", "match_keys": ["id"]}
+        project = make_project(self._dedup_thread(load=self.CDC, write=write))
+        with pytest.raises(ConfigError, match="dedup"):
+            load_config(project / "fact.thread", project_root=project)
+
+    @pytest.mark.parametrize("level", ["weave", "loom"])
+    def test_dedup_fails_with_a_cascaded_load(self, make_project, level):
+        defaults = {"defaults": {"load": self.CDC}}
+        project = make_project(
+            self._dedup_thread(write={"mode": "merge", "match_keys": ["id"]}),
+            weave=defaults if level == "weave" else None,
+            loom=defaults if level == "loom" else None,
+        )
+        with pytest.raises(ConfigError, match="dedup"):
+            load_config(
+                project / f"{'w.weave' if level == 'weave' else 'l.loom'}", project_root=project
+            )
+
+    def test_dimension_fails_on_the_thread_itself(self, make_project):
+        project = make_project(self._dimension_thread(load=self.CDC))
+        with pytest.raises(ConfigError, match=r"target\.dimension"):
+            load_config(project / "fact.thread", project_root=project)
+
+    def test_dimension_fails_with_a_cascaded_load(self, make_project):
+        project = make_project(self._dimension_thread(), weave={"defaults": {"load": self.CDC}})
+        with pytest.raises(ConfigError, match=r"target\.dimension"):
+            load_config(project / "w.weave", project_root=project)
+
+
+class TestLoadConfigDimensionWriteMode:
+    """Any write.mode on a dimension thread gets the one dimension error."""
+
+    DIMENSION = {
+        "business_key": ["id"],
+        "surrogate_key": {"name": "sk", "columns": ["id"]},
+        "change_detection": {"attrs": {"columns": ["name"], "on_change": "overwrite"}},
+    }
+
+    def _thread(self, write: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "config_version": "1.0",
+            "sources": {"s": {"type": "delta", "alias": "raw.c"}},
+            "target": {"path": "Tables/c", "dimension": self.DIMENSION},
+            "write": write,
+        }
+
+    @pytest.mark.parametrize("mode", ["merge", "overwrite", "append"])
+    def test_every_mode_gets_the_dimension_error(self, make_project, mode):
+        project = make_project(self._thread({"mode": mode}))
+        with pytest.raises(ConfigError, match="cannot be set when target.dimension"):
+            load_config(project / "fact.thread", project_root=project)
+
+    def test_merge_overrides_without_a_mode_still_load(self, make_project):
+        project = make_project(self._thread({"on_no_match_target": "insert"}))
+        result = load_config(project / "fact.thread", project_root=project)
+        assert isinstance(result, Thread)
+
+    def test_plain_merge_still_needs_match_keys(self, make_project):
+        thread = self._thread({"mode": "merge"})
+        del thread["target"]["dimension"]
+        project = make_project(thread)
+        with pytest.raises(ConfigError, match="match_keys"):
+            load_config(project / "fact.thread", project_root=project)
+
+
+class TestLoadConfigForeachInWith:
+    """foreach in a with: block fails with an error that says where and why."""
+
+    FOREACH = {
+        "foreach": {
+            "values": ["a"],
+            "as": "c",
+            "steps": [{"derive": {"columns": {"{c}_x": "{c}"}}}],
+        }
+    }
+
+    def _thread(self) -> dict[str, Any]:
+        return {
+            "config_version": "1.0",
+            "sources": {"s": {"type": "delta", "alias": "raw.c"}},
+            "target": {"path": "Tables/c"},
+            "with": {"cte": {"from": "s", "steps": [self.FOREACH]}},
+            "steps": [],
+        }
+
+    def test_direct_thread(self, make_project):
+        project = make_project(self._thread())
+        with pytest.raises(ConfigError, match=r"foreach.*with\.cte\.steps.*top-level") as exc:
+            load_config(project / "fact.thread", project_root=project)
+        assert exc.value.file_path == str(project / "fact.thread")
+        assert not isinstance(exc.value, ModelValidationError)
+
+    @pytest.mark.parametrize("entry", ["w.weave", "l.loom"])
+    def test_through_a_parent(self, make_project, entry):
+        project = make_project(self._thread())
+        with pytest.raises(ConfigError, match=r"foreach.*with\.cte\.steps.*top-level"):
+            load_config(project / entry, project_root=project)
+
+    def test_top_level_foreach_still_expands(self, make_project):
+        thread = self._thread()
+        del thread["with"]
+        thread["steps"] = [self.FOREACH]
+        project = make_project(thread)
+        result = load_config(project / "fact.thread", project_root=project)
+        assert isinstance(result, Thread)
+        assert len(result.steps) == 1

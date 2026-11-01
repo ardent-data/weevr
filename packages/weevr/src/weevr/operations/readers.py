@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from pyspark.sql import Column, DataFrame, SparkSession, Window
+from pyspark.sql import Column, DataFrame, Row, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import LongType, StructField, StructType
 
-from weevr.delta import is_table_alias
+from weevr.delta import is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
@@ -396,6 +396,23 @@ def compute_generic_cdc_hwm(df: DataFrame, load_config: LoadConfig) -> str | Non
     return max_hwm(df, typed)
 
 
+def _read_cdf_snapshot(spark: SparkSession, alias: str, latest: Row) -> DataFrame:
+    """Read a table's ``latest`` history row as inserts, for a first Change Data Feed run.
+
+    A change feed read needs a starting version, and version 0 only works if
+    the feed was on from creation with nothing vacuumed. The snapshot gives a
+    first run the current state for any table, and its version is where the
+    next run's feed read starts.
+    """
+    reader = spark.read.format("delta").option("versionAsOf", latest["version"])
+    df = reader.table(alias) if is_table_alias(alias) else reader.load(alias)
+    return (
+        df.withColumn("_change_type", F.lit("insert"))
+        .withColumn("_commit_version", F.lit(latest["version"]).cast("long"))
+        .withColumn("_commit_timestamp", F.lit(latest["timestamp"]))
+    )
+
+
 def read_cdc_source(
     spark: SparkSession,
     source: Source,
@@ -409,7 +426,9 @@ def read_cdc_source(
 ) -> tuple[DataFrame, str | None]:
     """Read a CDC source, optionally narrowed by a watermark filter.
 
-    For ``preset=delta_cdf``, reads with Delta Change Data Feed options;
+    For ``preset=delta_cdf``, reads with Delta Change Data Feed options,
+    or the current snapshot as inserts when ``last_version`` is ``None``
+    (no rows when nothing is newer than ``last_version``);
     the second tuple element is always ``None`` because CDF version
     capture is performed by the executor against ``_commit_version``.
 
@@ -430,8 +449,9 @@ def read_cdc_source(
         source: Source configuration (must be Delta for CDF preset).
         cdc_config: CDC configuration with preset or explicit mapping.
         last_version: Last processed CDF commit version. If provided,
-            reads changes starting from ``last_version + 1``. Only
-            meaningful for the CDF preset path.
+            reads changes starting from ``last_version + 1``; if ``None``,
+            reads the current snapshot. Only meaningful for the CDF
+            preset path.
         load_config: Thread-level load configuration. Required for
             generic-CDC watermark composition; ignored for the CDF
             preset.
@@ -453,9 +473,25 @@ def read_cdc_source(
         if source.type != "delta" or source.alias is None:
             raise ExecutionError("Delta CDF preset requires a Delta source with 'alias' set")
 
-        reader = spark.read.format("delta").option("readChangeFeed", "true")
-        if last_version is not None:
-            reader = reader.option("startingVersion", last_version + 1)
+        latest = resolve_delta_table(spark, source.alias).history(1).first()
+        if latest is None:
+            raise ExecutionError(f"Delta source '{source.alias}' has no commit history")
+        if last_version is None:
+            return _read_cdf_snapshot(spark, source.alias, latest), None
+        if last_version > latest["version"]:
+            raise ExecutionError(
+                f"Stored version {last_version} for Delta source '{source.alias}' is ahead of "
+                f"its latest version {latest['version']}. The source was likely recreated or "
+                "restored; seed or reset the thread's watermark before running it again."
+            )
+        if last_version == latest["version"]:
+            # Delta rejects a starting version past the latest commit
+            return _read_cdf_snapshot(spark, source.alias, latest).limit(0), None
+        reader = (
+            spark.read.format("delta")
+            .option("readChangeFeed", "true")
+            .option("startingVersion", last_version + 1)
+        )
         if is_table_alias(source.alias):
             return reader.table(source.alias), None
         return reader.load(source.alias), None

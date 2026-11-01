@@ -9,7 +9,7 @@ from typing import Any
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import CharType, StringType, StructType, VarcharType
 
-from weevr.delta import delta_table_exists
+from weevr.delta import delta_table_exists, is_table_alias, read_delta
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.dimension import DimensionConfig, SystemMemberConfig
 from weevr.model.seed import SeedConfig
@@ -44,9 +44,9 @@ def _table_is_empty(spark: SparkSession, path: str) -> bool:
 
     Args:
         spark: Active SparkSession.
-        path: File path to the Delta table.
+        path: Table alias or file path of the Delta table.
     """
-    return spark.read.format("delta").load(path).first() is None
+    return read_delta(spark, path).first() is None
 
 
 def check_seed_trigger(
@@ -170,10 +170,13 @@ def execute_seeds(
     rows_inserted = len(seed_config.rows)
 
     table_exists = handle.exists() if handle is not None else delta_table_exists(spark, table_path)
+    writer = seed_df.write.format("delta")
     if table_exists:
-        seed_df.write.format("delta").mode("append").save(table_path)
+        writer = writer.mode("append")
+    if is_table_alias(table_path):
+        writer.saveAsTable(table_path)
     else:
-        seed_df.write.format("delta").save(table_path)
+        writer.save(table_path)
 
     return SeedResult(
         triggered=True,

@@ -284,3 +284,59 @@ class TestResolveLookupsInlineAndWith:
         proj = make_project(thread)
         with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
             load_config(proj / "fact.thread")
+
+
+class TestSourceLookupsAtLoad:
+    """A source lookup no visible scope defines is caught at load."""
+
+    LOOKUP = {"source": {"type": "delta", "alias": "ref.dim"}}
+
+    @staticmethod
+    def _thread(**overrides: Any) -> dict[str, Any]:
+        return {
+            "config_version": "1.0",
+            "sources": {
+                "s": {"type": "delta", "alias": "raw.c"},
+                "dim": {"lookup": "dim_codes"},
+            },
+            "target": {"path": "Tables/c"},
+            **overrides,
+        }
+
+    @pytest.mark.parametrize("entry", ["w.weave", "l.loom"])
+    def test_undefined_fails_through_a_parent(self, make_project, entry):
+        project = make_project(self._thread())
+        with pytest.raises(ConfigError, match="source 'dim'.*undefined lookup 'dim_codes'") as exc:
+            load_config(project / entry, project_root=project)
+        assert exc.value.file_path == str(project / "fact.thread")
+
+    def test_undefined_fails_in_load_resolved(self, make_project):
+        project = make_project(self._thread())
+        with pytest.raises(ConfigError, match="undefined lookup 'dim_codes'"):
+            load_resolved(project / "w.weave", project_root=project)
+
+    def test_error_lists_available_lookups(self, make_project):
+        project = make_project(self._thread(), weave={"lookups": {"other": self.LOOKUP}})
+        with pytest.raises(ConfigError, match=r"available lookups: \['other'\]"):
+            load_config(project / "w.weave", project_root=project)
+
+    @pytest.mark.parametrize("level", ["thread", "weave", "loom"])
+    def test_defined_at_any_level_passes(self, make_project, level):
+        lookups = {"lookups": {"dim_codes": self.LOOKUP}}
+        project = make_project(
+            self._thread(**(lookups if level == "thread" else {})),
+            weave=lookups if level == "weave" else None,
+            loom=lookups if level == "loom" else None,
+        )
+        loaded = load_resolved(project / "l.loom", project_root=project)
+        assert not [w for w in loaded.warnings if "dim_codes" in w]
+
+    def test_loaded_alone_warns_and_loads(self, make_project):
+        project = make_project(self._thread())
+        loaded = load_resolved(project / "fact.thread", project_root=project)
+        assert any("dim_codes" in w and w.startswith("WARN") for w in loaded.warnings)
+
+    def test_loaded_alone_with_its_own_lookup_stays_quiet(self, make_project):
+        project = make_project(self._thread(lookups={"dim_codes": self.LOOKUP}))
+        loaded = load_resolved(project / "fact.thread", project_root=project)
+        assert not [w for w in loaded.warnings if "dim_codes" in w]

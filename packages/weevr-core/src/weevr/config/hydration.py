@@ -8,8 +8,12 @@ from pydantic import ValidationError
 
 from weevr.config.attribution import attribute_errors
 from weevr.config.locations import ConfigLocation
-from weevr.config.macros import expand_foreach
-from weevr.config.validation import split_diagnostics, validate_resolve_lookups
+from weevr.config.macros import expand_foreach, reject_foreach_in_with
+from weevr.config.validation import (
+    split_diagnostics,
+    validate_resolve_lookups,
+    validate_source_lookups,
+)
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
@@ -50,23 +54,29 @@ def check_resolve_lookups(
     source: ConfigLocation | str,
     name: str,
     warnings: list[str] | None,
+    *,
+    standalone: bool = False,
 ) -> None:
-    """Check a thread's resolve steps against the lookups it can see at run time.
+    """Check a thread's lookup references against the lookups it can see at run time.
 
     ``visible`` holds the enclosing weave's and loom's lookup names; the
-    thread's own lookups and lookup-bound source aliases are added here.
+    thread's own lookups and, for resolve steps, its lookup-bound source
+    aliases are added here. ``standalone`` marks a thread loaded from its own
+    file: its source lookups may come from a weave or loom it can't see, so
+    those warn. See :func:`~weevr.config.validation.validate_source_lookups`.
 
     Raises:
         ConfigError: For a lookup no scope defines (single mode with
             ``on_failure: warn`` adds a warning to ``warnings`` instead).
     """
     sources = thread_dict.get("sources") or {}
-    available = set(visible) | set(thread_dict.get("lookups") or {})
-    available |= {
+    defined = set(visible) | set(thread_dict.get("lookups") or {})
+    available = defined | {
         alias for alias, src in sources.items() if isinstance(src, dict) and src.get("lookup")
     }
     errors, advisories = split_diagnostics(
-        validate_resolve_lookups(thread_dict, available_lookups=available)
+        validate_source_lookups(thread_dict, available_lookups=defined, standalone=standalone)
+        + validate_resolve_lookups(thread_dict, available_lookups=available)
     )
     if errors:
         raise ConfigError("; ".join(errors), file_path=str(source))
@@ -154,8 +164,9 @@ def hydrate_threads(
 
         # Expand foreach macros, as a directly loaded thread does at step 8b.
         steps = thread_dict.get("steps")
-        if isinstance(steps, list):
-            with attribute_errors(thread_source):
+        with attribute_errors(thread_source):
+            reject_foreach_in_with(thread_dict)
+            if isinstance(steps, list):
                 thread_dict["steps"] = expand_foreach(steps)
 
         check_resolve_lookups(

@@ -1701,6 +1701,78 @@ class TestValidateModeSourceProbes:
             assert ctx._check_source_existence(threads) == []
         assert jc.jobs == 0
 
+    @staticmethod
+    def _connection_thread(tgt: str, *, connection: str = "lake") -> Thread:
+        return Thread.model_validate(
+            {
+                "name": "probe_t",
+                "config_version": "1",
+                "connections": {
+                    "lake": {"type": "onelake", "workspace": "ws", "lakehouse": "lh"},
+                },
+                "sources": {"main": {"connection": connection, "table": "orders"}},
+                "target": {"path": tgt},
+            }
+        )
+
+    def test_connection_source_that_exists_passes(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str, job_counter
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {"t": self._connection_thread(str(tmp_path / "tgt"))}
+        with (
+            patch("weevr.context.resolve_connection_path", return_value=one_row_src),
+            job_counter() as jc,
+        ):
+            assert ctx._check_source_existence(threads) == []
+        assert jc.jobs == 0
+
+    def test_missing_connection_table_is_reported(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        missing = str(tmp_path / "no_table")
+        threads = {"t": self._connection_thread(str(tmp_path / "tgt"))}
+        with patch("weevr.context.resolve_connection_path", return_value=missing):
+            errors = ctx._check_source_existence(threads)
+        assert len(errors) == 1
+        assert all(text in errors[0] for text in ("'main'", "'t'", "not found", missing))
+
+    def test_undefined_connection_is_reported_not_raised(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
+        errors = ctx._check_source_existence({"t": thread})
+        assert len(errors) == 1
+        assert "undefined connection 'nope'" in errors[0]
+
+    @pytest.mark.parametrize("source_type", ["csv", "delta"])
+    def test_failed_probe_is_not_reported_as_missing(
+        self, spark: SparkSession, tmp_path: Path, source_type: str
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        location = "nosuchscheme://bucket/orders"
+        tgt = str(tmp_path / "tgt")
+        threads = {"t": self._thread_with_source(source_type, location, tgt)}
+        errors = ctx._check_source_existence(threads)
+        assert len(errors) == 1
+        assert "could not be verified" in errors[0]
+        assert "not found" not in errors[0]
+        assert location in errors[0]
+
+    def test_shared_connection_location_is_probed_once(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        thread = self._connection_thread(str(tmp_path / "tgt"))
+        with (
+            patch("weevr.context.resolve_connection_path", return_value=one_row_src),
+            patch.object(ctx, "_source_location_exists", return_value=True) as probe,
+        ):
+            ctx._check_source_existence({"a": thread, "b": thread})
+        probe.assert_called_once_with("delta", one_row_src)
+
     def test_validate_mode_existing_but_empty_directory_counts_as_present(
         self, spark: SparkSession, tmp_path: Path
     ) -> None:
@@ -1976,3 +2048,164 @@ exports:
         stamp = self._stamp(spark, tgt)
         assert "weave" not in stamp
         assert "loom" not in stamp
+
+
+@pytest.mark.spark
+class TestPreviewLookups:
+    """Preview sees the lookups a real run sees, and resolves against all of them."""
+
+    SAMPLE = 5
+    RESOLVE = {"name": "code_sk", "lookup": "dim", "match": "code", "pk": "sk"}
+
+    @pytest.fixture()
+    def orders(self, spark: SparkSession, tmp_path: Path) -> str:
+        path = str(tmp_path / "orders")
+        rows = [(i, f"c{i}") for i in range(200)]
+        spark.createDataFrame(rows, ["id", "code"]).write.format("delta").save(path)
+        return path
+
+    @staticmethod
+    def _dim(spark: SparkSession, tmp_path: Path, name: str = "dim", base: int = 1000) -> str:
+        """200 codes, stored in reverse so a sampled lookup can't match sampled orders."""
+        path = str(tmp_path / name)
+        rows = [(f"c{i}", base + i) for i in reversed(range(200))]
+        spark.createDataFrame(rows, ["code", "sk"]).coalesce(1).write.format("delta").save(path)
+        return path
+
+    @staticmethod
+    def _write(project: Path, thread: dict, weave: dict | None = None, loom: dict | None = None):
+        body = {"config_version": "1.0", "target": {"path": str(project / "tgt")}, **thread}
+        (project / "fact.thread").write_text(json.dumps(body))
+        weave_body = {"config_version": "1.0", "threads": [{"ref": "fact.thread"}], **(weave or {})}
+        (project / "w.weave").write_text(json.dumps(weave_body))
+        loom_body = {"config_version": "1.0", "weaves": [{"ref": "w.weave"}], **(loom or {})}
+        (project / "l.loom").write_text(json.dumps(loom_body))
+
+    def _preview(self, spark: SparkSession, project: Path, entry: str) -> RunResult:
+        ctx = Context(spark=spark, project=project)
+        return ctx.run(entry, mode="preview", sample_rows=self.SAMPLE)
+
+    def _thread(self, orders: str, **extra: dict) -> dict:
+        sources = {"main": {"type": "delta", "alias": orders}}
+        return {"sources": sources, "steps": [{"resolve": self.RESOLVE}], **extra}
+
+    def _sks(self, result: RunResult, name: str = "fact") -> list[int]:
+        assert result.preview_data is not None, result.warnings
+        return [r.code_sk for r in result.preview_data[name].collect()]
+
+    def test_resolve_matches_the_full_lookup(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim = {"source": {"type": "delta", "alias": self._dim(spark, tmp_path)}}
+        self._write(project, self._thread(orders, lookups={"dim": dim}))
+        sks = self._sks(self._preview(spark, project, "fact.thread"))
+        assert len(sks) == self.SAMPLE
+        assert all(sk >= 1000 for sk in sks)
+
+    def test_lookup_bound_source_is_sampled(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim = {"source": {"type": "delta", "alias": self._dim(spark, tmp_path)}}
+        thread = {"sources": {"main": {"lookup": "dim"}}, "lookups": {"dim": dim}}
+        self._write(project, thread)
+        result = self._preview(spark, project, "fact.thread")
+        assert result.preview_data is not None, result.warnings
+        assert result.preview_data["fact"].count() == self.SAMPLE
+        assert result.preview_data["fact"].columns == ["code", "sk"]
+
+    def test_resolve_sees_the_full_frame_of_a_bound_source(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim = {"source": {"type": "delta", "alias": self._dim(spark, tmp_path)}}
+        sources = {"main": {"type": "delta", "alias": orders}, "dim": {"lookup": "dim"}}
+        self._write(project, self._thread(orders, sources=sources, lookups={"dim": dim}))
+        assert all(sk >= 1000 for sk in self._sks(self._preview(spark, project, "fact.thread")))
+
+    @pytest.mark.parametrize(
+        ("entry", "scopes", "base"),
+        [
+            ("w.weave", ("weave",), 2000),
+            ("l.loom", ("loom",), 3000),
+            ("l.loom", ("loom", "weave"), 2000),
+            ("l.loom", ("loom", "weave", "thread"), 1000),
+        ],
+        ids=["weave", "loom", "weave-over-loom", "thread-over-weave"],
+    )
+    def test_visibility_and_precedence(
+        self,
+        spark: SparkSession,
+        tmp_path: Path,
+        orders: str,
+        entry: str,
+        scopes: tuple[str, ...],
+        base: int,
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lookup = {
+            scope: {
+                "dim": {"source": {"type": "delta", "alias": self._dim(spark, tmp_path, scope, b)}}
+            }
+            for scope, b in (("thread", 1000), ("weave", 2000), ("loom", 3000))
+            if scope in scopes
+        }
+        thread = self._thread(
+            orders, **({"lookups": lookup["thread"]} if "thread" in lookup else {})
+        )
+        self._write(
+            project,
+            thread,
+            weave={"lookups": lookup["weave"]} if "weave" in lookup else None,
+            loom={"lookups": lookup["loom"]} if "loom" in lookup else None,
+        )
+        sks = self._sks(self._preview(spark, project, entry))
+        assert sks
+        assert all(base <= sk < base + 1000 for sk in sks)
+
+    def test_narrow_pipeline_applies(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim = {
+            "source": {"type": "delta", "alias": self._dim(spark, tmp_path)},
+            "key": ["code"],
+            "values": ["sk"],
+            "filter": "sk < 0",
+        }
+        self._write(project, self._thread(orders, lookups={"dim": dim}))
+        assert all(sk < 0 for sk in self._sks(self._preview(spark, project, "fact.thread")))
+
+    def test_lookup_source_through_a_connection(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim_path = self._dim(spark, tmp_path)
+        lake = {"type": "onelake", "workspace": "ws", "lakehouse": "lh"}
+        dim = {"source": {"connection": "lake", "table": "dim"}}
+        self._write(project, self._thread(orders, lookups={"dim": dim}, connections={"lake": lake}))
+        with patch("weevr.config.paths.resolve_connection_path", return_value=dim_path):
+            sks = self._sks(self._preview(spark, project, "fact.thread"))
+        assert all(sk >= 1000 for sk in sks)
+
+    def test_failing_lookup_stays_on_its_thread(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        broken = {"source": {"type": "delta", "alias": str(tmp_path / "missing")}}
+        self._write(project, self._thread(orders, lookups={"dim": broken}))
+        healthy = {
+            "config_version": "1.0",
+            "sources": {"main": {"type": "delta", "alias": orders}},
+            "target": {"path": str(project / "tgt2")},
+        }
+        (project / "ok.thread").write_text(json.dumps(healthy))
+        threads = [{"ref": "fact.thread"}, {"ref": "ok.thread"}]
+        (project / "w.weave").write_text(json.dumps({"config_version": "1.0", "threads": threads}))
+        result = self._preview(spark, project, "w.weave")
+        assert result.preview_data is not None
+        assert "ok" in result.preview_data
+        assert "fact" not in result.preview_data
+        assert result.status == "partial"
+        assert any("fact" in w for w in result.warnings)

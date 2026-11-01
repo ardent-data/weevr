@@ -101,6 +101,9 @@ except ConfigError as e:
 - Declared config name does not match filename stem
 - Circular dependency detected in weave thread ordering
 - Invalid `foreach` block structure in step list
+- `foreach` inside a `with:` sub-pipeline
+- `write` or `keys` field a dimension target forbids, including `write.mode`
+- `resolve` step or source `lookup` that names an undefined lookup
 
 **Resolution:**
 
@@ -350,13 +353,14 @@ result = ctx.run("daily.loom", mode="validate")
 
 ### LookupResolutionError
 
-Raised while a thread runs when a lookup can't be used: a source's
-`lookup` names a lookup the weave doesn't provide, a lookup's declared
+Raised while a thread runs when a lookup can't be used: a lookup's declared
 columns are missing from its source, a `unique_key` check fails with
-`on_failure: abort`, or `values` / `unique_key` is set without `key`.
-An undefined source `lookup` is not caught when the config loads (unlike
-a `resolve` step's `lookup`, which fails the load with a `ConfigError`),
-so it surfaces when the thread runs.
+`on_failure: abort`, `values` / `unique_key` is set without `key`, or a
+source's `lookup` names a lookup the thread can't see.
+
+An undefined source `lookup` usually fails earlier, with a `ConfigError` at
+load. This error reports it at run time for a thread file loaded on its own,
+where the load only warns because a weave or loom may define the lookup.
 
 **Common causes:**
 
