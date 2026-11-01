@@ -414,7 +414,11 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
     # Rename via toDF() to avoid ambiguous column references when dedup
     # creates output names that collide with other columns' original names.
     if len(kept) < len(df.columns):
-        df = df.select(list(kept.keys()))
+        # Narrow by position: Spark resolves names case-insensitively, so
+        # selecting 'order' is ambiguous next to an 'Order' column.
+        positions = [df.columns.index(old) for old in kept]
+        placeholders = [f"_{i}" for i in range(len(df.columns))]
+        df = df.toDF(*placeholders).select([placeholders[i] for i in positions])
     return df.toDF(*kept.values())
 
 
