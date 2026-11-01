@@ -1707,6 +1707,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.Lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.Loom" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2116,10 +2127,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.context.delta_table_exists" class="md-nav__link">
+  <a href="#weevr.context.resolve_connection_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        delta_table_exists
+        resolve_connection_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.probe_delta_table_exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        probe_delta_table_exists
       
     </span>
   </a>
@@ -2138,10 +2160,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.resolve_lookup_frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_lookup_frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.build_plan" class="md-nav__link">
     <span class="md-ellipsis">
       
         build_plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.merge_resource_dicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge_resource_dicts
       
     </span>
   </a>
@@ -5031,6 +5075,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.Lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.Loom" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5440,10 +5495,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#weevr.context.delta_table_exists" class="md-nav__link">
+  <a href="#weevr.context.resolve_connection_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        delta_table_exists
+        resolve_connection_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.probe_delta_table_exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        probe_delta_table_exists
       
     </span>
   </a>
@@ -5462,10 +5528,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.resolve_lookup_frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_lookup_frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.build_plan" class="md-nav__link">
     <span class="md-ellipsis">
       
         build_plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.merge_resource_dicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge_resource_dicts
       
     </span>
   </a>
@@ -7859,6 +7947,170 @@ execution. Maps to Python logging levels internally.</p>
 
 
 
+<h3 id="weevr.context.Lookup" class="doc doc-heading">
+            <code>Lookup</code>
+
+
+<a href="#weevr.context.Lookup" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="weevr.model.base.FrozenBase">FrozenBase</span></code></p>
+
+
+
+        <p>A weave-level named data definition that can be referenced by threads.</p>
+<p>Lookups define small reference datasets shared across threads in a weave.
+When <code>materialize</code> is true, the data is read once and cached (or broadcast)
+before threads execute.</p>
+<p>Narrow lookup fields (<code>key</code>, <code>values</code>, <code>filter</code>) control projection
+and filtering applied during materialization or on-demand reads.  When set,
+only the declared key and value columns are retained, reducing memory and
+improving join performance.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.source">source</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Source (weevr.model.source.Source)" href="../model/#weevr.model.Source">Source</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Source definition for the lookup data.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.materialize">materialize</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to pre-read and cache/broadcast the data before
+thread execution.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.strategy">strategy</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;broadcast&#39;, &#39;cache&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Materialization strategy. Only meaningful when <code>materialize</code>
+is true. <code>"broadcast"</code> uses Spark broadcast join hints;
+<code>"cache"</code> uses DataFrame caching.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.key">key</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Column(s) used for matching (join key). Kept in the cached
+projection alongside <code>values</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.values">values</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Payload column(s) to retrieve. When set, only <code>key</code> + <code>values</code>
+columns are retained in the cached DataFrame.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.filter">filter</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>SQL WHERE expression applied to the source before projection.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.unique_key">unique_key</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>When true, validate that <code>key</code> columns form a unique key
+after filtering and projection.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="weevr.context.Lookup.on_failure">on_failure</span></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;abort&#39;, &#39;warn&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Behavior when <code>unique_key</code> check finds duplicates.
+Only meaningful when <code>unique_key</code> is true.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
 <h3 id="weevr.context.Loom" class="doc doc-heading">
             <code>Loom</code>
 
@@ -9798,18 +10050,73 @@ the file's directory.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="weevr.context.delta_table_exists" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">delta_table_exists</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></code>
+<h3 id="weevr.context.resolve_connection_path" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_connection_path</span><span class="p">(</span><span class="n">connection_name</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">schema_override</span><span class="p">,</span> <span class="n">connections</span><span class="p">)</span></code>
 
-<a href="#weevr.context.delta_table_exists" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#weevr.context.resolve_connection_path" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Return True if a Delta table exists at the given path or alias.</p>
-<p>A probe failure (metastore or storage error — not a clean "absent"
-answer) is logged with its cause and reported as False. Callers for
-whom that conflation is unsafe use :func:<code>probe_delta_table_exists</code>.</p>
+        <p>Resolve a connection+table declaration to its abfss:// path.</p>
+<p>The one shared implementation of connection resolution — the executor
+(targets), the readers (sources), the target-identity resolver, and
+the planner's dependency analysis all call it instead of duplicating
+the lookup-and-build sequence.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the connection is undeclared or <code>table</code> is absent.
+Callers wrap this in their own error types with call-site
+context (thread name, source alias).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.probe_delta_table_exists" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">probe_delta_table_exists</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></code>
+
+<a href="#weevr.context.probe_delta_table_exists" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Raw existence probe — raises when the probe itself fails.</p>
+<p>Callers that must distinguish "confirmed absent" from "could not
+ask" (the write path, where the two answers route to different
+branches) use this directly; everyone else goes through
+:func:<code>delta_table_exists</code>, which folds failures into False.</p>
+<p>The alias branch asks the catalog rather than resolving the table
+through a reader, so no Delta log is read and no job is launched.
+<code>tableExists</code> answers "any table exists" — not "a Delta-readable
+table exists" — which is equivalent on Fabric, where lakehouse
+tables are Delta by platform contract. If parity evidence ever
+demands distinguishing non-Delta catalog entries, the fallback is a
+provider check (catalog provider field or <code>DESCRIBE DETAIL</code>).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9998,7 +10305,7 @@ the signature to PySpark types.</p>
                 <code>weave_lookups</code>
             </td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="../model/#weevr.model.Lookup">Lookup</a>] | None</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="#weevr.context.Lookup">Lookup</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10274,6 +10581,201 @@ A miss falls back to a direct read.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="weevr.context.resolve_lookup_frames" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_lookup_frames</span><span class="p">(</span><span class="n">thread</span><span class="p">,</span> <span class="n">lookups</span><span class="p">,</span> <span class="n">cached_dfs</span><span class="p">,</span> <span class="n">spark</span><span class="p">,</span> <span class="n">connections</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">uk_memo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.context.resolve_lookup_frames" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve every lookup a thread uses, for lookup-bound sources and <code>resolve</code> steps.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Thread (weevr.model.thread.Thread)" href="#weevr.context.Thread">Thread</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The thread whose sources and <code>resolve</code> steps name lookups.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookups</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="#weevr.context.Lookup">Lookup</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Lookup definitions visible to the thread, by name.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cached_dfs</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="pyspark.sql.DataFrame">DataFrame</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pre-materialized DataFrames by lookup name.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>spark</code>
+            </td>
+            <td>
+                  <code><span title="pyspark.sql.SparkSession">SparkSession</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Active SparkSession for on-demand reads.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>connections</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="OneLakeConnection (weevr.model.connection.OneLakeConnection)" href="../model/#weevr.model.OneLakeConnection">OneLakeConnection</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Named connection declarations forwarded to on-demand reads.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>uk_memo</code>
+            </td>
+            <td>
+                  <code><span title="weevr.engine.lookups.UniqueKeyMemo">UniqueKeyMemo</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Per-weave unique-key memo, as for :func:<code>resolve_thread_lookups</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="pyspark.sql.DataFrame">DataFrame</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Frames for lookup-bound sources by source alias, and what <code>resolve</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="pyspark.sql.DataFrame">DataFrame</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>steps see: every visible lookup they name by lookup name, with bound</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="pyspark.sql.DataFrame">DataFrame</span>], <span title="dict">dict</span>[<span title="str">str</span>, <span title="pyspark.sql.DataFrame">DataFrame</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>aliases winning a clash.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LookupResolutionError (weevr.errors.exceptions.LookupResolutionError)" href="../errors/#weevr.errors.LookupResolutionError">LookupResolutionError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If a bound source names an undefined lookup.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="weevr.context.build_plan" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">build_plan</span><span class="p">(</span><span class="n">weave_name</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">thread_entries</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
@@ -10360,7 +10862,7 @@ carry explicit dependency declarations.</p>
                 <code>lookups</code>
             </td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="../model/#weevr.model.Lookup">Lookup</a>] | None</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="#weevr.context.Lookup">Lookup</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10419,6 +10921,153 @@ computed.</p>
 the message), if an explicit dependency references a thread that
 does not exist in <code>threads</code>, or if two or more threads write the
 same target without explicit dependencies ordering them.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.merge_resource_dicts" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">merge_resource_dicts</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">child</span><span class="p">,</span> <span class="n">resource_type</span><span class="p">,</span> <span class="n">parent_level</span><span class="p">,</span> <span class="n">child_level</span><span class="p">)</span></code>
+
+<a href="#weevr.context.merge_resource_dicts" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Merge two resource dicts, with child winning on key conflicts.</p>
+<p>Emits a DEBUG log entry for each key in child that shadows a key in parent.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>parent</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resource dict from the outer (parent) level, or None.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>child</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resource dict from the inner (child) level, or None.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>resource_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Human-readable label for the resource type (used in logs).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>parent_level</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the parent scope level (e.g. <code>"loom"</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>child_level</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the child scope level (e.g. <code>"weave"</code>).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Merged dict where child keys win, or None if both inputs are None.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An empty child dict is treated as no override — parent is returned.</p>
               </div>
             </td>
           </tr>
@@ -10814,7 +11463,7 @@ instead of <code>plan.weave_name</code>. Typically the weave's qualified key.</p
                 <code>lookups</code>
             </td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="../model/#weevr.model.Lookup">Lookup</a>] | None</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="#weevr.context.Lookup">Lookup</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -11007,7 +11656,7 @@ sets, carried into weave telemetry for value parity.</p>
                 <code>inherited_lookups</code>
             </td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="../model/#weevr.model.Lookup">Lookup</a>] | None</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="Lookup (weevr.model.lookup.Lookup)" href="#weevr.context.Lookup">Lookup</a>] | None</code>
             </td>
             <td>
               <div class="doc-md-description">

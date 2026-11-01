@@ -3464,8 +3464,9 @@ field reference.</p>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">validation_errors</span><span class="p">)</span>
 </code></pre></div>
 <p>Validate mode parses the config, resolves variables and references, checks
-the DAG for cycles, and verifies that source paths exist -- all without
-reading or writing any data. Use it in CI or as a pre-flight check before
+the DAG for cycles, and verifies that sources exist (tables and paths,
+including connection-form sources; lookup-bound sources are skipped) -- all
+without reading or writing any data. Use it in CI or as a pre-flight check before
 production runs.</p>
 <p>You can also use plan mode to see the execution order without running:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"nightly.loom"</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"plan"</span><span class="p">)</span>

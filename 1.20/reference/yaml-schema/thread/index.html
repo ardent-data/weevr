@@ -4452,7 +4452,7 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <td><code>string</code></td>
 <td>conditional</td>
 <td><code>null</code></td>
-<td>Lookup name. Mutually exclusive with <code>type</code>. Resolved from the nearest <code>lookups</code> map (thread, weave, or loom level) at execution time.</td>
+<td>Lookup name. Mutually exclusive with <code>type</code>. Resolved from the nearest <code>lookups</code> map (thread, weave, or loom level) at execution time. An undefined name fails the config load; see <a href="../../../guides/config-resolution/#loading-without-running">Loading without running</a> for a thread loaded on its own.</td>
 </tr>
 <tr>
 <td><code>alias</code></td>
@@ -4557,7 +4557,7 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <td><code>string</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Sort expression to determine which row to keep. On the primary (first) source of an <code>incremental_watermark</code> thread it must be <code>"&lt;watermark_column&gt; DESC"</code>; leaving it unset fails the config load.</td>
+<td>Sort expression to determine which row to keep. On the primary (first) source of an <code>incremental_watermark</code> thread it must be <code>"&lt;watermark_column&gt; DESC"</code>; leaving it unset fails the config load. A primary source of a <code>cdc</code> thread can't set <code>dedup</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -6818,7 +6818,8 @@ for detailed examples.</p>
 forbidden — the engine derives these from the dimension
 block, and setting one on the thread fails the config load.
 <code>write.on_no_match_source</code> and <code>write.on_no_match_target</code>
-remain available as overrides.</p>
+remain available as overrides. A dimension target can't be
+combined with <code>load.mode: cdc</code>.</p>
 </div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nt">target</span><span class="p">:</span>
 <a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Tables/dim_customer</span>
@@ -7095,6 +7096,15 @@ table is empty.</p>
 Spark major versions. Neither is recommended for high-cardinality
 surrogate key use cases.</p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Separator collisions</p>
+<p>Key and change-detection columns are joined with <code>|</code> before hashing, so
+value sets that join to the same text hash identically: <code>('a|b', 'c')</code>
+and <code>('a', 'b|c')</code> get the same key, and those rows are treated as one
+entity. This applies to <code>keys.surrogate_key</code>, <code>keys.change_detection</code>,
+and their <code>dimension</code> equivalents. If a key column can contain <code>|</code>,
+replace or strip it in a pipeline step first.</p>
+</div>
 <div class="admonition info">
 <p class="admonition-title">keys vs dimension surrogate key</p>
 <p><code>keys.surrogate_key</code> uses <code>SurrogateKeyConfig</code> (hash-based, no
@@ -7332,6 +7342,8 @@ the two mechanisms are redundant.</p>
   of <code>timestamp</code> or <code>date</code>.</li>
 <li>In <code>incremental_watermark</code> mode, a <code>dedup</code> on the primary (first) source
   requires <code>order_by: "&lt;watermark_column&gt; DESC"</code>.</li>
+<li>In <code>cdc</code> mode, the primary (first) source can't set <code>dedup</code> (the merge
+  keeps the latest change per key), and <code>target.dimension</code> is rejected.</li>
 </ul>
 </li>
 <li><strong>When the thread starts executing</strong> — not reported by <code>load_config</code> or

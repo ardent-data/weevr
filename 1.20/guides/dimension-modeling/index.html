@@ -3321,6 +3321,21 @@ column.</p>
 <li><code>first_write</code> — insert when the table does not exist</li>
 <li><code>empty</code> — insert when the table is empty or missing</li>
 </ul>
+<p>Seeds run before the data is written, on every write path, including
+<code>load.mode: cdc</code>. On a CDC target with <code>on_delete: soft_delete</code>, seed rows take
+<code>soft_delete_active_value</code> unless the row sets the column itself, and a change
+to a seed key merges onto it. A seed never changes which data rows land.</p>
+<p>Seeds and the first merge commit separately. If a seeded first CDC run fails
+during the merge, drop the target before retrying: a retry sees an existing
+table, so only insert rows land, and update rows for unseen keys are skipped.</p>
+<p>A dimension target can't be combined with <code>load.mode: cdc</code>: the config load
+fails, since the dimension merge ignores the operation column.</p>
+<div class="admonition warning">
+<p class="admonition-title">Key values containing <code>|</code></p>
+<p>Surrogate key and change detection hashes join their columns with <code>|</code>,
+so <code>('a|b', 'c')</code> and <code>('a', 'b|c')</code> hash identically. See
+<a href="../../reference/yaml-schema/thread/#keyssurrogate_key">Separator collisions</a>.</p>
+</div>
 <h2 id="additional-keys">Additional Keys<a class="headerlink" href="#additional-keys" title="Permanent link">&para;</a></h2>
 <p>Generate secondary hash columns alongside the primary SK:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">dimension</span><span class="p">:</span>
