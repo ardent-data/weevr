@@ -10,7 +10,7 @@ Last validated against weevr **1.20.3**.
 | Component | Version | Notes |
 |-----------|---------|-------|
 | Python | 3.11 | Pinned via `.python-version` |
-| PySpark | 3.5.x | Bundled with Fabric Runtime 1.3 |
+| PySpark | 3.5.5 | Bundled with Fabric Runtime 1.3 |
 | Delta Lake | 3.2.x | Bundled with Fabric Runtime 1.3 |
 | Microsoft Fabric Runtime | 1.3 | Target deployment environment |
 | Pydantic | 2.x | Configuration validation |
