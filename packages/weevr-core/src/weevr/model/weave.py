@@ -126,7 +126,10 @@ class Weave(FrozenBase):
     )
     qualified_key: str = Field(
         default="",
-        description="Dot-separated namespace key, derived from directory path.",
+        description=(
+            "Path of the weave file relative to the project root "
+            "(e.g. weaves/orders.weave). Set by the loader. An inline weave uses its name."
+        ),
     )
     config_version: str = Field(
         description="Configuration schema version. Must be '1.0'.",

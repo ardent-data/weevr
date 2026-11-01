@@ -69,7 +69,10 @@ class Loom(FrozenBase):
     )
     qualified_key: str = Field(
         default="",
-        description="Dot-separated namespace key, derived from directory path.",
+        description=(
+            "Path of the loom file relative to the project root "
+            "(e.g. looms/daily.loom). Set by the loader."
+        ),
     )
     config_version: str = Field(
         description="Configuration schema version. Must be '1.0'.",
