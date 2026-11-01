@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from pyspark.sql import functions as F
@@ -13,6 +14,10 @@ from weevr.state.watermark import WatermarkState, WatermarkStore
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
+
+_CREATE_RACE_ERROR = "DELTA_CREATE_TABLE_WITH_NON_EMPTY_LOCATION"
+_CREATE_RACE_WAIT_SECONDS = 10.0
+_CREATE_RACE_POLL_SECONDS = 0.1
 
 _WATERMARK_SCHEMA = StructType(
     [
@@ -72,17 +77,31 @@ class MetadataTableStore(WatermarkStore):
                 USING DELTA
             """)
         except Exception as exc:
-            # Threads sharing a store race on first use: IF NOT EXISTS isn't
-            # atomic, so a loser can fail while the winner's table appears.
-            if not self._table_exists(spark):
+            if not self._table_appears(spark, exc):
                 raise StateError(
                     f"Failed to create the watermark table at '{self._table_path}'",
                     cause=exc,
                 ) from exc
         self._table_ensured = True
 
+    def _table_appears(self, spark: SparkSession, create_error: Exception) -> bool:
+        """Whether the table appears after a failed create.
+
+        Threads sharing a store race on first use: IF NOT EXISTS isn't
+        atomic, so a loser can fail on the winner's uncommitted files, and
+        the table only reads as Delta once the winner commits. Any other
+        create failure gets one check, so a real fault doesn't wait.
+        """
+        wait = _CREATE_RACE_WAIT_SECONDS if _CREATE_RACE_ERROR in str(create_error) else 0.0
+        deadline = time.monotonic() + wait
+        while not self._table_exists(spark):
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(_CREATE_RACE_POLL_SECONDS)
+        return True
+
     def _table_exists(self, spark: SparkSession) -> bool:
-        """Whether the watermark table exists (re-checked once after a failed create)."""
+        """Whether the watermark table exists and reads as a watermark table."""
         try:
             columns = read_delta(spark, self._table_path).columns
         except Exception:
