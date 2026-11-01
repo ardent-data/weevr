@@ -681,7 +681,7 @@ class TestGeneratedSourceIntegration:
     def test_generated_source_as_with_block_from(self, spark: SparkSession) -> None:
         """A generated source can serve as the from: input for a with: sub-pipeline.
 
-        Simulates the CTE resolution that _resolve_with_block performs: read the
+        Simulates the CTE resolution that resolve_with_block performs: read the
         generated source, then apply a column derivation step the way the engine
         would via run_pipeline.
         """
@@ -698,7 +698,7 @@ class TestGeneratedSourceIntegration:
         )
         df = read_source(spark, "dates", source)
 
-        # Replicate what the engine does inside _resolve_with_block:
+        # Replicate what the engine does inside resolve_with_block:
         # run_pipeline applies steps to the CTE DataFrame.
         steps: list = [
             DeriveStep(derive=DeriveParams(columns={"week_num": SparkExpr("weekofyear(dt)")})),

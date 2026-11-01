@@ -528,7 +528,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
             # Resolve with: block CTEs before the primary DataFrame is set
             if thread.with_:
-                sources_map = _resolve_with_block(
+                sources_map = resolve_with_block(
                     thread,
                     sources_map,
                     collector=collector if span_builder else None,
@@ -1121,7 +1121,7 @@ def _meta_for_resolve(
     return {name: meta for name, meta in lookup_meta.items() if name not in shadowing}
 
 
-def _resolve_with_block(
+def resolve_with_block(
     thread: Thread,
     sources_map: dict[str, Any],
     collector: SpanCollector | None = None,

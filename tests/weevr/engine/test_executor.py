@@ -924,11 +924,11 @@ class TestExecuteThreadConnections:
 
 
 class TestResolveWithBlock:
-    """Unit tests for _resolve_with_block — CTE resolution phase."""
+    """Unit tests for resolve_with_block — CTE resolution phase."""
 
     def test_single_cte_filter_registered_in_sources(self, spark: SparkSession) -> None:
         """A CTE with a filter step produces a filtered DataFrame in the enriched registry."""
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
 
         orders = spark.createDataFrame(
             [{"id": 1, "amount": 200}, {"id": 2, "amount": 30}, {"id": 3, "amount": 150}]
@@ -951,14 +951,14 @@ class TestResolveWithBlock:
             }
         )
 
-        result = _resolve_with_block(thread, sources_map)
+        result = resolve_with_block(thread, sources_map)
 
         assert "big_orders" in result
         assert result["big_orders"].count() == 2
 
     def test_original_sources_preserved(self, spark: SparkSession) -> None:
-        """_resolve_with_block does not mutate the original sources_map."""
-        from weevr.engine.executor import _resolve_with_block
+        """resolve_with_block does not mutate the original sources_map."""
+        from weevr.engine.executor import resolve_with_block
 
         orders = spark.createDataFrame([{"id": 1, "amount": 50}])
         sources_map = {"orders": orders}
@@ -976,14 +976,14 @@ class TestResolveWithBlock:
             }
         )
 
-        _resolve_with_block(thread, sources_map)
+        resolve_with_block(thread, sources_map)
 
         assert set(sources_map.keys()) == {"orders"}
 
     def test_cte_result_joinable_in_main_pipeline(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
-        """CTE registered by _resolve_with_block can be joined in the main pipeline."""
+        """CTE registered by resolve_with_block can be joined in the main pipeline."""
         src = tmp_delta_path("cte_join_src")
         tgt = tmp_delta_path("cte_join_tgt")
 
@@ -1023,7 +1023,7 @@ class TestResolveWithBlock:
 
     def test_cte_chaining_b_from_a(self, spark: SparkSession) -> None:
         """CTE B declared after CTE A can reference CTE A as its source."""
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
 
         data = spark.createDataFrame(
             [{"id": 1, "val": 10}, {"id": 2, "val": 20}, {"id": 3, "val": 30}]
@@ -1044,7 +1044,7 @@ class TestResolveWithBlock:
             }
         )
 
-        result = _resolve_with_block(thread, sources_map)
+        result = resolve_with_block(thread, sources_map)
 
         assert result["cte_a"].count() == 2
         assert result["cte_b"].count() == 1
@@ -1070,11 +1070,11 @@ class TestResolveWithBlock:
 
 
 class TestResolveWithBlockTelemetry:
-    """CTE telemetry spans emitted by _resolve_with_block."""
+    """CTE telemetry spans emitted by resolve_with_block."""
 
     def test_two_ctes_produce_two_child_spans(self, spark: SparkSession) -> None:
         """A thread with 2 CTEs produces 2 cte:* child spans in the collector."""
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
         from weevr.telemetry.collector import SpanCollector
         from weevr.telemetry.span import generate_trace_id
 
@@ -1098,7 +1098,7 @@ class TestResolveWithBlockTelemetry:
         )
 
         collector = SpanCollector(generate_trace_id())
-        _resolve_with_block(thread, sources_map, collector=collector)
+        resolve_with_block(thread, sources_map, collector=collector)
 
         spans = collector.get_spans()
         cte_spans = [s for s in spans if s.name.startswith("cte:")]
@@ -1108,7 +1108,7 @@ class TestResolveWithBlockTelemetry:
 
     def test_cte_span_has_duration(self, spark: SparkSession) -> None:
         """Each CTE span records a non-None end_time so duration can be derived."""
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
         from weevr.telemetry.collector import SpanCollector
         from weevr.telemetry.span import generate_trace_id
 
@@ -1127,7 +1127,7 @@ class TestResolveWithBlockTelemetry:
         )
 
         collector = SpanCollector(generate_trace_id())
-        _resolve_with_block(thread, sources_map, collector=collector)
+        resolve_with_block(thread, sources_map, collector=collector)
 
         spans = collector.get_spans()
         cte_spans = [s for s in spans if s.name.startswith("cte:")]
@@ -1137,7 +1137,7 @@ class TestResolveWithBlockTelemetry:
 
     def test_cte_span_has_row_count_attribute(self, spark: SparkSession) -> None:
         """Each CTE span includes a row_count attribute matching the output row count."""
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
         from weevr.telemetry.collector import SpanCollector
         from weevr.telemetry.span import generate_trace_id
 
@@ -1158,7 +1158,7 @@ class TestResolveWithBlockTelemetry:
         )
 
         collector = SpanCollector(generate_trace_id())
-        _resolve_with_block(thread, sources_map, collector=collector)
+        resolve_with_block(thread, sources_map, collector=collector)
 
         spans = collector.get_spans()
         cte_spans = [s for s in spans if s.name == "cte:big"]
@@ -1167,7 +1167,7 @@ class TestResolveWithBlockTelemetry:
 
     def test_cte_span_parented_to_thread_span(self, spark: SparkSession) -> None:
         """CTE spans use the supplied parent_span_id so they appear under the thread span."""
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
         from weevr.telemetry.collector import SpanCollector
         from weevr.telemetry.span import generate_span_id, generate_trace_id
 
@@ -1187,7 +1187,7 @@ class TestResolveWithBlockTelemetry:
 
         collector = SpanCollector(generate_trace_id())
         thread_span_id = generate_span_id()
-        _resolve_with_block(thread, sources_map, collector=collector, parent_span_id=thread_span_id)
+        resolve_with_block(thread, sources_map, collector=collector, parent_span_id=thread_span_id)
 
         spans = collector.get_spans()
         cte_spans = [s for s in spans if s.name.startswith("cte:")]
@@ -1195,8 +1195,8 @@ class TestResolveWithBlockTelemetry:
         assert cte_spans[0].parent_span_id == thread_span_id
 
     def test_no_collector_no_spans_no_error(self, spark: SparkSession) -> None:
-        """_resolve_with_block works correctly when no collector is provided."""
-        from weevr.engine.executor import _resolve_with_block
+        """resolve_with_block works correctly when no collector is provided."""
+        from weevr.engine.executor import resolve_with_block
 
         data = spark.createDataFrame([{"id": 1}, {"id": 2}])
         sources_map = {"raw": data}
@@ -1212,7 +1212,7 @@ class TestResolveWithBlockTelemetry:
             }
         )
 
-        result = _resolve_with_block(thread, sources_map)
+        result = resolve_with_block(thread, sources_map)
         assert "subset" in result
 
     def test_cte_spans_visible_in_execute_thread_collector(
@@ -1506,7 +1506,7 @@ class TestWithBlockColumnControlIntegration:
         - excluded columns are absent from the result
         - the same source joined multiple times under different aliases works correctly
         """
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
 
         materials = spark.createDataFrame(
             [
@@ -1594,7 +1594,7 @@ class TestWithBlockColumnControlIntegration:
             }
         )
 
-        enriched = _resolve_with_block(thread, sources_map)
+        enriched = resolve_with_block(thread, sources_map)
 
         # hierarchy_enriched CTE should have the derived column
         assert "enriched_label" in enriched["hierarchy_enriched"].columns
@@ -1793,7 +1793,7 @@ class TestCteObservationScoping:
     """CTE observations merge into the thread registry under unique scopes."""
 
     def test_same_named_map_steps_in_cte_and_main_never_collide(self, spark: SparkSession) -> None:
-        from weevr.engine.executor import _resolve_with_block
+        from weevr.engine.executor import resolve_with_block
         from weevr.operations.pipeline import ObservationRegistry, run_pipeline
 
         orders = spark.createDataFrame(
@@ -1814,7 +1814,7 @@ class TestCteObservationScoping:
         )
 
         registry = ObservationRegistry(scope="main")
-        enriched = _resolve_with_block(thread, sources_map, observations=registry)
+        enriched = resolve_with_block(thread, sources_map, observations=registry)
 
         df = run_pipeline(
             enriched["prepped"],
