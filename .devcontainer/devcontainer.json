@@ -20,7 +20,11 @@
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {},
         "ghcr.io/devcontainers/features/github-cli:1": {},
-        "ghcr.io/devcontainers/features/azure-cli:1": {},
+        // Microsoft has no apt repo for Debian trixie, and Debian's own package can't load
+        // every command module, so install from PyPI instead.
+        "ghcr.io/devcontainers/features/azure-cli:1": {
+            "installUsingPython": true
+        },
         "ghcr.io/devcontainers/features/copilot-cli:1": {},
         "ghcr.io/devcontainers/features/node:2": {},
         "ghcr.io/devcontainers/features/java:1": {
