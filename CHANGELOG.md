@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.5](https://github.com/ardent-data/weevr/compare/weevr-v1.20.4...weevr-v1.20.5) (2026-11-01)
+
+
+### Bug Fixes
+
+* **state:** stop parallel threads failing on a new watermark table ([#273](https://github.com/ardent-data/weevr/issues/273)) ([373ef90](https://github.com/ardent-data/weevr/commit/373ef905a2e005ce2e856fa8dc77ee26e5ed2f1b))
+
 ## [1.20.4](https://github.com/ardent-data/weevr/compare/weevr-v1.20.3...weevr-v1.20.4) (2026-11-01)
 
 
