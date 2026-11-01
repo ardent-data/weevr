@@ -27,6 +27,19 @@ This creates a `.venv` directory (ignored by git) with all runtime and
 dev dependencies including Ruff, Pyright, pytest, MkDocs Material, and
 mkdocstrings.
 
+## Devcontainer
+
+The repository's devcontainer provides the toolchain, plus the Fabric tools
+`fab`, `az` and `azcopy`. Its shell runs in UTC.
+
+`fab auth login` needs a real terminal, so run it from an interactive shell
+rather than a one-shot command. The token cache stays inside the container, so
+repeat the login after a rebuild.
+
+The devcontainer sets `PYSPARK_PYTHON` to its Python 3.11 virtual environment.
+An isolated environment on another Python version must override that variable,
+or Spark workers start on the wrong interpreter.
+
 ## Running checks locally
 
 Before opening a pull request, run all four checks and confirm they pass.
