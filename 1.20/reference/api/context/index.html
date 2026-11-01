@@ -2160,6 +2160,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.resolve_with_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_with_block
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.resolve_lookup_frames" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5521,6 +5532,17 @@
     <span class="md-ellipsis">
       
         execute_thread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.resolve_with_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resolve_with_block
       
     </span>
   </a>
@@ -10567,6 +10589,190 @@ A miss falls back to a direct read.</p>
             <td>
               <div class="doc-md-description">
                 <p>If an export with <code>on_failure: abort</code> fails.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.resolve_with_block" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolve_with_block</span><span class="p">(</span><span class="n">thread</span><span class="p">,</span> <span class="n">sources_map</span><span class="p">,</span> <span class="n">collector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">parent_span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">observations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookup_meta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lookups</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+<a href="#weevr.context.resolve_with_block" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve with: block CTEs, registering each result in the source registry.</p>
+<p>Each CTE is evaluated in declaration order. The result of each CTE is
+added to the registry so that later CTEs (and the main pipeline) can
+reference it by name.</p>
+<p>When a <code>collector</code> is provided, a child span is emitted per CTE with
+<code>row_count</code>, <code>from</code>, and <code>step_count</code> attributes recorded on each.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Thread (weevr.model.thread.Thread)" href="#weevr.context.Thread">Thread</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thread configuration with a populated <code>with_</code> block.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sources_map</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Current source registry (sources + lookup DataFrames).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>collector</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SpanCollector (weevr.telemetry.collector.SpanCollector)" href="../telemetry/#weevr.telemetry.SpanCollector">SpanCollector</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional span collector for telemetry.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>parent_span_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parent span ID to link CTE spans into the thread span.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>observations</code>
+            </td>
+            <td>
+                  <code><span title="weevr.operations.pipeline.ObservationRegistry">ObservationRegistry</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Thread-level registry; each CTE's observations attach
+under its own scope and merge in for plan-wide unique names.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookup_meta</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="weevr.operations.pipeline.LookupMeta">LookupMeta</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Materialization-time lookup facts for resolve steps.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookups</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Lookup DataFrames visible to resolve steps, by name.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An enriched copy of <code>sources_map</code> with each CTE result registered</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>under its declared name.</p>
               </div>
             </td>
           </tr>
