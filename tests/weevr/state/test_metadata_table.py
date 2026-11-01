@@ -1,6 +1,7 @@
 """Spark integration tests for MetadataTableStore."""
 
 from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pyspark.sql import SparkSession
@@ -20,6 +21,55 @@ class TestMetadataTableStoreInit:
     def test_accepts_normal_path(self) -> None:
         store = MetadataTableStore("/lakehouse/tables/watermarks")
         assert store.table_path == "/lakehouse/tables/watermarks"
+
+
+class TestCreateRaceRecovery:
+    """A failed create waits for a racing thread's commit, and only for that race."""
+
+    RACE_ERROR = "[DELTA_CREATE_TABLE_WITH_NON_EMPTY_LOCATION] Cannot create table"
+
+    @staticmethod
+    def _store_failing_create(error: str) -> tuple[MetadataTableStore, MagicMock]:
+        spark = MagicMock()
+        spark.sql.side_effect = RuntimeError(error)
+        return MetadataTableStore("/lakehouse/tables/watermarks"), spark
+
+    def test_waits_for_the_winner_to_commit(self) -> None:
+        store, spark = self._store_failing_create(self.RACE_ERROR)
+        with patch.object(store, "_table_exists", side_effect=[False, False, True]) as exists:
+            store._ensure_table_exists(spark)
+        assert exists.call_count == 3
+        assert store._table_ensured
+
+    def test_gives_up_when_the_table_never_appears(self) -> None:
+        store, spark = self._store_failing_create(self.RACE_ERROR)
+        with (
+            patch("weevr.state.metadata_table._CREATE_RACE_WAIT_SECONDS", 0.05),
+            patch("weevr.state.metadata_table._CREATE_RACE_POLL_SECONDS", 0.01),
+            patch.object(store, "_table_exists", return_value=False),
+            pytest.raises(StateError, match="not empty"),
+        ):
+            store._ensure_table_exists(spark)
+        assert not store._table_ensured
+
+    def test_logs_the_wait(self, caplog: pytest.LogCaptureFixture) -> None:
+        store, spark = self._store_failing_create(self.RACE_ERROR)
+        with (
+            caplog.at_level("INFO", logger="weevr.state.metadata_table"),
+            patch.object(store, "_table_exists", return_value=True),
+        ):
+            store._ensure_table_exists(spark)
+        assert store.table_path in caplog.text
+
+    def test_other_create_failures_are_checked_once(self) -> None:
+        store, spark = self._store_failing_create("storage unavailable")
+        with (
+            patch.object(store, "_table_exists", return_value=False) as exists,
+            pytest.raises(StateError, match="watermark table") as raised,
+        ):
+            store._ensure_table_exists(spark)
+        exists.assert_called_once()
+        assert "not empty" not in raised.value.message
 
 
 @pytest.mark.spark
