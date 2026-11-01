@@ -105,6 +105,9 @@ names is read once. Lookups come from the same places as in execution, with
 thread lookups over weave lookups over loom lookups. Validate mode never reads
 a lookup.
 
+`with:` sub-pipelines run in preview on those sampled rows, so a selective
+sub-pipeline can show few or no rows even when a real run would find matches.
+
 In notebooks, results render automatically as styled HTML when you
 evaluate the result in a cell. Each mode gets a tailored report:
 

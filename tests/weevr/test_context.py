@@ -2209,3 +2209,168 @@ class TestPreviewLookups:
         assert "fact" not in result.preview_data
         assert result.status == "partial"
         assert any("fact" in w for w in result.warnings)
+
+
+@pytest.mark.spark
+class TestPreviewWithBlocks:
+    """Preview runs a thread's with: CTEs against its sampled sources."""
+
+    SAMPLE = 5
+
+    @pytest.fixture()
+    def orders(self, spark: SparkSession, tmp_path: Path) -> str:
+        path = str(tmp_path / "orders")
+        rows = [(i, f"c{i}") for i in range(200)]
+        spark.createDataFrame(rows, ["id", "code"]).write.format("delta").save(path)
+        return path
+
+    @staticmethod
+    def _cte(expr: str = "id >= 0", source: str = "main") -> dict:
+        return {"from": source, "steps": [{"filter": {"expr": expr}}]}
+
+    @staticmethod
+    def _thread(orders: str, with_: dict, *, reads: str = "kept") -> dict:
+        return {
+            "sources": {"main": {"type": "delta", "alias": orders}},
+            "with": with_,
+            "steps": [{"union": {"sources": [reads]}}],
+        }
+
+    def _preview(self, spark: SparkSession, project: Path, entry: str) -> RunResult:
+        ctx = Context(spark=spark, project=project)
+        return ctx.run(entry, mode="preview", sample_rows=self.SAMPLE)
+
+    def test_cte_is_applied(self, spark: SparkSession, tmp_path: Path, orders: str) -> None:
+        project = _project_dir(tmp_path)
+        thread = self._thread(orders, {"kept": self._cte("id < 0")})
+        TestPreviewLookups._write(project, thread)
+        result = self._preview(spark, project, "fact.thread")
+        assert result.status == "success", result.warnings
+        assert result.preview_data["fact"].count() == self.SAMPLE
+
+    def test_cte_reads_the_sampled_source(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        TestPreviewLookups._write(project, self._thread(orders, {"kept": self._cte()}))
+        result = self._preview(spark, project, "fact.thread")
+        assert result.preview_data["fact"].count() == 2 * self.SAMPLE
+
+    def test_later_cte_reads_an_earlier_one(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        with_ = {"first": self._cte(), "kept": self._cte("id < 0", source="first")}
+        TestPreviewLookups._write(project, self._thread(orders, with_))
+        result = self._preview(spark, project, "fact.thread")
+        assert result.status == "success", result.warnings
+        assert result.preview_data["fact"].count() == self.SAMPLE
+
+    def test_cte_reads_a_lookup_bound_source(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim = {"source": {"type": "delta", "alias": TestPreviewLookups._dim(spark, tmp_path)}}
+        thread = {
+            "sources": {"main": {"lookup": "dim"}},
+            "lookups": {"dim": dim},
+            "with": {"kept": self._cte("sk >= 0")},
+            "steps": [{"union": {"sources": ["kept"]}}],
+        }
+        TestPreviewLookups._write(project, thread)
+        result = self._preview(spark, project, "fact.thread")
+        assert result.status == "success", result.warnings
+        assert result.preview_data["fact"].count() == 2 * self.SAMPLE
+
+    def test_resolve_in_a_cte_sees_the_full_lookup(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        dim = {"source": {"type": "delta", "alias": TestPreviewLookups._dim(spark, tmp_path)}}
+        thread = {
+            "sources": {"main": {"type": "delta", "alias": orders}},
+            "lookups": {"dim": dim},
+            "with": {
+                "kept": {"from": "main", "steps": [{"resolve": TestPreviewLookups.RESOLVE}]},
+            },
+            "steps": [
+                {"select": {"columns": ["id"]}},
+                {
+                    "join": {
+                        "source": "kept",
+                        "on": [{"left": "id", "right": "id"}],
+                        "type": "inner",
+                    }
+                },
+            ],
+        }
+        TestPreviewLookups._write(project, thread)
+        result = self._preview(spark, project, "fact.thread")
+        assert result.preview_data is not None, result.warnings
+        sks = [r.code_sk for r in result.preview_data["fact"].collect()]
+        assert len(sks) == self.SAMPLE
+        assert all(sk >= 1000 for sk in sks)
+
+    def test_failing_cte_stays_with_its_thread(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        target = {"path": str(project / "tgt")}
+        bad = self._thread(orders, {"kept": self._cte("no_such_column = 1")})
+        good = self._thread(orders, {"kept": self._cte()})
+        for name, thread in (("bad", bad), ("good", good)):
+            body = {"config_version": "1.0", "target": target, **thread}
+            (project / f"{name}.thread").write_text(json.dumps(body))
+        threads = [{"ref": "bad.thread"}, {"ref": "good.thread"}]
+        (project / "w.weave").write_text(json.dumps({"config_version": "1.0", "threads": threads}))
+        result = self._preview(spark, project, "w.weave")
+        assert result.status == "partial"
+        assert "good" in result.preview_data
+        assert any("bad" in warning for warning in result.warnings)
+
+    def test_cte_resolution_passes_no_collector(
+        self, spark: SparkSession, tmp_path: Path, orders: str
+    ) -> None:
+        """The resolver's only count action is gated on a collector."""
+        from weevr.engine.executor import resolve_with_block
+
+        project = _project_dir(tmp_path)
+        TestPreviewLookups._write(project, self._thread(orders, {"kept": self._cte()}))
+        with patch("weevr.context.resolve_with_block", wraps=resolve_with_block) as resolver:
+            self._preview(spark, project, "fact.thread")
+        resolver.assert_called_once()
+        assert resolver.call_args.kwargs.get("collector") is None
+
+
+@pytest.mark.spark
+class TestNamingOnJoinedColumns:
+    """A join overlap under target.naming fails rather than losing a column."""
+
+    def test_overlap_fails_and_writes_nothing(self, spark: SparkSession, tmp_path: Path) -> None:
+        left, right = str(tmp_path / "left"), str(tmp_path / "right")
+        spark.createDataFrame([(1, 10)], ["id", "amount"]).write.format("delta").save(left)
+        spark.createDataFrame([(1, 20)], ["id", "amount"]).write.format("delta").save(right)
+        target = tmp_path / "tgt"
+        project = _project_dir(tmp_path)
+        thread = {
+            "config_version": "1.0",
+            "sources": {
+                "a": {"type": "delta", "alias": left},
+                "b": {"type": "delta", "alias": right},
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "b",
+                        "type": "inner",
+                        "on": [{"left": "id", "right": "id"}],
+                    }
+                }
+            ],
+            "target": {"path": str(target), "naming": {"columns": "snake_case"}},
+        }
+        (project / "t.thread").write_text(json.dumps(thread))
+        result = Context(spark=spark, project=project).run("t.thread")
+        assert result.status == "failure"
+        assert not target.exists()
+        assert "prefix" in result.summary()

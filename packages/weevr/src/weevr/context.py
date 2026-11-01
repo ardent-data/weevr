@@ -14,7 +14,7 @@ from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
 from weevr.delta import probe_delta_table_exists
-from weevr.engine.executor import execute_thread
+from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import build_plan
 from weevr.engine.resources import merge_resource_dicts
@@ -800,8 +800,16 @@ class Context:
                 frames = {**read_dfs, **lookup_dfs}
                 sources_map = {key: frames[key].limit(sample_rows) for key in thread.sources}
 
-                df = next(iter(sources_map.values()))
                 obs_registry = ObservationRegistry(scope="main")
+                if thread.with_:
+                    sources_map = resolve_with_block(
+                        thread,
+                        sources_map,
+                        observations=obs_registry,
+                        lookups=resolve_lookups or None,
+                    )
+
+                df = next(iter(sources_map.values()))
                 df = run_pipeline(
                     df,
                     thread.steps,
