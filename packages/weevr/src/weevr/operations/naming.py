@@ -5,6 +5,7 @@ from __future__ import annotations
 import fnmatch
 import logging
 import re
+from collections import Counter
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -368,11 +369,19 @@ def normalize_columns(df: DataFrame, config: NamingConfig) -> DataFrame:
         DataFrame with normalized column names.
 
     Raises:
-        ConfigError: If normalization produces duplicate column names and
-            ``on_collision`` is ``"error"``.
+        ConfigError: If the DataFrame already has duplicate column names, or
+            normalization produces them and ``on_collision`` is ``"error"``.
     """
     if config.columns is None or config.columns == NamingPattern.NONE:
         return df
+
+    # Renames are keyed by name, so a repeated name would quietly lose a column
+    repeated = sorted(name for name, count in Counter(df.columns).items() if count > 1)
+    if repeated:
+        raise ConfigError(
+            f"Can't normalize duplicate column names: {repeated}. "
+            f"Set a prefix on the join that adds them, or rename them first."
+        )
 
     if config.columns == NamingPattern.KEBAB_CASE:
         _log.warning("kebab-case column names require backtick-quoting in SQL expressions")

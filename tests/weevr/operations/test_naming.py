@@ -420,6 +420,24 @@ class TestNormalizeColumnsSpark:
         assert result.columns == ["id", "total"]
         assert list(result.collect()[0]) == [0, 2]
 
+    @pytest.mark.parametrize(
+        "config",
+        [
+            {},
+            {"on_collision": "suffix"},
+            {"on_collision": "suffix", "reserved_words": {"strategy": "drop"}},
+        ],
+    )
+    def test_exact_duplicate_names_are_rejected(self, spark, config):
+        df = spark.createDataFrame([(1, 2, 3)], ["id", "a", "b"]).toDF("id", "amount", "amount")
+        naming = NamingConfig(columns=NamingPattern.SNAKE_CASE, **config)
+        with pytest.raises(ConfigError, match=r"amount.*prefix"):
+            normalize_columns(df, naming)
+
+    def test_duplicate_names_pass_through_without_a_pattern(self, spark):
+        df = spark.createDataFrame([(1, 2)], ["a", "b"]).toDF("amount", "amount")
+        assert normalize_columns(df, NamingConfig()).columns == ["amount", "amount"]
+
     def test_on_collision_error_raises(self, spark):
         # httpStatus and http_status both normalise to http_status
         df = spark.createDataFrame([(1, 2)], ["httpStatus", "http_status"])

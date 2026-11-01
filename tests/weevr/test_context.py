@@ -2340,3 +2340,37 @@ class TestPreviewWithBlocks:
             self._preview(spark, project, "fact.thread")
         resolver.assert_called_once()
         assert resolver.call_args.kwargs.get("collector") is None
+
+
+@pytest.mark.spark
+class TestNamingOnJoinedColumns:
+    """A join overlap under target.naming fails rather than losing a column."""
+
+    def test_overlap_fails_and_writes_nothing(self, spark: SparkSession, tmp_path: Path) -> None:
+        left, right = str(tmp_path / "left"), str(tmp_path / "right")
+        spark.createDataFrame([(1, 10)], ["id", "amount"]).write.format("delta").save(left)
+        spark.createDataFrame([(1, 20)], ["id", "amount"]).write.format("delta").save(right)
+        target = tmp_path / "tgt"
+        project = _project_dir(tmp_path)
+        thread = {
+            "config_version": "1.0",
+            "sources": {
+                "a": {"type": "delta", "alias": left},
+                "b": {"type": "delta", "alias": right},
+            },
+            "steps": [
+                {
+                    "join": {
+                        "source": "b",
+                        "type": "inner",
+                        "on": [{"left": "id", "right": "id"}],
+                    }
+                }
+            ],
+            "target": {"path": str(target), "naming": {"columns": "snake_case"}},
+        }
+        (project / "t.thread").write_text(json.dumps(thread))
+        result = Context(spark=spark, project=project).run("t.thread")
+        assert result.status == "failure"
+        assert not target.exists()
+        assert "prefix" in result.summary()
