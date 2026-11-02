@@ -812,6 +812,23 @@ class TestCommitMetricsCounts:
         assert metrics is None  # degrade, never misattribute
         assert any("foreign commit" in r.message for r in caplog.records)
 
+    def test_user_optimize_after_commit_still_rejected(
+        self, spark: SparkSession, tmp_delta_path, caplog
+    ) -> None:
+        """Only auto compaction is exempt: a user OPTIMIZE is a foreign commit."""
+        from weevr.operations.target_handle import TargetHandle
+
+        path = tmp_delta_path("cm_guard_optimize")
+        spark.range(4).repartition(4).write.format("delta").save(path)  # v0
+        handle = TargetHandle(spark, path)
+        pre = handle.current_version()
+
+        spark.range(4, 8).repartition(4).write.format("delta").mode("append").save(path)  # v1
+        spark.sql(f"OPTIMIZE delta.`{path}`")  # v2, operationParameters.auto = false
+
+        assert handle.commit_metrics_after(pre) is None
+        assert any("foreign commit" in r.message for r in caplog.records)
+
     def test_dimension_first_write_count_from_metrics(
         self, spark: SparkSession, tmp_delta_path, count_spy: list[int]
     ) -> None:

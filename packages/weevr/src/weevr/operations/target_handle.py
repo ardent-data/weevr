@@ -28,6 +28,16 @@ STAMP_ENGINE_MARKER = "weevr"
 STAMP_VERSION = 1
 
 
+def _is_auto_compaction(commit: Any) -> bool:
+    """Return whether a history row is Delta's post-commit auto compaction.
+
+    Delta records ``auto = true`` on these ``OPTIMIZE`` commits and
+    ``auto = false`` on a user-run ``OPTIMIZE``.
+    """
+    parameters = commit["operationParameters"] or {}
+    return commit["operation"] == "OPTIMIZE" and parameters.get("auto") == "true"
+
+
 @dataclass(frozen=True)
 class CommitStamp:
     """Lineage stamp written as Delta commit ``userMetadata`` on engine writes.
@@ -248,12 +258,14 @@ class TargetHandle:
         own stamp — exact regardless of interleaved foreign commits.
 
         Without a stamp (merge paths, where per-write userMetadata is
-        not honored), the latest commit is accepted ONLY when its
-        version is exactly ``pre_version + 1`` (or 0 for a fresh
-        table) — a foreign commit landing between the engine's write
-        and this read makes the version jump, and the metrics are then
-        reported absent rather than misattributed. Either way: degrade,
-        never misattribute.
+        not honored), the commit is accepted ONLY at version
+        ``pre_version + 1`` (or 0 for a fresh table), and only when
+        nothing but auto compaction landed after it. Auto compaction
+        commits synchronously inside the write call, so it is the
+        write settling, not a foreign writer. Any other commit landing
+        between the engine's write and this read makes the version
+        jump, and the metrics are then reported absent rather than
+        misattributed. Either way: degrade, never misattribute.
         """
         if stamp is not None:
             return self._stamped_commit_metrics(pre_version, stamp)
@@ -267,20 +279,30 @@ class TargetHandle:
         expected = 0 if pre_version is None else pre_version + 1
         try:
             table = _delta.resolve_delta_table(self._spark, self.path)
-            row = table.history(1).select("version", "operationMetrics").collect()[0]
+            rows = (
+                table.history(2)
+                .select("version", "operation", "operationMetrics", "operationParameters")
+                .collect()
+            )
         except Exception:
             logger.warning("Commit metrics unavailable for '%s'", self.path)
             return None
-        if int(row[0]) != expected:
+        if not rows:
+            logger.warning("Commit metrics unavailable for '%s'", self.path)
+            return None
+        latest = rows[0]
+        if len(rows) == 2 and _is_auto_compaction(latest) and int(rows[1]["version"]) == expected:
+            return dict(rows[1]["operationMetrics"])
+        if int(latest["version"]) != expected:
             logger.warning(
                 "Commit metrics for '%s' skipped: expected version %d, found %d "
                 "(foreign commit interleaved)",
                 self.path,
                 expected,
-                int(row[0]),
+                int(latest["version"]),
             )
             return None
-        return dict(row[1])
+        return dict(latest["operationMetrics"])
 
     def _stamped_commit_metrics(
         self, pre_version: int | None, stamp: CommitStamp
