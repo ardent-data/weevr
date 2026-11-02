@@ -2167,6 +2167,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#devcontainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Devcontainer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-checks-locally" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3191,6 +3202,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#devcontainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Devcontainer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-checks-locally" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3525,6 +3547,15 @@ environment setup to submitting a pull request. It extends the root
 <p>This creates a <code>.venv</code> directory (ignored by git) with all runtime and
 dev dependencies including Ruff, Pyright, pytest, MkDocs Material, and
 mkdocstrings.</p>
+<h2 id="devcontainer">Devcontainer<a class="headerlink" href="#devcontainer" title="Permanent link">&para;</a></h2>
+<p>The repository's devcontainer provides the toolchain, plus the Fabric tools
+<code>fab</code>, <code>az</code> and <code>azcopy</code>. Its shell runs in UTC.</p>
+<p><code>fab auth login</code> needs a real terminal, so run it from an interactive shell
+rather than a one-shot command. The token cache stays inside the container, so
+repeat the login after a rebuild.</p>
+<p>The devcontainer sets <code>PYSPARK_PYTHON</code> to its Python 3.11 virtual environment.
+An isolated environment on another Python version must override that variable,
+or Spark workers start on the wrong interpreter.</p>
 <h2 id="running-checks-locally">Running checks locally<a class="headerlink" href="#running-checks-locally" title="Permanent link">&para;</a></h2>
 <p>Before opening a pull request, run all four checks and confirm they pass.</p>
 <h3 id="linting">Linting<a class="headerlink" href="#linting" title="Permanent link">&para;</a></h3>
@@ -3533,12 +3564,12 @@ mkdocstrings.</p>
 <p>Ruff enforces rules from the E, F, I, UP, B, SIM, and D (Google-style
 docstrings) rule sets. Line length is 100 characters.</p>
 <h3 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>.
 </code></pre></div>
 <p>Ruff formats with double quotes, 4-space indentation, and a 100-character
-line limit. Run this before committing to avoid CI failures.</p>
+line limit. Run <code>uv run ruff format .</code> before committing to apply it.</p>
 <h3 id="type-checking">Type checking<a class="headerlink" href="#type-checking" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pyright<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pyright
 </code></pre></div>
 <p>Pyright runs in standard mode against Python 3.11. All public functions
 must have type annotations.</p>
@@ -3628,9 +3659,11 @@ Release Please for versioning, and PR titles become changelog entries.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>feat(engine): add parallel thread execution
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>fix(config): resolve variable substitution in nested maps
 <a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>chore(ci): pin ruff version in workflow
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>docs(guides): add observability guide
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>chore(docs): add observability guide
 </code></pre></div>
-<p>Always include the component scope in parentheses.</p>
+<p>Always include the component scope in parentheses. Documentation-only
+changes use <code>chore(docs)</code>, not <code>docs</code>, because Release Please cuts a patch
+release for <code>docs</code> titles.</p>
 <h3 id="breaking-changes">Breaking changes<a class="headerlink" href="#breaking-changes" title="Permanent link">&para;</a></h3>
 <p>Indicate breaking changes with <code>!</code> after the type:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>feat(model)!: rename thread execution fields
@@ -3789,7 +3822,7 @@ changes.</p>
 </tr>
 <tr>
 <td>Type check</td>
-<td><code>uv run pyright .</code></td>
+<td><code>uv run pyright</code></td>
 </tr>
 <tr>
 <td>Tests</td>
