@@ -1,5 +1,10 @@
 # weevr
 
+[![PyPI version](https://img.shields.io/pypi/v/weevr)](https://pypi.org/project/weevr/)
+[![Python](https://img.shields.io/pypi/pyversions/weevr)](https://pypi.org/project/weevr/)
+[![License](https://img.shields.io/github/license/ardent-data/weevr)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/ardent-data/weevr/code-quality.yaml?branch=main&label=CI)](https://github.com/ardent-data/weevr/actions)
+
 Configuration-driven data shaping for Spark in Microsoft Fabric.
 
 **[Documentation](https://ardent-data.github.io/weevr/latest/)** · **[Getting Started](https://ardent-data.github.io/weevr/latest/tutorials/your-first-loom/)** · **[YAML Reference](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/thread/)** · **[weevr-cli](https://ardent-data.github.io/weevr-cli/latest/)**
