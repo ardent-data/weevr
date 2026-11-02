@@ -3,14 +3,14 @@
 weevr is designed to run within the Microsoft Fabric runtime. The table below
 lists the tested and supported versions for each dependency.
 
-Last validated against weevr **1.20.3**.
+Last validated against weevr **1.20.6**. <!-- x-release-please-version -->
 
 ## Runtime matrix
 
 | Component | Version | Notes |
 |-----------|---------|-------|
 | Python | 3.11 | Pinned via `.python-version` |
-| PySpark | 3.5.x | Bundled with Fabric Runtime 1.3 |
+| PySpark | 3.5.5 | Bundled with Fabric Runtime 1.3 |
 | Delta Lake | 3.2.x | Bundled with Fabric Runtime 1.3 |
 | Microsoft Fabric Runtime | 1.3 | Target deployment environment |
 | Pydantic | 2.x | Configuration validation |

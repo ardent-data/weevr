@@ -27,6 +27,19 @@ This creates a `.venv` directory (ignored by git) with all runtime and
 dev dependencies including Ruff, Pyright, pytest, MkDocs Material, and
 mkdocstrings.
 
+## Devcontainer
+
+The repository's devcontainer provides the toolchain, plus the Fabric tools
+`fab`, `az` and `azcopy`. Its shell runs in UTC.
+
+`fab auth login` needs a real terminal, so run it from an interactive shell
+rather than a one-shot command. The token cache stays inside the container, so
+repeat the login after a rebuild.
+
+The devcontainer sets `PYSPARK_PYTHON` to its Python 3.11 virtual environment.
+An isolated environment on another Python version must override that variable,
+or Spark workers start on the wrong interpreter.
+
 ## Running checks locally
 
 Before opening a pull request, run all four checks and confirm they pass.
@@ -43,16 +56,16 @@ docstrings) rule sets. Line length is 100 characters.
 ### Formatting
 
 ```bash
-uv run ruff format .
+uv run ruff format --check .
 ```
 
 Ruff formats with double quotes, 4-space indentation, and a 100-character
-line limit. Run this before committing to avoid CI failures.
+line limit. Run `uv run ruff format .` before committing to apply it.
 
 ### Type checking
 
 ```bash
-uv run pyright .
+uv run pyright
 ```
 
 Pyright runs in standard mode against Python 3.11. All public functions
@@ -155,10 +168,12 @@ Release Please for versioning, and PR titles become changelog entries.
 feat(engine): add parallel thread execution
 fix(config): resolve variable substitution in nested maps
 chore(ci): pin ruff version in workflow
-docs(guides): add observability guide
+chore(docs): add observability guide
 ```
 
-Always include the component scope in parentheses.
+Always include the component scope in parentheses. Documentation-only
+changes use `chore(docs)`, not `docs`, because Release Please cuts a patch
+release for `docs` titles.
 
 ### Breaking changes
 
@@ -308,7 +323,7 @@ All pull requests run the following checks in GitHub Actions:
 |---------------------|---------|
 | Lint                | `uv run ruff check .` |
 | Format              | `uv run ruff format --check .` |
-| Type check          | `uv run pyright .` |
+| Type check          | `uv run pyright` |
 | Tests               | `uv run pytest` |
 | Docstring coverage  | `uv run interrogate packages/weevr-core/src/weevr/ packages/weevr/src/weevr/ --fail-under 90` |
 | DCO sign-off        | GitHub App check |

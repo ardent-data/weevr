@@ -10,6 +10,10 @@ weevr lets you declare data transformation intent in YAML and execute it on PySp
 pip install weevr
 ```
 
+weevr ships as two wheels sharing the `weevr` namespace. `weevr` is the Spark engine and
+depends on `weevr-core`, the Spark-free config model, validation, and planner. Install
+`weevr-core` alone to use those without PySpark.
+
 ## Quick Start
 
 Define a thread — the smallest unit of work — using a `.thread` file:

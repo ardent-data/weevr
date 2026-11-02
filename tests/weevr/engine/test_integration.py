@@ -667,7 +667,6 @@ class TestFactValidation:
         alias = "fact_alias_advisory_tgt"
 
         try:
-            spark.sql(f"CREATE TABLE {alias} (sk_customer BIGINT, amount BIGINT) USING delta")
             target = Target(alias=alias, fact=FactConfig(foreign_keys=["sk_customer"]))
             thread = self._fact_thread(
                 "fact_alias",

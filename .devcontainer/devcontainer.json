@@ -20,6 +20,11 @@
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {},
         "ghcr.io/devcontainers/features/github-cli:1": {},
+        // Microsoft has no apt repo for Debian trixie, and Debian's own package can't load
+        // every command module, so install from PyPI instead.
+        "ghcr.io/devcontainers/features/azure-cli:1": {
+            "installUsingPython": true
+        },
         "ghcr.io/devcontainers/features/copilot-cli:1": {},
         "ghcr.io/devcontainers/features/node:2": {},
         "ghcr.io/devcontainers/features/java:1": {
@@ -49,10 +54,13 @@
 
     // After install.sh, flip the in-process auto-updater on (the native
     // installer ships with it disabled by default).
+    // A failed fab install only warns, so it can't stop the postStartCommand.
+    // fab stays out of the host mounts on purpose: without an OS keyring its token
+    // cache can be unencrypted, so `fab auth login` is repeated after a rebuild.
     // Codex comes from npm rather than the jsburckhardt feature: that feature
     // installs the newest GitHub release including alphas, which often don't
     // have linux assets published yet, and it has no version option to pin.
-    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && sudo chown vscode:vscode /home/vscode/.claude/downloads && npm install -g @openai/codex && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev",
+    "postCreateCommand": "git config --global --add safe.directory /workspaces/weevr && sudo chown vscode:vscode /home/vscode/.claude/downloads && npm install -g @openai/codex && curl -fsSL https://claude.ai/install.sh | bash && python3 -c \"import json, os; p=os.path.expanduser('~/.claude.json'); d=json.load(open(p)) if os.path.exists(p) and os.path.getsize(p)>0 else {}; d['autoUpdates']=True; json.dump(d, open(p,'w'), indent=2)\" && git clone https://github.com/coderabbitai/git-worktree-runner.git /home/vscode/.gtr && sudo ln -sf /home/vscode/.gtr/bin/git-gtr /usr/local/bin/git-gtr && sudo ln -sf /home/vscode/.gtr/bin/gtr /usr/local/bin/gtr && uv sync --dev && (uv tool install ms-fabric-cli || echo 'fab install failed: retry with uv tool install ms-fabric-cli')",
 
     // Keep the venv current and the claude CLI fresh on every container start
     // (in-process auto-updater handles between-session refreshes; this is the
@@ -62,6 +70,7 @@
     "postStartCommand": "uv sync; claude update 2>/dev/null || true; TARGET=\"$(readlink -f /home/vscode/.local/bin/claude 2>/dev/null)\"; [ -n \"$TARGET\" ] && find /home/vscode/.local/share/claude/versions -maxdepth 1 -type f ! -path \"$TARGET\" -delete 2>/dev/null || true",
 
     "remoteEnv": {
+        "TZ": "UTC",
         "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv",
         "UV_PYTHON_PREFERENCE": "system",
         "PYSPARK_PYTHON": "/home/vscode/.venv/bin/python",

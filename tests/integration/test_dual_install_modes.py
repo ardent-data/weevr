@@ -276,7 +276,7 @@ def test_full_install(
         python,
         str(engine),
         str(core),
-        "pyspark>=3.5.0,<3.6.0",
+        "pyspark>=3.5.5,<3.5.6",
     )
 
     _run_imports(python, SHARED_IMPORTS, expect_ok=True)

@@ -54,11 +54,6 @@ class TestAliasTargetWarp:
         # Own location so the database never lands in the default warehouse
         spark.sql(f"CREATE DATABASE b028_warp LOCATION '{tmp_path / 'b028_warp.db'}'")
         request.addfinalizer(lambda: spark.sql("DROP DATABASE IF EXISTS b028_warp CASCADE"))
-        # Alias overwrite is unavailable on OSS Spark >= 3.5.6, so pre-create and append
-        spark.sql(
-            "CREATE TABLE b028_warp.dim_customer (id BIGINT, name STRING, region STRING) "
-            "USING delta"
-        )
         project = tmp_path / "p.weevr"
         _write(project / "threads" / "dim_customer.warp", WARP)
         _write(

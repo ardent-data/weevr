@@ -14,14 +14,14 @@
 
 - [ ] uv sync --dev
 - [ ] uv run ruff check .
-- [ ] uv run ruff format .
-- [ ] uv run pyright .
+- [ ] uv run ruff format --check .
+- [ ] uv run pyright
 - [ ] uv run pytest
 
 ## Release / Versioning
 
-- [ ] PR title follows Conventional Commit format (feat:, fix:, chore:, docs:, ci:, etc.)
-- [ ] Breaking change indicated (feat!: / fix!: or BREAKING CHANGE in body)
+- [ ] PR title follows Conventional Commit format with a scope (feat(engine):, fix(config):, chore(docs):, etc.)
+- [ ] Breaking change indicated (feat(model)!: / fix(config)!: or BREAKING CHANGE in body)
 
 ## Notes
 
