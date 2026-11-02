@@ -15,6 +15,10 @@ Last validated against weevr **1.20.6**. <!-- x-release-please-version -->
 | Microsoft Fabric Runtime | 1.3 | Target deployment environment |
 | Pydantic | 2.x | Configuration validation |
 
+weevr 1.x does not support Fabric Runtime 2.0: Runtime 2.0 runs Python 3.13, so
+the install fails there. See [Fabric Runtime](../guides/fabric-runtime.md#runtime-compatibility)
+for how to keep a workspace or item on Runtime 1.3.
+
 ## Python version policy
 
 weevr targets Python 3.11 exclusively to match the Fabric Runtime 1.3

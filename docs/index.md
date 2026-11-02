@@ -23,6 +23,9 @@ orchestration — just deterministic, metadata-driven data pipelines.
 pip install weevr
 ```
 
+weevr 1.x runs on [Fabric Runtime 1.3](guides/fabric-runtime.md#runtime-compatibility)
+and doesn't install on Runtime 2.0, the default for new workspaces.
+
 ```python
 from weevr import Context
 

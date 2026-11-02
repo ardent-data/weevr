@@ -2,6 +2,8 @@
 
 Configuration-driven data shaping for Spark in Microsoft Fabric.
 
+**[Documentation](https://ardent-data.github.io/weevr/latest/)** · **[Getting Started](https://ardent-data.github.io/weevr/latest/tutorials/your-first-loom/)** · **[YAML Reference](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/thread/)**
+
 weevr lets you declare data transformation intent in YAML and execute it on PySpark. Define **what** should happen to your data — sources, transforms, joins, validations, write behavior — and let a stable engine handle **how** it runs. No code generation, no abstraction leaks. Just Spark DataFrame operations driven by configuration.
 
 ## Installation
@@ -14,6 +16,9 @@ weevr ships as two wheels sharing the `weevr` namespace. `weevr` is the Spark en
 depends on `weevr-core`, the Spark-free config model, validation, and planner. Install
 `weevr-core` alone to use those without PySpark.
 
+weevr 1.x requires Fabric Runtime 1.3 and doesn't install on Runtime 2.0, the default for new
+workspaces. See [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/#runtime-compatibility).
+
 ## Quick Start
 
 Define a thread — the smallest unit of work — using a `.thread` file:
@@ -24,19 +29,19 @@ config_version: "1.0"
 sources:
   raw_customers:
     type: delta
-    path: "${lakehouse_path}/raw/customers"
+    alias: raw.customers
 steps:
   - filter:
       expr: "is_active = true"
   - select:
       columns: [customer_id, name, email, region]
 target:
-  path: "${lakehouse_path}/curated/dim_customer"
+  alias: curated.dim_customer
 write:
   mode: overwrite
 ```
 
-Run it from a Fabric Notebook or any PySpark environment:
+Run it from a Fabric Notebook, with the file in a `.weevr` project folder:
 
 ```python
 from weevr import Context
@@ -46,18 +51,24 @@ result = ctx.run("dim_customer.thread")
 print(result.status)  # "success"
 ```
 
+`ctx.run()` also takes `mode="validate"`, `"plan"`, or `"preview"` to check a config without
+writing data.
+
 ## Features
 
-* **Declarative transforms** — Filter, join, dedup, sort, rename, cast, derive, select, drop, aggregate, window, pivot, and union — all expressed in YAML
+* **Declarative transforms** — 23 step types expressed in YAML, covering filtering, joins, dedup, sorting, column shaping, type and null handling, `case_when`, value mapping, string and date operations, aggregation, windows, pivot and unpivot, union, and foreign key resolution
+* **Dimensional modeling** — SCD Type 2 dimensions with surrogate keys and system members, and fact tables with foreign key and sentinel handling
 * **Flexible write modes** — Overwrite, append, and merge (upsert) with configurable match, update, and delete behavior
 * **Validation and data quality** — Pre-write rules with severity routing (info, warn, error, fatal) and automatic row quarantine; post-write assertions for row counts, null checks, uniqueness, and custom expressions
 * **DAG orchestration** — Automatic dependency resolution, parallel thread execution within weaves, sequential weave ordering, configurable failure behavior, and auto-cache management
+* **Schema contracts** — Warp files declare a target's intended shape, with enforcement, pre-initialization, and strict, lenient, or adaptive schema drift handling
+* **Connections and secondary outputs** — Named OneLake connections for cross-lakehouse work, reusable audit column templates, and exports to additional locations
 * **Configuration inheritance** — Define patterns once at loom or weave level, cascade to threads with child-wins semantics
 * **Variable injection** — Environment-agnostic configs with parameter files and runtime overrides
 * **Incremental processing** — Watermark-based incremental loads, CDC merge routing with hard/soft delete support, and Delta Change Data Feed integration
 * **Observability** — OTel-compatible execution spans, structured JSON logging, row count reconciliation, and execution trace trees
 * **Null-safe defaults** — Opinionated join semantics and key handling that prevent common Spark pitfalls
-* **Python API** — `Context` class with `run()` for execution, `load()` for config inspection, and verification modes for dry-run validation
+* **Python API** — `Context` class with `run()` in execute, validate, plan, and preview modes, and `load()` for config inspection
 
 ## Core Abstractions
 
@@ -66,7 +77,7 @@ weevr organizes work through four concepts:
 * **Thread** — The smallest executable unit. Reads from one or more sources, applies transforms, validates, and writes to a single target.
 * **Weave** — A collection of threads forming a dependency DAG. Represents a subject area or processing stage. Independent threads run in parallel.
 * **Loom** — A deployable unit packaging one or more weaves with defined execution order. The primary unit of versioning and release.
-* **Project** — A logical grouping of looms. Defines the boundary for shared configuration, parameter files, helpers, and UDFs.
+* **Project** — A logical grouping of looms, stored as a `.weevr` folder. Defines the boundary for shared configuration and parameter files.
 
 ## Core Principles
 
@@ -98,7 +109,7 @@ The goal is to reduce orchestration friction and enforce repeatable patterns —
 
 weevr's engine is a general-purpose library distributed via PyPI. It contains no project-specific configuration.
 
-**Integration projects** are separate repositories containing YAML configs, Fabric Notebooks, and any project-specific UDFs or helpers. This separation lets the engine evolve independently while teams own their configuration.
+**Integration projects** are separate repositories containing YAML configs and Fabric Notebooks. This separation lets the engine evolve independently while teams own their configuration.
 
 ## Compatibility
 
@@ -108,6 +119,8 @@ weevr's engine is a general-purpose library distributed via PyPI. It contains no
 | PySpark | 3.5 |
 | Delta Lake | 3.2 |
 | Microsoft Fabric Runtime | 1.3 |
+
+weevr 1.x doesn't support Runtime 2.0.
 
 ## CLI
 
@@ -121,14 +134,9 @@ pip install weevr-cli
 
 Full CLI documentation: [ardent-data.github.io/weevr-cli](https://ardent-data.github.io/weevr-cli/latest/)
 
-## What's Next
-
-* Extensibility — Reusable stitch patterns, project-level UDF and helper registries
-* Advanced merge patterns — Insert-only mode, complex update strategies
-
 ## Documentation
 
-Full documentation is available at [ardent-data.github.io/weevr](https://ardent-data.github.io/weevr/).
+Full documentation is available at [ardent-data.github.io/weevr](https://ardent-data.github.io/weevr/latest/).
 
 ## Contributing
 
