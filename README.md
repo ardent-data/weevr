@@ -2,7 +2,7 @@
 
 Configuration-driven data shaping for Spark in Microsoft Fabric.
 
-**[Documentation](https://ardent-data.github.io/weevr/latest/)** · **[Getting Started](https://ardent-data.github.io/weevr/latest/tutorials/your-first-loom/)** · **[YAML Reference](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/thread/)**
+**[Documentation](https://ardent-data.github.io/weevr/latest/)** · **[Getting Started](https://ardent-data.github.io/weevr/latest/tutorials/your-first-loom/)** · **[YAML Reference](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/thread/)** · **[weevr-cli](https://ardent-data.github.io/weevr-cli/latest/)**
 
 weevr lets you declare data transformation intent in YAML and execute it on PySpark. Define **what** should happen to your data — sources, transforms, joins, validations, write behavior — and let a stable engine handle **how** it runs. No code generation, no abstraction leaks. Just Spark DataFrame operations driven by configuration.
 
