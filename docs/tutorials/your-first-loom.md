@@ -17,12 +17,14 @@ transformations, and writes the result to a Delta table.
 pip install weevr
 ```
 
-In a Fabric environment, install the package into your Spark environment or
-add it to your notebook's inline install cell:
+In a Fabric notebook on Runtime 1.3, add an inline install cell:
 
 ```python
 %pip install weevr
 ```
+
+weevr 1.x doesn't install on Runtime 2.0, the default for new workspaces. See
+[Fabric Runtime](../guides/fabric-runtime.md#runtime-compatibility).
 
 ## Project structure
 

@@ -5,6 +5,23 @@ Users declare data shaping intent in YAML; a stable PySpark engine
 interprets that intent to execute optimized, repeatable data
 transformations.
 
+## Compatibility
+
+weevr 1.x requires Fabric Runtime 1.3 (Python 3.11, Spark 3.5, Delta 3.2).
+It doesn't install on Runtime 2.0, which runs Python 3.13 and is the default
+for new workspaces. In a Runtime 2.0 workspace, attach a published Environment
+set to Runtime 1.3. For production, pin the weevr version in that Environment
+rather than running `%pip install` at session start.
+
+## Run Modes
+
+`Context.run(path, mode=...)` accepts:
+
+- `execute` (default) — run the config and write data
+- `validate` — check the config, the DAG, and that sources exist
+- `plan` — build the execution plan and return it without running
+- `preview` — run transforms on sampled data and skip writes
+
 ## Configuration Hierarchy
 
 weevr uses three configuration file types, each with a typed file
@@ -208,6 +225,31 @@ boundaries.
 
 The `fact:` block declares foreign key columns and sentinel value
 conventions for validation during mapping operations.
+
+### Warps and Schema Drift
+
+A `.warp` file declares a target's intended columns, independent of the
+pipeline. Set on `target`:
+
+- `warp` — a warp file name, or `false` to opt out of discovery
+- `warp_enforcement` — `warn` (default), `enforce`, or `off`
+- `warp_mode: auto` — write or update the warp after each successful run
+- `warp_init` — create the Delta table from the warp before the first run
+
+`target.schema_drift` handles columns that no longer match the baseline:
+
+- `lenient` (default) — report drift and write as configured
+- `strict` — act on `on_drift`: `error`, `warn`, or `ignore`
+- `adaptive` — add new columns to the Delta table
+
+### Audit Templates and Exports
+
+`audit_templates:` defines named sets of audit columns at loom, weave, or
+thread level; a target applies them with `target.audit_template`. The
+built-in presets are `fabric` and `minimal`.
+
+`exports:` writes the thread's output to additional locations after the
+primary write, with `on_failure: warn` or `abort`.
 
 ## Connections
 

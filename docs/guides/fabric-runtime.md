@@ -6,7 +6,7 @@ production.
 
 ## Runtime compatibility
 
-weevr targets **Fabric Runtime 1.3**, which ships with:
+weevr 1.x requires **Fabric Runtime 1.3**, which ships with:
 
 | Component  | Version    |
 |------------|------------|
@@ -18,34 +18,53 @@ weevr pins `requires-python = ">=3.11,<3.12"` to match. All transforms,
 readers, writers, and telemetry primitives are tested against PySpark 3.5 and
 Delta 3.2.
 
-!!! note "Runtime version lock"
+!!! warning "weevr 1.x does not install on Runtime 2.0"
 
-    Fabric Runtime versions are fixed per workspace capacity. If you upgrade
-    to a newer runtime in the future, check the
-    [Compatibility](../reference/compatibility.md) page for supported
-    version combinations.
+    Runtime 2.0 runs Python 3.13, so `%pip install weevr` fails there with
+    `No matching distribution found for weevr`. Runtime 2.0 is the default for
+    new workspaces, and changing a workspace to Runtime 2.0 also moves its
+    existing items the next time they start a session.
+
+    Keep weevr on Runtime 1.3 in either of these ways:
+
+    - Set the workspace runtime to 1.3 under **Workspace settings** >
+      **Data Engineering/Science** > **Spark settings**.
+    - Attach the notebook or Spark Job Definition to a published
+      **Environment** set to Runtime 1.3. The Environment keeps it on 1.3 even
+      in a Runtime 2.0 workspace.
+
+    See [Compatibility](../reference/compatibility.md) for supported versions.
 
 ## Installing weevr
 
-### Option 1 -- pip install (recommended)
+### Option 1 -- Fabric Environment (recommended for production)
 
-In a Fabric Notebook, install weevr at the top of the first cell:
+An Environment pins both the runtime and the weevr version, so scheduled runs
+are reproducible and don't depend on PyPI at session start:
+
+1. In your workspace, select **New item** > **Environment**.
+2. Set the Environment's runtime to **1.3**.
+3. Under **Libraries**, add `weevr` as a public library with an exact version.
+4. Select **Publish**.
+5. Attach the Environment to your notebook or Spark Job Definition, or set it
+   as the workspace default under **Workspace settings** >
+   **Data Engineering/Science** > **Spark settings**.
+
+### Option 2 -- `%pip` install (development)
+
+For interactive work in a Fabric Notebook, install weevr at the top of the
+first cell, pinned to the version you want:
 
 ```python
-%pip install weevr
+%pip install weevr==<version>
 ```
 
-This pulls the latest release from PyPI and makes it available for the
-duration of the Spark session.
+This installs from PyPI for the duration of the Spark session. An unpinned
+install takes the newest release on every run, and any `%pip` install from
+PyPI fails in a workspace with outbound access protection, so use an
+Environment for production.
 
-For a persistent installation that survives notebook restarts, add weevr to
-your **Fabric Environment** via the workspace portal:
-
-1. Go to **Workspace settings** > **Data Engineering** > **Environment**.
-2. Under **Public libraries**, add `weevr` with the desired version pin.
-3. Save and restart your Spark session.
-
-### Option 2 -- wheel upload
+### Option 3 -- wheel upload
 
 If your workspace has restricted network access, download both the
 `weevr` and `weevr-core` `.whl` files from PyPI and upload them to a
@@ -62,7 +81,7 @@ Replace the version numbers with the actual wheel filenames; both
 wheels publish to PyPI in lockstep at the same version on every
 release.
 
-### Option 3 -- inline package in a Spark Job Definition
+### Option 4 -- inline package in a Spark Job Definition
 
 For production jobs, declare weevr in the Spark Job Definition's
 **Referenced libraries** section. This avoids install latency on each run
@@ -279,6 +298,13 @@ See [Run from Fabric Pipeline](../how-to/run-from-fabric-pipeline.md) for
 a step-by-step walkthrough.
 
 ## Troubleshooting
+
+### No matching distribution found for weevr
+
+The session is on Runtime 2.0, where Python 3.13 doesn't satisfy weevr 1.x's
+Python 3.11 requirement. Check with `spark.version`: weevr 1.x needs 3.5.x. Move
+the workspace or the item to Runtime 1.3, as described under
+[Runtime compatibility](#runtime-compatibility).
 
 ### Package not found after install
 

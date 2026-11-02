@@ -54,11 +54,11 @@ pipeline.notebook_activity -> failure: "raise RuntimeError" {style.stroke: "#C62
 In your Fabric workspace, create a new notebook. Attach it to a Lakehouse that
 contains your weevr config files and source data.
 
-Install weevr if it is not already part of the Spark environment:
-
-```python
-%pip install weevr
-```
+For a scheduled pipeline, attach a published Environment that uses Runtime 1.3 and
+pins the weevr version, as described in
+[Installing weevr](../guides/fabric-runtime.md#installing-weevr). An unpinned
+`%pip install` at session start isn't reproducible, and it fails on Runtime 2.0
+and in workspaces with outbound access protection.
 
 ## Step 2 -- Import weevr and get the SparkSession
 

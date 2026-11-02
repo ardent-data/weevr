@@ -7,11 +7,14 @@
 
 ## Documentation
 
-- [Docs home](https://ardent-data.github.io/weevr/)
-- [Thread YAML schema](https://ardent-data.github.io/weevr/reference/yaml-schema/thread/)
-- [Weave YAML schema](https://ardent-data.github.io/weevr/reference/yaml-schema/weave/)
-- [Loom YAML schema](https://ardent-data.github.io/weevr/reference/yaml-schema/loom/)
-- [Configuration keys](https://ardent-data.github.io/weevr/reference/configuration-keys/)
+- [Docs home](https://ardent-data.github.io/weevr/latest/)
+- [Thread YAML schema](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/thread/)
+- [Weave YAML schema](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/weave/)
+- [Loom YAML schema](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/loom/)
+- [Configuration keys](https://ardent-data.github.io/weevr/latest/reference/configuration-keys/)
+- [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/): weevr 1.x requires Runtime 1.3
+- [Execution modes](https://ardent-data.github.io/weevr/latest/concepts/execution-modes/)
+- [CLI](https://ardent-data.github.io/weevr-cli/latest/)
 
 ## JSON Schema
 
@@ -24,10 +27,18 @@ Machine-readable schema files for LLM and IDE consumption:
 
 ## Key Concepts
 
-- [Thread, Weave, Loom hierarchy](https://ardent-data.github.io/weevr/concepts/thread-weave-loom/)
-- [Config resolution and variable interpolation](https://ardent-data.github.io/weevr/guides/config-resolution/)
-- [Dimension modeling](https://ardent-data.github.io/weevr/guides/dimension-modeling/)
-- [Fact tables](https://ardent-data.github.io/weevr/guides/fact-tables/)
+- [Thread, Weave, Loom hierarchy](https://ardent-data.github.io/weevr/latest/concepts/thread-weave-loom/)
+- [Config resolution and variable interpolation](https://ardent-data.github.io/weevr/latest/guides/config-resolution/)
+- [Dimension modeling](https://ardent-data.github.io/weevr/latest/guides/dimension-modeling/)
+- [Fact tables](https://ardent-data.github.io/weevr/latest/guides/fact-tables/)
+- [Connections](https://ardent-data.github.io/weevr/latest/guides/connections/)
+- [Warps](https://ardent-data.github.io/weevr/latest/guides/warps/)
+- [Schema drift](https://ardent-data.github.io/weevr/latest/guides/schema-drift/)
+- [Resolve](https://ardent-data.github.io/weevr/latest/guides/resolve/)
+- [Sub-pipelines](https://ardent-data.github.io/weevr/latest/guides/sub-pipelines/)
+- [Thread templates](https://ardent-data.github.io/weevr/latest/guides/thread-templates/)
+- [Audit templates](https://ardent-data.github.io/weevr/latest/guides/audit-templates/)
+- [Exports](https://ardent-data.github.io/weevr/latest/guides/exports/)
 
 ## Examples
 
