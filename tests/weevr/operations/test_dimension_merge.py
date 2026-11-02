@@ -135,6 +135,75 @@ class TestFirstWrite:
         assert spark.read.format("delta").load(path).count() == 1  # the write itself landed
 
 
+@pytest.fixture
+def eager_auto_compaction(spark: SparkSession):
+    """Make auto compaction fire on small tables, restoring the session after."""
+    key = "spark.databricks.delta.autoCompact.minNumFiles"
+    spark.conf.set(key, "2")
+    yield
+    spark.conf.unset(key)
+
+
+def _enable_auto_compaction(spark: SparkSession, path: str) -> None:
+    spark.sql(
+        f"ALTER TABLE delta.`{path}` SET TBLPROPERTIES ('delta.autoOptimize.autoCompact' = 'true')"
+    )
+
+
+def _operations(spark: SparkSession, path: str) -> list[str]:
+    history = spark.sql(f"DESCRIBE HISTORY delta.`{path}`").orderBy("version")
+    return [row["operation"] for row in history.collect()]
+
+
+@pytest.mark.spark
+@pytest.mark.usefixtures("eager_auto_compaction")
+class TestMergeCountsUnderAutoCompaction:
+    """Auto compaction commits inside the merge call; counts must survive it."""
+
+    def _merge(self, spark, path, dim, rows, ts):  # type: ignore[no-untyped-def]
+        from weevr.operations.target_handle import TargetHandle
+
+        source = _prepare_source(spark, rows, dim, ts).repartition(4)
+        builder = DimensionMergeBuilder(dim)
+        handle = TargetHandle(spark, path)
+        return execute_dimension_merge(spark, source, builder, path, ts, handle=handle)
+
+    def test_versioned_merge_counts(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_ac_versioned")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "cd": {"columns": "auto", "on_change": "version"},
+            },
+        )
+        first = [{"customer_id": f"C{i}", "name": "old"} for i in range(4)]
+        self._merge(spark, path, dim, first, "2026-01-01")
+        _enable_auto_compaction(spark, path)
+
+        second = [
+            {"customer_id": "C0", "name": "changed"},
+            *[{"customer_id": f"N{i}", "name": "new"} for i in range(11)],
+        ]
+        result = self._merge(spark, path, dim, second, "2026-01-02")
+
+        assert _operations(spark, path)[-1] == "OPTIMIZE"  # compaction actually fired
+        assert result.rows_versioned == 1
+        assert result.rows_inserted == 11
+
+    def test_overwrite_merge_counts(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_ac_overwrite")
+        dim = _make_dim(track_history=False)
+        first = [{"customer_id": f"C{i}", "name": "old"} for i in range(4)]
+        self._merge(spark, path, dim, first, "2026-01-01")
+        _enable_auto_compaction(spark, path)
+
+        second = [{"customer_id": f"N{i}", "name": "new"} for i in range(12)]
+        result = self._merge(spark, path, dim, second, "2026-01-02")
+
+        assert _operations(spark, path)[-1] == "OPTIMIZE"
+        assert result.rows_inserted == 12
+
+
 @pytest.mark.spark
 class TestIdempotency:
     """Second run with same data: no-op."""
