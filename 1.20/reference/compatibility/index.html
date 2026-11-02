@@ -3015,6 +3015,9 @@ lists the tested and supported versions for each dependency.</p>
 </tr>
 </tbody>
 </table>
+<p>weevr 1.x does not support Fabric Runtime 2.0: Runtime 2.0 runs Python 3.13, so
+the install fails there. See <a href="../../guides/fabric-runtime/#runtime-compatibility">Fabric Runtime</a>
+for how to keep a workspace or item on Runtime 1.3.</p>
 <h2 id="python-version-policy">Python version policy<a class="headerlink" href="#python-version-policy" title="Permanent link">&para;</a></h2>
 <p>weevr targets Python 3.11 exclusively to match the Fabric Runtime 1.3
 interpreter. This version is enforced by the <code>.python-version</code> file at the
