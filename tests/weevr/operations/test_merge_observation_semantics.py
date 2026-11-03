@@ -18,12 +18,16 @@ the dimension split degrades to absent-with-warning for the
 track_history + soft_delete combination.
 """
 
+from importlib.metadata import version
+
 import pytest
 from delta.tables import DeltaTable
 from pyspark.sql import Observation, SparkSession
 from pyspark.sql import functions as F
 
 pytestmark = pytest.mark.spark
+
+_DELTA_MAJOR = int(version("delta-spark").split(".")[0])
 
 
 def _seed_target(spark: SparkSession, path: str) -> DeltaTable:
@@ -56,15 +60,18 @@ class TestMergeSourceObservation:
         )
 
         row = dict(obs.get)
-        # VERDICT (2026-07-19, pyspark 3.5 / delta pinned): the merge
-        # fulfills the observation WITHOUT flowing source rows through the
-        # observed node — it fires with zero rows. Merge-fulfilled
-        # observations are therefore UNUSABLE for source-side counts; the
-        # engine uses bounded window-scale actions instead (the recorded
-        # fallback). This lock pins the misbehavior: if a runtime upgrade
-        # makes this exactly-once (n=2, id_sum=6), the assertion fails and
-        # the observation mechanism can be reconsidered.
-        assert row == {"n": 0, "id_sum": None}
+        # VERDICT (2026-07-19, pyspark 3.5 / Delta 3.2): the merge fulfills
+        # the observation WITHOUT flowing source rows through the observed
+        # node — it fires with zero rows. Merge-fulfilled observations are
+        # therefore UNUSABLE for source-side counts on Delta 3; the engine
+        # uses bounded window-scale actions instead (the recorded fallback).
+        # Delta 4.2 (Spark 4.1) observes the source exactly once. Both are
+        # pinned: if either changes, the assertion fails and the observation
+        # mechanism can be reconsidered.
+        if _DELTA_MAJOR >= 4:
+            assert row == {"n": 2, "id_sum": 6}
+        else:
+            assert row == {"n": 0, "id_sum": None}
 
     def test_split_update_metric_keys_present(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("obs_merge_metrics")

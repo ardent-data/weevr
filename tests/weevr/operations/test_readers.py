@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from delta.tables import DeltaTable
-from pyspark.sql import SparkSession
+from pyspark.sql import Column, SparkSession
 from pyspark.sql import functions as F
 
 from spark_helpers import create_delta_table
@@ -1075,6 +1075,16 @@ class TestTypedWatermarkCol:
             typed_watermark_col("col", bad_type, "yyyy-MM-dd")
 
 
+def _passing_ts(spark: SparkSession, col: Column) -> list[str]:
+    """Rows of a one-column AEDATTM frame (one second either side of 10:00) the filter keeps.
+
+    Evaluates the filter rather than its rendering, which differs between Spark versions.
+    """
+    values = [f"2026-01-01 {t}.00000Z" for t in ("09:59:59", "10:00:00", "10:00:01")]
+    df = spark.createDataFrame([(v,) for v in values], "AEDATTM string")
+    return sorted(r.AEDATTM for r in df.filter(col).collect())
+
+
 @pytest.mark.spark
 class TestBuildWatermarkFilter:
     """Unit tests for ``build_watermark_filter`` parameter shape."""
@@ -1102,7 +1112,8 @@ class TestBuildWatermarkFilter:
         )
         rendered = str(col)
         assert "to_timestamp(" in rendered
-        assert "CAST(2026-01-01 10:00:00 AS TIMESTAMP)" in rendered
+        assert "AS TIMESTAMP)" in rendered
+        assert _passing_ts(spark, col) == ["2026-01-01 10:00:01.00000Z"]
 
     def test_with_format_inclusive_uses_ge(self, spark: SparkSession) -> None:
         col = build_watermark_filter(
@@ -1112,9 +1123,11 @@ class TestBuildWatermarkFilter:
             inclusive=True,
             watermark_format="yyyy-MM-dd HH:mm:ss.SSSSSX",
         )
-        rendered = str(col)
-        assert " >= " in rendered
-        assert "to_timestamp(" in rendered
+        assert "to_timestamp(" in str(col)
+        assert _passing_ts(spark, col) == [
+            "2026-01-01 10:00:00.00000Z",
+            "2026-01-01 10:00:01.00000Z",
+        ]
 
 
 _SAP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSSSX"
