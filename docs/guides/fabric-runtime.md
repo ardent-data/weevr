@@ -23,11 +23,11 @@ weevr 1.20 and earlier require Python 3.11, so they install only on Runtime
 
 ### Notes for Runtime 2.0
 
-- **Delta table protocol.** Runtime 2.0 writes Delta 4.2 tables and may enable
-  table features such as deletion vectors on the tables it creates. A protocol
-  upgrade can't be undone. If Runtime 1.3 and Runtime 2.0 items share tables,
-  confirm that both runtimes can read and write them before moving production
-  items.
+- **Delta table protocol.** Tables that Runtime 2.0 creates have deletion
+  vectors enabled, which upgrades their Delta protocol (reader version 3,
+  writer version 7). Runtime 1.3 reads these tables and merges into them, so
+  items on both runtimes can share them. A protocol upgrade can't be undone,
+  though: such a table stays out of reach of older Delta readers.
 - **Native Execution Engine.** weevr produces the same results with the Native
   Execution Engine on or off.
 - **ANSI mode.** weevr doesn't change `spark.sql.ansi.enabled`. Fabric's
