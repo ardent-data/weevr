@@ -21,8 +21,8 @@ weevr ships as two wheels sharing the `weevr` namespace. `weevr` is the Spark en
 depends on `weevr-core`, the Spark-free config model, validation, and planner. Install
 `weevr-core` alone to use those without PySpark.
 
-weevr 1.x requires Fabric Runtime 1.3 and doesn't install on Runtime 2.0, the default for new
-workspaces. See [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/#runtime-compatibility).
+weevr runs on Fabric Runtime 1.3 and Runtime 2.0 (from 1.21). Earlier versions install only on
+Runtime 1.3. See [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/#runtime-compatibility).
 
 ## Quick Start
 
@@ -118,14 +118,13 @@ weevr's engine is a general-purpose library distributed via PyPI. It contains no
 
 ## Compatibility
 
-| Component | Version |
-|-----------|---------|
-| Python | 3.11 |
-| PySpark | 3.5 |
-| Delta Lake | 3.2 |
-| Microsoft Fabric Runtime | 1.3 |
+| Component | Runtime 1.3 | Runtime 2.0 |
+|-----------|-------------|-------------|
+| Python | 3.11 | 3.13 |
+| PySpark | 3.5 | 4.1 |
+| Delta Lake | 3.2 | 4.2 |
 
-weevr 1.x doesn't support Runtime 2.0.
+Runtime 2.0 support starts with weevr 1.21.
 
 ## CLI
 
