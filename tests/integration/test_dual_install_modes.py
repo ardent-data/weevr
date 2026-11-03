@@ -16,6 +16,9 @@ each mode:
   transitively; if it does, the carve-out is leaking and the
   weevr-cli unblock regresses.
 
+Every mode runs on each supported Fabric runtime's Python: 3.11
+(Runtime 1.3) and 3.13 (Runtime 2.0).
+
 * ``weevr`` (full) — the existing ``pip install weevr`` UX without
   PySpark in the venv (PySpark is a runtime requirement of the engine
   but not a declared install dependency, matching the user-facing
@@ -64,6 +67,13 @@ CORE_ONLY_REJECTS = [
 # PySpark, so we deliberately stop at hasattr to keep the test
 # self-contained without installing PySpark.
 FULL_INSTALL_LAZY_NAMES = ["Context", "RunResult", "ExecutionMode", "LoadedConfig"]
+# Python of each supported Fabric runtime, mapped to the PySpark that
+# runtime ships (full-install mode only).
+RUNTIME_PYSPARK = {
+    "3.11": "pyspark>=3.5.5,<3.5.6",  # Runtime 1.3
+    "3.13": "pyspark==4.1.1",  # Runtime 2.0
+}
+
 FULL_INSTALL_PROBE = (
     "import weevr; "
     "missing = [n for n in " + repr(FULL_INSTALL_LAZY_NAMES) + " if n not in weevr.__all__]; "
@@ -86,10 +96,10 @@ def _build_wheels(dist_dir: Path) -> tuple[Path, Path]:
     return engine, core
 
 
-def _make_venv(venv_dir: Path) -> Path:
-    """Create a Python 3.11 venv at venv_dir; return its python interpreter."""
+def _make_venv(venv_dir: Path, python_version: str) -> Path:
+    """Create a venv for python_version at venv_dir; return its python interpreter."""
     subprocess.run(
-        ["uv", "venv", "--python", "3.11", str(venv_dir)],
+        ["uv", "venv", "--python", python_version, str(venv_dir)],
         check=True,
     )
     return venv_dir / "bin" / "python"
@@ -143,15 +153,21 @@ def wheels(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
     return _build_wheels(dist)
 
 
+@pytest.fixture(params=sorted(RUNTIME_PYSPARK))
+def python_version(request: pytest.FixtureRequest) -> str:
+    return request.param
+
+
 @pytest.mark.install_smoke
 def test_core_only_install(
     wheels: tuple[Path, Path],
     tmp_path: Path,
+    python_version: str,
 ) -> None:
     """``pip install weevr-core`` exposes every pure-Python validation path."""
     _, core = wheels
     venv = tmp_path / "core_only"
-    python = _make_venv(venv)
+    python = _make_venv(venv, python_version)
     _pip_install(python, str(core))
 
     _run_imports(python, SHARED_IMPORTS, expect_ok=True)
@@ -162,10 +178,11 @@ def test_core_only_install(
 def test_core_only_install_quiet_with_unrelated_src(
     wheels: tuple[Path, Path],
     tmp_path: Path,
+    python_version: str,
 ) -> None:
     """An unrelated ``src`` directory on the path doesn't trigger the partial-workspace warning."""
     _, core = wheels
-    python = _make_venv(tmp_path / "core_only_unrelated_src")
+    python = _make_venv(tmp_path / "core_only_unrelated_src", python_version)
     _pip_install(python, str(core))
     unrelated = tmp_path / "unrelated" / "src"
     unrelated.mkdir(parents=True)
@@ -183,11 +200,12 @@ def test_core_only_install_quiet_with_unrelated_src(
 def test_core_only_install_does_not_pull_pyspark(
     wheels: tuple[Path, Path],
     tmp_path: Path,
+    python_version: str,
 ) -> None:
     """No core-only import path may transitively load PySpark."""
     _, core = wheels
     venv = tmp_path / "core_only_no_pyspark"
-    python = _make_venv(venv)
+    python = _make_venv(venv, python_version)
     _pip_install(python, str(core))
 
     statements = [
@@ -234,10 +252,11 @@ assert "pyspark" not in sys.modules
 def test_core_only_install_loads_resolved_children(
     wheels: tuple[Path, Path],
     tmp_path: Path,
+    python_version: str,
 ) -> None:
     """``load_resolved`` loads, plans, and validates a weave and a loom in a core-only install."""
     _, core = wheels
-    python = _make_venv(tmp_path / "core_only_load")
+    python = _make_venv(tmp_path / "core_only_load", python_version)
     _pip_install(python, str(core))
 
     project = tmp_path / "smoke.weevr"
@@ -262,21 +281,23 @@ def test_core_only_install_loads_resolved_children(
 def test_full_install(
     wheels: tuple[Path, Path],
     tmp_path: Path,
+    python_version: str,
 ) -> None:
     """``pip install weevr`` (engine + core + PySpark) keeps every pure path."""
     engine, core = wheels
     venv = tmp_path / "full"
-    python = _make_venv(venv)
+    python = _make_venv(venv, python_version)
     # Install both wheels at once so pip resolves the engine's pinned
     # weevr-core dependency to the local core wheel rather than PyPI.
     # PySpark is not a declared install dependency of weevr — Microsoft
     # Fabric provides it at runtime — but exercising weevr.engine.*
-    # eagerly-imported submodules requires it, so install it here.
+    # eagerly-imported submodules requires it, so install the version
+    # that runtime ships.
     _pip_install(
         python,
         str(engine),
         str(core),
-        "pyspark>=3.5.5,<3.5.6",
+        RUNTIME_PYSPARK[python_version],
     )
 
     _run_imports(python, SHARED_IMPORTS, expect_ok=True)
