@@ -79,8 +79,9 @@ def spark_action_counter(monkeypatch) -> dict[str, int]:
 
     Returns a dict whose "total" key holds the running action count.
     """
-    from pyspark.sql import DataFrame
+    from spark_helpers import dataframe_class
 
+    DataFrame = dataframe_class()
     state = {"total": 0, "_depth": 0}
 
     def _make_wrapper(original):

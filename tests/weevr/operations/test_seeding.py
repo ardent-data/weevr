@@ -464,7 +464,9 @@ class TestEmptyProbeIsCheap:
     def test_emptiness_probe_avoids_full_count(
         self, spark: SparkSession, tmp_delta_path, monkeypatch
     ) -> None:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         path = tmp_delta_path("empty_probe_cheap")
         create_delta_table(spark, path, [{"id": i, "name": "x"} for i in range(50)])

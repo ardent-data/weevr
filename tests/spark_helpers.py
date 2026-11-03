@@ -46,3 +46,18 @@ def assert_dataframes_equal(actual: DataFrame, expected: DataFrame) -> None:
     assert actual_sorted.collect() == expected_sorted.collect(), (
         f"DataFrames differ.\nActual:\n{actual.collect()}\nExpected:\n{expected.collect()}"
     )
+
+
+def dataframe_class() -> type[DataFrame]:
+    """Return the DataFrame class whose methods Spark sessions actually run.
+
+    Spark 4 turned ``pyspark.sql.DataFrame`` into an abstract base; sessions
+    return ``pyspark.sql.classic.dataframe.DataFrame``, so a monkeypatch on
+    the base never fires. Spark 3.5 has only the one class. Patch DataFrame
+    methods on the class this returns.
+    """
+    try:
+        from pyspark.sql.classic.dataframe import DataFrame as ClassicDataFrame
+    except ImportError:
+        return DataFrame
+    return ClassicDataFrame
