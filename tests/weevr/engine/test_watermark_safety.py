@@ -171,6 +171,20 @@ class TestOtherWatermarkTypes:
         state = MetadataTableStore(store).read(spark, "t")
         assert state is not None and state.last_value == "2024-01-01"
 
+    def test_date_watermark_second_run_reads_only_new_rows(self, spark: SparkSession, tmp_path):
+        src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))
+        _append(spark, src, "select 1 as id, date'2024-01-01' as d")
+        thread = _thread(src, tgt, store, wm_type="date", wm_col="d")
+        assert execute_thread(spark, thread).status == "success"
+        _append(spark, src, "select 2 as id, date'2024-01-02' as d")
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert sorted(r.id for r in spark.read.format("delta").load(tgt).collect()) == [1, 2]
+        state = MetadataTableStore(store).read(spark, "t")
+        assert state is not None and state.last_value == "2024-01-02"
+
     def test_ntz_watermark_round_trip(self, new_york_session, tmp_path):
         spark = new_york_session
         src, tgt, store = (str(tmp_path / n) for n in ("src", "tgt", "wm"))

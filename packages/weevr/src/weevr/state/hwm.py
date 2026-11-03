@@ -149,12 +149,18 @@ def _checked_cast(df: DataFrame, last_value: str, type_name: str) -> Column:
     cast working, including forms Python's parsers reject. ``try_cast`` gives
     NULL under ANSI mode too, where a plain cast raises instead.
 
+    The text travels as a row of data, never as SQL text or a SQL parameter:
+    parameterized ``spark.sql`` fails with the Delta session extension on
+    Spark 4.1 (Fabric Runtime 2.0), and ``Column.try_cast`` needs Spark 4.0.
+
     Raises:
         ValueError: If Spark can't cast the text.
     """
-    row = df.sparkSession.sql(
-        f"SELECT try_cast(:value AS {type_name}) IS NULL AS bad", args={"value": last_value}
-    ).first()
+    row = (
+        df.sparkSession.createDataFrame([(last_value,)], "v string")
+        .select(F.expr(f"try_cast(v AS {type_name}) IS NULL").alias("bad"))
+        .first()
+    )
     if row is None or row["bad"]:
         raise ValueError(f"not castable to {type_name}: {last_value!r}")
     return F.lit(last_value).cast(type_name)
