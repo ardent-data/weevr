@@ -3,7 +3,7 @@ name: Deploy Docs
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 1.x]
     paths:
       - "docs/**"
       - "mkdocs.yml"
@@ -16,10 +16,17 @@ permissions:
 
 jobs:
   deploy-docs:
-    # Skip release-please commits — the release workflow handles those
+    # Publish only from the docs branch (repository variable DOCS_BRANCH, set
+    # to 1.x once it exists, so prerelease docs never reach the site). Skip
+    # release-please commits — the release workflow handles those.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      !startsWith(github.event.head_commit.message, 'chore(main): release')
+      github.ref_name == (vars.DOCS_BRANCH || 'main') && (
+        github.event_name == 'workflow_dispatch' ||
+        !startsWith(
+          github.event.head_commit.message,
+          format('chore({0}): release', github.ref_name)
+        )
+      )
     runs-on: ubuntu-latest
 
     steps:
