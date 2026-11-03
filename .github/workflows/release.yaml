@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, 1.x]
   workflow_dispatch:
     inputs:
       force_release:
@@ -33,6 +33,7 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          target-branch: ${{ github.ref_name }}
 
   build:
     needs: release
@@ -114,7 +115,12 @@ jobs:
 
   deploy-docs:
     needs: release
-    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    # Publish only from the docs branch; see the Deploy Docs workflow.
+    if: >-
+      ${{
+        needs.release.outputs.releases_created == 'true' &&
+        github.ref_name == (vars.DOCS_BRANCH || 'main')
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

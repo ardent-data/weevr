@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
+      - 1.x
   # Docs, devcontainer, and tooling-only PRs skip the Spark suite. Every
-  # push to main still runs it in full.
+  # push to main or 1.x still runs it in full.
   pull_request:
     paths:
       - "packages/**"
