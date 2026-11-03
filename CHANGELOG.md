@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.7](https://github.com/ardent-data/weevr/compare/weevr-v1.20.6...weevr-v1.20.7) (2026-11-03)
+
+
+### Bug Fixes
+
+* **operations:** keep dimension merge counts under auto compaction ([#279](https://github.com/ardent-data/weevr/issues/279)) ([df3722a](https://github.com/ardent-data/weevr/commit/df3722a623db79bc0742271f5f33f2768a06c1e5))
+
 ## [1.20.6](https://github.com/ardent-data/weevr/compare/weevr-v1.20.5...weevr-v1.20.6) (2026-11-01)
 
 
