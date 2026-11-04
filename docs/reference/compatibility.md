@@ -22,6 +22,20 @@ Runtime 2.0 and on choosing a runtime per workspace or item, and
 [Move to Runtime 2.0](../how-to/move-to-runtime-2.md) to move an existing
 workload.
 
+## Support window for weevr 1.x
+
+weevr 1.x is supported for as long as Microsoft supports Fabric Runtime 1.3.
+Until then, it receives bug fixes and security fixes as patch releases. New
+features go into weevr 2.x.
+
+Microsoft's [runtime lifecycle](https://learn.microsoft.com/fabric/data-engineering/lifecycle)
+page puts Runtime 1.3 in Long Term Support from October 1, 2026, through
+March 2027. If Microsoft changes that date, the weevr 1.x window changes with
+it. After it ends, weevr 1.x gets no further releases.
+
+weevr 1.x also runs on Runtime 2.0, but the window still follows Runtime 1.3.
+To stay supported on Runtime 2.0, move to weevr 2.x once it is released.
+
 ## Python version policy
 
 The wheels support Python 3.11 through 3.13: the interpreters of Runtime 1.3
