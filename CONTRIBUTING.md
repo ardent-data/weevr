@@ -324,8 +324,11 @@ Documentation updates are welcome but not required from external contributors. M
 
 ## Branching model
 
-* Default branch: `main`
-* Create feature branches from `main`
+* `main`: development of weevr 2.0
+* `1.x`: maintenance of weevr 1.x. The published documentation is built from this branch.
+* Create feature branches from the branch your change is for, and open the pull request
+  against it. A fix for released 1.x behavior goes to `1.x`; maintainers forward-port it
+  to `main` when the affected code still exists there.
 * Keep branches short-lived and focused
 
 Recommended branch name patterns:
