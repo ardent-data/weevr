@@ -1,5 +1,15 @@
 # Security Policy
 
+## Supported Versions
+
+| Version | Supported |
+|---------|-----------|
+| 1.x (latest patch) | Yes, until Fabric Runtime 1.3 leaves support (currently March 2027) |
+| Earlier 1.x releases | No: upgrade to the latest 1.x patch |
+
+Security fixes for 1.x ship as patch releases from the `1.x` branch. See the
+support window in the [compatibility reference](docs/reference/compatibility.md).
+
 ## Reporting a Vulnerability
 
 If you believe you have discovered a security vulnerability in **weevr**, please report it responsibly.
