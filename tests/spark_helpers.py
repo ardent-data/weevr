@@ -6,6 +6,7 @@ test modules that need programmatic DataFrame setup or comparison.
 
 from typing import Any
 
+import pyspark
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StructType
 
@@ -55,9 +56,15 @@ def dataframe_class() -> type[DataFrame]:
     return ``pyspark.sql.classic.dataframe.DataFrame``, so a monkeypatch on
     the base never fires. Spark 3.5 has only the one class. Patch DataFrame
     methods on the class this returns.
+
+    Raises:
+        ImportError: On Spark 4 or later when the classic class is missing,
+            so patches can't silently land on the abstract base.
     """
     try:
         from pyspark.sql.classic.dataframe import DataFrame as ClassicDataFrame
     except ImportError:
-        return DataFrame
+        if pyspark.__version__.startswith("3."):
+            return DataFrame
+        raise
     return ClassicDataFrame
