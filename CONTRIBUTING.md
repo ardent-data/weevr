@@ -210,6 +210,10 @@ curl -fsSL https://d2lang.com/install.sh | sh -s --
 Or download a release from <https://github.com/terrastruct/d2/releases> and
 place the `d2` binary on your `PATH`.
 
+CI builds the docs with the D2 version pinned in
+`.github/actions/install-d2/action.yml`. To match it locally, pass that
+version to the script, for example `sh -s -- --version v0.9.0`.
+
 Verify:
 
 ```bash
