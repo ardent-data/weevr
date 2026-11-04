@@ -61,6 +61,7 @@ nav:
       - Implement Custom Telemetry Sink: how-to/implement-custom-telemetry-sink.md
       - Cache a Lookup: how-to/cache-a-lookup.md
       - Run from Fabric Pipeline: how-to/run-from-fabric-pipeline.md
+      - Move to Runtime 2.0: how-to/move-to-runtime-2.md
   - Reference:
       - YAML Schema:
           - Thread: reference/yaml-schema/thread.md

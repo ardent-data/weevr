@@ -18,7 +18,9 @@ weevr 1.21 and later support both Fabric Runtime 1.3 and Fabric Runtime 2.0.
 
 weevr 1.20 and earlier require Python 3.11 and install only on Runtime 1.3. See
 [Fabric Runtime](../guides/fabric-runtime.md#runtime-compatibility) for notes on
-Runtime 2.0 and on choosing a runtime per workspace or item.
+Runtime 2.0 and on choosing a runtime per workspace or item, and
+[Move to Runtime 2.0](../how-to/move-to-runtime-2.md) to move an existing
+workload.
 
 ## Python version policy
 

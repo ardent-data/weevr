@@ -27,7 +27,11 @@ weevr 1.20 and earlier require Python 3.11, so they install only on Runtime
   vectors enabled, which upgrades their Delta protocol (reader version 3,
   writer version 7). Runtime 1.3 reads these tables and merges into them, so
   items on both runtimes can share them. A protocol upgrade can't be undone,
-  though: such a table stays out of reach of older Delta readers.
+  though: such a table stays out of reach of older Delta readers. Tables that
+  Runtime 1.3 created keep their protocol when Runtime 2.0 writes to them.
+- **Incremental state.** Watermark and CDC state carries over between the
+  runtimes in both directions, so incremental threads continue where they
+  stopped after a move.
 - **Native Execution Engine.** weevr produces the same results with the Native
   Execution Engine on or off.
 - **ANSI mode.** weevr doesn't change `spark.sql.ansi.enabled`. Fabric's
@@ -42,7 +46,9 @@ item on one runtime, attach it to a published **Environment** set to that
 runtime, or set the runtime under **Workspace settings** >
 **Data Engineering/Science** > **Spark settings**.
 
-See [Compatibility](../reference/compatibility.md) for supported versions.
+To move an existing workload from Runtime 1.3, follow
+[Move to Runtime 2.0](../how-to/move-to-runtime-2.md). See
+[Compatibility](../reference/compatibility.md) for supported versions.
 
 ## Installing weevr
 
