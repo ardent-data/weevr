@@ -57,6 +57,7 @@
     "OPFLAG",
     "overwrite",
     "pathlib",
+    "pipefail",
     "powerbi",
     "pushdown",
     "pydantic",
