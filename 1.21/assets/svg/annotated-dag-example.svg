@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 458 362" width="458" height="362"><style>
+  .dag-node{fill:#f7fafc;stroke:#a0aec0;stroke-width:1.5}
+  .dag-node-cached{fill:#ebf8ff;stroke:#3182ce;stroke-width:2}
+  .dag-label{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central}
+  .dag-label-cached{fill:#2c5282;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central}
+  .dag-edge{stroke:#a0aec0;stroke-width:1.5;fill:none}
+  .dag-arrow{fill:#a0aec0}
+  .dag-lookup-node{fill:#fffaf0;stroke:#dd6b20;stroke-width:1.5;stroke-dasharray:4 2}
+  .dag-lookup-node-label{fill:#c05621;font-family:system-ui, -apple-system, sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central}
+  .dag-lookup-edge{stroke:#dd6b20;stroke-width:1.5;fill:none;stroke-dasharray:6 3}
+  .dag-lookup-line{stroke:#dd6b20;stroke-width:1;stroke-dasharray:6 3}
+  .dag-lookup-label{fill:#c05621;font-family:system-ui, -apple-system, sans-serif;font-size:11px;text-anchor:middle;dominant-baseline:central}
+  .dag-swimlane{fill:none;stroke:#a0aec0;stroke-width:1;rx:8}
+  .dag-swimlane-header{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:13px;text-anchor:middle;dominant-baseline:central;font-weight:600}
+  .dag-bg{fill:#ffffff}
+  @media(prefers-color-scheme:dark){
+    .dag-node{fill:#2d3748;stroke:#718096}
+    .dag-node-cached{fill:#2a4365;stroke:#63b3ed}
+    .dag-label{fill:#e2e8f0}
+    .dag-label-cached{fill:#bee3f8}
+    .dag-edge{stroke:#718096}
+    .dag-arrow{fill:#718096}
+    .dag-lookup-node{fill:#744210;stroke:#ed8936}
+    .dag-lookup-node-label{fill:#fbd38d}
+    .dag-lookup-edge{stroke:#ed8936}
+    .dag-lookup-line{stroke:#ed8936}
+    .dag-lookup-label{fill:#fbd38d}
+    .dag-swimlane{stroke:#718096}
+    .dag-swimlane-header{fill:#e2e8f0}
+    .dag-bg{fill:#1a202c}
+  }
+</style><style>  .dag-dur{fill:#2d3748;font-family:system-ui, -apple-system, sans-serif;font-size:11px;text-anchor:middle;opacity:0.7}  @media(prefers-color-scheme:dark){.dag-dur{fill:#e2e8f0}}</style><defs><marker id="dag-arrowhead" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto-start-reverse"><polygon points="0 0, 8 4, 0 8" class="dag-arrow"/></marker></defs><rect width="458" height="362" class="dag-bg"/><line x1="240.5" y1="56.0" x2="150.0" y2="136.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="86.8" y1="56.0" x2="150.0" y2="136.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="240.5" y1="56.0" x2="303.7" y2="136.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="150.0" y1="172.0" x2="228.8" y2="252.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><line x1="303.7" y1="172.0" x2="228.8" y2="252.0" class="dag-edge" marker-end="url(#dag-arrowhead)"/><rect x="20.0" y="20.0" width="133.6" height="36.0" rx="6" class="dag-node"/><text x="86.8" y="38.0" class="dag-label">dim_customer</text><circle cx="145.6" cy="28.0" r="5" fill="#48bb78" stroke="white" stroke-width="1.5"/><text x="86.8" y="70.0" class="dag-dur">3.0s</text><rect x="177.6" y="20.0" width="125.8" height="36.0" rx="6" class="dag-node-cached"/><text x="240.5" y="38.0" class="dag-label-cached">dim_product</text><circle cx="295.4" cy="28.0" r="5" fill="#48bb78" stroke="white" stroke-width="1.5"/><text x="240.5" y="70.0" class="dag-dur">2.3s</text><rect x="327.4" y="20.0" width="110.2" height="36.0" rx="6" class="dag-node"/><text x="382.5" y="38.0" class="dag-label">dim_store</text><circle cx="429.6" cy="28.0" r="5" fill="#48bb78" stroke="white" stroke-width="1.5"/><text x="382.5" y="70.0" class="dag-dur">1.3s</text><rect x="87.1" y="136.0" width="125.8" height="36.0" rx="6" class="dag-node"/><text x="150.0" y="154.0" class="dag-label">fact_orders</text><circle cx="204.9" cy="144.0" r="5" fill="#48bb78" stroke="white" stroke-width="1.5"/><text x="150.0" y="186.0" class="dag-dur">4.7s</text><rect x="236.9" y="136.0" width="133.6" height="36.0" rx="6" class="dag-node"/><text x="303.7" y="154.0" class="dag-label">fact_returns</text><circle cx="362.5" cy="144.0" r="5" fill="#48bb78" stroke="white" stroke-width="1.5"/><text x="303.7" y="186.0" class="dag-dur">2.8s</text><rect x="142.5" y="252.0" width="172.6" height="36.0" rx="6" class="dag-node"/><text x="228.8" y="270.0" class="dag-label">agg_daily_revenue</text><circle cx="307.1" cy="260.0" r="5" fill="#48bb78" stroke="white" stroke-width="1.5"/><text x="228.8" y="302.0" class="dag-dur">1.3s</text></svg>
