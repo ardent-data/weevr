@@ -1,0 +1,32 @@
+name: Install D2
+description: >-
+  Install a pinned D2 release for the docs build. Downloads the release archive
+  from GitHub, checks it against a pinned SHA-256, and installs the binary. No
+  API calls and no token, so it isn't subject to the unauthenticated API rate
+  limit.
+
+inputs:
+  version:
+    description: D2 version, without the leading v.
+    default: "0.9.0"
+  sha256:
+    description: SHA-256 of d2-v<version>-linux-amd64.tar.gz. Update with the version.
+    default: "5669ddc46b99e942cc96078f4a4e36d5e62103348f4c05179ede27802fdd87a9"
+
+runs:
+  using: composite
+  steps:
+    - name: Download, verify, and install D2
+      shell: bash
+      env:
+        D2_VERSION: ${{ inputs.version }}
+        D2_SHA256: ${{ inputs.sha256 }}
+      run: |
+        set -euo pipefail
+        archive="d2-v${D2_VERSION}-linux-amd64.tar.gz"
+        curl -fsSL --retry 3 -o "${RUNNER_TEMP}/${archive}" \
+          "https://github.com/d2lang/d2/releases/download/v${D2_VERSION}/${archive}"
+        echo "${D2_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum -c -
+        tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}"
+        sudo install -m 0755 "${RUNNER_TEMP}/d2-v${D2_VERSION}/bin/d2" /usr/local/bin/d2
+        d2 --version
