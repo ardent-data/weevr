@@ -617,7 +617,9 @@ class TestJoinMutationBatching:
     def test_include_exclude_prefix_use_batched_calls(
         self, spark: SparkSession, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         calls = {"withColumnRenamed": 0, "drop": 0}
         orig_rename = DataFrame.withColumnRenamed

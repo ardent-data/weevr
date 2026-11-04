@@ -6,8 +6,10 @@ environment setup to submitting a pull request. It extends the root
 
 ## Prerequisites
 
-- **Python 3.11** -- weevr targets Fabric Runtime 1.3, which ships
-  Python 3.11. The version is pinned via `.python-version`.
+- **Python 3.11** -- the default development environment matches Fabric
+  Runtime 1.3, which ships Python 3.11. The version is pinned via
+  `.python-version`. Python 3.13 is needed only for the
+  [Runtime 2.0 stack](#runtime-20-stack).
 - **uv** -- Used for dependency management, virtual environment creation,
   and running all project commands.
 - **Git** -- Configured with your name and email for commit sign-off.
@@ -37,8 +39,9 @@ rather than a one-shot command. The token cache stays inside the container, so
 repeat the login after a rebuild.
 
 The devcontainer sets `PYSPARK_PYTHON` to its Python 3.11 virtual environment.
-An isolated environment on another Python version must override that variable,
-or Spark workers start on the wrong interpreter.
+The test suite replaces it with the interpreter running pytest. A script that
+starts Spark from another environment must set it to that environment's
+Python, or Spark workers start on the wrong interpreter.
 
 ## Running checks locally
 
@@ -115,6 +118,26 @@ For verbose output and coverage:
 ```bash
 uv run pytest -v --cov
 ```
+
+### Runtime 2.0 stack
+
+The default environment matches Fabric Runtime 1.3: Python 3.11, PySpark
+3.5.5 and Delta 3.2. A second locked stack matches Runtime 2.0: Python 3.13,
+PySpark 4.1.1 and Delta 4.2.0, declared as the engine package's `rt2`
+dependency group. CI runs the default suite and the Spark suite on both
+stacks.
+
+Build the Runtime 2.0 stack in its own environment, so it doesn't replace the
+default one:
+
+```bash
+UV_PROJECT_ENVIRONMENT=.venv-rt2 uv sync --no-dev --group rt2 --python 3.13
+UV_PROJECT_ENVIRONMENT=.venv-rt2 uv run --no-sync pytest -m spark -n 2
+```
+
+`--no-sync` stops `uv run` from syncing the default `dev` group back into that
+environment. The first Spark run downloads the Delta 4.2 JARs; run it with
+`-n 1` once so parallel workers don't race the download.
 
 ## Branching model
 

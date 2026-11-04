@@ -6,34 +6,49 @@ production.
 
 ## Runtime compatibility
 
-weevr 1.x requires **Fabric Runtime 1.3**, which ships with:
+weevr 1.21 and later run on **Fabric Runtime 1.3** and **Fabric Runtime 2.0**:
 
-| Component  | Version    |
-|------------|------------|
-| Python     | 3.11       |
-| PySpark    | 3.5.x      |
-| Delta Lake | 3.2.x      |
+| Component  | Runtime 1.3 | Runtime 2.0 |
+|------------|-------------|-------------|
+| Python     | 3.11        | 3.13        |
+| PySpark    | 3.5.x       | 4.1.x       |
+| Delta Lake | 3.2.x       | 4.2.x       |
 
-weevr pins `requires-python = ">=3.11,<3.12"` to match. All transforms,
-readers, writers, and telemetry primitives are tested against PySpark 3.5 and
-Delta 3.2.
+Both wheels declare `requires-python = ">=3.11,<3.14"`. Every release is tested
+against both stacks: PySpark 3.5 with Delta 3.2, and PySpark 4.1 with Delta 4.2.
+The same configs produce the same tables, keys, and hashes on either runtime.
 
-!!! warning "weevr 1.x does not install on Runtime 2.0"
+weevr 1.20 and earlier require Python 3.11, so they install only on Runtime
+1.3. To run on Runtime 2.0, upgrade to 1.21 or later.
 
-    Runtime 2.0 runs Python 3.13, so `%pip install weevr` fails there with
-    `No matching distribution found for weevr`. Runtime 2.0 is the default for
-    new workspaces, and changing a workspace to Runtime 2.0 also moves its
-    existing items the next time they start a session.
+### Notes for Runtime 2.0
 
-    Keep weevr on Runtime 1.3 in either of these ways:
+- **Delta table protocol.** Tables that Runtime 2.0 creates have deletion
+  vectors enabled, which upgrades their Delta protocol (reader version 3,
+  writer version 7). Runtime 1.3 reads these tables and merges into them, so
+  items on both runtimes can share them. A protocol upgrade can't be undone,
+  though: such a table stays out of reach of older Delta readers. Tables that
+  Runtime 1.3 created keep their protocol when Runtime 2.0 writes to them.
+- **Incremental state.** Watermark and CDC state carries over between the
+  runtimes in both directions, so incremental threads continue where they
+  stopped after a move.
+- **Native Execution Engine.** weevr produces the same results with the Native
+  Execution Engine on or off.
+- **ANSI mode.** weevr doesn't change `spark.sql.ansi.enabled`. Fabric's
+  default is off on both runtimes. If you turn it on, a cast that fails raises an
+  error instead of returning `NULL`, on either runtime.
 
-    - Set the workspace runtime to 1.3 under **Workspace settings** >
-      **Data Engineering/Science** > **Spark settings**.
-    - Attach the notebook or Spark Job Definition to a published
-      **Environment** set to Runtime 1.3. The Environment keeps it on 1.3 even
-      in a Runtime 2.0 workspace.
+### Choosing a runtime
 
-    See [Compatibility](../reference/compatibility.md) for supported versions.
+Runtime 2.0 is the default for new workspaces. Changing a workspace's runtime
+also moves its existing items the next time they start a session. To keep an
+item on one runtime, attach it to a published **Environment** set to that
+runtime, or set the runtime under **Workspace settings** >
+**Data Engineering/Science** > **Spark settings**.
+
+To move an existing workload from Runtime 1.3, follow
+[Move to Runtime 2.0](../how-to/move-to-runtime-2.md). See
+[Compatibility](../reference/compatibility.md) for supported versions.
 
 ## Installing weevr
 
@@ -43,7 +58,7 @@ An Environment pins both the runtime and the weevr version, so scheduled runs
 are reproducible and don't depend on PyPI at session start:
 
 1. In your workspace, select **New item** > **Environment**.
-2. Set the Environment's runtime to **1.3**.
+2. Set the Environment's runtime to **1.3** or **2.0**.
 3. Under **Libraries**, add `weevr` as a public library with an exact version.
 4. Select **Publish**.
 5. Attach the Environment to your notebook or Spark Job Definition, or set it
@@ -301,16 +316,18 @@ a step-by-step walkthrough.
 
 ### No matching distribution found for weevr
 
-The session is on Runtime 2.0, where Python 3.13 doesn't satisfy weevr 1.x's
-Python 3.11 requirement. Check with `spark.version`: weevr 1.x needs 3.5.x. Move
-the workspace or the item to Runtime 1.3, as described under
-[Runtime compatibility](#runtime-compatibility).
+The session is on Runtime 2.0 and the requested version is 1.20 or earlier,
+which needs Python 3.11. Check with `spark.version`: `4.1.x` is Runtime 2.0.
+Install weevr 1.21 or later, or move the item to Runtime 1.3 as described under
+[Choosing a runtime](#choosing-a-runtime).
 
 ### Package not found after install
 
 If `%pip install weevr` succeeds but `from weevr import Context` fails,
-restart the Spark session. In-session pip installs require a kernel restart
-to take effect in some Fabric configurations.
+restart the Python process with `notebookutils.session.restartPython()` and
+import again. The install can upgrade packages the session has already loaded,
+such as `pydantic`, and the running kernel keeps the old copies until it
+restarts. Installing through an Environment avoids this.
 
 ### Permission denied on abfss:// paths
 

@@ -761,7 +761,9 @@ class TestCommitMetricsCounts:
         ``history(1).collect()`` metadata reads, which are the design's
         accepted (log-scale) cost; this spy isolates fact-scale counts.
         """
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         calls: list[int] = []
         original = DataFrame.count

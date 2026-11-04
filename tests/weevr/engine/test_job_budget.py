@@ -161,7 +161,9 @@ class TestThreadActionBudget:
 
     @pytest.fixture()
     def eager_spies(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         spies: dict[str, list[int]] = {"count": [], "toPandas": []}
         orig_count = DataFrame.count
@@ -245,7 +247,9 @@ class TestFeatureEnableMatrix:
 
     @pytest.fixture()
     def eager_spies(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         spies: dict[str, list[int]] = {"count": [], "toPandas": []}
         orig_count = DataFrame.count

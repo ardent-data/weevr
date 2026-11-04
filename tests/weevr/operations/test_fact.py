@@ -203,7 +203,9 @@ class TestCheckFactSentinels:
     def test_aggregation_failure_swallowed_as_advisory(self, spark: SparkSession, monkeypatch):
         """A failing sentinel aggregation returns no diagnostics and
         raises nothing — the check is advisory only."""
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         schema = StructType([StructField("sk_customer", IntegerType(), True)])
         df = spark.createDataFrame([(1,)], schema)

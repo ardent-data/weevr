@@ -6,6 +6,7 @@ test modules that need programmatic DataFrame setup or comparison.
 
 from typing import Any
 
+import pyspark
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StructType
 
@@ -46,3 +47,24 @@ def assert_dataframes_equal(actual: DataFrame, expected: DataFrame) -> None:
     assert actual_sorted.collect() == expected_sorted.collect(), (
         f"DataFrames differ.\nActual:\n{actual.collect()}\nExpected:\n{expected.collect()}"
     )
+
+
+def dataframe_class() -> type[DataFrame]:
+    """Return the DataFrame class whose methods Spark sessions actually run.
+
+    Spark 4 turned ``pyspark.sql.DataFrame`` into an abstract base; sessions
+    return ``pyspark.sql.classic.dataframe.DataFrame``, so a monkeypatch on
+    the base never fires. Spark 3.5 has only the one class. Patch DataFrame
+    methods on the class this returns.
+
+    Raises:
+        ImportError: On Spark 4 or later when the classic class is missing,
+            so patches can't silently land on the abstract base.
+    """
+    try:
+        from pyspark.sql.classic.dataframe import DataFrame as ClassicDataFrame
+    except ImportError:
+        if pyspark.__version__.startswith("3."):
+            return DataFrame
+        raise
+    return ClassicDataFrame

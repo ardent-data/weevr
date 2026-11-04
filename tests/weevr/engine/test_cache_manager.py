@@ -49,7 +49,9 @@ class TestRegistryUnit:
     def test_persist_materializes_eagerly(
         self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         path = tmp_delta_path("cmreg_eager")
         spark.createDataFrame([{"id": 1}]).write.format("delta").save(path)

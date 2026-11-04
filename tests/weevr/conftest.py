@@ -8,10 +8,12 @@ from pathlib import Path
 import pytest
 from pyspark.sql import SparkSession
 
-# Ensure PySpark worker processes use the same Python interpreter as the test
-# runner (i.e., the virtual environment Python, not a system Python).
-os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
-os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
+# PySpark workers must run the test runner's interpreter. Overwrite, not
+# setdefault: a shell that exports PYSPARK_PYTHON for one environment (the
+# devcontainer does) would otherwise start workers on the wrong Python when
+# the tests run from another, such as the Runtime 2.0 stack.
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
 
 
 @pytest.fixture(scope="session")
@@ -29,6 +31,10 @@ def spark(tmp_path_factory: pytest.TempPathFactory) -> Generator[SparkSession, N
 
     Under pytest-xdist each worker gets its own session, so each also gets
     its own warehouse directory to keep default-catalog tables apart.
+
+    ANSI mode is off, as on both Fabric runtimes. Spark 3.5 already
+    defaults to off; Spark 4 defaults to on. Tests that need ANSI on set
+    it themselves.
     """
     from delta import configure_spark_with_delta_pip
 
@@ -46,6 +52,7 @@ def spark(tmp_path_factory: pytest.TempPathFactory) -> Generator[SparkSession, N
         .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "1")
         .config("spark.sql.codegen.wholeStage", "false")
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.ansi.enabled", "false")
         .config("spark.driver.memory", "3g")
         .config("spark.ui.enabled", "false")
         .config("spark.ui.showConsoleProgress", "false")
@@ -72,8 +79,9 @@ def spark_action_counter(monkeypatch) -> dict[str, int]:
 
     Returns a dict whose "total" key holds the running action count.
     """
-    from pyspark.sql import DataFrame
+    from spark_helpers import dataframe_class
 
+    DataFrame = dataframe_class()
     state = {"total": 0, "_depth": 0}
 
     def _make_wrapper(original):

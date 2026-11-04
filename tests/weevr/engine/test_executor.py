@@ -1853,7 +1853,9 @@ class TestCaptureSamplesGate:
 
     @pytest.fixture()
     def topandas_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         calls: list[int] = []
         original = DataFrame.toPandas
@@ -2054,7 +2056,9 @@ class TestPersistBoundaries:
         """Count DataFrame.unpersist calls (Delta internals cache RDDs of
         their own, so asserting on the global persistent-RDD registry is
         noise — the release INVOCATION is the engine's contract)."""
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         calls: list[int] = []
         original = DataFrame.unpersist
@@ -2189,7 +2193,9 @@ class TestFindingsRegression:
     ) -> None:
         # The B-007 lesson: a failure mid-write must not leak the export
         # persist — the finally block releases every boundary
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         from weevr.engine import executor as executor_mod
 

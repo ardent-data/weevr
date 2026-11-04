@@ -10,5 +10,5 @@ the companion [`weevr-core`](https://pypi.org/project/weevr-core/) wheel; `weevr
 runtime dependency, so `pip install weevr` continues to install the full
 stack unchanged.
 
-weevr 1.x requires Fabric Runtime 1.3 and doesn't install on Runtime 2.0. See
+weevr runs on Fabric Runtime 1.3 and Runtime 2.0 (from 1.21). See
 [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/#runtime-compatibility).

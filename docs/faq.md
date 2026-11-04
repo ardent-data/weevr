@@ -26,8 +26,10 @@ config is what runs.
 
 ## What Spark and Delta versions are supported?
 
-weevr targets **PySpark 3.5.x** and **Delta Lake 3.2.x**, which align with
-Microsoft Fabric Runtime 1.3 and Python 3.11. See the
+weevr supports both Microsoft Fabric runtimes: **PySpark 3.5.x** with
+**Delta Lake 3.2.x** on Runtime 1.3 (Python 3.11), and **PySpark 4.1.x** with
+**Delta Lake 4.2.x** on Runtime 2.0 (Python 3.13). Runtime 2.0 support starts
+with weevr 1.21. See the
 [Compatibility](reference/compatibility.md) page for the full version
 matrix.
 

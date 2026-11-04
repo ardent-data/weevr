@@ -2630,7 +2630,9 @@ class TestCaptureSamplesWiring:
         tmp_path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         attempts: list[int] = []
         original = DataFrame.toPandas

@@ -51,7 +51,8 @@ modules' `_LAZY_ATTRS` map in sync with their `__all__`, and
 
 ## Development prerequisites
 
-* **Python**: 3.11.x (aligned with Microsoft Fabric Runtime 1.3)
+* **Python**: 3.11.x for the default environment (aligned with Microsoft Fabric Runtime 1.3);
+  3.13 for the Runtime 2.0 stack
 * **uv**: used for Python version pinning, dependency management, and execution
 * **Git**: configured with your preferred name and email
 
@@ -100,6 +101,17 @@ uv run pyright
 
 ```bash
 uv run pytest
+```
+
+### Runtime 2.0 stack
+
+The default environment matches Fabric Runtime 1.3. The engine package's `rt2` dependency group
+matches Fabric Runtime 2.0 (Python 3.13, PySpark 4.1.1, Delta 4.2.0), and CI tests both. Build it in
+its own environment and keep `uv run` from re-syncing it:
+
+```bash
+UV_PROJECT_ENVIRONMENT=.venv-rt2 uv sync --no-dev --group rt2 --python 3.13
+UV_PROJECT_ENVIRONMENT=.venv-rt2 uv run --no-sync pytest -m spark -n 2
 ```
 
 ### JSON schema check

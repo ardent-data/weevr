@@ -49,6 +49,7 @@
     "mkdocs",
     "mkdocstrings",
     "mssparkutils",
+    "notebookutils",
     "nullable",
     "Okafor",
     "okafor",

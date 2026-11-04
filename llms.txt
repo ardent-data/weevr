@@ -12,7 +12,8 @@
 - [Weave YAML schema](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/weave/)
 - [Loom YAML schema](https://ardent-data.github.io/weevr/latest/reference/yaml-schema/loom/)
 - [Configuration keys](https://ardent-data.github.io/weevr/latest/reference/configuration-keys/)
-- [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/): weevr 1.x requires Runtime 1.3
+- [Fabric Runtime](https://ardent-data.github.io/weevr/latest/guides/fabric-runtime/): weevr runs on Runtime 1.3 and Runtime 2.0 (2.0 from 1.21)
+- [Move to Runtime 2.0](https://ardent-data.github.io/weevr/latest/how-to/move-to-runtime-2/): move a Runtime 1.3 workload; state and existing tables carry over
 - [Execution modes](https://ardent-data.github.io/weevr/latest/concepts/execution-modes/)
 - [CLI](https://ardent-data.github.io/weevr-cli/latest/)
 

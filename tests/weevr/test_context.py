@@ -1595,7 +1595,9 @@ write:
         # No sampling action means unfulfilled observations: the harvest is
         # skipped, the preview stays intact, and the thread is never demoted
         # to errors.
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         def _boom(self):  # type: ignore[no-untyped-def]
             raise RuntimeError("sampling unavailable")
@@ -1823,7 +1825,9 @@ class TestPreviewRenderPurity:
         self, spark: SparkSession, tmp_path: Path, id_val_src: str, monkeypatch
     ) -> None:
         """A failed count leaves the preview intact, never demotes to errors."""
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         tgt = str(tmp_path / "tgt_degrade")
         yaml_path = _create_thread_yaml(tmp_path, "prevd1", id_val_src, tgt)
@@ -1911,7 +1915,9 @@ class TestPreviewPartialMetadata:
     def test_sample_capture_failure_keeps_count(
         self, spark: SparkSession, tmp_path: Path, monkeypatch
     ) -> None:
-        from pyspark.sql import DataFrame
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
 
         src = str(tmp_path / "src_partial")
         tgt = str(tmp_path / "tgt_partial")

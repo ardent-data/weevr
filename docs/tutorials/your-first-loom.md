@@ -6,7 +6,7 @@ transformations, and writes the result to a Delta table.
 
 ## Prerequisites
 
-- **Python 3.11** installed (weevr targets Fabric Runtime 1.3)
+- **Python 3.11 or 3.13** installed (the Python of Fabric Runtime 1.3 and 2.0)
 - **Microsoft Fabric workspace** with a Lakehouse, or a local Spark installation
   for development
 - Basic familiarity with YAML syntax
@@ -17,13 +17,13 @@ transformations, and writes the result to a Delta table.
 pip install weevr
 ```
 
-In a Fabric notebook on Runtime 1.3, add an inline install cell:
+In a Fabric notebook, add an inline install cell:
 
 ```python
 %pip install weevr
 ```
 
-weevr 1.x doesn't install on Runtime 2.0, the default for new workspaces. See
+weevr 1.21 and later run on Runtime 1.3 and Runtime 2.0. See
 [Fabric Runtime](../guides/fabric-runtime.md#runtime-compatibility).
 
 ## Project structure
