@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/ardent-data/weevr/compare/weevr-v1.20.7...weevr-v1.21.0) (2026-11-04)
+
+
+### Features
+
+* **build:** support Fabric Runtime 2.0 alongside Runtime 1.3 ([#282](https://github.com/ardent-data/weevr/issues/282)) ([9451644](https://github.com/ardent-data/weevr/commit/9451644617133ec9a1b1874b822fb089155e016e))
+
 ## [1.20.7](https://github.com/ardent-data/weevr/compare/weevr-v1.20.6...weevr-v1.20.7) (2026-11-03)
 
 
