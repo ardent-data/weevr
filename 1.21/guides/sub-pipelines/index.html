@@ -2054,6 +2054,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#where-the-main-pipeline-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the main pipeline starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#chaining-sub-pipelines" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3053,6 +3064,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#where-the-main-pipeline-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the main pipeline starts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#chaining-sub-pipelines" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3206,6 +3228,15 @@ source in <code>steps</code> directly — <code>with:</code> is for reuse and co
 <p><code>filtered_orders</code> is available to all subsequent <code>with:</code> entries and to the
 main <code>steps:</code> block. It is never written to storage — it exists only in memory
 for the duration of the thread.</p>
+<h2 id="where-the-main-pipeline-starts">Where the main pipeline starts<a class="headerlink" href="#where-the-main-pipeline-starts" title="Permanent link">&para;</a></h2>
+<p>The main <code>steps:</code> block always starts from the <strong>first declared source</strong>, never
+from a sub-pipeline. A sub-pipeline's result is registered by name alongside the
+sources, so it takes part in the main pipeline only when a <code>join</code> or <code>union</code>
+step references it. A sub-pipeline that nothing references logs a warning:
+<code>with: CTE '&lt;name&gt;' is declared but never referenced</code>.</p>
+<p>If the chain you're building <em>is</em> the main flow, put those steps in the main
+<code>steps:</code> block instead of in <code>with:</code>. Keep <code>with:</code> for preparing side inputs
+that the main flow joins or unions in.</p>
 <h2 id="chaining-sub-pipelines">Chaining sub-pipelines<a class="headerlink" href="#chaining-sub-pipelines" title="Permanent link">&para;</a></h2>
 <p>A sub-pipeline can reference another sub-pipeline by name. The engine
 resolves dependencies in declaration order, so later entries can build on
