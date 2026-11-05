@@ -48,6 +48,18 @@ steps:
 main `steps:` block. It is never written to storage — it exists only in memory
 for the duration of the thread.
 
+## Where the main pipeline starts
+
+The main `steps:` block always starts from the **first declared source**, never
+from a sub-pipeline. A sub-pipeline's result is registered by name alongside the
+sources, so it takes part in the main pipeline only when a `join` or `union`
+step references it. A sub-pipeline that nothing references logs a warning:
+`with: CTE '<name>' is declared but never referenced`.
+
+If the chain you're building *is* the main flow, put those steps in the main
+`steps:` block instead of in `with:`. Keep `with:` for preparing side inputs
+that the main flow joins or unions in.
+
 ## Chaining sub-pipelines
 
 A sub-pipeline can reference another sub-pipeline by name. The engine
