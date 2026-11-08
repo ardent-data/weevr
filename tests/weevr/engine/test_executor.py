@@ -2235,6 +2235,20 @@ class TestFindingsRegression:
         assert len(unpersists) >= 1  # the export persist was released
 
 
+def _warp_error() -> Exception:
+    """A WarpEnforcementError without thread context."""
+    from weevr.errors.exceptions import WarpEnforcementError
+
+    return WarpEnforcementError("warp violated")
+
+
+def _drift_error() -> Exception:
+    """A SchemaDriftError without thread context."""
+    from weevr.errors.exceptions import SchemaDriftError
+
+    return SchemaDriftError("drift detected")
+
+
 class TestThreadPhaseContract:
     """Characterization of execute_thread's observable phase contract.
 
@@ -2418,8 +2432,8 @@ class TestThreadPhaseContract:
         "make_error",
         [
             pytest.param(lambda: DataValidationError("bad data"), id="data-validation"),
-            pytest.param(lambda: _warp_error(), id="warp-enforcement"),
-            pytest.param(lambda: _drift_error(), id="schema-drift"),
+            pytest.param(_warp_error, id="warp-enforcement"),
+            pytest.param(_drift_error, id="schema-drift"),
         ],
     )
     def test_domain_errors_reraise_same_object_with_error_span(
@@ -2538,17 +2552,3 @@ class TestThreadPhaseContract:
         spans = [s for s in collector.get_spans() if s.name == "thread:unexpected"]
         assert len(spans) == 1
         assert spans[0].status == SpanStatus.ERROR
-
-
-def _warp_error() -> Exception:
-    """A WarpEnforcementError without thread context."""
-    from weevr.errors.exceptions import WarpEnforcementError
-
-    return WarpEnforcementError("warp violated")
-
-
-def _drift_error() -> Exception:
-    """A SchemaDriftError without thread context."""
-    from weevr.errors.exceptions import SchemaDriftError
-
-    return SchemaDriftError("drift detected")
