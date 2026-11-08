@@ -2,9 +2,9 @@
 
 
 # Federated namespace: weevr.engine spans both wheels — the pure-Python
-# planner and result-formatter live in weevr-core; everything that
-# touches Spark (executor, runner, cache, display, hooks, result types,
-# etc.) and this package's __init__.py stay engine-side. The eager
+# planner, formatting helpers, result models, and display rendering live
+# in weevr-core; everything that touches Spark (executor, runner, cache,
+# hooks, etc.) and this package's __init__.py stay engine-side. The eager
 # imports below pull weevr-core's contributions, so __path__ must
 # include the core's engine/ directory before they execute. The same
 # helper pattern is mirrored in every federated sub-package's

@@ -39,13 +39,13 @@ useLibraryCodeForTypes = true
 # Pyright cannot merge the engine wheel's regular weevr package
 # (which ships weevr/__init__.py for the lazy Context entry point)
 # with namespace contributions weevr-core makes to weevr.config,
-# weevr.errors, weevr.model, weevr.engine.planner / formatting, and
-# weevr.telemetry.* — when a regular package wins the resolver's
-# scan, namespace portions on other extraPaths are dropped. Runtime
-# resolution works (Python's PEP 420 + each federated __init__.py's
-# __path__ extension wire both src/ roots into the namespace at
-# import time) and is locked by the full pytest suite including the
-# no-pyspark lock test. Downgrade reportMissingImports and the
+# weevr.errors, weevr.model, weevr.engine.planner / formatting /
+# display / result, and weevr.telemetry.* — when a regular package
+# wins the resolver's scan, namespace portions on other extraPaths are
+# dropped. Runtime resolution works (Python's PEP 420 + each federated
+# __init__.py's __path__ extension wire both src/ roots into the
+# namespace at import time) and is locked by the full pytest suite
+# including the no-pyspark lock test. Downgrade reportMissingImports and the
 # cascade-from-missing-import reportAttributeAccessIssue so the
 # federated cross-wheel imports do not block CI; genuine new
 # attribute-access issues elsewhere still surface as warnings to
