@@ -14,6 +14,8 @@ import pytest
 REMOVED_MODULES = [
     # parse_duration -> weevr.duration
     "weevr.config.duration",
+    # reserved-word presets and resolve_effective_words -> weevr.reserved_words
+    "weevr.operations.reserved_words",
 ]
 
 

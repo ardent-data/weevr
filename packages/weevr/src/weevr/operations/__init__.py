@@ -44,9 +44,9 @@ __all__ = [
 
 # Map each public attribute to the submodule that defines it. Lazy access
 # preserves every existing import path (``from weevr.operations import X``)
-# while letting submodule paths (``from weevr.operations.reserved_words import
-# resolve_effective_words``) resolve without dragging the Spark-bound
-# transforms / readers / writers / pipeline modules.
+# while letting a submodule import (``from weevr.operations.<module> import X``)
+# load only that submodule, not the Spark-bound transforms / readers /
+# writers / pipeline modules.
 _LAZY_ATTRS: dict[str, str] = {
     "AuditContext": "weevr.operations.audit",
     "build_sources_json": "weevr.operations.audit",

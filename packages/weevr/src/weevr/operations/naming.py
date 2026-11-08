@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from weevr.errors.exceptions import ConfigError
 from weevr.model.naming import NamingConfig, NamingPattern
-from weevr.operations.reserved_words import resolve_effective_words
+from weevr.reserved_words import resolve_effective_words
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame

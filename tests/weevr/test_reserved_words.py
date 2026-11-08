@@ -3,7 +3,7 @@
 import pytest
 
 from weevr.model.column_set import ReservedWordConfig, ReservedWordPreset
-from weevr.operations.reserved_words import (
+from weevr.reserved_words import (
     ANSI_RESERVED_WORDS,
     DAX_RESERVED_WORDS,
     M_RESERVED_WORDS,
