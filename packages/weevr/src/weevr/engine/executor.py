@@ -341,102 +341,38 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 or (thread.write is not None and thread.write.mode == "merge")
             )
 
-            # Resolve with: block CTEs before the primary DataFrame is set
-            if thread.with_:
-                sources_map = resolve_with_block(
-                    thread,
-                    sources_map,
-                    collector=collector if span_builder else None,
-                    parent_span_id=span_builder.span_id if span_builder else None,
-                    observations=obs_registry,
-                    lookup_meta=resolve_meta,
-                    lookups=resolve_lookups or None,
-                )
-
-            # Step 5 — primary DataFrame is the first declared source
-            df = next(iter(sources_map.values()))
-            rows_read_obs: Observation | None = None
-            if merge_terminal:
-                rows_read = df.count()
-            else:
-                rows_read_obs = Observation()
-                df = df.observe(rows_read_obs, F.count(F.lit(1)).alias("n"))
-
-            # Step 6 — run pipeline steps
-            df = run_pipeline(
-                df,
-                thread.steps,
+            # Steps 5-6 — CTEs, primary DataFrame, pipeline steps, counts
+            transformed = _run_transforms(
+                thread,
                 sources_map,
-                effective_column_sets,
-                effective_column_set_defs,
-                lookups=resolve_lookups or None,
-                observations=obs_registry,
-                lookup_meta=resolve_meta,
+                merge_terminal,
+                obs_registry,
+                column_sets=effective_column_sets,
+                column_set_defs=effective_column_set_defs,
+                resolve_lookups=resolve_lookups,
+                resolve_meta=resolve_meta,
+                collector=collector,
+                span_builder=span_builder,
             )
+            df = transformed.df
+            rows_read = transformed.rows_read
+            rows_read_obs = transformed.rows_read_obs
+            rows_after_transforms = transformed.rows_after_transforms
+            rows_after_transforms_obs = transformed.rows_after_transforms_obs
 
-            # Intermediate row count for waterfall visualization. On
-            # merge-terminal paths this eager count is ALSO the first action
-            # over the plan — the one that fixes every observation with true
-            # full-scale values before the merge can zero-fire them. On
-            # single-pass paths it becomes an observation fixed by the write.
-            rows_after_transforms_obs: Observation | None = None
-            if merge_terminal:
-                rows_after_transforms = df.count()
-            else:
-                rows_after_transforms_obs = Observation()
-                df = df.observe(rows_after_transforms_obs, F.count(F.lit(1)).alias("n"))
-
-            # Step 7 — run validation rules
-            if thread.validations:
-                outcome = validate_dataframe(df, thread.validations)
-                validation_results = outcome.validation_results
-
-                if outcome.has_fatal:
-                    raise DataValidationError(
-                        f"Fatal validation failure in thread '{thread.name}'",
-                    )
-
-                # Write quarantine rows if present. The union computes once:
-                # persist, count from cache, write only when rows exist (an
-                # all-clean run leaves the prior quarantine table untouched),
-                # sample from cache. Released in finally.
-                if outcome.quarantine_df is not None:
-                    quarantine_df = outcome.quarantine_df.persist(StorageLevel.MEMORY_AND_DISK)
-                    cleanup.quarantine_frame = quarantine_df
-                    rows_quarantined = write_quarantine(spark, quarantine_df, target_path)
-                    if capture_samples:
-                        with contextlib.suppress(Exception):
-                            quarantine_sample = (
-                                quarantine_df.limit(10).toPandas().to_dict("records")
-                            )
-
-                # Continue with clean_df
-                df = outcome.clean_df
-
-            # Step 8 — apply naming normalization (before target mapping)
-            if thread.target.naming is not None:
-                df = normalize_columns(df, thread.target.naming)
-
-            # Step 9 — compute keys and hashes
+            # Steps 7-9b — validation and quarantine, naming, keys, SCD columns,
+            # fact schema check
+            shaped = _validate_and_key(
+                spark, thread, df, target_path, cleanup, capture_samples, run_timestamp
+            )
+            df = shaped.df
+            validation_results = shaped.validation_results
+            rows_quarantined = shaped.rows_quarantined
+            quarantine_sample = shaped.quarantine_sample
+            dim_builder = shaped.dim_builder
             dim_config = thread.target.dimension
             fact_config = thread.target.fact
             seed_config = thread.target.seed
-
-            if dim_config is not None:
-                # Dimension mode: use dimension-aware key computation.
-                # Pass audit column names so auto hash excludes them.
-                audit_col_names = (
-                    set(thread.target.audit_columns.keys()) if thread.target.audit_columns else None
-                )
-                df = compute_dimension_keys(df, dim_config, audit_columns=audit_col_names)
-            elif thread.keys is not None:
-                df = compute_keys(df, thread.keys)
-
-            # Step 9b — inject SCD columns for versioned dimensions
-            dim_builder: DimensionMergeBuilder | None = None
-            if dim_config is not None:
-                dim_builder = DimensionMergeBuilder(dim_config, thread.write)
-                df = dim_builder.inject_scd_columns(df, run_timestamp)
 
             # Step 10 — resolve and prepare audit columns
             audit_columns = thread.target.audit_columns or {}
@@ -446,14 +382,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 audit_ctx = _build_audit_context(
                     thread, weave_name, loom_name, run_timestamp, run_id
                 )
-
-            # Step 10b — validate fact target schema (if fact mode).
-            # Schema-only, no Spark actions; the sentinel advisory runs
-            # post-write against the written table (step 13b).
-            if fact_config is not None:
-                fact_diags = validate_fact_schema(df, fact_config)
-                if fact_diags:
-                    raise ExecutionError(fact_diags[0])
 
             # Step 11/12/13 — write to Delta
             write_mode = thread.write.mode if thread.write else "overwrite"
@@ -914,6 +842,32 @@ class _SourceRead:
     resolve_meta: dict[str, LookupMeta] | None
 
 
+@dataclass
+class _Transformed:
+    """The working DataFrame after pipeline steps, with its row counts.
+
+    Merge-terminal paths count eagerly; single-pass paths carry
+    observations that the write fulfils.
+    """
+
+    df: Any
+    rows_read: int
+    rows_read_obs: Observation | None
+    rows_after_transforms: int
+    rows_after_transforms_obs: Observation | None
+
+
+@dataclass
+class _Shaped:
+    """The working DataFrame after validation, naming, keys, and SCD columns."""
+
+    df: Any
+    validation_results: list[Any]
+    rows_quarantined: int
+    quarantine_sample: list[dict[str, Any]] | None
+    dim_builder: DimensionMergeBuilder | None
+
+
 def _prepare_thread_resources(
     spark: SparkSession,
     thread: Thread,
@@ -1282,6 +1236,159 @@ def _read_cdc_window(
             prior_state is not None,
         )
     return primary_df, new_hwm
+
+
+def _run_transforms(
+    thread: Thread,
+    sources_map: dict[str, Any],
+    merge_terminal: bool,
+    obs_registry: ObservationRegistry,
+    *,
+    column_sets: dict[str, dict[str, str]] | None,
+    column_set_defs: dict[str, ColumnSet] | None,
+    resolve_lookups: dict[str, Any],
+    resolve_meta: dict[str, LookupMeta] | None,
+    collector: SpanCollector | None,
+    span_builder: SpanBuilder | None,
+) -> _Transformed:
+    """Resolve ``with`` CTEs, run the pipeline steps, and count rows."""
+    # Resolve with: block CTEs before the primary DataFrame is set
+    if thread.with_:
+        sources_map = resolve_with_block(
+            thread,
+            sources_map,
+            collector=collector if span_builder else None,
+            parent_span_id=span_builder.span_id if span_builder else None,
+            observations=obs_registry,
+            lookup_meta=resolve_meta,
+            lookups=resolve_lookups or None,
+        )
+
+    # Step 5 — primary DataFrame is the first declared source
+    df = next(iter(sources_map.values()))
+    rows_read = 0
+    rows_read_obs: Observation | None = None
+    if merge_terminal:
+        rows_read = df.count()
+    else:
+        rows_read_obs = Observation()
+        df = df.observe(rows_read_obs, F.count(F.lit(1)).alias("n"))
+
+    # Step 6 — run pipeline steps
+    df = run_pipeline(
+        df,
+        thread.steps,
+        sources_map,
+        column_sets,
+        column_set_defs,
+        lookups=resolve_lookups or None,
+        observations=obs_registry,
+        lookup_meta=resolve_meta,
+    )
+
+    # Intermediate row count for waterfall visualization. On
+    # merge-terminal paths this eager count is ALSO the first action
+    # over the plan — the one that fixes every observation with true
+    # full-scale values before the merge can zero-fire them. On
+    # single-pass paths it becomes an observation fixed by the write.
+    rows_after_transforms = 0
+    rows_after_transforms_obs: Observation | None = None
+    if merge_terminal:
+        rows_after_transforms = df.count()
+    else:
+        rows_after_transforms_obs = Observation()
+        df = df.observe(rows_after_transforms_obs, F.count(F.lit(1)).alias("n"))
+
+    return _Transformed(
+        df=df,
+        rows_read=rows_read,
+        rows_read_obs=rows_read_obs,
+        rows_after_transforms=rows_after_transforms,
+        rows_after_transforms_obs=rows_after_transforms_obs,
+    )
+
+
+def _validate_and_key(
+    spark: SparkSession,
+    thread: Thread,
+    df: Any,
+    target_path: str,
+    cleanup: _ThreadCleanup,
+    capture_samples: bool,
+    run_timestamp: str,
+) -> _Shaped:
+    """Apply ValidationRules, naming, keys, and SCD columns; check fact schema.
+
+    Raises:
+        DataValidationError: If a fatal-severity rule fails (before any write).
+        ExecutionError: If a fact target's schema is invalid.
+    """
+    validation_results: list[Any] = []
+    rows_quarantined = 0
+    quarantine_sample: list[dict[str, Any]] | None = None
+
+    # Step 7 — run validation rules
+    if thread.validations:
+        outcome = validate_dataframe(df, thread.validations)
+        validation_results = outcome.validation_results
+
+        if outcome.has_fatal:
+            raise DataValidationError(
+                f"Fatal validation failure in thread '{thread.name}'",
+            )
+
+        # Write quarantine rows if present. The union computes once:
+        # persist, count from cache, write only when rows exist (an
+        # all-clean run leaves the prior quarantine table untouched),
+        # sample from cache. Released in finally.
+        if outcome.quarantine_df is not None:
+            quarantine_df = outcome.quarantine_df.persist(StorageLevel.MEMORY_AND_DISK)
+            cleanup.quarantine_frame = quarantine_df
+            rows_quarantined = write_quarantine(spark, quarantine_df, target_path)
+            if capture_samples:
+                with contextlib.suppress(Exception):
+                    quarantine_sample = quarantine_df.limit(10).toPandas().to_dict("records")
+
+        # Continue with clean_df
+        df = outcome.clean_df
+
+    # Step 8 — apply naming normalization (before target mapping)
+    if thread.target.naming is not None:
+        df = normalize_columns(df, thread.target.naming)
+
+    # Step 9 — compute keys and hashes
+    dim_config = thread.target.dimension
+    if dim_config is not None:
+        # Dimension mode: use dimension-aware key computation.
+        # Pass audit column names so auto hash excludes them.
+        audit_col_names = (
+            set(thread.target.audit_columns.keys()) if thread.target.audit_columns else None
+        )
+        df = compute_dimension_keys(df, dim_config, audit_columns=audit_col_names)
+    elif thread.keys is not None:
+        df = compute_keys(df, thread.keys)
+
+    # Step 9b — inject SCD columns for versioned dimensions
+    dim_builder: DimensionMergeBuilder | None = None
+    if dim_config is not None:
+        dim_builder = DimensionMergeBuilder(dim_config, thread.write)
+        df = dim_builder.inject_scd_columns(df, run_timestamp)
+
+    # Step 10b — validate fact target schema (if fact mode).
+    # Schema-only, no Spark actions; the sentinel advisory runs
+    # post-write against the written table (step 13b).
+    if thread.target.fact is not None:
+        fact_diags = validate_fact_schema(df, thread.target.fact)
+        if fact_diags:
+            raise ExecutionError(fact_diags[0])
+
+    return _Shaped(
+        df=df,
+        validation_results=validation_results,
+        rows_quarantined=rows_quarantined,
+        quarantine_sample=quarantine_sample,
+        dim_builder=dim_builder,
+    )
 
 
 def _meta_for_resolve(
