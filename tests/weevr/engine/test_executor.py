@@ -2233,3 +2233,322 @@ class TestFindingsRegression:
         with pytest.raises(ExecutionError, match="write exploded"):
             execute_thread(spark, thread)
         assert len(unpersists) >= 1  # the export persist was released
+
+
+class TestThreadPhaseContract:
+    """Characterization of execute_thread's observable phase contract.
+
+    Pins the order of a thread's side effects, the release of persisted
+    frames when a later phase fails, and how each error class surfaces —
+    the behavior any restructuring of the executor must preserve.
+    """
+
+    @pytest.fixture()
+    def unpersist_spy(self, monkeypatch: pytest.MonkeyPatch) -> list[int]:
+        """Count DataFrame.unpersist invocations (the engine's release contract)."""
+        from spark_helpers import dataframe_class
+
+        DataFrame = dataframe_class()
+        calls: list[int] = []
+        original = DataFrame.unpersist
+
+        def _spy(inner_self, blocking=False):  # type: ignore[no-untyped-def]
+            calls.append(1)
+            return original(inner_self, blocking)
+
+        monkeypatch.setattr(DataFrame, "unpersist", _spy)
+        return calls
+
+    def test_side_effect_order_incremental_thread(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """pre_steps → read → write → watermark persist → assertions → exports → post_steps."""
+        from weevr.engine import executor as executor_mod
+        from weevr.model.hooks import LogMessageStep
+        from weevr.model.load import LoadConfig, WatermarkStoreConfig
+
+        events: list[str] = []
+
+        def _record(label: str, fn):  # type: ignore[no-untyped-def]
+            def _wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
+                events.append(label)
+                return fn(*args, **kwargs)
+
+            return _wrapped
+
+        from weevr.engine.hooks import run_hook_steps as original_hooks
+
+        def _hooks(spark_, steps, phase, *args, **kwargs):  # type: ignore[no-untyped-def]
+            events.append(f"hook:{phase}")
+            return original_hooks(spark_, steps, phase, *args, **kwargs)
+
+        class _StoreProxy:
+            def __init__(self, inner: object) -> None:
+                self._inner = inner
+
+            def write(self, spark_, state):  # type: ignore[no-untyped-def]
+                events.append("watermark")
+                return self._inner.write(spark_, state)  # type: ignore[attr-defined]
+
+            def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
+                return getattr(self._inner, name)
+
+        from weevr.state import resolve_store as original_resolve_store
+
+        monkeypatch.setattr(executor_mod, "run_hook_steps", _hooks)
+        monkeypatch.setattr(
+            executor_mod,
+            "resolve_store",
+            lambda load, path: _StoreProxy(original_resolve_store(load, path)),
+        )
+        for name, label in [
+            ("read_source_incremental", "read"),
+            ("write_target", "write"),
+            ("evaluate_assertions", "assertions"),
+            ("write_export", "export"),
+        ]:
+            monkeypatch.setattr(executor_mod, name, _record(label, getattr(executor_mod, name)))
+
+        src = tmp_delta_path("order_src")
+        tgt = tmp_delta_path("order_tgt")
+        wm = tmp_delta_path("order_wm")
+        exp = tmp_delta_path("order_exp")
+        create_delta_table(spark, src, [{"id": 1, "ts": 1}, {"id": 2, "ts": 2}])
+
+        thread = Thread(
+            name="order_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt),
+            write=WriteConfig(mode="append"),
+            load=LoadConfig(
+                mode="incremental_watermark",
+                watermark_column="ts",
+                watermark_type="int",
+                watermark_store=WatermarkStoreConfig(type="metadata_table", table_path=wm),
+            ),
+            assertions=[Assertion(type="row_count", min=1, max=10)],
+            exports=[Export(name="e1", type="delta", path=exp)],
+            pre_steps=[LogMessageStep(type="log_message", message="pre", level="info")],
+            post_steps=[LogMessageStep(type="log_message", message="post", level="info")],
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert events == [
+            "hook:pre",
+            "read",
+            "write",
+            "watermark",
+            "assertions",
+            "export",
+            "hook:post",
+        ]
+
+    def test_cdc_merge_failure_releases_change_window(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        monkeypatch: pytest.MonkeyPatch,
+        unpersist_spy: list[int],
+    ) -> None:
+        """A merge failing after the CDC window is persisted still releases it."""
+        from weevr.engine import executor as executor_mod
+        from weevr.model.load import CdcConfig, LoadConfig, WatermarkStoreConfig
+
+        def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("merge exploded")
+
+        monkeypatch.setattr(executor_mod, "execute_cdc_merge", _boom)
+
+        src = tmp_delta_path("cdc_fail_src")
+        tgt = tmp_delta_path("cdc_fail_tgt")
+        wm = tmp_delta_path("cdc_fail_wm")
+        create_delta_table(spark, src, [{"id": 1, "OPFLAG": "I", "AEDATTM": 1}])
+
+        thread = Thread(
+            name="cdc_fail_thread",
+            config_version="1",
+            sources={"main": Source(type="delta", alias=src)},
+            steps=[],
+            target=Target(path=tgt),
+            write=WriteConfig(mode="merge", match_keys=["id"]),
+            load=LoadConfig(
+                mode="cdc",
+                cdc=CdcConfig(
+                    operation_column="OPFLAG",
+                    insert_value="I",
+                    update_value="U",
+                    delete_value="D",
+                ),
+                watermark_column="AEDATTM",
+                watermark_type="int",
+                watermark_store=WatermarkStoreConfig(type="metadata_table", table_path=wm),
+            ),
+        )
+
+        with pytest.raises(ExecutionError, match="failed unexpectedly") as exc_info:
+            execute_thread(spark, thread)
+        assert exc_info.value.thread_name == "cdc_fail_thread"
+        assert str(exc_info.value.cause) == "merge exploded"  # failed at the merge
+        assert len(unpersist_spy) >= 1  # the persisted change window was released
+
+    def test_export_abort_releases_working_frame(
+        self, spark: SparkSession, tmp_delta_path, one_row_src, unpersist_spy: list[int]
+    ) -> None:
+        """An aborting export after the exports persist still releases the frame."""
+        tgt = tmp_delta_path("abort_rel_tgt")
+        exports = [
+            Export(
+                name="critical",
+                type="parquet",
+                path="/nonexistent/\x00invalid",
+                on_failure="abort",
+            )
+        ]
+        thread = _make_thread("abort_rel_thread", one_row_src, tgt, exports=exports)
+
+        with pytest.raises(ExportError, match="critical"):
+            execute_thread(spark, thread)
+        assert len(unpersist_spy) >= 1
+
+    @pytest.mark.parametrize(
+        "make_error",
+        [
+            pytest.param(lambda: DataValidationError("bad data"), id="data-validation"),
+            pytest.param(lambda: _warp_error(), id="warp-enforcement"),
+            pytest.param(lambda: _drift_error(), id="schema-drift"),
+        ],
+    )
+    def test_domain_errors_reraise_same_object_with_error_span(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        one_row_src,
+        monkeypatch: pytest.MonkeyPatch,
+        make_error,  # type: ignore[no-untyped-def]
+    ) -> None:
+        """Validation, warp, and drift errors surface unchanged; the span ends ERROR."""
+        from weevr.engine import executor as executor_mod
+        from weevr.errors.exceptions import SchemaDriftError, WarpEnforcementError
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import SpanStatus, generate_trace_id
+
+        error = make_error()
+
+        def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise error
+
+        monkeypatch.setattr(executor_mod, "run_pipeline", _raise)
+        collector = SpanCollector(generate_trace_id())
+        thread = _make_thread("domain_err", one_row_src, tmp_delta_path("domain_err_tgt"))
+
+        with pytest.raises(type(error)) as exc_info:
+            execute_thread(spark, thread, collector=collector)
+
+        assert exc_info.value is error
+        if isinstance(error, WarpEnforcementError | SchemaDriftError):
+            assert error.thread_name == "domain_err"
+        spans = [s for s in collector.get_spans() if s.name == "thread:domain_err"]
+        assert len(spans) == 1
+        assert spans[0].status == SpanStatus.ERROR
+
+    def test_execution_error_without_thread_name_is_rewrapped(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        one_row_src,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """An ExecutionError lacking thread_name is re-raised with it, details kept."""
+        from weevr.engine import executor as executor_mod
+
+        original = ExecutionError("step broke", step_index=2, step_type="filter")
+
+        def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise original
+
+        monkeypatch.setattr(executor_mod, "run_pipeline", _raise)
+        thread = _make_thread("rewrap", one_row_src, tmp_delta_path("rewrap_tgt"))
+
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_thread(spark, thread)
+
+        raised = exc_info.value
+        assert raised is not original
+        assert raised.message == "step broke"
+        assert raised.thread_name == "rewrap"
+        assert raised.step_index == 2
+        assert raised.step_type == "filter"
+        assert raised.__cause__ is original
+
+    def test_execution_error_with_thread_name_passes_through(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        one_row_src,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """An ExecutionError already naming a thread surfaces as the same object."""
+        from weevr.engine import executor as executor_mod
+
+        original = ExecutionError("named", thread_name="other_thread")
+
+        def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise original
+
+        monkeypatch.setattr(executor_mod, "run_pipeline", _raise)
+        thread = _make_thread("passthru", one_row_src, tmp_delta_path("passthru_tgt"))
+
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_thread(spark, thread)
+        assert exc_info.value is original
+        assert exc_info.value.thread_name == "other_thread"
+
+    def test_unexpected_error_wrapped_as_execution_error(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        one_row_src,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Any other exception becomes ExecutionError naming the thread, cause kept."""
+        from weevr.engine import executor as executor_mod
+        from weevr.telemetry.collector import SpanCollector
+        from weevr.telemetry.span import SpanStatus, generate_trace_id
+
+        original = RuntimeError("kaboom")
+
+        def _raise(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise original
+
+        monkeypatch.setattr(executor_mod, "run_pipeline", _raise)
+        collector = SpanCollector(generate_trace_id())
+        thread = _make_thread("unexpected", one_row_src, tmp_delta_path("unexpected_tgt"))
+
+        with pytest.raises(ExecutionError) as exc_info:
+            execute_thread(spark, thread, collector=collector)
+
+        raised = exc_info.value
+        assert raised.message == "Thread 'unexpected' failed unexpectedly"
+        assert raised.thread_name == "unexpected"
+        assert raised.cause is original
+        spans = [s for s in collector.get_spans() if s.name == "thread:unexpected"]
+        assert len(spans) == 1
+        assert spans[0].status == SpanStatus.ERROR
+
+
+def _warp_error() -> Exception:
+    """A WarpEnforcementError without thread context."""
+    from weevr.errors.exceptions import WarpEnforcementError
+
+    return WarpEnforcementError("warp violated")
+
+
+def _drift_error() -> Exception:
+    """A SchemaDriftError without thread context."""
+    from weevr.errors.exceptions import SchemaDriftError
+
+    return SchemaDriftError("drift detected")
