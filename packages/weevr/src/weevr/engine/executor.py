@@ -150,20 +150,21 @@ def execute_thread(
     Execution order:
     1. Initialize thread-level resources (variables, lookups, column_sets).
     2. Run thread-level pre_steps.
-    3. Resolve lookup-based sources from cached or on-demand DataFrames.
-    4. Read all remaining declared sources into DataFrames.
-       - For ``incremental_watermark``: load prior HWM, apply filter, capture new HWM.
+    3. Resolve the target write path and Warp (pre-initializing the table
+       when ``warp_init`` is set), and load prior watermark state.
+    4. Resolve lookup-based sources and read all remaining declared sources.
+       - For ``incremental_watermark``: apply the prior HWM filter, capture new HWM.
        - For ``cdc``: read via CDF or generic CDC source.
     5. Set the primary (first) source as the working DataFrame.
     6. Run pipeline steps against the working DataFrame.
     7. Run validation rules (if configured) — quarantine or abort on failures.
     8. Apply naming normalization (if configured).
     9. Compute business keys and hashes if configured.
-    10. Resolve the target write path.
-    11. Apply target column mapping.
-    12. Inject audit columns (if configured; bypasses mapping mode).
-    13. Write to the Delta target.
-        - For ``cdc``: use CDC merge routing instead of standard write.
+    10. Apply target column mapping.
+    11. Inject audit columns (if configured; bypasses mapping mode).
+    12. Seed and write to the Delta target.
+        - For dimensions: dimension merge; for ``cdc``: CDC merge routing.
+    13. Run the fact sentinel advisory and auto warp generation.
     14. Persist watermark state (if applicable).
     15. Run post-write assertions (if configured).
     16. Write exports (secondary outputs, if configured).
