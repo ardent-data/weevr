@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pyspark.sql import SparkSession
 
+from weevr.config.audit_templates import AuditContext
 from weevr.model.export import Export
-from weevr.operations.audit import AuditContext
 from weevr.operations.exports import resolve_export_path, resolve_exports, write_export
 
 
