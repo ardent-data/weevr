@@ -127,7 +127,7 @@ class _ThreadResources:
     lookup_meta: dict[str, LookupMeta] | None
 
 
-def execute_thread(  # type: ignore[reportGeneralTypeIssues]
+def execute_thread(
     spark: SparkSession,
     thread: Thread,
     collector: SpanCollector | None = None,
@@ -231,22 +231,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         if thread.template_ref:
             span_builder.set_attribute("thread.template_ref", thread.template_ref)
 
-    validation_results: list = []
-    assertion_results: list = []
-    thread_warnings: list[str] = []
-    rows_read = 0
-    rows_written: int | None = 0
-    rows_quarantined = 0
-    rows_after_transforms = 0
-    output_schema: list[tuple[str, str]] | None = None
-    output_sample: list[dict[str, Any]] | None = None
-    quarantine_sample: list[dict[str, Any]] | None = None
-
-    # Incremental processing state
     load_mode = thread.load.mode if thread.load else "full"
-    new_hwm: str | None = None
-    watermark_persisted = False
-    cdc_counts: dict[str, int] | None = None
 
     # Fail-fast: validate incremental config cross-cutting constraints
     if load_mode != "full":
@@ -256,7 +241,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
     thread_variable_ctx = _build_thread_variable_context(thread)
     cleanup = _ThreadCleanup()
 
-    try:  # noqa: PLR0912 — outer try/finally for thread-level resource cleanup
+    try:
         resources = _prepare_thread_resources(
             spark,
             thread,
@@ -269,11 +254,6 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             resolved_params=resolved_params,
             connections=connections,
         )
-        effective_cached_lookups = resources.cached_lookups
-        effective_weave_lookups = resources.weave_lookups
-        effective_column_sets = resources.column_sets
-        effective_column_set_defs = resources.column_set_defs
-        lookup_meta = resources.lookup_meta
 
         # Run thread-level pre_steps
         if thread.pre_steps:
@@ -297,13 +277,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             target_handle = TargetHandle(spark, target_path)
 
             resolved_warp = _resolve_warp(spark, thread, target_path, target_handle)
-            warp_findings: list[dict[str, str]] = []
-            drift_report = None
-
             watermark_store, prior_state = _load_watermark_state(
                 spark, thread, load_mode, target_path, target_handle
             )
-            watermark_first_run = watermark_store is not None and prior_state is None
 
             # --- Steps 3-4: Resolve lookup-based sources, read the rest ---
             source_read = _read_sources(
@@ -312,17 +288,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 load_mode,
                 prior_state,
                 cleanup,
-                cached_lookups=effective_cached_lookups,
-                weave_lookups=effective_weave_lookups,
-                lookup_meta=lookup_meta,
+                cached_lookups=resources.cached_lookups,
+                weave_lookups=resources.weave_lookups,
+                lookup_meta=resources.lookup_meta,
                 connections=connections,
                 cache_registry=cache_registry,
                 uk_memo=uk_memo,
             )
-            sources_map = source_read.sources_map
             new_hwm = source_read.new_hwm
-            resolve_lookups = source_read.resolve_lookups
-            resolve_meta = source_read.resolve_meta
 
             # Step statistics attach as Observations (harvested after the
             # write); CTE sub-pipelines contribute under their own scopes.
@@ -344,34 +317,22 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # Steps 5-6 — CTEs, primary DataFrame, pipeline steps, counts
             transformed = _run_transforms(
                 thread,
-                sources_map,
+                source_read.sources_map,
                 merge_terminal,
                 obs_registry,
-                column_sets=effective_column_sets,
-                column_set_defs=effective_column_set_defs,
-                resolve_lookups=resolve_lookups,
-                resolve_meta=resolve_meta,
+                column_sets=resources.column_sets,
+                column_set_defs=resources.column_set_defs,
+                resolve_lookups=source_read.resolve_lookups,
+                resolve_meta=source_read.resolve_meta,
                 collector=collector,
                 span_builder=span_builder,
             )
-            df = transformed.df
-            rows_read = transformed.rows_read
-            rows_read_obs = transformed.rows_read_obs
-            rows_after_transforms = transformed.rows_after_transforms
-            rows_after_transforms_obs = transformed.rows_after_transforms_obs
 
             # Steps 7-9b — validation and quarantine, naming, keys, SCD columns,
             # fact schema check
             shaped = _validate_and_key(
-                spark, thread, df, target_path, cleanup, capture_samples, run_timestamp
+                spark, thread, transformed.df, target_path, cleanup, capture_samples, run_timestamp
             )
-            df = shaped.df
-            validation_results = shaped.validation_results
-            rows_quarantined = shaped.rows_quarantined
-            quarantine_sample = shaped.quarantine_sample
-            dim_builder = shaped.dim_builder
-            dim_config = thread.target.dimension
-            fact_config = thread.target.fact
 
             # Step 10 — resolve and prepare audit columns
             audit_columns = thread.target.audit_columns or {}
@@ -411,103 +372,43 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 capture_samples=capture_samples,
                 cleanup=cleanup,
             )
-            if dim_config is not None and dim_builder is not None:
+            if thread.target.dimension is not None and shaped.dim_builder is not None:
                 written = _write_dimension(
                     spark,
                     thread,
-                    df,
-                    dim_builder,
+                    shaped.df,
+                    shaped.dim_builder,
                     write_ctx,
-                    rows_quarantined=rows_quarantined,
-                    rows_after_transforms=rows_after_transforms,
+                    rows_quarantined=shaped.rows_quarantined,
+                    rows_after_transforms=transformed.rows_after_transforms,
                 )
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-                written = _write_cdc(spark, thread, df, thread.load, thread.load.cdc, write_ctx)
+                written = _write_cdc(
+                    spark, thread, shaped.df, thread.load, thread.load.cdc, write_ctx
+                )
             else:
-                written = _write_standard(spark, thread, df, write_ctx)
-            df = written.df
-            rows_written = written.rows_written
-            cdc_counts = written.cdc_counts
-            warp_findings = written.warp_findings
-            drift_report = written.drift_report
-            audit_columns_applied = written.audit_columns_applied
-            output_schema = written.output_schema
-            output_sample = written.output_sample
+                written = _write_standard(spark, thread, shaped.df, write_ctx)
 
             # A successful write whose count could not be attributed reads
             # as unknown, never as zero — surface it to the caller.
-            if rows_written is None:
+            thread_warnings: list[str] = []
+            if written.rows_written is None:
                 thread_warnings.append(
                     f"Thread '{thread.name}': rows written to '{target_path}' "
                     f"could not be attributed to the engine's commit; "
                     f"reported as unknown"
                 )
 
-            # Step 13b — post-write fact sentinel advisory. Runs against
-            # the written table, where columnar stats make per-column
-            # scans cheap. Advisory only: failures never block the run.
-            if fact_config is not None and target_path:
-                try:
-                    written_df = read_delta(spark, target_path)
-                    # Return value intentionally unused: the check logs its
-                    # own WARNs, and advisory diagnostics are not stored.
-                    check_fact_sentinels(written_df, fact_config)
-                except Exception:
-                    logger.debug(
-                        "Post-write fact sentinel advisory failed for thread '%s'",
-                        thread.name,
-                        exc_info=True,
-                    )
-
-            # Auto-generate warp after successful write (all paths)
-            if thread.target.warp_mode == "auto":
-                destination = _auto_warp_destination(thread, target_path)
-                if destination is not None:
-                    auto_generate_warp(
-                        df,
-                        resolved_warp,
-                        drift_report,
-                        destination[1],
-                        destination[0],
-                        adaptive=thread.target.schema_drift == "adaptive",
-                    )
+            # Steps 13b-13c — fact sentinel advisory, auto warp generation
+            _run_post_write_checks(spark, thread, written, target_path, resolved_warp)
 
             # Step 14 — persist watermark state
-            if (
-                watermark_store is not None
-                and load_mode in ("incremental_watermark", "cdc")
-                and thread.load is not None
-                and new_hwm is not None
-            ):
-                try:
-                    wm_type = thread.load.watermark_type or "timestamp"
-                    wm_col = thread.load.watermark_column or "_commit_version"
-
-                    new_state = WatermarkState(
-                        thread_name=thread.name,
-                        watermark_column=wm_col,
-                        watermark_type=wm_type,
-                        last_value=new_hwm,
-                        last_updated=datetime.now(UTC),
-                    )
-                    watermark_store.write(spark, new_state)
-                    watermark_persisted = True
-                    logger.debug(
-                        "Thread '%s': persisted HWM %s=%s",
-                        thread.name,
-                        wm_col,
-                        new_hwm,
-                    )
-                except StateError:
-                    raise
-                except Exception as e:
-                    raise StateError(
-                        f"Failed to persist watermark for thread '{thread.name}'",
-                        cause=e,
-                        thread_name=thread.name,
-                    ) from e
+            watermark_persisted = _persist_watermark(
+                spark, thread, load_mode, watermark_store, new_hwm
+            )
 
             # Step 15 — run post-write assertions
+            assertion_results: list[Any] = []
             if thread.assertions:
                 assertion_results = evaluate_assertions(spark, thread.assertions, target_path)
 
@@ -515,44 +416,12 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             export_results: list[ExportResult] = []
             if thread.exports:
                 # Build AuditContext for export path resolution if not already built
-                if audit_ctx is None:
-                    audit_ctx = _build_audit_context(
-                        thread, weave_name, loom_name, run_timestamp, run_id
-                    )
-
-                resolved = resolve_exports(thread.exports, audit_ctx)
-                for export in resolved:
-                    exp = export
-                    if export.connection:
-                        conn_name = export.connection
-                        if not connections or conn_name not in connections:
-                            raise ExportError(
-                                f"Export '{export.name}' references undefined "
-                                f"connection '{conn_name}'",
-                                thread_name=thread.name,
-                                export_name=export.name,
-                                export_type=export.type,
-                            )
-                        from weevr.config.paths import build_onelake_path
-
-                        conn = connections[conn_name]
-                        if export.table is None:
-                            raise ExportError(
-                                f"Export '{export.name}' connection requires 'table'",
-                                thread_name=thread.name,
-                                export_name=export.name,
-                            )
-                        path = build_onelake_path(conn, export.schema_override, export.table)
-                        exp = export.model_copy(update={"path": path})
-                    result = write_export(spark, df, exp, row_count=rows_written)
-                    export_results.append(result)
-                    if result.status == "aborted":
-                        raise ExportError(
-                            f"Export '{export.name}' failed: {result.error}",
-                            thread_name=thread.name,
-                            export_name=export.name,
-                            export_type=export.type,
-                        )
+                export_ctx = (
+                    audit_ctx
+                    if audit_ctx is not None
+                    else _build_audit_context(thread, weave_name, loom_name, run_timestamp, run_id)
+                )
+                export_results = _write_exports(spark, thread, written, export_ctx, connections)
 
             # Run thread-level post_steps (after core execution, before result)
             if thread.post_steps:
@@ -564,30 +433,19 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                     params=resolved_params,
                 )
 
-            # Step 18 — build result
-            samples: dict[str, list[dict[str, Any]]] | None = None
-            if output_sample:
-                samples = {"output": output_sample}
-                if quarantine_sample:
-                    samples["quarantine"] = quarantine_sample
-
-            # Harvest step observations — fulfilled by the write (or the
-            # first action that executed the plan). Best-effort by design.
+            # Step 18 — build result. Harvest step observations — fulfilled
+            # by the write (or the first action that executed the plan).
+            # Best-effort by design.
             step_stats = obs_registry.harvest() or None
-            if rows_read_obs is not None:
-                rr = read_observation(rows_read_obs)
-                rows_read = int(rr["n"]) if rr and rr.get("n") is not None else 0
-            if rows_after_transforms_obs is not None:
-                rat = read_observation(rows_after_transforms_obs)
-                rows_after_transforms = int(rat["n"]) if rat and rat.get("n") is not None else 0
-
+            rows_read, rows_after_transforms = _harvest_row_counts(transformed)
+            drift_report = written.drift_report
             telemetry = _build_telemetry(
                 span_builder,
-                validation_results,
+                shaped.validation_results,
                 assertion_results,
                 rows_read,
-                rows_written,
-                rows_quarantined,
+                written.rows_written,
+                shaped.rows_quarantined,
                 collector=collector,
                 step_stats=step_stats,
                 load_mode=load_mode,
@@ -595,11 +453,11 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 watermark_previous_value=prior_state.last_value if prior_state else None,
                 watermark_new_value=new_hwm,
                 watermark_persisted=watermark_persisted,
-                watermark_first_run=watermark_first_run,
-                cdc_counts=cdc_counts,
+                watermark_first_run=watermark_store is not None and prior_state is None,
+                cdc_counts=written.cdc_counts,
                 rows_after_transforms=rows_after_transforms,
                 resolved_params=resolved_params,
-                audit_columns_applied=audit_columns_applied,
+                audit_columns_applied=written.audit_columns_applied,
                 export_results=export_results,
                 warp_name=resolved_warp.description if resolved_warp else None,
                 warp_source="explicit"
@@ -613,67 +471,32 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 drift_action_taken=drift_report.action_taken if drift_report else None,
             )
 
-            # Build drift report dict for ThreadResult
-            drift_report_dict = None
-            if drift_report is not None and drift_report.has_drift:
-                drift_report_dict = {
-                    "extra_columns": drift_report.extra_columns,
-                    "missing_columns": drift_report.missing_columns,
-                    "action_taken": drift_report.action_taken,
-                    "drift_mode": drift_report.drift_mode,
-                    "baseline_source": drift_report.baseline_source,
-                }
-
             return ThreadResult(
                 status="success",
                 thread_name=thread.name,
-                rows_written=rows_written,
+                rows_written=written.rows_written,
                 write_mode=write_mode,
                 target_path=target_path,
                 telemetry=telemetry,
-                output_schema=output_schema,
-                samples=samples,
-                drift_report=drift_report_dict,
-                warp_findings=warp_findings if warp_findings else None,
+                output_schema=written.output_schema,
+                samples=_result_samples(written.output_sample, shaped.quarantine_sample),
+                drift_report=_drift_report_dict(drift_report),
+                warp_findings=written.warp_findings or None,
                 warnings=thread_warnings or None,
             )
 
         except DataValidationError:
-            _build_telemetry(
-                span_builder,
-                validation_results,
-                assertion_results,
-                rows_read,
-                rows_written,
-                rows_quarantined,
-                status=SpanStatus.ERROR,
-                collector=collector,
-            )
+            _finish_error_span(span_builder, collector)
             raise
 
-        except WarpEnforcementError as exc:
-            if span_builder is not None:
-                span = span_builder.finish(status=SpanStatus.ERROR)
-                if collector is not None:
-                    collector.add_span(span)
-            if exc.thread_name is None:
-                exc.thread_name = thread.name
-            raise
-
-        except SchemaDriftError as exc:
-            if span_builder is not None:
-                span = span_builder.finish(status=SpanStatus.ERROR)
-                if collector is not None:
-                    collector.add_span(span)
+        except (WarpEnforcementError, SchemaDriftError) as exc:
+            _finish_error_span(span_builder, collector)
             if exc.thread_name is None:
                 exc.thread_name = thread.name
             raise
 
         except ExecutionError as exc:
-            if span_builder is not None:
-                span = span_builder.finish(status=SpanStatus.ERROR)
-                if collector is not None:
-                    collector.add_span(span)
+            _finish_error_span(span_builder, collector)
             if exc.thread_name is None:
                 raise ExecutionError(
                     exc.message,
@@ -685,10 +508,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 ) from exc
             raise
         except Exception as exc:
-            if span_builder is not None:
-                span = span_builder.finish(status=SpanStatus.ERROR)
-                if collector is not None:
-                    collector.add_span(span)
+            _finish_error_span(span_builder, collector)
             raise ExecutionError(
                 f"Thread '{thread.name}' failed unexpectedly",
                 cause=exc,
@@ -1500,6 +1320,191 @@ def _write_standard(
         output_schema=output_schema,
         output_sample=output_sample,
     )
+
+
+def _run_post_write_checks(
+    spark: SparkSession,
+    thread: Thread,
+    written: _WriteOutcome,
+    target_path: str,
+    resolved_warp: WarpConfig | None,
+) -> None:
+    """Run the fact sentinel advisory and auto Warp generation after a write."""
+    # Step 13b — post-write fact sentinel advisory. Runs against
+    # the written table, where columnar stats make per-column
+    # scans cheap. Advisory only: failures never block the run.
+    fact_config = thread.target.fact
+    if fact_config is not None and target_path:
+        try:
+            written_df = read_delta(spark, target_path)
+            # Return value intentionally unused: the check logs its
+            # own WARNs, and advisory diagnostics are not stored.
+            check_fact_sentinels(written_df, fact_config)
+        except Exception:
+            logger.debug(
+                "Post-write fact sentinel advisory failed for thread '%s'",
+                thread.name,
+                exc_info=True,
+            )
+
+    # Auto-generate warp after successful write (all paths)
+    if thread.target.warp_mode == "auto":
+        destination = _auto_warp_destination(thread, target_path)
+        if destination is not None:
+            auto_generate_warp(
+                written.df,
+                resolved_warp,
+                written.drift_report,
+                destination[1],
+                destination[0],
+                adaptive=thread.target.schema_drift == "adaptive",
+            )
+
+
+def _persist_watermark(
+    spark: SparkSession,
+    thread: Thread,
+    load_mode: str,
+    watermark_store: WatermarkStore | None,
+    new_hwm: str | None,
+) -> bool:
+    """Persist the new high-water mark after a successful write.
+
+    Returns:
+        Whether a Watermark state was written.
+
+    Raises:
+        StateError: If the store write fails.
+    """
+    if (
+        watermark_store is None
+        or load_mode not in ("incremental_watermark", "cdc")
+        or thread.load is None
+        or new_hwm is None
+    ):
+        return False
+    try:
+        wm_type = thread.load.watermark_type or "timestamp"
+        wm_col = thread.load.watermark_column or "_commit_version"
+
+        new_state = WatermarkState(
+            thread_name=thread.name,
+            watermark_column=wm_col,
+            watermark_type=wm_type,
+            last_value=new_hwm,
+            last_updated=datetime.now(UTC),
+        )
+        watermark_store.write(spark, new_state)
+        logger.debug(
+            "Thread '%s': persisted HWM %s=%s",
+            thread.name,
+            wm_col,
+            new_hwm,
+        )
+    except StateError:
+        raise
+    except Exception as e:
+        raise StateError(
+            f"Failed to persist watermark for thread '{thread.name}'",
+            cause=e,
+            thread_name=thread.name,
+        ) from e
+    return True
+
+
+def _write_exports(
+    spark: SparkSession,
+    thread: Thread,
+    written: _WriteOutcome,
+    audit_ctx: AuditContext,
+    connections: dict[str, OneLakeConnection] | None,
+) -> list[ExportResult]:
+    """Write the thread's exports from the write-ready frame.
+
+    Raises:
+        ExportError: If an export names an undefined connection, lacks a
+            table for its connection, or aborts on failure.
+    """
+    export_results: list[ExportResult] = []
+    for export in resolve_exports(thread.exports or [], audit_ctx):
+        exp = export
+        if export.connection:
+            conn_name = export.connection
+            if not connections or conn_name not in connections:
+                raise ExportError(
+                    f"Export '{export.name}' references undefined connection '{conn_name}'",
+                    thread_name=thread.name,
+                    export_name=export.name,
+                    export_type=export.type,
+                )
+            from weevr.config.paths import build_onelake_path
+
+            conn = connections[conn_name]
+            if export.table is None:
+                raise ExportError(
+                    f"Export '{export.name}' connection requires 'table'",
+                    thread_name=thread.name,
+                    export_name=export.name,
+                )
+            path = build_onelake_path(conn, export.schema_override, export.table)
+            exp = export.model_copy(update={"path": path})
+        result = write_export(spark, written.df, exp, row_count=written.rows_written)
+        export_results.append(result)
+        if result.status == "aborted":
+            raise ExportError(
+                f"Export '{export.name}' failed: {result.error}",
+                thread_name=thread.name,
+                export_name=export.name,
+                export_type=export.type,
+            )
+    return export_results
+
+
+def _harvest_row_counts(transformed: _Transformed) -> tuple[int, int]:
+    """Rows read and rows after transforms, from eager counts or observations."""
+    rows_read = transformed.rows_read
+    rows_after_transforms = transformed.rows_after_transforms
+    if transformed.rows_read_obs is not None:
+        rr = read_observation(transformed.rows_read_obs)
+        rows_read = int(rr["n"]) if rr and rr.get("n") is not None else 0
+    if transformed.rows_after_transforms_obs is not None:
+        rat = read_observation(transformed.rows_after_transforms_obs)
+        rows_after_transforms = int(rat["n"]) if rat and rat.get("n") is not None else 0
+    return rows_read, rows_after_transforms
+
+
+def _result_samples(
+    output_sample: list[dict[str, Any]] | None,
+    quarantine_sample: list[dict[str, Any]] | None,
+) -> dict[str, list[dict[str, Any]]] | None:
+    """Samples for display: output first, quarantine only alongside output."""
+    if not output_sample:
+        return None
+    samples = {"output": output_sample}
+    if quarantine_sample:
+        samples["quarantine"] = quarantine_sample
+    return samples
+
+
+def _drift_report_dict(drift_report: DriftReport | None) -> dict[str, Any] | None:
+    """The ThreadResult drift summary, present only when drift was detected."""
+    if drift_report is None or not drift_report.has_drift:
+        return None
+    return {
+        "extra_columns": drift_report.extra_columns,
+        "missing_columns": drift_report.missing_columns,
+        "action_taken": drift_report.action_taken,
+        "drift_mode": drift_report.drift_mode,
+        "baseline_source": drift_report.baseline_source,
+    }
+
+
+def _finish_error_span(span_builder: SpanBuilder | None, collector: SpanCollector | None) -> None:
+    """Close the thread span as ERROR and record it with the collector."""
+    if span_builder is not None:
+        span = span_builder.finish(status=SpanStatus.ERROR)
+        if collector is not None:
+            collector.add_span(span)
 
 
 def _meta_for_resolve(
