@@ -6,6 +6,9 @@
       "package-name": "weevr",
       "changelog-path": "CHANGELOG.md",
       "include-v-in-tag": true,
+      "versioning": "prerelease",
+      "prerelease-type": "alpha",
+      "prerelease": true,
       "extra-files": [
         {
           "path": "uv.lock",
