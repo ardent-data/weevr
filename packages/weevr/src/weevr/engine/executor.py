@@ -42,6 +42,7 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.lookup import Lookup
 from weevr.model.seed import SeedConfig
 from weevr.model.thread import Thread
+from weevr.model.warp import WarpConfig
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.audit import AuditContext, build_sources_json, inject_audit_columns
@@ -242,10 +243,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
     # Incremental processing state
     load_mode = thread.load.mode if thread.load else "full"
-    watermark_store: WatermarkStore | None = None
-    prior_state: WatermarkState | None = None
     new_hwm: str | None = None
-    watermark_first_run = False
     watermark_persisted = False
     cdc_counts: dict[str, int] | None = None
 
@@ -289,35 +287,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         # --- Core execution pipeline ---
         try:
             # Resolve target path early (needed for watermark store resolution)
-            target_path = thread.target.alias or thread.target.path
-            if target_path is None and thread.target.connection:
-                conn_name = thread.target.connection
-                from weevr.config.paths import resolve_connection_path
-
-                try:
-                    target_path = resolve_connection_path(
-                        conn_name,
-                        thread.target.table,
-                        thread.target.schema_override,
-                        connections,
-                    )
-                except ValueError as exc:
-                    raise ExecutionError(
-                        f"Target connection resolution failed: {exc}",
-                        thread_name=thread.name,
-                    ) from exc
-                logger.debug(
-                    "Thread '%s': resolved target connection '%s' → %s",
-                    thread.name,
-                    conn_name,
-                    target_path,
-                )
-            if target_path is None:
-                raise ExecutionError(
-                    "Target has no 'alias', 'path', or 'connection' "
-                    "— cannot resolve write location",
-                    thread_name=thread.name,
-                )
+            target_path = _resolve_target_path(thread, connections)
 
             # One existence/identity resolution per thread. Refreshed after
             # every engine-internal commit (warp pre-init, seeds) so
@@ -325,60 +295,14 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # their previous independent probes did.
             target_handle = TargetHandle(spark, target_path)
 
-            # --- Warp resolution ---
-            resolved_warp = None
+            resolved_warp = _resolve_warp(spark, thread, target_path, target_handle)
             warp_findings: list[dict[str, str]] = []
             drift_report = None
 
-            # The loader resolves warps from the thread file and project root.
-            # A thread built without the loader has no binding; it keeps the
-            # original lookup beside the target, explicit references only.
-            if thread.warp_binding is not None:
-                resolved_warp = thread.warp_binding.warp
-            elif isinstance(thread.target.warp, str):
-                from weevr.config.warp import resolve_warp
-
-                thread_dir = Path(target_path).parent if target_path else Path(".")
-                config_root = thread_dir
-                resolved_warp = resolve_warp(
-                    warp_ref=thread.target.warp,
-                    thread_dir=thread_dir,
-                    config_root=config_root,
-                    target_alias=thread.target.alias,
-                )
-
-            # --- Warp pre-initialization ---
-            # Note: SCD and soft-delete columns are not yet known at this
-            # point. Dimension targets using warp_init should declare SCD
-            # columns in the warp itself.
-            if resolved_warp is not None and thread.target.warp_init:
-                from weevr.config.warp import build_effective_warp
-
-                engine_col_names = list((thread.target.audit_columns or {}).keys())
-                effective_warp = build_effective_warp(resolved_warp.columns, [], engine_col_names)
-                pre_initialize_table(spark, target_path, effective_warp)
-                target_handle.refresh()
-
-            # --- Watermark/CDC state loading ---
-            if load_mode in ("incremental_watermark", "cdc") and thread.load is not None:
-                watermark_store = resolve_store(thread.load, target_path)
-                prior_state = watermark_store.read(spark, thread.name)
-                if (
-                    load_mode == "incremental_watermark"
-                    and thread.write is not None
-                    and thread.write.mode == "append"
-                ):
-                    prior_state = _reconcile_stamped_hwm(
-                        spark, thread, prior_state, target_handle, target_path
-                    )
-                watermark_first_run = prior_state is None
-                logger.debug(
-                    "Thread '%s': load_mode=%s, first_run=%s, prior_value=%s",
-                    thread.name,
-                    load_mode,
-                    watermark_first_run,
-                    prior_state.last_value if prior_state else None,
-                )
+            watermark_store, prior_state = _load_watermark_state(
+                spark, thread, load_mode, target_path, target_handle
+            )
+            watermark_first_run = watermark_store is not None and prior_state is None
 
             # --- Step 3: Resolve lookup-based sources ---
             # lookup_dfs: frames for lookup-bound sources, by source alias.
@@ -1166,6 +1090,113 @@ def _prepare_thread_resources(
         resources.column_sets = {**(column_sets or {}), **thread_resolved_cs}
 
     return resources
+
+
+def _resolve_target_path(thread: Thread, connections: dict[str, OneLakeConnection] | None) -> str:
+    """Resolve the Target's write location from alias, path, or connection.
+
+    Raises:
+        ExecutionError: If connection resolution fails or no location is set.
+    """
+    target_path = thread.target.alias or thread.target.path
+    if target_path is None and thread.target.connection:
+        conn_name = thread.target.connection
+        from weevr.config.paths import resolve_connection_path
+
+        try:
+            target_path = resolve_connection_path(
+                conn_name,
+                thread.target.table,
+                thread.target.schema_override,
+                connections,
+            )
+        except ValueError as exc:
+            raise ExecutionError(
+                f"Target connection resolution failed: {exc}",
+                thread_name=thread.name,
+            ) from exc
+        logger.debug(
+            "Thread '%s': resolved target connection '%s' → %s",
+            thread.name,
+            conn_name,
+            target_path,
+        )
+    if target_path is None:
+        raise ExecutionError(
+            "Target has no 'alias', 'path', or 'connection' — cannot resolve write location",
+            thread_name=thread.name,
+        )
+    return target_path
+
+
+def _resolve_warp(
+    spark: SparkSession, thread: Thread, target_path: str, target_handle: TargetHandle
+) -> WarpConfig | None:
+    """Resolve the Thread's Warp and pre-initialize the target when asked.
+
+    The loader resolves warps from the thread file and project root. A
+    thread built without the loader has no binding; it keeps the original
+    lookup beside the target, explicit references only.
+    """
+    resolved_warp: WarpConfig | None = None
+    if thread.warp_binding is not None:
+        resolved_warp = thread.warp_binding.warp
+    elif isinstance(thread.target.warp, str):
+        from weevr.config.warp import resolve_warp
+
+        thread_dir = Path(target_path).parent if target_path else Path(".")
+        config_root = thread_dir
+        resolved_warp = resolve_warp(
+            warp_ref=thread.target.warp,
+            thread_dir=thread_dir,
+            config_root=config_root,
+            target_alias=thread.target.alias,
+        )
+
+    # --- Warp pre-initialization ---
+    # Note: SCD and soft-delete columns are not yet known at this
+    # point. Dimension targets using warp_init should declare SCD
+    # columns in the warp itself.
+    if resolved_warp is not None and thread.target.warp_init:
+        from weevr.config.warp import build_effective_warp
+
+        engine_col_names = list((thread.target.audit_columns or {}).keys())
+        effective_warp = build_effective_warp(resolved_warp.columns, [], engine_col_names)
+        pre_initialize_table(spark, target_path, effective_warp)
+        target_handle.refresh()
+
+    return resolved_warp
+
+
+def _load_watermark_state(
+    spark: SparkSession,
+    thread: Thread,
+    load_mode: str,
+    target_path: str,
+    target_handle: TargetHandle,
+) -> tuple[WatermarkStore | None, WatermarkState | None]:
+    """Load the prior Watermark state for incremental and CDC threads.
+
+    Returns ``(None, None)`` for load modes that keep no state.
+    """
+    if load_mode not in ("incremental_watermark", "cdc") or thread.load is None:
+        return None, None
+    watermark_store = resolve_store(thread.load, target_path)
+    prior_state = watermark_store.read(spark, thread.name)
+    if (
+        load_mode == "incremental_watermark"
+        and thread.write is not None
+        and thread.write.mode == "append"
+    ):
+        prior_state = _reconcile_stamped_hwm(spark, thread, prior_state, target_handle, target_path)
+    logger.debug(
+        "Thread '%s': load_mode=%s, first_run=%s, prior_value=%s",
+        thread.name,
+        load_mode,
+        prior_state is None,
+        prior_state.last_value if prior_state else None,
+    )
+    return watermark_store, prior_state
 
 
 def _meta_for_resolve(
