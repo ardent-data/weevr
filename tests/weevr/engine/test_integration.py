@@ -11,7 +11,8 @@ from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 from spark_helpers import create_delta_table
 from weevr.config import load_config
-from weevr.engine import ThreadResult, execute_thread
+from weevr.engine import execute_thread
+from weevr.engine.result import ThreadResult
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.fact import FactConfig
 from weevr.model.keys import KeyConfig

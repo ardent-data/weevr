@@ -2162,7 +2162,7 @@ class TestDisplayPurity:
     def test_no_dataframe_method_calls_in_source(self) -> None:
         import inspect
 
-        from weevr.engine import display
+        import weevr.engine.display as display
 
         source = Path(inspect.getfile(display)).read_text()
         forbidden = (
