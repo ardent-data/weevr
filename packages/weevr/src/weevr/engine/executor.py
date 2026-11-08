@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -83,6 +84,45 @@ from weevr.telemetry.results import ExportResult, ThreadTelemetry
 from weevr.telemetry.span import ExecutionSpan, SpanStatus, generate_span_id, generate_trace_id
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ThreadCleanup:
+    """Resources a thread run must release, registered the moment they exist.
+
+    Phase helpers record what they create here, so a helper that fails after
+    persisting a frame still has it released by ``execute_thread``'s
+    ``finally``.
+    """
+
+    thread_lookups: dict[str, Any] = field(default_factory=dict)
+    cdc_window: Any = None
+    working_frame: Any = None
+    quarantine_frame: Any = None
+
+    def release(self) -> None:
+        """Release thread-level lookups, then every persisted frame.
+
+        Lookup cleanup is not suppressed; each frame release suppresses its
+        own failure.
+        """
+        if self.thread_lookups:
+            cleanup_lookups(self.thread_lookups)
+        for frame in (self.cdc_window, self.working_frame, self.quarantine_frame):
+            if frame is not None:
+                with contextlib.suppress(Exception):
+                    frame.unpersist()
+
+
+@dataclass
+class _ThreadResources:
+    """Weave-level resources merged with the thread's own (thread wins)."""
+
+    cached_lookups: dict[str, Any] | None
+    weave_lookups: dict[str, Lookup] | None
+    column_sets: dict[str, dict[str, str]] | None
+    column_set_defs: dict[str, ColumnSet] | None
+    lookup_meta: dict[str, LookupMeta] | None
 
 
 def execute_thread(  # type: ignore[reportGeneralTypeIssues]
@@ -215,58 +255,26 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
 
     # --- Thread-level resource lifecycle ---
     thread_variable_ctx = _build_thread_variable_context(thread)
-    thread_cached_lookups: dict[str, Any] = {}
-    cdc_window_df: Any = None
-    working_df_persisted: Any = None
-    quarantine_df_persisted: Any = None
+    cleanup = _ThreadCleanup()
 
-    # Compute effective resources by merging weave-level with thread-level
-    effective_cached_lookups = cached_lookups
-    effective_weave_lookups = weave_lookups
-    effective_column_sets = column_sets
-    effective_column_set_defs = column_set_defs
-
-    try:  # noqa: PLR0912 — outer try/finally for thread-level lookup cleanup
-        # Materialize thread-level lookups and merge with weave-level
-        if thread.lookups:
-            thread_cached_lookups, thread_lookup_results = materialize_lookups(
-                spark, thread.lookups, connections=connections
-            )
-            all_cached: dict[str, Any] = {}
-            if cached_lookups:
-                all_cached.update(cached_lookups)
-            all_cached.update(thread_cached_lookups)  # thread wins
-            # A thread lookup that isn't materialized must not be served an
-            # inherited frame of the same name
-            for name in thread.lookups:
-                if name not in thread_cached_lookups:
-                    all_cached.pop(name, None)
-            effective_cached_lookups = all_cached or None
-            # Thread-scoped materialization facts join the inherited map so
-            # resolve steps can reuse unique-key outcomes at every scope
-            lookup_meta = build_lookup_meta(thread_lookup_results, base=lookup_meta)
-            # Merge lookup definitions so resolve_thread_lookups sees both
-            effective_weave_lookups = merge_resource_dicts(
-                weave_lookups, thread.lookups, "lookup", "weave", "thread"
-            )
-
-        # Merge thread-level column_sets with weave-level (thread wins).
-        # Only the THREAD's defs materialize here — the weave's mappings
-        # arrive already resolved and merge as plain dicts, so a weave set
-        # resolves once per weave regardless of thread count
-        if thread.column_sets:
-            merged_cs_defs = merge_resource_dicts(
-                column_set_defs, thread.column_sets, "column_set", "weave", "thread"
-            )
-            if merged_cs_defs:
-                effective_column_set_defs = merged_cs_defs
-            thread_resolved_cs, _ = materialize_column_sets(
-                spark,
-                dict(thread.column_sets),
-                resolved_params or {},
-                connections=connections,
-            )
-            effective_column_sets = {**(column_sets or {}), **thread_resolved_cs}
+    try:  # noqa: PLR0912 — outer try/finally for thread-level resource cleanup
+        resources = _prepare_thread_resources(
+            spark,
+            thread,
+            cleanup,
+            cached_lookups=cached_lookups,
+            weave_lookups=weave_lookups,
+            column_sets=column_sets,
+            column_set_defs=column_set_defs,
+            lookup_meta=lookup_meta,
+            resolved_params=resolved_params,
+            connections=connections,
+        )
+        effective_cached_lookups = resources.cached_lookups
+        effective_weave_lookups = resources.weave_lookups
+        effective_column_sets = resources.column_sets
+        effective_column_set_defs = resources.column_set_defs
+        lookup_meta = resources.lookup_meta
 
         # Run thread-level pre_steps
         if thread.pre_steps:
@@ -451,7 +459,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # lineage — window-scale, cached once, released in the
                 # thread's finally block
                 primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
-                cdc_window_df = primary_df
+                cleanup.cdc_window = primary_df
                 # Generic-preset HWM computes AGAINST the persisted window,
                 # sharing one lineage with the op counts and the merge — the
                 # captured value and the applied rows cannot diverge. (The
@@ -586,14 +594,13 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # all-clean run leaves the prior quarantine table untouched),
                 # sample from cache. Released in finally.
                 if outcome.quarantine_df is not None:
-                    quarantine_df_persisted = outcome.quarantine_df.persist(
-                        StorageLevel.MEMORY_AND_DISK
-                    )
-                    rows_quarantined = write_quarantine(spark, quarantine_df_persisted, target_path)
+                    quarantine_df = outcome.quarantine_df.persist(StorageLevel.MEMORY_AND_DISK)
+                    cleanup.quarantine_frame = quarantine_df
+                    rows_quarantined = write_quarantine(spark, quarantine_df, target_path)
                     if capture_samples:
                         with contextlib.suppress(Exception):
                             quarantine_sample = (
-                                quarantine_df_persisted.limit(10).toPandas().to_dict("records")
+                                quarantine_df.limit(10).toPandas().to_dict("records")
                             )
 
                 # Continue with clean_df
@@ -680,7 +687,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # mapping is not a valid anchor). Released in finally.
                 if thread.exports:
                     df = df.persist(StorageLevel.MEMORY_AND_DISK)
-                    working_df_persisted = df
+                    cleanup.working_frame = df
 
                 # Seed phase (before merge)
                 if seed_config is not None or dim_config.seed_system_members:
@@ -754,7 +761,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # mapping is not a valid anchor). Released in finally.
                 if thread.exports:
                     df = df.persist(StorageLevel.MEMORY_AND_DISK)
-                    working_df_persisted = df
+                    cleanup.working_frame = df
 
                 output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
                 if capture_samples:
@@ -803,7 +810,7 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 # mapping is not a valid anchor). Released in finally.
                 if thread.exports:
                     df = df.persist(StorageLevel.MEMORY_AND_DISK)
-                    working_df_persisted = df
+                    cleanup.working_frame = df
 
                 # General seed phase (non-dimension)
                 if seed_config is not None:
@@ -1086,18 +1093,79 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             ) from exc
 
     finally:
-        # Cleanup thread-level lookups only; weave-level cleanup is the caller's job
-        if thread_cached_lookups:
-            cleanup_lookups(thread_cached_lookups)
-        if cdc_window_df is not None:
-            with contextlib.suppress(Exception):
-                cdc_window_df.unpersist()
-        if working_df_persisted is not None:
-            with contextlib.suppress(Exception):
-                working_df_persisted.unpersist()
-        if quarantine_df_persisted is not None:
-            with contextlib.suppress(Exception):
-                quarantine_df_persisted.unpersist()
+        # Thread-level resources only; weave-level cleanup is the caller's job
+        cleanup.release()
+
+
+def _prepare_thread_resources(
+    spark: SparkSession,
+    thread: Thread,
+    cleanup: _ThreadCleanup,
+    *,
+    cached_lookups: dict[str, Any] | None,
+    weave_lookups: dict[str, Lookup] | None,
+    column_sets: dict[str, dict[str, str]] | None,
+    column_set_defs: dict[str, ColumnSet] | None,
+    lookup_meta: dict[str, LookupMeta] | None,
+    resolved_params: dict[str, Any] | None,
+    connections: dict[str, OneLakeConnection] | None,
+) -> _ThreadResources:
+    """Materialize the thread's own lookups and column sets over the weave's.
+
+    Materialized thread lookups are registered with ``cleanup`` before any
+    later step can fail.
+    """
+    resources = _ThreadResources(
+        cached_lookups=cached_lookups,
+        weave_lookups=weave_lookups,
+        column_sets=column_sets,
+        column_set_defs=column_set_defs,
+        lookup_meta=lookup_meta,
+    )
+
+    # Materialize thread-level lookups and merge with weave-level
+    if thread.lookups:
+        thread_cached_lookups, thread_lookup_results = materialize_lookups(
+            spark, thread.lookups, connections=connections
+        )
+        cleanup.thread_lookups = thread_cached_lookups
+        all_cached: dict[str, Any] = {}
+        if cached_lookups:
+            all_cached.update(cached_lookups)
+        all_cached.update(thread_cached_lookups)  # thread wins
+        # A thread lookup that isn't materialized must not be served an
+        # inherited frame of the same name
+        for name in thread.lookups:
+            if name not in thread_cached_lookups:
+                all_cached.pop(name, None)
+        resources.cached_lookups = all_cached or None
+        # Thread-scoped materialization facts join the inherited map so
+        # resolve steps can reuse unique-key outcomes at every scope
+        resources.lookup_meta = build_lookup_meta(thread_lookup_results, base=lookup_meta)
+        # Merge lookup definitions so resolve_thread_lookups sees both
+        resources.weave_lookups = merge_resource_dicts(
+            weave_lookups, thread.lookups, "lookup", "weave", "thread"
+        )
+
+    # Merge thread-level column_sets with weave-level (thread wins).
+    # Only the THREAD's defs materialize here — the weave's mappings
+    # arrive already resolved and merge as plain dicts, so a weave set
+    # resolves once per weave regardless of thread count
+    if thread.column_sets:
+        merged_cs_defs = merge_resource_dicts(
+            column_set_defs, thread.column_sets, "column_set", "weave", "thread"
+        )
+        if merged_cs_defs:
+            resources.column_set_defs = merged_cs_defs
+        thread_resolved_cs, _ = materialize_column_sets(
+            spark,
+            dict(thread.column_sets),
+            resolved_params or {},
+            connections=connections,
+        )
+        resources.column_sets = {**(column_sets or {}), **thread_resolved_cs}
+
+    return resources
 
 
 def _meta_for_resolve(
