@@ -39,6 +39,7 @@ from weevr.errors.exceptions import (
 )
 from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
+from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.lookup import Lookup
 from weevr.model.seed import SeedConfig
 from weevr.model.thread import Thread
@@ -304,142 +305,24 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             )
             watermark_first_run = watermark_store is not None and prior_state is None
 
-            # --- Step 3: Resolve lookup-based sources ---
-            # lookup_dfs: frames for lookup-bound sources, by source alias.
-            # resolve_lookups: what resolve steps see — every visible lookup
-            # they name, by lookup name, with bound aliases winning a clash.
-            lookup_dfs: dict[str, Any] = {}
-            resolve_lookups: dict[str, Any] = {}
-            resolve_meta = lookup_meta
-            if effective_cached_lookups is not None or effective_weave_lookups is not None:
-                lookup_dfs, resolve_lookups = resolve_lookup_frames(
-                    thread,
-                    effective_weave_lookups or {},
-                    effective_cached_lookups or {},
-                    spark,
-                    connections=connections,
-                    uk_memo=uk_memo,
-                )
-                resolve_meta = _meta_for_resolve(thread, lookup_meta)
-
-            # --- Step 4: Read sources ---
-            if load_mode == "incremental_watermark" and thread.load is not None:
-                # Read primary source with watermark filter
-                primary_alias = next(iter(thread.sources))
-                primary_source = thread.sources[primary_alias]
-                primary_df, new_hwm = read_source_incremental(
-                    spark,
-                    primary_alias,
-                    primary_source,
-                    thread.load,
-                    prior_state,
-                    connections=connections,
-                )
-
-                # Secondary sources (the primary keeps its filtered read —
-                # snapshot semantics don't apply to it) consult the cache
-                # registry like any full-mode source
-                sources_map = {primary_alias: primary_df}
-                for alias, source in thread.sources.items():
-                    if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = _read_source_via_registry(
-                            spark, alias, source, connections, cache_registry
-                        )
-                sources_map.update(lookup_dfs)
-
-            elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-                # Read CDC source
-                primary_alias = next(iter(thread.sources))
-                primary_source = thread.sources[primary_alias]
-
-                # last_version is only meaningful for the CDF preset path,
-                # where prior_state.last_value is a stringified commit version.
-                # For generic CDC, the persisted value is a watermark string
-                # (timestamp / date / int / long) and must not be coerced to int.
-                last_version: int | None = None
-                if thread.load.cdc.preset == "delta_cdf" and prior_state is not None:
-                    try:
-                        last_version = int(prior_state.last_value)
-                    except (ValueError, TypeError) as exc:
-                        raise StateError(
-                            f"Stored CDF version {prior_state.last_value!r} is not an "
-                            f"integer; seed or reset the watermark",
-                            cause=exc,
-                            thread_name=thread.name,
-                        ) from exc
-
-                primary_df, cdc_new_hwm = read_cdc_source(
-                    spark,
-                    primary_source,
-                    thread.load.cdc,
-                    last_version,
-                    load_config=thread.load,
-                    prior_state=prior_state,
-                    connections=connections,
-                    compute_hwm=False,
-                )
-                # Persist the change window: the version capture, the
-                # op-code counts, and the merge itself all execute this
-                # lineage — window-scale, cached once, released in the
-                # thread's finally block
-                primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
-                cleanup.cdc_window = primary_df
-                # Generic-preset HWM computes AGAINST the persisted window,
-                # sharing one lineage with the op counts and the merge — the
-                # captured value and the applied rows cannot diverge. (The
-                # old in-read capture ran on a separate execution: a commit
-                # between it and the merge silently decoupled persisted
-                # state from applied state.)
-                if thread.load.cdc.preset != "delta_cdf":
-                    cdc_new_hwm = compute_generic_cdc_hwm(primary_df, thread.load)
-
-                # Capture new CDF version if Delta CDF
-                if (
-                    thread.load.cdc.preset == "delta_cdf"
-                    and "_commit_version" in primary_df.columns
-                ):
-                    max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
-                    if max_row and max_row[0]["mv"] is not None:
-                        new_hwm = str(max_row[0]["mv"])
-                elif cdc_new_hwm is not None:
-                    # Generic CDC + watermark composition: HWM was captured
-                    # from the filtered DataFrame at read time. Persistence
-                    # still goes through the existing save_watermark path
-                    # below, which keys on `new_hwm is not None`.
-                    new_hwm = cdc_new_hwm
-                    prior_hwm_value = prior_state.last_value if prior_state is not None else None
-                    logger.debug(
-                        "Thread '%s': CDC watermark captured on %s "
-                        "(prior=%s, new=%s, filter_applied=%s)",
-                        thread.name,
-                        thread.load.watermark_column,
-                        prior_hwm_value,
-                        cdc_new_hwm,
-                        prior_state is not None,
-                    )
-
-                # Secondary sources (the primary keeps its filtered read —
-                # snapshot semantics don't apply to it) consult the cache
-                # registry like any full-mode source
-                sources_map = {primary_alias: primary_df}
-                for alias, source in thread.sources.items():
-                    if alias != primary_alias and alias not in lookup_dfs:
-                        sources_map[alias] = _read_source_via_registry(
-                            spark, alias, source, connections, cache_registry
-                        )
-                sources_map.update(lookup_dfs)
-            else:
-                # Full mode or incremental_parameter — read non-lookup
-                # sources, serving registered cache snapshots when the
-                # source's identity matches a same-run producer
-                normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
-                sources_map = {
-                    alias_name: _read_source_via_registry(
-                        spark, alias_name, src, connections, cache_registry
-                    )
-                    for alias_name, src in normal_sources.items()
-                }
-                sources_map.update(lookup_dfs)
+            # --- Steps 3-4: Resolve lookup-based sources, read the rest ---
+            source_read = _read_sources(
+                spark,
+                thread,
+                load_mode,
+                prior_state,
+                cleanup,
+                cached_lookups=effective_cached_lookups,
+                weave_lookups=effective_weave_lookups,
+                lookup_meta=lookup_meta,
+                connections=connections,
+                cache_registry=cache_registry,
+                uk_memo=uk_memo,
+            )
+            sources_map = source_read.sources_map
+            new_hwm = source_read.new_hwm
+            resolve_lookups = source_read.resolve_lookups
+            resolve_meta = source_read.resolve_meta
 
             # Step statistics attach as Observations (harvested after the
             # write); CTE sub-pipelines contribute under their own scopes.
@@ -1021,6 +904,16 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
         cleanup.release()
 
 
+@dataclass
+class _SourceRead:
+    """Sources read for a thread run, keyed by alias, plus resolve-step context."""
+
+    sources_map: dict[str, Any]
+    new_hwm: str | None
+    resolve_lookups: dict[str, Any]
+    resolve_meta: dict[str, LookupMeta] | None
+
+
 def _prepare_thread_resources(
     spark: SparkSession,
     thread: Thread,
@@ -1197,6 +1090,198 @@ def _load_watermark_state(
         prior_state.last_value if prior_state else None,
     )
     return watermark_store, prior_state
+
+
+def _read_sources(
+    spark: SparkSession,
+    thread: Thread,
+    load_mode: str,
+    prior_state: WatermarkState | None,
+    cleanup: _ThreadCleanup,
+    *,
+    cached_lookups: dict[str, Any] | None,
+    weave_lookups: dict[str, Lookup] | None,
+    lookup_meta: dict[str, LookupMeta] | None,
+    connections: dict[str, OneLakeConnection] | None,
+    cache_registry: CacheManager | None,
+    uk_memo: UniqueKeyMemo | None,
+) -> _SourceRead:
+    """Resolve lookup-bound sources and read every other declared Source.
+
+    The primary (first) Source is read per load mode — watermark-filtered,
+    as a CDC change window, or in full; the new high-water mark is captured
+    alongside.
+    """
+    # lookup_dfs: frames for lookup-bound sources, by source alias.
+    # resolve_lookups: what resolve steps see — every visible lookup
+    # they name, by lookup name, with bound aliases winning a clash.
+    lookup_dfs: dict[str, Any] = {}
+    resolve_lookups: dict[str, Any] = {}
+    resolve_meta = lookup_meta
+    if cached_lookups is not None or weave_lookups is not None:
+        lookup_dfs, resolve_lookups = resolve_lookup_frames(
+            thread,
+            weave_lookups or {},
+            cached_lookups or {},
+            spark,
+            connections=connections,
+            uk_memo=uk_memo,
+        )
+        resolve_meta = _meta_for_resolve(thread, lookup_meta)
+
+    new_hwm: str | None = None
+    if load_mode == "incremental_watermark" and thread.load is not None:
+        # Read primary source with watermark filter
+        primary_alias = next(iter(thread.sources))
+        primary_df, new_hwm = read_source_incremental(
+            spark,
+            primary_alias,
+            thread.sources[primary_alias],
+            thread.load,
+            prior_state,
+            connections=connections,
+        )
+        sources_map = _with_secondary_sources(
+            spark, thread, primary_alias, primary_df, lookup_dfs, connections, cache_registry
+        )
+    elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
+        primary_alias = next(iter(thread.sources))
+        primary_df, new_hwm = _read_cdc_window(
+            spark, thread, thread.load, thread.load.cdc, prior_state, cleanup, connections
+        )
+        sources_map = _with_secondary_sources(
+            spark, thread, primary_alias, primary_df, lookup_dfs, connections, cache_registry
+        )
+    else:
+        # Full mode or incremental_parameter — read non-lookup
+        # sources, serving registered cache snapshots when the
+        # source's identity matches a same-run producer
+        normal_sources = {k: v for k, v in thread.sources.items() if k not in lookup_dfs}
+        sources_map = {
+            alias_name: _read_source_via_registry(
+                spark, alias_name, src, connections, cache_registry
+            )
+            for alias_name, src in normal_sources.items()
+        }
+        sources_map.update(lookup_dfs)
+
+    return _SourceRead(
+        sources_map=sources_map,
+        new_hwm=new_hwm,
+        resolve_lookups=resolve_lookups,
+        resolve_meta=resolve_meta,
+    )
+
+
+def _with_secondary_sources(
+    spark: SparkSession,
+    thread: Thread,
+    primary_alias: str,
+    primary_df: Any,
+    lookup_dfs: dict[str, Any],
+    connections: dict[str, OneLakeConnection] | None,
+    cache_registry: CacheManager | None,
+) -> dict[str, Any]:
+    """Build the sources map around an already-read primary Source.
+
+    Secondary sources (the primary keeps its filtered read — snapshot
+    semantics don't apply to it) consult the cache registry like any
+    full-mode source; lookup-bound frames are added last.
+    """
+    sources_map = {primary_alias: primary_df}
+    for alias, source in thread.sources.items():
+        if alias != primary_alias and alias not in lookup_dfs:
+            sources_map[alias] = _read_source_via_registry(
+                spark, alias, source, connections, cache_registry
+            )
+    sources_map.update(lookup_dfs)
+    return sources_map
+
+
+def _read_cdc_window(
+    spark: SparkSession,
+    thread: Thread,
+    load: LoadConfig,
+    cdc: CdcConfig,
+    prior_state: WatermarkState | None,
+    cleanup: _ThreadCleanup,
+    connections: dict[str, OneLakeConnection] | None,
+) -> tuple[Any, str | None]:
+    """Read and persist the primary Source's CDC change window.
+
+    The window is registered with ``cleanup`` as soon as it is persisted.
+
+    Returns:
+        The persisted change window and the new high-water mark (``None``
+        when the window yields none).
+
+    Raises:
+        StateError: If a stored Delta CDF version is not an integer.
+    """
+    primary_source = thread.sources[next(iter(thread.sources))]
+
+    # last_version is only meaningful for the CDF preset path,
+    # where prior_state.last_value is a stringified commit version.
+    # For generic CDC, the persisted value is a watermark string
+    # (timestamp / date / int / long) and must not be coerced to int.
+    last_version: int | None = None
+    if cdc.preset == "delta_cdf" and prior_state is not None:
+        try:
+            last_version = int(prior_state.last_value)
+        except (ValueError, TypeError) as exc:
+            raise StateError(
+                f"Stored CDF version {prior_state.last_value!r} is not an "
+                f"integer; seed or reset the watermark",
+                cause=exc,
+                thread_name=thread.name,
+            ) from exc
+
+    primary_df, cdc_new_hwm = read_cdc_source(
+        spark,
+        primary_source,
+        cdc,
+        last_version,
+        load_config=load,
+        prior_state=prior_state,
+        connections=connections,
+        compute_hwm=False,
+    )
+    # Persist the change window: the version capture, the
+    # op-code counts, and the merge itself all execute this
+    # lineage — window-scale, cached once, released in the
+    # thread's finally block
+    primary_df = primary_df.persist(StorageLevel.MEMORY_AND_DISK)
+    cleanup.cdc_window = primary_df
+    # Generic-preset HWM computes AGAINST the persisted window,
+    # sharing one lineage with the op counts and the merge — the
+    # captured value and the applied rows cannot diverge. (The
+    # old in-read capture ran on a separate execution: a commit
+    # between it and the merge silently decoupled persisted
+    # state from applied state.)
+    if cdc.preset != "delta_cdf":
+        cdc_new_hwm = compute_generic_cdc_hwm(primary_df, load)
+
+    new_hwm: str | None = None
+    # Capture new CDF version if Delta CDF
+    if cdc.preset == "delta_cdf" and "_commit_version" in primary_df.columns:
+        max_row = primary_df.agg(F.max("_commit_version").alias("mv")).collect()
+        if max_row and max_row[0]["mv"] is not None:
+            new_hwm = str(max_row[0]["mv"])
+    elif cdc_new_hwm is not None:
+        # Generic CDC + watermark composition: HWM was captured
+        # from the filtered DataFrame at read time. Persistence
+        # still goes through the save_watermark path, which keys on
+        # `new_hwm is not None`.
+        new_hwm = cdc_new_hwm
+        logger.debug(
+            "Thread '%s': CDC watermark captured on %s (prior=%s, new=%s, filter_applied=%s)",
+            thread.name,
+            load.watermark_column,
+            prior_state.last_value if prior_state is not None else None,
+            cdc_new_hwm,
+            prior_state is not None,
+        )
+    return primary_df, new_hwm
 
 
 def _meta_for_resolve(
