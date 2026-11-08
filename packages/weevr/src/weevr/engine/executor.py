@@ -43,7 +43,7 @@ from weevr.model.load import CdcConfig, LoadConfig
 from weevr.model.lookup import Lookup
 from weevr.model.seed import SeedConfig
 from weevr.model.thread import Thread
-from weevr.model.warp import WarpConfig
+from weevr.model.warp import DriftReport, WarpConfig
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
 from weevr.operations.audit import AuditContext, build_sources_json, inject_audit_columns
@@ -372,11 +372,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             dim_builder = shaped.dim_builder
             dim_config = thread.target.dimension
             fact_config = thread.target.fact
-            seed_config = thread.target.seed
 
             # Step 10 — resolve and prepare audit columns
             audit_columns = thread.target.audit_columns or {}
-            audit_columns_applied: list[str] = []
             audit_ctx: AuditContext | None = None
             if audit_columns:
                 audit_ctx = _build_audit_context(
@@ -402,169 +400,39 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
                 else None,
             )
 
+            write_ctx = _WriteContext(
+                target_path=target_path,
+                target_handle=target_handle,
+                resolved_warp=resolved_warp,
+                audit_columns=audit_columns,
+                audit_ctx=audit_ctx,
+                commit_stamp=commit_stamp,
+                run_timestamp=run_timestamp,
+                capture_samples=capture_samples,
+                cleanup=cleanup,
+            )
             if dim_config is not None and dim_builder is not None:
-                # Dimension merge routing
-                df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
-                    df,
+                written = _write_dimension(
+                    spark,
                     thread,
-                    spark,
-                    target_handle,
-                    target_path,
-                    resolved_warp,
-                    audit_columns,
-                    audit_ctx,
-                    _writer_managed_columns(thread, dim_builder),
-                )
-                # Exports reuse one compute of the working DataFrame: the
-                # persist anchors here — after warp/drift, before the
-                # branch-specific write — the point common to all branches
-                # (the CDC branch deliberately skips target mapping, so
-                # mapping is not a valid anchor). Released in finally.
-                if thread.exports:
-                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
-                    cleanup.working_frame = df
-
-                # Seed phase (before merge)
-                if seed_config is not None or dim_config.seed_system_members:
-                    target_schema = df.schema
-                    all_seed_rows: list[dict[str, Any]] = []
-                    if seed_config is not None:
-                        all_seed_rows.extend(seed_config.rows)
-                    if dim_config.seed_system_members:
-                        all_seed_rows.extend(build_system_member_rows(dim_config, df))
-                    if all_seed_rows:
-                        combined_seed = SeedConfig(
-                            on=seed_config.on if seed_config else "first_write",
-                            rows=all_seed_rows,
-                        )
-                        execute_seeds(
-                            spark, combined_seed, target_path, target_schema, handle=target_handle
-                        )
-                        target_handle.refresh()
-
-                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                if capture_samples:
-                    with contextlib.suppress(Exception):
-                        output_sample = df.limit(10).toPandas().to_dict("records")
-                was_first_write = not target_handle.exists()
-                merge_result = execute_dimension_merge(
-                    spark,
                     df,
                     dim_builder,
-                    target_path,
-                    run_timestamp,
-                    handle=target_handle,
-                    stamp=commit_stamp,
-                    evolve=thread.target.schema_drift == "adaptive",
+                    write_ctx,
+                    rows_quarantined=rows_quarantined,
+                    rows_after_transforms=rows_after_transforms,
                 )
-                # Input-rows semantic. Quarantine-free merges need no new
-                # action: transforms after the eager rows_after_transforms
-                # count are column-only, so write-input rows equal it. With
-                # quarantined rows the subtraction would lie — quarantine
-                # frames are exploded one row per FAILED RULE, so a source
-                # row failing two rules subtracts twice — and the input df
-                # must be counted directly (exact beats cheap here). First
-                # writes report the commit's own numOutputRows.
-                if was_first_write:
-                    rows_written = merge_result.rows_inserted
-                elif rows_quarantined:
-                    rows_written = df.count()
-                else:
-                    rows_written = rows_after_transforms
-
             elif load_mode == "cdc" and thread.load is not None and thread.load.cdc is not None:
-                # CDC merge routing (no dimension) — skip target column
-                # mapping because execute_cdc_merge handles column
-                # selection internally (retains operation column).
-                if audit_columns and audit_ctx is not None:
-                    df = inject_audit_columns(df, audit_columns, audit_ctx)
-                    audit_columns_applied = list(audit_columns)
-
-                # Warp enforcement, drift detection, warp-only append
-                engine_col_names = audit_columns_applied + _writer_managed_columns(thread, None)
-                df, warp_findings, drift_report = _apply_warp_and_drift(
-                    df,
-                    resolved_warp,
-                    thread,
-                    engine_col_names,
-                    table_columns=existing_target_columns(spark, target_path, target_handle),
-                )
-                # Exports reuse one compute of the working DataFrame: the
-                # persist anchors here — after warp/drift, before the
-                # branch-specific write — the point common to all branches
-                # (the CDC branch deliberately skips target mapping, so
-                # mapping is not a valid anchor). Released in finally.
-                if thread.exports:
-                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
-                    cleanup.working_frame = df
-
-                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                if capture_samples:
-                    with contextlib.suppress(Exception):
-                        output_sample = df.limit(10).toPandas().to_dict("records")
-                cdc_write = _validate_cdc_write_config(thread)
-                seeded_first_write = seed_config is not None and seed_cdc_target(
-                    spark,
-                    df,
-                    seed_config,
-                    target_path,
-                    cdc_write,
-                    thread.load.cdc,
-                    target_handle,
-                )
-                cdc_counts = execute_cdc_merge(
-                    spark,
-                    df,
-                    target_path,
-                    cdc_write,
-                    thread.load.cdc,
-                    load_config=thread.load,
-                    handle=target_handle,
-                    evolve=thread.target.schema_drift == "adaptive",
-                    seeded_first_write=seeded_first_write,
-                )
-                rows_written = sum(cdc_counts.values())
-
+                written = _write_cdc(spark, thread, df, thread.load, thread.load.cdc, write_ctx)
             else:
-                # Standard write path
-                df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
-                    df,
-                    thread,
-                    spark,
-                    target_handle,
-                    target_path,
-                    resolved_warp,
-                    audit_columns,
-                    audit_ctx,
-                    _writer_managed_columns(thread, None),
-                )
-                # Exports reuse one compute of the working DataFrame: the
-                # persist anchors here — after warp/drift, before the
-                # branch-specific write — the point common to all branches
-                # (the CDC branch deliberately skips target mapping, so
-                # mapping is not a valid anchor). Released in finally.
-                if thread.exports:
-                    df = df.persist(StorageLevel.MEMORY_AND_DISK)
-                    cleanup.working_frame = df
-
-                # General seed phase (non-dimension)
-                if seed_config is not None:
-                    execute_seeds(spark, seed_config, target_path, df.schema, handle=target_handle)
-                    target_handle.refresh()
-
-                output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
-                if capture_samples:
-                    with contextlib.suppress(Exception):
-                        output_sample = df.limit(10).toPandas().to_dict("records")
-                rows_written = write_target(
-                    spark,
-                    df,
-                    thread.target,
-                    thread.write,
-                    target_path,
-                    handle=target_handle,
-                    stamp=commit_stamp,
-                )
+                written = _write_standard(spark, thread, df, write_ctx)
+            df = written.df
+            rows_written = written.rows_written
+            cdc_counts = written.cdc_counts
+            warp_findings = written.warp_findings
+            drift_report = written.drift_report
+            audit_columns_applied = written.audit_columns_applied
+            output_schema = written.output_schema
+            output_sample = written.output_sample
 
             # A successful write whose count could not be attributed reads
             # as unknown, never as zero — surface it to the caller.
@@ -866,6 +734,35 @@ class _Shaped:
     rows_quarantined: int
     quarantine_sample: list[dict[str, Any]] | None
     dim_builder: DimensionMergeBuilder | None
+
+
+@dataclass
+class _WriteContext:
+    """What every write route needs besides the working DataFrame."""
+
+    target_path: str
+    target_handle: TargetHandle
+    resolved_warp: WarpConfig | None
+    audit_columns: dict[str, str]
+    audit_ctx: AuditContext | None
+    commit_stamp: CommitStamp
+    run_timestamp: str
+    capture_samples: bool
+    cleanup: _ThreadCleanup
+
+
+@dataclass
+class _WriteOutcome:
+    """The result of one write route."""
+
+    df: Any
+    rows_written: int | None
+    warp_findings: list[dict[str, str]]
+    drift_report: DriftReport | None
+    audit_columns_applied: list[str]
+    output_schema: list[tuple[str, str]]
+    output_sample: list[dict[str, Any]] | None
+    cdc_counts: dict[str, int] | None = None
 
 
 def _prepare_thread_resources(
@@ -1388,6 +1285,220 @@ def _validate_and_key(
         rows_quarantined=rows_quarantined,
         quarantine_sample=quarantine_sample,
         dim_builder=dim_builder,
+    )
+
+
+def _capture_output(
+    df: Any, thread: Thread, ctx: _WriteContext
+) -> tuple[Any, list[tuple[str, str]], list[dict[str, Any]] | None]:
+    """Persist the write-ready frame for exports and capture its schema and sample.
+
+    Exports reuse one compute of the working DataFrame: the persist anchors
+    after warp/drift, before the route-specific write — the point common to
+    all routes (the CDC route deliberately skips target mapping, so mapping
+    is not a valid anchor). Seeding only reads the frame's schema, so routes
+    that seed call this after seeding. Released in ``execute_thread``'s
+    finally.
+
+    Returns:
+        The (possibly persisted) frame, its output schema, and the optional
+        10-row sample.
+    """
+    if thread.exports:
+        df = df.persist(StorageLevel.MEMORY_AND_DISK)
+        ctx.cleanup.working_frame = df
+    output_schema = [(name, str(dtype)) for name, dtype in df.dtypes]
+    output_sample: list[dict[str, Any]] | None = None
+    if ctx.capture_samples:
+        with contextlib.suppress(Exception):
+            output_sample = df.limit(10).toPandas().to_dict("records")
+    return df, output_schema, output_sample
+
+
+def _write_dimension(
+    spark: SparkSession,
+    thread: Thread,
+    df: Any,
+    dim_builder: DimensionMergeBuilder,
+    ctx: _WriteContext,
+    *,
+    rows_quarantined: int,
+    rows_after_transforms: int,
+) -> _WriteOutcome:
+    """Shape, seed, and merge into a dimension target."""
+    dim_config = dim_builder.config
+    seed_config = thread.target.seed
+    df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
+        df,
+        thread,
+        spark,
+        ctx.target_handle,
+        ctx.target_path,
+        ctx.resolved_warp,
+        ctx.audit_columns,
+        ctx.audit_ctx,
+        _writer_managed_columns(thread, dim_builder),
+    )
+
+    # Seed phase (before merge)
+    if seed_config is not None or dim_config.seed_system_members:
+        target_schema = df.schema
+        all_seed_rows: list[dict[str, Any]] = []
+        if seed_config is not None:
+            all_seed_rows.extend(seed_config.rows)
+        if dim_config.seed_system_members:
+            all_seed_rows.extend(build_system_member_rows(dim_config, df))
+        if all_seed_rows:
+            combined_seed = SeedConfig(
+                on=seed_config.on if seed_config else "first_write",
+                rows=all_seed_rows,
+            )
+            execute_seeds(
+                spark, combined_seed, ctx.target_path, target_schema, handle=ctx.target_handle
+            )
+            ctx.target_handle.refresh()
+
+    df, output_schema, output_sample = _capture_output(df, thread, ctx)
+    was_first_write = not ctx.target_handle.exists()
+    merge_result = execute_dimension_merge(
+        spark,
+        df,
+        dim_builder,
+        ctx.target_path,
+        ctx.run_timestamp,
+        handle=ctx.target_handle,
+        stamp=ctx.commit_stamp,
+        evolve=thread.target.schema_drift == "adaptive",
+    )
+    # Input-rows semantic. Quarantine-free merges need no new
+    # action: transforms after the eager rows_after_transforms
+    # count are column-only, so write-input rows equal it. With
+    # quarantined rows the subtraction would lie — quarantine
+    # frames are exploded one row per FAILED RULE, so a source
+    # row failing two rules subtracts twice — and the input df
+    # must be counted directly (exact beats cheap here). First
+    # writes report the commit's own numOutputRows.
+    if was_first_write:
+        rows_written: int | None = merge_result.rows_inserted
+    elif rows_quarantined:
+        rows_written = df.count()
+    else:
+        rows_written = rows_after_transforms
+
+    return _WriteOutcome(
+        df=df,
+        rows_written=rows_written,
+        warp_findings=warp_findings,
+        drift_report=drift_report,
+        audit_columns_applied=audit_columns_applied,
+        output_schema=output_schema,
+        output_sample=output_sample,
+    )
+
+
+def _write_cdc(
+    spark: SparkSession,
+    thread: Thread,
+    df: Any,
+    load: LoadConfig,
+    cdc: CdcConfig,
+    ctx: _WriteContext,
+) -> _WriteOutcome:
+    """Apply a CDC change window to the target by merge.
+
+    Skips target column mapping because ``execute_cdc_merge`` handles
+    column selection internally (it retains the operation column).
+    """
+    audit_columns_applied: list[str] = []
+    if ctx.audit_columns and ctx.audit_ctx is not None:
+        df = inject_audit_columns(df, ctx.audit_columns, ctx.audit_ctx)
+        audit_columns_applied = list(ctx.audit_columns)
+
+    # Warp enforcement, drift detection, warp-only append
+    engine_col_names = audit_columns_applied + _writer_managed_columns(thread, None)
+    df, warp_findings, drift_report = _apply_warp_and_drift(
+        df,
+        ctx.resolved_warp,
+        thread,
+        engine_col_names,
+        table_columns=existing_target_columns(spark, ctx.target_path, ctx.target_handle),
+    )
+
+    df, output_schema, output_sample = _capture_output(df, thread, ctx)
+    seed_config = thread.target.seed
+    cdc_write = _validate_cdc_write_config(thread)
+    seeded_first_write = seed_config is not None and seed_cdc_target(
+        spark,
+        df,
+        seed_config,
+        ctx.target_path,
+        cdc_write,
+        cdc,
+        ctx.target_handle,
+    )
+    cdc_counts = execute_cdc_merge(
+        spark,
+        df,
+        ctx.target_path,
+        cdc_write,
+        cdc,
+        load_config=load,
+        handle=ctx.target_handle,
+        evolve=thread.target.schema_drift == "adaptive",
+        seeded_first_write=seeded_first_write,
+    )
+    return _WriteOutcome(
+        df=df,
+        rows_written=sum(cdc_counts.values()),
+        warp_findings=warp_findings,
+        drift_report=drift_report,
+        audit_columns_applied=audit_columns_applied,
+        output_schema=output_schema,
+        output_sample=output_sample,
+        cdc_counts=cdc_counts,
+    )
+
+
+def _write_standard(
+    spark: SparkSession, thread: Thread, df: Any, ctx: _WriteContext
+) -> _WriteOutcome:
+    """Shape, seed, and write the target with the thread's write mode."""
+    df, warp_findings, drift_report, audit_columns_applied = _shape_for_target(
+        df,
+        thread,
+        spark,
+        ctx.target_handle,
+        ctx.target_path,
+        ctx.resolved_warp,
+        ctx.audit_columns,
+        ctx.audit_ctx,
+        _writer_managed_columns(thread, None),
+    )
+
+    # General seed phase (non-dimension)
+    seed_config = thread.target.seed
+    if seed_config is not None:
+        execute_seeds(spark, seed_config, ctx.target_path, df.schema, handle=ctx.target_handle)
+        ctx.target_handle.refresh()
+
+    df, output_schema, output_sample = _capture_output(df, thread, ctx)
+    rows_written = write_target(
+        spark,
+        df,
+        thread.target,
+        thread.write,
+        ctx.target_path,
+        handle=ctx.target_handle,
+        stamp=ctx.commit_stamp,
+    )
+    return _WriteOutcome(
+        df=df,
+        rows_written=rows_written,
+        warp_findings=warp_findings,
+        drift_report=drift_report,
+        audit_columns_applied=audit_columns_applied,
+        output_schema=output_schema,
+        output_sample=output_sample,
     )
 
 
