@@ -6,15 +6,15 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from weevr.config.audit_templates import CONTEXT_VAR_PATTERN, resolve_context_variables
 from weevr.errors.exceptions import ExportError
 from weevr.model.export import Export
-from weevr.operations.audit import CONTEXT_VAR_PATTERN, resolve_context_variables
 from weevr.telemetry.results import ExportResult
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame, SparkSession
 
-    from weevr.operations.audit import AuditContext
+    from weevr.config.audit_templates import AuditContext
 
 logger = logging.getLogger(__name__)
 

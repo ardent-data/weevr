@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 
-from weevr.config.duration import parse_duration
+from weevr.duration import parse_duration
 
 
 class TestParseDuration:

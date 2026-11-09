@@ -51,6 +51,8 @@ SHARED_IMPORTS = [
     "from weevr.model.thread import Thread",
     "from weevr.engine.planner import build_plan",
     "from weevr.engine.formatting import format_duration",
+    "from weevr.engine.display import DAGDiagram, FlowDiagram",
+    "from weevr.engine.result import LoomResult, ThreadResult, WeaveResult",
     "from weevr.telemetry.results import ThreadTelemetry",
     "from weevr.reserved_words import resolve_effective_words",
 ]

@@ -5,18 +5,17 @@ import json
 import pytest
 from pyspark.sql import SparkSession
 
-from weevr.errors.exceptions import ConfigError, ExecutionError
-from weevr.model.source import Source
-from weevr.operations.audit import (
+from weevr.config.audit_templates import (
     BUILTIN_AUDIT_PRESETS,
     AuditContext,
     apply_audit_exclusions,
-    build_sources_json,
-    inject_audit_columns,
     merge_audit_columns_with_templates,
     resolve_audit_columns,
     resolve_template_columns,
 )
+from weevr.errors.exceptions import ConfigError, ExecutionError
+from weevr.model.source import Source
+from weevr.operations.audit import build_sources_json, inject_audit_columns
 
 
 def _ctx(**overrides: str) -> AuditContext:

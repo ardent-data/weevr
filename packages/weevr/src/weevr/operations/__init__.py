@@ -4,12 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weevr.operations.assertions import evaluate_assertions
-    from weevr.operations.audit import (
-        AuditContext,
-        build_sources_json,
-        inject_audit_columns,
-        resolve_audit_columns,
-    )
+    from weevr.operations.audit import build_sources_json, inject_audit_columns
     from weevr.operations.exports import (
         resolve_export_path,
         resolve_exports,
@@ -23,7 +18,6 @@ if TYPE_CHECKING:
     from weevr.operations.writers import apply_target_mapping, write_target
 
 __all__ = [
-    "AuditContext",
     "apply_target_mapping",
     "build_sources_json",
     "compute_keys",
@@ -31,7 +25,6 @@ __all__ = [
     "inject_audit_columns",
     "read_source",
     "read_sources",
-    "resolve_audit_columns",
     "resolve_export_path",
     "resolve_exports",
     "run_pipeline",
@@ -44,14 +37,12 @@ __all__ = [
 
 # Map each public attribute to the submodule that defines it. Lazy access
 # preserves every existing import path (``from weevr.operations import X``)
-# while letting submodule paths (``from weevr.operations.reserved_words import
-# resolve_effective_words``) resolve without dragging the Spark-bound
-# transforms / readers / writers / pipeline modules.
+# while letting a submodule import (``from weevr.operations.<module> import X``)
+# load only that submodule, not the Spark-bound transforms / readers /
+# writers / pipeline modules.
 _LAZY_ATTRS: dict[str, str] = {
-    "AuditContext": "weevr.operations.audit",
     "build_sources_json": "weevr.operations.audit",
     "inject_audit_columns": "weevr.operations.audit",
-    "resolve_audit_columns": "weevr.operations.audit",
     "evaluate_assertions": "weevr.operations.assertions",
     "resolve_export_path": "weevr.operations.exports",
     "resolve_exports": "weevr.operations.exports",

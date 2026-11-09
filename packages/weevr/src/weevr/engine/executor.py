@@ -14,6 +14,7 @@ from pyspark import StorageLevel
 from pyspark.sql import Observation, SparkSession
 from pyspark.sql import functions as F
 
+from weevr.config.audit_templates import AuditContext
 from weevr.delta import read_delta
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
@@ -46,7 +47,7 @@ from weevr.model.thread import Thread
 from weevr.model.warp import DriftReport, WarpConfig
 from weevr.model.write import WriteConfig
 from weevr.operations.assertions import evaluate_assertions
-from weevr.operations.audit import AuditContext, build_sources_json, inject_audit_columns
+from weevr.operations.audit import build_sources_json, inject_audit_columns
 from weevr.operations.dimension import DimensionMergeBuilder, execute_dimension_merge
 from weevr.operations.drift import handle_drift
 from weevr.operations.exports import resolve_exports, write_export

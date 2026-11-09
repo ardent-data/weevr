@@ -235,7 +235,6 @@ exists, run only in `Context.run(mode="validate")`.
 | `config/attribution.py` | Attaches the source file to config errors raised while loading it |
 | `config/audit_templates.py` | Audit template presets, context variables, and template merge helpers |
 | `config/onelake.py` | Spark-free OneLake path construction shared by the runtime and the planner |
-| `config/duration.py` | Re-exports the duration string parser for backward compatibility |
 | `config/fabric.py` | Engine wheel. Builds `${fabric.*}` context from Fabric runtime variables |
 | `config/paths.py` | Engine wheel. OneLake path utilities, including translating `/lakehouse/` FUSE mount paths to `abfss://` URIs |
 | `config/locations.py` | Filesystem-agnostic location abstraction; routes local paths through pathlib and remote URIs through Hadoop FileSystem |

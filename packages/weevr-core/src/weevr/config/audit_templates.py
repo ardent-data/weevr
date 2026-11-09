@@ -1,10 +1,9 @@
 """Pure-Python helpers for resolving and merging audit column templates.
 
-This is the canonical home for the audit-template merge primitives used by
-``weevr.config.inheritance``. The historical home in ``weevr.operations.audit``
-re-exports these symbols for back-compat with external callers; core modules
-(notably ``weevr.config.inheritance``) MUST import from here directly so the
-config layer stays Spark-free.
+This is the home of the audit-template merge primitives used by
+``weevr.config.inheritance`` and by the engine's audit column injection
+(``weevr.operations.audit``) and export path resolution. It stays Spark-free
+so the config layer can use it in a core-only install.
 """
 
 from __future__ import annotations

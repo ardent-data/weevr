@@ -413,10 +413,10 @@ without the cache optimization.
 ## Module map
 
 The `weevr.engine` namespace is *federated* across the two wheels: the
-pure-Python planner and the column/duration-formatting helpers ship from
-`weevr-core`, and the rest — everything that touches Spark — ships from
-the engine wheel. The "Wheel" column below records which package each
-file lives in.
+pure-Python planner, result models, notebook display rendering, and
+column/duration-formatting helpers ship from `weevr-core`, and the rest
+(everything that touches Spark) ships from the engine wheel. The "Wheel"
+column below records which package each file lives in.
 
 | Module | Wheel | Responsibility |
 |--------|-------|----------------|
@@ -424,7 +424,7 @@ file lives in.
 | `engine/formatting.py` | `weevr-core` | Pure-Python column-name and duration formatters used by result rendering |
 | `engine/executor.py` | `weevr` | Thread-level pipeline: read → transform → validate → write |
 | `engine/runner.py` | `weevr` | Weave and loom orchestration, parallel dispatch, failure handling |
-| `engine/result.py` | `weevr` | Immutable result models: `ThreadResult`, `WeaveResult`, `LoomResult` |
+| `engine/result.py` | `weevr-core` | Immutable result models: `ThreadResult`, `WeaveResult`, `LoomResult` |
 | `engine/cache_manager.py` | `weevr` | Reference-counted DataFrame caching |
 | `engine/conditions.py` | `weevr` | Condition evaluation: parameter resolution, built-in functions, boolean parsing |
 | `engine/hooks.py` | `weevr` | Pre/post hook step execution: quality gates, SQL statements, log messages |
@@ -433,7 +433,7 @@ file lives in.
 | `engine/resources.py` | `weevr` | Runtime resource merges across loom → weave → thread (lookups, column sets, variables, hook lists); the inner level wins on name conflicts |
 | `engine/target_identity.py` | `weevr` | Canonical target identity, so cache registration and lookup agree on one key per physical table |
 | `engine/variables.py` | `weevr` | Variable binding and resolution for loom, weave, and thread variables |
-| `engine/display.py` | `weevr` | SVG visualization (DAG, flow, timeline, waterfall) and HTML result rendering for notebooks |
+| `engine/display.py` | `weevr-core` | SVG visualization (DAG, flow, timeline, waterfall) and HTML result rendering for notebooks |
 
 ## Design decisions
 

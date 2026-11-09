@@ -2162,9 +2162,8 @@ class TestDisplayPurity:
     def test_no_dataframe_method_calls_in_source(self) -> None:
         import inspect
 
-        from weevr.engine import display
-
-        source = Path(inspect.getfile(display)).read_text()
+        # Any function from the module locates its source file.
+        source = Path(inspect.getfile(render_dag_svg)).read_text()
         forbidden = (
             ".count()",
             ".collect()",
