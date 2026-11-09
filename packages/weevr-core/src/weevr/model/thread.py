@@ -12,7 +12,7 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import ExecutionConfig
 from weevr.model.export import Export
 from weevr.model.failure import FailureConfig
-from weevr.model.hooks import HookStep
+from weevr.model.hooks import HookStep, reject_pre_step_baseline_checks
 from weevr.model.keys import KeyConfig
 from weevr.model.load import LoadConfig
 from weevr.model.lookup import Lookup
@@ -83,6 +83,11 @@ class Thread(FrozenBase):
             binding: The resolved warp and its locations.
         """
         self._warp_binding = binding
+
+    @field_validator("pre_steps")
+    @classmethod
+    def _reject_pre_step_baseline_checks(cls, v: list[HookStep] | None) -> list[HookStep] | None:
+        return reject_pre_step_baseline_checks(v)
 
     @field_validator("sources")
     @classmethod

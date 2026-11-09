@@ -214,6 +214,33 @@ def _hook_step_discriminator(v: Any) -> str:
     return f"<unknown:{type(v).__name__}>"
 
 
+def reject_pre_step_baseline_checks(steps: list[Any] | None) -> list[Any] | None:
+    """Reject ``row_count_delta`` gates in a ``pre_steps`` list.
+
+    A ``row_count_delta`` gate compares a target's row count with a baseline
+    taken just before its scope's threads run. A pre-step runs before that
+    baseline exists, so the check can't mean anything there.
+
+    Args:
+        steps: The validated ``pre_steps`` list of a loom, weave, or thread.
+
+    Returns:
+        ``steps`` unchanged.
+
+    Raises:
+        ValueError: If any step is a ``row_count_delta`` quality gate.
+    """
+    for i, step in enumerate(steps or []):
+        if isinstance(step, QualityGateStep) and step.check == "row_count_delta":
+            label = f"pre_steps[{i}]" + (f" ({step.name!r})" if step.name else "")
+            raise ValueError(
+                f"{label}: row_count_delta compares against the row count taken before "
+                "the threads run, so it only works in post_steps. Move it to "
+                "post_steps, or use check: row_count for absolute bounds in a pre-step."
+            )
+    return steps
+
+
 HookStep = Annotated[
     Annotated[QualityGateStep, Tag("quality_gate")]
     | Annotated[SqlStatementStep, Tag("sql_statement")]
