@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.1](https://github.com/ardent-data/weevr/compare/weevr-v1.21.0...weevr-v1.21.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **engine:** measure row_count_delta gates against the pre-run count ([#299](https://github.com/ardent-data/weevr/issues/299)) ([b526290](https://github.com/ardent-data/weevr/commit/b526290b6f2bdf937ce4e1c127065eb3a49ac764))
+
 ## [1.21.0](https://github.com/ardent-data/weevr/compare/weevr-v1.20.7...weevr-v1.21.0) (2026-11-04)
 
 
