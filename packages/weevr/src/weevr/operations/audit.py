@@ -8,7 +8,6 @@ The Spark-bound audit primitives: ``inject_audit_columns`` and
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import Mapping
 
 from pyspark.sql import DataFrame
@@ -18,8 +17,6 @@ from weevr.config.audit_templates import AuditContext, resolve_context_variables
 from weevr.errors.exceptions import ExecutionError
 
 __all__ = ["build_sources_json", "inject_audit_columns"]
-
-logger = logging.getLogger(__name__)
 
 
 def inject_audit_columns(

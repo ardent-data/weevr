@@ -11,8 +11,12 @@ from weevr.engine.formatting import format_duration as _format_duration
 from weevr.model.pipeline import STEP_TYPES
 
 if TYPE_CHECKING:
-    from weevr.engine.planner import ExecutionPlan
     from weevr.model.thread import Thread
+
+# Plans are duck-typed here: the shape is weevr.engine.planner.ExecutionPlan, but
+# planner imports this module for its dag() and notebook rendering, so an import
+# edge back (even under TYPE_CHECKING) would be cyclic.
+_ExecutionPlan = Any
 
 # ---------------------------------------------------------------------------
 # SVG layout constants
@@ -242,7 +246,7 @@ def _estimate_lookup_node_width(name: str) -> float:
 
 
 def _compute_layout(
-    plan: ExecutionPlan,
+    plan: _ExecutionPlan,
     resolved_threads: dict[str, Any] | None = None,
 ) -> tuple[
     dict[str, tuple[float, float, float, float]],
@@ -485,7 +489,7 @@ def _build_svg_style(dark: bool | None = None) -> str:
 
 
 def render_dag_svg(
-    plan: ExecutionPlan,
+    plan: _ExecutionPlan,
     resolved_threads: dict[str, Any] | None = None,
     *,
     dark: bool | None = None,
@@ -664,7 +668,7 @@ def render_dag_svg(
 
 
 def render_loom_dag_svg(
-    plans: list[ExecutionPlan],
+    plans: list[_ExecutionPlan],
     resolved_threads: dict[str, Any] | None = None,
     *,
     dark: bool | None = None,
@@ -2073,7 +2077,7 @@ def render_waterfall_svg(
 
 
 def render_annotated_dag_svg(
-    plan: ExecutionPlan,
+    plan: _ExecutionPlan,
     thread_results: dict[str, Any] | None = None,
     resolved_threads: dict[str, Any] | None = None,
     *,
@@ -2254,7 +2258,7 @@ _S_DETAIL_BODY = "padding:8px 12px"
 
 def _html_dep_badges(
     thread_name: str,
-    plan: ExecutionPlan,
+    plan: _ExecutionPlan,
 ) -> str:
     """Build HTML badges for a thread's dependencies with provenance."""
     deps = plan.dependencies.get(thread_name, [])
@@ -2277,7 +2281,7 @@ def _html_dep_badges(
 
 
 def render_execution_plan_html(
-    plan: ExecutionPlan,
+    plan: _ExecutionPlan,
     resolved_threads: dict[str, Any] | None = None,
 ) -> str:
     """Generate styled HTML for a single ExecutionPlan.
