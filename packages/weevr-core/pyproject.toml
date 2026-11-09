@@ -11,7 +11,7 @@ authors = [
 requires-python = ">=3.11,<3.14"
 keywords = ["weevr", "pydantic", "fabric", "etl", "data-pipeline", "yaml", "configuration"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
