@@ -12,9 +12,58 @@ if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
 
+def _split_table_ref(alias: str) -> list[str] | None:
+    """Split a table reference into its dot-separated name parts.
+
+    A part wrapped in backticks is taken as already quoted: dots inside it
+    belong to the part and doubled backticks unescape to one. Returns
+    ``None`` when the reference can't be split cleanly (an unterminated
+    quote, text after a closing quote, or an empty part).
+    """
+    parts: list[str] = []
+    i, n = 0, len(alias)
+    while True:
+        if i < n and alias[i] == "`":
+            chars: list[str] = []
+            i += 1
+            while True:
+                if i >= n:
+                    return None
+                if alias[i] == "`":
+                    if i + 1 < n and alias[i + 1] == "`":
+                        chars.append("`")
+                        i += 2
+                        continue
+                    i += 1
+                    break
+                chars.append(alias[i])
+                i += 1
+            part = "".join(chars)
+        else:
+            end = alias.find(".", i)
+            end = n if end == -1 else end
+            part = alias[i:end]
+            i = end
+        if not part:
+            return None
+        parts.append(part)
+        if i == n:
+            return parts
+        if alias[i] != ".":
+            return None
+        i += 1
+
+
 def _quote_table_ref(alias: str) -> str:
-    """Backtick-escape a table reference for SQL injection safety."""
-    return f"`{alias.replace('`', '``')}`"
+    """Backtick-quote each part of a table reference for SQL injection safety.
+
+    ``silver.orders`` becomes `` `silver`.`orders` `` so Spark resolves the
+    schema and table separately; quoting the whole name would make it one
+    identifier. A reference that can't be split cleanly is quoted whole, so
+    it fails as an unknown table rather than reaching SQL unescaped.
+    """
+    parts = _split_table_ref(alias) or [alias]
+    return ".".join(f"`{part.replace('`', '``')}`" for part in parts)
 
 
 class GateResult(FrozenBase):

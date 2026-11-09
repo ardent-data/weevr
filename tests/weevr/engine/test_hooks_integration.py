@@ -670,3 +670,49 @@ class TestNarrowLookupBackwardCompat:
         # All columns preserved — no narrow projection
         written = spark.read.format("delta").load(tgt)
         assert set(written.columns) == {"id", "code", "name"}
+
+
+# ---------------------------------------------------------------------------
+# Quality gates on schema-qualified tables and row_count_delta baselines
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def gate_schema(spark: SparkSession, tmp_path, request) -> str:
+    """A throwaway schema for schema-qualified gate targets."""
+    name = "gate_sch"
+    spark.sql(f"CREATE DATABASE IF NOT EXISTS {name} LOCATION '{tmp_path / 'gate_sch.db'}'")
+    request.addfinalizer(lambda: spark.sql(f"DROP DATABASE IF EXISTS {name} CASCADE"))
+    return name
+
+
+def _write_rows(spark: SparkSession, table: str, n: int) -> None:
+    spark.range(n).write.format("delta").mode("overwrite").saveAsTable(table)
+
+
+class TestGatesOnQualifiedTables:
+    """row_count, row_count_delta, and source_freshness resolve schema.table targets."""
+
+    def test_qualified_targets(self, spark: SparkSession, gate_schema: str) -> None:
+        from weevr.engine.hooks import run_hook_steps
+        from weevr.engine.variables import VariableContext
+
+        table = f"{gate_schema}.orders"
+        _write_rows(spark, table, 5)
+        steps = [
+            QualityGateStep(
+                type="quality_gate", check="row_count", target=table, min_count=5, max_count=5
+            ),
+            QualityGateStep(
+                type="quality_gate", check="row_count_delta", target=table, max_delta=0
+            ),
+            QualityGateStep(
+                type="quality_gate", check="source_freshness", source=table, max_age="1h"
+            ),
+        ]
+
+        results = run_hook_steps(spark, steps, "post", VariableContext(), row_counts={table: 5})
+
+        assert [r.status for r in results] == ["passed", "passed", "passed"], [
+            r.error for r in results
+        ]

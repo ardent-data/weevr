@@ -3,8 +3,11 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
+import pytest
+
 from weevr.operations.gates import (
     GateResult,
+    _quote_table_ref,
     check_expression,
     check_row_count,
     check_row_count_delta,
@@ -253,3 +256,24 @@ class TestCheckExpression:
         spark.sql.return_value.collect.return_value = []
         result = check_expression(spark, "SELECT false")
         assert result.passed is False
+
+
+class TestQuoteTableRef:
+    """Table names are quoted per dot-separated part."""
+
+    @pytest.mark.parametrize(
+        ("alias", "expected"),
+        [
+            ("orders", "`orders`"),
+            ("silver.orders", "`silver`.`orders`"),
+            ("lake.silver.orders", "`lake`.`silver`.`orders`"),
+            ("`my-lake`.dbo.orders", "`my-lake`.`dbo`.`orders`"),
+            ("`a.b`.c", "`a.b`.`c`"),
+            ("`we``ird`.t", "`we``ird`.`t`"),
+            ("a`b", "`a``b`"),
+            ("x; DROP TABLE y", "`x; DROP TABLE y`"),
+            ("`unterminated.t", "```unterminated.t`"),
+        ],
+    )
+    def test_quoting(self, alias, expected):
+        assert _quote_table_ref(alias) == expected
