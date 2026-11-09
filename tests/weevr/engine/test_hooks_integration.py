@@ -716,3 +716,204 @@ class TestGatesOnQualifiedTables:
         assert [r.status for r in results] == ["passed", "passed", "passed"], [
             r.error for r in results
         ]
+
+
+def _delta_gate(table: str, **limits) -> QualityGateStep:
+    return QualityGateStep(
+        type="quality_gate",
+        check="row_count_delta",
+        target=table,
+        name="delta_gate",
+        **limits,
+    )
+
+
+class TestRowCountDeltaBaseline:
+    """Post-step row_count_delta gates compare with the count taken before the scope ran."""
+
+    def _weave_with_overwrite(self, spark, mock_exec, table: str, after_rows: int):
+        def _run(*args, **kwargs):
+            _write_rows(spark, table, after_rows)
+            return _make_result("A")
+
+        mock_exec.side_effect = _run
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_shrink_fails(self, mock_exec, spark: SparkSession, gate_schema: str) -> None:
+        table = f"{gate_schema}.orders"
+        _write_rows(spark, table, 1000)
+        self._weave_with_overwrite(spark, mock_exec, table, 100)
+        threads = {"A": _make_thread_model("A")}
+        plan = build_plan("shrink", threads, _entries("A"))
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            collector=SpanCollector(generate_trace_id()),
+            post_steps=[_delta_gate(table, max_decrease_pct=10)],
+        )
+
+        assert result.telemetry is not None
+        hook = result.telemetry.hook_results[0]
+        assert hook.gate_result is not None
+        assert hook.status == "warned"
+        assert hook.gate_result.measured_value == {"before": 1000, "after": 100, "delta": -900}
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_weave_within_bounds_passes(
+        self, mock_exec, spark: SparkSession, gate_schema: str
+    ) -> None:
+        table = f"{gate_schema}.orders"
+        _write_rows(spark, table, 1000)
+        self._weave_with_overwrite(spark, mock_exec, table, 950)
+        threads = {"A": _make_thread_model("A")}
+        plan = build_plan("steady", threads, _entries("A"))
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            collector=SpanCollector(generate_trace_id()),
+            post_steps=[_delta_gate(table, max_decrease_pct=10)],
+        )
+
+        assert result.telemetry is not None
+        assert result.telemetry.hook_results[0].status == "passed"
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_parallel_threads_share_one_snapshot(
+        self, mock_exec, spark: SparkSession, gate_schema: str
+    ) -> None:
+        table = f"{gate_schema}.events"
+        _write_rows(spark, table, 10)
+
+        def _append(*args, **kwargs):
+            # Blind INSERTs commit concurrently; saveAsTable appends can race on metadata.
+            spark.sql(f"INSERT INTO {table} SELECT id FROM range(5)")
+            return _make_result(args[1].name)
+
+        mock_exec.side_effect = _append
+        # Distinct declared targets keep the planner's concurrent-writer guard
+        # quiet; the mocked threads both append to the gated table.
+        threads = {
+            "A": _make_thread_model("A").model_copy(update={"target": Target(alias="t_a")}),
+            "B": _make_thread_model("B").model_copy(update={"target": Target(alias="t_b")}),
+        }
+        plan = build_plan("parallel", threads, _entries("A", "B"))
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            collector=SpanCollector(generate_trace_id()),
+            post_steps=[_delta_gate(table, min_delta=10, max_delta=10)],
+        )
+
+        assert mock_exec.call_count == 2
+        assert result.status == "success", (result.status, result.thread_results)
+        assert spark.table(table).count() == 20
+        assert result.telemetry is not None
+        hook = result.telemetry.hook_results[0]
+        assert hook.gate_result is not None
+        assert hook.status == "passed", hook.error
+        assert hook.gate_result.measured_value["before"] == 10
+
+    @patch("weevr.engine.runner.execute_thread")
+    def test_first_load_has_no_baseline(
+        self, mock_exec, spark: SparkSession, gate_schema: str
+    ) -> None:
+        table = f"{gate_schema}.fresh"
+        self._weave_with_overwrite(spark, mock_exec, table, 500)
+        threads = {"A": _make_thread_model("A")}
+        plan = build_plan("first", threads, _entries("A"))
+
+        result = execute_weave(
+            spark,
+            plan,
+            threads,
+            collector=SpanCollector(generate_trace_id()),
+            post_steps=[_delta_gate(table, max_increase_pct=10, max_delta=100)],
+        )
+
+        assert result.telemetry is not None
+        hook = result.telemetry.hook_results[0]
+        assert hook.gate_result is not None
+        assert hook.status == "warned"
+        assert "no baseline" in hook.gate_result.message
+        assert "delta 500 > max 100" in hook.gate_result.message
+
+    @patch("weevr.engine.runner.execute_weave")
+    def test_loom_post_step_uses_pre_loom_count(
+        self, mock_weave, spark: SparkSession, gate_schema: str
+    ) -> None:
+        from weevr.engine.result import WeaveResult
+        from weevr.engine.runner import execute_loom
+        from weevr.model.loom import Loom
+        from weevr.model.weave import Weave
+
+        table = f"{gate_schema}.loom_target"
+        _write_rows(spark, table, 1000)
+
+        def _run_weave(*args, **kwargs):
+            _write_rows(spark, table, 100)
+            return WeaveResult(
+                status="success",
+                weave_name="w1",
+                thread_results=[],
+                threads_skipped=[],
+                duration_ms=0,
+            )
+
+        mock_weave.side_effect = _run_weave
+        loom = Loom.model_validate(
+            {
+                "config_version": "1.0",
+                "name": "nightly",
+                "weaves": ["w1"],
+                "post_steps": [
+                    {
+                        "type": "quality_gate",
+                        "check": "row_count_delta",
+                        "target": table,
+                        "max_decrease_pct": 10,
+                        "on_failure": "abort",
+                    }
+                ],
+            }
+        )
+        weaves = {"w1": Weave.model_validate({"config_version": "1.0", "threads": ["A"]})}
+
+        with pytest.raises(HookError, match="decrease"):
+            execute_loom(spark, loom, weaves, {"w1": {"A": _make_thread_model("A")}})
+
+    def test_thread_post_step_uses_pre_thread_count(
+        self, spark: SparkSession, gate_schema: str
+    ) -> None:
+        from weevr.engine.executor import execute_thread
+
+        source = f"{gate_schema}.src"
+        target = f"{gate_schema}.thread_target"
+        _write_rows(spark, source, 100)
+        _write_rows(spark, target, 1000)
+        thread = Thread.model_validate(
+            {
+                "name": "shrinker",
+                "config_version": "1.0",
+                "sources": {"s": {"type": "delta", "alias": source}},
+                "target": {"alias": target},
+                "write": {"mode": "overwrite"},
+                "post_steps": [
+                    {
+                        "type": "quality_gate",
+                        "check": "row_count_delta",
+                        "target": target,
+                        "max_decrease_pct": 10,
+                        "on_failure": "abort",
+                    }
+                ],
+            }
+        )
+
+        with pytest.raises(Exception, match="decrease"):
+            execute_thread(spark, thread)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from weevr.delta import probe_delta_table_exists
 from weevr.duration import parse_duration
 from weevr.model.base import FrozenBase
 
@@ -124,6 +125,31 @@ def check_source_freshness(spark: SparkSession, source_alias: str, max_age_str: 
     )
 
 
+def _count_rows(spark: SparkSession, target_alias: str) -> int:
+    """Count a table's rows the way every row-count gate does."""
+    row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
+    return row[0]["cnt"] if row else 0
+
+
+def snapshot_row_count(spark: SparkSession, target_alias: str) -> int:
+    """Take the baseline row count for a ``row_count_delta`` gate.
+
+    A table that doesn't exist yet (a first load) counts as 0. A failed
+    existence probe or count raises, so callers can tell "no rows" apart
+    from "couldn't ask".
+
+    Args:
+        spark: Active SparkSession.
+        target_alias: Table name the gate checks.
+
+    Returns:
+        The table's current row count, or 0 if it doesn't exist.
+    """
+    if not probe_delta_table_exists(spark, target_alias):
+        return 0
+    return _count_rows(spark, target_alias)
+
+
 def check_row_count_delta(
     spark: SparkSession,
     target_alias: str,
@@ -153,8 +179,7 @@ def check_row_count_delta(
     Returns:
         GateResult with pass/fail and delta details.
     """
-    after_row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
-    after_count = after_row[0]["cnt"] if after_row else 0
+    after_count = _count_rows(spark, target_alias)
     delta = after_count - before_count
     # A zero baseline (missing or empty target, e.g. a first load) has no
     # percentage change, so the percentage limits are skipped rather than

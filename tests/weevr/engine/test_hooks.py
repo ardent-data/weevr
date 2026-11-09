@@ -602,3 +602,73 @@ class TestRunHookStepsGateDispatch:
         assert results[0].status == "passed"
         assert results[0].gate_result is not None
         assert results[0].gate_result.passed is True
+
+
+class TestSnapshotRowCounts:
+    """Pre-run snapshot for row_count_delta post-steps."""
+
+    def _gate(self, target: str, check: str = "row_count_delta") -> QualityGateStep:
+        if check == "row_count_delta":
+            return QualityGateStep(
+                type="quality_gate", check=check, target=target, max_decrease_pct=10.0
+            )
+        return QualityGateStep(type="quality_gate", check=check, target=target, min_count=1)
+
+    def test_counts_only_delta_targets_once(self, monkeypatch):
+        from weevr.engine import hooks
+
+        calls: list[str] = []
+
+        def fake_count(spark, target):
+            calls.append(target)
+            return 7
+
+        monkeypatch.setattr(hooks, "snapshot_row_count", fake_count)
+        steps = [self._gate("a.t"), self._gate("a.t"), self._gate("b.t", check="row_count")]
+
+        assert hooks.snapshot_row_counts(MagicMock(), steps) == {"a.t": 7}
+        assert calls == ["a.t"]
+
+    def test_no_delta_gates_means_no_count(self, monkeypatch):
+        from weevr.engine import hooks
+
+        monkeypatch.setattr(hooks, "snapshot_row_count", MagicMock(side_effect=AssertionError))
+        assert hooks.snapshot_row_counts(MagicMock(), None) == {}
+        assert hooks.snapshot_row_counts(MagicMock(), [self._gate("b.t", "row_count")]) == {}
+
+    def test_failed_snapshot_is_recorded_and_fails_only_the_gate(self, monkeypatch):
+        from weevr.engine import hooks
+
+        monkeypatch.setattr(
+            hooks, "snapshot_row_count", MagicMock(side_effect=RuntimeError("catalog down"))
+        )
+        spark = MagicMock()
+        counts = hooks.snapshot_row_counts(spark, [self._gate("a.t")])
+        assert counts == {"a.t": None}
+
+        results = run_hook_steps(
+            spark, [self._gate("a.t")], "post", VariableContext(), row_counts=counts
+        )
+
+        assert results[0].status == "warned"
+        assert "a.t" in (results[0].error or "")
+        assert "snapshot" in (results[0].error or "")
+
+    def test_missing_table_snapshots_as_zero(self, monkeypatch):
+        from weevr.operations import gates
+
+        monkeypatch.setattr(gates, "probe_delta_table_exists", lambda spark, path: False)
+        spark = MagicMock()
+        assert gates.snapshot_row_count(spark, "a.t") == 0
+        spark.sql.assert_not_called()
+
+    def test_existing_table_snapshot_counts(self, monkeypatch):
+        from weevr.operations import gates
+
+        monkeypatch.setattr(gates, "probe_delta_table_exists", lambda spark, path: True)
+        spark = MagicMock()
+        row = MagicMock()
+        row.__getitem__ = MagicMock(return_value=42)
+        spark.sql.return_value.collect.return_value = [row]
+        assert gates.snapshot_row_count(spark, "a.t") == 42
+        assert "`a`.`t`" in spark.sql.call_args[0][0]

@@ -14,7 +14,7 @@ from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
 from weevr.engine.executor import execute_thread
-from weevr.engine.hooks import HookResult, run_hook_steps
+from weevr.engine.hooks import HookResult, run_hook_steps, snapshot_row_counts
 from weevr.engine.lookups import (
     LookupResult,
     UniqueKeyMemo,
@@ -280,6 +280,10 @@ def execute_weave(
                 all_hook_results.extend(pre_results)
             except HookError:
                 raise
+
+        # Baseline for row_count_delta post-steps: counted after the pre-steps,
+        # before any thread runs (so parallel threads share one snapshot).
+        post_row_counts = snapshot_row_counts(spark, post_steps)
 
         # Materialize lookups: when a lookup schedule is available, defer
         # internal lookups to the correct group boundary. Otherwise (backward
@@ -593,9 +597,6 @@ def execute_weave(
                             )
 
         # Execute post-steps after all threads complete.
-        # Note: row_counts is not populated, so row_count_delta checks in post-hooks
-        # compare against before_count=0. Use row_count (absolute bounds) in post-hooks
-        # for target validation instead.
         if post_steps:
             post_results = run_hook_steps(
                 spark,
@@ -603,6 +604,7 @@ def execute_weave(
                 "post",
                 variable_ctx,
                 params=params,
+                row_counts=post_row_counts,
                 collector=collector,
                 parent_span_id=weave_span_id,
             )
@@ -795,6 +797,9 @@ def execute_loom(
                 parent_span_id=loom_span_id,
             )
 
+        # Baseline for row_count_delta post-steps, before any weave runs.
+        loom_post_row_counts = snapshot_row_counts(spark, loom.post_steps)
+
         # Resolve loom-level column sets ONCE (shared across all weaves);
         # per-weave passes hand down the resolved mappings, excluding keys
         # a weave overrides so precedence still re-resolves those
@@ -957,6 +962,7 @@ def execute_loom(
                 "post",
                 loom_variable_ctx,
                 params=params,
+                row_counts=loom_post_row_counts,
                 collector=collector,
                 parent_span_id=loom_span_id,
             )
