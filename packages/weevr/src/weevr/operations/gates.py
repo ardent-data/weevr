@@ -87,7 +87,10 @@ def check_row_count_delta(
 ) -> GateResult:
     """Check that row count change is within thresholds.
 
-    Compares ``before_count`` (pre-snapshot) against current count.
+    Compares ``before_count`` (pre-snapshot) against current count. When
+    ``before_count`` is 0 there is no baseline: ``max_decrease_pct`` and
+    ``max_increase_pct`` are skipped (the message says so), while
+    ``min_delta`` and ``max_delta`` still apply.
 
     Args:
         spark: Active SparkSession.
@@ -104,24 +107,31 @@ def check_row_count_delta(
     after_row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
     after_count = after_row[0]["cnt"] if after_row else 0
     delta = after_count - before_count
-    if before_count != 0:
-        pct_change = delta / before_count * 100
-    else:
-        pct_change = 0.0 if delta == 0 else float("inf")
+    # A zero baseline (missing or empty target, e.g. a first load) has no
+    # percentage change, so the percentage limits are skipped rather than
+    # judged against an infinite value. Absolute limits still apply.
+    has_baseline = before_count != 0
     failures: list[str] = []
 
-    if max_decrease_pct is not None and pct_change < -max_decrease_pct:
-        failures.append(f"decrease {abs(pct_change):.1f}% > max {max_decrease_pct}%")
-    if max_increase_pct is not None and pct_change > max_increase_pct:
-        failures.append(f"increase {pct_change:.1f}% > max {max_increase_pct}%")
+    if has_baseline:
+        pct_change = delta / before_count * 100
+        if max_decrease_pct is not None and pct_change < -max_decrease_pct:
+            failures.append(f"decrease {abs(pct_change):.1f}% > max {max_decrease_pct}%")
+        if max_increase_pct is not None and pct_change > max_increase_pct:
+            failures.append(f"increase {pct_change:.1f}% > max {max_increase_pct}%")
     if min_delta is not None and delta < min_delta:
         failures.append(f"delta {delta} < min {min_delta}")
     if max_delta is not None and delta > max_delta:
         failures.append(f"delta {delta} > max {max_delta}")
 
     passed = len(failures) == 0
-    msg = f"Row count delta: {before_count} -> {after_count} (delta={delta})" + (
-        f"; FAILED: {'; '.join(failures)}" if failures else ""
+    pct_skipped = not has_baseline and (
+        max_decrease_pct is not None or max_increase_pct is not None
+    )
+    msg = (
+        f"Row count delta: {before_count} -> {after_count} (delta={delta})"
+        + ("; no baseline, percentage limits skipped" if pct_skipped else "")
+        + (f"; FAILED: {'; '.join(failures)}" if failures else "")
     )
     return GateResult(
         check="row_count_delta",

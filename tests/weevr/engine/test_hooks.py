@@ -515,10 +515,11 @@ class TestRunHookStepsGateDispatch:
 
         results = run_hook_steps(spark, [step], "post", ctx, row_counts={"db.table": 0})
 
-        # 0→10 is infinite % increase, exceeds 50% threshold
-        assert results[0].status == "warned"
+        # A zero baseline skips the percentage limits: 0→10 passes max_increase_pct
+        assert results[0].status == "passed"
         assert results[0].gate_result is not None
-        assert results[0].gate_result.passed is False
+        assert results[0].gate_result.passed is True
+        assert "no baseline" in results[0].gate_result.message
 
     def test_row_count_delta_min_delta(self):
         """row_count_delta min_delta threshold works through dispatcher."""
