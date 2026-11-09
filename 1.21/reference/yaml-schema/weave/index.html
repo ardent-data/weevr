@@ -4009,6 +4009,13 @@ the <code>type</code> field.</p>
 </tr>
 </tbody>
 </table>
+<p><code>row_count_delta</code> is post-step only: loading a config with it in <code>pre_steps</code> fails. Its
+baseline is the target's row count taken after the scope's pre-steps and before its work
+runs (a loom's weaves, a weave's threads, or a thread's own pipeline), so the gate judges the
+change that work made. Parallel threads in a weave share one baseline. A target that doesn't
+exist yet has a baseline of 0; with no baseline, <code>max_decrease_pct</code> and <code>max_increase_pct</code>
+are skipped (the gate message says so), while <code>min_delta</code> and <code>max_delta</code> still apply.
+Table names may be schema-qualified (<code>silver.orders</code>).</p>
 <h3 id="sql_statement">sql_statement<a class="headerlink" href="#sql_statement" title="Permanent link">&para;</a></h3>
 <p>Executes an arbitrary Spark SQL statement. Optionally captures the scalar
 result into a weave-scoped variable.</p>
