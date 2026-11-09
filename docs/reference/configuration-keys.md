@@ -731,6 +731,14 @@ Used in `pre_steps` and `post_steps` at loom, weave, or thread level.
 | `sql` | `str` | `None` | SQL expression (for `expression`) |
 | `message` | `str` | `None` | Failure message (for `expression`) |
 
+`row_count_delta` is post-step only: loading a config with it in `pre_steps` fails. Its
+baseline is the target's row count taken after the scope's pre-steps and before its work
+runs (a loom's weaves, a weave's threads, or a thread's own pipeline), so the gate judges the
+change that work made. Parallel threads in a weave share one baseline. A target that doesn't
+exist yet has a baseline of 0; with no baseline, `max_decrease_pct` and `max_increase_pct`
+are skipped (the gate message says so), while `min_delta` and `max_delta` still apply.
+Table names may be schema-qualified (`silver.orders`).
+
 ### SqlStatementStep
 
 | Field | Type | Default | Description |
