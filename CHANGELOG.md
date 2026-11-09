@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0-alpha.1](https://github.com/ardent-data/weevr/compare/weevr-v1.21.0...weevr-v2.0.0-alpha.1) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **engine:** removed back-compat import paths. weevr.config.duration -> weevr.duration; weevr.operations.reserved_words -> weevr.reserved_words; audit-template names are no longer exported from weevr.operations.audit or weevr.operations -> import them from weevr.config.audit_templates.
+
+### Code Refactoring
+
+* **engine:** drop back-compat import shims, lock core layering ([#296](https://github.com/ardent-data/weevr/issues/296)) ([f9c2c47](https://github.com/ardent-data/weevr/commit/f9c2c47e2f467d92d1b4f7acf96baf13e5137712))
+
+
+### Continuous Integration
+
+* **build:** release v2 prereleases from main ([#294](https://github.com/ardent-data/weevr/issues/294)) ([b746df8](https://github.com/ardent-data/weevr/commit/b746df8e52c6ac0d18a92e45a597f5869b951cac))
+
 ## [1.21.0](https://github.com/ardent-data/weevr/compare/weevr-v1.20.7...weevr-v1.21.0) (2026-11-04)
 
 
