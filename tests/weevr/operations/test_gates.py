@@ -3,8 +3,11 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
+import pytest
+
 from weevr.operations.gates import (
     GateResult,
+    _quote_table_ref,
     check_expression,
     check_row_count,
     check_row_count_delta,
@@ -111,11 +114,36 @@ class TestCheckRowCountDelta:
         result = check_row_count_delta(spark, "db.table", before_count=0, max_increase_pct=50.0)
         assert result.passed is True
 
-    def test_before_count_zero_with_increase(self):
-        """Zero before_count with increase produces infinite pct, exceeds threshold."""
-        spark = self._mock_count(10)
-        result = check_row_count_delta(spark, "db.table", before_count=0, max_increase_pct=50.0)
+    def test_no_baseline_skips_increase_pct(self):
+        """With a zero baseline the percentage limits aren't evaluated."""
+        spark = self._mock_count(500)
+        result = check_row_count_delta(spark, "db.table", before_count=0, max_increase_pct=10.0)
+        assert result.passed is True
+        assert "0 -> 500" in result.message
+        assert "no baseline" in result.message
+
+    def test_no_baseline_skips_decrease_pct(self):
+        """A zero baseline can't shrink; the decrease limit is skipped too."""
+        spark = self._mock_count(0)
+        result = check_row_count_delta(spark, "db.table", before_count=0, max_decrease_pct=10.0)
+        assert result.passed is True
+        assert "no baseline" in result.message
+
+    def test_no_baseline_still_enforces_absolute_bounds(self):
+        """min_delta and max_delta still apply without a baseline."""
+        spark = self._mock_count(500)
+        result = check_row_count_delta(
+            spark, "db.table", before_count=0, max_increase_pct=10.0, max_delta=100
+        )
         assert result.passed is False
+        assert "delta 500 > max 100" in result.message
+        assert "increase" not in result.message.split("FAILED:")[1]
+
+    def test_baseline_present_has_no_note(self):
+        """The no-baseline note only appears when the baseline is zero."""
+        spark = self._mock_count(110)
+        result = check_row_count_delta(spark, "db.table", before_count=100, max_increase_pct=20.0)
+        assert "no baseline" not in result.message
 
     def test_min_delta_failing(self):
         """Delta below min_delta threshold fails."""
@@ -228,3 +256,24 @@ class TestCheckExpression:
         spark.sql.return_value.collect.return_value = []
         result = check_expression(spark, "SELECT false")
         assert result.passed is False
+
+
+class TestQuoteTableRef:
+    """Table names are quoted per dot-separated part."""
+
+    @pytest.mark.parametrize(
+        ("alias", "expected"),
+        [
+            ("orders", "`orders`"),
+            ("silver.orders", "`silver`.`orders`"),
+            ("lake.silver.orders", "`lake`.`silver`.`orders`"),
+            ("`my-lake`.dbo.orders", "`my-lake`.`dbo`.`orders`"),
+            ("`a.b`.c", "`a.b`.`c`"),
+            ("`we``ird`.t", "`we``ird`.`t`"),
+            ("a`b", "`a``b`"),
+            ("x; DROP TABLE y", "`x; DROP TABLE y`"),
+            ("`unterminated.t", "```unterminated.t`"),
+        ],
+    )
+    def test_quoting(self, alias, expected):
+        assert _quote_table_ref(alias) == expected

@@ -3,14 +3,14 @@
 from pathlib import PurePath
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
 from weevr.model.column_set import ColumnSet
 from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import ExecutionConfig
-from weevr.model.hooks import HookStep
+from weevr.model.hooks import HookStep, reject_pre_step_baseline_checks
 from weevr.model.lookup import Lookup
 from weevr.model.naming import NamingConfig
 from weevr.model.params import ParamSpec
@@ -181,6 +181,11 @@ class Weave(FrozenBase):
         default=None,
         description="Named connection definitions for resolving source and target paths.",
     )
+
+    @field_validator("pre_steps")
+    @classmethod
+    def _reject_pre_step_baseline_checks(cls, v: list[HookStep] | None) -> list[HookStep] | None:
+        return reject_pre_step_baseline_checks(v)
 
     @model_validator(mode="before")
     @classmethod
