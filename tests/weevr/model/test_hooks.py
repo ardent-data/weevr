@@ -258,3 +258,80 @@ class TestHookStepDiscriminator:
         """Missing type field raises ValidationError."""
         with pytest.raises(ValidationError):
             hook_step_adapter.validate_python({"sql": "SELECT 1"})
+
+
+_DELTA_GATE = {
+    "type": "quality_gate",
+    "name": "no_shrink",
+    "check": "row_count_delta",
+    "target": "silver.orders",
+    "max_decrease_pct": 10,
+}
+_COUNT_GATE = {
+    "type": "quality_gate",
+    "check": "row_count",
+    "target": "silver.orders",
+    "min_count": 1,
+}
+
+_OWNERS = {
+    "loom": (
+        "weevr.model.loom",
+        "Loom",
+        {"config_version": "1.0", "weaves": ["w1"]},
+    ),
+    "weave": (
+        "weevr.model.weave",
+        "Weave",
+        {"config_version": "1.0", "threads": ["t1"]},
+    ),
+    "thread": (
+        "weevr.model.thread",
+        "Thread",
+        {
+            "config_version": "1.0",
+            "sources": {"customers": {"type": "delta", "alias": "raw.customers"}},
+            "target": {"alias": "test"},
+        },
+    ),
+}
+
+
+def _owner(level: str):
+    import importlib
+
+    module, cls_name, base = _OWNERS[level]
+    return getattr(importlib.import_module(module), cls_name), base
+
+
+@pytest.mark.parametrize("level", ["loom", "weave", "thread"])
+class TestRowCountDeltaPhase:
+    """row_count_delta needs a pre-run baseline, so it only belongs in post_steps."""
+
+    def test_pre_step_rejected(self, level):
+        model, base = _owner(level)
+        with pytest.raises(ValidationError) as exc_info:
+            model.model_validate({**base, "pre_steps": [_COUNT_GATE, _DELTA_GATE]})
+        message = str(exc_info.value)
+        assert "row_count_delta" in message
+        assert "pre_steps[1]" in message
+        assert "no_shrink" in message
+        assert "row_count" in message
+        assert "post_steps" in message
+
+    def test_unnamed_pre_step_rejected(self, level):
+        model, base = _owner(level)
+        unnamed = {k: v for k, v in _DELTA_GATE.items() if k != "name"}
+        with pytest.raises(ValidationError, match=r"pre_steps\[0\]"):
+            model.model_validate({**base, "pre_steps": [unnamed]})
+
+    def test_post_step_allowed(self, level):
+        model, base = _owner(level)
+        obj = model.model_validate({**base, "post_steps": [_DELTA_GATE]})
+        assert obj.post_steps is not None
+        assert obj.post_steps[0].check == "row_count_delta"
+
+    def test_other_checks_allowed_in_pre_steps(self, level):
+        model, base = _owner(level)
+        obj = model.model_validate({**base, "pre_steps": [_COUNT_GATE]})
+        assert obj.pre_steps is not None

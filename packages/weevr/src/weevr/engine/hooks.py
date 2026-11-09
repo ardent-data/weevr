@@ -18,6 +18,7 @@ from weevr.operations.gates import (
     check_row_count_delta,
     check_source_freshness,
     check_table_exists,
+    snapshot_row_count,
 )
 from weevr.telemetry.span import SpanStatus
 
@@ -100,14 +101,15 @@ def _resolve_text(text: str, variable_ctx: VariableContext, params: dict[str, An
 def _execute_quality_gate(
     spark: SparkSession,
     step: QualityGateStep,
-    row_counts: dict[str, int],
+    row_counts: dict[str, int | None],
 ) -> GateResult:
     """Dispatch a quality gate check to the appropriate gate function.
 
     Args:
         spark: Active SparkSession.
         step: Quality gate step configuration.
-        row_counts: Pre-snapshot row counts keyed by table alias.
+        row_counts: Pre-snapshot row counts keyed by table alias. ``None``
+            marks a target whose snapshot failed.
 
     Returns:
         GateResult from the appropriate check function.
@@ -127,7 +129,12 @@ def _execute_quality_gate(
     if check == "row_count_delta":
         if step.target is None:
             raise ExecutionError("row_count_delta hook step requires 'target'")
-        before_count = row_counts.get(step.target, 0)
+        if step.target in row_counts and row_counts[step.target] is None:
+            raise ExecutionError(
+                f"row_count_delta has no baseline for '{step.target}': the row count "
+                "snapshot taken before the threads ran failed"
+            )
+        before_count = row_counts.get(step.target) or 0
         return check_row_count_delta(
             spark,
             step.target,
@@ -213,6 +220,35 @@ def _execute_log_message(
     return resolved_msg
 
 
+def snapshot_row_counts(spark: SparkSession, steps: Sequence[Any] | None) -> dict[str, int | None]:
+    """Count each target a ``row_count_delta`` step will check.
+
+    Call it just before a scope's threads run and pass the result to that
+    scope's post-step :func:`run_hook_steps`. Each target is counted once.
+    A count that fails is recorded as ``None`` and logged; the gate then
+    fails under its own ``on_failure`` instead of the scope aborting here.
+
+    Args:
+        spark: Active SparkSession.
+        steps: The scope's post-steps.
+
+    Returns:
+        Row counts keyed by target. Empty when no step needs a baseline.
+    """
+    counts: dict[str, int | None] = {}
+    for step in steps or []:
+        if not isinstance(step, QualityGateStep) or step.check != "row_count_delta":
+            continue
+        if step.target is None or step.target in counts:
+            continue
+        try:
+            counts[step.target] = snapshot_row_count(spark, step.target)
+        except Exception as exc:
+            logger.warning("Row count snapshot failed for '%s': %s", step.target, exc)
+            counts[step.target] = None
+    return counts
+
+
 def run_hook_steps(
     spark: SparkSession,
     steps: Sequence[HookStep],
@@ -221,7 +257,7 @@ def run_hook_steps(
     params: dict[str, Any] | None = None,
     collector: SpanCollector | None = None,
     parent_span_id: str | None = None,
-    row_counts: dict[str, int] | None = None,
+    row_counts: dict[str, int | None] | None = None,
 ) -> list[HookResult]:
     """Execute hook steps sequentially in declared order.
 
@@ -236,8 +272,9 @@ def run_hook_steps(
         params: Optional parameter mapping for ``${param.name}`` resolution.
         collector: Optional span collector for telemetry.
         parent_span_id: Optional parent span ID for hierarchy.
-        row_counts: Pre-snapshot row counts for row_count_delta checks.
-            When ``None``, defaults to an empty dict (before_count=0 for all tables).
+        row_counts: Pre-snapshot row counts for row_count_delta checks, from
+            :func:`snapshot_row_counts`. A target missing from it compares
+            against 0; a ``None`` value fails that gate.
 
     Returns:
         List of HookResult objects, one per step.

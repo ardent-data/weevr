@@ -18,7 +18,7 @@ from weevr.config.audit_templates import AuditContext
 from weevr.delta import read_delta
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
-from weevr.engine.hooks import run_hook_steps
+from weevr.engine.hooks import run_hook_steps, snapshot_row_counts
 from weevr.engine.lookups import (
     UniqueKeyMemo,
     build_lookup_meta,
@@ -267,6 +267,9 @@ def execute_thread(
                 params=resolved_params,
             )
 
+        # Baseline for row_count_delta post-steps, before the core pipeline runs.
+        post_row_counts = snapshot_row_counts(spark, thread.post_steps)
+
         # --- Core execution pipeline ---
         try:
             # Resolve target path early (needed for watermark store resolution)
@@ -433,6 +436,7 @@ def execute_thread(
                     "post",
                     thread_variable_ctx,
                     params=resolved_params,
+                    row_counts=post_row_counts,
                 )
 
             # Step 18 — build result. Harvest step observations — fulfilled
