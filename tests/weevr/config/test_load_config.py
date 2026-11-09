@@ -1460,3 +1460,25 @@ class TestLoadConfigForeachInWith:
         result = load_config(project / "fact.thread", project_root=project)
         assert isinstance(result, Thread)
         assert len(result.steps) == 1
+
+
+def test_pre_step_row_count_delta_fails_at_load(tmp_path: Path) -> None:
+    """A row_count_delta gate in pre_steps is rejected before anything runs."""
+    weave = tmp_path / "nightly.weave"
+    weave.write_text(
+        "config_version: '1.0'\n"
+        "threads: [t1]\n"
+        "pre_steps:\n"
+        "  - type: quality_gate\n"
+        "    check: row_count_delta\n"
+        "    target: silver.orders\n"
+        "    max_decrease_pct: 10\n"
+    )
+    (tmp_path / "t1.thread").write_text(
+        "config_version: '1.0'\n"
+        "sources:\n  s: {type: delta, alias: raw.s}\n"
+        "target: {alias: silver.orders}\n"
+    )
+    with pytest.raises(ModelValidationError, match=r"pre_steps\[0\].*post_steps") as exc_info:
+        load_config(weave)
+    assert getattr(exc_info.value, "file_path", None)

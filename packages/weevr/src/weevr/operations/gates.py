@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from weevr.delta import probe_delta_table_exists
 from weevr.duration import parse_duration
 from weevr.model.base import FrozenBase
 
@@ -12,9 +13,58 @@ if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
 
+def _split_table_ref(alias: str) -> list[str] | None:
+    """Split a table reference into its dot-separated name parts.
+
+    A part wrapped in backticks is taken as already quoted: dots inside it
+    belong to the part and doubled backticks unescape to one. Returns
+    ``None`` when the reference can't be split cleanly (an unterminated
+    quote, text after a closing quote, or an empty part).
+    """
+    parts: list[str] = []
+    i, n = 0, len(alias)
+    while True:
+        if i < n and alias[i] == "`":
+            chars: list[str] = []
+            i += 1
+            while True:
+                if i >= n:
+                    return None
+                if alias[i] == "`":
+                    if i + 1 < n and alias[i + 1] == "`":
+                        chars.append("`")
+                        i += 2
+                        continue
+                    i += 1
+                    break
+                chars.append(alias[i])
+                i += 1
+            part = "".join(chars)
+        else:
+            end = alias.find(".", i)
+            end = n if end == -1 else end
+            part = alias[i:end]
+            i = end
+        if not part:
+            return None
+        parts.append(part)
+        if i == n:
+            return parts
+        if alias[i] != ".":
+            return None
+        i += 1
+
+
 def _quote_table_ref(alias: str) -> str:
-    """Backtick-escape a table reference for SQL injection safety."""
-    return f"`{alias.replace('`', '``')}`"
+    """Backtick-quote each part of a table reference for SQL injection safety.
+
+    ``silver.orders`` becomes `` `silver`.`orders` `` so Spark resolves the
+    schema and table separately; quoting the whole name would make it one
+    identifier. A reference that can't be split cleanly is quoted whole, so
+    it fails as an unknown table rather than reaching SQL unescaped.
+    """
+    parts = _split_table_ref(alias) or [alias]
+    return ".".join(f"`{part.replace('`', '``')}`" for part in parts)
 
 
 class GateResult(FrozenBase):
@@ -75,6 +125,31 @@ def check_source_freshness(spark: SparkSession, source_alias: str, max_age_str: 
     )
 
 
+def _count_rows(spark: SparkSession, target_alias: str) -> int:
+    """Count a table's rows the way every row-count gate does."""
+    row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
+    return row[0]["cnt"] if row else 0
+
+
+def snapshot_row_count(spark: SparkSession, target_alias: str) -> int:
+    """Take the baseline row count for a ``row_count_delta`` gate.
+
+    A table that doesn't exist yet (a first load) counts as 0. A failed
+    existence probe or count raises, so callers can tell "no rows" apart
+    from "couldn't ask".
+
+    Args:
+        spark: Active SparkSession.
+        target_alias: Table name the gate checks.
+
+    Returns:
+        The table's current row count, or 0 if it doesn't exist.
+    """
+    if not probe_delta_table_exists(spark, target_alias):
+        return 0
+    return _count_rows(spark, target_alias)
+
+
 def check_row_count_delta(
     spark: SparkSession,
     target_alias: str,
@@ -87,7 +162,10 @@ def check_row_count_delta(
 ) -> GateResult:
     """Check that row count change is within thresholds.
 
-    Compares ``before_count`` (pre-snapshot) against current count.
+    Compares ``before_count`` (pre-snapshot) against current count. When
+    ``before_count`` is 0 there is no baseline: ``max_decrease_pct`` and
+    ``max_increase_pct`` are skipped (the message says so), while
+    ``min_delta`` and ``max_delta`` still apply.
 
     Args:
         spark: Active SparkSession.
@@ -101,27 +179,33 @@ def check_row_count_delta(
     Returns:
         GateResult with pass/fail and delta details.
     """
-    after_row = spark.sql(f"SELECT COUNT(*) AS cnt FROM {_quote_table_ref(target_alias)}").collect()  # noqa: S608
-    after_count = after_row[0]["cnt"] if after_row else 0
+    after_count = _count_rows(spark, target_alias)
     delta = after_count - before_count
-    if before_count != 0:
-        pct_change = delta / before_count * 100
-    else:
-        pct_change = 0.0 if delta == 0 else float("inf")
+    # A zero baseline (missing or empty target, e.g. a first load) has no
+    # percentage change, so the percentage limits are skipped rather than
+    # judged against an infinite value. Absolute limits still apply.
+    has_baseline = before_count != 0
     failures: list[str] = []
 
-    if max_decrease_pct is not None and pct_change < -max_decrease_pct:
-        failures.append(f"decrease {abs(pct_change):.1f}% > max {max_decrease_pct}%")
-    if max_increase_pct is not None and pct_change > max_increase_pct:
-        failures.append(f"increase {pct_change:.1f}% > max {max_increase_pct}%")
+    if has_baseline:
+        pct_change = delta / before_count * 100
+        if max_decrease_pct is not None and pct_change < -max_decrease_pct:
+            failures.append(f"decrease {abs(pct_change):.1f}% > max {max_decrease_pct}%")
+        if max_increase_pct is not None and pct_change > max_increase_pct:
+            failures.append(f"increase {pct_change:.1f}% > max {max_increase_pct}%")
     if min_delta is not None and delta < min_delta:
         failures.append(f"delta {delta} < min {min_delta}")
     if max_delta is not None and delta > max_delta:
         failures.append(f"delta {delta} > max {max_delta}")
 
     passed = len(failures) == 0
-    msg = f"Row count delta: {before_count} -> {after_count} (delta={delta})" + (
-        f"; FAILED: {'; '.join(failures)}" if failures else ""
+    pct_skipped = not has_baseline and (
+        max_decrease_pct is not None or max_increase_pct is not None
+    )
+    msg = (
+        f"Row count delta: {before_count} -> {after_count} (delta={delta})"
+        + ("; no baseline, percentage limits skipped" if pct_skipped else "")
+        + (f"; FAILED: {'; '.join(failures)}" if failures else "")
     )
     return GateResult(
         check="row_count_delta",
