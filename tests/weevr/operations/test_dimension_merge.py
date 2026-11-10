@@ -3,7 +3,7 @@
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import StringType, StructField, StructType
+from pyspark.sql.types import BooleanType, StringType, StructField, StructType
 
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
@@ -319,7 +319,7 @@ class TestVersionedLifecycle:
         assert v1["_valid_to"] == v2["_valid_from"]
         assert v2["_valid_to"] == v3["_valid_from"]
 
-    def test_overwrite_columns_on_closed_rows_stable(
+    def test_overwrite_columns_restamped_on_closed_rows(
         self, spark: SparkSession, tmp_delta_path
     ) -> None:
         path = tmp_delta_path("dim_lifecycle_overwrite")
@@ -339,12 +339,10 @@ class TestVersionedLifecycle:
 
         rows = spark.read.format("delta").load(path).orderBy("_valid_from").collect()
         assert len(rows) == 3
-        v1, v2, v3 = rows
-        # Overwrite values on closed rows come from the write that closed
-        # them and are never re-stamped by later merges
-        assert v1["email"] == "a2@x.com"
-        assert v2["email"] == "a3@x.com"
-        assert v3["email"] == "a3@x.com"
+        # Overwrite columns are updated in place across all versions: every
+        # row of the key carries the latest value, including closed rows
+        assert [r["email"] for r in rows] == ["a3@x.com"] * 3
+        assert [r["_is_current"] for r in rows] == [False, False, True]
 
     def test_previous_columns_captured_only_on_closing_row(
         self, spark: SparkSession, tmp_delta_path
@@ -429,6 +427,257 @@ class TestVersionedLifecycle:
             "2026-04-01",
         )
         assert read_scd_rows(nofilter_path) == nofilter_rows
+
+
+_OW_SCHEMA = StructType(
+    [
+        StructField("customer_id", StringType()),
+        StructField("name", StringType()),
+        StructField("email", StringType()),
+        StructField("tier", StringType()),
+    ]
+)
+
+
+def _ow_dim(attrs: dict | None = None, **overrides):  # type: ignore[no-untyped-def]
+    """Versioned dimension: email/tier version, name per ``attrs`` (None = unassigned)."""
+    groups: dict = {"tracked": {"columns": ["email", "tier"], "on_change": "version"}}
+    if attrs is not None:
+        groups["attrs"] = attrs
+    return _make_dim(track_history=True, change_detection=groups, **overrides)
+
+
+@pytest.mark.spark
+class TestOverwriteInPlace:
+    """Overwrite columns update in place across every version of the key."""
+
+    @staticmethod
+    def _write(spark, path, dim, rows, ts, schema=_OW_SCHEMA, evolve=False, overrides=None):  # type: ignore[no-untyped-def]
+        from weevr.operations.target_handle import TargetHandle
+
+        src = spark.createDataFrame(rows, schema=schema)
+        src = compute_dimension_keys(src, dim)
+        builder = DimensionMergeBuilder(dim, write_overrides=overrides)
+        src = builder.inject_scd_columns(src, ts)
+        handle = TargetHandle(spark, path)
+        return execute_dimension_merge(spark, src, builder, path, ts, handle=handle, evolve=evolve)
+
+    @staticmethod
+    def _rows(spark, path):  # type: ignore[no-untyped-def]
+        df = spark.read.format("delta").load(path)
+        return df.orderBy("customer_id", "_valid_from").collect()
+
+    @staticmethod
+    def _row(cid, name, email="b@x.com", tier="gold"):  # type: ignore[no-untyped-def]
+        return {"customer_id": cid, "name": name, "email": email, "tier": tier}
+
+    def test_overwrite_only_change_updates_current_row(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_repro")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bobby")], "2026-02-01")
+
+        rows = self._rows(spark, path)
+        assert len(rows) == 1  # no new version
+        (row,) = rows
+        assert row["name"] == "Bobby"
+        assert row["_is_current"] is True
+        assert row["_valid_from"] == "2026-01-01"
+        assert row["_valid_to"] == "9999-12-31"
+
+    def test_overwrite_only_change_updates_closed_rows(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_closed")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bob", email="c@x.com")], "2026-02-01")
+        before = [
+            (r["_valid_from"], r["_valid_to"], r["_is_current"]) for r in self._rows(spark, path)
+        ]
+        self._write(spark, path, dim, [self._row("C1", "Bobby", email="c@x.com")], "2026-03-01")
+
+        rows = self._rows(spark, path)
+        assert [r["name"] for r in rows] == ["Bobby", "Bobby"]
+        # Validity is untouched by an in-place update
+        assert [(r["_valid_from"], r["_valid_to"], r["_is_current"]) for r in rows] == before
+        # The closed row keeps its own version columns
+        assert [r["email"] for r in rows] == ["b@x.com", "c@x.com"]
+
+    def test_version_and_overwrite_change_in_same_run(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_mixed")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bob", email="c@x.com")], "2026-02-01")
+        self._write(spark, path, dim, [self._row("C1", "Bobby", email="d@x.com")], "2026-03-01")
+
+        rows = self._rows(spark, path)
+        assert len(rows) == 3
+        assert [r["name"] for r in rows] == ["Bobby"] * 3
+        assert [r["email"] for r in rows] == ["b@x.com", "c@x.com", "d@x.com"]
+        assert [r["_is_current"] for r in rows] == [False, False, True]
+        assert [r["_valid_to"] for r in rows] == ["2026-02-01", "2026-03-01", "9999-12-31"]
+
+    def test_auto_overwrite_group(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("ow_auto")
+        dim = _ow_dim({"columns": "auto", "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bob", tier="silver")], "2026-02-01")
+        self._write(spark, path, dim, [self._row("C1", "Bobby", tier="silver")], "2026-03-01")
+
+        rows = self._rows(spark, path)
+        assert len(rows) == 2
+        assert [r["name"] for r in rows] == ["Bobby", "Bobby"]
+
+    def test_unassigned_columns(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("ow_unassigned")
+        dim = _ow_dim(None)
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bob", tier="silver")], "2026-02-01")
+        self._write(spark, path, dim, [self._row("C1", "Bobby", tier="silver")], "2026-03-01")
+
+        rows = self._rows(spark, path)
+        assert len(rows) == 2
+        assert [r["name"] for r in rows] == ["Bobby", "Bobby"]
+
+    def test_overwrite_hash_matches_updated_values(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_hash")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bob", email="c@x.com")], "2026-02-01")
+        self._write(spark, path, dim, [self._row("C1", "Bobby", email="c@x.com")], "2026-03-01")
+
+        expected = compute_dimension_keys(
+            spark.createDataFrame([self._row("C1", "Bobby")], schema=_OW_SCHEMA), dim
+        ).collect()[0]["attrs"]
+        assert [r["attrs"] for r in self._rows(spark, path)] == [expected, expected]
+
+    def test_static_and_previous_columns_keep_semantics(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_static_prev")
+        schema = StructType([*_OW_SCHEMA.fields, StructField("_prev_email", StringType())])
+        dim = _make_dim(
+            track_history=True,
+            previous_columns={"_prev_email": "email"},
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email"], "on_change": "version"},
+                "attrs": {"columns": ["name"], "on_change": "overwrite"},
+                "fixed": {"columns": ["tier"], "on_change": "static"},
+            },
+        )
+
+        def row(name, email, tier):  # type: ignore[no-untyped-def]
+            return {**self._row("C1", name, email=email, tier=tier), "_prev_email": None}
+
+        self._write(spark, path, dim, [row("Bob", "b@x.com", "gold")], "2026-01-01", schema)
+        self._write(spark, path, dim, [row("Bob", "c@x.com", "gold")], "2026-02-01", schema)
+        # Overwrite-only change plus a static change: static never moves
+        self._write(spark, path, dim, [row("Bobby", "c@x.com", "platinum")], "2026-03-01", schema)
+
+        rows = self._rows(spark, path)
+        assert [r["name"] for r in rows] == ["Bobby", "Bobby"]
+        assert [r["tier"] for r in rows] == ["gold", "gold"]
+        # previous_columns set on the closing row only, not by the in-place update
+        assert [r["_prev_email"] for r in rows] == ["b@x.com", None]
+
+    def test_unchanged_rerun_updates_nothing(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("ow_rerun")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        rows = [self._row("C1", None), self._row("C2", "Cara")]
+        self._write(spark, path, dim, rows, "2026-01-01")
+        self._write(
+            spark, path, dim, [self._row("C1", None, email="c@x.com"), rows[1]], "2026-02-01"
+        )
+        before = self._rows(spark, path)
+        self._write(
+            spark, path, dim, [self._row("C1", None, email="c@x.com"), rows[1]], "2026-03-01"
+        )
+
+        assert self._rows(spark, path) == before
+        last = spark.sql(f"DESCRIBE HISTORY delta.`{path}` LIMIT 1").collect()[0]
+        assert last["operationMetrics"]["numTargetRowsUpdated"] == "0"
+
+    def test_one_commit_per_merge(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("ow_commit")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        self._write(spark, path, dim, [self._row("C1", "Bob", email="c@x.com")], "2026-02-01")
+        version_before = spark.sql(f"DESCRIBE HISTORY delta.`{path}` LIMIT 1").collect()[0][
+            "version"
+        ]
+        self._write(spark, path, dim, [self._row("C1", "Bobby", email="d@x.com")], "2026-03-01")
+        last = spark.sql(f"DESCRIBE HISTORY delta.`{path}` LIMIT 1").collect()[0]
+        assert last["version"] == version_before + 1
+        assert last["operation"] == "MERGE"
+
+    def test_adaptive_drift_new_unassigned_column(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_adaptive")
+        dim = _ow_dim(None)
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+        wide = StructType([*_OW_SCHEMA.fields, StructField("segment", StringType())])
+        new_row = {**self._row("C1", "Bob"), "segment": "retail"}
+        # The new column is not in the target yet: the write must succeed
+        self._write(spark, path, dim, [new_row], "2026-02-01", schema=wide, evolve=True)
+        assert "segment" in spark.read.format("delta").load(path).columns
+        # Once the column exists, the next run fills it in place
+        self._write(spark, path, dim, [new_row], "2026-03-01", schema=wide, evolve=True)
+        rows = self._rows(spark, path)
+        assert len(rows) == 1
+        assert rows[0]["segment"] == "retail"
+
+    def test_soft_delete_unaffected(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("ow_soft")
+        schema = StructType([*_OW_SCHEMA.fields, StructField("deleted", BooleanType())])
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        overrides = _write_overrides(on_no_match_source="soft_delete", soft_delete_column="deleted")
+
+        def row(cid, name, email="b@x.com"):  # type: ignore[no-untyped-def]
+            return {**self._row(cid, name, email=email), "deleted": False}
+
+        self._write(
+            spark,
+            path,
+            dim,
+            [row("C1", "Bob"), row("C2", "Cara")],
+            "2026-01-01",
+            schema,
+            overrides=overrides,
+        )
+        self._write(
+            spark,
+            path,
+            dim,
+            [row("C1", "Bob", "c@x.com"), row("C2", "Cara")],
+            "2026-02-01",
+            schema,
+            overrides=overrides,
+        )
+        # C2 vanishes; C1 gets an overwrite-only change
+        self._write(
+            spark,
+            path,
+            dim,
+            [row("C1", "Bobby", "c@x.com")],
+            "2026-03-01",
+            schema,
+            overrides=overrides,
+        )
+
+        rows = self._rows(spark, path)
+        c1 = [r for r in rows if r["customer_id"] == "C1"]
+        c2 = [r for r in rows if r["customer_id"] == "C2"]
+        assert [r["name"] for r in c1] == ["Bobby", "Bobby"]
+        assert [r["deleted"] for r in c1] == [False, False]
+        assert [r["deleted"] for r in c2] == [True]
 
 
 @pytest.mark.spark
