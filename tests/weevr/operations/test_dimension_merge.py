@@ -661,6 +661,35 @@ class TestOverwriteInPlace:
         assert (result.rows_versioned, result.rows_overwritten, result.rows_inserted) == (1, 1, 2)
         assert len(self._rows(spark, path)) == 5
 
+    def test_failed_setup_releases_cached_frames(
+        self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A failure after the frames are cached but before the MERGE runs
+        # must still release both the source and the new-version frame
+        from spark_helpers import dataframe_class
+        from weevr.operations import dimension as dimension_mod
+
+        path = tmp_delta_path("ow_release")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
+
+        DataFrame = dataframe_class()
+        unpersisted: list[int] = []
+        original_unpersist = DataFrame.unpersist
+
+        def _unpersist_spy(inner_self, blocking=False):  # type: ignore[no-untyped-def]
+            unpersisted.append(1)
+            return original_unpersist(inner_self, blocking)
+
+        def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("resolve failed")
+
+        monkeypatch.setattr(DataFrame, "unpersist", _unpersist_spy)
+        monkeypatch.setattr(dimension_mod, "resolve_delta_table", _boom)
+        with pytest.raises(RuntimeError, match="resolve failed"):
+            self._write(spark, path, dim, [self._row("C1", "Bobby")], "2026-02-01")
+        assert len(unpersisted) == 2  # source frame + new-version frame
+
     def test_one_commit_per_merge(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("ow_commit")
         dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
