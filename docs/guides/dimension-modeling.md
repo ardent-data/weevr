@@ -102,9 +102,11 @@ closed rows — and refreshes the overwrite group's hash. Validity columns
 (`valid_from`, `valid_to`, `is_current`) are untouched, and no new
 version is created. When a version column changes in the same run, the
 current row is closed and the new version inserted as usual, and every
-version carries the new overwrite values. The comparison is against the
-stored values, so a value that went stale earlier is corrected the next
-time its key appears in the source. Because the merge reads every
+version carries the new overwrite values. Audit columns are written when
+a version is inserted; closing a row and in-place overwrite updates leave
+them unchanged. The comparison is against the stored values, so a value
+that went stale earlier is corrected the next time its key appears in the
+source. Because the merge reads every
 version of each incoming key, dimensions with long histories read more
 rows per merge; clustering or partitioning by the business key keeps
 that read narrow.
