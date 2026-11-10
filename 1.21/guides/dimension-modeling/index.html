@@ -3296,6 +3296,28 @@ single auto group with <code>on_change: version</code> when
 </tr>
 </tbody>
 </table>
+<p><strong>Which columns are overwritten.</strong> On a versioned dimension, the
+overwrite set is the columns listed in <code>overwrite</code> groups, plus the
+columns an <code>overwrite</code> group with <code>columns: auto</code> covers. When no group
+uses <code>columns: auto</code>, columns that belong to no group also default to
+overwrite (the engine logs them as "Unassigned columns default to
+overwrite"). Keys, SCD columns, group hash columns, <code>previous_columns</code>
+outputs, and audit columns are engine-managed and never part of it.</p>
+<p><strong>How overwrite applies.</strong> Whenever an incoming row's overwrite values
+differ from a stored row of the same business key, the engine updates
+them in place on every version of that key — the current row and all
+closed rows — and refreshes the overwrite group's hash. Validity columns
+(<code>valid_from</code>, <code>valid_to</code>, <code>is_current</code>) are untouched, and no new
+version is created. When a version column changes in the same run, the
+current row is closed and the new version inserted as usual, and every
+version carries the new overwrite values. Audit columns are written when
+a version is inserted; closing a row and in-place overwrite updates leave
+them unchanged. The comparison is against the stored values, so a value
+that went stale earlier is corrected the next time its key appears in the
+source. Because the merge reads every
+version of each incoming key, dimensions with long histories read more
+rows per merge; clustering or partitioning by the business key keeps
+that read narrow.</p>
 <h3 id="previous_columns">previous_columns<a class="headerlink" href="#previous_columns" title="Permanent link">&para;</a></h3>
 <p>Track the previous value of a column before an update:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">dimension</span><span class="p">:</span>
