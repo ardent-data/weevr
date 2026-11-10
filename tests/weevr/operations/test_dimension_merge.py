@@ -190,6 +190,30 @@ class TestMergeCountsUnderAutoCompaction:
         assert result.rows_versioned == 1
         assert result.rows_inserted == 11
 
+    def test_versioned_overwrite_merge_counts(self, spark: SparkSession, tmp_delta_path) -> None:
+        path = tmp_delta_path("dim_ac_versioned_overwrite")
+        dim = _make_dim(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["tier"], "on_change": "version"},
+            },
+        )
+        first = [{"customer_id": f"C{i}", "name": "old", "tier": "gold"} for i in range(4)]
+        self._merge(spark, path, dim, first, "2026-01-01")
+        _enable_auto_compaction(spark, path)
+
+        second = [
+            {"customer_id": "C0", "name": "old", "tier": "silver"},  # version
+            {"customer_id": "C1", "name": "renamed", "tier": "gold"},  # unassigned → overwrite
+            *[{"customer_id": f"N{i}", "name": "new", "tier": "gold"} for i in range(10)],
+        ]
+        result = self._merge(spark, path, dim, second, "2026-01-02")
+
+        assert _operations(spark, path)[-1] == "OPTIMIZE"
+        assert result.rows_versioned == 1
+        assert result.rows_overwritten == 1
+        assert result.rows_inserted == 10
+
     def test_overwrite_merge_counts(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("dim_ac_overwrite")
         dim = _make_dim(track_history=False)
@@ -477,8 +501,9 @@ class TestOverwriteInPlace:
         path = tmp_delta_path("ow_repro")
         dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
         self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
-        self._write(spark, path, dim, [self._row("C1", "Bobby")], "2026-02-01")
+        result = self._write(spark, path, dim, [self._row("C1", "Bobby")], "2026-02-01")
 
+        assert (result.rows_versioned, result.rows_overwritten, result.rows_inserted) == (0, 1, 0)
         rows = self._rows(spark, path)
         assert len(rows) == 1  # no new version
         (row,) = rows
@@ -497,8 +522,11 @@ class TestOverwriteInPlace:
         before = [
             (r["_valid_from"], r["_valid_to"], r["_is_current"]) for r in self._rows(spark, path)
         ]
-        self._write(spark, path, dim, [self._row("C1", "Bobby", email="c@x.com")], "2026-03-01")
+        result = self._write(
+            spark, path, dim, [self._row("C1", "Bobby", email="c@x.com")], "2026-03-01"
+        )
 
+        assert (result.rows_versioned, result.rows_overwritten, result.rows_inserted) == (0, 2, 0)
         rows = self._rows(spark, path)
         assert [r["name"] for r in rows] == ["Bobby", "Bobby"]
         # Validity is untouched by an in-place update
@@ -513,8 +541,13 @@ class TestOverwriteInPlace:
         dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
         self._write(spark, path, dim, [self._row("C1", "Bob")], "2026-01-01")
         self._write(spark, path, dim, [self._row("C1", "Bob", email="c@x.com")], "2026-02-01")
-        self._write(spark, path, dim, [self._row("C1", "Bobby", email="d@x.com")], "2026-03-01")
+        result = self._write(
+            spark, path, dim, [self._row("C1", "Bobby", email="d@x.com")], "2026-03-01"
+        )
 
+        # The current row is closed (a version); the older closed row is
+        # updated in place; the new version is not a new entity
+        assert (result.rows_versioned, result.rows_overwritten, result.rows_inserted) == (1, 1, 0)
         rows = self._rows(spark, path)
         assert len(rows) == 3
         assert [r["name"] for r in rows] == ["Bobby"] * 3
@@ -596,13 +629,37 @@ class TestOverwriteInPlace:
             spark, path, dim, [self._row("C1", None, email="c@x.com"), rows[1]], "2026-02-01"
         )
         before = self._rows(spark, path)
-        self._write(
+        result = self._write(
             spark, path, dim, [self._row("C1", None, email="c@x.com"), rows[1]], "2026-03-01"
         )
 
+        assert (result.rows_versioned, result.rows_overwritten, result.rows_inserted) == (0, 0, 0)
         assert self._rows(spark, path) == before
         last = spark.sql(f"DESCRIBE HISTORY delta.`{path}` LIMIT 1").collect()[0]
         assert last["operationMetrics"]["numTargetRowsUpdated"] == "0"
+
+    def test_counts_with_new_entities_and_versions(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        path = tmp_delta_path("ow_counts")
+        dim = _ow_dim({"columns": ["name"], "on_change": "overwrite"})
+        self._write(
+            spark, path, dim, [self._row("C1", "Ann"), self._row("C2", "Bob")], "2026-01-01"
+        )
+        result = self._write(
+            spark,
+            path,
+            dim,
+            [
+                self._row("C1", "Ann", email="c@x.com"),  # version
+                self._row("C2", "Bobby"),  # overwrite only
+                self._row("C3", "Cara"),  # new entity
+                self._row("C4", "Dan"),  # new entity
+            ],
+            "2026-02-01",
+        )
+        assert (result.rows_versioned, result.rows_overwritten, result.rows_inserted) == (1, 1, 2)
+        assert len(self._rows(spark, path)) == 5
 
     def test_one_commit_per_merge(self, spark: SparkSession, tmp_delta_path) -> None:
         path = tmp_delta_path("ow_commit")

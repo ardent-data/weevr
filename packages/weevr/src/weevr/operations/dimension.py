@@ -400,6 +400,14 @@ def _execute_versioned_merge(
     src_cols = [F.col(f"src.{c}") for c in source_df.columns]
     new_version_df = new_versions.select(src_cols)
 
+    # With overwrite columns the MERGE's matched-update count mixes closes
+    # and in-place updates, so the new versions are counted to split them.
+    # The frame is persisted so the MERGE reuses the counted rows.
+    overwrite_cols = builder.resolve_overwrite_columns(source_df.columns)
+    count_versions = bool(overwrite_cols)
+    if count_versions:
+        new_version_df = new_version_df.persist(StorageLevel.MEMORY_AND_DISK)
+
     # Tag the new-version rows with a unique marker column so the MERGE
     # sees them as "not matched" (different BK value via the marker).
     marker = "__dim_new_version__"
@@ -422,7 +430,6 @@ def _execute_versioned_merge(
     # row that differs. The comparison only uses columns the target already
     # has — under adaptive drift a new column is added by this merge and
     # filled on the next run.
-    overwrite_cols = builder.resolve_overwrite_columns(source_df.columns)
     overwrite_set: dict[str, Column] = {
         c: F.col(f"source.{quote_identifier(c)}")
         for c in [*overwrite_cols, *builder.get_overwrite_hash_columns()]
@@ -483,13 +490,17 @@ def _execute_versioned_merge(
 
     pre_version = handle.current_version() if handle is not None else None
     try:
+        closes = new_version_df.count() if count_versions else None
         merger.execute()
     finally:
         with contextlib.suppress(Exception):
             source_df.unpersist()
+        if count_versions:
+            with contextlib.suppress(Exception):
+                new_version_df.unpersist()
     if handle is not None:
         handle.mark_exists()
-    return _populate_merge_result(result, handle, pre_version, versioned=True)
+    return _populate_merge_result(result, handle, pre_version, versioned=True, closes=closes)
 
 
 def _execute_standard_merge(
@@ -568,15 +579,19 @@ def _populate_merge_result(
     pre_version: int | None,
     *,
     versioned: bool,
+    closes: int | None = None,
 ) -> DimensionMergeResult:
     """Fill merge metrics from the commit's split update keys.
 
     Uses the split keys only — the ``numTargetRowsUpdated`` aggregate
-    conflates the close/overwrite clause with the soft-delete clause
+    conflates the close/overwrite clauses with the soft-delete clause
     (``whenNotMatchedBySourceUpdate``) and must never feed the split.
     On the versioned path, one close corresponds to exactly one
     new-version insert (single current row per entity), so new-entity
-    inserts are total inserts minus closes. ``rows_unchanged`` stays
+    inserts are total inserts minus closes. ``closes`` is the counted
+    number of new versions when the merge also updates overwrite columns
+    in place; matched updates beyond it are in-place updates. Without it,
+    every matched update is a close. ``rows_unchanged`` stays
     absent by decision — no Delta metric expresses it. Metrics absent or
     guard-rejected: warn and leave zeros, never a corrupted number.
     """
@@ -594,8 +609,10 @@ def _populate_merge_result(
     deleted = int(metrics.get("numTargetRowsDeleted", 0))
     nmbs_updated = int(metrics.get("numTargetRowsNotMatchedBySourceUpdated", 0))
     if versioned:
-        result.rows_versioned = matched_updated
-        result.rows_inserted = inserted - matched_updated
+        versions = matched_updated if closes is None else closes
+        result.rows_versioned = versions
+        result.rows_overwritten = matched_updated - versions
+        result.rows_inserted = inserted - versions
     else:
         result.rows_overwritten = matched_updated
         result.rows_inserted = inserted
