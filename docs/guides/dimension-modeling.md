@@ -87,6 +87,30 @@ Each group's `on_change` behavior:
 | `overwrite` | Update in place across all versions |
 | `static` | Never update, regardless of source |
 
+**Which columns are overwritten.** On a versioned dimension, the
+overwrite set is the columns listed in `overwrite` groups, plus the
+columns an `overwrite` group with `columns: auto` covers. When no group
+uses `columns: auto`, columns that belong to no group also default to
+overwrite (the engine logs them as "Unassigned columns default to
+overwrite"). Keys, SCD columns, group hash columns, `previous_columns`
+outputs, and audit columns are engine-managed and never part of it.
+
+**How overwrite applies.** Whenever an incoming row's overwrite values
+differ from a stored row of the same business key, the engine updates
+them in place on every version of that key — the current row and all
+closed rows — and refreshes the overwrite group's hash. Validity columns
+(`valid_from`, `valid_to`, `is_current`) are untouched, and no new
+version is created. When a version column changes in the same run, the
+current row is closed and the new version inserted as usual, and every
+version carries the new overwrite values. Audit columns are written when
+a version is inserted; closing a row and in-place overwrite updates leave
+them unchanged. The comparison is against the stored values, so a value
+that went stale earlier is corrected the next time its key appears in the
+source. Because the merge reads every
+version of each incoming key, dimensions with long histories read more
+rows per merge; clustering or partitioning by the business key keeps
+that read narrow.
+
 ### previous_columns
 
 Track the previous value of a column before an update:

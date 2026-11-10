@@ -1,10 +1,13 @@
 """Tests for the dimension merge builder."""
 
+import logging
+
 import pytest
 from pyspark.sql import SparkSession
 
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
+from weevr.operations import hashing
 from weevr.operations.dimension import DimensionMergeBuilder
 
 
@@ -194,6 +197,179 @@ class TestGetOverwriteColumns:
         )
         builder = DimensionMergeBuilder(dim)
         assert sorted(builder.get_overwrite_columns()) == ["status", "tier"]
+
+
+class TestResolveOverwriteColumns:
+    """Tests for DimensionMergeBuilder.resolve_overwrite_columns.
+
+    The effective overwrite set covers explicit overwrite groups, an
+    overwrite group with ``columns: auto``, and unassigned payload columns.
+    """
+
+    # Frame columns as they reach the merge: payload, keys, the "tracked"
+    # group hash (other group outputs are excluded by name either way),
+    # SCD columns, and one audit column.
+    FRAME = [
+        "customer_id",
+        "name",
+        "email",
+        "tier",
+        "region",
+        "_sk",
+        "tracked",
+        "_valid_from",
+        "_valid_to",
+        "_is_current",
+        "_loaded_at",
+    ]
+
+    def test_explicit_overwrite_group(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email", "tier"], "on_change": "version"},
+                "attrs": {"columns": ["name"], "on_change": "overwrite"},
+                "fixed": {"columns": ["region"], "on_change": "static"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert builder.resolve_overwrite_columns(self.FRAME) == ["name"]
+
+    def test_auto_overwrite_group_matches_its_hash_columns(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email", "tier"], "on_change": "version"},
+                "attrs": {"columns": "auto", "on_change": "overwrite"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert builder.resolve_overwrite_columns(self.FRAME) == ["name", "region"]
+
+    def test_unassigned_columns_without_auto_group(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email", "tier"], "on_change": "version"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert builder.resolve_overwrite_columns(self.FRAME) == ["name", "region"]
+
+    def test_explicit_and_unassigned_combined(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email"], "on_change": "version"},
+                "attrs": {"columns": ["tier"], "on_change": "overwrite"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert builder.resolve_overwrite_columns(self.FRAME) == ["tier", "name", "region"]
+
+    def test_auto_version_group_leaves_nothing_unassigned(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": "auto", "on_change": "version"},
+                "attrs": {"columns": ["name"], "on_change": "overwrite"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert builder.resolve_overwrite_columns(self.FRAME) == ["name"]
+
+    def test_auto_static_group_leaves_nothing_unassigned(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email"], "on_change": "version"},
+                "fixed": {"columns": "auto", "on_change": "static"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert builder.resolve_overwrite_columns(self.FRAME) == []
+
+    def test_engine_managed_columns_never_included(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email"], "on_change": "version"},
+            },
+            additional_keys={  # type: ignore[arg-type]
+                "nk": {"name": "_nk", "columns": ["region"]},
+            },
+            previous_columns={"_prev_email": "email"},
+        )
+        frame = [*self.FRAME, "_nk", "_prev_email"]
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        # region is an additional-key source; _nk, _prev_email, SCD, SK,
+        # BK, hashes, and audit columns are engine-managed.
+        assert builder.resolve_overwrite_columns(frame) == ["name", "tier"]
+
+    def test_audit_columns_unassigned_without_audit_names(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email", "tier"], "on_change": "version"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim)
+        assert "_loaded_at" in builder.resolve_overwrite_columns(self.FRAME)
+
+    def test_previous_columns_source_that_is_unassigned_included(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email"], "on_change": "version"},
+            },
+            previous_columns={"_prev_tier": "tier"},
+        )
+        frame = [*self.FRAME, "_prev_tier"]
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        cols = builder.resolve_overwrite_columns(frame)
+        assert "tier" in cols
+        assert "_prev_tier" not in cols
+
+    def test_matches_unassigned_log_line(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The columns logged as defaulting to overwrite are the ones overwritten."""
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email", "tier"], "on_change": "version"},
+            },
+        )
+        payload = ["customer_id", "name", "email", "tier", "region", "_loaded_at"]
+        with caplog.at_level(logging.INFO, logger=hashing.__name__):
+            hashing.log_unassigned_columns(payload, dim, audit_columns={"_loaded_at"})
+        logged = [r.getMessage() for r in caplog.records if "default to overwrite" in r.message]
+        builder = DimensionMergeBuilder(dim, audit_columns={"_loaded_at"})
+        assert logged == [
+            "Unassigned columns default to overwrite: "
+            + ", ".join(builder.resolve_overwrite_columns(self.FRAME))
+        ]
+
+
+class TestGetOverwriteHashColumns:
+    """Tests for DimensionMergeBuilder.get_overwrite_hash_columns."""
+
+    def test_overwrite_group_outputs(self) -> None:
+        dim = _make_dim_config(
+            track_history=True,
+            change_detection={  # type: ignore[arg-type]
+                "tracked": {"columns": ["email"], "on_change": "version"},
+                "attrs": {"columns": ["name"], "on_change": "overwrite"},
+                "more": {"name": "_h_more", "columns": "auto", "on_change": "overwrite"},
+                "fixed": {"columns": ["region"], "on_change": "static"},
+            },
+        )
+        builder = DimensionMergeBuilder(dim)
+        assert builder.get_overwrite_hash_columns() == ["attrs", "_h_more"]
+
+    def test_default_group_versions_with_history(self) -> None:
+        # The default group is auto + version under track_history.
+        builder = DimensionMergeBuilder(_make_dim_config(track_history=True))
+        assert builder.get_overwrite_hash_columns() == []
+        assert builder.resolve_overwrite_columns(["customer_id", "name", "_sk"]) == []
 
 
 class TestGetStaticColumns:

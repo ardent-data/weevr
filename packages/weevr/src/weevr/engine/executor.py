@@ -624,7 +624,9 @@ def execute_thread(  # type: ignore[reportGeneralTypeIssues]
             # Step 9b — inject SCD columns for versioned dimensions
             dim_builder: DimensionMergeBuilder | None = None
             if dim_config is not None:
-                dim_builder = DimensionMergeBuilder(dim_config, thread.write)
+                dim_builder = DimensionMergeBuilder(
+                    dim_config, thread.write, audit_columns=audit_col_names
+                )
                 df = dim_builder.inject_scd_columns(df, run_timestamp)
 
             # Step 10 — resolve and prepare audit columns

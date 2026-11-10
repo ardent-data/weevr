@@ -197,32 +197,61 @@ def compute_dimension_keys(
     result = result.withColumn(sk_cfg.name, sk_col)
 
     # 3. Build the exclusion set used for auto column resolution.
-    exclude = _build_auto_exclusion_set(dimension_config, audit_columns)
+    exclude = build_auto_exclusion_set(dimension_config, audit_columns)
 
     # 4. Compute change detection group hashes.
     if dimension_config.change_detection:
         result = compute_named_group_hashes(result, dimension_config.change_detection, exclude)
-
-        # Log unassigned columns (those not in any explicit group and not
-        # absorbed by an auto group) so users know what defaults to overwrite.
-        has_auto = any(g.columns == "auto" for g in dimension_config.change_detection.values())
-        if not has_auto:
-            assigned = set()
-            for g in dimension_config.change_detection.values():
-                if isinstance(g.columns, list):
-                    assigned.update(g.columns)
-            unassigned = sorted(c for c in df.columns if c not in exclude and c not in assigned)
-            if unassigned:
-                logger.info(
-                    "Unassigned columns default to overwrite: %s",
-                    ", ".join(unassigned),
-                )
+        log_unassigned_columns(df.columns, dimension_config, audit_columns)
 
     # 5. Compute additional keys.
     if dimension_config.additional_keys:
         result = compute_additional_keys(result, dimension_config.additional_keys)
 
     return result
+
+
+def resolve_unassigned_columns(
+    df_columns: list[str],
+    config: DimensionConfig,
+    audit_columns: set[str] | None = None,
+) -> list[str]:
+    """Return payload columns that belong to no explicit change detection group.
+
+    These are the columns a ``columns: "auto"`` group claims. With no
+    ``auto`` group they are unassigned and default to overwrite.
+
+    Args:
+        df_columns: All column names present in the DataFrame.
+        config: Full :class:`DimensionConfig`.
+        audit_columns: Names of audit columns, which are engine-managed.
+
+    Returns:
+        Sorted column names outside every explicit group and engine-managed column.
+    """
+    return resolve_auto_columns(df_columns, build_auto_exclusion_set(config, audit_columns))
+
+
+def log_unassigned_columns(
+    df_columns: list[str],
+    config: DimensionConfig,
+    audit_columns: set[str] | None = None,
+) -> None:
+    """Log the columns that default to overwrite because no group claims them.
+
+    Nothing is logged when an ``auto`` group absorbs the remaining columns.
+
+    Args:
+        df_columns: All column names present in the DataFrame.
+        config: Full :class:`DimensionConfig`.
+        audit_columns: Names of audit columns, which are engine-managed.
+    """
+    groups = config.change_detection or {}
+    if any(g.columns == "auto" for g in groups.values()):
+        return
+    unassigned = resolve_unassigned_columns(df_columns, config, audit_columns)
+    if unassigned:
+        logger.info("Unassigned columns default to overwrite: %s", ", ".join(unassigned))
 
 
 def resolve_auto_columns(df_columns: list[str], exclude_set: set[str]) -> list[str]:
@@ -318,7 +347,7 @@ def compute_additional_keys(
     return result
 
 
-def _build_auto_exclusion_set(
+def build_auto_exclusion_set(
     config: DimensionConfig,
     audit_columns: set[str] | None = None,
 ) -> set[str]:
