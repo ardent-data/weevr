@@ -1081,12 +1081,13 @@ def _validate_and_key(
 
     # Step 9 — compute keys and hashes
     dim_config = thread.target.dimension
+    # Audit column names are engine-managed: auto hashes and the overwrite
+    # column set both exclude them.
+    audit_col_names = (
+        set(thread.target.audit_columns.keys()) if thread.target.audit_columns else None
+    )
     if dim_config is not None:
         # Dimension mode: use dimension-aware key computation.
-        # Pass audit column names so auto hash excludes them.
-        audit_col_names = (
-            set(thread.target.audit_columns.keys()) if thread.target.audit_columns else None
-        )
         df = compute_dimension_keys(df, dim_config, audit_columns=audit_col_names)
     elif thread.keys is not None:
         df = compute_keys(df, thread.keys)
@@ -1094,7 +1095,7 @@ def _validate_and_key(
     # Step 9b — inject SCD columns for versioned dimensions
     dim_builder: DimensionMergeBuilder | None = None
     if dim_config is not None:
-        dim_builder = DimensionMergeBuilder(dim_config, thread.write)
+        dim_builder = DimensionMergeBuilder(dim_config, thread.write, audit_columns=audit_col_names)
         df = dim_builder.inject_scd_columns(df, run_timestamp)
 
     # Step 10b — validate fact target schema (if fact mode).

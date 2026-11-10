@@ -20,6 +20,7 @@ from pyspark.sql import functions as F
 from weevr.delta import resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
+from weevr.operations.hashing import resolve_unassigned_columns
 from weevr.operations.target_handle import CommitStamp, TargetHandle
 from weevr.operations.writers import quote_identifier
 
@@ -59,16 +60,21 @@ class DimensionMergeBuilder:
         dimension_config: The dimension configuration block.
         write_overrides: Optional user write config for non-dimension fields
             (on_no_match_source, soft_delete_column, etc.).
+        audit_columns: Names of the target's audit columns. They are
+            engine-managed, so they never count as unassigned overwrite
+            columns. Pass the same names used when computing the hashes.
     """
 
     def __init__(
         self,
         dimension_config: DimensionConfig,
         write_overrides: WriteConfig | None = None,
+        audit_columns: set[str] | None = None,
     ) -> None:
         """Initialize the builder with dimension config and optional overrides."""
         self._config = dimension_config
         self._overrides = write_overrides
+        self._audit_columns = audit_columns
 
     @property
     def config(self) -> DimensionConfig:
@@ -175,8 +181,45 @@ class DimensionMergeBuilder:
             return False
         return any(g.on_change == "version" for g in self._config.change_detection.values())
 
+    def resolve_overwrite_columns(self, df_columns: list[str]) -> list[str]:
+        """Return every column updated in place on a versioned dimension.
+
+        The set covers columns listed in overwrite groups, the columns an
+        overwrite group with ``columns: auto`` hashes, and — when no group
+        uses ``auto`` — unassigned payload columns, which default to
+        overwrite. Version and static columns and engine-managed columns
+        (keys, SCD, group outputs, ``previous_columns`` outputs, audit
+        columns) are never included.
+
+        Args:
+            df_columns: Columns of the frame being merged.
+
+        Returns:
+            Explicit overwrite columns in config order, then the remaining
+            payload columns sorted.
+        """
+        groups = self._config.change_detection or {}
+        cols = self.get_overwrite_columns()
+        auto_group = next((g for g in groups.values() if g.columns == "auto"), None)
+        if auto_group is None or auto_group.on_change == "overwrite":
+            remainder = resolve_unassigned_columns(df_columns, self._config, self._audit_columns)
+            cols.extend(c for c in remainder if c not in cols)
+        return cols
+
+    def get_overwrite_hash_columns(self) -> list[str]:
+        """Return the hash output columns of overwrite groups.
+
+        Returns:
+            Output column names (group name, else the group key) in config order.
+        """
+        groups = self._config.change_detection or {}
+        return [g.name or key for key, g in groups.items() if g.on_change == "overwrite"]
+
     def get_overwrite_columns(self) -> list[str]:
-        """Return columns from groups with on_change: overwrite.
+        """Return columns listed explicitly in groups with on_change: overwrite.
+
+        ``columns: auto`` groups and unassigned columns are not included;
+        :meth:`resolve_overwrite_columns` returns the full set.
 
         Returns:
             Flat list of column names in overwrite groups.
@@ -227,6 +270,7 @@ def execute_dimension_merge(
     2. Join source to target on business key.
     3. Compare change detection hashes per group.
     4. Build MERGE clauses: close changed rows (set valid_to, is_current),
+       update overwrite columns in place on every version of the key,
        insert new versions, insert unmatched source rows.
     5. Handle ``on_no_match_source`` with system member auto-exclusion.
 
@@ -301,7 +345,9 @@ def _execute_versioned_merge(
     2. Join source to target on BK to identify changed/new rows.
     3. Build new-version rows for changed entities.
     4. Union new-version rows (with a marker) into the source.
-    5. Single MERGE: close changed rows, insert new versions + new entities.
+    5. Single MERGE over every version of the incoming keys: close changed
+       current rows, update overwrite columns in place on any version whose
+       values differ, insert new versions + new entities.
     """
     config = builder.config
     result = DimensionMergeResult()
@@ -310,119 +356,154 @@ def _execute_versioned_merge(
 
     # The MERGE's unioned source embeds this lineage twice (directly and
     # via the new-version derivation); persist so it computes once.
-    # Released in the finally below.
+    # Released in the finally at the end.
     source_df = source_df.persist(StorageLevel.MEMORY_AND_DISK)
-
-    # Identify version-group hash columns
-    version_hash_cols: list[str] = []
-    if config.change_detection:
-        for key, group in config.change_detection.items():
-            col_name = group.name or key
-            if group.on_change == "version":
-                version_hash_cols.append(col_name)
-
-    # Read current target rows. Detection must always operate on current
-    # rows only — comparing against closed versions would produce one
-    # duplicate new-version row per historical version.
-    target_snap = spark.read.format("delta").load(target_path)
-    target_snap = target_snap.filter(
-        F.col(scd.is_current) == True  # noqa: E712
-    )
-
-    # Join source to target on BK to detect changes
-    join_cond = [source_df[c].eqNullSafe(target_snap[c]) for c in bk_cols]
-    joined = source_df.alias("src").join(target_snap.alias("tgt"), join_cond, "left")
-
-    # Build version change condition
-    if version_hash_cols:
-        version_changed = F.lit(False)
-        for hc in version_hash_cols:
-            version_changed = version_changed | (F.col(f"src.{hc}") != F.col(f"tgt.{hc}"))
-    else:
-        version_changed = F.lit(False)
-
-    # New-version rows: source rows where BK matched but hash changed.
-    # Check ALL target-side BK columns to handle composite keys correctly.
-    is_matched = reduce(
-        lambda a, c: a & F.col(f"tgt.{c}").isNotNull(),
-        bk_cols[1:],
-        F.col(f"tgt.{bk_cols[0]}").isNotNull(),
-    )
-    new_versions = joined.filter(is_matched & version_changed)
-
-    # Select only source columns for new version rows
-    src_cols = [F.col(f"src.{c}") for c in source_df.columns]
-    new_version_df = new_versions.select(src_cols)
-
-    # Tag the new-version rows with a unique marker column so the MERGE
-    # sees them as "not matched" (different BK value via the marker).
-    marker = "__dim_new_version__"
-    source_tagged = source_df.withColumn(marker, F.lit(False))
-    new_version_tagged = new_version_df.withColumn(marker, F.lit(True))
-    merged_source = source_tagged.unionByName(new_version_tagged)
-
-    # Build merge condition: match on BK AND marker=False
-    # (so new-version rows never match existing target rows).
-    # Scope to the current row so the close clause never touches rows
-    # already closed by earlier merges.
-    merge_parts = [
-        f"target.{quote_identifier(c)} <=> source.{quote_identifier(c)}" for c in bk_cols
-    ]
-    merge_parts.append(f"source.{quote_identifier(marker)} = false")
-    merge_parts.append(f"target.{quote_identifier(scd.is_current)} = true")
-    merge_cond = " AND ".join(merge_parts)
-
-    delta_table = resolve_delta_table(spark, target_path)
-    merger = delta_table.alias("target").merge(merged_source.alias("source"), merge_cond)
-    if evolve:
-        merger = merger.withSchemaEvolution()
-
-    # Matched + version hash changed → close old row
-    if version_hash_cols:
-        version_change_sql = " OR ".join(
-            f"source.{quote_identifier(c)} != target.{quote_identifier(c)}"
-            for c in version_hash_cols
-        )
-        close_set: dict[str, Column] = {
-            scd.valid_to: F.lit(run_timestamp),
-            scd.is_current: F.lit(False),
-        }
-        # Apply overwrite columns during close
-        for col_name in builder.get_overwrite_columns():
-            close_set[col_name] = F.col(f"source.{quote_identifier(col_name)}")
-        # Apply previous_columns
-        if config.previous_columns:
-            for prev_col, src_col in config.previous_columns.items():
-                close_set[prev_col] = F.col(f"target.{quote_identifier(src_col)}")
-        merger = merger.whenMatchedUpdate(condition=version_change_sql, set=close_set)
-
-    # Not matched → insert (includes new entities AND new version rows).
-    # IMPORTANT: use source_df.columns (not merged_source.columns) to
-    # exclude the __dim_new_version__ marker from the insert values.
-    # The marker must never be written to the target schema.
-    insert_cols = {c: F.col(f"source.{quote_identifier(c)}") for c in source_df.columns}
-    merger = merger.whenNotMatchedInsert(values=insert_cols)
-
-    # Handle on_no_match_source. The MERGE condition scopes matching to
-    # current rows, so closed history rows always land in the
-    # not-matched-by-source set — the clauses must be scoped to the current
-    # row or delete would erase history and soft_delete would re-stamp
-    # closed rows on every merge.
-    merger = _apply_not_matched_by_source(
-        merger,
-        builder,
-        scope_condition=f"target.{quote_identifier(scd.is_current)} = true",
-    )
-
-    pre_version = handle.current_version() if handle is not None else None
+    # Every frame cached below is released in the finally, on every exit path.
+    cached: list[DataFrame] = [source_df]
     try:
+        # Identify version-group hash columns
+        version_hash_cols: list[str] = []
+        if config.change_detection:
+            for key, group in config.change_detection.items():
+                col_name = group.name or key
+                if group.on_change == "version":
+                    version_hash_cols.append(col_name)
+
+        # Read current target rows. Detection must always operate on current
+        # rows only — comparing against closed versions would produce one
+        # duplicate new-version row per historical version.
+        target_snap = spark.read.format("delta").load(target_path)
+        target_snap = target_snap.filter(
+            F.col(scd.is_current) == True  # noqa: E712
+        )
+
+        # Join source to target on BK to detect changes
+        join_cond = [source_df[c].eqNullSafe(target_snap[c]) for c in bk_cols]
+        joined = source_df.alias("src").join(target_snap.alias("tgt"), join_cond, "left")
+
+        # Build version change condition
+        if version_hash_cols:
+            version_changed = F.lit(False)
+            for hc in version_hash_cols:
+                version_changed = version_changed | (F.col(f"src.{hc}") != F.col(f"tgt.{hc}"))
+        else:
+            version_changed = F.lit(False)
+
+        # New-version rows: source rows where BK matched but hash changed.
+        # Check ALL target-side BK columns to handle composite keys correctly.
+        is_matched = reduce(
+            lambda a, c: a & F.col(f"tgt.{c}").isNotNull(),
+            bk_cols[1:],
+            F.col(f"tgt.{bk_cols[0]}").isNotNull(),
+        )
+        new_versions = joined.filter(is_matched & version_changed)
+
+        # Select only source columns for new version rows
+        src_cols = [F.col(f"src.{c}") for c in source_df.columns]
+        new_version_df = new_versions.select(src_cols)
+
+        # With overwrite columns the MERGE's matched-update count mixes closes
+        # and in-place updates, so the new versions are counted to split them.
+        # The frame is persisted so the MERGE reuses the counted rows.
+        overwrite_cols = builder.resolve_overwrite_columns(source_df.columns)
+        count_versions = bool(overwrite_cols)
+        if count_versions:
+            new_version_df = new_version_df.persist(StorageLevel.MEMORY_AND_DISK)
+            cached.append(new_version_df)
+
+        # Tag the new-version rows with a unique marker column so the MERGE
+        # sees them as "not matched" (different BK value via the marker).
+        marker = "__dim_new_version__"
+        source_tagged = source_df.withColumn(marker, F.lit(False))
+        new_version_tagged = new_version_df.withColumn(marker, F.lit(True))
+        merged_source = source_tagged.unionByName(new_version_tagged)
+
+        # Build merge condition: match on BK AND marker=False
+        # (so new-version rows never match existing target rows). Every
+        # version of an incoming key matches — closed rows too — so overwrite
+        # columns can be updated across history. The close clause is scoped
+        # to the current row by its own condition.
+        merge_parts = [
+            f"target.{quote_identifier(c)} <=> source.{quote_identifier(c)}" for c in bk_cols
+        ]
+        merge_parts.append(f"source.{quote_identifier(marker)} = false")
+        merge_cond = " AND ".join(merge_parts)
+
+        # Overwrite columns: values are taken from the source on every matched
+        # row that differs. The in-place trigger only compares columns the
+        # target already has. Under adaptive drift a new column is added by
+        # this merge; closes and new versions write it in this run, and rows
+        # updated in place get it on the next run that compares it.
+        overwrite_set: dict[str, Column] = {
+            c: F.col(f"source.{quote_identifier(c)}")
+            for c in [*overwrite_cols, *builder.get_overwrite_hash_columns()]
+            if c in source_df.columns
+        }
+        target_cols = set(target_snap.columns)
+        overwrite_changed_sql = " OR ".join(
+            f"NOT (source.{quote_identifier(c)} <=> target.{quote_identifier(c)})"
+            for c in overwrite_cols
+            if c in target_cols
+        )
+
+        delta_table = resolve_delta_table(spark, target_path)
+        merger = delta_table.alias("target").merge(merged_source.alias("source"), merge_cond)
+        if evolve:
+            merger = merger.withSchemaEvolution()
+
+        # Matched current row + version hash changed → close it. Overwrite
+        # columns take the new values in the same update.
+        if version_hash_cols:
+            version_change_sql = " OR ".join(
+                f"source.{quote_identifier(c)} != target.{quote_identifier(c)}"
+                for c in version_hash_cols
+            )
+            close_cond = (
+                f"target.{quote_identifier(scd.is_current)} = true AND ({version_change_sql})"
+            )
+            close_set: dict[str, Column] = {
+                scd.valid_to: F.lit(run_timestamp),
+                scd.is_current: F.lit(False),
+                **overwrite_set,
+            }
+            # Apply previous_columns
+            if config.previous_columns:
+                for prev_col, src_col in config.previous_columns.items():
+                    close_set[prev_col] = F.col(f"target.{quote_identifier(src_col)}")
+            merger = merger.whenMatchedUpdate(condition=close_cond, set=close_set)
+
+        # Any other matched row (current or closed) whose overwrite columns
+        # differ → update them in place, without touching validity.
+        if overwrite_changed_sql:
+            merger = merger.whenMatchedUpdate(condition=overwrite_changed_sql, set=overwrite_set)
+
+        # Not matched → insert (includes new entities AND new version rows).
+        # IMPORTANT: use source_df.columns (not merged_source.columns) to
+        # exclude the __dim_new_version__ marker from the insert values.
+        # The marker must never be written to the target schema.
+        insert_cols = {c: F.col(f"source.{quote_identifier(c)}") for c in source_df.columns}
+        merger = merger.whenNotMatchedInsert(values=insert_cols)
+
+        # Handle on_no_match_source. Closed history rows of keys absent from the
+        # source land in the not-matched-by-source set — the clauses must be
+        # scoped to the current row or delete would erase history and
+        # soft_delete would re-stamp closed rows on every merge.
+        merger = _apply_not_matched_by_source(
+            merger,
+            builder,
+            scope_condition=f"target.{quote_identifier(scd.is_current)} = true",
+        )
+
+        pre_version = handle.current_version() if handle is not None else None
+        closes = new_version_df.count() if count_versions else None
         merger.execute()
     finally:
-        with contextlib.suppress(Exception):
-            source_df.unpersist()
+        for frame in cached:
+            with contextlib.suppress(Exception):
+                frame.unpersist()
     if handle is not None:
         handle.mark_exists()
-    return _populate_merge_result(result, handle, pre_version, versioned=True)
+    return _populate_merge_result(result, handle, pre_version, versioned=True, closes=closes)
 
 
 def _execute_standard_merge(
@@ -501,15 +582,19 @@ def _populate_merge_result(
     pre_version: int | None,
     *,
     versioned: bool,
+    closes: int | None = None,
 ) -> DimensionMergeResult:
     """Fill merge metrics from the commit's split update keys.
 
     Uses the split keys only — the ``numTargetRowsUpdated`` aggregate
-    conflates the close/overwrite clause with the soft-delete clause
+    conflates the close/overwrite clauses with the soft-delete clause
     (``whenNotMatchedBySourceUpdate``) and must never feed the split.
     On the versioned path, one close corresponds to exactly one
     new-version insert (single current row per entity), so new-entity
-    inserts are total inserts minus closes. ``rows_unchanged`` stays
+    inserts are total inserts minus closes. ``closes`` is the counted
+    number of new versions when the merge also updates overwrite columns
+    in place; matched updates beyond it are in-place updates. Without it,
+    every matched update is a close. ``rows_unchanged`` stays
     absent by decision — no Delta metric expresses it. Metrics absent or
     guard-rejected: warn and leave zeros, never a corrupted number.
     """
@@ -527,8 +612,10 @@ def _populate_merge_result(
     deleted = int(metrics.get("numTargetRowsDeleted", 0))
     nmbs_updated = int(metrics.get("numTargetRowsNotMatchedBySourceUpdated", 0))
     if versioned:
-        result.rows_versioned = matched_updated
-        result.rows_inserted = inserted - matched_updated
+        versions = matched_updated if closes is None else closes
+        result.rows_versioned = versions
+        result.rows_overwritten = matched_updated - versions
+        result.rows_inserted = inserted - versions
     else:
         result.rows_overwritten = matched_updated
         result.rows_inserted = inserted
