@@ -2188,6 +2188,57 @@ class TestFindingsRegression:
         assert telem.rows_quarantined == 2  # exploded per rule (existing semantic)
         assert result2.rows_written == 2  # C1, C2 — never 1
 
+    @pytest.mark.parametrize("explicit_group", [True, False], ids=["attrs_group", "unassigned"])
+    def test_scd2_overwrite_updates_every_version(
+        self, spark: SparkSession, tmp_delta_path, explicit_group: bool
+    ) -> None:
+        # A change confined to overwrite columns updates every version of
+        # the key in place; a run-varying audit column is never treated as
+        # an unassigned overwrite column
+        src = tmp_delta_path(f"fr_scd2_ow_src_{explicit_group}")
+        tgt = tmp_delta_path(f"fr_scd2_ow_tgt_{explicit_group}")
+        change_detection: dict = {"tracked": {"columns": ["email", "tier"], "on_change": "version"}}
+        if explicit_group:
+            change_detection["attrs"] = {"columns": ["name"], "on_change": "overwrite"}
+        thread = Thread.model_validate(
+            {
+                "name": "fr_scd2_ow",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [],
+                "target": {
+                    "path": tgt,
+                    "audit_columns": {"_loaded_at": "current_timestamp()"},
+                    "dimension": {
+                        "business_key": ["customer_id"],
+                        "surrogate_key": {"name": "_sk", "columns": ["customer_id"]},
+                        "track_history": True,
+                        "change_detection": change_detection,
+                    },
+                },
+            }
+        )
+
+        def run(name: str, email: str) -> None:
+            spark.createDataFrame(
+                [{"customer_id": "C1", "name": name, "email": email, "tier": "gold"}]
+            ).write.format("delta").mode("overwrite").save(src)
+            result = execute_thread(spark, thread)
+            assert result.status == "success", result.error
+
+        run("Bob", "b@x.com")
+        run("Bob", "c@x.com")  # version change
+        run("Bobby", "c@x.com")  # overwrite-only change
+
+        rows = spark.read.format("delta").load(tgt).orderBy("_valid_from").collect()
+        assert [r["name"] for r in rows] == ["Bobby", "Bobby"]
+        assert [r["email"] for r in rows] == ["b@x.com", "c@x.com"]
+        assert [r["_is_current"] for r in rows] == [False, True]
+
+        run("Bobby", "c@x.com")  # unchanged rerun: nothing updated
+        last = spark.sql(f"DESCRIBE HISTORY delta.`{tgt}` LIMIT 1").collect()[0]
+        assert last["operationMetrics"]["numTargetRowsUpdated"] == "0"
+
     def test_failing_write_still_unpersists(
         self, spark: SparkSession, tmp_delta_path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
