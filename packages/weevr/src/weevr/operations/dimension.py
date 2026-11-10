@@ -20,6 +20,7 @@ from pyspark.sql import functions as F
 from weevr.delta import resolve_delta_table
 from weevr.model.dimension import DimensionConfig
 from weevr.model.write import WriteConfig
+from weevr.operations.hashing import resolve_unassigned_columns
 from weevr.operations.target_handle import CommitStamp, TargetHandle
 from weevr.operations.writers import quote_identifier
 
@@ -59,16 +60,21 @@ class DimensionMergeBuilder:
         dimension_config: The dimension configuration block.
         write_overrides: Optional user write config for non-dimension fields
             (on_no_match_source, soft_delete_column, etc.).
+        audit_columns: Names of the target's audit columns. They are
+            engine-managed, so they never count as unassigned overwrite
+            columns. Pass the same names used when computing the hashes.
     """
 
     def __init__(
         self,
         dimension_config: DimensionConfig,
         write_overrides: WriteConfig | None = None,
+        audit_columns: set[str] | None = None,
     ) -> None:
         """Initialize the builder with dimension config and optional overrides."""
         self._config = dimension_config
         self._overrides = write_overrides
+        self._audit_columns = audit_columns
 
     @property
     def config(self) -> DimensionConfig:
@@ -175,8 +181,45 @@ class DimensionMergeBuilder:
             return False
         return any(g.on_change == "version" for g in self._config.change_detection.values())
 
+    def resolve_overwrite_columns(self, df_columns: list[str]) -> list[str]:
+        """Return every column updated in place on a versioned dimension.
+
+        The set covers columns listed in overwrite groups, the columns an
+        overwrite group with ``columns: auto`` hashes, and — when no group
+        uses ``auto`` — unassigned payload columns, which default to
+        overwrite. Version and static columns and engine-managed columns
+        (keys, SCD, group outputs, ``previous_columns`` outputs, audit
+        columns) are never included.
+
+        Args:
+            df_columns: Columns of the frame being merged.
+
+        Returns:
+            Explicit overwrite columns in config order, then the remaining
+            payload columns sorted.
+        """
+        groups = self._config.change_detection or {}
+        cols = self.get_overwrite_columns()
+        auto_group = next((g for g in groups.values() if g.columns == "auto"), None)
+        if auto_group is None or auto_group.on_change == "overwrite":
+            remainder = resolve_unassigned_columns(df_columns, self._config, self._audit_columns)
+            cols.extend(c for c in remainder if c not in cols)
+        return cols
+
+    def get_overwrite_hash_columns(self) -> list[str]:
+        """Return the hash output columns of overwrite groups.
+
+        Returns:
+            Output column names (group name, else the group key) in config order.
+        """
+        groups = self._config.change_detection or {}
+        return [g.name or key for key, g in groups.items() if g.on_change == "overwrite"]
+
     def get_overwrite_columns(self) -> list[str]:
-        """Return columns from groups with on_change: overwrite.
+        """Return columns listed explicitly in groups with on_change: overwrite.
+
+        ``columns: auto`` groups and unassigned columns are not included;
+        :meth:`resolve_overwrite_columns` returns the full set.
 
         Returns:
             Flat list of column names in overwrite groups.
