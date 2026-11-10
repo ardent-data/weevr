@@ -328,10 +328,19 @@ commit's split update keys — never the conflated
 the same number as version closes:
 
 - `rows_versioned` — current rows closed (a new version was inserted)
+- `rows_overwritten` — rows updated in place: overwrite columns on a
+  versioned dimension (current or closed rows), or changed rows on a
+  dimension without history
 - `rows_inserted` — genuinely new entities (new-version inserts are
   excluded arithmetically)
 - `rows_deleted` — hard deletes plus soft-delete stamps from
   `on_no_match_source`
+
+On a versioned dimension with overwrite columns, closes and in-place
+updates land in the same Delta update count, so the engine also counts
+the new versions it inserts (one extra Spark action on an already
+persisted frame) to split them exactly. Dimensions without overwrite
+columns skip that count.
 
 `rows_unchanged` is intentionally absent: no Delta metric expresses it
 (`numTargetRowsCopied` is a file-rewrite artifact, not a logical
