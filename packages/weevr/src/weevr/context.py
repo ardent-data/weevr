@@ -16,7 +16,12 @@ from weevr.config.onelake import resolve_connection_path
 from weevr.delta import probe_delta_table_exists
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
-from weevr.engine.planner import build_plan, build_producer_map, find_in_run_producers
+from weevr.engine.planner import (
+    build_plan,
+    build_producer_map,
+    find_in_run_producers,
+    resolve_lookup_names,
+)
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
@@ -594,6 +599,48 @@ class Context:
                     )
         return errors
 
+    def _awaited_in_run_table(
+        self,
+        thread_name: str,
+        thread: Thread,
+        lookups: dict[str, Lookup],
+        producers: dict[str, list[str]],
+    ) -> tuple[str, list[str]] | None:
+        """Find a table the thread reads that another thread in the run writes but hasn't yet.
+
+        Checks the thread's own sources and the sources of the lookups it
+        uses (lookup-bound sources and ``resolve`` steps). A location that
+        can't be resolved or probed is left to the normal read, which
+        reports the real error.
+
+        Returns:
+            ``(location, writer threads)`` for the first such table, else ``None``.
+        """
+        bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
+        names = {src.lookup for src in thread.sources.values() if src.lookup is not None}
+        names |= resolve_lookup_names(thread) - bound
+        candidates = [src for src in thread.sources.values() if src.lookup is None]
+        candidates += [lookups[name].source for name in sorted(names) if name in lookups]
+
+        for source in candidates:
+            try:
+                location = self._source_location(source, thread.connections)
+            except ValueError:
+                continue
+            if location is None:
+                continue
+            source_type, path = location
+            writers = find_in_run_producers(path, producers, reader=thread_name)
+            if not writers:
+                continue
+            try:
+                exists = self._source_location_exists(source_type, path)
+            except Exception:
+                continue
+            if not exists:
+                return path, writers
+        return None
+
     @staticmethod
     def _source_location(
         source: Source, connections: dict[str, OneLakeConnection] | None
@@ -792,6 +839,8 @@ class Context:
             all_threads, tags=tags, thread_names=thread_names
         )
         inherited_lookups = self._inherited_lookups(loaded)
+        # Only the selected threads run, so only they produce tables here.
+        producers = build_producer_map(all_threads)
 
         preview_data: dict[str, Any] = {}
         preview_metadata: dict[str, PreviewThreadMetadata] = {}
@@ -808,6 +857,20 @@ class Context:
                     "weave",
                     "thread",
                 )
+                # Preview doesn't feed one thread's output into the next, so a
+                # thread reading a table this run hasn't written yet has
+                # nothing to read: report it as skipped, not as a failure.
+                waiting = self._awaited_in_run_table(
+                    thread_name, thread, visible_lookups or {}, producers
+                )
+                if waiting is not None:
+                    path, writers = waiting
+                    produced_by = ", ".join(f"thread '{w}'" for w in writers)
+                    warnings.append(
+                        f"Preview skipped thread '{thread_name}': reads {path}, produced by "
+                        f"{produced_by} in this run; not materialized yet"
+                    )
+                    continue
                 lookup_dfs, resolve_lookups = resolve_lookup_frames(
                     thread,
                     visible_lookups or {},

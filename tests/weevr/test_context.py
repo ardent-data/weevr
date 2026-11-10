@@ -1885,6 +1885,119 @@ class TestValidateInRunSources:
 
 
 @pytest.mark.spark
+class TestPreviewInRunSources:
+    """Threads waiting on a table the run hasn't written yet are skipped, not failed."""
+
+    def test_fresh_environment_skips_downstream_thread(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        weave = _in_run_weave(project, one_row_src, lake)
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"silver_orders"}
+        skips = [w for w in result.warnings if "fact_orders" in w]
+        assert len(skips) == 1
+        assert str(lake / "silver_orders") in skips[0]
+        assert "silver_orders" in skips[0].replace(str(lake / "silver_orders"), "")
+        assert "skipped" in skips[0]
+
+    def test_lookup_sourced_from_in_run_target_skips(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "dim_customer", one_row_src, str(lake / "dim_customer"))
+        (project / "threads" / "fact_sales.thread").write_text(
+            f"""\
+config_version: "1.0"
+lookups:
+  customers:
+    source:
+      type: delta
+      alias: "{lake / "dim_customer"}"
+sources:
+  main:
+    type: delta
+    alias: "{one_row_src}"
+  dim:
+    lookup: customers
+target:
+  path: "{lake / "fact_sales"}"
+write:
+  mode: overwrite
+"""
+        )
+        weave = _create_weave_yaml(project, "sales", ["dim_customer", "fact_sales"])
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"dim_customer"}
+        assert any("fact_sales" in w and "dim_customer" in w for w in result.warnings)
+
+    def test_existing_in_run_table_is_read(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        spark.createDataFrame([{"id": 7}]).write.format("delta").save(str(lake / "silver_orders"))
+        weave = _in_run_weave(project, one_row_src, lake)
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"silver_orders", "fact_orders"}
+        assert not any("skipped" in w for w in result.warnings)
+
+    def test_filter_excluding_producer_reports_missing_table(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
+        result = Context(spark=spark, project=project).run(
+            weave, mode="preview", threads=["fact_orders"]
+        )
+
+        assert result.status == "failure"
+        assert any("Preview failed for thread 'fact_orders'" in w for w in result.warnings)
+
+    def test_genuine_failure_elsewhere_is_still_partial(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "silver_orders", one_row_src, str(lake / "silver_orders"))
+        _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "f"))
+        _create_thread_yaml(project, "broken", str(tmp_path / "no_such_table"), str(lake / "b"))
+        weave = _create_weave_yaml(project, "mixed", ["silver_orders", "fact_orders", "broken"])
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "partial"
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"silver_orders"}
+        assert any("Preview failed for thread 'broken'" in w for w in result.warnings)
+        assert any("fact_orders" in w and "skipped" in w for w in result.warnings)
+
+    def test_failed_producer_and_skipped_reader_is_failure(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        # Every thread is either skipped or failed: nothing previewed
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        weave = _in_run_weave(project, str(tmp_path / "no_such_table"), lake)
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "failure"
+        assert result.preview_data is None
+        assert any("Preview failed for thread 'silver_orders'" in w for w in result.warnings)
+        assert any("fact_orders" in w and "skipped" in w for w in result.warnings)
+
+
+@pytest.mark.spark
 class TestPreviewRenderPurity:
     """Preview rendering is pure formatting over metadata captured at build."""
 
