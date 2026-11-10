@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from weevr.config.onelake import resolve_connection_path
@@ -154,6 +155,48 @@ def _extract_source_paths(thread: Thread) -> set[str]:
             except ValueError:
                 continue
     return paths
+
+
+def build_producer_map(threads: Mapping[str, Thread]) -> dict[str, list[str]]:
+    """Map each normalized target path in a run to the threads that write it.
+
+    Uses the same target resolution as dependency inference (alias, else
+    path, else the connection's abfss:// path), across every thread in the
+    run regardless of weave. Threads whose target doesn't resolve are left
+    out.
+
+    Args:
+        threads: Every thread in the run, by name.
+
+    Returns:
+        Normalized target path → writer thread names, in input order.
+    """
+    producers: dict[str, list[str]] = {}
+    for name, thread in threads.items():
+        target = _extract_target_path(thread)
+        if target is not None:
+            producers.setdefault(target, []).append(name)
+    return producers
+
+
+def find_in_run_producers(
+    path: str, producers: Mapping[str, list[str]], *, reader: str
+) -> list[str]:
+    """Return the other threads in the run that write ``path``.
+
+    The path is normalized the way plan matches sources to targets. A
+    thread is never its own producer: a thread reading its own target
+    reads what an earlier run wrote.
+
+    Args:
+        path: Source location as declared or resolved (alias, path, or abfss://).
+        producers: Output of :func:`build_producer_map` for the run.
+        reader: Name of the thread reading ``path``.
+
+    Returns:
+        Writer thread names other than ``reader``; empty when none.
+    """
+    return [name for name in producers.get(_normalize_path(path), []) if name != reader]
 
 
 def _build_explicit_index(

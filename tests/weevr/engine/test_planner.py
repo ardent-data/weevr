@@ -6,7 +6,13 @@ from dicts using model_validate with controlled source and target paths.
 
 import pytest
 
-from weevr.engine.planner import ExecutionPlan, build_plan, resolve_lookup_names
+from weevr.engine.planner import (
+    ExecutionPlan,
+    build_plan,
+    build_producer_map,
+    find_in_run_producers,
+    resolve_lookup_names,
+)
 from weevr.errors.exceptions import ConfigError
 from weevr.model.lookup import Lookup
 from weevr.model.source import Source
@@ -1080,3 +1086,59 @@ class TestConnectionFormIdentity:
         threads = {"producer": self._producer(), "consumer": consumer}
         plan = build_plan("w", threads, _entries("producer", "consumer"))
         assert "producer" in plan.dependencies["consumer"]
+
+
+class TestInRunProducers:
+    """Run-wide producer map shared by validate and preview."""
+
+    _CONN = TestConnectionFormIdentity._CONN
+
+    def test_maps_target_paths_to_writers(self):
+        threads = {
+            "silver": _make_thread("silver", ["raw.orders"], target_alias="lake.silver_orders/"),
+            "fact": _make_thread("fact", ["lake.silver_orders"], target_alias="lake.fact"),
+        }
+        assert build_producer_map(threads) == {
+            "lake.silver_orders": ["silver"],
+            "lake.fact": ["fact"],
+        }
+
+    def test_trailing_slash_on_source_still_matches(self):
+        threads = {"silver": _make_thread("silver", ["raw"])}
+        producers = build_producer_map(threads)
+        assert find_in_run_producers("test.silver/", producers, reader="fact") == ["silver"]
+
+    def test_reader_is_never_its_own_producer(self):
+        threads = {"merge": _make_thread("merge", ["lake.dim"], target_alias="lake.dim")}
+        producers = build_producer_map(threads)
+        assert find_in_run_producers("lake.dim", producers, reader="merge") == []
+
+    def test_unknown_path_has_no_producers(self):
+        producers = build_producer_map({"a": _make_thread("a", ["x"], target_alias="lake.a")})
+        assert find_in_run_producers("lake.other", producers, reader="b") == []
+
+    def test_connection_form_writer_is_found_by_its_abfss_path(self):
+        writer = Thread.model_validate(
+            {
+                "name": "writer",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
+                "target": {"connection": "lake", "table": "shared_dim"},
+                "connections": self._CONN,
+            }
+        )
+        producers = build_producer_map({"writer": writer})
+        (path,) = producers
+        assert path.startswith("abfss://")
+        assert find_in_run_producers(path, producers, reader="consumer") == ["writer"]
+
+    def test_unresolvable_target_is_skipped(self):
+        thread = Thread.model_validate(
+            {
+                "name": "broken",
+                "config_version": "1.0",
+                "sources": {"main": {"type": "delta", "alias": "raw"}},
+                "target": {"connection": "nope", "table": "t"},
+            }
+        )
+        assert build_producer_map({"broken": thread}) == {}

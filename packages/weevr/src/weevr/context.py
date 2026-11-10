@@ -16,7 +16,7 @@ from weevr.config.onelake import resolve_connection_path
 from weevr.delta import probe_delta_table_exists
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
-from weevr.engine.planner import build_plan
+from weevr.engine.planner import build_plan, build_producer_map, find_in_run_producers
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
@@ -24,9 +24,11 @@ from weevr.errors import (
     DataValidationError,
     ExecutionError,
 )
+from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
+from weevr.model.source import Source
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
 from weevr.result import ExecutionMode, LoadedConfig, PreviewThreadMetadata, RunResult
@@ -554,29 +556,25 @@ class Context:
         """
         errors: list[str] = []
         checked: set[str] = set()
+        # Sources another thread in this run writes are created by the run
+        # itself, in dependency order — they need not exist yet.
+        producers = build_producer_map(threads)
 
         for thread_name, thread in threads.items():
             for source_name, source in thread.sources.items():
                 if source.lookup is not None:
                     continue
-                if source.connection:
-                    source_type = "delta"
-                    try:
-                        resolve_path = resolve_connection_path(
-                            source.connection,
-                            source.table,
-                            source.schema_override,
-                            thread.connections,
-                        )
-                    except ValueError as exc:
-                        errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
-                        continue
-                elif source.type is None:
+                try:
+                    location = self._source_location(source, thread.connections)
+                except ValueError as exc:
+                    errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
                     continue
-                else:
-                    source_type = source.type
-                    resolve_path = source.alias if source.type == "delta" else source.path
-                if resolve_path is None or resolve_path in checked:
+                if location is None:
+                    continue
+                source_type, resolve_path = location
+                if find_in_run_producers(resolve_path, producers, reader=thread_name):
+                    continue
+                if resolve_path in checked:
                     continue
                 checked.add(resolve_path)
 
@@ -595,6 +593,31 @@ class Context:
                         f"not found: {resolve_path}"
                     )
         return errors
+
+    @staticmethod
+    def _source_location(
+        source: Source, connections: dict[str, OneLakeConnection] | None
+    ) -> tuple[str, str] | None:
+        """Return a source's ``(type, location)`` for an existence probe.
+
+        Connection-form sources are Delta tables at their resolved abfss://
+        path; Delta sources use their alias, file sources their path.
+
+        Returns:
+            ``None`` when the source declares no probeable location.
+
+        Raises:
+            ValueError: If a connection-form source can't be resolved.
+        """
+        if source.connection:
+            path = resolve_connection_path(
+                source.connection, source.table, source.schema_override, connections
+            )
+            return "delta", path
+        if source.type is None:
+            return None
+        path = source.alias if source.type == "delta" else source.path
+        return (source.type, path) if path is not None else None
 
     def _source_location_exists(self, source_type: str, resolve_path: str) -> bool:
         """Job-free existence probe for a single source location.

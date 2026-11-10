@@ -1793,6 +1793,97 @@ class TestValidateModeSourceProbes:
         assert ctx._check_source_existence(threads) == []
 
 
+def _in_run_weave(project: Path, src: str, lake: Path, weave: str = "orders") -> Path:
+    """Weave where fact_orders reads the table silver_orders writes (not yet created)."""
+    _create_thread_yaml(project, "silver_orders", src, str(lake / "silver_orders"))
+    _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "fact"))
+    return _create_weave_yaml(project, weave, ["silver_orders", "fact_orders"])
+
+
+@pytest.mark.spark
+class TestValidateInRunSources:
+    """Sources another thread in the run writes are not required to exist yet."""
+
+    def test_fresh_environment_weave_validates(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
+        result = Context(spark=spark, project=project).run(weave, mode="validate")
+
+        assert result.status == "success", result.validation_errors
+        assert result.validation_errors is None
+
+    def test_missing_external_source_still_fails(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "silver_orders", one_row_src, str(lake / "silver_orders"))
+        _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "f"))
+        _create_thread_yaml(project, "dim_x", str(tmp_path / "no_such_table"), str(lake / "d"))
+        weave = _create_weave_yaml(project, "mixed", ["silver_orders", "fact_orders", "dim_x"])
+        result = Context(spark=spark, project=project).run(weave, mode="validate")
+
+        assert result.status == "failure"
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert "dim_x" in result.validation_errors[0]
+        assert "not found" in result.validation_errors[0]
+
+    def test_loom_reads_earlier_weave_target(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "silver_orders", one_row_src, str(lake / "silver_orders"))
+        _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "f"))
+        _create_weave_yaml(project, "silver", ["silver_orders"])
+        _create_weave_yaml(project, "gold", ["fact_orders"])
+        loom = _create_loom_yaml(project, "nightly", ["silver", "gold"])
+        result = Context(spark=spark, project=project).run(loom, mode="validate")
+
+        assert result.status == "success", result.validation_errors
+
+    def test_connection_form_reader_of_connection_form_writer(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        conns = {"lake": {"type": "onelake", "workspace": "ws", "lakehouse": "lh"}}
+        writer = Thread.model_validate(
+            {
+                "name": "writer",
+                "config_version": "1",
+                "connections": conns,
+                "sources": {"main": {"type": "delta", "alias": one_row_src}},
+                "target": {"connection": "lake", "table": "shared"},
+            }
+        )
+        reader = Thread.model_validate(
+            {
+                "name": "reader",
+                "config_version": "1",
+                "connections": conns,
+                "sources": {"main": {"connection": "lake", "table": "shared"}},
+                "target": {"path": str(tmp_path / "out")},
+            }
+        )
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        assert ctx._check_source_existence({"writer": writer, "reader": reader}) == []
+
+    def test_thread_reading_its_own_target_is_still_probed(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        own = str(tmp_path / "lake" / "self_merge")
+        yaml_path = _create_thread_yaml(tmp_path, "self_merge", own, own)
+        result = Context(spark=spark, project=_project_dir(tmp_path)).run(
+            yaml_path, mode="validate"
+        )
+
+        assert result.status == "failure"
+        assert result.validation_errors is not None
+        assert any("not found" in e for e in result.validation_errors)
+
+
 @pytest.mark.spark
 class TestPreviewRenderPurity:
     """Preview rendering is pure formatting over metadata captured at build."""
