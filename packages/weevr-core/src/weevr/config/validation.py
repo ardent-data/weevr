@@ -345,6 +345,62 @@ def validate_resolve_lookups(
     return diagnostics
 
 
+def validate_rename_column_sets(
+    thread_config: dict[str, Any],
+    *,
+    available_column_sets: set[str],
+    standalone: bool = False,
+) -> list[str]:
+    """Validate that rename steps name column sets the thread can see.
+
+    Covers the main pipeline and every ``with:`` sub-pipeline. A set that
+    is defined but resolves to no mapping at run time (an optional
+    param-sourced set, say) is fine here; only a name no scope defines is
+    reported.
+
+    Args:
+        thread_config: Resolved thread configuration dictionary.
+        available_column_sets: Names defined by the thread and, unless
+            ``standalone``, its weave and loom.
+        standalone: The thread was loaded from its own file, so a weave or
+            loom that defines the set can't be seen. Missing names warn
+            instead of failing, since such a thread is valid in its weave.
+
+    Returns:
+        List of diagnostic messages, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+    """
+    pipelines: list[tuple[str, Any]] = [("", thread_config.get("steps"))]
+    # Resolved dicts carry the block as ``with_`` (the model field); raw YAML as ``with``
+    sub_pipelines = thread_config.get("with_") or thread_config.get("with") or {}
+    if isinstance(sub_pipelines, dict):
+        for sub_name, sub in sub_pipelines.items():
+            if isinstance(sub, dict):
+                pipelines.append((f"with.{sub_name} ", sub.get("steps")))
+
+    diagnostics: list[str] = []
+    available = sorted(available_column_sets) or "(none)"
+    for prefix, steps in pipelines:
+        if not isinstance(steps, list):
+            continue
+        for index, step in enumerate(steps, start=1):
+            rename = step.get("rename") if isinstance(step, dict) else None
+            name = rename.get("column_set") if isinstance(rename, dict) else None
+            if not isinstance(name, str) or name in available_column_sets:
+                continue
+            where = f"{prefix}step {index}"
+            if standalone:
+                diagnostics.append(
+                    f"WARN: rename {where} references column set '{name}', which this "
+                    f"thread doesn't define; it must come from a weave or loom"
+                )
+            else:
+                diagnostics.append(
+                    f"ERROR: rename {where} references undefined column set '{name}'; "
+                    f"available column sets: {available}"
+                )
+    return diagnostics
+
+
 def validate_source_lookups(
     thread_config: dict[str, Any],
     *,

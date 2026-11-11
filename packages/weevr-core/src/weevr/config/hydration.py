@@ -11,6 +11,7 @@ from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.validation import (
     split_diagnostics,
+    validate_rename_column_sets,
     validate_resolve_lookups,
     validate_source_lookups,
 )
@@ -84,6 +85,41 @@ def check_resolve_lookups(
         warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
 
 
+def check_column_set_references(
+    thread_dict: dict[str, Any],
+    visible: set[str],
+    source: ConfigLocation | str,
+    name: str,
+    warnings: list[str] | None,
+    *,
+    standalone: bool = False,
+) -> None:
+    """Check a thread's rename steps against the column sets it can see at run time.
+
+    ``visible`` holds the enclosing weave's and loom's column set names; the
+    thread's own are added here. ``standalone`` marks a thread loaded from
+    its own file, where a set may come from a weave or loom it can't see, so
+    a missing name warns. See
+    :func:`~weevr.config.validation.validate_rename_column_sets`.
+
+    Raises:
+        ConfigError: For a column set no visible scope defines.
+    """
+    available = set(visible) | set(thread_dict.get("column_sets") or {})
+    errors, advisories = split_diagnostics(
+        validate_rename_column_sets(
+            thread_dict, available_column_sets=available, standalone=standalone
+        )
+    )
+    if errors:
+        raise ConfigError(
+            "; ".join(f"thread '{name}': {message}" for message in errors),
+            file_path=str(source),
+        )
+    if warnings is not None:
+        warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
+
+
 def hydrate_model(
     data: dict[str, Any], config_type: str, source: ConfigLocation | str
 ) -> Thread | Weave | Loom:
@@ -118,6 +154,7 @@ def hydrate_threads(
     visible_lookups: set[str] | None = None,
     warnings: list[str] | None = None,
     bind: ThreadBinder | None = None,
+    visible_column_sets: set[str] | None = None,
 ) -> dict[str, Thread]:
     """Hydrate a weave's resolved threads into a name-to-Thread mapping.
 
@@ -134,12 +171,15 @@ def hydrate_threads(
             each thread's resolve steps are checked against them.
         warnings: Collects load warnings from those checks.
         bind: Optional hook called with each hydrated thread and its file.
+        visible_column_sets: Column set names the enclosing weave and loom
+            define; each thread's rename steps are checked against them.
 
     Returns:
         Hydrated threads keyed by effective name (``as`` > name > stem).
 
     Raises:
-        ConfigError: If a resolve step names a lookup no scope defines.
+        ConfigError: If a resolve step names a lookup, or a rename step a
+            column set, that no scope defines.
         ModelValidationError: If a thread fails model validation.
     """
     result: dict[str, Thread] = {}
@@ -171,6 +211,9 @@ def hydrate_threads(
 
         check_resolve_lookups(
             thread_dict, visible_lookups or set(), thread_source, effective_name, warnings
+        )
+        check_column_set_references(
+            thread_dict, visible_column_sets or set(), thread_source, effective_name, warnings
         )
 
         if prepare is not None:
@@ -220,7 +263,8 @@ def hydrate_children(
 
     Raises:
         ConfigError: If two weave entries in a loom resolve to the same name,
-            or a child thread's resolve step names a lookup no scope defines.
+            or a child thread's resolve step names a lookup, or its rename
+            step a column set, that no scope defines.
         ModelValidationError: If any child fails model validation. The error
             names the child's own file, or the enclosing file for inline
             definitions.
@@ -237,6 +281,7 @@ def hydrate_children(
             visible_lookups=set(resolved.get("lookups") or {}),
             warnings=warnings,
             bind=bind,
+            visible_column_sets=set(resolved.get("column_sets") or {}),
         )
 
     elif config_type == "loom":
@@ -275,6 +320,8 @@ def hydrate_children(
                 | set(weave_dict.get("lookups") or {}),
                 warnings=warnings,
                 bind=bind,
+                visible_column_sets=set(resolved.get("column_sets") or {})
+                | set(weave_dict.get("column_sets") or {}),
             )
 
     return weaves, threads
