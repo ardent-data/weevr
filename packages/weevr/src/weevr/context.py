@@ -635,7 +635,9 @@ class Context:
                 continue
             try:
                 exists = self._source_location_exists(source_type, path)
-            except Exception:
+            except Exception as exc:
+                # Unknown: don't skip. The normal read reports the real error.
+                logger.warning("Preview could not check in-run table '%s': %s", path, exc)
                 continue
             if not exists:
                 return path, writers
