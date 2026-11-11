@@ -80,7 +80,7 @@ preview_phase -> preview_stop: {style.stroke-dash: 3; style.stroke: "#6A1B9A"}
 | Mode | What happens | Result contains |
 |------|-------------|-----------------|
 | `execute` | Full execution: read, transform, write (default) | Status, row counts, telemetry |
-| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets), and check that every source exists (a metadata probe — no data is read) | `validation_errors` list |
+| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets), and check that every source exists (a metadata probe — no data is read). Sources another thread in the run writes don't need to exist yet | `validation_errors` list |
 | `plan` | Build the execution plan and return it without running | `execution_plan` list, `summary()` with cache markers, `explain()` for detailed breakdown |
 | `preview` | Run transforms against sampled data, skip writes | `preview_data` DataFrames |
 
@@ -107,6 +107,26 @@ a lookup.
 
 `with:` sub-pipelines run in preview on those sampled rows, so a selective
 sub-pipeline can show few or no rows even when a real run would find matches.
+
+### Sources the run itself writes
+
+A weave or loom often has one thread read the table another thread writes, for
+example a fact thread reading a dimension built earlier in the same run. Validate
+and preview treat these sources differently from the rest:
+
+- **validate** doesn't require them to exist. The run creates them in dependency
+  order, so on a fresh environment they're accepted. Sources are matched to the
+  run's targets the same way `plan` infers dependencies (alias, path, or a
+  connection's table), across every weave in a loom. Every other source is still
+  probed, and so is a thread that reads its own target.
+- **preview** doesn't pass one thread's output to the next. A thread that reads
+  such a table, directly or through a lookup, is skipped while the table doesn't
+  exist yet, with a warning that names the path and the thread that writes it.
+  Skips don't count as failures, so a run whose other threads preview cleanly
+  reports `success`; check `warnings` to see which threads weren't previewed.
+  Once the table exists, for example after a first execute, preview reads it
+  as usual. With a `threads` or `tags` filter, only the selected threads count
+  as writers.
 
 In notebooks, results render automatically as styled HTML when you
 evaluate the result in a cell. Each mode gets a tailored report:
