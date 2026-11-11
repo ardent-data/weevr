@@ -13,6 +13,7 @@ from pyspark.sql import SparkSession
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
+from weevr.config.validation import split_diagnostics, validate_rename_column_sets
 from weevr.delta import probe_delta_table_exists
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
@@ -259,6 +260,7 @@ class Context:
 
         start_ns = time.monotonic_ns()
         loaded = self._load(path)
+        self._check_standalone_column_sets(loaded, path)
 
         # Single application point for the effective YAML log level —
         # before mode dispatch, so all four modes behave identically.
@@ -288,6 +290,31 @@ class Context:
 
         result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
         return result
+
+    def _check_standalone_column_sets(self, loaded: LoadedConfig, path: str | Path) -> None:
+        """Fail a thread run on its own whose rename steps name sets it doesn't define.
+
+        Loading a thread file only warns about such a set, since the thread
+        may be valid inside the weave or loom that defines it. Run on its
+        own, though, the thread sees only its own column sets, and the
+        rename would silently do nothing.
+
+        Raises:
+            ConfigError: If a rename step names a set the thread doesn't define.
+        """
+        model = loaded.model
+        if loaded.config_type != "thread" or not isinstance(model, Thread):
+            return
+        errors, _ = split_diagnostics(
+            validate_rename_column_sets(
+                model.model_dump(), available_column_sets=set(model.column_sets or {})
+            )
+        )
+        if errors:
+            raise ConfigError(
+                "; ".join(f"thread '{loaded.config_name}': {message}" for message in errors),
+                file_path=str(self._resolve_config_path(path)),
+            )
 
     # ------------------------------------------------------------------
     # Execute mode

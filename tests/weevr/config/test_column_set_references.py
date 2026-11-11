@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from pyspark.sql import SparkSession
@@ -115,6 +116,16 @@ class TestColumnSetReferencesOnLoad:
         loaded = load_resolved(project / "fact.thread", project_root=project)
         assert not [w for w in loaded.warnings if "std" in w]
 
+    @pytest.mark.parametrize("entry", ["w.weave", "l.loom"])
+    def test_with_sub_pipeline_undefined_fails_through_a_parent(
+        self, make_project: MakeProject, entry: str
+    ):
+        thread = _thread([], **{"with": {"orders": {"from": "main", "steps": [_rename("nope")]}}})
+        project = make_project(thread)
+        with pytest.raises(ConfigError, match="rename with.orders step 1") as exc:
+            load_resolved(project / entry, project_root=project)
+        assert "undefined column set 'nope'" in str(exc.value)
+
     def test_foreach_expanded_steps_checked(self, make_project: MakeProject):
         foreach = {
             "foreach": {
@@ -126,6 +137,44 @@ class TestColumnSetReferencesOnLoad:
         project = make_project(_thread([foreach]), weave={"column_sets": {"std": _SET}})
         with pytest.raises(ConfigError, match="undefined column set 'nope'"):
             load_resolved(project / "w.weave", project_root=project)
+
+
+class TestStandaloneThreadRun:
+    """A thread run on its own only sees its own sets, so a missing one fails the run."""
+
+    @staticmethod
+    def _ctx(project: Path) -> Context:
+        return Context(spark=MagicMock(spec=SparkSession), project=str(project))
+
+    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    def test_run_fails_before_any_mode_runs(self, make_project: MakeProject, mode: str):
+        # The weave defines the set, but the thread is run on its own
+        project = make_project(_thread([_rename("std")]), weave={"column_sets": {"std": _SET}})
+        with pytest.raises(ConfigError, match="undefined column set 'std'") as exc:
+            self._ctx(project).run("fact.thread", mode=mode)
+        assert exc.value.file_path == str(project / "fact.thread")
+        assert "thread 'fact'" in str(exc.value)
+
+    def test_with_sub_pipeline_checked(self, make_project: MakeProject):
+        thread = _thread([], **{"with": {"orders": {"from": "main", "steps": [_rename("nope")]}}})
+        project = make_project(thread)
+        with pytest.raises(ConfigError, match="rename with.orders step 1"):
+            self._ctx(project).run("fact.thread", mode="validate")
+
+    def test_own_set_runs(self, make_project: MakeProject):
+        project = make_project(_thread([_rename("std")], column_sets={"std": _SET}))
+        result = self._ctx(project).run("fact.thread", mode="plan")
+        assert result.status == "success"
+
+    def test_loading_alone_still_only_warns(self, make_project: MakeProject):
+        project = make_project(_thread([_rename("std")]))
+        loaded = self._ctx(project).load("fact.thread")
+        assert loaded.config_type == "thread"
+
+    def test_weave_run_is_unaffected(self, make_project: MakeProject):
+        project = make_project(_thread([_rename("std")]), weave={"column_sets": {"std": _SET}})
+        result = self._ctx(project).run("w.weave", mode="plan")
+        assert result.status == "success"
 
 
 @pytest.mark.spark
