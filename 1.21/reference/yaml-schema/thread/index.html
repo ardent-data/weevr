@@ -5102,10 +5102,18 @@ static entries in <code>columns</code> override matching column set entries.</p>
 <td><code>string</code></td>
 <td>no</td>
 <td><code>null</code></td>
-<td>Name of a column set defined at weave or loom level</td>
+<td>Name of a column set defined at thread, weave, or loom level</td>
 </tr>
 </tbody>
 </table>
+<p><code>column_set</code> must name a set the thread can see: its own <code>column_sets</code>, or its
+weave's or loom's. A name no level defines fails when a weave or loom loads,
+naming the thread, the step, and the sets that are defined. Loading a thread from
+its own file only warns, since the set may come from the weave or loom that runs
+it; running that thread on its own fails before anything is read, because it then
+sees only its own <code>column_sets</code>. A set that is defined but resolves to no mapping
+at run time, such as an optional param-sourced set, leaves the step to its static
+<code>columns</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Static rename only</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">rename</span><span class="p">:</span>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">columns</span><span class="p">:</span>

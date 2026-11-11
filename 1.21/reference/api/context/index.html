@@ -2188,6 +2188,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#weevr.context.split_diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        split_diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.validate_rename_column_sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_rename_column_sets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#weevr.context.probe_delta_table_exists" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5643,6 +5665,28 @@
     <span class="md-ellipsis">
       
         resolve_connection_path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.split_diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        split_diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weevr.context.validate_rename_column_sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_rename_column_sets
       
     </span>
   </a>
@@ -10391,6 +10435,137 @@ the lookup-and-build sequence.</p>
                 <p>If the connection is undeclared or <code>table</code> is absent.
 Callers wrap this in their own error types with call-site
 context (thread name, source alias).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.split_diagnostics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">split_diagnostics</span><span class="p">(</span><span class="n">diagnostics</span><span class="p">)</span></code>
+
+<a href="#weevr.context.split_diagnostics" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Split validator diagnostics into <code>(errors, warnings)</code>, prefixes removed.</p>
+<p>Validators report <code>"ERROR: …"</code> (fatal) and <code>"WARN: …"</code> (advisory)
+strings; anything else is ignored.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="weevr.context.validate_rename_column_sets" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_rename_column_sets</span><span class="p">(</span><span class="n">thread_config</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">available_column_sets</span><span class="p">,</span> <span class="n">standalone</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+
+<a href="#weevr.context.validate_rename_column_sets" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Validate that rename steps name column sets the thread can see.</p>
+<p>Covers the main pipeline and every <code>with:</code> sub-pipeline. A set that
+is defined but resolves to no mapping at run time (an optional
+param-sourced set, say) is fine here; only a name no scope defines is
+reported.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>thread_config</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resolved thread configuration dictionary.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>available_column_sets</code>
+            </td>
+            <td>
+                  <code><span title="set">set</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Names defined by the thread and, unless
+<code>standalone</code>, its weave and loom.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>standalone</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The thread was loaded from its own file, so a weave or
+loom that defines the set can't be seen. Missing names warn
+instead of failing, since such a thread is valid in its weave.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of diagnostic messages, <code>"ERROR:"</code> or <code>"WARN:"</code> prefixed.</p>
               </div>
             </td>
           </tr>
