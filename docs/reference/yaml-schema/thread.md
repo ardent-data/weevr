@@ -53,8 +53,8 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 |-----|------|----------|---------|-------------|
 | `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. |
 | `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. An undefined name fails the config load; see [Loading without running](../../guides/config-resolution.md#loading-without-running) for a thread loaded on its own. |
-| `alias` | `string` | conditional | `null` | Lakehouse table alias. Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
-| `path` | `string` | conditional | `null` | File path. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
+| `alias` | `string` | conditional | `null` | Delta table to read: a table name such as `schema.table` (read from the metastore) or a table path. A path is used as given, never joined to the project root; see [How relative locations resolve](#how-relative-locations-resolve). Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
+| `path` | `string` | conditional | `null` | File path. A relative path is joined to the project root. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
 | `dedup` | `DedupConfig` | no | `null` | Deduplication applied immediately after reading |
 | `connection` | `string` | conditional | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. Connection sources read Delta tables only: omit `type` or set it to `"delta"`. |
@@ -905,8 +905,8 @@ Defines where the thread writes its output.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `alias` | `string` | cond. | `null` | Lakehouse table alias for Delta targets. Mutually exclusive with `connection`. |
-| `path` | `string` | cond. | `null` | File path for file-based targets. |
+| `alias` | `string` | cond. | `null` | Delta table to write: a table name such as `schema.table` (managed by the metastore) or a table path. Used when both `alias` and `path` are set. Mutually exclusive with `connection`. |
+| `path` | `string` | cond. | `null` | Path of the Delta table to write. Used as given, never joined to the project root; see [How relative locations resolve](#how-relative-locations-resolve). |
 | `connection` | `string` | cond. | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. |
 | `schema` | `string` | no | `null` | Schema override within the connection's lakehouse. Overrides `connection.default_schema`. |
 | `table` | `string` | cond. | `null` | Table name within the connection's lakehouse. Required when `connection` is set. |
@@ -936,6 +936,23 @@ At least one of `alias`, `path`, or `connection` + `table` is required.
     v1, so the same `/lakehouse/...` path can point at different physical
     locations as a source and as a target. Use an `alias`, a connection, or an
     `abfss://` path for targets.
+
+### How relative locations resolve
+
+Sources and targets treat a relative location differently. Source files are part
+of the project; tables live in the lakehouse.
+
+| Where | Relative value resolves against |
+|-------|---------------------------------|
+| Source `path` (csv, json, parquet, excel) | The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a `Files/...` path in that lakehouse. |
+| Delta source `alias`, target `alias` or `path` | Spark's default filesystem, unchanged. In a Fabric notebook that is the attached default lakehouse, so `Tables/stg_customers` is that lakehouse's table. Run locally, it is the process's working directory. |
+
+A value with no `/` and no `://`, such as `staging.stg_customers`, is a table name
+that Spark resolves through the metastore. Absolute paths and URIs such as
+`abfss://...` are used as given, except that a source read from a
+`/lakehouse/default/...` path is translated to its `abfss://` form. To address a
+table in another lakehouse, use a [connection](../../guides/connections.md)
+instead of a path.
 
 ### target.columns (ColumnMapping)
 

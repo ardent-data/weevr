@@ -103,6 +103,13 @@ write:
 This thread reads the CSV, filters to active customers, derives a `full_name`
 column, selects and casts the final columns, then overwrites the Delta target.
 
+!!! note "Where `Tables/stg_customers` lands"
+    The source `path` is relative to the project, but the target path is passed
+    to Spark as written. In a Fabric notebook, `Tables/stg_customers` is a table
+    in the attached default lakehouse. Running locally, it would land under the
+    current working directory, so use an absolute path there. See
+    [How relative locations resolve](../reference/yaml-schema/thread.md#how-relative-locations-resolve).
+
 !!! tip "Step ordering matters"
     Steps execute top-to-bottom. Filter early to reduce the data volume before
     downstream transforms run.
