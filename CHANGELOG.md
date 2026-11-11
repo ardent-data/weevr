@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.21.2](https://github.com/ardent-data/weevr/compare/weevr-v1.21.1...weevr-v1.21.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **config:** reject rename steps that name an undefined column set ([#308](https://github.com/ardent-data/weevr/issues/308)) ([cc01299](https://github.com/ardent-data/weevr/commit/cc012994a3112ede89690ee939f5f64d6692bbc9))
+* **engine:** stop validate and preview failing on in-run sources ([#305](https://github.com/ardent-data/weevr/issues/305)) ([5a130bf](https://github.com/ardent-data/weevr/commit/5a130bf429332ade5b6eee62c3b4ea2010bdbfee))
+* **operations:** apply SCD2 overwrite columns in place across all versions ([#302](https://github.com/ardent-data/weevr/issues/302)) ([cc85565](https://github.com/ardent-data/weevr/commit/cc855655973da472d69511eddc0492f4871bf3e1))
+
 ## [1.21.1](https://github.com/ardent-data/weevr/compare/weevr-v1.21.0...weevr-v1.21.1) (2026-11-09)
 
 
