@@ -3347,7 +3347,11 @@ specific table.</p>
 <p>The <code>schema:</code> field on a source or target always takes precedence over
 <code>default_schema</code> on the connection.</p>
 <h2 id="source-target-and-export-references">Source, target, and export references<a class="headerlink" href="#source-target-and-export-references" title="Permanent link">&para;</a></h2>
-<p>Connections work the same way in sources, the primary target, and exports.</p>
+<p>Connections work the same way in sources, the primary target, and exports. A
+connection always resolves to a full <code>abfss://</code> path, so it doesn't depend on the
+attached lakehouse or the working directory. For how a plain relative <code>path</code> or
+<code>alias</code> resolves instead, see
+<a href="../../reference/yaml-schema/thread/#how-relative-locations-resolve">How relative locations resolve</a>.</p>
 <p><strong>Source:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">sources</span><span class="p">:</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">products</span><span class="p">:</span>

@@ -1367,6 +1367,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#how-relative-locations-resolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How relative locations resolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#targetcolumns-columnmapping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3970,6 +3981,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#how-relative-locations-resolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How relative locations resolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#targetcolumns-columnmapping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4515,14 +4537,14 @@ subsequent steps (e.g. in join, union). The value is a <code>Source</code> objec
 <td><code>string</code></td>
 <td>conditional</td>
 <td><code>null</code></td>
-<td>Lakehouse table alias. Required when <code>type</code> is <code>"delta"</code> without a <code>connection</code>. Mutually exclusive with <code>connection</code>.</td>
+<td>Delta table to read: a table name such as <code>schema.table</code> (read from the metastore) or a table path. A path is used as given, never joined to the project root; see <a href="#how-relative-locations-resolve">How relative locations resolve</a>. Required when <code>type</code> is <code>"delta"</code> without a <code>connection</code>. Mutually exclusive with <code>connection</code>.</td>
 </tr>
 <tr>
 <td><code>path</code></td>
 <td><code>string</code></td>
 <td>conditional</td>
 <td><code>null</code></td>
-<td>File path. Required for file-based types (<code>csv</code>, <code>json</code>, <code>parquet</code>, <code>excel</code>).</td>
+<td>File path. A relative path is joined to the project root. Required for file-based types (<code>csv</code>, <code>json</code>, <code>parquet</code>, <code>excel</code>).</td>
 </tr>
 <tr>
 <td><code>options</code></td>
@@ -6338,14 +6360,14 @@ step model.</p>
 <td><code>string</code></td>
 <td>cond.</td>
 <td><code>null</code></td>
-<td>Lakehouse table alias for Delta targets. Mutually exclusive with <code>connection</code>.</td>
+<td>Delta table to write: a table name such as <code>schema.table</code> (managed by the metastore) or a table path. Used when both <code>alias</code> and <code>path</code> are set. Mutually exclusive with <code>connection</code>.</td>
 </tr>
 <tr>
 <td><code>path</code></td>
 <td><code>string</code></td>
 <td>cond.</td>
 <td><code>null</code></td>
-<td>File path for file-based targets.</td>
+<td>Path of the Delta table to write. Used as given, never joined to the project root; see <a href="#how-relative-locations-resolve">How relative locations resolve</a>.</td>
 </tr>
 <tr>
 <td><code>connection</code></td>
@@ -6498,6 +6520,33 @@ v1, so the same <code>/lakehouse/...</code> path can point at different physical
 locations as a source and as a target. Use an <code>alias</code>, a connection, or an
 <code>abfss://</code> path for targets.</p>
 </div>
+<h3 id="how-relative-locations-resolve">How relative locations resolve<a class="headerlink" href="#how-relative-locations-resolve" title="Permanent link">&para;</a></h3>
+<p>Sources and targets treat a relative location differently. Source files are part
+of the project; tables live in the lakehouse.</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Relative value resolves against</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source <code>path</code> (csv, json, parquet, excel)</td>
+<td>The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a <code>Files/...</code> path in that lakehouse.</td>
+</tr>
+<tr>
+<td>Delta source <code>alias</code>, target <code>alias</code> or <code>path</code></td>
+<td>Spark's default filesystem, unchanged. In a Fabric notebook that is the attached default lakehouse, so <code>Tables/stg_customers</code> is that lakehouse's table. Run locally, it is the process's working directory.</td>
+</tr>
+</tbody>
+</table>
+<p>A value with no <code>/</code> and no <code>://</code>, such as <code>staging.stg_customers</code>, is a table name
+that Spark resolves through the metastore. Absolute paths and URIs such as
+<code>abfss://...</code> are used as given, except that a source read from a
+<code>/lakehouse/default/...</code> path is translated to its <code>abfss://</code> form. To address a
+table in another lakehouse, use a <a href="../../../guides/connections/">connection</a>
+instead of a path.</p>
 <h3 id="targetcolumns-columnmapping">target.columns (ColumnMapping)<a class="headerlink" href="#targetcolumns-columnmapping" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
