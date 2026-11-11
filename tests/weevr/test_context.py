@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -1455,8 +1456,6 @@ class TestStandaloneTraceGating:
 
 class TestExecutionScopeWarnings:
     def _run_validate(self, project: Path, path: str, caplog) -> list[str]:
-        import logging
-
         mock_spark = MagicMock(spec=SparkSession)
         ctx = Context(spark=mock_spark, project=str(project))
         with caplog.at_level(logging.WARNING, logger="weevr.context"):
@@ -1494,8 +1493,6 @@ class TestExecutionScopeWarnings:
         assert warnings == []
 
     def test_execute_mode_also_warns(self, tmp_path: Path, caplog) -> None:
-        import logging
-
         project = _stub_execution_project(
             tmp_path, loom_extra="defaults:\n  execution:\n    trace: false\n"
         )
@@ -1791,6 +1788,303 @@ class TestValidateModeSourceProbes:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         threads = {"c": self._thread_with_source("csv", str(empty_dir), tgt)}
         assert ctx._check_source_existence(threads) == []
+
+
+def _in_run_weave(project: Path, src: str, lake: Path, weave: str = "orders") -> Path:
+    """Weave where fact_orders reads the table silver_orders writes (not yet created)."""
+    _create_thread_yaml(project, "silver_orders", src, str(lake / "silver_orders"))
+    _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "fact"))
+    return _create_weave_yaml(project, weave, ["silver_orders", "fact_orders"])
+
+
+@pytest.mark.spark
+class TestValidateInRunSources:
+    """Sources another thread in the run writes are not required to exist yet."""
+
+    def test_fresh_environment_weave_validates(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
+        result = Context(spark=spark, project=project).run(weave, mode="validate")
+
+        assert result.status == "success", result.validation_errors
+        assert result.validation_errors is None
+
+    def test_missing_external_source_still_fails(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "silver_orders", one_row_src, str(lake / "silver_orders"))
+        _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "f"))
+        _create_thread_yaml(project, "dim_x", str(tmp_path / "no_such_table"), str(lake / "d"))
+        weave = _create_weave_yaml(project, "mixed", ["silver_orders", "fact_orders", "dim_x"])
+        result = Context(spark=spark, project=project).run(weave, mode="validate")
+
+        assert result.status == "failure"
+        assert result.validation_errors is not None
+        assert len(result.validation_errors) == 1
+        assert "dim_x" in result.validation_errors[0]
+        assert "not found" in result.validation_errors[0]
+
+    def test_loom_reads_earlier_weave_target(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "silver_orders", one_row_src, str(lake / "silver_orders"))
+        _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "f"))
+        _create_weave_yaml(project, "silver", ["silver_orders"])
+        _create_weave_yaml(project, "gold", ["fact_orders"])
+        loom = _create_loom_yaml(project, "nightly", ["silver", "gold"])
+        result = Context(spark=spark, project=project).run(loom, mode="validate")
+
+        assert result.status == "success", result.validation_errors
+
+    def test_connection_form_reader_of_connection_form_writer(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        conns = {"lake": {"type": "onelake", "workspace": "ws", "lakehouse": "lh"}}
+        writer = Thread.model_validate(
+            {
+                "name": "writer",
+                "config_version": "1",
+                "connections": conns,
+                "sources": {"main": {"type": "delta", "alias": one_row_src}},
+                "target": {"connection": "lake", "table": "shared"},
+            }
+        )
+        reader = Thread.model_validate(
+            {
+                "name": "reader",
+                "config_version": "1",
+                "connections": conns,
+                "sources": {"main": {"connection": "lake", "table": "shared"}},
+                "target": {"path": str(tmp_path / "out")},
+            }
+        )
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        assert ctx._check_source_existence({"writer": writer, "reader": reader}) == []
+
+    def test_thread_reading_its_own_target_is_still_probed(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        own = str(tmp_path / "lake" / "self_merge")
+        yaml_path = _create_thread_yaml(tmp_path, "self_merge", own, own)
+        result = Context(spark=spark, project=_project_dir(tmp_path)).run(
+            yaml_path, mode="validate"
+        )
+
+        assert result.status == "failure"
+        assert result.validation_errors is not None
+        assert any("not found" in e for e in result.validation_errors)
+
+
+@pytest.mark.spark
+class TestPreviewInRunSources:
+    """Threads waiting on a table the run hasn't written yet are skipped, not failed."""
+
+    def test_fresh_environment_skips_downstream_thread(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        weave = _in_run_weave(project, one_row_src, lake)
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"silver_orders"}
+        skips = [w for w in result.warnings if "fact_orders" in w]
+        assert len(skips) == 1
+        assert str(lake / "silver_orders") in skips[0]
+        assert "silver_orders" in skips[0].replace(str(lake / "silver_orders"), "")
+        assert "skipped" in skips[0]
+
+    def test_lookup_sourced_from_in_run_target_skips(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "dim_customer", one_row_src, str(lake / "dim_customer"))
+        (project / "threads" / "fact_sales.thread").write_text(
+            f"""\
+config_version: "1.0"
+lookups:
+  customers:
+    source:
+      type: delta
+      alias: "{lake / "dim_customer"}"
+sources:
+  main:
+    type: delta
+    alias: "{one_row_src}"
+  dim:
+    lookup: customers
+target:
+  path: "{lake / "fact_sales"}"
+write:
+  mode: overwrite
+"""
+        )
+        weave = _create_weave_yaml(project, "sales", ["dim_customer", "fact_sales"])
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"dim_customer"}
+        assert any("fact_sales" in w and "dim_customer" in w for w in result.warnings)
+
+    def test_resolve_step_lookup_from_in_run_target_skips(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "dim_customer", one_row_src, str(lake / "dim_customer"))
+        (project / "threads" / "fact_sales.thread").write_text(
+            f"""\
+config_version: "1.0"
+lookups:
+  customers:
+    source:
+      type: delta
+      alias: "{lake / "dim_customer"}"
+sources:
+  main:
+    type: delta
+    alias: "{one_row_src}"
+steps:
+  - resolve:
+      name: customer_sk
+      lookup: customers
+      match: id
+      pk: id
+target:
+  path: "{lake / "fact_sales"}"
+write:
+  mode: overwrite
+"""
+        )
+        weave = _create_weave_yaml(project, "sales", ["dim_customer", "fact_sales"])
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"dim_customer"}
+        assert any("fact_sales" in w and "dim_customer" in w for w in result.warnings)
+
+    def test_mutual_in_run_readers_all_skipped(self, spark: SparkSession, tmp_path: Path) -> None:
+        # A cycle (validate and plan reject it) skips every thread: nothing
+        # failed, nothing previewed, one warning per thread
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "a", str(lake / "b_out"), str(lake / "a_out"))
+        _create_thread_yaml(project, "b", str(lake / "a_out"), str(lake / "b_out"))
+        weave = _create_weave_yaml(project, "loop", ["a", "b"])
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success"
+        assert result.preview_data is None
+        skips = [w for w in result.warnings if "skipped" in w]
+        assert len(skips) == 2
+        assert any("'a'" in w for w in skips)
+        assert any("'b'" in w for w in skips)
+
+    def test_failed_probe_is_logged_and_read_normally(
+        self,
+        spark: SparkSession,
+        tmp_path: Path,
+        one_row_src: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        weave = _in_run_weave(project, one_row_src, lake)
+        ctx = Context(spark=spark, project=project)
+        with (
+            patch.object(ctx, "_source_location_exists", side_effect=RuntimeError("no access")),
+            caplog.at_level(logging.WARNING, logger="weevr.context"),
+        ):
+            result = ctx.run(weave, mode="preview")
+
+        assert any(
+            str(lake / "silver_orders") in r.getMessage() and "no access" in r.getMessage()
+            for r in caplog.records
+        )
+        # Not skipped: the normal read runs and reports the missing table
+        assert result.status == "partial"
+        assert any("Preview failed for thread 'fact_orders'" in w for w in result.warnings)
+
+    def test_existing_in_run_table_is_read(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        spark.createDataFrame([{"id": 7}]).write.format("delta").save(str(lake / "silver_orders"))
+        weave = _in_run_weave(project, one_row_src, lake)
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "success", result.warnings
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"silver_orders", "fact_orders"}
+        assert not any("skipped" in w for w in result.warnings)
+
+    def test_filter_excluding_producer_reports_missing_table(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
+        result = Context(spark=spark, project=project).run(
+            weave, mode="preview", threads=["fact_orders"]
+        )
+
+        assert result.status == "failure"
+        assert any("Preview failed for thread 'fact_orders'" in w for w in result.warnings)
+
+    def test_tags_filter_excluding_producer_reports_missing_table(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
+        fact = project / "threads" / "fact_orders.thread"
+        fact.write_text(fact.read_text() + "tags:\n  - fact\n")
+        result = Context(spark=spark, project=project).run(weave, mode="preview", tags=["fact"])
+
+        assert result.preview_data is None
+        assert result.status == "failure"
+        assert any("Preview failed for thread 'fact_orders'" in w for w in result.warnings)
+
+    def test_genuine_failure_elsewhere_is_still_partial(
+        self, spark: SparkSession, tmp_path: Path, one_row_src: str
+    ) -> None:
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        _create_thread_yaml(project, "silver_orders", one_row_src, str(lake / "silver_orders"))
+        _create_thread_yaml(project, "fact_orders", str(lake / "silver_orders"), str(lake / "f"))
+        _create_thread_yaml(project, "broken", str(tmp_path / "no_such_table"), str(lake / "b"))
+        weave = _create_weave_yaml(project, "mixed", ["silver_orders", "fact_orders", "broken"])
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "partial"
+        assert result.preview_data is not None
+        assert set(result.preview_data) == {"silver_orders"}
+        assert any("Preview failed for thread 'broken'" in w for w in result.warnings)
+        assert any("fact_orders" in w and "skipped" in w for w in result.warnings)
+
+    def test_failed_producer_and_skipped_reader_is_failure(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        # Every thread is either skipped or failed: nothing previewed
+        project = _project_dir(tmp_path)
+        lake = tmp_path / "lake"
+        weave = _in_run_weave(project, str(tmp_path / "no_such_table"), lake)
+        result = Context(spark=spark, project=project).run(weave, mode="preview")
+
+        assert result.status == "failure"
+        assert result.preview_data is None
+        assert any("Preview failed for thread 'silver_orders'" in w for w in result.warnings)
+        assert any("fact_orders" in w and "skipped" in w for w in result.warnings)
 
 
 @pytest.mark.spark

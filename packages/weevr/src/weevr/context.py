@@ -16,7 +16,12 @@ from weevr.config.onelake import resolve_connection_path
 from weevr.delta import probe_delta_table_exists
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
-from weevr.engine.planner import build_plan
+from weevr.engine.planner import (
+    build_plan,
+    build_producer_map,
+    find_in_run_producers,
+    resolve_lookup_names,
+)
 from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
@@ -24,9 +29,11 @@ from weevr.errors import (
     DataValidationError,
     ExecutionError,
 )
+from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
+from weevr.model.source import Source
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
 from weevr.result import ExecutionMode, LoadedConfig, PreviewThreadMetadata, RunResult
@@ -554,29 +561,25 @@ class Context:
         """
         errors: list[str] = []
         checked: set[str] = set()
+        # Sources another thread in this run writes are created by the run
+        # itself, in dependency order — they need not exist yet.
+        producers = build_producer_map(threads)
 
         for thread_name, thread in threads.items():
             for source_name, source in thread.sources.items():
                 if source.lookup is not None:
                     continue
-                if source.connection:
-                    source_type = "delta"
-                    try:
-                        resolve_path = resolve_connection_path(
-                            source.connection,
-                            source.table,
-                            source.schema_override,
-                            thread.connections,
-                        )
-                    except ValueError as exc:
-                        errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
-                        continue
-                elif source.type is None:
+                try:
+                    location = self._source_location(source, thread.connections)
+                except ValueError as exc:
+                    errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
                     continue
-                else:
-                    source_type = source.type
-                    resolve_path = source.alias if source.type == "delta" else source.path
-                if resolve_path is None or resolve_path in checked:
+                if location is None:
+                    continue
+                source_type, resolve_path = location
+                if find_in_run_producers(resolve_path, producers, reader=thread_name):
+                    continue
+                if resolve_path in checked:
                     continue
                 checked.add(resolve_path)
 
@@ -595,6 +598,75 @@ class Context:
                         f"not found: {resolve_path}"
                     )
         return errors
+
+    def _awaited_in_run_table(
+        self,
+        thread_name: str,
+        thread: Thread,
+        lookups: dict[str, Lookup],
+        producers: dict[str, list[str]],
+    ) -> tuple[str, list[str]] | None:
+        """Find a table the thread reads that another thread in the run writes but hasn't yet.
+
+        Checks the thread's own sources and the sources of the lookups it
+        uses (lookup-bound sources and ``resolve`` steps). A location that
+        can't be resolved or probed is left to the normal read, which
+        reports the real error.
+
+        Returns:
+            ``(location, writer threads)`` for the first such table, else ``None``.
+        """
+        bound = {alias for alias, src in thread.sources.items() if src.lookup is not None}
+        names = {src.lookup for src in thread.sources.values() if src.lookup is not None}
+        names |= resolve_lookup_names(thread) - bound
+        candidates = [src for src in thread.sources.values() if src.lookup is None]
+        candidates += [lookups[name].source for name in sorted(names) if name in lookups]
+
+        for source in candidates:
+            try:
+                location = self._source_location(source, thread.connections)
+            except ValueError:
+                continue
+            if location is None:
+                continue
+            source_type, path = location
+            writers = find_in_run_producers(path, producers, reader=thread_name)
+            if not writers:
+                continue
+            try:
+                exists = self._source_location_exists(source_type, path)
+            except Exception as exc:
+                # Unknown: don't skip. The normal read reports the real error.
+                logger.warning("Preview could not check in-run table '%s': %s", path, exc)
+                continue
+            if not exists:
+                return path, writers
+        return None
+
+    @staticmethod
+    def _source_location(
+        source: Source, connections: dict[str, OneLakeConnection] | None
+    ) -> tuple[str, str] | None:
+        """Return a source's ``(type, location)`` for an existence probe.
+
+        Connection-form sources are Delta tables at their resolved abfss://
+        path; Delta sources use their alias, file sources their path.
+
+        Returns:
+            ``None`` when the source declares no probeable location.
+
+        Raises:
+            ValueError: If a connection-form source can't be resolved.
+        """
+        if source.connection:
+            path = resolve_connection_path(
+                source.connection, source.table, source.schema_override, connections
+            )
+            return "delta", path
+        if source.type is None:
+            return None
+        path = source.alias if source.type == "delta" else source.path
+        return (source.type, path) if path is not None else None
 
     def _source_location_exists(self, source_type: str, resolve_path: str) -> bool:
         """Job-free existence probe for a single source location.
@@ -769,6 +841,8 @@ class Context:
             all_threads, tags=tags, thread_names=thread_names
         )
         inherited_lookups = self._inherited_lookups(loaded)
+        # Only the selected threads run, so only they produce tables here.
+        producers = build_producer_map(all_threads)
 
         preview_data: dict[str, Any] = {}
         preview_metadata: dict[str, PreviewThreadMetadata] = {}
@@ -785,6 +859,20 @@ class Context:
                     "weave",
                     "thread",
                 )
+                # Preview doesn't feed one thread's output into the next, so a
+                # thread reading a table this run hasn't written yet has
+                # nothing to read: report it as skipped, not as a failure.
+                waiting = self._awaited_in_run_table(
+                    thread_name, thread, visible_lookups or {}, producers
+                )
+                if waiting is not None:
+                    path, writers = waiting
+                    produced_by = ", ".join(f"thread '{w}'" for w in writers)
+                    warnings.append(
+                        f"Preview skipped thread '{thread_name}': reads {path}, produced by "
+                        f"{produced_by} in this run; not materialized yet"
+                    )
+                    continue
                 lookup_dfs, resolve_lookups = resolve_lookup_frames(
                     thread,
                     visible_lookups or {},
