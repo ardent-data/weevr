@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0-alpha.2](https://github.com/ardent-data/weevr/compare/weevr-v2.0.0-alpha.1...weevr-v2.0.0-alpha.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **config:** reject rename steps that name an undefined column set ([#309](https://github.com/ardent-data/weevr/issues/309)) ([da24899](https://github.com/ardent-data/weevr/commit/da24899a5e112dc9c4ba4b0411d573f63f3a4ebf))
+* **engine:** mark v2 prereleases as Alpha and break an import cycle ([#297](https://github.com/ardent-data/weevr/issues/297)) ([1f663f3](https://github.com/ardent-data/weevr/commit/1f663f30e63498d5ad937e3fb3fe189b0f5b8c4e))
+* **engine:** measure row_count_delta gates against the pre-run count ([#301](https://github.com/ardent-data/weevr/issues/301)) ([ee61798](https://github.com/ardent-data/weevr/commit/ee6179879076f4b718e1db2985db9df2e68c7bd9))
+* **engine:** stop validate and preview failing on in-run sources ([#307](https://github.com/ardent-data/weevr/issues/307)) ([6d41732](https://github.com/ardent-data/weevr/commit/6d41732f549c95cdd135aa8e817c13346a18fe39))
+* **operations:** apply SCD2 overwrite columns in place across all versions ([#304](https://github.com/ardent-data/weevr/issues/304)) ([f4c98cf](https://github.com/ardent-data/weevr/commit/f4c98cfa983e9110bd600219e63dc9a79e7e13c3))
+
 ## [2.0.0-alpha.1](https://github.com/ardent-data/weevr/compare/weevr-v1.21.0...weevr-v2.0.0-alpha.1) (2026-11-09)
 
 
