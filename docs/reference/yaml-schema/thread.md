@@ -347,7 +347,16 @@ static entries in `columns` override matching column set entries.
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `columns` | `dict[string, string]` | no | `{}` | Map of old name to new name |
-| `column_set` | `string` | no | `null` | Name of a column set defined at weave or loom level |
+| `column_set` | `string` | no | `null` | Name of a column set defined at thread, weave, or loom level |
+
+`column_set` must name a set the thread can see: its own `column_sets`, or its
+weave's or loom's. A name no level defines fails when a weave or loom loads,
+naming the thread, the step, and the sets that are defined. Loading a thread from
+its own file only warns, since the set may come from the weave or loom that runs
+it; running that thread on its own fails before anything is read, because it then
+sees only its own `column_sets`. A set that is defined but resolves to no mapping
+at run time, such as an optional param-sourced set, leaves the step to its static
+`columns`.
 
 ```yaml
 # Static rename only
