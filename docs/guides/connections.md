@@ -143,7 +143,11 @@ The `schema:` field on a source or target always takes precedence over
 
 ## Source, target, and export references
 
-Connections work the same way in sources, the primary target, and exports.
+Connections work the same way in sources, the primary target, and exports. A
+connection always resolves to a full `abfss://` path, so it doesn't depend on the
+attached lakehouse or the working directory. For how a plain relative `path` or
+`alias` resolves instead, see
+[How relative locations resolve](../reference/yaml-schema/thread.md#how-relative-locations-resolve).
 
 **Source:**
 
