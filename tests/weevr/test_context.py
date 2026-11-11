@@ -1456,8 +1456,6 @@ class TestStandaloneTraceGating:
 
 class TestExecutionScopeWarnings:
     def _run_validate(self, project: Path, path: str, caplog) -> list[str]:
-        import logging
-
         mock_spark = MagicMock(spec=SparkSession)
         ctx = Context(spark=mock_spark, project=str(project))
         with caplog.at_level(logging.WARNING, logger="weevr.context"):
@@ -1495,8 +1493,6 @@ class TestExecutionScopeWarnings:
         assert warnings == []
 
     def test_execute_mode_also_warns(self, tmp_path: Path, caplog) -> None:
-        import logging
-
         project = _stub_execution_project(
             tmp_path, loom_extra="defaults:\n  execution:\n    trace: false\n"
         )
