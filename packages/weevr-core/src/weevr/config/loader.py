@@ -15,7 +15,12 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
-from weevr.config.hydration import check_resolve_lookups, hydrate_children, hydrate_model
+from weevr.config.hydration import (
+    check_column_set_references,
+    check_resolve_lookups,
+    hydrate_children,
+    hydrate_model,
+)
 from weevr.config.inheritance import apply_inheritance
 from weevr.config.locations import (
     ConfigLocation,
@@ -241,6 +246,14 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
     if resolved.config_type == "thread":
         # A standalone thread sees only its own lookups at run time
         check_resolve_lookups(
+            resolved.data,
+            set(),
+            resolved.location,
+            resolved.config_name,
+            lookup_warnings,
+            standalone=True,
+        )
+        check_column_set_references(
             resolved.data,
             set(),
             resolved.location,
