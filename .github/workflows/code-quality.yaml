@@ -87,7 +87,13 @@ jobs:
       - name: Python 3.11 is refused
         run: |
           uv venv -p 3.11 "$RUNNER_TEMP/core311"
-          if uv pip install -p "$RUNNER_TEMP/core311" dist/weevr_core-*.whl; then
+          if uv pip install -p "$RUNNER_TEMP/core311" dist/weevr_core-*.whl 2> install.log; then
             echo "weevr-core installed on Python 3.11; its floor is 3.12" >&2
+            exit 1
+          fi
+          # Only a Requires-Python refusal counts; any other install failure fails the job.
+          if ! grep -q "does not satisfy Python>=3.12" install.log; then
+            echo "Install on Python 3.11 failed for another reason:" >&2
+            cat install.log >&2
             exit 1
           fi

@@ -65,10 +65,11 @@ extraPaths = ["packages/weevr-core/src"]
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"
-extraPaths = ["packages/weevr-core/src", "packages/weevr/src"]
+extraPaths = ["packages/weevr-core/src", "packages/weevr/src", "scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["scripts"]  # test_examples.py shares discovery with validate_examples_core.py
 addopts = "-q -m 'not spark and not install_smoke'"
 markers = [
     "spark: marks tests that require PySpark and Delta Lake (deselected by default)",
