@@ -16,8 +16,8 @@ each mode:
   transitively; if it does, the carve-out is leaking and the
   weevr-cli unblock regresses.
 
-Every mode runs on each supported Fabric runtime's Python: 3.11
-(Runtime 1.3) and 3.13 (Runtime 2.0).
+Every mode runs on the Python of each supported Fabric runtime: 3.13
+(Runtime 2.0).
 
 * ``weevr`` (full) — the existing ``pip install weevr`` UX without
   PySpark in the venv (PySpark is a runtime requirement of the engine
@@ -72,7 +72,6 @@ FULL_INSTALL_LAZY_NAMES = ["Context", "RunResult", "ExecutionMode", "LoadedConfi
 # Python of each supported Fabric runtime, mapped to the PySpark that
 # runtime ships (full-install mode only).
 RUNTIME_PYSPARK = {
-    "3.11": "pyspark>=3.5.5,<3.5.6",  # Runtime 1.3
     "3.13": "pyspark==4.1.1",  # Runtime 2.0
 }
 

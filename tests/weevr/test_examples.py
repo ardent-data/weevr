@@ -9,53 +9,29 @@ rewrite can't silently drop the feature the example exists to show.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
-import yaml
+
+# Discovery, required params and project roots live in the core-only check
+# script (on pytest's pythonpath) so both checks cover the same files.
+from validate_examples_core import (
+    CONFIG_FILES,
+    EXAMPLES_DIR,
+    WARP_FILES,
+    WARP_NAMING_THREADS,
+    check_warp_reference,
+    load_example,
+    rel,
+    validate_warp,
+)
 
 from weevr.config import load_config, load_resolved
-from weevr.config.warp import resolve_warp
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
-from weevr.model.warp import WarpConfig
-
-EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
-FABCON_DIR = EXAMPLES_DIR / "fabcon"
-
-CONFIG_FILES = sorted(
-    p for ext in ("*.thread", "*.weave", "*.loom") for p in EXAMPLES_DIR.rglob(ext)
-)
-WARP_FILES = sorted(EXAMPLES_DIR.rglob("*.warp"))
-
-
-def _names_warp(path: Path) -> bool:
-    target = (yaml.safe_load(path.read_text()) or {}).get("target") or {}
-    return isinstance(target.get("warp"), str)
-
-
-WARP_NAMING_THREADS = [p for p in CONFIG_FILES if p.suffix == ".thread" and _names_warp(p)]
-
-# Required params per example, keyed by path relative to examples/. A required
-# param missing here fails the load instead of silently defaulting.
-REQUIRED_PARAMS: dict[str, dict[str, Any]] = {
-    "sales_lakehouse.loom": {"lakehouse_path": "/lakehouse/default"},
-    "fabcon/daily.loom": {"lakehouse_path": "/lakehouse/default"},
-}
-
-
-def _rel(path: Path) -> str:
-    return path.relative_to(EXAMPLES_DIR).as_posix()
-
-
-def _project_root(path: Path) -> Path:
-    return FABCON_DIR if FABCON_DIR in path.parents else EXAMPLES_DIR
 
 
 def _load(path: Path) -> Thread | Weave | Loom:
-    model = load_config(
-        path, runtime_params=REQUIRED_PARAMS.get(_rel(path)), project_root=_project_root(path)
-    )
+    model = load_example(path)
     assert isinstance(model, Thread | Weave | Loom)
     return model
 
@@ -67,26 +43,22 @@ def test_examples_discovered() -> None:
     assert WARP_NAMING_THREADS, "no example thread names a warp"
 
 
-@pytest.mark.parametrize("path", CONFIG_FILES, ids=_rel)
+@pytest.mark.parametrize("path", CONFIG_FILES, ids=rel)
 def test_example_loads(path: Path) -> None:
     """Every example config loads through the real loader."""
     _load(path)
 
 
-@pytest.mark.parametrize("path", WARP_FILES, ids=_rel)
+@pytest.mark.parametrize("path", WARP_FILES, ids=rel)
 def test_warp_validates(path: Path) -> None:
     """Every example warp validates as a WarpConfig."""
-    WarpConfig.model_validate(yaml.safe_load(path.read_text()))
+    validate_warp(path)
 
 
-@pytest.mark.parametrize("path", WARP_NAMING_THREADS, ids=_rel)
+@pytest.mark.parametrize("path", WARP_NAMING_THREADS, ids=rel)
 def test_named_warp_reference_resolves(path: Path) -> None:
     """A thread that names its warp can find it from the project root."""
-    thread = _load(path)
-    assert isinstance(thread, Thread)
-    warp = thread.target.warp
-    assert isinstance(warp, str)
-    assert resolve_warp(warp, path.parent, _project_root(path)) is not None
+    check_warp_reference(path)
 
 
 class TestExampleStories:

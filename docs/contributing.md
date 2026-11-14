@@ -6,10 +6,8 @@ environment setup to submitting a pull request. It extends the root
 
 ## Prerequisites
 
-- **Python 3.11** -- the default development environment matches Fabric
-  Runtime 1.3, which ships Python 3.11. The version is pinned via
-  `.python-version`. Python 3.13 is needed only for the
-  [Runtime 2.0 stack](#runtime-20-stack).
+- **Python 3.13** -- the development environment matches Fabric Runtime
+  2.0, which ships Python 3.13. The version is pinned via `.python-version`.
 - **uv** -- Used for dependency management, virtual environment creation,
   and running all project commands.
 - **Git** -- Configured with your name and email for commit sign-off.
@@ -21,7 +19,7 @@ Clone the repository and install all development dependencies:
 ```bash
 git clone https://github.com/ardent-data/weevr.git
 cd weevr
-uv python install 3.11
+uv python install 3.13
 uv sync --dev
 ```
 
@@ -38,7 +36,7 @@ The repository's devcontainer provides the toolchain, plus the Fabric tools
 rather than a one-shot command. The token cache stays inside the container, so
 repeat the login after a rebuild.
 
-The devcontainer sets `PYSPARK_PYTHON` to its Python 3.11 virtual environment.
+The devcontainer sets `PYSPARK_PYTHON` to its Python 3.13 virtual environment.
 The test suite replaces it with the interpreter running pytest. A script that
 starts Spark from another environment must set it to that environment's
 Python, or Spark workers start on the wrong interpreter.
@@ -71,8 +69,9 @@ line limit. Run `uv run ruff format .` before committing to apply it.
 uv run pyright
 ```
 
-Pyright runs in standard mode against Python 3.11. All public functions
-must have type annotations.
+Pyright runs in standard mode. It checks `weevr-core` against Python 3.12,
+its lowest supported version, and the engine and tests against 3.13. All
+public functions must have type annotations.
 
 ### Tests
 
@@ -119,25 +118,21 @@ For verbose output and coverage:
 uv run pytest -v --cov
 ```
 
-### Runtime 2.0 stack
+### Spark stack
 
-The default environment matches Fabric Runtime 1.3: Python 3.11, PySpark
-3.5.5 and Delta 3.2. A second locked stack matches Runtime 2.0: Python 3.13,
-PySpark 4.1.1 and Delta 4.2.0, declared as the engine package's `rt2`
-dependency group. CI runs the default suite and the Spark suite on both
-stacks.
+The development environment matches Fabric Runtime 2.0: Python 3.13, PySpark
+4.1.1 and Delta 4.2.0. CI runs the default suite and the Spark suite on that
+stack, and installs the `weevr-core` wheel alone on Python 3.12 to validate the
+examples. Runtime 1.3 is tested on the `1.x` branch.
 
-Build the Runtime 2.0 stack in its own environment, so it doesn't replace the
-default one:
+Spark tests are excluded from the default run:
 
 ```bash
-UV_PROJECT_ENVIRONMENT=.venv-rt2 uv sync --no-dev --group rt2 --python 3.13
-UV_PROJECT_ENVIRONMENT=.venv-rt2 uv run --no-sync pytest -m spark -n 2
+uv run pytest -m spark -n 2
 ```
 
-`--no-sync` stops `uv run` from syncing the default `dev` group back into that
-environment. The first Spark run downloads the Delta 4.2 JARs; run it with
-`-n 1` once so parallel workers don't race the download.
+The first Spark run downloads the Delta 4.2 JARs; run it with `-n 1` once so
+parallel workers don't race the download.
 
 ## Branching model
 

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:3.11
+FROM mcr.microsoft.com/devcontainers/python:3.13
 
 # Rootless podman runs the build in a user namespace, where apt's privilege-dropped
 # _apt sandbox user can't write temp files to /tmp during signature verification.
