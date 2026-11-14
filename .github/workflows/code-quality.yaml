@@ -57,3 +57,37 @@ jobs:
 
       - name: Tests (fast)
         run: uv run --no-sync pytest -n auto
+
+  # weevr-core's floor (3.12) sits below the workspace's (3.13), so the core
+  # can't be checked through uv sync. Build its wheel, install it alone into
+  # a fresh 3.12 environment (no engine wheel, no PySpark) and validate every
+  # example there. Python 3.11 must be refused at install.
+  core-py312:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version-file: ".tool-versions"
+
+      - name: Build the weevr-core wheel
+        run: uv build --package weevr-core -o dist
+
+      - name: Install it alone on Python 3.12
+        run: |
+          uv venv -p 3.12 "$RUNNER_TEMP/core312"
+          uv pip install -p "$RUNNER_TEMP/core312" dist/weevr_core-*.whl
+
+      - name: Validate every example with the core alone
+        run: '"$RUNNER_TEMP/core312/bin/python" scripts/validate_examples_core.py'
+
+      - name: Python 3.11 is refused
+        run: |
+          uv venv -p 3.11 "$RUNNER_TEMP/core311"
+          if uv pip install -p "$RUNNER_TEMP/core311" dist/weevr_core-*.whl; then
+            echo "weevr-core installed on Python 3.11; its floor is 3.12" >&2
+            exit 1
+          fi
