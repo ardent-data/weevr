@@ -6,20 +6,22 @@ production.
 
 ## Runtime compatibility
 
-weevr 1.21 and later run on **Fabric Runtime 1.3** and **Fabric Runtime 2.0**:
+weevr 2 runs on **Fabric Runtime 2.0**:
 
-| Component  | Runtime 1.3 | Runtime 2.0 |
-|------------|-------------|-------------|
-| Python     | 3.11        | 3.13        |
-| PySpark    | 3.5.x       | 4.1.x       |
-| Delta Lake | 3.2.x       | 4.2.x       |
+| Component  | Runtime 2.0 |
+|------------|-------------|
+| Python     | 3.13        |
+| PySpark    | 4.1.x       |
+| Delta Lake | 4.2.x       |
 
-Both wheels declare `requires-python = ">=3.11,<3.14"`. Every release is tested
-against both stacks: PySpark 3.5 with Delta 3.2, and PySpark 4.1 with Delta 4.2.
-The same configs produce the same tables, keys, and hashes on either runtime.
+The `weevr` wheel declares `requires-python = ">=3.13,<3.14"`. `weevr-core`, the
+Spark-free config model, validation, and planner, declares `">=3.12,<3.14"`, so
+tooling can validate configs outside a Spark session. Every release is tested
+against PySpark 4.1.1 with Delta 4.2.0.
 
-weevr 1.20 and earlier require Python 3.11, so they install only on Runtime
-1.3. To run on Runtime 2.0, upgrade to 1.21 or later.
+Fabric Runtime 1.3 ships Python 3.11, which can't install weevr 2. Items that
+stay on Runtime 1.3 use weevr 1.x; see
+[Compatibility](../reference/compatibility.md#support-window-for-weevr-1x).
 
 ### Notes for Runtime 2.0
 
@@ -316,10 +318,12 @@ a step-by-step walkthrough.
 
 ### No matching distribution found for weevr
 
-The session is on Runtime 2.0 and the requested version is 1.20 or earlier,
-which needs Python 3.11. Check with `spark.version`: `4.1.x` is Runtime 2.0.
-Install weevr 1.21 or later, or move the item to Runtime 1.3 as described under
-[Choosing a runtime](#choosing-a-runtime).
+The session is on Runtime 1.3 and the requested version is weevr 2, which
+needs Python 3.13. Check with `spark.version`: `3.5.x` is Runtime 1.3. Move the
+item to Runtime 2.0 as described under [Choosing a runtime](#choosing-a-runtime),
+or install weevr 1.x there. A plain `%pip install weevr` on Runtime 1.3 installs
+the latest 1.x, because pip skips releases whose Python requirement the session
+doesn't meet.
 
 ### Package not found after install
 

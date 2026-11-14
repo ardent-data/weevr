@@ -1019,8 +1019,9 @@ def _run_transforms(
     if merge_terminal:
         rows_after_transforms = df.count()
     else:
-        rows_after_transforms_obs = Observation()
-        df = df.observe(rows_after_transforms_obs, F.count(F.lit(1)).alias("n"))
+        observation = Observation()
+        df = df.observe(observation, F.count(F.lit(1)).alias("n"))
+        rows_after_transforms_obs = observation
 
     return _Transformed(
         df=df,

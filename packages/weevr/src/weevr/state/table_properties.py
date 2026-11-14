@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal, TypeAlias, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from weevr.delta import delta_table_exists, is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import StateError
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
 
-_WatermarkType: TypeAlias = Literal["timestamp", "date", "int", "long"]
+type _WatermarkType = Literal["timestamp", "date", "int", "long"]
 _PROP_PREFIX = "weevr.watermark"
 
 

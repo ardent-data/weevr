@@ -11,26 +11,11 @@ permissions:
   contents: read
 
 jobs:
-  # The fast suite runs on every Python weevr supports: 3.11 and 3.12 on the
-  # Runtime 1.3 stack (dev group), 3.13 on the Runtime 2.0 stack (rt2 group).
-  # Lint, format, type, schema and docstring checks run once, on 3.11.
+  # Every check runs once, on the Fabric Runtime 2.0 stack (Python 3.13). The
+  # uv workspace locks to 3.13 (the engine's floor); pyright checks weevr-core
+  # at its own 3.12 floor.
   ci:
-    name: ci (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - python: "3.11"
-            groups: "--dev"
-          - python: "3.12"
-            groups: "--dev"
-          - python: "3.13"
-            groups: "--no-dev --group rt2"
-
-    env:
-      UV_PYTHON: ${{ matrix.python }}
 
     steps:
       - uses: actions/checkout@v7
@@ -38,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python }}
+          python-version-file: ".python-version"
 
       # Install uv (current major is v7) and enable uv cache
       - name: Install uv
@@ -51,29 +36,58 @@ jobs:
       # deterministically. --no-sync on every uv run below keeps the
       # environment this step built.
       - name: Sync (locked)
-        run: uv sync --locked ${{ matrix.groups }}
+        run: uv sync --locked --dev
 
       - name: Lint
-        if: matrix.python == '3.11'
         run: uv run --no-sync ruff check .
 
       - name: Format (check)
-        if: matrix.python == '3.11'
         run: uv run --no-sync ruff format --check .
 
       - name: Type check
-        if: matrix.python == '3.11'
         run: uv run --no-sync pyright .
 
       - name: Schema check
-        if: matrix.python == '3.11'
         run: uv run --no-sync python scripts/generate_schema.py --check
 
       - name: Docstring coverage
-        if: matrix.python == '3.11'
         run: >-
           uv run --no-sync interrogate packages/weevr-core/src/weevr/
           packages/weevr/src/weevr/ --fail-under 90
 
       - name: Tests (fast)
         run: uv run --no-sync pytest -n auto
+
+  # weevr-core's floor (3.12) sits below the workspace's (3.13), so the core
+  # can't be checked through uv sync. Build its wheel, install it alone into
+  # a fresh 3.12 environment (no engine wheel, no PySpark) and validate every
+  # example there. Python 3.11 must be refused at install.
+  core-py312:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version-file: ".tool-versions"
+
+      - name: Build the weevr-core wheel
+        run: uv build --package weevr-core -o dist
+
+      - name: Install it alone on Python 3.12
+        run: |
+          uv venv -p 3.12 "$RUNNER_TEMP/core312"
+          uv pip install -p "$RUNNER_TEMP/core312" dist/weevr_core-*.whl
+
+      - name: Validate every example with the core alone
+        run: '"$RUNNER_TEMP/core312/bin/python" scripts/validate_examples_core.py'
+
+      - name: Python 3.11 is refused
+        run: |
+          uv venv -p 3.11 "$RUNNER_TEMP/core311"
+          if uv pip install -p "$RUNNER_TEMP/core311" dist/weevr_core-*.whl; then
+            echo "weevr-core installed on Python 3.11; its floor is 3.12" >&2
+            exit 1
+          fi
