@@ -944,7 +944,7 @@ of the project; tables live in the lakehouse.
 
 | Where | Relative value resolves against |
 |-------|---------------------------------|
-| Source `path` (csv, json, parquet, excel) | The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a `Files/...` path in that lakehouse. |
+| Source `path` (csv, json, parquet, excel), on a thread source or a lookup's source at any level | The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a `Files/...` path in that lakehouse. |
 | Delta source `alias`, target `alias` or `path` | Spark's default filesystem, unchanged. In a Fabric notebook that is the attached default lakehouse, so `Tables/stg_customers` is that lakehouse's table. Run locally, it is the process's working directory. |
 
 A value with no `/` and no `://`, such as `staging.stg_customers`, is a table name
