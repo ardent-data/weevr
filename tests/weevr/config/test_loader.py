@@ -74,6 +74,56 @@ class TestResolveSourcePaths:
         assert thread_dict["sources"]["main"]["path"] == expected
 
 
+class TestResolveLookupSourcePaths:
+    """resolve_source_paths joins relative file paths on lookup sources too."""
+
+    def test_relative_lookup_path_resolved(self, tmp_path: Path) -> None:
+        config: dict = {
+            "lookups": {"regions": {"source": {"type": "csv", "path": "ref/regions.csv"}}}
+        }
+        resolve_source_paths(config, tmp_path)
+        assert config["lookups"]["regions"]["source"]["path"] == str(tmp_path / "ref/regions.csv")
+
+    def test_sources_and_lookups_both_resolved(self, tmp_path: Path) -> None:
+        config: dict = {
+            "sources": {"orders": {"type": "csv", "path": "data/orders.csv"}},
+            "lookups": {"regions": {"source": {"type": "csv", "path": "ref/regions.csv"}}},
+        }
+        resolve_source_paths(config, tmp_path)
+        assert config["sources"]["orders"]["path"] == str(tmp_path / "data/orders.csv")
+        assert config["lookups"]["regions"]["source"]["path"] == str(tmp_path / "ref/regions.csv")
+
+    def test_fabric_mount_prefix_stripped(self) -> None:
+        config: dict = {
+            "lookups": {"regions": {"source": {"type": "csv", "path": "ref/regions.csv"}}}
+        }
+        resolve_source_paths(config, Path("/lakehouse/default/Files/fabcon.weevr"))
+        expected = "Files/fabcon.weevr/ref/regions.csv"
+        assert config["lookups"]["regions"]["source"]["path"] == expected
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            {"type": "csv", "path": "/absolute/ref/regions.csv"},
+            {"type": "csv", "path": "abfss://ws@onelake.dfs.fabric.microsoft.com/lh/Files/r.csv"},
+            {"type": "delta", "connection": "ref_lh", "table": "regions"},
+            {"type": "delta", "alias": "ref.regions"},
+            {"lookup": "base_regions"},
+        ],
+        ids=["absolute", "uri", "connection", "alias", "lookup-ref"],
+    )
+    def test_non_relative_lookup_source_unchanged(self, source: dict) -> None:
+        config: dict = {"lookups": {"regions": {"source": dict(source)}}}
+        resolve_source_paths(config, Path("/project.weevr"))
+        assert config["lookups"]["regions"]["source"] == source
+
+    @pytest.mark.parametrize("lookup", [{}, {"source": None}, {"source": "ref.csv"}, "regions"])
+    def test_malformed_lookup_skipped(self, lookup: object) -> None:
+        config: dict = {"lookups": {"regions": lookup}}
+        resolve_source_paths(config, Path("/project.weevr"))
+        assert config == {"lookups": {"regions": lookup}}
+
+
 FIXTURE_PROJECT = Path(__file__).parent.parent / "fixtures" / "load_parity" / "parity.weevr"
 
 

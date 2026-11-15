@@ -1215,6 +1215,11 @@ _FILE_SOURCE_THREAD = (
     "target:\n  alias: stg.orders\n"
 )
 
+_LOOKUP_THREAD = _FILE_SOURCE_THREAD + (
+    "lookups:\n  regions:\n    source:\n      type: csv\n      path: ref/regions.csv\n"
+    "    materialize: false\n"
+)
+
 
 class TestLoadConfigMatchesContext:
     """load_config behaves like Context.load for typed configs."""
@@ -1236,6 +1241,23 @@ class TestLoadConfigMatchesContext:
         thread = load_config(tmp_path / "t.thread")
         assert isinstance(thread, Thread)
         assert thread.sources["orders"].path == str(tmp_path / "data" / "orders.csv")
+
+    def test_relative_thread_lookup_path_is_absolute(self, tmp_path):
+        """A thread's own lookup resolves a relative file path like its sources."""
+        (tmp_path / "t.thread").write_text(_LOOKUP_THREAD)
+        thread = load_config(tmp_path / "t.thread", project_root=tmp_path)
+        assert isinstance(thread, Thread)
+        assert thread.lookups is not None
+        assert thread.lookups["regions"].source.path == str(tmp_path / "ref" / "regions.csv")
+
+    def test_child_thread_lookup_path_is_absolute(self, tmp_path):
+        """A weave's child thread resolves its own lookup's relative file path."""
+        (tmp_path / "t.thread").write_text(_LOOKUP_THREAD)
+        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: t.thread\n')
+        result = load_resolved(tmp_path / "w.weave", project_root=tmp_path)
+        thread = result.resolved_threads["w"]["t"]
+        assert thread.lookups is not None
+        assert thread.lookups["regions"].source.path == str(tmp_path / "ref" / "regions.csv")
 
     def test_template_thread_hint(self, tmp_path):
         """A standalone thread failing on ${param.x} says it may be a template."""

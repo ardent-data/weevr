@@ -532,17 +532,20 @@ def compute_qualified_key(file_path: ConfigLocation, project_root: ConfigLocatio
 
 
 def resolve_source_paths(
-    thread_dict: dict[str, Any],
+    config_dict: dict[str, Any],
     project_root: ConfigLocation | Path | str,
 ) -> None:
     """Resolve relative source file paths against the project root.
 
-    Modifies the thread config dict in place, prepending the project
-    root to any relative ``path`` values in file-based sources (csv,
-    json, parquet, excel).
+    Modifies the config dict in place, prepending the project root to
+    any relative ``path`` values in file-based sources (csv, json,
+    parquet, excel): the entries under ``sources`` and the ``source`` of
+    each entry under ``lookups``. Absolute paths and URIs are left as
+    they are.
 
     Args:
-        thread_dict: Thread configuration dict (pre-hydration).
+        config_dict: Thread, weave, or loom configuration dict
+            (pre-hydration).
         project_root: Resolved project root. Accepts a
             :class:`ConfigLocation`, :class:`pathlib.Path`, or string
             for backward compatibility with internal callers.
@@ -563,10 +566,19 @@ def resolve_source_paths(
         location = None
         legacy_str_root = project_root
 
-    sources = thread_dict.get("sources")
-    if not sources or not isinstance(sources, dict):
-        return
-    for source_cfg in sources.values():
+    source_cfgs: list[Any] = []
+    sources = config_dict.get("sources")
+    if isinstance(sources, dict):
+        source_cfgs.extend(sources.values())
+    lookups = config_dict.get("lookups")
+    if isinstance(lookups, dict):
+        source_cfgs.extend(
+            lookup_cfg.get("source")
+            for lookup_cfg in lookups.values()
+            if isinstance(lookup_cfg, dict)
+        )
+
+    for source_cfg in source_cfgs:
         if not isinstance(source_cfg, dict):
             continue
         path = source_cfg.get("path")
