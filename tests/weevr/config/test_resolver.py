@@ -801,6 +801,17 @@ class TestReferenceResolution:
         with pytest.raises(ConfigError, match="Unsupported extension"):
             resolve_ref_path("bad.yaml", tmp_path)
 
+    @pytest.mark.parametrize("ref", [5, None, ["a.thread"], {"path": "a.thread"}])
+    def test_resolve_ref_path_rejects_non_string(self, tmp_path, ref):
+        """A ref that isn't a string fails as a reference error naming no file of its own."""
+        from weevr.config.resolver import resolve_ref_path
+        from weevr.errors import ReferenceResolutionError
+
+        with pytest.raises(ReferenceResolutionError, match="must be a path string") as caught:
+            resolve_ref_path(ref, tmp_path)
+        # The enclosing config's file is attached by attribute_errors.
+        assert caught.value.file_path is None
+
     def test_resolve_ref_path_traversal_rejected(self, tmp_path):
         """Raise ReferenceResolutionError when ref escapes the project root."""
         from weevr.config.resolver import resolve_ref_path

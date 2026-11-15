@@ -512,12 +512,20 @@ def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLoc
         Resolved location for the referenced config file.
 
     Raises:
-        ReferenceResolutionError: If the referenced file does not exist or
-            resolves outside the project root.
+        ReferenceResolutionError: If the reference isn't a string, or the
+            referenced file does not exist or resolves outside the project
+            root.
         ConfigError: If the reference does not have a typed extension.
     """
     from weevr.config.locations import LocalConfigLocation
     from weevr.errors import ReferenceResolutionError
+
+    # Child entries reach here as unvalidated dicts, so the YAML may hold
+    # any type. No file is named: the enclosing config's file is attached.
+    if not isinstance(ref, str):
+        raise ReferenceResolutionError(
+            f"Reference must be a path string, got {type(ref).__name__}: {ref!r}"
+        )
 
     if isinstance(project_root, Path):
         project_root = LocalConfigLocation(project_root)
