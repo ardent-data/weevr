@@ -70,9 +70,11 @@ weaves:
 ## lookups
 
 Loom-level lookup definitions shared across all weaves. The structure is
-identical to [weave-level lookups](weave.md#lookups), including how a
-relative file `path` resolves. When a weave defines a lookup with the same
-name, the weave-level definition wins.
+identical to [weave-level lookups](weave.md#lookups). A relative file `path`
+on a lookup's source resolves against the project root; see
+[How relative locations resolve](thread.md#how-relative-locations-resolve).
+When a weave defines a lookup with the same name, the weave-level definition
+wins.
 
 ```yaml
 lookups:
