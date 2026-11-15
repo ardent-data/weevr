@@ -145,9 +145,10 @@ loaded config.
 **Validate name and hydrate model** — The config `name` field is
 validated against the filename stem (mismatch raises `ConfigError`;
 missing name is injected from the stem), and `qualified_key` is set to the
-file's path relative to the project root. For a thread, relative `path`
-values on file sources (CSV, JSON, Parquet, Excel) are resolved against
-the project root. The fully resolved dictionary
+file's path relative to the project root. Relative `path` values on file
+sources (CSV, JSON, Parquet, Excel) are resolved against the project root,
+both a thread's sources and the source of every lookup, whether the thread,
+weave, or loom declares it. The fully resolved dictionary
 is then validated through the typed Pydantic model (`Thread`, `Weave`,
 or `Loom`). Semantic errors at this stage raise `ModelValidationError`.
 For a weave or loom, every child it pulls in, whether referenced or
