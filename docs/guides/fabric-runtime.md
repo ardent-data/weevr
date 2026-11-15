@@ -140,6 +140,7 @@ in thread configuration:
 
 **staging/stg_customers.thread**
 
+<!-- weevr-snippet: {params: {bronze_base: Tables, silver_base: Tables}} -->
 ```yaml
 config_version: "1.0"
 

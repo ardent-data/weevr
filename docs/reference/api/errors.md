@@ -113,6 +113,7 @@ except ConfigError as e:
 
 **Example:**
 
+<!-- weevr-snippet: {path: orders/fact_orders.thread, expect: ConfigError} -->
 ```yaml
 # This file is saved as "orders/fact_orders.thread"
 # but declares a different name — triggers ConfigError
@@ -122,6 +123,8 @@ sources:
   orders:
     type: delta
     alias: raw.orders
+target:
+  alias: gold.fact_orders
 ```
 
 **Related:** [Configuration Keys](../configuration-keys.md)
@@ -301,6 +304,7 @@ references are detected.
 
 **Example:**
 
+<!-- weevr-snippet: {expect: ReferenceResolutionError} -->
 ```yaml
 # Weave referencing a non-existent thread
 config_version: "1.0"

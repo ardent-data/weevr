@@ -65,6 +65,7 @@ to a single target.
 
 Create `staging/stg_customers.thread`:
 
+<!-- weevr-snippet: {path: staging/stg_customers.thread} -->
 ```yaml
 config_version: "1.0"
 
@@ -121,6 +122,7 @@ dependency DAG. Even a single-thread weave is valid.
 
 Create `staging.weave`:
 
+<!-- weevr-snippet: {path: staging.weave} -->
 ```yaml
 config_version: "1.0"
 
@@ -137,6 +139,7 @@ A **loom** is the deployable execution unit. It sequences one or more weaves.
 
 Create `daily.loom`:
 
+<!-- weevr-snippet: {path: daily.loom} -->
 ```yaml
 config_version: "1.0"
 
