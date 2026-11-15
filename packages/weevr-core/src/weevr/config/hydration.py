@@ -18,8 +18,8 @@ from weevr.config.validation import (
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
-ThreadPreparer = Callable[[dict[str, Any]], None]
-"""Hook applied to each child thread dict just before validation."""
+ChildPreparer = Callable[[dict[str, Any]], None]
+"""Hook applied to each child thread dict, and each loom child weave dict, before validation."""
 
 ThreadBinder = Callable[[Thread, str], None]
 """Hook called with each hydrated thread and the file it came from (path or URI)."""
@@ -150,7 +150,7 @@ def hydrate_threads(
     entries: list[Any],
     resolved: list[dict[str, Any]],
     source: ConfigLocation | str,
-    prepare: ThreadPreparer | None = None,
+    prepare: ChildPreparer | None = None,
     visible_lookups: set[str] | None = None,
     warnings: list[str] | None = None,
     bind: ThreadBinder | None = None,
@@ -238,7 +238,7 @@ def hydrate_children(
     resolved: dict[str, Any],
     source: ConfigLocation | str,
     name: str,
-    prepare: ThreadPreparer | None = None,
+    prepare: ChildPreparer | None = None,
     warnings: list[str] | None = None,
     bind: ThreadBinder | None = None,
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
@@ -253,7 +253,8 @@ def hydrate_children(
             inheritance cascade.
         source: The top-level config's file.
         name: The top-level config's name, used as the weave key for a weave.
-        prepare: Optional hook applied to each thread dict before validation.
+        prepare: Optional hook applied to each child thread dict, and to each
+            child weave dict of a loom, before validation.
         warnings: Collects load warnings from the children's checks.
         bind: Optional hook called with each hydrated thread and its file.
 
@@ -306,6 +307,8 @@ def hydrate_children(
                 weave_dict["name"] = weave_name
             # Inline weaves have no file of their own; they live in the loom.
             weave_source = weave_dict.pop("_source_path", None) or str(source)
+            if prepare is not None:
+                prepare(weave_dict)
             weave_model = hydrate_model(weave_dict, "weave", weave_source)
             if not isinstance(weave_model, Weave):  # pragma: no cover
                 continue

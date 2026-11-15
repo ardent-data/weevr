@@ -59,7 +59,7 @@ source type.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `source` | `Source` | yes | -- | Source definition for the lookup data |
+| `source` | `Source` | yes | -- | Source definition for the lookup data. A relative file `path` resolves against the project root, as on a thread source; see [How relative locations resolve](thread.md#how-relative-locations-resolve). |
 | `materialize` | `bool` | no | `false` | Pre-read and cache/broadcast the data before thread execution |
 | `strategy` | `string` | no | `"cache"` | Materialization strategy: `"broadcast"` (Spark broadcast join hints) or `"cache"` (DataFrame caching). Only meaningful when `materialize` is true. |
 | `key` | `list[string]` | no | `null` | Column(s) used for matching (join key). When set with `values`, only these columns plus `values` columns are retained. |
