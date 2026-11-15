@@ -3392,8 +3392,11 @@ need an explicit <code>name</code> on one of them:</p>
 <hr />
 <h2 id="lookups">lookups<a class="headerlink" href="#lookups" title="Permanent link">&para;</a></h2>
 <p>Loom-level lookup definitions shared across all weaves. The structure is
-identical to <a href="../weave/#lookups">weave-level lookups</a>. When a weave defines
-a lookup with the same name, the weave-level definition wins.</p>
+identical to <a href="../weave/#lookups">weave-level lookups</a>. A relative file <code>path</code>
+on a lookup's source resolves against the project root; see
+<a href="../thread/#how-relative-locations-resolve">How relative locations resolve</a>.
+When a weave defines a lookup with the same name, the weave-level definition
+wins.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">lookups</span><span class="p">:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">dim_calendar</span><span class="p">:</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">source</span><span class="p">:</span>
