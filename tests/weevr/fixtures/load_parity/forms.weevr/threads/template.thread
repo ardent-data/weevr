@@ -1,0 +1,19 @@
+config_version: "1.0"
+
+params:
+  suffix:
+    name: suffix
+    type: string
+    required: true
+
+sources:
+  base:
+    type: delta
+    alias: gold.base
+
+steps:
+  - filter:
+      expr: "kind = '${param.suffix}'"
+
+target:
+  alias: "gold.tpl_${param.suffix}"

@@ -345,5 +345,8 @@
       }
     }
   },
+  "warnings": [
+    "WARN: thread 'stg_orders' declares an execution block (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
+  ],
   "weaves": {}
 }

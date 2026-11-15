@@ -1,0 +1,134 @@
+{
+  "config_name": "stg_orders_with_exports",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": null,
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": [
+      {
+        "alias": null,
+        "connection": null,
+        "description": "Daily Parquet archive for external consumers",
+        "enabled": true,
+        "mode": "overwrite",
+        "name": "parquet_archive",
+        "on_failure": "warn",
+        "options": null,
+        "partition_by": [
+          "order_year"
+        ],
+        "path": "/lakehouse/archive/orders/${run.timestamp}/",
+        "schema_override": null,
+        "table": null,
+        "type": "parquet"
+      },
+      {
+        "alias": null,
+        "connection": null,
+        "description": "Pipe-delimited CSV for legacy system",
+        "enabled": true,
+        "mode": "overwrite",
+        "name": "csv_extract",
+        "on_failure": "warn",
+        "options": {
+          "delimiter": "|",
+          "header": "true"
+        },
+        "partition_by": null,
+        "path": "/lakehouse/exports/orders_latest/",
+        "schema_override": null,
+        "table": null,
+        "type": "csv"
+      }
+    ],
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "stg_orders_with_exports",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "stg_orders_with_exports.thread",
+    "sources": {
+      "orders": {
+        "alias": "bronze.orders",
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "status != 'cancelled'"
+        }
+      },
+      {
+        "derive": {
+          "columns": {
+            "order_year": "year(order_date)"
+          }
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "silver.stg_orders",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": null,
+    "with_": null,
+    "write": {
+      "match_keys": null,
+      "mode": "overwrite",
+      "on_match": "update",
+      "on_no_match_source": "ignore",
+      "on_no_match_target": "insert",
+      "soft_delete_active_value": null,
+      "soft_delete_column": null,
+      "soft_delete_value": true
+    }
+  },
+  "threads": {},
+  "warnings": [],
+  "weaves": {}
+}

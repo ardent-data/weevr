@@ -1,9 +1,16 @@
-"""Pinned output of the config load across weave and loom configs.
+"""Pinned output of the config load across every entry point and entry form.
 
-Loads the ``load_parity`` fixture project through ``Context.load`` and compares
-the hydrated models, their children, and the load warnings against committed
-expectations. Set ``WEEVR_UPDATE_GOLDEN=1`` to rewrite the expectation files
-after an intended change.
+The corpus is every example config, the ``load_parity`` fixture project, and
+the ``forms`` project (each entry form at each scope: inline, file-referenced
+and convention weaves; inline, file-referenced and ``as``/``params`` template
+threads; ``foreach``; defaults; lookups, column sets and variables declared at
+every level with shadowing; dependencies and conditions on entries).
+
+Each config is loaded through ``Context.load``, ``load_resolved`` and
+``load_config``. The models, children, execution order and warnings match
+committed expectations, and the three entry points agree. Set
+``WEEVR_UPDATE_GOLDEN=1`` to rewrite the expectation files after an intended
+change.
 """
 
 from __future__ import annotations
@@ -14,29 +21,87 @@ import json
 import logging
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from pyspark.sql import SparkSession
+from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, FABCON_DIR, REQUIRED_PARAMS
 
-from weevr.config import load_resolved
+from weevr.config import load_config, load_resolved
 from weevr.context import Context
 from weevr.result import LoadedConfig
 
-FIXTURE_PROJECT = Path(__file__).parent / "fixtures" / "load_parity" / "parity.weevr"
-GOLDEN_DIR = Path(__file__).parent / "fixtures" / "load_parity" / "expected"
+FIXTURES = Path(__file__).parent / "fixtures" / "load_parity"
+FIXTURE_PROJECT = FIXTURES / "parity.weevr"
+FORMS_PROJECT = FIXTURES / "forms.weevr"
+GOLDEN_DIR = FIXTURES / "expected"
 
 PARITY_CONFIGS = ["nightly.loom", "weaves/sales.weave", "threads/stg_orders.thread"]
+FORMS_CONFIGS = [
+    "forms.loom",
+    "conv.weave",
+    "pair_file.weave",
+    "pair_inline.weave",
+    "threads/base.thread",
+]
+
+# Fields derived from where a thread was written rather than what it says.
+LOCATION_FIELDS = ("qualified_key", "template_ref")
+
+
+@dataclass(frozen=True)
+class Case:
+    """One corpus config: the project it lives in and how to load it."""
+
+    project: Path
+    config: str
+    params: dict[str, Any] | None = None
+
+    @property
+    def id(self) -> str:
+        return f"{self.project.name}/{self.config}"
+
+    @property
+    def golden(self) -> Path:
+        if self.project == FIXTURE_PROJECT:
+            # The original parity goldens keep their names.
+            return GOLDEN_DIR / (self.config.replace("/", "__") + ".json")
+        name = self.project.name.removesuffix(".weevr")
+        return GOLDEN_DIR / name / (self.config.replace("/", "__") + ".json")
+
+
+def _example_case(path: Path) -> Case:
+    project = FABCON_DIR if FABCON_DIR in path.parents else EXAMPLES_DIR
+    rel = path.relative_to(EXAMPLES_DIR).as_posix()
+    return Case(project, path.relative_to(project).as_posix(), REQUIRED_PARAMS.get(rel))
+
+
+CORPUS = [
+    *(Case(FIXTURE_PROJECT, c) for c in PARITY_CONFIGS),
+    *(Case(FORMS_PROJECT, c) for c in FORMS_CONFIGS),
+    *(_example_case(p) for p in CONFIG_FILES),
+]
+
+
+def _copy_project(source: Path, tmp_path: Path) -> Path:
+    """Copy a project into a ``.weevr`` directory so resolved paths are stable."""
+    name = source.name if source.name.endswith(".weevr") else f"{source.name}.weevr"
+    target = tmp_path / name
+    shutil.copytree(source, target)
+    return target
 
 
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     """Copy the fixture project so resolved paths are stable per test."""
-    target = tmp_path / "parity.weevr"
-    shutil.copytree(FIXTURE_PROJECT, target)
-    return target
+    return _copy_project(FIXTURE_PROJECT, tmp_path)
+
+
+def _mask(data: Any, root: Path) -> Any:
+    return json.loads(json.dumps(data).replace(str(root), "<root>"))
 
 
 def _snapshot(loaded: Any, root: Path) -> dict[str, Any]:
@@ -54,28 +119,85 @@ def _snapshot(loaded: Any, root: Path) -> dict[str, Any]:
         },
         "execution_order": [plan.execution_order for plan in loaded.execution_plan or []],
     }
-    return json.loads(json.dumps(data).replace(str(root), "<root>"))
+    return _mask(data, root)
 
 
-def _golden_path(config: str) -> Path:
-    return GOLDEN_DIR / (config.replace("/", "__") + ".json")
-
-
-def _check_golden(config: str, actual: dict[str, Any]) -> None:
-    path = _golden_path(config)
+def _write_or_compare(path: Path, actual: dict[str, Any]) -> None:
     if os.environ.get("WEEVR_UPDATE_GOLDEN"):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n")
+        path.write_text(json.dumps(actual, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
     assert actual == json.loads(path.read_text())
 
 
-class TestContextLoadParity:
-    """``Context.load`` output for the parity corpus matches the pinned expectations."""
+def _context(root: Path, params: dict[str, Any] | None = None) -> Context:
+    return Context(spark=MagicMock(spec=SparkSession), project=str(root), params=params)
 
-    @pytest.mark.parametrize("config", PARITY_CONFIGS)
-    def test_load_matches_expectation(self, project: Path, config: str) -> None:
-        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
-        _check_golden(config, _snapshot(ctx.load(config), project))
+
+class TestCorpusAcrossEntryPoints:
+    """Every corpus config loads the same through all three entry points."""
+
+    @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
+    def test_context_load_matches_golden(self, case: Case, tmp_path: Path) -> None:
+        root = _copy_project(case.project, tmp_path)
+        loaded = _context(root, case.params).load(case.config)
+        snapshot = _snapshot(loaded, root)
+        snapshot["warnings"] = _mask(list(loaded.warnings), root)
+        _write_or_compare(case.golden, snapshot)
+
+    @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
+    def test_load_resolved_matches_context(self, case: Case, tmp_path: Path) -> None:
+        root = _copy_project(case.project, tmp_path)
+        via_context = _context(root, case.params).load(case.config)
+        direct = load_resolved(root / case.config, runtime_params=case.params, project_root=root)
+        assert _snapshot(direct, root) == _snapshot(via_context, root)
+        assert direct.warnings == via_context.warnings
+
+    @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
+    def test_load_config_matches_load_resolved(
+        self, case: Case, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        root = _copy_project(case.project, tmp_path)
+        resolved = load_resolved(root / case.config, runtime_params=case.params, project_root=root)
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="weevr.config"):
+            model = load_config(root / case.config, runtime_params=case.params, project_root=root)
+        assert not isinstance(model, dict)
+        assert model.model_dump(mode="json") == resolved.model.model_dump(mode="json")
+        logged = [r.getMessage() for r in caplog.records if r.name == "weevr.config"]
+        assert logged == list(resolved.warnings)
+
+
+class TestInlineMatchesFile:
+    """A thread written inline hydrates like the same thread in its own file."""
+
+    def test_inline_and_file_threads_match(self, tmp_path: Path) -> None:
+        root = _copy_project(FORMS_PROJECT, tmp_path)
+        by_file = load_resolved(root / "pair_file.weave", project_root=root)
+        inline = load_resolved(root / "pair_inline.weave", project_root=root)
+
+        def body(loaded: Any, weave: str) -> dict[str, Any]:
+            dumped = loaded.resolved_threads[weave]["pair"].model_dump(mode="json")
+            for field in LOCATION_FIELDS:
+                dumped.pop(field)
+            return dumped
+
+        assert body(by_file, "pair_file") == body(inline, "pair_inline")
+
+    def test_location_fields_differ(self, tmp_path: Path) -> None:
+        """The excluded fields really are location-derived, so excluding them hides nothing else."""
+        root = _copy_project(FORMS_PROJECT, tmp_path)
+        by_file = load_resolved(root / "pair_file.weave", project_root=root)
+        inline = load_resolved(root / "pair_inline.weave", project_root=root)
+        file_thread = by_file.resolved_threads["pair_file"]["pair"]
+        inline_thread = inline.resolved_threads["pair_inline"]["pair"]
+        assert file_thread.qualified_key == "threads/pair.thread"
+        assert inline_thread.qualified_key == "pair"
+        assert file_thread.template_ref == "threads/pair.thread"
+        assert inline_thread.template_ref is None
+
+
+class TestContextLoadParity:
+    """``Context.load`` warnings for the parity project keep their wording."""
 
     @pytest.mark.parametrize(
         ("config", "expected"),
@@ -216,23 +338,6 @@ class TestValidateWording:
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
         result = ctx._run_validate(loaded)
         assert "Weave 'dup' not found" in (result.validation_errors or [])
-
-
-class TestLoadResolvedMatchesContext:
-    """``load_resolved`` and ``Context.load`` return the same config."""
-
-    @pytest.mark.parametrize("config", PARITY_CONFIGS)
-    def test_same_snapshot(self, project: Path, config: str) -> None:
-        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
-        via_context = _snapshot(ctx.load(config), project)
-        direct = _snapshot(load_resolved(project / config, project_root=project), project)
-        assert direct == via_context
-
-    @pytest.mark.parametrize("config", PARITY_CONFIGS)
-    def test_same_warnings(self, project: Path, config: str) -> None:
-        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
-        direct = load_resolved(project / config, project_root=project)
-        assert ctx.load(config).warnings == direct.warnings
 
 
 _LOAD_STEPS = (

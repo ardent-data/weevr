@@ -1,0 +1,177 @@
+{
+  "config_name": "stg_customers_validated",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": [
+      {
+        "column": null,
+        "columns": [
+          "customer_id"
+        ],
+        "expression": null,
+        "max": null,
+        "max_rate": null,
+        "message": null,
+        "min": null,
+        "sentinel": null,
+        "sentinels": null,
+        "severity": "error",
+        "type": "unique"
+      },
+      {
+        "column": null,
+        "columns": [
+          "customer_id",
+          "full_name"
+        ],
+        "expression": null,
+        "max": null,
+        "max_rate": null,
+        "message": null,
+        "min": null,
+        "sentinel": null,
+        "sentinels": null,
+        "severity": "error",
+        "type": "column_not_null"
+      },
+      {
+        "column": null,
+        "columns": null,
+        "expression": null,
+        "max": null,
+        "max_rate": null,
+        "message": null,
+        "min": 1,
+        "sentinel": null,
+        "sentinels": null,
+        "severity": "warn",
+        "type": "row_count"
+      }
+    ],
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "stg_customers_validated",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "stg_customers_validated.thread",
+    "sources": {
+      "customers": {
+        "alias": null,
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {
+          "header": true,
+          "inferSchema": true
+        },
+        "path": "<root>/data/customers.csv",
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "csv"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "status = 'active'"
+        }
+      },
+      {
+        "derive": {
+          "columns": {
+            "full_name": "concat(first_name, ' ', last_name)"
+          }
+        }
+      },
+      {
+        "select": {
+          "columns": [
+            "customer_id",
+            "first_name",
+            "last_name",
+            "full_name",
+            "email",
+            "signup_date"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "customer_id": "int",
+            "signup_date": "date"
+          }
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "staging.stg_customers",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": [
+      {
+        "name": "email_not_null",
+        "rule": "email IS NOT NULL",
+        "severity": "error"
+      },
+      {
+        "name": "customer_id_positive",
+        "rule": "customer_id > 0",
+        "severity": "fatal"
+      }
+    ],
+    "variables": null,
+    "with_": null,
+    "write": {
+      "match_keys": null,
+      "mode": "overwrite",
+      "on_match": "update",
+      "on_no_match_source": "ignore",
+      "on_no_match_target": "insert",
+      "soft_delete_active_value": null,
+      "soft_delete_column": null,
+      "soft_delete_value": true
+    }
+  },
+  "threads": {},
+  "warnings": [],
+  "weaves": {}
+}

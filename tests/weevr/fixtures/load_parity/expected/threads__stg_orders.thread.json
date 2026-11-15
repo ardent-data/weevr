@@ -89,5 +89,8 @@
     "write": null
   },
   "threads": {},
+  "warnings": [
+    "WARN: thread '#0' declares an execution block (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
+  ],
   "weaves": {}
 }

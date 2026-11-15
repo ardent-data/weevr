@@ -1,0 +1,946 @@
+{
+  "config_name": "forms",
+  "config_type": "loom",
+  "execution_order": [
+    [
+      [
+        "base"
+      ],
+      [
+        "tpl_a",
+        "tpl_b"
+      ],
+      [
+        "inline_core"
+      ]
+    ],
+    [
+      [
+        "conv"
+      ]
+    ],
+    [
+      [
+        "inline_t"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": {
+      "loom_map": {
+        "on_extra": "ignore",
+        "on_failure": "abort",
+        "on_unmapped": "pass_through",
+        "param": "loom_map",
+        "source": null
+      },
+      "shared_map": {
+        "on_extra": "ignore",
+        "on_failure": "abort",
+        "on_unmapped": "pass_through",
+        "param": "loom_shared_map",
+        "source": null
+      }
+    },
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": {
+      "target_schema": "gold"
+    },
+    "execution": null,
+    "lookups": {
+      "regions": {
+        "filter": null,
+        "key": null,
+        "materialize": true,
+        "on_failure": "abort",
+        "source": {
+          "alias": "ref.regions",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      },
+      "shared": {
+        "filter": null,
+        "key": null,
+        "materialize": false,
+        "on_failure": "abort",
+        "source": {
+          "alias": "ref.shared_loom",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      }
+    },
+    "name": "forms",
+    "naming": null,
+    "params": {
+      "env": {
+        "default": "dev",
+        "description": "",
+        "name": "env",
+        "required": true,
+        "type": "string"
+      }
+    },
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "forms.loom",
+    "variables": {
+      "loom_var": {
+        "default": "a",
+        "type": "string"
+      },
+      "shared_var": {
+        "default": 1,
+        "type": "int"
+      }
+    },
+    "weaves": [
+      {
+        "condition": {
+          "when": "'dev' == 'dev'"
+        },
+        "name": "",
+        "ref": "weaves/core.weave"
+      },
+      {
+        "condition": null,
+        "name": "conv",
+        "ref": null
+      },
+      {
+        "condition": null,
+        "name": "inline_w",
+        "ref": null
+      }
+    ]
+  },
+  "threads": {
+    "conv": {
+      "conv": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "conv",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/conv.thread",
+        "sources": {
+          "data": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": "<root>/data/conv.csv",
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "csv"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": "gold.conv",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/conv.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    },
+    "core": {
+      "base": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": {
+          "thread_map": {
+            "on_extra": "ignore",
+            "on_failure": "abort",
+            "on_unmapped": "pass_through",
+            "param": "thread_map",
+            "source": null
+          }
+        },
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": {
+          "shared": {
+            "filter": null,
+            "key": null,
+            "materialize": false,
+            "on_failure": "abort",
+            "source": {
+              "alias": "ref.shared_thread",
+              "column": null,
+              "connection": null,
+              "dedup": null,
+              "end": null,
+              "lookup": null,
+              "options": {},
+              "path": null,
+              "schema_override": null,
+              "start": null,
+              "step": null,
+              "table": null,
+              "type": "delta"
+            },
+            "strategy": "cache",
+            "unique_key": false,
+            "values": null
+          }
+        },
+        "name": "base",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/base.thread",
+        "sources": {
+          "orders": {
+            "alias": "raw.orders",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "region": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": "regions",
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": null
+          },
+          "shared": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": "shared",
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": null
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "order_id is not null"
+            }
+          },
+          {
+            "filter": {
+              "expr": "customer_id is not null"
+            }
+          },
+          {
+            "rename": {
+              "column_set": "thread_map",
+              "columns": {}
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.base",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/base.thread",
+        "validations": null,
+        "variables": {
+          "shared_var": {
+            "default": 3,
+            "type": "int"
+          }
+        },
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "inline_core": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "inline_core",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "inline_core",
+        "sources": {
+          "w": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": "weave_only",
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": null
+          },
+          "x": {
+            "alias": "raw.x",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "rename": {
+              "column_set": "shared_map",
+              "columns": {}
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "out.inline_core",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "tpl_a": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "tpl_a",
+        "params": {
+          "suffix": {
+            "default": null,
+            "description": "",
+            "name": "suffix",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/template.thread",
+        "sources": {
+          "base": {
+            "alias": "gold.base",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "kind = 'a'"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.tpl_a",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/template.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "tpl_b": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "tpl_b",
+        "params": {
+          "suffix": {
+            "default": null,
+            "description": "",
+            "name": "suffix",
+            "required": true,
+            "type": "string"
+          }
+        },
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/template.thread",
+        "sources": {
+          "base": {
+            "alias": "gold.base",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "kind = 'b'"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.tpl_b",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/template.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "append",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      }
+    },
+    "inline_w": {
+      "inline_t": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "inline_t",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "inline_t",
+        "sources": {
+          "s": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": "shared",
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": null
+          }
+        },
+        "steps": [
+          {
+            "rename": {
+              "column_set": "loom_map",
+              "columns": {}
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.inline_t",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    }
+  },
+  "warnings": [],
+  "weaves": {
+    "conv": {
+      "audit_templates": null,
+      "column_sets": null,
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": null,
+      "execution": null,
+      "lookups": null,
+      "name": "conv",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "conv.weave",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "",
+          "params": null,
+          "ref": "threads/conv.thread"
+        }
+      ],
+      "variables": null
+    },
+    "core": {
+      "audit_templates": null,
+      "column_sets": {
+        "shared_map": {
+          "on_extra": "ignore",
+          "on_failure": "abort",
+          "on_unmapped": "pass_through",
+          "param": "weave_shared_map",
+          "source": null
+        }
+      },
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": {
+        "write": {
+          "mode": "append"
+        }
+      },
+      "execution": null,
+      "lookups": {
+        "shared": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.shared_weave",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        },
+        "weave_only": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.weave_only",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      },
+      "name": "core",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "weaves/core.weave",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "",
+          "params": null,
+          "ref": "threads/base.thread"
+        },
+        {
+          "as_": "tpl_a",
+          "condition": null,
+          "dependencies": [
+            "base"
+          ],
+          "name": "",
+          "params": {
+            "suffix": "a"
+          },
+          "ref": "threads/template.thread"
+        },
+        {
+          "as_": "tpl_b",
+          "condition": {
+            "when": "table_exists('gold.base')"
+          },
+          "dependencies": null,
+          "name": "",
+          "params": {
+            "suffix": "b"
+          },
+          "ref": "threads/template.thread"
+        },
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": [
+            "tpl_a"
+          ],
+          "name": "inline_core",
+          "params": null,
+          "ref": null
+        }
+      ],
+      "variables": {
+        "shared_var": {
+          "default": 2,
+          "type": "int"
+        }
+      }
+    },
+    "inline_w": {
+      "audit_templates": null,
+      "column_sets": null,
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": null,
+      "execution": null,
+      "lookups": {
+        "shared": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.shared_inline",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      },
+      "name": "inline_w",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "inline_w",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "inline_t",
+          "params": null,
+          "ref": null
+        }
+      ],
+      "variables": null
+    }
+  }
+}

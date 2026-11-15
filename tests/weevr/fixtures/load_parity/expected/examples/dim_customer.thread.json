@@ -1,0 +1,97 @@
+{
+  "config_name": "dim_customer",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": null,
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "dim_customer",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "dim_customer.thread",
+    "sources": {
+      "customers": {
+        "alias": "raw.customers",
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "customer_id",
+            "first_name",
+            "last_name",
+            "email",
+            "region"
+          ]
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "curated.dim_customer",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": null,
+    "with_": null,
+    "write": {
+      "match_keys": null,
+      "mode": "overwrite",
+      "on_match": "update",
+      "on_no_match_source": "ignore",
+      "on_no_match_target": "insert",
+      "soft_delete_active_value": null,
+      "soft_delete_column": null,
+      "soft_delete_value": true
+    }
+  },
+  "threads": {},
+  "warnings": [],
+  "weaves": {}
+}

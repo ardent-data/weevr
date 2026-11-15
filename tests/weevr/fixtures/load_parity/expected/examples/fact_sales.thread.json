@@ -1,0 +1,274 @@
+{
+  "config_name": "fact_sales",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": [
+      {
+        "column": "plant_id",
+        "columns": null,
+        "expression": null,
+        "max": null,
+        "max_rate": 0.05,
+        "message": "plant FK invalid rate exceeded",
+        "min": null,
+        "sentinel": -4,
+        "sentinels": null,
+        "severity": "warn",
+        "type": "fk_sentinel_rate"
+      },
+      {
+        "column": null,
+        "columns": [
+          "plant_id",
+          "customer_id",
+          "product_id"
+        ],
+        "expression": null,
+        "max": null,
+        "max_rate": 0.1,
+        "message": "FK unresolved rate exceeded",
+        "min": null,
+        "sentinel": null,
+        "sentinels": {
+          "invalid": {
+            "max_rate": null,
+            "value": -4
+          },
+          "unknown": {
+            "max_rate": null,
+            "value": -1
+          }
+        },
+        "severity": "warn",
+        "type": "fk_sentinel_rate"
+      }
+    ],
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": {
+      "dim_customer": {
+        "filter": null,
+        "key": null,
+        "materialize": false,
+        "on_failure": "abort",
+        "source": {
+          "alias": "curated.dim_customer",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      },
+      "dim_plant": {
+        "filter": null,
+        "key": null,
+        "materialize": false,
+        "on_failure": "abort",
+        "source": {
+          "alias": "curated.dim_plant",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      },
+      "dim_product": {
+        "filter": null,
+        "key": null,
+        "materialize": false,
+        "on_failure": "abort",
+        "source": {
+          "alias": "curated.dim_product",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      }
+    },
+    "name": "fact_sales",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "fact_sales.thread",
+    "sources": {
+      "sales": {
+        "alias": "raw.sales",
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "resolve": {
+          "batch": null,
+          "drop_source_columns": false,
+          "effective": null,
+          "include": null,
+          "include_prefix": null,
+          "lookup": "dim_plant",
+          "match": {
+            "plant_code": "plant_code"
+          },
+          "name": "plant_id",
+          "normalize": null,
+          "on_duplicate": "warn",
+          "on_failure": "abort",
+          "on_invalid": -4,
+          "on_unknown": -1,
+          "pk": "id",
+          "where": null
+        }
+      },
+      {
+        "resolve": {
+          "batch": null,
+          "drop_source_columns": false,
+          "effective": null,
+          "include": null,
+          "include_prefix": null,
+          "lookup": "dim_customer",
+          "match": {
+            "customer_code": "natural_id",
+            "region": "region_code"
+          },
+          "name": "customer_id",
+          "normalize": "trim_lower",
+          "on_duplicate": "warn",
+          "on_failure": "abort",
+          "on_invalid": -4,
+          "on_unknown": -1,
+          "pk": "id",
+          "where": null
+        }
+      },
+      {
+        "resolve": {
+          "batch": null,
+          "drop_source_columns": false,
+          "effective": {
+            "current": {
+              "column": "is_current",
+              "value": true
+            },
+            "date_column": null,
+            "from_": null,
+            "to": null
+          },
+          "include": [
+            "product_name",
+            "category"
+          ],
+          "include_prefix": "product_",
+          "lookup": "dim_product",
+          "match": {
+            "product_code": "product_code"
+          },
+          "name": "product_id",
+          "normalize": null,
+          "on_duplicate": "warn",
+          "on_failure": "abort",
+          "on_invalid": -4,
+          "on_unknown": -1,
+          "pk": "id",
+          "where": null
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "curated.fact_sales",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": null,
+    "with_": null,
+    "write": {
+      "match_keys": null,
+      "mode": "overwrite",
+      "on_match": "update",
+      "on_no_match_source": "ignore",
+      "on_no_match_target": "insert",
+      "soft_delete_active_value": null,
+      "soft_delete_column": null,
+      "soft_delete_value": true
+    }
+  },
+  "threads": {},
+  "warnings": [],
+  "weaves": {}
+}

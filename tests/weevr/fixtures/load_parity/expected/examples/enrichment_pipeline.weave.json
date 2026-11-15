@@ -1,0 +1,316 @@
+{
+  "config_name": "enrichment_pipeline",
+  "config_type": "weave",
+  "execution_order": [
+    [
+      [
+        "enrich_customers"
+      ],
+      [
+        "enrich_orders"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": {
+      "capture_samples": false,
+      "log_level": "verbose",
+      "max_parallel_threads": null,
+      "trace": true
+    },
+    "lookups": {
+      "country_codes": {
+        "filter": null,
+        "key": null,
+        "materialize": true,
+        "on_failure": "abort",
+        "source": {
+          "alias": "ref.country_codes",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "broadcast",
+        "unique_key": false,
+        "values": null
+      },
+      "region_mapping": {
+        "filter": null,
+        "key": null,
+        "materialize": false,
+        "on_failure": "abort",
+        "source": {
+          "alias": "ref.region_mapping",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      }
+    },
+    "name": "enrichment_pipeline",
+    "naming": null,
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "enrichment_pipeline.weave",
+    "threads": [
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": null,
+        "name": "enrich_customers",
+        "params": null,
+        "ref": null
+      },
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": [
+          "enrich_customers"
+        ],
+        "name": "enrich_orders",
+        "params": null,
+        "ref": null
+      }
+    ],
+    "variables": null
+  },
+  "threads": {
+    "enrichment_pipeline": {
+      "enrich_customers": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "enrich_customers",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "enrich_customers",
+        "sources": {
+          "countries": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": "country_codes",
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": null
+          },
+          "customers": {
+            "alias": "raw.customers",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "alias": null,
+              "exclude": null,
+              "filter": null,
+              "include": null,
+              "null_safe": true,
+              "on": [
+                {
+                  "left": "country_code",
+                  "right": "country_code"
+                }
+              ],
+              "prefix": null,
+              "rename": null,
+              "source": "countries",
+              "type": "left"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "curated.customers_enriched",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      },
+      "enrich_orders": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "enrich_orders",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "enrich_orders",
+        "sources": {
+          "orders": {
+            "alias": "raw.orders",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "regions": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": "region_mapping",
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": null
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "alias": null,
+              "exclude": null,
+              "filter": null,
+              "include": null,
+              "null_safe": true,
+              "on": [
+                {
+                  "left": "region_id",
+                  "right": "region_id"
+                }
+              ],
+              "prefix": null,
+              "rename": null,
+              "source": "regions",
+              "type": "left"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "curated.orders_enriched",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    }
+  },
+  "warnings": [],
+  "weaves": {}
+}

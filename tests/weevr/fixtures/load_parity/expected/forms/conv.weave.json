@@ -1,0 +1,111 @@
+{
+  "config_name": "conv",
+  "config_type": "weave",
+  "execution_order": [
+    [
+      [
+        "conv"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "lookups": null,
+    "name": "conv",
+    "naming": null,
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "conv.weave",
+    "threads": [
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": null,
+        "name": "",
+        "params": null,
+        "ref": "threads/conv.thread"
+      }
+    ],
+    "variables": null
+  },
+  "threads": {
+    "conv": {
+      "conv": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "conv",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/conv.thread",
+        "sources": {
+          "data": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": "<root>/data/conv.csv",
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "csv"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": "gold.conv",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/conv.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    }
+  },
+  "warnings": [],
+  "weaves": {}
+}

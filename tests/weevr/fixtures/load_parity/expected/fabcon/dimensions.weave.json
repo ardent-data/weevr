@@ -1,0 +1,507 @@
+{
+  "config_name": "dimensions",
+  "config_type": "weave",
+  "execution_order": [
+    [
+      [
+        "stg_customers",
+        "stg_products"
+      ],
+      [
+        "dim_customer",
+        "dim_product"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "lookups": null,
+    "name": "dimensions",
+    "naming": null,
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "dimensions.weave",
+    "threads": [
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": null,
+        "name": "stg_customers",
+        "params": null,
+        "ref": "dimensions/stg_customers.thread"
+      },
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": null,
+        "name": "stg_products",
+        "params": null,
+        "ref": "dimensions/stg_products.thread"
+      },
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": [
+          "stg_customers"
+        ],
+        "name": "dim_customer",
+        "params": null,
+        "ref": "dimensions/dim_customer.thread"
+      },
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": [
+          "stg_products"
+        ],
+        "name": "dim_product",
+        "params": null,
+        "ref": "dimensions/dim_product.thread"
+      }
+    ],
+    "variables": null
+  },
+  "threads": {
+    "dimensions": {
+      "dim_customer": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": {
+          "business_key": [
+            "customer_id"
+          ],
+          "change_detection": {
+            "algorithm": "xxhash64",
+            "columns": [
+              "first_name",
+              "last_name",
+              "full_name",
+              "email"
+            ],
+            "name": "row_hash",
+            "output": "native"
+          },
+          "surrogate_key": {
+            "algorithm": "xxhash64",
+            "name": "customer_sk",
+            "output": "native"
+          }
+        },
+        "load": null,
+        "lookups": null,
+        "name": "dim_customer",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "dimensions/dim_customer.thread",
+        "sources": {
+          "customers": {
+            "alias": "staging.stg_customers",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "select": {
+              "columns": [
+                "customer_id",
+                "first_name",
+                "last_name",
+                "full_name",
+                "email",
+                "signup_date"
+              ]
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "silver.dim_customer",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "dimensions/dim_customer.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": [
+            "customer_id"
+          ],
+          "mode": "merge",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "dim_product": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": {
+          "business_key": [
+            "product_id"
+          ],
+          "change_detection": null,
+          "surrogate_key": {
+            "algorithm": "xxhash64",
+            "name": "product_sk",
+            "output": "native"
+          }
+        },
+        "load": null,
+        "lookups": null,
+        "name": "dim_product",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "dimensions/dim_product.thread",
+        "sources": {
+          "products": {
+            "alias": "staging.stg_products",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "select": {
+              "columns": [
+                "product_id",
+                "product_name",
+                "category",
+                "unit_price",
+                "supplier"
+              ]
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "silver.dim_product",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "dimensions/dim_product.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": [
+            "product_id"
+          ],
+          "mode": "merge",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "stg_customers": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "stg_customers",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "dimensions/stg_customers.thread",
+        "sources": {
+          "customers": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {
+              "header": true,
+              "inferSchema": true
+            },
+            "path": "<root>/data/customers.csv",
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "status = 'active'"
+            }
+          },
+          {
+            "dedup": {
+              "keep": "last",
+              "keys": [
+                "customer_id"
+              ],
+              "order_by": "signup_date DESC"
+            }
+          },
+          {
+            "derive": {
+              "columns": {
+                "full_name": "concat(first_name, ' ', last_name)"
+              }
+            }
+          },
+          {
+            "select": {
+              "columns": [
+                "customer_id",
+                "first_name",
+                "last_name",
+                "full_name",
+                "email",
+                "signup_date"
+              ]
+            }
+          },
+          {
+            "cast": {
+              "columns": {
+                "customer_id": "int",
+                "signup_date": "date"
+              }
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "staging.stg_customers",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "dimensions/stg_customers.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "overwrite",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      },
+      "stg_products": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "stg_products",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "dimensions/stg_products.thread",
+        "sources": {
+          "products": {
+            "alias": "raw.products",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "select": {
+              "columns": [
+                "product_id",
+                "product_name",
+                "category",
+                "unit_price",
+                "supplier"
+              ]
+            }
+          },
+          {
+            "cast": {
+              "columns": {
+                "unit_price": "decimal(10,2)"
+              }
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "staging.stg_products",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "dimensions/stg_products.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "overwrite",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      }
+    }
+  },
+  "warnings": [],
+  "weaves": {}
+}
