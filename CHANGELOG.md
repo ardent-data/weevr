@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.3](https://github.com/ardent-data/weevr/compare/weevr-v1.21.2...weevr-v1.21.3) (2026-11-15)
+
+
+### Bug Fixes
+
+* **config:** join relative lookup source paths to the project root ([#313](https://github.com/ardent-data/weevr/issues/313)) ([ac23ca2](https://github.com/ardent-data/weevr/commit/ac23ca20cebf1d70aca2edab51b371ee25b4cc8c))
+
 ## [1.21.2](https://github.com/ardent-data/weevr/compare/weevr-v1.21.1...weevr-v1.21.2) (2026-11-11)
 
 
