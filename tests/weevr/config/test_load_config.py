@@ -1504,3 +1504,78 @@ def test_pre_step_row_count_delta_fails_at_load(tmp_path: Path) -> None:
     with pytest.raises(ModelValidationError, match=r"pre_steps\[0\].*post_steps") as exc_info:
         load_config(weave)
     assert getattr(exc_info.value, "file_path", None)
+
+
+def _lookups_block(name: str, path: str, indent: str = "") -> str:
+    """Return a ``lookups:`` block with one csv lookup, indented for nesting."""
+    return (
+        f"{indent}lookups:\n{indent}  {name}:\n{indent}    source:\n"
+        f"{indent}      type: csv\n{indent}      path: {path}\n"
+        f"{indent}    materialize: false\n"
+    )
+
+
+class TestLoadConfigLookupPaths:
+    """Weave and loom lookups resolve relative file paths against the project root."""
+
+    @staticmethod
+    def _weave(tmp_path: Path) -> None:
+        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
+        (tmp_path / "w.weave").write_text(
+            'config_version: "1.0"\n'
+            + _lookups_block("countries", "ref/countries.csv")
+            + "threads:\n  - ref: t.thread\n"
+        )
+
+    def test_weave_lookup_path_is_absolute(self, tmp_path):
+        """A weave's lookup joins its relative path to the project root."""
+        self._weave(tmp_path)
+        weave = load_config(tmp_path / "w.weave", project_root=tmp_path)
+        assert isinstance(weave, Weave)
+        assert weave.lookups is not None
+        assert weave.lookups["countries"].source.path == str(tmp_path / "ref" / "countries.csv")
+
+    def test_loom_and_child_weave_lookup_paths_are_absolute(self, tmp_path):
+        """A loom's lookups and its referenced and inline weaves' lookups are joined."""
+        self._weave(tmp_path)
+        (tmp_path / "x.loom").write_text(
+            'config_version: "1.0"\n'
+            + _lookups_block("calendar", "ref/calendar.csv")
+            + "weaves:\n  - ref: w.weave\n"
+            + '  - name: inline_ops\n    config_version: "1.0"\n'
+            + _lookups_block("stores", "ref/stores.csv", indent="    ")
+            + "    threads:\n      - ref: t.thread\n"
+        )
+        result = load_resolved(tmp_path / "x.loom", project_root=tmp_path)
+        loom = result.model
+        assert isinstance(loom, Loom)
+        assert loom.lookups is not None
+        assert loom.lookups["calendar"].source.path == str(tmp_path / "ref" / "calendar.csv")
+        referenced = result.resolved_weaves["w"].lookups
+        inline = result.resolved_weaves["inline_ops"].lookups
+        assert referenced is not None and inline is not None
+        assert referenced["countries"].source.path == str(tmp_path / "ref" / "countries.csv")
+        assert inline["stores"].source.path == str(tmp_path / "ref" / "stores.csv")
+
+    def test_weave_lookup_joined_once_under_a_loom(self, tmp_path):
+        """A weave's lookup path is the same loaded alone or as a loom's child."""
+        self._weave(tmp_path)
+        (tmp_path / "x.loom").write_text('config_version: "1.0"\nweaves:\n  - ref: w.weave\n')
+        alone = load_config(tmp_path / "w.weave", project_root=tmp_path)
+        child = load_resolved(tmp_path / "x.loom", project_root=tmp_path).resolved_weaves["w"]
+        assert isinstance(alone, Weave)
+        assert alone.lookups is not None and child.lookups is not None
+        assert child.lookups["countries"].source.path == alone.lookups["countries"].source.path
+
+    def test_absolute_weave_lookup_path_unchanged(self, tmp_path):
+        """An absolute weave lookup path is used as written."""
+        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
+        (tmp_path / "w.weave").write_text(
+            'config_version: "1.0"\n'
+            + _lookups_block("countries", "/data/ref/countries.csv")
+            + "threads:\n  - ref: t.thread\n"
+        )
+        weave = load_config(tmp_path / "w.weave", project_root=tmp_path)
+        assert isinstance(weave, Weave)
+        assert weave.lookups is not None
+        assert weave.lookups["countries"].source.path == "/data/ref/countries.csv"

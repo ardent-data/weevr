@@ -214,8 +214,9 @@ def resolve_config(
     elif not data.get("name"):
         data["name"] = location.stem
 
-    if config_type == "thread":
-        resolve_source_paths(data, root)
+    # Children are joined during hydration (hydrate_children's prepare hook),
+    # so only the top-level config is joined here.
+    resolve_source_paths(data, root)
 
     return ResolvedConfig(
         location=location,
@@ -270,7 +271,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         resolved.data,
         resolved.location,
         resolved.config_name,
-        prepare=lambda thread_dict: resolve_source_paths(thread_dict, root),
+        prepare=lambda child_dict: resolve_source_paths(child_dict, root),
         warnings=lookup_warnings,
         bind=lambda thread, source: bind_thread_warp(thread, location_like(source, root), root),
     )
