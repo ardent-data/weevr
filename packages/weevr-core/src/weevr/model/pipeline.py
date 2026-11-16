@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
 
@@ -105,7 +106,7 @@ class DeriveParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: dict[str, SparkExpr]) -> dict[str, SparkExpr]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
 
@@ -163,7 +164,7 @@ class JoinParams(FrozenBase):
     @classmethod
     def _normalize_keys(cls, v: Any) -> list[Any]:
         if not isinstance(v, list):
-            raise ValueError("'on' must be a list")
+            raise rule_error("C102", "'on' must be a list")
         result = []
         for item in v:
             if isinstance(item, str):
@@ -196,7 +197,7 @@ class SelectParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
 
@@ -209,7 +210,7 @@ class DropParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
 
@@ -235,7 +236,7 @@ class CastParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: dict[str, str]) -> dict[str, str]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
 
@@ -257,7 +258,7 @@ class SortParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
 
@@ -272,7 +273,7 @@ class UnionParams(FrozenBase):
     @classmethod
     def _sources_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("sources must not be empty")
+            raise rule_error("C401", "sources must not be empty")
         return v
 
 
@@ -358,7 +359,7 @@ class WindowFrame(FrozenBase):
     def _start_le_end(cls, v: int, info: Any) -> int:
         start = info.data.get("start")
         if start is not None and start > v:
-            raise ValueError(f"frame start ({start}) must be <= end ({v})")
+            raise rule_error("C406", f"frame start ({start}) must be <= end ({v})")
         return v
 
 
@@ -388,7 +389,7 @@ class AggregateParams(FrozenBase):
     @classmethod
     def _measures_non_empty(cls, v: dict[str, SparkExpr]) -> dict[str, SparkExpr]:
         if not v:
-            raise ValueError("measures must not be empty")
+            raise rule_error("C401", "measures must not be empty")
         return v
 
 
@@ -408,14 +409,14 @@ class WindowParams(FrozenBase):
     @classmethod
     def _functions_non_empty(cls, v: dict[str, SparkExpr]) -> dict[str, SparkExpr]:
         if not v:
-            raise ValueError("functions must not be empty")
+            raise rule_error("C401", "functions must not be empty")
         return v
 
     @field_validator("partition_by")
     @classmethod
     def _partition_by_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("partition_by must not be empty")
+            raise rule_error("C401", "partition_by must not be empty")
         return v
 
 
@@ -434,7 +435,7 @@ class PivotParams(FrozenBase):
     @classmethod
     def _values_non_empty(cls, v: list[str | int | float | bool]) -> list[str | int | float | bool]:
         if not v:
-            raise ValueError("values must not be empty")
+            raise rule_error("C401", "values must not be empty")
         return v
 
 
@@ -449,7 +450,7 @@ class UnpivotParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
     @field_validator("value_column")
@@ -457,7 +458,7 @@ class UnpivotParams(FrozenBase):
     def _name_ne_value(cls, v: str, info: Any) -> str:
         name_col = info.data.get("name_column")
         if name_col is not None and name_col == v:
-            raise ValueError("name_column and value_column must be different")
+            raise rule_error("C405", "name_column and value_column must be different")
         return v
 
 
@@ -475,7 +476,7 @@ class CaseWhenParams(FrozenBase):
     @classmethod
     def _cases_non_empty(cls, v: list[CaseWhenBranch]) -> list[CaseWhenBranch]:
         if not v:
-            raise ValueError("cases must not be empty")
+            raise rule_error("C401", "cases must not be empty")
         return v
 
 
@@ -499,15 +500,17 @@ class FillNullParams(FrozenBase):
     @model_validator(mode="after")
     def _validate_fill_null_config(self) -> "FillNullParams":
         if self.columns is None and self.mode is None:
-            raise ValueError("at least one of 'columns' or 'mode' must be set")
+            raise rule_error("C403", "at least one of 'columns' or 'mode' must be set")
         if self.columns is not None and not self.columns and self.mode is None:
-            raise ValueError("columns must not be empty when mode is not set")
+            raise rule_error("C401", "columns must not be empty when mode is not set")
         if self.mode == "type_defaults" and self.code is None:
-            raise ValueError("'code' is required when mode is 'type_defaults'")
+            raise rule_error("C403", "'code' is required when mode is 'type_defaults'")
         if self.mode is None:
             for field_name in ("code", "include", "exclude", "overrides", "where"):
                 if getattr(self, field_name) is not None:
-                    raise ValueError(f"'{field_name}' is only valid when mode is 'type_defaults'")
+                    raise rule_error(
+                        "C404", f"'{field_name}' is only valid when mode is 'type_defaults'"
+                    )
         return self
 
 
@@ -523,10 +526,10 @@ class CoalesceParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         for key, sources in v.items():
             if not sources:
-                raise ValueError(f"source list for '{key}' must not be empty")
+                raise rule_error("C401", f"source list for '{key}' must not be empty")
         return v
 
 
@@ -549,13 +552,13 @@ class ConcatParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
     @model_validator(mode="after")
     def _validate_null_literal(self) -> "ConcatParams":
         if self.null_mode == "literal" and not self.null_literal:
-            raise ValueError("null_literal must not be empty when null_mode is 'literal'")
+            raise rule_error("C403", "null_literal must not be empty when null_mode is 'literal'")
         return self
 
 
@@ -585,15 +588,16 @@ class MapParams(FrozenBase):
     @classmethod
     def _values_non_empty(cls, v: dict[str, Any]) -> dict[str, Any]:
         if not v:
-            raise ValueError("values must not be empty")
+            raise rule_error("C401", "values must not be empty")
         return v
 
     @model_validator(mode="after")
     def _default_unmapped_exclusive(self) -> "MapParams":
         if self.default is not None and self.unmapped in ("null", "validate"):
-            raise ValueError(
+            raise rule_error(
+                "C402",
                 "default and unmapped modes 'null'/'validate' are mutually "
-                "exclusive — default already handles unmapped values"
+                "exclusive — default already handles unmapped values",
             )
         return self
 
@@ -625,21 +629,24 @@ class FormatSpec(FrozenBase):
     def _exactly_one_format_type(self) -> "FormatSpec":
         set_count = sum(v is not None for v in (self.pattern, self.number, self.date))
         if set_count != 1:
-            raise ValueError("exactly one of 'pattern', 'number', or 'date' must be set")
+            raise rule_error(
+                "C402" if set_count > 1 else "C403",
+                "exactly one of 'pattern', 'number', or 'date' must be set",
+            )
         return self
 
     @field_validator("pattern")
     @classmethod
     def _validate_pattern_syntax(cls, v: str | None) -> str | None:
         if v is not None and not v:
-            raise ValueError("pattern must not be empty")
+            raise rule_error("C401", "pattern must not be empty")
         if v is not None and "{" in v:
             for match in _FORMAT_PLACEHOLDER_RE.finditer(v):
                 pos, length = int(match.group(1)), int(match.group(2))
                 if pos < 1:
-                    raise ValueError(f"pattern position must be >= 1, got {pos}")
+                    raise rule_error("C105", f"pattern position must be >= 1, got {pos}")
                 if length < 1:
-                    raise ValueError(f"pattern length must be >= 1, got {length}")
+                    raise rule_error("C105", f"pattern length must be >= 1, got {length}")
         return v
 
     @field_validator("number")
@@ -649,9 +656,10 @@ class FormatSpec(FrozenBase):
             allowed = set("0#.,%-E+();' ")
             invalid = set(v) - allowed
             if invalid:
-                raise ValueError(
+                raise rule_error(
+                    "C407",
                     f"number pattern contains invalid characters: "
-                    f"{', '.join(sorted(repr(c) for c in invalid))}"
+                    f"{', '.join(sorted(repr(c) for c in invalid))}",
                 )
         return v
 
@@ -678,7 +686,7 @@ class FormatParams(FrozenBase):
     @classmethod
     def _columns_non_empty(cls, v: dict[str, FormatSpec]) -> dict[str, FormatSpec]:
         if not v:
-            raise ValueError("columns must not be empty")
+            raise rule_error("C401", "columns must not be empty")
         return v
 
 
@@ -746,14 +754,17 @@ class EffectiveConfig(FrozenBase):
         has_current = self.current is not None
 
         if date_set > 0 and date_set < 3:
-            raise ValueError(
+            raise rule_error(
+                "C403",
                 "date range fields (date_column, from, to) are "
-                "all-or-nothing — set all three or none"
+                "all-or-nothing — set all three or none",
             )
         if date_set == 3 and has_current:
-            raise ValueError("date range and current flag are mutually exclusive")
+            raise rule_error("C402", "date range and current flag are mutually exclusive")
         if date_set == 0 and not has_current:
-            raise ValueError("effective block requires either date range fields or current flag")
+            raise rule_error(
+                "C403", "effective block requires either date range fields or current flag"
+            )
         return self
 
 
@@ -873,28 +884,30 @@ class ResolveParams(FrozenBase):
         has_single = any(f is not None for f in single_fields)
 
         if self.batch is not None and has_single:
-            raise ValueError(
+            raise rule_error(
+                "C402",
                 "batch and single-mode fields (name, lookup, match) "
                 "are mutually exclusive — use batch items or "
-                "single-mode fields, not both"
+                "single-mode fields, not both",
             )
 
         if self.batch is not None and len(self.batch) == 0:
-            raise ValueError("batch must contain at least one item")
+            raise rule_error("C401", "batch must contain at least one item")
 
         if self.batch is None:
             for field_name in ("name", "lookup", "match", "pk"):
                 if getattr(self, field_name) is None:
-                    raise ValueError(f"'{field_name}' is required in single-mode resolve")
+                    raise rule_error("C403", f"'{field_name}' is required in single-mode resolve")
 
         if self.include_prefix is not None and self.include is None:
-            raise ValueError("include_prefix requires include to be set")
+            raise rule_error("C403", "include_prefix requires include to be set")
 
         if self.on_invalid == self.on_unknown:
-            raise ValueError(
+            raise rule_error(
+                "C405",
                 f"on_invalid ({self.on_invalid}) and on_unknown "
                 f"({self.on_unknown}) must be different values — "
-                f"equal sentinels prevent accurate resolution stats"
+                f"equal sentinels prevent accurate resolution stats",
             )
 
         return self
@@ -966,7 +979,7 @@ class StringOpsParams(FrozenBase):
     @classmethod
     def _expr_has_col_placeholder(cls, v: str) -> str:
         if "{col}" not in v:
-            raise ValueError("expr must contain '{col}' placeholder")
+            raise rule_error("C408", "expr must contain '{col}' placeholder")
         return v
 
 
@@ -985,7 +998,7 @@ class DateOpsParams(FrozenBase):
     @classmethod
     def _expr_has_col_placeholder(cls, v: str) -> str:
         if "{col}" not in v:
-            raise ValueError("expr must contain '{col}' placeholder")
+            raise rule_error("C408", "expr must contain '{col}' placeholder")
         return v
 
 
