@@ -138,12 +138,20 @@ def _code(error_type: str) -> str:
 
 def _expected(details: ErrorDetails) -> list[str] | None:
     ctx = details.get("ctx") or {}
+    if details["type"] in REGISTRY:
+        expected = ctx.get("expected")
+        return [str(value) for value in expected] if isinstance(expected, list) else None
     if details["type"] in {"union_tag_invalid", "union_tag_not_found"}:
         return _QUOTED.findall(str(ctx.get("expected_tags", ""))) or None
     if details["type"] in {"literal_error", "enum"}:
         text = str(ctx.get("expected", ""))
         return _QUOTED.findall(text) or ([text] if text else None)
     return None
+
+
+def _hint(details: ErrorDetails) -> str | None:
+    hint = (details.get("ctx") or {}).get("hint")
+    return str(hint) if hint is not None and details["type"] in REGISTRY else None
 
 
 def _message(details: ErrorDetails) -> str:
@@ -161,6 +169,7 @@ def _convert(item: _Located, file: str | None) -> Diagnostic:
         file=file,
         resolved_path=json_pointer(item.path),
         expected=_expected(item.error),
+        hint=_hint(item.error),
         **_step_context(item.path),
     )
 

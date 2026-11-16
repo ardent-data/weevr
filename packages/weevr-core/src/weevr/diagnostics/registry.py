@@ -133,12 +133,21 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unknown-config-kind",
         "The config's kind could not be determined, or is not one weevr knows.",
     ),
+    # C3xx — references and entry forms (config/resolver.py, macros.py, locations.py)
     # C4xx — cross-field rules
     _config(
         "C400",
         "invalid-config",
         "A config rule was broken, in a way no more specific code covers.",
     ),
+    # C401–C439 — pipeline step rules (model/pipeline.py, model/sub_pipeline.py)
+    # C440–C479 — other model rules (model/*.py)
+    # C480–C499 — load-time cross-field checks (config/validation.py)
+    # P1xx — variables and parameters
+    # R101–R119 — lookup and column-set definitions (model/*.py)
+    # R120–R139 — lookup and column-set references checked at load
+    # D1xx — plan and dependencies
+    # S1xx — source existence
 )
 
 RETIRED_CODES: frozenset[str] = frozenset()

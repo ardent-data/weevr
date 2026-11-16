@@ -14,6 +14,7 @@ from weevr.diagnostics.registry import (
     diagnostic,
     track_usage,
 )
+from weevr.diagnostics.rules import rule_error
 
 __all__ = [
     "DOCS_BASE_URL",
@@ -25,5 +26,6 @@ __all__ = [
     "Severity",
     "Stability",
     "diagnostic",
+    "rule_error",
     "track_usage",
 ]
