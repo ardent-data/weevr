@@ -147,6 +147,21 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     # R101–R119 — lookup and column-set definitions (model/*.py)
     # R120–R139 — lookup and column-set references checked at load
     # D1xx — plan and dependencies
+    _config(
+        "D101",
+        "circular-dependency",
+        "The threads of a weave depend on each other in a cycle.",
+    ),
+    _config(
+        "D102",
+        "conflicting-target-writers",
+        "Several threads write one target without being ordered or condition-gated.",
+    ),
+    _config(
+        "D103",
+        "undefined-dependency",
+        "A thread declares a dependency on a thread the weave does not define.",
+    ),
     # S1xx — source existence
 )
 
