@@ -79,7 +79,7 @@ class TestExampleStories:
         assert isinstance(weave, Weave)
         assert weave.lookups is not None
         assert {lookup.materialize for lookup in weave.lookups.values()} == {True, False}
-        resolved = load_resolved(path, project_root=EXAMPLES_DIR).resolved_threads
+        resolved = load_resolved(path, project_root=EXAMPLES_DIR).document.weave_threads()
         bound = {
             source.lookup
             for thread in resolved["enrichment_pipeline"].values()

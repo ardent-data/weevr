@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.document import EntryMeta, ResolvedDocument, ScopeRegistries
 from weevr.config.loader import COMPONENT_TYPES as _COMPONENT_TYPES
 from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
@@ -14,7 +15,13 @@ from weevr.model import Loom, Thread, Weave
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["load_config", "load_resolved"]
+__all__ = [
+    "EntryMeta",
+    "ResolvedDocument",
+    "ScopeRegistries",
+    "load_config",
+    "load_resolved",
+]
 
 
 def load_config(
@@ -75,10 +82,10 @@ def load_config(
         resolved = _resolve_config(file_path, runtime_params=runtime_params, project_root=root)
         if resolved.config_type not in _COMPONENT_TYPES:
             return resolved.data
-        loaded = _hydrate_resolved(resolved)
-    for warning in loaded.warnings:
+        document, warnings = _hydrate_resolved(resolved)
+    for warning in warnings:
         logger.warning(warning)
-    return loaded.model
+    return document.model
 
 
 # Federated namespace: weevr.config splits across two wheels — pure

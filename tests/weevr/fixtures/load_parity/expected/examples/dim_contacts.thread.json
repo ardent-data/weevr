@@ -1,0 +1,153 @@
+{
+  "config_name": "dim_contacts",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": null,
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "dim_contacts",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "dim_contacts.thread",
+    "sources": {
+      "raw_contacts": {
+        "alias": "raw_contacts",
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "concat": {
+          "collapse_separators": true,
+          "columns": [
+            "first_name",
+            "middle_name",
+            "last_name"
+          ],
+          "null_literal": "<NULL>",
+          "null_mode": "skip",
+          "separator": " ",
+          "target": "full_name",
+          "trim": true
+        }
+      },
+      {
+        "map": {
+          "case_sensitive": true,
+          "column": "status_code",
+          "default": "Unknown",
+          "on_null": null,
+          "target": "status_label",
+          "unmapped": "keep",
+          "values": {
+            "A": "Active",
+            "I": "Inactive",
+            "P": "Pending"
+          }
+        }
+      },
+      {
+        "fill_null": {
+          "code": "unknown",
+          "columns": null,
+          "exclude": [
+            "id",
+            "*_id"
+          ],
+          "include": null,
+          "mode": "type_defaults",
+          "overrides": {
+            "region": "Unspecified"
+          },
+          "where": null
+        }
+      },
+      {
+        "format": {
+          "columns": {
+            "hire_date": {
+              "date": "yyyy-MM-dd",
+              "number": null,
+              "on_short": "null",
+              "pattern": null,
+              "source": null,
+              "strict_types": false
+            },
+            "phone_display": {
+              "date": null,
+              "number": null,
+              "on_short": "null",
+              "pattern": "({1:3}) {4:3}-{7:4}",
+              "source": "phone_raw",
+              "strict_types": false
+            }
+          }
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "dim_contacts",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": null,
+    "with_": null,
+    "write": null
+  },
+  "threads": {},
+  "tree": {
+    "children": [],
+    "effective": {},
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_contacts",
+    "source_ref": "<root>/dim_contacts.thread"
+  },
+  "warnings": [],
+  "weaves": {}
+}

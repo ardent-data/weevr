@@ -1,6 +1,12 @@
 """Tests for incremental config cross-cutting validation."""
 
+from pathlib import Path
+
+import pytest
+
+from weevr.config import load_config, load_resolved
 from weevr.config.validation import validate_incremental_config
+from weevr.errors import ConfigError
 
 
 class TestValidateIncrementalConfig:
@@ -218,3 +224,219 @@ class TestValidateIncrementalConfig:
         }
         diags = validate_incremental_config(config)
         assert not any("WARN" in d and "incremental_parameter" in d for d in diags)
+
+
+# ---------------------------------------------------------------------------
+# The checks run in the shared load, for every thread it pulls in
+# ---------------------------------------------------------------------------
+
+
+_CDC_OVERWRITE = """\
+config_version: "1.0"
+sources:
+  src: {type: delta, alias: raw.orders}
+target: {alias: silver.orders}
+load:
+  mode: cdc
+  cdc: {preset: delta_cdf}
+"""
+
+_PARAM_THREAD = """\
+config_version: "1.0"
+params:
+  start: {name: start, type: string, default: "2024-01-01"}
+sources:
+  src: {type: delta, alias: raw.orders}
+steps:
+  - filter: {expr: "order_date >= '${param.start}'"}
+target: {alias: silver.orders}
+write: {mode: append}
+load: {mode: incremental_parameter}
+"""
+
+_PARAM_FREE_THREAD = """\
+config_version: "1.0"
+sources:
+  src: {type: delta, alias: raw.orders}
+steps:
+  - filter: {expr: "order_date >= '2024-01-01'"}
+target: {alias: silver.orders}
+write: {mode: append}
+load: {mode: incremental_parameter}
+"""
+
+
+def _project(tmp_path: Path, files: dict[str, str]) -> Path:
+    root = tmp_path / "inc.weevr"
+    for name, text in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    return root
+
+
+def _context_load(root: Path, config: str) -> object:
+    from unittest.mock import MagicMock
+
+    from pyspark.sql import SparkSession
+
+    from weevr.context import Context
+
+    return Context(spark=MagicMock(spec=SparkSession), project=str(root)).load(config)
+
+
+_ENTRY_POINTS = {
+    "load_config": lambda root, config: load_config(root / config, project_root=root),
+    "load_resolved": lambda root, config: load_resolved(root / config, project_root=root),
+    "Context.load": _context_load,
+}
+
+
+class TestIncrementalChecksAtLoad:
+    """Invalid incremental settings fail at load with a located ConfigError."""
+
+    @pytest.mark.parametrize("entry", _ENTRY_POINTS)
+    def test_standalone_thread(self, entry: str, tmp_path: Path) -> None:
+        root = _project(tmp_path, {"t.thread": _CDC_OVERWRITE})
+        with pytest.raises(
+            ConfigError, match=r"thread 't'.*cdc mode requires write.mode='merge'"
+        ) as e:
+            _ENTRY_POINTS[entry](root, "t.thread")
+        assert e.value.file_path == str(root / "t.thread")
+
+    @pytest.mark.parametrize("entry", _ENTRY_POINTS)
+    def test_child_thread_names_its_own_file(self, entry: str, tmp_path: Path) -> None:
+        root = _project(
+            tmp_path,
+            {
+                "threads/t.thread": _CDC_OVERWRITE,
+                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: threads/t.thread\n',
+                "l.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+            },
+        )
+        for config in ("w.weave", "l.loom"):
+            with pytest.raises(ConfigError, match=r"thread 't'.*cdc mode") as e:
+                _ENTRY_POINTS[entry](root, config)
+            assert e.value.file_path == str(root / "threads" / "t.thread")
+
+    def test_inline_thread_names_the_enclosing_file(self, tmp_path: Path) -> None:
+        weave = (
+            'config_version: "1.0"\n'
+            "threads:\n"
+            "  - name: t\n"
+            '    config_version: "1.0"\n'
+            "    sources: {src: {type: delta, alias: raw.orders}}\n"
+            "    target: {alias: silver.orders}\n"
+            "    load: {mode: cdc, cdc: {preset: delta_cdf}}\n"
+        )
+        root = _project(tmp_path, {"w.weave": weave})
+        with pytest.raises(ConfigError, match=r"thread 't'.*cdc mode") as e:
+            load_resolved(root / "w.weave", project_root=root)
+        assert e.value.file_path == str(root / "w.weave")
+
+    def test_weave_defaults_fix_the_write_mode(self, tmp_path: Path) -> None:
+        """The check sees the cascaded thread, as the engine runs it."""
+        root = _project(
+            tmp_path,
+            {
+                "threads/t.thread": _CDC_OVERWRITE,
+                "w.weave": (
+                    'config_version: "1.0"\ndefaults:\n  write: {mode: merge, match_keys: [id]}\n'
+                    "threads:\n  - ref: threads/t.thread\n"
+                ),
+            },
+        )
+        load_resolved(root / "w.weave", project_root=root)
+
+    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    def test_every_context_mode_fails_at_load(self, mode: str, tmp_path: Path) -> None:
+        """Execute used to raise ExecutionError at thread start; now every mode fails at load."""
+        from unittest.mock import MagicMock
+
+        from pyspark.sql import SparkSession
+
+        from weevr.context import Context
+
+        root = _project(tmp_path, {"t.thread": _CDC_OVERWRITE})
+        spark = MagicMock(spec=SparkSession)
+        with pytest.raises(ConfigError, match=r"thread 't'.*cdc mode"):
+            Context(spark=spark, project=str(root)).run("t.thread", mode=mode)
+        spark.read.assert_not_called()
+
+
+class TestIncrementalParameterWarning:
+    """The "no ${param.*}" warning reads the thread as written, before substitution."""
+
+    _MESSAGE = "incremental_parameter mode but no ${param.*} references"
+
+    def test_param_using_thread_does_not_warn(self, tmp_path: Path) -> None:
+        root = _project(tmp_path, {"t.thread": _PARAM_THREAD})
+        loaded = load_resolved(root / "t.thread", project_root=root)
+        assert not any(self._MESSAGE in w for w in loaded.warnings)
+
+    def test_param_free_thread_warns(self, tmp_path: Path) -> None:
+        root = _project(tmp_path, {"t.thread": _PARAM_FREE_THREAD})
+        loaded = load_resolved(root / "t.thread", project_root=root)
+        assert [w for w in loaded.warnings if self._MESSAGE in w] == [
+            f"WARN: thread 't': {self._MESSAGE} found in steps or sources"
+        ]
+
+    def test_param_using_template_child_does_not_warn(self, tmp_path: Path) -> None:
+        root = _project(
+            tmp_path,
+            {
+                "threads/t.thread": _PARAM_THREAD,
+                "w.weave": (
+                    'config_version: "1.0"\nthreads:\n'
+                    "  - ref: threads/t.thread\n    as: a\n    params: {start: '2025-01-01'}\n"
+                ),
+            },
+        )
+        loaded = load_resolved(root / "w.weave", project_root=root)
+        assert not any(self._MESSAGE in w for w in loaded.warnings)
+
+    def test_load_config_logs_the_warning(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging
+
+        root = _project(tmp_path, {"t.thread": _PARAM_FREE_THREAD})
+        with caplog.at_level(logging.WARNING, logger="weevr.config"):
+            load_config(root / "t.thread", project_root=root)
+        assert any(self._MESSAGE in r.getMessage() for r in caplog.records)
+
+
+class TestIncrementalDiagnostics:
+    """The load and the engine build the check's input the same way."""
+
+    @staticmethod
+    def _thread(**fields: object):
+        from weevr.model.thread import Thread
+
+        return Thread.model_validate(
+            {
+                "name": "t",
+                "config_version": "1.0",
+                "sources": {"src": {"type": "delta", "alias": "raw.orders"}},
+                "target": {"alias": "silver.orders"},
+                **fields,
+            }
+        )
+
+    def test_errors_come_from_the_hydrated_thread(self) -> None:
+        from weevr.config.validation import incremental_diagnostics
+
+        load = {"mode": "incremental_watermark", "watermark_column": "ts", "watermark_type": "long"}
+        thread = self._thread(load=load)
+        assert incremental_diagnostics(thread) == [
+            "ERROR: incremental_watermark mode requires write.mode='append' or 'merge', "
+            "got 'overwrite' (the default)"
+        ]
+
+    def test_param_rule_reads_the_authored_dict(self) -> None:
+        from weevr.config.validation import incremental_diagnostics
+
+        thread = self._thread(load={"mode": "incremental_parameter"}, write={"mode": "append"})
+        authored = {"steps": [{"filter": {"expr": "d > '${param.start}'"}}]}
+        assert incremental_diagnostics(thread, authored) == []
+        assert any("incremental_parameter" in d for d in incremental_diagnostics(thread))

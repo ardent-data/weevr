@@ -1,0 +1,54 @@
+config_version: "1.0"
+
+defaults:
+  write:
+    mode: append
+
+lookups:
+  shared:
+    source:
+      type: delta
+      alias: ref.shared_weave
+  weave_only:
+    source:
+      type: delta
+      alias: ref.weave_only
+
+column_sets:
+  shared_map:
+    param: weave_shared_map
+
+variables:
+  shared_var:
+    type: int
+    default: 2
+
+threads:
+  - ref: threads/base.thread
+  - ref: threads/template.thread
+    as: tpl_a
+    params:
+      suffix: a
+    dependencies:
+      - base
+  - ref: threads/template.thread
+    as: tpl_b
+    params:
+      suffix: b
+    condition:
+      when: "table_exists('gold.base')"
+  - name: inline_core
+    config_version: "1.0"
+    sources:
+      x:
+        type: delta
+        alias: raw.x
+      w:
+        lookup: weave_only
+    steps:
+      - rename:
+          column_set: shared_map
+    target:
+      alias: out.inline_core
+    dependencies:
+      - tpl_a

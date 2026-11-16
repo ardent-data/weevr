@@ -36,6 +36,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -236,11 +237,12 @@ from weevr.config import load_resolved
 
 root = Path(sys.argv[1])
 weave = load_resolved(root / "w.weave", project_root=root)
-assert list(weave.resolved_threads["w"]) == ["a", "b"], dict(weave.resolved_threads)
+threads = weave.document.weave_threads()
+assert list(threads["w"]) == ["a", "b"], threads
 assert [p.execution_order for p in weave.execution_plan] == [[["a"], ["b"]]]
 
 loom = load_resolved(root / "l.loom", project_root=root)
-assert list(loom.resolved_weaves) == ["w"]
+assert list(loom.document.weaves()) == ["w"]
 assert [p.weave_name for p in loom.execution_plan] == ["w"]
 assert weave.validate_plans() == ()
 assert loom.validate_plans() == ()
@@ -276,6 +278,91 @@ def test_core_only_install_loads_resolved_children(
         text=True,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+
+# Loads a whole project and prints everything the load produces as JSON:
+# the document tree with each node's effective registries, the warnings,
+# each weave's plan, and the plan issues.
+_PROJECT_SUMMARY = """\
+import json
+import sys
+from pathlib import Path
+
+from weevr.config import load_resolved
+
+root = Path(sys.argv[1])
+loaded = load_resolved(root / "forms.loom", project_root=root)
+
+
+def registries(scope):
+    return {
+        kind: {name: value.model_dump(mode="json") for name, value in registry.items()}
+        for kind in ("lookups", "column_sets", "variables")
+        if (registry := getattr(scope, kind)) is not None
+    }
+
+
+def node(doc):
+    return {
+        "kind": doc.kind,
+        "name": doc.name,
+        "model": doc.model.model_dump(mode="json"),
+        "effective": registries(doc.effective),
+        "children": [node(child) for child in doc.children.values()],
+    }
+
+
+summary = {
+    "tree": node(loaded.document),
+    "warnings": list(loaded.warnings),
+    "plans": [
+        [p.weave_name, p.execution_order, p.lookup_schedule]
+        for p in loaded.execution_plan or []
+    ],
+    "issues": [[i.weave_name, i.message] for i in loaded.validate_plans()],
+    "pyspark_loaded": "pyspark" in sys.modules,
+}
+print(json.dumps(summary, sort_keys=True).replace(str(root), "<root>"))
+"""
+
+FORMS_PROJECT = REPO_ROOT / "tests" / "weevr" / "fixtures" / "load_parity" / "forms.weevr"
+
+
+@pytest.mark.install_smoke
+def test_core_only_install_loads_a_whole_project(
+    wheels: tuple[Path, Path],
+    tmp_path: Path,
+    python_version: str,
+) -> None:
+    """A multi-weave loom with templates, lookups and column sets loads fully without Spark.
+
+    The tree, effective registries, warnings, plans and plan issues in a
+    core-only install match the same load in this (full) environment.
+    """
+    import json
+
+    _, core = wheels
+    python = _make_venv(tmp_path / "core_only_project", python_version)
+    _pip_install(python, str(core))
+    project = tmp_path / "forms.weevr"
+    shutil.copytree(FORMS_PROJECT, project)
+
+    def summary(interpreter: str) -> dict[str, object]:
+        result = subprocess.run(
+            [interpreter, "-c", _PROJECT_SUMMARY, str(project)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        return json.loads(result.stdout)
+
+    core_only = summary(str(python))
+    pyspark_loaded = core_only.pop("pyspark_loaded")
+    assert pyspark_loaded is False
+    full = summary(sys.executable)
+    full.pop("pyspark_loaded")
+    assert core_only == full
+    assert len(core_only["plans"]) == 3  # type: ignore[arg-type]
 
 
 @pytest.mark.install_smoke

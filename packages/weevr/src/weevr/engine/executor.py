@@ -15,6 +15,7 @@ from pyspark.sql import Observation, SparkSession
 from pyspark.sql import functions as F
 
 from weevr.config.audit_templates import AuditContext
+from weevr.config.document import ScopeRegistries
 from weevr.delta import read_delta
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
@@ -26,7 +27,6 @@ from weevr.engine.lookups import (
     materialize_lookups,
     resolve_lookup_frames,
 )
-from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import ThreadResult
 from weevr.engine.target_identity import resolve_target_identity
 from weevr.engine.variables import VariableContext
@@ -145,6 +145,7 @@ def execute_thread(
     capture_samples: bool = False,
     cache_registry: CacheManager | None = None,
     uk_memo: UniqueKeyMemo | None = None,
+    scope: ScopeRegistries | None = None,
 ) -> ThreadResult:
     """Execute a single thread from sources through transforms to a Delta target.
 
@@ -181,8 +182,8 @@ def execute_thread(
         cached_lookups: Pre-materialized lookup DataFrames keyed by lookup name.
             Runtime type is ``dict[str, DataFrame]``; ``Any`` avoids coupling
             the signature to PySpark types.
-        weave_lookups: Weave-level lookup definitions for on-demand resolution
-            of non-materialized lookups.
+        weave_lookups: The enclosing weave's effective lookup definitions.
+            Used only when ``scope`` is not given.
         resolved_params: Runtime parameter values for telemetry capture.
             Stored on ThreadTelemetry for thread-level runs.
         loom_name: Loom name for audit column context variables.
@@ -192,9 +193,12 @@ def execute_thread(
         column_sets: Pre-resolved column set mappings keyed by name. Passed
             through to ``run_pipeline`` so rename steps can look up their
             resolved dictionaries.
-        column_set_defs: Column set model instances keyed by name. Passed
-            through to ``run_pipeline`` so rename steps can read
-            ``on_unmapped`` and ``on_extra`` settings.
+        column_set_defs: The enclosing weave's effective column set models.
+            Used only when ``scope`` is not given.
+        scope: The thread's effective lookups and column sets from the
+            resolved config tree (its own over its weave's and loom's). When
+            omitted, they are computed from ``thread`` and the weave-level
+            ``weave_lookups`` / ``column_set_defs`` by the same rule.
         connections: Named connection declarations keyed by connection name.
             When provided, source reads, lookup materialization, target path
             resolution, and export writes use connection-based paths where
@@ -235,20 +239,29 @@ def execute_thread(
 
     load_mode = thread.load.mode if thread.load else "full"
 
-    # Fail-fast: validate incremental config cross-cutting constraints
+    # The load rejects these settings for every config it loads; this guard
+    # covers threads built in code and passed here directly, where an
+    # incremental slice could otherwise overwrite the whole target.
     if load_mode != "full":
-        _validate_incremental(thread, load_mode)
+        _reject_invalid_incremental(thread)
 
     # --- Thread-level resource lifecycle ---
     thread_variable_ctx = _build_thread_variable_context(thread)
     cleanup = _ThreadCleanup()
 
     try:
+        if scope is None:
+            scope = ScopeRegistries.declared_by(thread).under(
+                ScopeRegistries(lookups=weave_lookups, column_sets=column_set_defs),
+                "weave",
+                "thread",
+            )
         resources = _prepare_thread_resources(
             spark,
             thread,
             cleanup,
             cached_lookups=cached_lookups,
+            scope=scope,
             weave_lookups=weave_lookups,
             column_sets=column_sets,
             column_set_defs=column_set_defs,
@@ -597,6 +610,7 @@ def _prepare_thread_resources(
     cleanup: _ThreadCleanup,
     *,
     cached_lookups: dict[str, Any] | None,
+    scope: ScopeRegistries,
     weave_lookups: dict[str, Lookup] | None,
     column_sets: dict[str, dict[str, str]] | None,
     column_set_defs: dict[str, ColumnSet] | None,
@@ -606,14 +620,20 @@ def _prepare_thread_resources(
 ) -> _ThreadResources:
     """Materialize the thread's own lookups and column sets over the weave's.
 
+    Only the thread's declared lookups and column sets materialize here;
+    definitions are looked up in ``scope``, the thread's effective registries.
+    Where the scope has none, the weave-level values pass through as given
+    (an empty mapping still switches lookup resolution on).
     Materialized thread lookups are registered with ``cleanup`` before any
     later step can fail.
     """
     resources = _ThreadResources(
         cached_lookups=cached_lookups,
-        weave_lookups=weave_lookups,
+        weave_lookups=dict(scope.lookups) if scope.lookups is not None else weave_lookups,
         column_sets=column_sets,
-        column_set_defs=column_set_defs,
+        column_set_defs=(
+            dict(scope.column_sets) if scope.column_sets is not None else column_set_defs
+        ),
         lookup_meta=lookup_meta,
     )
 
@@ -636,21 +656,12 @@ def _prepare_thread_resources(
         # Thread-scoped materialization facts join the inherited map so
         # resolve steps can reuse unique-key outcomes at every scope
         resources.lookup_meta = build_lookup_meta(thread_lookup_results, base=lookup_meta)
-        # Merge lookup definitions so resolve_thread_lookups sees both
-        resources.weave_lookups = merge_resource_dicts(
-            weave_lookups, thread.lookups, "lookup", "weave", "thread"
-        )
 
     # Merge thread-level column_sets with weave-level (thread wins).
     # Only the THREAD's defs materialize here — the weave's mappings
     # arrive already resolved and merge as plain dicts, so a weave set
     # resolves once per weave regardless of thread count
     if thread.column_sets:
-        merged_cs_defs = merge_resource_dicts(
-            column_set_defs, thread.column_sets, "column_set", "weave", "thread"
-        )
-        if merged_cs_defs:
-            resources.column_set_defs = merged_cs_defs
         thread_resolved_cs, _ = materialize_column_sets(
             spark,
             dict(thread.column_sets),
@@ -1942,32 +1953,6 @@ def _build_audit_context(
     )
 
 
-def _validate_incremental(thread: Thread, load_mode: str) -> None:
-    """Run cross-cutting incremental config validation at executor entry."""
-    from weevr.config.validation import validate_incremental_config
-
-    load_raw: dict[str, object] = {"mode": load_mode}
-    if thread.load is not None:
-        load_raw["watermark_inclusive"] = thread.load.watermark_inclusive
-        if thread.load.watermark_column is not None:
-            load_raw["watermark_column"] = thread.load.watermark_column
-        if thread.load.cdc is not None:
-            load_raw["cdc"] = thread.load.cdc.model_dump()
-    raw: dict[str, object] = {"load": load_raw}
-    if thread.write is not None:
-        raw["write"] = {"mode": thread.write.mode}
-    diagnostics = validate_incremental_config(raw)
-    errors = [d for d in diagnostics if d.startswith("ERROR:")]
-    if errors:
-        raise ExecutionError(
-            "; ".join(errors),
-            thread_name=thread.name,
-        )
-    for diag in diagnostics:
-        if diag.startswith("WARN:"):
-            logger.warning("Thread '%s': %s", thread.name, diag)
-
-
 def _validate_cdc_write_config(thread: Thread) -> WriteConfig:
     """Validate and return write config for CDC merge, failing fast if misconfigured."""
     if thread.write is None:
@@ -2094,3 +2079,18 @@ def _build_telemetry(
         drift_action_taken=drift_action_taken,
         step_stats=step_stats,
     )
+
+
+def _reject_invalid_incremental(thread: Thread) -> None:
+    """Raise for incremental settings that can never run safely.
+
+    Errors only: warnings are reported by the load.
+
+    Raises:
+        ExecutionError: Naming the thread and every failed rule.
+    """
+    from weevr.config.validation import incremental_diagnostics, split_diagnostics
+
+    errors, _ = split_diagnostics(incremental_diagnostics(thread))
+    if errors:
+        raise ExecutionError("; ".join(errors), thread_name=thread.name)

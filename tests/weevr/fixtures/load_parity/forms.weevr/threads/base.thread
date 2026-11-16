@@ -1,0 +1,38 @@
+config_version: "1.0"
+
+lookups:
+  shared:
+    source:
+      type: delta
+      alias: ref.shared_thread
+
+column_sets:
+  thread_map:
+    param: thread_map
+
+variables:
+  shared_var:
+    type: int
+    default: 3
+
+sources:
+  orders:
+    type: delta
+    alias: raw.orders
+  region:
+    lookup: regions
+  shared:
+    lookup: shared
+
+steps:
+  - foreach:
+      values: [order_id, customer_id]
+      as: col
+      steps:
+        - filter:
+            expr: "{col} is not null"
+  - rename:
+      column_set: thread_map
+
+target:
+  alias: gold.base

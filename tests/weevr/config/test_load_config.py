@@ -1255,7 +1255,7 @@ class TestLoadConfigMatchesContext:
         (tmp_path / "t.thread").write_text(_LOOKUP_THREAD)
         (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: t.thread\n')
         result = load_resolved(tmp_path / "w.weave", project_root=tmp_path)
-        thread = result.resolved_threads["w"]["t"]
+        thread = result.document.weave_threads()["w"]["t"]
         assert thread.lookups is not None
         assert thread.lookups["regions"].source.path == str(tmp_path / "ref" / "regions.csv")
 
@@ -1322,7 +1322,7 @@ class TestLoadConfigFlatAuditTemplates:
             loom=templates if level == "loom" else None,
         )
         loaded = load_resolved(project / "l.loom", project_root=project)
-        audit = loaded.resolved_threads["w"]["fact"].target.audit_columns
+        audit = loaded.document.weave_threads()["w"]["fact"].target.audit_columns
         assert audit is not None
         assert {k: audit[k] for k in self.COLUMNS} == self.COLUMNS
 
@@ -1551,8 +1551,8 @@ class TestLoadConfigLookupPaths:
         assert isinstance(loom, Loom)
         assert loom.lookups is not None
         assert loom.lookups["calendar"].source.path == str(tmp_path / "ref" / "calendar.csv")
-        referenced = result.resolved_weaves["w"].lookups
-        inline = result.resolved_weaves["inline_ops"].lookups
+        referenced = result.document.weaves()["w"].lookups
+        inline = result.document.weaves()["inline_ops"].lookups
         assert referenced is not None and inline is not None
         assert referenced["countries"].source.path == str(tmp_path / "ref" / "countries.csv")
         assert inline["stores"].source.path == str(tmp_path / "ref" / "stores.csv")
@@ -1562,7 +1562,7 @@ class TestLoadConfigLookupPaths:
         self._weave(tmp_path)
         (tmp_path / "x.loom").write_text('config_version: "1.0"\nweaves:\n  - ref: w.weave\n')
         alone = load_config(tmp_path / "w.weave", project_root=tmp_path)
-        child = load_resolved(tmp_path / "x.loom", project_root=tmp_path).resolved_weaves["w"]
+        child = load_resolved(tmp_path / "x.loom", project_root=tmp_path).document.weaves()["w"]
         assert isinstance(alone, Weave)
         assert alone.lookups is not None and child.lookups is not None
         assert child.lookups["countries"].source.path == alone.lookups["countries"].source.path

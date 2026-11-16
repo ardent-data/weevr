@@ -2339,7 +2339,7 @@ class TestLoomResourceLifecycle:
         assert "ref" in pre_cached
         assert pre_cached["ref"] is mock_df
         # Definitions travel separately: visible to threads, not re-materialized
-        assert set(call_kwargs["inherited_lookups"]) == {"ref"}
+        assert set(call_kwargs["effective_lookups"]) == {"ref"}
         assert call_kwargs["lookups"] is None
 
     @patch("weevr.engine.runner.execute_thread")
@@ -2455,7 +2455,7 @@ class TestLoomResourceLifecycle:
 
     @patch("weevr.engine.runner.execute_weave")
     def test_loom_column_sets_use_merge_helper(self, mock_weave_exec):
-        """Column sets now use merge_resource_dicts helper for loom/weave merge."""
+        """Column sets reach the weave as its effective registry: its own over the loom's."""
         from weevr.model.column_set import ColumnSet, ColumnSetSource
 
         mock_weave_exec.return_value = self._weave_result()

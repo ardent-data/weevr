@@ -115,7 +115,12 @@ Thread execution is orchestrated at two levels:
    loom's `variables` declarations.
 2. **Pre-steps** — Loom `pre_steps` hooks run.
 3. **Shared resources** — Loom-level column sets are resolved and loom-level
-   lookups are materialized once, then shared by every weave.
+   lookups are materialized once, then shared by every weave. Which
+   definition each name means in each weave and thread is not worked out
+   here: the load already merged lookups, column sets, and variables by
+   scope and recorded the result on the
+   [document tree](config-resolution.md#the-document-tree), and the runner
+   reads it from there.
 4. **Weaves** — Weaves run in declared order. Each weave gets its own plan
    and executor pass. Weave-level conditions are evaluated before planning;
    a false condition skips the entire weave. If a weave's status is
@@ -176,7 +181,8 @@ Thread execution is orchestrated at two levels:
    threads are then submitted to a `ThreadPoolExecutor` for
    concurrent execution. Threads reference lookups via
    `source.lookup` or a `resolve` step and receive the cached DataFrame,
-   or read a non-materialized lookup on demand.
+   or read a non-materialized lookup on demand. Each thread looks
+   definitions up in its effective registries from the tree.
 6. **Post-steps** — After all threads complete, `post_steps` hook
    steps run. Failures with `on_failure: abort` mark the weave
    as failed.
@@ -430,7 +436,7 @@ column below records which package each file lives in.
 | `engine/hooks.py` | `weevr` | Pre/post hook step execution: quality gates, SQL statements, log messages |
 | `engine/lookups.py` | `weevr` | Lookup materialization: pre-read, narrow projection, caching/broadcast |
 | `engine/column_sets.py` | `weevr` | Column set resolution: builds named column mappings from Delta, YAML, or parameter sources |
-| `engine/resources.py` | `weevr` | Runtime resource merges across loom → weave → thread (lookups, column sets, variables, hook lists); the inner level wins on name conflicts |
+| `engine/resources.py` | `weevr` | Hook list resolution across loom → weave → thread (an inner list replaces the outer). Lookups, column sets, and variables merge at load, not here |
 | `engine/target_identity.py` | `weevr` | Canonical target identity, so cache registration and lookup agree on one key per physical table |
 | `engine/variables.py` | `weevr` | Variable binding and resolution for loom, weave, and thread variables |
 | `engine/display.py` | `weevr-core` | SVG visualization (DAG, flow, timeline, waterfall) and HTML result rendering for notebooks |

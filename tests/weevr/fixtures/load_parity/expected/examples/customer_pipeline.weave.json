@@ -1,0 +1,368 @@
+{
+  "config_name": "customer_pipeline",
+  "config_type": "weave",
+  "execution_order": [
+    [
+      [
+        "staging_customers"
+      ],
+      [
+        "dim_customer"
+      ],
+      [
+        "fact_customer_orders"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": {
+      "capture_samples": false,
+      "log_level": "verbose",
+      "max_parallel_threads": null,
+      "trace": true
+    },
+    "lookups": null,
+    "name": "customer_pipeline",
+    "naming": null,
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "customer_pipeline.weave",
+    "threads": [
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": null,
+        "name": "staging_customers",
+        "params": null,
+        "ref": null
+      },
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": [
+          "staging_customers"
+        ],
+        "name": "dim_customer",
+        "params": null,
+        "ref": null
+      },
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": [
+          "dim_customer"
+        ],
+        "name": "fact_customer_orders",
+        "params": null,
+        "ref": null
+      }
+    ],
+    "variables": null
+  },
+  "threads": {
+    "customer_pipeline": {
+      "dim_customer": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "dim_customer",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "dim_customer",
+        "sources": {
+          "customers": {
+            "alias": "staging.customers",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": "curated.dim_customer",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      },
+      "fact_customer_orders": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "fact_customer_orders",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "fact_customer_orders",
+        "sources": {
+          "customers": {
+            "alias": "curated.dim_customer",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "orders": {
+            "alias": "raw.orders",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "alias": null,
+              "exclude": null,
+              "filter": null,
+              "include": null,
+              "null_safe": true,
+              "on": [
+                {
+                  "left": "customer_id",
+                  "right": "customer_id"
+                }
+              ],
+              "prefix": null,
+              "rename": null,
+              "source": "customers",
+              "type": "left"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "curated.fact_customer_orders",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      },
+      "staging_customers": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "staging_customers",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "staging_customers",
+        "sources": {
+          "raw_customers": {
+            "alias": "raw.customers",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": "staging.customers",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    }
+  },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "effective": {},
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "staging_customers",
+        "source_ref": "<root>/customer_pipeline.weave"
+      },
+      {
+        "children": [],
+        "effective": {},
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "staging_customers"
+          ],
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "dim_customer",
+        "source_ref": "<root>/customer_pipeline.weave"
+      },
+      {
+        "children": [],
+        "effective": {},
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "dim_customer"
+          ],
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "fact_customer_orders",
+        "source_ref": "<root>/customer_pipeline.weave"
+      }
+    ],
+    "effective": {},
+    "entry": null,
+    "kind": "weave",
+    "name": "customer_pipeline",
+    "source_ref": "<root>/customer_pipeline.weave"
+  },
+  "warnings": [],
+  "weaves": {}
+}

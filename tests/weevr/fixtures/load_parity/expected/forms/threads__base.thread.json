@@ -1,0 +1,213 @@
+{
+  "config_name": "base",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": null,
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": {
+      "thread_map": {
+        "on_extra": "ignore",
+        "on_failure": "abort",
+        "on_unmapped": "pass_through",
+        "param": "thread_map",
+        "source": null
+      }
+    },
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": {
+      "shared": {
+        "filter": null,
+        "key": null,
+        "materialize": false,
+        "on_failure": "abort",
+        "source": {
+          "alias": "ref.shared_thread",
+          "column": null,
+          "connection": null,
+          "dedup": null,
+          "end": null,
+          "lookup": null,
+          "options": {},
+          "path": null,
+          "schema_override": null,
+          "start": null,
+          "step": null,
+          "table": null,
+          "type": "delta"
+        },
+        "strategy": "cache",
+        "unique_key": false,
+        "values": null
+      }
+    },
+    "name": "base",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "threads/base.thread",
+    "sources": {
+      "orders": {
+        "alias": "raw.orders",
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "delta"
+      },
+      "region": {
+        "alias": null,
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": "regions",
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": null
+      },
+      "shared": {
+        "alias": null,
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": "shared",
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": null
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "order_id is not null"
+        }
+      },
+      {
+        "filter": {
+          "expr": "customer_id is not null"
+        }
+      },
+      {
+        "rename": {
+          "column_set": "thread_map",
+          "columns": {}
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "gold.base",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": {
+      "shared_var": {
+        "default": 3,
+        "type": "int"
+      }
+    },
+    "with_": null,
+    "write": null
+  },
+  "threads": {},
+  "tree": {
+    "children": [],
+    "effective": {
+      "column_sets": {
+        "thread_map": {
+          "on_extra": "ignore",
+          "on_failure": "abort",
+          "on_unmapped": "pass_through",
+          "param": "thread_map",
+          "source": null
+        }
+      },
+      "lookups": {
+        "shared": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.shared_thread",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      },
+      "variables": {
+        "shared_var": {
+          "default": 3,
+          "type": "int"
+        }
+      }
+    },
+    "entry": null,
+    "kind": "thread",
+    "name": "base",
+    "source_ref": "<root>/threads/base.thread"
+  },
+  "warnings": [
+    "WARN: thread 'base': source 'region' references lookup 'regions', which this thread doesn't define; it must come from a weave or loom"
+  ],
+  "weaves": {}
+}

@@ -1,0 +1,169 @@
+{
+  "config_name": "dim_store",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": [
+      {
+        "column": null,
+        "columns": [
+          "store_id",
+          "store_name"
+        ],
+        "expression": null,
+        "max": null,
+        "max_rate": null,
+        "message": null,
+        "min": null,
+        "sentinel": null,
+        "sentinels": null,
+        "severity": "error",
+        "type": "column_not_null"
+      },
+      {
+        "column": null,
+        "columns": null,
+        "expression": null,
+        "max": null,
+        "max_rate": null,
+        "message": null,
+        "min": 1,
+        "sentinel": null,
+        "sentinels": null,
+        "severity": "warn",
+        "type": "row_count"
+      },
+      {
+        "column": null,
+        "columns": [
+          "store_id"
+        ],
+        "expression": null,
+        "max": null,
+        "max_rate": null,
+        "message": null,
+        "min": null,
+        "sentinel": null,
+        "sentinels": null,
+        "severity": "error",
+        "type": "unique"
+      }
+    ],
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "dim_store",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "dim_store.thread",
+    "sources": {
+      "stores": {
+        "alias": "raw.stores",
+        "column": null,
+        "connection": null,
+        "dedup": null,
+        "end": null,
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": null,
+        "step": null,
+        "table": null,
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "store_id",
+            "store_name",
+            "city",
+            "state",
+            "square_footage",
+            "open_date"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "square_footage": "int"
+          }
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "curated.dim_store",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": [
+      {
+        "name": "store_id_not_null",
+        "rule": "store_id IS NOT NULL",
+        "severity": "fatal"
+      },
+      {
+        "name": "square_footage_positive",
+        "rule": "square_footage > 0",
+        "severity": "warn"
+      }
+    ],
+    "variables": null,
+    "with_": null,
+    "write": {
+      "match_keys": null,
+      "mode": "overwrite",
+      "on_match": "update",
+      "on_no_match_source": "ignore",
+      "on_no_match_target": "insert",
+      "soft_delete_active_value": null,
+      "soft_delete_column": null,
+      "soft_delete_value": true
+    }
+  },
+  "threads": {},
+  "tree": {
+    "children": [],
+    "effective": {},
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_store",
+    "source_ref": "<root>/dim_store.thread"
+  },
+  "warnings": [],
+  "weaves": {}
+}

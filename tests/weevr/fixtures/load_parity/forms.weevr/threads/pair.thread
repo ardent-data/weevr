@@ -1,0 +1,15 @@
+config_version: "1.0"
+
+sources:
+  data:
+    type: csv
+    path: data/pair.csv
+    options:
+      header: true
+
+steps:
+  - filter:
+      expr: "id is not null"
+
+target:
+  alias: gold.pair

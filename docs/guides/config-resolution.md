@@ -108,9 +108,10 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
 - Weave → loads referenced threads
 
 Each child is itself run through the full pipeline (recursion). A `visited`
-set tracks loaded paths to detect circular references. Entry-level
-overrides like `dependencies` and `condition` are preserved alongside the
-loaded config.
+set tracks loaded paths to detect circular references. Each child travels
+with the entry that pulled it in (`ref`, `as`, `params`, `dependencies`,
+`condition`), the file it is written in, and its config as written before
+variable substitution. Nothing is added to the config itself.
 
 ### Stage 8–9: Inherit and expand
 
@@ -132,6 +133,16 @@ loaded config.
     Target policies — `schema_drift`, `on_drift`, and `warp_enforcement`
     under `defaults.target` — cascade per key from loom to weave to the
     thread's target, and the most specific level wins.
+
+    Named registries — `lookups`, `column_sets`, and `variables` — merge
+    by name from loom to weave to thread: each scope sees the outer
+    scopes' entries plus its own, and its own win a name clash. The
+    merged registries are computed once, here, and recorded on the
+    [document tree](#the-document-tree); plan, preview, validate, and
+    execution all read them, so they can't disagree about which
+    definition a name means. Merging only decides which definition a
+    name resolves to: a lookup still materializes once, in the scope
+    that declares it.
 
 - **Stage 9 — Expand macros.** `foreach` blocks in thread step lists are expanded
    into repeated sequences. This applies to a thread loaded directly and
@@ -155,12 +166,12 @@ For a weave or loom, every child it pulls in, whether referenced or
 inline, is hydrated and validated the same way, so a broken child fails
 the whole load. The error's `file_path` names the child's own file, or
 the file containing an inline definition.
-Incremental-mode constraints that span `load` and `write` (for example,
-CDC requires merge write mode, and watermark loads reject the default
-`overwrite`) are not part of the load. They are checked when the thread
-starts executing, so `load_config`, `load_resolved`, and
-`mode="validate"` do not report them; a violating config fails its run
-with an `ExecutionError`. See
+Finally, incremental-mode constraints that span `load` and `write` (for
+example, CDC requires merge write mode, and watermark loads reject the
+default `overwrite`) are checked on every thread the config pulls in,
+after the cascade, so defaults count. A violation raises a `ConfigError`
+naming the thread and the file it is written in, from every entry point
+and in every `Context` mode. Advisory findings join the load warnings. See
 [When load rules are checked](../reference/yaml-schema/thread.md#when-load-rules-are-checked).
 
 ## Loading without running
@@ -176,7 +187,7 @@ the difference is what comes back and what's needed:
 |---|---|---|
 | `Context.load()` | Yes | `LoadedConfig`, with `${fabric.*}` resolved |
 | `load_config()` | No | The `Thread`, `Weave`, or `Loom` model (or a params dict) |
-| `load_resolved()` | No | `LoadedConfig`, with each weave's resolved threads |
+| `load_resolved()` | No | `LoadedConfig`, with the resolved config tree |
 
 `load_resolved()` suits tools that check or plan configs outside the engine,
 such as a CLI or a CI step. It takes `.thread`, `.weave`, and `.loom` files
@@ -191,7 +202,7 @@ from weevr.config import load_resolved
 project = Path("project.weevr")
 loaded = load_resolved(project / "nightly.loom", project_root=project)
 
-for weave_name, threads in loaded.resolved_threads.items():
+for weave_name, threads in loaded.document.weave_threads().items():
     print(weave_name, list(threads))
 
 for warning in loaded.warnings:
@@ -220,8 +231,40 @@ exists, run only in `Context.run(mode="validate")`.
 
 !!! note
     `LoadedConfig.threads` and `.weaves` return the model's own entries
-    (`ThreadEntry` / `WeaveEntry`). The resolved models are under
-    `resolved_threads` and `resolved_weaves`.
+    (`ThreadEntry` / `WeaveEntry`). The resolved models are in the
+    document tree, below.
+
+### The document tree
+
+`LoadedConfig.document` is a `ResolvedDocument`: the loaded config and
+everything it pulls in, as a frozen tree. Each node has:
+
+| Field | What it holds |
+|---|---|
+| `model` | The hydrated `Thread`, `Weave`, or `Loom` |
+| `kind` | `"thread"`, `"weave"`, or `"loom"` |
+| `name` | The effective name (`as`, else `name`, else the file stem) |
+| `entry` | An `EntryMeta` for the entry that pulled it in: `ref`, `alias` (`as`), `params`, `dependencies`, `condition`. `None` for the loaded file |
+| `children` | A loom's weaves or a weave's threads, by effective name, in entry order |
+| `source_ref` | The file it is written in: its own, or the file holding it inline |
+| `effective` | The `lookups`, `column_sets`, and `variables` it sees, merged over every enclosing scope |
+| `declared` | The ones it declares itself |
+
+```python
+loom = loaded.document
+for weave in loom.children.values():
+    for thread in weave.children.values():
+        print(thread.name, thread.source_ref, sorted(thread.effective.lookups or {}))
+```
+
+`document.weave_threads()` and `document.weaves()` give the thread and
+weave models by name.
+
+!!! warning "Deprecated: `resolved_threads` and `resolved_weaves`"
+    `LoadedConfig.resolved_threads` and `LoadedConfig.resolved_weaves`
+    still return the same data, read from the tree, but each access raises
+    a `DeprecationWarning`. Use `document.weave_threads()` and
+    `document.weaves()` instead. Both properties are removed in weevr 3.0.
 
 ## Module map
 
@@ -229,8 +272,9 @@ exists, run only in `Context.run(mode="validate")`.
 |--------|----------------|
 | `config/parser.py` | YAML parsing, version extraction, typed extension detection |
 | `config/resolver.py` | Variable interpolation, reference loading, circular dependency detection |
-| `config/inheritance.py` | Three-level cascade: loom → weave → thread |
-| `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); lookup reference checks for `resolve` steps and sources (run during hydration); incremental cross-field checks (run when a thread starts executing) |
+| `config/inheritance.py` | Three-level cascade: loom → weave → thread, including the named registry merge (`cascade_registry`) |
+| `config/validation.py` | Pre-resolution schema validation; dimension override checks (run during load, before the cascade); lookup and column set reference checks (run during hydration); incremental cross-field checks (run at the end of the load, on every thread) |
+| `config/document.py` | The resolved config tree: `ResolvedDocument`, `EntryMeta`, and each node's registries |
 | `config/macros.py` | `foreach` block expansion in step lists; rejects `foreach` in `with:` sub-pipelines |
 | `config/hydration.py` | Hydrates resolved dicts into typed models, including referenced and inline children |
 | `config/attribution.py` | Attaches the source file to config errors raised while loading it |

@@ -754,7 +754,7 @@ class TestExplain:
             steps: list[Any] = []
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "Thread detail:" in text
         assert "delta:raw/customers" in text
@@ -785,7 +785,7 @@ class TestExplain:
             steps = [_FakeJoinStep(), _FakeOtherStep(), _FakeJoinStep()]
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "3 steps" in text
         assert "2 joins" in text
@@ -812,7 +812,7 @@ class TestExplain:
             steps = [_FakeJoinStep()]
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "1 step," in text
         assert "1 join" in text
@@ -875,7 +875,7 @@ class TestExplain:
             with_ = {"discounts": _FakeCTE()}
 
         result = self._make_result([plan])
-        result._resolved_threads = {"sales": _FakeThread()}
+        result.thread_models = {"sales": _FakeThread()}
         text = result.explain()
         assert "sub-pipelines:" in text
         assert "discounts \u2190 bi" in text
@@ -912,7 +912,7 @@ class TestExplain:
             with_ = {"ranked": _FakeCTE()}
 
         result = self._make_result([plan])
-        result._resolved_threads = {"t": _FakeThread()}
+        result.thread_models = {"t": _FakeThread()}
         text = result.explain()
         assert "1 step (join)" in text
         assert "1 steps" not in text
@@ -960,7 +960,7 @@ class TestExplain:
             with_ = {"discounts": _FakeCTE1(), "taxes": _FakeCTE2()}
 
         result = self._make_result([plan])
-        result._resolved_threads = {"sales": _FakeThread()}
+        result.thread_models = {"sales": _FakeThread()}
         text = result.explain()
         assert "discounts \u2190 bi" in text
         assert "taxes \u2190 pf" in text
@@ -985,7 +985,7 @@ class TestExplain:
             with_ = None
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "sub-pipelines:" not in text
 
@@ -1264,6 +1264,29 @@ class TestRunResultDag:
         assert "Weave: facts" in diagram.svg
 
 
+class TestRunResultThreadModels:
+    def test_thread_models_default_to_none(self) -> None:
+        result = RunResult(
+            status="success", mode=ExecutionMode.PLAN, config_type="weave", config_name="w"
+        )
+        assert result.thread_models is None
+        assert result.preview_metadata is None
+
+    def test_thread_models_are_read_only(self) -> None:
+        thread = _plan_thread("a", "out.a")
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="w",
+            thread_models={"a": thread},
+        )
+        assert result.thread_models is not None
+        assert result.thread_models["a"] is thread
+        with pytest.raises(TypeError):
+            result.thread_models["b"] = thread  # type: ignore[index]
+
+
 class TestLoadedConfig:
     @pytest.fixture()
     def sample_thread(self) -> Thread:
@@ -1291,6 +1314,57 @@ class TestLoadedConfig:
                 "weaves": ["dimensions"],
             }
         )
+
+    def test_from_document_reads_everything_from_the_tree(self, sample_thread: Thread) -> None:
+        from weevr.config import ResolvedDocument
+
+        document = ResolvedDocument(model=sample_thread, kind="thread", name="dim_customer")
+        loaded = LoadedConfig.from_document(document, ["WARN: x"])
+        assert loaded.document is document
+        assert loaded.model is sample_thread
+        assert (loaded.config_type, loaded.config_name) == ("thread", "dim_customer")
+        assert loaded.warnings == ("WARN: x",)
+
+    def test_parts_build_a_tree(
+        self, sample_loom: Loom, sample_weave: Weave, sample_thread: Thread
+    ) -> None:
+        loaded = LoadedConfig(
+            sample_loom,
+            "loom",
+            "nightly",
+            threads={"dimensions": {"dim_customer": sample_thread, "unlisted": sample_thread}},
+            weaves={"dimensions": sample_weave},
+        )
+        document = loaded.document
+        assert (document.kind, document.name) == ("loom", "nightly")
+        weave = document.children["dimensions"]
+        assert weave.model is sample_weave
+        # Children no entry lists are left out.
+        assert list(weave.children) == ["dim_customer"]
+        assert weave.children["dim_customer"].model is sample_thread
+
+    def test_parts_accept_thread_dicts(self, sample_weave: Weave, sample_thread: Thread) -> None:
+        loaded = LoadedConfig(
+            sample_weave,
+            "weave",
+            "dimensions",
+            threads={"dimensions": {"dim_customer": sample_thread.model_dump()}},
+        )
+        thread = loaded.document.children["dim_customer"].model
+        assert isinstance(thread, Thread)
+        assert thread == sample_thread
+
+    def test_deprecated_views_warn(self, sample_thread: Thread) -> None:
+        loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
+        with pytest.warns(DeprecationWarning, match=r"3\.0.*document\.weave_threads\(\)"):
+            assert loaded.resolved_threads == {}
+        with pytest.warns(DeprecationWarning, match=r"3\.0.*document\.weaves\(\)"):
+            assert loaded.resolved_weaves == {}
+
+    def test_deprecated_view_docstrings(self) -> None:
+        for name in ("resolved_threads", "resolved_weaves"):
+            doc = getattr(LoadedConfig, name).__doc__
+            assert doc.startswith("Deprecated"), name
 
     def test_model_property(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
@@ -1528,7 +1602,7 @@ class TestExplainExports:
                 "exports": exports,
             },
         )()
-        result._resolved_threads = {"stg_orders": thread_obj}
+        result.thread_models = {"stg_orders": thread_obj}
 
         text = result.explain()
         assert "exports:" in text
@@ -1621,7 +1695,7 @@ class TestSummaryPreviewMetadata:
             config_name="dim_customer",
             preview_data={"dim_customer": object()},
         )
-        result._preview_metadata = {
+        result.preview_metadata = {
             "dim_customer": {
                 "output_schema": [("id", "bigint"), ("name", "string")],
                 "row_count": 42,
@@ -1651,7 +1725,7 @@ class TestSummaryPreviewMetadata:
             config_name="dim_customer",
             preview_data={"dim_customer": object()},
         )
-        result._preview_metadata = {
+        result.preview_metadata = {
             "dim_customer": {"output_schema": [("id", "bigint")], "row_count": 0}
         }
         s = result.summary()

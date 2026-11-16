@@ -1,0 +1,62 @@
+# Entry forms x scopes: a file-referenced weave with a condition, a weave
+# found by convention, and an inline weave; lookups, column sets and
+# variables declared at loom, weave and thread level with shadowing.
+config_version: "1.0"
+
+params:
+  env:
+    name: env
+    type: string
+    default: dev
+
+defaults:
+  target_schema: gold
+
+lookups:
+  regions:
+    source:
+      type: delta
+      alias: ref.regions
+    materialize: true
+  shared:
+    source:
+      type: delta
+      alias: ref.shared_loom
+
+column_sets:
+  loom_map:
+    param: loom_map
+  shared_map:
+    param: loom_shared_map
+
+variables:
+  loom_var:
+    type: string
+    default: a
+  shared_var:
+    type: int
+    default: 1
+
+weaves:
+  - ref: weaves/core.weave
+    condition:
+      when: "'${param.env}' == 'dev'"
+  - name: conv
+  - name: inline_w
+    config_version: "1.0"
+    lookups:
+      shared:
+        source:
+          type: delta
+          alias: ref.shared_inline
+    threads:
+      - name: inline_t
+        config_version: "1.0"
+        sources:
+          s:
+            lookup: shared
+        steps:
+          - rename:
+              column_set: loom_map
+        target:
+          alias: "${target_schema}.inline_t"

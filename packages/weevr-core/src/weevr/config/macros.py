@@ -77,7 +77,7 @@ def expand_foreach(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
         var_name = foreach.get("as")
         template_steps = foreach.get("steps")
 
-        if values is None or (isinstance(values, list) and len(values) == 0):
+        if not isinstance(values, list) or len(values) == 0:
             raise ConfigError(f"foreach block at step index {i}: 'values' must be a non-empty list")
         if not var_name:
             raise ConfigError(f"foreach block at step index {i}: 'as' variable name is required")

@@ -1,14 +1,16 @@
 """Hydrate resolved config dicts into typed models, including referenced children."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.inheritance import cascade_registry
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
+from weevr.config.resolver import ResolvedChild
 from weevr.config.validation import (
     split_diagnostics,
     validate_rename_column_sets,
@@ -49,9 +51,18 @@ def _weave_origin(entry: Any) -> str:
     return f"'{_entry_name(entry)}.weave'"
 
 
+def _effective_names(outer: Mapping[str, Any] | None, own: Any, resource_type: str) -> set[str]:
+    """Names a thread sees: its own registry cascaded under its enclosing scope's."""
+    own_registry = own if isinstance(own, Mapping) else None
+    merged = cascade_registry(
+        outer, own_registry, resource_type, "weave", "thread", log_shadowing=False
+    )
+    return set(merged or {})
+
+
 def check_resolve_lookups(
     thread_dict: dict[str, Any],
-    visible: set[str],
+    outer: Mapping[str, Any] | None,
     source: ConfigLocation | str,
     name: str,
     warnings: list[str] | None,
@@ -60,9 +71,10 @@ def check_resolve_lookups(
 ) -> None:
     """Check a thread's lookup references against the lookups it can see at run time.
 
-    ``visible`` holds the enclosing weave's and loom's lookup names; the
-    thread's own lookups and, for resolve steps, its lookup-bound source
-    aliases are added here. ``standalone`` marks a thread loaded from its own
+    ``outer`` is the enclosing scope's effective lookups (the weave's merged
+    over the loom's); the thread's own are cascaded under it with the same
+    rule the tree uses, and resolve steps also see its lookup-bound source
+    aliases. ``standalone`` marks a thread loaded from its own
     file: its source lookups may come from a weave or loom it can't see, so
     those warn. See :func:`~weevr.config.validation.validate_source_lookups`.
 
@@ -71,7 +83,7 @@ def check_resolve_lookups(
             ``on_failure: warn`` adds a warning to ``warnings`` instead).
     """
     sources = thread_dict.get("sources") or {}
-    defined = set(visible) | set(thread_dict.get("lookups") or {})
+    defined = _effective_names(outer, thread_dict.get("lookups"), "lookup")
     available = defined | {
         alias for alias, src in sources.items() if isinstance(src, dict) and src.get("lookup")
     }
@@ -87,7 +99,7 @@ def check_resolve_lookups(
 
 def check_column_set_references(
     thread_dict: dict[str, Any],
-    visible: set[str],
+    outer: Mapping[str, Any] | None,
     source: ConfigLocation | str,
     name: str,
     warnings: list[str] | None,
@@ -96,16 +108,16 @@ def check_column_set_references(
 ) -> None:
     """Check a thread's rename steps against the column sets it can see at run time.
 
-    ``visible`` holds the enclosing weave's and loom's column set names; the
-    thread's own are added here. ``standalone`` marks a thread loaded from
-    its own file, where a set may come from a weave or loom it can't see, so
-    a missing name warns. See
+    ``outer`` is the enclosing scope's effective column sets; the thread's
+    own are cascaded under it with the same rule the tree uses.
+    ``standalone`` marks a thread loaded from its own file, where a set may
+    come from a weave or loom it can't see, so a missing name warns. See
     :func:`~weevr.config.validation.validate_rename_column_sets`.
 
     Raises:
         ConfigError: For a column set no visible scope defines.
     """
-    available = set(visible) | set(thread_dict.get("column_sets") or {})
+    available = _effective_names(outer, thread_dict.get("column_sets"), "column_set")
     errors, advisories = split_diagnostics(
         validate_rename_column_sets(
             thread_dict, available_column_sets=available, standalone=standalone
@@ -147,14 +159,13 @@ def hydrate_model(
 
 
 def hydrate_threads(
-    entries: list[Any],
-    resolved: list[dict[str, Any]],
+    children: list[ResolvedChild],
     source: ConfigLocation | str,
     prepare: ChildPreparer | None = None,
-    visible_lookups: set[str] | None = None,
+    outer_lookups: Mapping[str, Any] | None = None,
     warnings: list[str] | None = None,
     bind: ThreadBinder | None = None,
-    visible_column_sets: set[str] | None = None,
+    outer_column_sets: Mapping[str, Any] | None = None,
 ) -> dict[str, Thread]:
     """Hydrate a weave's resolved threads into a name-to-Thread mapping.
 
@@ -163,16 +174,15 @@ def hydrate_threads(
     blocks in each thread's steps are expanded before validation.
 
     Args:
-        entries: The weave's ``threads`` entries, aligned with ``resolved``.
-        resolved: Resolved thread dicts from reference resolution.
+        children: The weave's resolved threads.
         source: The weave's file.
         prepare: Optional hook applied to each thread dict before validation.
-        visible_lookups: Lookup names the enclosing weave and loom define;
-            each thread's resolve steps are checked against them.
+        outer_lookups: The enclosing scope's effective lookups; each
+            thread's lookup references are checked against them and its own.
         warnings: Collects load warnings from those checks.
         bind: Optional hook called with each hydrated thread and its file.
-        visible_column_sets: Column set names the enclosing weave and loom
-            define; each thread's rename steps are checked against them.
+        outer_column_sets: The enclosing scope's effective column sets; each
+            thread's rename steps are checked against them and its own.
 
     Returns:
         Hydrated threads keyed by effective name (``as`` > name > stem).
@@ -183,13 +193,11 @@ def hydrate_threads(
         ModelValidationError: If a thread fails model validation.
     """
     result: dict[str, Thread] = {}
-    for entry, thread_dict in zip(entries, resolved, strict=True):
-        # Pop stashed entry-level fields before model validation.
-        # _entry_params was already consumed by the resolver during
-        # two-phase param resolution; popped here for model cleanliness.
-        entry_as = thread_dict.pop("_entry_as", None)
-        thread_dict.pop("_entry_params", None)
-        thread_source = thread_dict.pop("_source_path", None) or str(source)
+    for child in children:
+        entry = child.entry
+        thread_dict = child.data
+        entry_as = entry.get("as")
+        thread_source = child.source_path or str(source)
 
         # Effective name: as > name > stem
         effective_name = entry_as or _entry_name(entry)
@@ -198,7 +206,7 @@ def hydrate_threads(
             thread_dict["name"] = effective_name
 
         # Set template_ref for telemetry provenance
-        ref = entry.get("ref") if isinstance(entry, dict) else None
+        ref = entry.get("ref")
         if ref:
             thread_dict["template_ref"] = ref
 
@@ -209,11 +217,9 @@ def hydrate_threads(
             if isinstance(steps, list):
                 thread_dict["steps"] = expand_foreach(steps)
 
-        check_resolve_lookups(
-            thread_dict, visible_lookups or set(), thread_source, effective_name, warnings
-        )
+        check_resolve_lookups(thread_dict, outer_lookups, thread_source, effective_name, warnings)
         check_column_set_references(
-            thread_dict, visible_column_sets or set(), thread_source, effective_name, warnings
+            thread_dict, outer_column_sets, thread_source, effective_name, warnings
         )
 
         if prepare is not None:
@@ -236,6 +242,7 @@ def hydrate_threads(
 def hydrate_children(
     config_type: str,
     resolved: dict[str, Any],
+    children: list[ResolvedChild],
     source: ConfigLocation | str,
     name: str,
     prepare: ChildPreparer | None = None,
@@ -244,13 +251,13 @@ def hydrate_children(
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
     """Hydrate the weaves and threads a weave or loom pulls in.
 
-    Consumes the private keys reference resolution stashed on the child
-    dicts, so call it after hydrating the top-level model.
+    ``prepare`` mutates the child dicts in place, so hydrate each resolved
+    config once.
 
     Args:
         config_type: Type of the top-level config.
-        resolved: The top-level config after reference resolution and the
-            inheritance cascade.
+        resolved: The top-level config after reference resolution.
+        children: Its resolved children, after the inheritance cascade.
         source: The top-level config's file.
         name: The top-level config's name, used as the weave key for a weave.
         prepare: Optional hook applied to each child thread dict, and to each
@@ -275,25 +282,22 @@ def hydrate_children(
 
     if config_type == "weave":
         threads[name] = hydrate_threads(
-            resolved.get("threads", []),
-            resolved.get("_resolved_threads", []),
+            children,
             source,
             prepare,
-            visible_lookups=set(resolved.get("lookups") or {}),
+            outer_lookups=resolved.get("lookups"),
             warnings=warnings,
             bind=bind,
-            visible_column_sets=set(resolved.get("column_sets") or {}),
+            outer_column_sets=resolved.get("column_sets"),
         )
 
     elif config_type == "loom":
         # Weaves are keyed by name from here on (planner, runner, results),
         # so a second entry with the same name would silently replace the first.
         defined_by: dict[str, str] = {}
-        for weave_entry, weave_dict in zip(
-            resolved.get("weaves", []),
-            resolved.get("_resolved_weaves", []),
-            strict=True,
-        ):
+        for weave in children:
+            weave_entry = weave.entry
+            weave_dict = weave.data
             weave_name = _entry_name(weave_entry)
             origin = _weave_origin(weave_entry)
             if weave_name in defined_by:
@@ -306,7 +310,7 @@ def hydrate_children(
             if not weave_dict.get("name"):
                 weave_dict["name"] = weave_name
             # Inline weaves have no file of their own; they live in the loom.
-            weave_source = weave_dict.pop("_source_path", None) or str(source)
+            weave_source = weave.source_path or str(source)
             if prepare is not None:
                 prepare(weave_dict)
             weave_model = hydrate_model(weave_dict, "weave", weave_source)
@@ -315,16 +319,27 @@ def hydrate_children(
             weaves[weave_name] = weave_model
 
             threads[weave_name] = hydrate_threads(
-                weave_dict.get("threads", []),
-                weave_dict.get("_resolved_threads", []),
+                weave.children,
                 weave_source,
                 prepare,
-                visible_lookups=set(resolved.get("lookups") or {})
-                | set(weave_dict.get("lookups") or {}),
+                outer_lookups=cascade_registry(
+                    resolved.get("lookups"),
+                    weave_dict.get("lookups"),
+                    "lookup",
+                    "loom",
+                    "weave",
+                    log_shadowing=False,
+                ),
                 warnings=warnings,
                 bind=bind,
-                visible_column_sets=set(resolved.get("column_sets") or {})
-                | set(weave_dict.get("column_sets") or {}),
+                outer_column_sets=cascade_registry(
+                    resolved.get("column_sets"),
+                    weave_dict.get("column_sets"),
+                    "column_set",
+                    "loom",
+                    "weave",
+                    log_shadowing=False,
+                ),
             )
 
     return weaves, threads

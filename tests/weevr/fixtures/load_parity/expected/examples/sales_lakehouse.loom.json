@@ -1,0 +1,373 @@
+{
+  "config_name": "sales_lakehouse",
+  "config_type": "loom",
+  "execution_order": [
+    [
+      [
+        "dim_customer"
+      ]
+    ],
+    [
+      [
+        "fact_orders"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": {
+      "execution": {
+        "log_level": "standard"
+      },
+      "write": {
+        "mode": "overwrite"
+      }
+    },
+    "execution": {
+      "capture_samples": false,
+      "log_level": "standard",
+      "max_parallel_threads": null,
+      "trace": true
+    },
+    "lookups": null,
+    "name": "sales_lakehouse",
+    "naming": null,
+    "params": {
+      "lakehouse_path": {
+        "default": null,
+        "description": "Root path for the lakehouse storage layer",
+        "name": "lakehouse_path",
+        "required": true,
+        "type": "string"
+      },
+      "load_date": {
+        "default": "2025-01-01",
+        "description": "Date to use for incremental load boundaries",
+        "name": "load_date",
+        "required": false,
+        "type": "date"
+      }
+    },
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "sales_lakehouse.loom",
+    "variables": null,
+    "weaves": [
+      {
+        "condition": null,
+        "name": "dimensions",
+        "ref": null
+      },
+      {
+        "condition": {
+          "when": "table_exists('curated.dim_customer')"
+        },
+        "name": "facts",
+        "ref": null
+      }
+    ]
+  },
+  "threads": {
+    "dimensions": {
+      "dim_customer": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "standard",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "dim_customer",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "dim_customer",
+        "sources": {
+          "customers": {
+            "alias": "staging.customers",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [],
+        "tags": null,
+        "target": {
+          "alias": null,
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": "/lakehouse/default/curated/dim_customer",
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "overwrite",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      }
+    },
+    "facts": {
+      "fact_orders": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": {
+          "capture_samples": false,
+          "log_level": "standard",
+          "max_parallel_threads": null,
+          "trace": true
+        },
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "fact_orders",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "fact_orders",
+        "sources": {
+          "orders": {
+            "alias": "staging.orders",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "order_date >= '2025-01-01'"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": null,
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": "/lakehouse/default/curated/fact_orders",
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": null,
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": {
+          "match_keys": null,
+          "mode": "overwrite",
+          "on_match": "update",
+          "on_no_match_source": "ignore",
+          "on_no_match_target": "insert",
+          "soft_delete_active_value": null,
+          "soft_delete_column": null,
+          "soft_delete_value": true
+        }
+      }
+    }
+  },
+  "tree": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "effective": {},
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": null
+            },
+            "kind": "thread",
+            "name": "dim_customer",
+            "source_ref": "<root>/sales_lakehouse.loom"
+          }
+        ],
+        "effective": {},
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "dimensions",
+        "source_ref": "<root>/sales_lakehouse.loom"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "effective": {},
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": null
+            },
+            "kind": "thread",
+            "name": "fact_orders",
+            "source_ref": "<root>/sales_lakehouse.loom"
+          }
+        ],
+        "effective": {},
+        "entry": {
+          "alias": null,
+          "condition": "table_exists('curated.dim_customer')",
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "facts",
+        "source_ref": "<root>/sales_lakehouse.loom"
+      }
+    ],
+    "effective": {},
+    "entry": null,
+    "kind": "loom",
+    "name": "sales_lakehouse",
+    "source_ref": "<root>/sales_lakehouse.loom"
+  },
+  "warnings": [
+    "WARN: loom 'sales_lakehouse' declares defaults.execution (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
+  ],
+  "weaves": {
+    "dimensions": {
+      "audit_templates": null,
+      "column_sets": null,
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": null,
+      "execution": null,
+      "lookups": null,
+      "name": "dimensions",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "dimensions",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "dim_customer",
+          "params": null,
+          "ref": null
+        }
+      ],
+      "variables": null
+    },
+    "facts": {
+      "audit_templates": null,
+      "column_sets": null,
+      "config_version": "1.0",
+      "connections": null,
+      "defaults": null,
+      "execution": null,
+      "lookups": null,
+      "name": "facts",
+      "naming": null,
+      "params": null,
+      "post_steps": null,
+      "pre_steps": null,
+      "qualified_key": "facts",
+      "threads": [
+        {
+          "as_": null,
+          "condition": null,
+          "dependencies": null,
+          "name": "fact_orders",
+          "params": null,
+          "ref": null
+        }
+      ],
+      "variables": null
+    }
+  }
+}

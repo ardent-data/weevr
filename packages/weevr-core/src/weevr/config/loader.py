@@ -15,13 +15,14 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
 from weevr.config.hydration import (
     check_column_set_references,
     check_resolve_lookups,
     hydrate_children,
     hydrate_model,
 )
-from weevr.config.inheritance import apply_inheritance
+from weevr.config.inheritance import apply_inheritance, check_defaults_shape
 from weevr.config.locations import (
     ConfigLocation,
     LocalConfigLocation,
@@ -38,6 +39,7 @@ from weevr.config.parser import (
     validate_config_version,
 )
 from weevr.config.resolver import (
+    ResolvedChild,
     resolve_config_variables,
     resolve_declared_params,
     resolve_references,
@@ -46,6 +48,7 @@ from weevr.config.resolver import (
 from weevr.config.validation import (
     collect_execution_scope_warnings,
     collect_trace_composition_warnings,
+    incremental_diagnostics,
     split_diagnostics,
     validate_dimension_overrides,
     validate_schema,
@@ -59,6 +62,8 @@ logger = logging.getLogger("weevr.config")
 
 COMPONENT_TYPES = ("thread", "weave", "loom")
 
+_KINDS: dict[type, ConfigKind] = {Thread: "thread", Weave: "weave", Loom: "loom"}
+
 
 @dataclass
 class ResolvedConfig:
@@ -69,8 +74,10 @@ class ResolvedConfig:
         project_root: The root child references and Source paths resolved against.
         config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``, ``"params"``).
         config_name: Name of the config (declared, else the filename stem).
-        data: The resolved config dict, with child configs attached under the
-            resolver's ``_resolved_*`` keys.
+        data: The resolved config dict.
+        children: The configs it pulls in: a loom's weaves (each with its
+            threads) or a weave's threads, cascaded.
+        authored: The config dict before variable substitution.
         warnings: Load warnings collected so far.
     """
 
@@ -79,33 +86,8 @@ class ResolvedConfig:
     config_type: str
     config_name: str
     data: dict[str, Any]
-    warnings: list[str] = field(default_factory=list)
-
-
-@dataclass
-class HydratedConfig:
-    """A hydrated config with the children it pulls in.
-
-    The loader's own result. It deliberately is not
-    :class:`~weevr.result.LoadedConfig`: importing ``weevr.result`` reaches the
-    engine wheel's ``weevr.engine`` package, and ``load_config`` must stay
-    importable and runnable without PySpark in a full install.
-
-    Attributes:
-        model: The hydrated Thread, Weave, or Loom.
-        config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``).
-        config_name: Name of the config.
-        weaves: Hydrated weaves by name (looms only).
-        threads: Each weave's hydrated threads by weave name, then effective
-            thread name (weaves and looms).
-        warnings: Load warnings, in emission order.
-    """
-
-    model: Thread | Weave | Loom
-    config_type: str
-    config_name: str
-    weaves: dict[str, Weave] = field(default_factory=dict)
-    threads: dict[str, dict[str, Thread]] = field(default_factory=dict)
+    children: list[ResolvedChild] = field(default_factory=list)
+    authored: dict[str, Any] | None = None
     warnings: list[str] = field(default_factory=list)
 
 
@@ -182,19 +164,22 @@ def resolve_config(
         raise
 
     root = project_root if project_root is not None else location.parent
-    data = resolve_references(resolved, config_type, root, runtime_params)
+    data = resolved
+    children = resolve_references(resolved, config_type, root, runtime_params, authored=config_dict)
 
     # Execution-scope warnings come from the PRE-cascade dicts: after the
     # cascade an authored execution block is indistinguishable from one
     # injected by defaults.execution.
     warnings = (
-        collect_execution_warnings(config_type, data) if config_type in COMPONENT_TYPES else []
+        collect_execution_warnings(config_type, data, children)
+        if config_type in COMPONENT_TYPES
+        else []
     )
     # Dimension override rules apply to what each thread declares itself, so
     # they also run before the cascade adds loom/weave write and keys defaults.
     if config_type in COMPONENT_TYPES:
-        check_dimension_overrides(config_type, data, location)
-    _apply_cascade(config_type, data)
+        check_dimension_overrides(config_type, data, children, location)
+    _apply_cascade(config_type, data, children)
 
     if config_type == "thread":
         reject_foreach_in_with(data)
@@ -224,11 +209,13 @@ def resolve_config(
         config_type=config_type,
         config_name=data["name"],
         data=data,
+        children=children,
+        authored=config_dict,
         warnings=warnings,
     )
 
 
-def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
+def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[str]]:
     """Hydrate a resolved thread, weave, or loom and the children it pulls in.
 
     Hydration consumes ``resolved``: child dicts in ``resolved.data`` are
@@ -238,7 +225,8 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         resolved: The output of :func:`resolve_config` for a component config.
 
     Returns:
-        The hydrated model with its weaves, threads, and load warnings.
+        ``(document, warnings)``: the resolved config tree, and the load
+        warnings in emission order.
 
     Raises:
         ModelValidationError: If the config or any child fails model validation.
@@ -248,7 +236,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         # A standalone thread sees only its own lookups at run time
         check_resolve_lookups(
             resolved.data,
-            set(),
+            None,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -256,7 +244,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         )
         check_column_set_references(
             resolved.data,
-            set(),
+            None,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -269,6 +257,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
     weaves, threads = hydrate_children(
         resolved.config_type,
         resolved.data,
+        resolved.children,
         resolved.location,
         resolved.config_name,
         prepare=lambda child_dict: resolve_source_paths(child_dict, root),
@@ -289,14 +278,112 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
 
     warnings.extend(lookup_warnings)
 
-    return HydratedConfig(
+    document = _assemble_document(resolved, model, weaves, threads)
+    check_incremental(resolved, document, warnings)
+    return document, warnings
+
+
+def check_incremental(
+    resolved: ResolvedConfig, document: ResolvedDocument, warnings: list[str]
+) -> None:
+    """Run the incremental-load checks on every thread the config pulls in.
+
+    Each thread is checked as the engine runs it (hydrated, after the
+    cascade), except that the ``${param.*}`` rule reads its steps and
+    sources as written, before substitution.
+
+    Raises:
+        ConfigError: For an incremental setting that can never run, naming
+            the thread and the file it is written in.
+    """
+    for thread, authored in _threads_with_authored(resolved, document):
+        model = thread.model
+        if not isinstance(model, Thread) or model.load is None or model.load.mode == "full":
+            continue
+        errors, advisories = split_diagnostics(incremental_diagnostics(model, authored))
+        if errors:
+            raise ConfigError(
+                "; ".join(f"thread '{thread.name}': {message}" for message in errors),
+                file_path=thread.source_ref,
+            )
+        warnings.extend(f"WARN: thread '{thread.name}': {message}" for message in advisories)
+
+
+def _threads_with_authored(
+    resolved: ResolvedConfig, document: ResolvedDocument
+) -> list[tuple[ResolvedDocument, dict[str, Any] | None]]:
+    """Each thread node of the tree with its dict as written."""
+    if document.kind == "thread":
+        return [(document, resolved.authored)]
+    if document.kind == "weave":
+        weaves = [(document, resolved.children)]
+    else:
+        weaves = [
+            (weave, node.children)
+            for weave, node in zip(document.children.values(), resolved.children, strict=True)
+        ]
+    return [
+        (thread, node.authored)
+        for weave, nodes in weaves
+        for thread, node in zip(weave.children.values(), nodes, strict=True)
+    ]
+
+
+def _assemble_document(
+    resolved: ResolvedConfig,
+    model: Thread | Weave | Loom,
+    weaves: dict[str, Weave],
+    threads: dict[str, dict[str, Thread]],
+) -> ResolvedDocument:
+    """Build the document tree from the hydrated models and the resolved children.
+
+    Children, their hydrated models and the parent's typed entries all come
+    in entry order, so they are paired by position.
+    """
+    top_file = str(resolved.location)
+
+    def thread_docs(
+        weave: Weave, by_name: dict[str, Thread], nodes: list[ResolvedChild], enclosing: str
+    ) -> dict[str, ResolvedDocument]:
+        return {
+            name: ResolvedDocument(
+                model=thread,
+                kind="thread",
+                name=name,
+                entry=EntryMeta.from_entry(entry),
+                source_ref=node.source_path or enclosing,
+            )
+            for (name, thread), entry, node in zip(
+                by_name.items(), weave.threads, nodes, strict=True
+            )
+        }
+
+    children: dict[str, ResolvedDocument] = {}
+    if isinstance(model, Weave):
+        children = thread_docs(
+            model, threads.get(resolved.config_name, {}), resolved.children, top_file
+        )
+    elif isinstance(model, Loom):
+        for (name, weave), entry, node in zip(
+            weaves.items(), model.weaves, resolved.children, strict=True
+        ):
+            weave_file = node.source_path or top_file
+            children[name] = ResolvedDocument(
+                model=weave,
+                kind="weave",
+                name=name,
+                entry=EntryMeta.from_entry(entry),
+                children=thread_docs(weave, threads.get(name, {}), node.children, weave_file),
+                source_ref=weave_file,
+            )
+
+    return ResolvedDocument(
         model=model,
-        config_type=resolved.config_type,
-        config_name=resolved.config_name,
-        weaves=weaves,
-        threads=threads,
-        warnings=warnings,
-    )
+        kind=_KINDS[type(model)],
+        name=resolved.config_name,
+        children=children,
+        source_ref=top_file,
+    ).with_scopes()
 
 
 def bind_thread_warp(thread: Thread, thread_file: ConfigLocation, root: ConfigLocation) -> None:
@@ -341,7 +428,7 @@ def load_resolved_config(
     runtime_params: dict[str, Any] | None = None,
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
-) -> HydratedConfig:
+) -> tuple[ResolvedDocument, list[str]]:
     """Load a typed thread, weave, or loom file with its resolved children.
 
     The engine-facing entry point: ``Context`` calls it with its project root
@@ -356,7 +443,8 @@ def load_resolved_config(
         fabric_context: Optional Fabric environment values for ``${fabric.x}``.
 
     Returns:
-        The hydrated config with its weaves, threads, and load warnings.
+        ``(document, warnings)``: the resolved config tree and the load
+        warnings.
     """
     with attribute_errors(location):
         return hydrate_resolved(
@@ -396,10 +484,9 @@ def load_resolved(
             it; defaults to the file's directory.
 
     Returns:
-        A :class:`~weevr.result.LoadedConfig` with ``model``,
-        ``resolved_threads``, ``resolved_weaves``, ``warnings``, and
-        ``execution_plan``. Warnings are also
-        logged on the ``weevr.config`` logger.
+        A :class:`~weevr.result.LoadedConfig` with ``model``, ``document``
+        (the resolved config tree), ``warnings``, and ``execution_plan``.
+        Warnings are also logged on the ``weevr.config`` logger.
 
     Raises:
         ConfigError: Unsupported extension or a name/filename mismatch, plus
@@ -413,52 +500,52 @@ def load_resolved(
         root = project_root
     else:
         root = LocalConfigLocation(Path(project_root))
-    hydrated = load_resolved_config(
+    document, warnings = load_resolved_config(
         make_location(path), runtime_params=runtime_params, project_root=root
     )
-    for warning in hydrated.warnings:
+    for warning in warnings:
         logger.warning(warning)
-    return LoadedConfig.from_hydrated(hydrated)
+    return LoadedConfig.from_document(document, warnings)
 
 
-def _apply_cascade(config_type: str, data: dict[str, Any]) -> None:
-    """Cascade loom and weave defaults into each child thread, in place."""
-    if config_type == "loom" and "_resolved_weaves" in data:
-        loom_defaults = data.get("defaults")
-        loom_audit_templates = data.get("audit_templates")
-        loom_connections = data.get("connections")
-        for weave in data["_resolved_weaves"]:
-            if "_resolved_threads" in weave:
-                weave_defaults = weave.get("defaults")
-                weave_audit_templates = weave.get("audit_templates")
-                weave_connections = weave.get("connections")
-                for i, thread in enumerate(weave["_resolved_threads"]):
-                    weave["_resolved_threads"][i] = apply_inheritance(
-                        loom_defaults,
-                        weave_defaults,
-                        thread,
-                        loom_audit_templates=loom_audit_templates,
-                        weave_audit_templates=weave_audit_templates,
-                        loom_connections=loom_connections,
-                        weave_connections=weave_connections,
-                    )
+def _apply_cascade(config_type: str, data: dict[str, Any], children: list[ResolvedChild]) -> None:
+    """Cascade loom and weave defaults into each child thread's dict.
 
-    elif config_type == "weave" and "_resolved_threads" in data:
-        weave_defaults = data.get("defaults")
-        weave_audit_templates = data.get("audit_templates")
-        weave_connections = data.get("connections")
-        for i, thread in enumerate(data["_resolved_threads"]):
-            data["_resolved_threads"][i] = apply_inheritance(
+    A referenced weave's ``defaults`` are checked under its own file, so a
+    malformed block is reported there rather than against the loom.
+    """
+    if config_type == "loom":
+        for weave in children:
+            if weave.source_path is not None:
+                with attribute_errors(weave.source_path):
+                    check_defaults_shape(weave.data.get("defaults"), "weave")
+            for thread in weave.children:
+                thread.data = apply_inheritance(
+                    data.get("defaults"),
+                    weave.data.get("defaults"),
+                    thread.data,
+                    loom_audit_templates=data.get("audit_templates"),
+                    weave_audit_templates=weave.data.get("audit_templates"),
+                    loom_connections=data.get("connections"),
+                    weave_connections=weave.data.get("connections"),
+                )
+
+    elif config_type == "weave":
+        for thread in children:
+            thread.data = apply_inheritance(
                 None,
-                weave_defaults,
-                thread,
-                weave_audit_templates=weave_audit_templates,
-                weave_connections=weave_connections,
+                data.get("defaults"),
+                thread.data,
+                weave_audit_templates=data.get("audit_templates"),
+                weave_connections=data.get("connections"),
             )
 
 
 def check_dimension_overrides(
-    config_type: str, resolved: dict[str, Any], location: ConfigLocation
+    config_type: str,
+    resolved: dict[str, Any],
+    children: list[ResolvedChild],
+    location: ConfigLocation,
 ) -> None:
     """Reject forbidden write/keys fields on dimension threads, from pre-cascade dicts.
 
@@ -466,46 +553,50 @@ def check_dimension_overrides(
         ConfigError: Naming the field and the thread's own file (the enclosing
             file for an inline thread).
     """
-    for thread, enclosing in _pre_cascade_threads(config_type, resolved, str(location)):
+    for thread, thread_file in _pre_cascade_threads(config_type, resolved, children, str(location)):
         errors, _ = split_diagnostics(validate_dimension_overrides(thread))
         if errors:
-            raise ConfigError("; ".join(errors), file_path=thread.get("_source_path") or enclosing)
+            raise ConfigError("; ".join(errors), file_path=thread_file)
 
 
-def collect_execution_warnings(config_type: str, resolved: dict[str, Any]) -> list[str]:
+def collect_execution_warnings(
+    config_type: str, resolved: dict[str, Any], children: list[ResolvedChild]
+) -> list[str]:
     """Gather thread-scope execution warnings from pre-cascade dicts."""
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
     if config_type == "loom":
         loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((loom_label, resolved.get("defaults")))
-        for i, weave in enumerate(resolved.get("_resolved_weaves", [])):
-            weave_label = f"weave '{weave.get('name') or f'#{i}'}'"
-            defaults_by_scope.append((weave_label, weave.get("defaults")))
+        for i, weave in enumerate(children):
+            weave_label = f"weave '{weave.data.get('name') or f'#{i}'}'"
+            defaults_by_scope.append((weave_label, weave.data.get("defaults")))
     elif config_type == "weave":
         weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((weave_label, resolved.get("defaults")))
 
-    threads = [thread for thread, _ in _pre_cascade_threads(config_type, resolved, "")]
+    threads = [thread for thread, _ in _pre_cascade_threads(config_type, resolved, children, "")]
     return collect_execution_scope_warnings(defaults_by_scope, threads)
 
 
 def _pre_cascade_threads(
-    config_type: str, resolved: dict[str, Any], enclosing: str
+    config_type: str,
+    resolved: dict[str, Any],
+    children: list[ResolvedChild],
+    enclosing: str,
 ) -> list[tuple[dict[str, Any], str]]:
-    """Every thread dict a config pulls in, with the file that encloses it.
+    """Every thread dict a config pulls in, with the file it is written in.
 
-    The enclosing file is a referenced weave's own file, else ``enclosing``
-    (the top-level config); a thread's own ``_source_path`` takes precedence
-    where callers attribute errors.
+    That is the thread's own file, else the referenced weave file that holds
+    it inline, else ``enclosing`` (the top-level config).
     """
     if config_type == "loom":
         return [
-            (thread, weave.get("_source_path") or enclosing)
-            for weave in resolved.get("_resolved_weaves", [])
-            for thread in weave.get("_resolved_threads", [])
+            (thread.data, thread.source_path or weave.source_path or enclosing)
+            for weave in children
+            for thread in weave.children
         ]
     if config_type == "weave":
-        return [(thread, enclosing) for thread in resolved.get("_resolved_threads", [])]
+        return [(thread.data, thread.source_path or enclosing) for thread in children]
     return [(resolved, enclosing)]
 
 
@@ -583,7 +674,8 @@ def resolve_source_paths(
         if not isinstance(source_cfg, dict):
             continue
         path = source_cfg.get("path")
-        if path is None:
+        # Only string paths are joined; any other type fails model validation.
+        if not isinstance(path, str):
             continue
         # Skip already-absolute paths and URIs
         if os.path.isabs(path) or "://" in path:

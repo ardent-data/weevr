@@ -240,7 +240,7 @@ class _FakeResult:
         self.config_type = "weave"
         self.config_name = "test_weave"
         self.execution_plan = plans
-        self._resolved_threads = resolved_threads
+        self.thread_models = resolved_threads
 
 
 class TestRenderExecutionPlanHtml:
@@ -1728,7 +1728,7 @@ class TestCollapsibleLayout:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -1751,7 +1751,7 @@ class TestCollapsibleLayout:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -1773,7 +1773,7 @@ class TestCollapsibleLayout:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -1802,7 +1802,7 @@ class TestCollapsibleLayout:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -1858,7 +1858,7 @@ class TestModeMatrix:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -1880,9 +1880,9 @@ class TestModeMatrix:
                 "config_name": "test",
                 "duration_ms": 100,
                 "preview_data": {},
-                "_preview_metadata": {},
+                "preview_metadata": {},
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "warnings": [],
             },
         )()
@@ -1920,7 +1920,7 @@ class TestModeMatrix:
                 "validation_errors": [],
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {"dim_cust": thread_model},
+                "thread_models": {"dim_cust": thread_model},
             },
         )()
         html_out = render_result_html(result)
@@ -1941,7 +1941,7 @@ class TestModeMatrix:
                 "config_type": "weave",
                 "config_name": "test_weave",
                 "execution_plan": [plan],
-                "_resolved_threads": {"a": thread_model},
+                "thread_models": {"a": thread_model},
                 "telemetry": None,
             },
         )()
@@ -2047,7 +2047,7 @@ class TestPartialData:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -2070,7 +2070,7 @@ class TestPartialData:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -2094,7 +2094,7 @@ class TestPartialData:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -2122,7 +2122,7 @@ class TestPartialData:
                 "detail": detail,
                 "warnings": [],
                 "telemetry": None,
-                "_resolved_threads": {},
+                "thread_models": {},
                 "execution_plan": None,
             },
         )()
@@ -2190,9 +2190,9 @@ class TestPreviewZeroRows:
             config_name="empty_t",
             duration_ms=0,
             preview_data={"empty_t": object()},
-            _preview_metadata={"empty_t": {"output_schema": [("id", "bigint")], "row_count": 0}},
+            preview_metadata={"empty_t": {"output_schema": [("id", "bigint")], "row_count": 0}},
             telemetry=None,
-            _resolved_threads=None,
+            thread_models=None,
             warnings=[],
         )
         html_out = _render_preview_html(result)

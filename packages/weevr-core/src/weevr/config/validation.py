@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -25,6 +25,9 @@ from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
 from weevr.model.warp import WarpConfig
+
+if TYPE_CHECKING:
+    from weevr.model.thread import Thread
 
 
 class BaseConfig(BaseModel):
@@ -53,6 +56,11 @@ class ThreadConfig(BaseConfig):
     execution: dict[str, Any] | None = None
     connections: dict[str, Any] | None = None
     audit_templates: dict[str, Any] | None = None
+    lookups: dict[str, Any] | None = None
+    column_sets: dict[str, Any] | None = None
+    variables: dict[str, Any] | None = None
+    pre_steps: list[dict[str, Any]] | None = None
+    post_steps: list[dict[str, Any]] | None = None
     with_: dict[str, Any] | None = Field(
         default=None,
         alias="with",
@@ -125,6 +133,36 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
             f"Schema validation failed for {config_type} config: {exc}",
             cause=exc,
         ) from exc
+
+
+def validate_inline_thread_types(entry: dict[str, Any]) -> None:
+    """Check the value types of an inline thread body before the cascade reads it.
+
+    Unlike :func:`validate_schema`, missing fields are not errors here: a
+    name-only entry, or an inline body without its target, is reported by
+    model hydration with the thread's name. Only values of the wrong type
+    (``sources: [a]``, ``lookups: 5``) are rejected, because the cascade and
+    the load checks read them before hydration.
+
+    Args:
+        entry: An inline thread entry from a weave's ``threads`` list.
+
+    Raises:
+        ConfigSchemaError: If a typed field holds a value of the wrong type.
+    """
+    try:
+        ThreadConfig.model_validate(entry)
+    except ValidationError as exc:
+        wrong = [error for error in exc.errors() if error["type"] != "missing"]
+        if wrong:
+            details = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in wrong
+            )
+            name = entry.get("name", "")
+            raise ConfigSchemaError(
+                f"Schema validation failed for inline thread '{name}': {details}",
+                cause=exc,
+            ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +255,39 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
         )
 
     return diagnostics
+
+
+def incremental_diagnostics(thread: Thread, authored: dict[str, Any] | None = None) -> list[str]:
+    """Run :func:`validate_incremental_config` on a hydrated thread.
+
+    The load and the engine build the check's input the same way: load
+    and write settings from the hydrated (cascaded) thread, steps and
+    sources from ``authored``, the thread as written. The ``${param.*}``
+    rule needs the written form: after substitution a parameterized filter
+    looks like a literal one. Without ``authored`` that rule always warns.
+
+    Args:
+        thread: The hydrated thread.
+        authored: The thread's config dict before variable substitution.
+
+    Returns:
+        The diagnostics, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+    """
+    load = thread.load
+    load_raw: dict[str, Any] = {"mode": load.mode if load is not None else "full"}
+    if load is not None:
+        load_raw["watermark_inclusive"] = load.watermark_inclusive
+        if load.watermark_column is not None:
+            load_raw["watermark_column"] = load.watermark_column
+        if load.cdc is not None:
+            load_raw["cdc"] = load.cdc.model_dump()
+    config: dict[str, Any] = {"load": load_raw}
+    if thread.write is not None:
+        config["write"] = {"mode": thread.write.mode}
+    written = authored or {}
+    config["steps"] = written.get("steps", [])
+    config["sources"] = written.get("sources", {})
+    return validate_incremental_config(config)
 
 
 # ---------------------------------------------------------------------------

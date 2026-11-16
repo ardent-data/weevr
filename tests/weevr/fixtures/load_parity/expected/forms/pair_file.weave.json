@@ -1,0 +1,142 @@
+{
+  "config_name": "pair_file",
+  "config_type": "weave",
+  "execution_order": [
+    [
+      [
+        "pair"
+      ]
+    ]
+  ],
+  "model": {
+    "audit_templates": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "lookups": null,
+    "name": "pair_file",
+    "naming": null,
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "pair_file.weave",
+    "threads": [
+      {
+        "as_": null,
+        "condition": null,
+        "dependencies": null,
+        "name": "",
+        "params": null,
+        "ref": "threads/pair.thread"
+      }
+    ],
+    "variables": null
+  },
+  "threads": {
+    "pair_file": {
+      "pair": {
+        "assertions": null,
+        "audit_templates": null,
+        "cache": null,
+        "column_sets": null,
+        "config_version": "1.0",
+        "connections": null,
+        "defaults": null,
+        "execution": null,
+        "exports": null,
+        "failure": null,
+        "keys": null,
+        "load": null,
+        "lookups": null,
+        "name": "pair",
+        "params": null,
+        "post_steps": null,
+        "pre_steps": null,
+        "qualified_key": "threads/pair.thread",
+        "sources": {
+          "data": {
+            "alias": null,
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {
+              "header": true
+            },
+            "path": "<root>/data/pair.csv",
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "id is not null"
+            }
+          }
+        ],
+        "tags": null,
+        "target": {
+          "alias": "gold.pair",
+          "audit_columns": null,
+          "audit_columns_exclude": null,
+          "audit_template": null,
+          "audit_template_inherit": true,
+          "columns": null,
+          "connection": null,
+          "dimension": null,
+          "fact": null,
+          "mapping_mode": "auto",
+          "naming": null,
+          "on_drift": "warn",
+          "partition_by": null,
+          "path": null,
+          "schema_drift": "lenient",
+          "schema_override": null,
+          "seed": null,
+          "table": null,
+          "warp": null,
+          "warp_enforcement": "warn",
+          "warp_init": false,
+          "warp_mode": null
+        },
+        "template_ref": "threads/pair.thread",
+        "validations": null,
+        "variables": null,
+        "with_": null,
+        "write": null
+      }
+    }
+  },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "effective": {},
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": "threads/pair.thread"
+        },
+        "kind": "thread",
+        "name": "pair",
+        "source_ref": "<root>/threads/pair.thread"
+      }
+    ],
+    "effective": {},
+    "entry": null,
+    "kind": "weave",
+    "name": "pair_file",
+    "source_ref": "<root>/pair_file.weave"
+  },
+  "warnings": [],
+  "weaves": {}
+}

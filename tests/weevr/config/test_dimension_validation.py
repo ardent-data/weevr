@@ -242,7 +242,7 @@ class TestDimensionRulesOnLoad:
             weave={"defaults": {"write": {"mode": "overwrite", "match_keys": ["id"]}}},
         )
         loaded = load_resolved(project / "w.weave", project_root=project)
-        assert loaded.resolved_threads["w"]["dim"].target.dimension is not None
+        assert loaded.document.weave_threads()["w"]["dim"].target.dimension is not None
 
     def test_template_entry_rejected(self, make_project: MakeProject) -> None:
         thread = _dim_thread(

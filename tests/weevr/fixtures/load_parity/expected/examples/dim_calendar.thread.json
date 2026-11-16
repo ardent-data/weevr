@@ -1,0 +1,112 @@
+{
+  "config_name": "dim_calendar",
+  "config_type": "thread",
+  "execution_order": [],
+  "model": {
+    "assertions": null,
+    "audit_templates": null,
+    "cache": null,
+    "column_sets": null,
+    "config_version": "1.0",
+    "connections": null,
+    "defaults": null,
+    "execution": null,
+    "exports": null,
+    "failure": null,
+    "keys": null,
+    "load": null,
+    "lookups": null,
+    "name": "dim_calendar",
+    "params": null,
+    "post_steps": null,
+    "pre_steps": null,
+    "qualified_key": "dim_calendar.thread",
+    "sources": {
+      "dates": {
+        "alias": null,
+        "column": "calendar_date",
+        "connection": null,
+        "dedup": null,
+        "end": "2099-12-31",
+        "lookup": null,
+        "options": {},
+        "path": null,
+        "schema_override": null,
+        "start": "1970-01-01",
+        "step": "day",
+        "table": null,
+        "type": "date_sequence"
+      }
+    },
+    "steps": [
+      {
+        "derive": {
+          "columns": {
+            "calendar_id": "cast(date_format(calendar_date, 'yyyyMMdd') as int)\n",
+            "day_name": "date_format(calendar_date, 'EEEE')",
+            "day_of_month": "dayofmonth(calendar_date)",
+            "day_of_week": "dayofweek(calendar_date)",
+            "fiscal_quarter": "case when month(calendar_date) >= 7\nthen quarter(calendar_date) - 2\nelse quarter(calendar_date) + 2 end\n",
+            "fiscal_year": "case when month(calendar_date) >= 7\nthen year(calendar_date) + 1\nelse year(calendar_date) end\n",
+            "is_weekend": "case when dayofweek(calendar_date) in (1, 7)\nthen true else false end\n",
+            "month": "month(calendar_date)",
+            "month_name": "date_format(calendar_date, 'MMMM')",
+            "quarter": "quarter(calendar_date)",
+            "week_of_year": "weekofyear(calendar_date)",
+            "year": "year(calendar_date)"
+          }
+        }
+      }
+    ],
+    "tags": null,
+    "target": {
+      "alias": "gold.dim_calendar",
+      "audit_columns": null,
+      "audit_columns_exclude": null,
+      "audit_template": null,
+      "audit_template_inherit": true,
+      "columns": null,
+      "connection": null,
+      "dimension": null,
+      "fact": null,
+      "mapping_mode": "auto",
+      "naming": null,
+      "on_drift": "warn",
+      "partition_by": null,
+      "path": null,
+      "schema_drift": "lenient",
+      "schema_override": null,
+      "seed": null,
+      "table": null,
+      "warp": null,
+      "warp_enforcement": "warn",
+      "warp_init": false,
+      "warp_mode": null
+    },
+    "template_ref": null,
+    "validations": null,
+    "variables": null,
+    "with_": null,
+    "write": {
+      "match_keys": null,
+      "mode": "overwrite",
+      "on_match": "update",
+      "on_no_match_source": "ignore",
+      "on_no_match_target": "insert",
+      "soft_delete_active_value": null,
+      "soft_delete_column": null,
+      "soft_delete_value": true
+    }
+  },
+  "threads": {},
+  "tree": {
+    "children": [],
+    "effective": {},
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_calendar",
+    "source_ref": "<root>/dim_calendar.thread"
+  },
+  "warnings": [],
+  "weaves": {}
+}
