@@ -241,7 +241,7 @@ def hydrate_threads(
 
         # Expand foreach macros, as a directly loaded thread does at step 8b.
         steps = thread_dict.get("steps")
-        with attribute_errors(thread_source):
+        with attribute_errors(thread_source, child.at):
             reject_foreach_in_with(thread_dict)
             if isinstance(steps, list):
                 thread_dict["steps"] = expand_foreach(steps)

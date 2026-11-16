@@ -249,3 +249,34 @@ class TestLoad:
             load_config(thread)
         [diag] = exc_info.value.diagnostics  # type: ignore[attr-defined]
         assert (diag.code, diag.line) == ("C203", 2)
+
+
+def test_inline_thread_foreach_error_points_into_the_weave(tmp_path: Path) -> None:
+    from weevr.errors import ConfigError
+
+    weave = tmp_path / "w.weave"
+    weave.write_text(
+        yaml.safe_dump(
+            {
+                "config_version": "1.0",
+                "name": "w",
+                "threads": [
+                    {
+                        "name": "inline",
+                        "sources": {"a": {"type": "delta", "alias": "x.y"}},
+                        "target": {"alias": "x.z"},
+                        "steps": [{"foreach": {"values": [], "as": "c", "steps": []}}],
+                    }
+                ],
+            },
+            sort_keys=False,
+        )
+    )
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(weave)
+    [diag] = exc_info.value.diagnostics
+    assert diag.code == "C308"
+    assert diag.file == str(weave)
+    assert diag.pointer is not None
+    assert diag.pointer.startswith("/threads/0/steps/0")
+    assert diag.line is not None
