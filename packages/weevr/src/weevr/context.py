@@ -363,7 +363,7 @@ class Context:
             model = loaded.model
             if not isinstance(model, Weave):
                 raise TypeError(f"Expected Weave, got {type(model).__name__}")
-            weave_threads = loaded.resolved_threads.get(loaded.config_name, {})
+            weave_threads = loaded.document.weave_threads().get(loaded.config_name, {})
             weave_threads, warnings = self._filter_threads(
                 weave_threads, tags=tags, thread_names=thread_names
             )
@@ -444,10 +444,10 @@ class Context:
         filtered_threads: dict[str, dict[str, Thread]] = {}
         for weave_entry in model.weaves:
             weave_name = weave_entry.effective_name
-            weave = loaded.resolved_weaves.get(weave_name)
+            weave = loaded.document.weaves().get(weave_name)
             if weave is None:
                 continue
-            wt = loaded.resolved_threads.get(weave_name, {})
+            wt = loaded.document.weave_threads().get(weave_name, {})
             wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
             all_warnings.extend(warnings)
             if wt:
@@ -729,7 +729,7 @@ class Context:
             return {loaded.config_name: model}
 
         result: dict[str, Thread] = {}
-        for thread_map in loaded.resolved_threads.values():
+        for thread_map in loaded.document.weave_threads().values():
             result.update(thread_map)
         return result
 
@@ -746,10 +746,10 @@ class Context:
             loom_lookups = dict(loaded.model.lookups)
 
         result: dict[str, dict[str, Lookup]] = {}
-        for weave_name, threads in loaded.resolved_threads.items():
+        for weave_name, threads in loaded.document.weave_threads().items():
             weave = loaded.model if isinstance(loaded.model, Weave) else None
             if isinstance(loaded.model, Loom):
-                weave = loaded.resolved_weaves.get(weave_name)
+                weave = loaded.document.weaves().get(weave_name)
             weave_lookups = dict(weave.lookups) if weave and weave.lookups else None
             merged = merge_resource_dicts(loom_lookups, weave_lookups, "lookup", "loom", "weave")
             for thread_name in threads:
@@ -784,7 +784,7 @@ class Context:
             model = loaded.model
             if not isinstance(model, Weave):
                 raise TypeError(f"Expected Weave, got {type(model).__name__}")
-            wt = loaded.resolved_threads.get(loaded.config_name, {})
+            wt = loaded.document.weave_threads().get(loaded.config_name, {})
             wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
             all_warnings.extend(warnings)
             if wt:
@@ -804,10 +804,10 @@ class Context:
                 raise TypeError(f"Expected Loom, got {type(model).__name__}")
             for weave_entry in model.weaves:
                 weave_name = weave_entry.effective_name
-                weave = loaded.resolved_weaves.get(weave_name)
+                weave = loaded.document.weaves().get(weave_name)
                 if weave is None:
                     continue
-                wt = loaded.resolved_threads.get(weave_name, {})
+                wt = loaded.document.weave_threads().get(weave_name, {})
                 wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
                 all_warnings.extend(warnings)
                 if wt:
@@ -832,11 +832,11 @@ class Context:
 
         # Populate resolved threads for explain() thread detail
         if loaded.config_type == "weave":
-            wt = loaded.resolved_threads.get(loaded.config_name, {})
+            wt = loaded.document.weave_threads().get(loaded.config_name, {})
             result._resolved_threads = dict(wt)
         elif loaded.config_type == "loom":
             merged: dict[str, Any] = {}
-            for thread_map in loaded.resolved_threads.values():
+            for thread_map in loaded.document.weave_threads().values():
                 merged.update(thread_map)
             result._resolved_threads = merged
 
@@ -1032,12 +1032,12 @@ class Context:
         """
         from weevr.config.fabric import build_fabric_context
 
-        hydrated = load_resolved_config(
+        document, warnings = load_resolved_config(
             self._resolve_config_path(path),
             runtime_params=self._params,
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
         )
-        for warning in hydrated.warnings:
+        for warning in warnings:
             logger.warning(warning)
-        return LoadedConfig.from_hydrated(hydrated)
+        return LoadedConfig.from_document(document, warnings)

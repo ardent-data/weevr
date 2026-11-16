@@ -117,6 +117,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "fact_transactions",
+    "source_ref": "<root>/fact_transactions.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

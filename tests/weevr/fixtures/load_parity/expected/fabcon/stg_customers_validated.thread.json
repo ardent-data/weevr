@@ -172,6 +172,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "stg_customers_validated",
+    "source_ref": "<root>/stg_customers_validated.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

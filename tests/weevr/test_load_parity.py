@@ -104,20 +104,45 @@ def _mask(data: Any, root: Path) -> Any:
     return json.loads(json.dumps(data).replace(str(root), "<root>"))
 
 
+def _entry(entry: Any) -> dict[str, Any] | None:
+    if entry is None:
+        return None
+    return {
+        "ref": entry.ref,
+        "alias": entry.alias,
+        "params": dict(entry.params) if entry.params is not None else None,
+        "dependencies": list(entry.dependencies) if entry.dependencies is not None else None,
+        "condition": entry.condition.when if entry.condition is not None else None,
+    }
+
+
+def _tree(document: Any) -> dict[str, Any]:
+    """The tree's shape: kind, entry and file per node, children in order."""
+    return {
+        "kind": document.kind,
+        "name": document.name,
+        "entry": _entry(document.entry),
+        "source_ref": document.source_ref,
+        "children": [_tree(child) for child in document.children.values()],
+    }
+
+
 def _snapshot(loaded: Any, root: Path) -> dict[str, Any]:
     """Serialize a loaded config and its children with the project root masked."""
+    document = loaded.document
     data = {
         "config_type": loaded.config_type,
         "config_name": loaded.config_name,
         "model": loaded.model.model_dump(mode="json"),
         "weaves": {
-            name: weave.model_dump(mode="json") for name, weave in loaded.resolved_weaves.items()
+            name: weave.model_dump(mode="json") for name, weave in document.weaves().items()
         },
         "threads": {
             weave: {name: thread.model_dump(mode="json") for name, thread in threads.items()}
-            for weave, threads in loaded.resolved_threads.items()
+            for weave, threads in document.weave_threads().items()
         },
         "execution_order": [plan.execution_order for plan in loaded.execution_plan or []],
+        "tree": _tree(document),
     }
     return _mask(data, root)
 
@@ -167,6 +192,23 @@ class TestCorpusAcrossEntryPoints:
         assert logged == list(resolved.warnings)
 
 
+class TestDeprecatedViews:
+    """``resolved_threads`` / ``resolved_weaves`` still return the tree's data, and warn."""
+
+    @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
+    def test_views_match_the_document(self, case: Case, tmp_path: Path) -> None:
+        root = _copy_project(case.project, tmp_path)
+        loaded = load_resolved(root / case.config, runtime_params=case.params, project_root=root)
+        with pytest.warns(DeprecationWarning, match="resolved_threads.*3.0.*weave_threads"):
+            threads = loaded.resolved_threads
+        with pytest.warns(DeprecationWarning, match="resolved_weaves.*3.0.*weaves"):
+            weaves = loaded.resolved_weaves
+        assert {name: dict(by_name) for name, by_name in threads.items()} == (
+            loaded.document.weave_threads()
+        )
+        assert dict(weaves) == loaded.document.weaves()
+
+
 class TestInlineMatchesFile:
     """A thread written inline hydrates like the same thread in its own file."""
 
@@ -176,7 +218,7 @@ class TestInlineMatchesFile:
         inline = load_resolved(root / "pair_inline.weave", project_root=root)
 
         def body(loaded: Any, weave: str) -> dict[str, Any]:
-            dumped = loaded.resolved_threads[weave]["pair"].model_dump(mode="json")
+            dumped = loaded.document.children["pair"].model.model_dump(mode="json")
             for field in LOCATION_FIELDS:
                 dumped.pop(field)
             return dumped
@@ -188,8 +230,8 @@ class TestInlineMatchesFile:
         root = _copy_project(FORMS_PROJECT, tmp_path)
         by_file = load_resolved(root / "pair_file.weave", project_root=root)
         inline = load_resolved(root / "pair_inline.weave", project_root=root)
-        file_thread = by_file.resolved_threads["pair_file"]["pair"]
-        inline_thread = inline.resolved_threads["pair_inline"]["pair"]
+        file_thread = by_file.document.children["pair"].model
+        inline_thread = inline.document.children["pair"].model
         assert file_thread.qualified_key == "threads/pair.thread"
         assert inline_thread.qualified_key == "pair"
         assert file_thread.template_ref == "threads/pair.thread"
@@ -332,8 +374,8 @@ class TestValidateWording:
             model=full.model,
             config_type=full.config_type,
             config_name=full.config_name,
-            threads=dict(full.resolved_threads),
-            weaves={"cyc": full.resolved_weaves["cyc"]},
+            threads=full.document.weave_threads(),
+            weaves={"cyc": full.document.weaves()["cyc"]},
         )
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
         result = ctx._run_validate(loaded)
@@ -374,8 +416,8 @@ def test_context_has_no_load_steps_of_its_own() -> None:
     assert (names | defined) & {"_ResolvedConfig", "_resolve_and_hydrate"} == set()
 
 
-def test_context_reads_children_through_resolved_properties() -> None:
-    """Context reads children via ``resolved_*``; ``.threads`` / ``.weaves`` proxy to the model."""
+def test_context_reads_children_through_the_document() -> None:
+    """Context reads children via ``document``; ``.threads`` / ``.weaves`` proxy to the model."""
     reads = [
         node.attr
         for node in ast.walk(_context_module_tree())

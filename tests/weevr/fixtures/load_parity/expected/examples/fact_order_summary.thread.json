@@ -119,6 +119,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "fact_order_summary",
+    "source_ref": "<root>/fact_order_summary.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

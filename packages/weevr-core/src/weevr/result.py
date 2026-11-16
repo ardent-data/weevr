@@ -6,11 +6,12 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from weevr.engine.formatting import format_duration as _format_duration
 
 if TYPE_CHECKING:
+    from weevr.config.document import ConfigKind, ResolvedDocument
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
     from weevr.model.thread import Thread
@@ -538,28 +539,24 @@ class LoadedConfig:
     """A hydrated config with its resolved children, returned without executing.
 
     Returned by ``Context.load()`` and :func:`weevr.config.load_resolved`.
-    Provides the underlying model (Thread, Weave, or Loom), each weave's
-    resolved threads, the load warnings, and a lazily-built execution plan
-    for weave/loom configs. Proxies attribute access to the model for
+    Provides the underlying model (Thread, Weave, or Loom), the resolved
+    config tree, the load warnings, and a lazily-built execution plan for
+    weave/loom configs. Proxies attribute access to the model for
     convenience.
 
     Attributes:
         model: The hydrated domain model.
         config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``).
         config_name: Name derived from the config file path.
-        resolved_threads: Each weave's hydrated threads (read-only).
-        resolved_weaves: A loom's hydrated weaves (read-only).
+        document: The resolved config tree.
+        resolved_threads: Deprecated; use ``document``.
+        resolved_weaves: Deprecated; use ``document``.
         warnings: Load warnings.
     """
 
     __slots__ = (
-        "_model",
-        "_config_type",
-        "_config_name",
-        "_threads",
-        "_weaves",
-        "_resolved_threads",
-        "_resolved_weaves",
+        "_document",
+        "_children_given",
         "_warnings",
         "_execution_plan",
         "_plan_built",
@@ -574,73 +571,87 @@ class LoadedConfig:
         weaves: dict[str, Any] | None = None,
         warnings: list[str] | tuple[str, ...] | None = None,
     ) -> None:
-        """Initialize with a hydrated model and its metadata."""
-        self._model = model
-        self._config_type = config_type
-        self._config_name = config_name
-        self._threads = threads
-        self._weaves = weaves
-        self._resolved_threads: Mapping[str, Mapping[str, Thread]] = MappingProxyType(
-            {name: MappingProxyType(dict(by_name)) for name, by_name in (threads or {}).items()}
+        """Build from a hydrated model and its children.
+
+        The loader uses :meth:`from_document`; this form assembles the tree
+        from parts. Thread and weave values may be models or their dicts.
+        Children the model's entries don't list are left out of the tree.
+        """
+        self._document: ResolvedDocument = _document_from_parts(
+            model, config_type, config_name, threads, weaves
         )
-        self._resolved_weaves: Mapping[str, Weave] = MappingProxyType(dict(weaves or {}))
+        # A weave or loom built without its children has no plan to build.
+        self._children_given = threads is not None and (config_type != "loom" or weaves is not None)
         self._warnings: tuple[str, ...] = tuple(warnings or ())
         self._execution_plan: list[Any] | None = None
         self._plan_built = False
 
     @classmethod
-    def from_hydrated(cls, hydrated: Any) -> LoadedConfig:
-        """Wrap the config loader's result.
+    def from_document(
+        cls, document: ResolvedDocument, warnings: list[str] | tuple[str, ...] = ()
+    ) -> LoadedConfig:
+        """Wrap a resolved config tree and its load warnings.
 
         Args:
-            hydrated: A ``weevr.config.loader.HydratedConfig``. Typed ``Any``
-                because importing it here would close an import cycle.
+            document: The tree the config loader returned.
+            warnings: The load warnings, in emission order.
 
         Returns:
-            The loaded config, with the loader's children and warnings.
+            The loaded config.
         """
-        return cls(
-            model=hydrated.model,
-            config_type=hydrated.config_type,
-            config_name=hydrated.config_name,
-            threads=hydrated.threads,
-            weaves=hydrated.weaves,
-            warnings=hydrated.warnings,
-        )
+        loaded = cls.__new__(cls)
+        loaded._document = document
+        loaded._children_given = True
+        loaded._warnings = tuple(warnings)
+        loaded._execution_plan = None
+        loaded._plan_built = False
+        return loaded
+
+    @property
+    def document(self) -> ResolvedDocument:
+        """The resolved config tree: the model, then each weave and thread it pulls in."""
+        return self._document
 
     @property
     def model(self) -> Any:
         """The underlying Thread, Weave, or Loom model."""
-        return self._model
+        return self._document.model
 
     @property
     def config_type(self) -> str:
         """Config kind: ``"thread"``, ``"weave"``, or ``"loom"``."""
-        return self._config_type
+        return self._document.kind
 
     @property
     def config_name(self) -> str:
         """Name derived from the config file path."""
-        return self._config_name
+        return self._document.name
 
     @property
     def resolved_threads(self) -> Mapping[str, Mapping[str, Thread]]:
-        """Each weave's hydrated threads, by weave name then effective thread name.
+        """Deprecated: use ``document.weave_threads()``. Removed in 3.0.
 
-        A weave config has one entry (the weave itself); a loom has one per
-        weave; a thread config has none. Read-only. Not to be confused with
-        ``threads``, which proxies to a Weave model's ``ThreadEntry`` list.
+        Each weave's hydrated threads, by weave name then effective thread
+        name. A weave config has one entry (the weave itself); a loom has one
+        per weave; a thread config has none. Read-only.
         """
-        return self._resolved_threads
+        _warn_deprecated("resolved_threads", "document.weave_threads()")
+        return MappingProxyType(
+            {
+                name: MappingProxyType(threads)
+                for name, threads in self._document.weave_threads().items()
+            }
+        )
 
     @property
     def resolved_weaves(self) -> Mapping[str, Weave]:
-        """A loom's hydrated weaves by name; empty for thread and weave configs.
+        """Deprecated: use ``document.weaves()``. Removed in 3.0.
 
-        Read-only. Not to be confused with ``weaves``, which proxies to a Loom
-        model's ``WeaveEntry`` list.
+        A loom's hydrated weaves by name; empty for thread and weave configs.
+        Read-only.
         """
-        return self._resolved_weaves
+        _warn_deprecated("resolved_weaves", "document.weaves()")
+        return MappingProxyType(self._document.weaves())
 
     @property
     def warnings(self) -> tuple[str, ...]:
@@ -658,7 +669,7 @@ class LoadedConfig:
             return self._execution_plan
         self._plan_built = True
 
-        if self._config_type == "thread":
+        if self.config_type == "thread":
             self._execution_plan = None
             return self._execution_plan
 
@@ -706,35 +717,28 @@ class LoadedConfig:
 
         The model is ``None`` for a loom weave missing from the loaded config.
         """
-        from weevr.model.thread import Thread
-        from weevr.model.weave import Weave
-
-        def typed_threads(weave_name: str) -> dict[str, Thread]:
-            # Callers may construct LoadedConfig with plain dicts.
-            return {
-                name: t if isinstance(t, Thread) else Thread.model_validate(t)
-                for name, t in (self._threads or {}).get(weave_name, {}).items()
-            }
-
-        if self._config_type == "weave" and self._threads is not None:
-            weave = self._model
-            yield (
-                self._config_name,
-                weave,
-                typed_threads(self._config_name),
-                list(weave.threads),
-                _lookups(weave),
-            )
-        elif self._config_type == "loom" and self._weaves is not None and self._threads is not None:
-            for weave_entry in self._model.weaves:
+        document = self._document
+        if not self._children_given:
+            return
+        if document.kind == "weave":
+            threads = document.weave_threads()[document.name]
+            weave = document.model
+            yield document.name, weave, threads, list(weave.threads), _lookups(weave)
+        elif document.kind == "loom":
+            for weave_entry in document.model.weaves:
                 name = weave_entry.effective_name
-                weave = (self._weaves or {}).get(name)
-                if weave is None:
+                child = document.children.get(name)
+                if child is None:
                     yield name, None, {}, [], None
                     continue
-                if not isinstance(weave, Weave):
-                    weave = Weave.model_validate(weave)
-                yield name, weave, typed_threads(name), list(weave.threads), _lookups(weave)
+                weave = child.model
+                yield (
+                    name,
+                    weave,
+                    document.weave_threads()[name],
+                    list(weave.threads),
+                    _lookups(weave),
+                )
 
     def flow(self, *, dark: bool | None = None) -> Any:
         """Return a thread flow diagram for thread configs.
@@ -751,19 +755,88 @@ class LoadedConfig:
             A :class:`~weevr.engine.display.FlowDiagram`, or ``None``
             for non-thread configs.
         """
-        if self._config_type != "thread":
+        if self.config_type != "thread":
             return None
         from weevr.engine.display import FlowDiagram, render_flow_svg
 
-        return FlowDiagram(render_flow_svg(self._model, dark=dark))
+        return FlowDiagram(render_flow_svg(self.model, dark=dark))
 
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying model."""
+        model = self._document.model
         try:
-            return getattr(self._model, name)
+            return getattr(model, name)
         except AttributeError:
-            model_type = type(self._model).__name__
+            model_type = type(model).__name__
             raise AttributeError(
                 f"'{type(self).__name__}' object has no attribute '{name}' "
                 f"(underlying {model_type} model does not have this attribute either)"
             ) from None
+
+
+def _warn_deprecated(name: str, replacement: str) -> None:
+    import warnings
+
+    warnings.warn(
+        f"LoadedConfig.{name} is deprecated and will be removed in weevr 3.0; "
+        f"use LoadedConfig.{replacement} instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+def _document_from_parts(
+    model: Any,
+    config_type: str,
+    config_name: str,
+    threads: dict[str, dict[str, Any]] | None,
+    weaves: dict[str, Any] | None,
+) -> ResolvedDocument:
+    """Assemble a document tree from a model and its children by name.
+
+    Children are matched to the model's entries by effective name; a child no
+    entry names is left out, and an entry with no child has no node.
+    """
+    from weevr.config.document import EntryMeta, ResolvedDocument
+    from weevr.model.thread import Thread
+    from weevr.model.weave import Weave
+
+    def as_thread(value: Any) -> Thread:
+        return value if isinstance(value, Thread) else Thread.model_validate(value)
+
+    def thread_docs(weave: Any, by_name: dict[str, Any]) -> dict[str, ResolvedDocument]:
+        docs = {}
+        for entry in getattr(weave, "threads", None) or []:
+            name = entry.effective_name
+            if name in by_name:
+                docs[name] = ResolvedDocument(
+                    model=as_thread(by_name[name]),
+                    kind="thread",
+                    name=name,
+                    entry=EntryMeta.from_entry(entry),
+                )
+        return docs
+
+    children: dict[str, ResolvedDocument] = {}
+    if config_type == "weave":
+        children = thread_docs(model, (threads or {}).get(config_name, {}))
+    elif config_type == "loom":
+        for entry in getattr(model, "weaves", None) or []:
+            name = entry.effective_name
+            weave = (weaves or {}).get(name)
+            if weave is None:
+                continue
+            weave = weave if isinstance(weave, Weave) else Weave.model_validate(weave)
+            children[name] = ResolvedDocument(
+                model=weave,
+                kind="weave",
+                name=name,
+                entry=EntryMeta.from_entry(entry),
+                children=thread_docs(weave, (threads or {}).get(name, {})),
+            )
+    return ResolvedDocument(
+        model=model,
+        kind=cast("ConfigKind", config_type),
+        name=config_name,
+        children=children,
+    )

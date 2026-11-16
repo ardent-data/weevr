@@ -269,6 +269,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "fact_sales",
+    "source_ref": "<root>/fact_sales.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

@@ -737,6 +737,142 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": "threads/base.thread"
+            },
+            "kind": "thread",
+            "name": "base",
+            "source_ref": "<root>/threads/base.thread"
+          },
+          {
+            "children": [],
+            "entry": {
+              "alias": "tpl_a",
+              "condition": null,
+              "dependencies": [
+                "base"
+              ],
+              "params": {
+                "suffix": "a"
+              },
+              "ref": "threads/template.thread"
+            },
+            "kind": "thread",
+            "name": "tpl_a",
+            "source_ref": "<root>/threads/template.thread"
+          },
+          {
+            "children": [],
+            "entry": {
+              "alias": "tpl_b",
+              "condition": "table_exists('gold.base')",
+              "dependencies": null,
+              "params": {
+                "suffix": "b"
+              },
+              "ref": "threads/template.thread"
+            },
+            "kind": "thread",
+            "name": "tpl_b",
+            "source_ref": "<root>/threads/template.thread"
+          },
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": [
+                "tpl_a"
+              ],
+              "params": null,
+              "ref": null
+            },
+            "kind": "thread",
+            "name": "inline_core",
+            "source_ref": "<root>/weaves/core.weave"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": "'dev' == 'dev'",
+          "dependencies": null,
+          "params": null,
+          "ref": "weaves/core.weave"
+        },
+        "kind": "weave",
+        "name": "core",
+        "source_ref": "<root>/weaves/core.weave"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": "threads/conv.thread"
+            },
+            "kind": "thread",
+            "name": "conv",
+            "source_ref": "<root>/threads/conv.thread"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "conv",
+        "source_ref": "<root>/conv.weave"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": null
+            },
+            "kind": "thread",
+            "name": "inline_t",
+            "source_ref": "<root>/forms.loom"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "inline_w",
+        "source_ref": "<root>/forms.loom"
+      }
+    ],
+    "entry": null,
+    "kind": "loom",
+    "name": "forms",
+    "source_ref": "<root>/forms.loom"
+  },
   "warnings": [],
   "weaves": {
     "conv": {

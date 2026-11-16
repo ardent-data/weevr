@@ -89,6 +89,13 @@
     "write": null
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "stg_orders",
+    "source_ref": "<root>/threads/stg_orders.thread"
+  },
   "warnings": [
     "WARN: thread '#0' declares an execution block (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
   ],

@@ -116,6 +116,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "stg_customers",
+    "source_ref": "<root>/stg_customers.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

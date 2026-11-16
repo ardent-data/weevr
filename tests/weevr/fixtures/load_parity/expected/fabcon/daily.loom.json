@@ -748,6 +748,111 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": "dimensions/stg_customers.thread"
+            },
+            "kind": "thread",
+            "name": "stg_customers",
+            "source_ref": "<root>/dimensions/stg_customers.thread"
+          },
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": "dimensions/stg_products.thread"
+            },
+            "kind": "thread",
+            "name": "stg_products",
+            "source_ref": "<root>/dimensions/stg_products.thread"
+          },
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": [
+                "stg_customers"
+              ],
+              "params": null,
+              "ref": "dimensions/dim_customer.thread"
+            },
+            "kind": "thread",
+            "name": "dim_customer",
+            "source_ref": "<root>/dimensions/dim_customer.thread"
+          },
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": [
+                "stg_products"
+              ],
+              "params": null,
+              "ref": "dimensions/dim_product.thread"
+            },
+            "kind": "thread",
+            "name": "dim_product",
+            "source_ref": "<root>/dimensions/dim_product.thread"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "dimensions",
+        "source_ref": "<root>/dimensions.weave"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": "facts/fact_orders.thread"
+            },
+            "kind": "thread",
+            "name": "fact_orders",
+            "source_ref": "<root>/facts/fact_orders.thread"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": "table_exists('silver.dim_customer')",
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "facts",
+        "source_ref": "<root>/facts.weave"
+      }
+    ],
+    "entry": null,
+    "kind": "loom",
+    "name": "daily",
+    "source_ref": "<root>/daily.loom"
+  },
   "warnings": [
     "WARN: loom 'daily' declares defaults.execution (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
   ],

@@ -140,6 +140,13 @@
     "write": null
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_contacts",
+    "source_ref": "<root>/dim_contacts.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

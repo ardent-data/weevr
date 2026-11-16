@@ -156,6 +156,13 @@
     "write": null
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "base",
+    "source_ref": "<root>/threads/base.thread"
+  },
   "warnings": [
     "WARN: thread 'base': source 'region' references lookup 'regions', which this thread doesn't define; it must come from a weave or loom"
   ],

@@ -129,6 +129,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "stg_orders_with_exports",
+    "source_ref": "<root>/stg_orders_with_exports.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

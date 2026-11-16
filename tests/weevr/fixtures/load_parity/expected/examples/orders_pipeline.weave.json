@@ -302,6 +302,42 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "staging_orders",
+        "source_ref": "<root>/orders_pipeline.weave"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "staging_orders"
+          ],
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "fact_orders",
+        "source_ref": "<root>/orders_pipeline.weave"
+      }
+    ],
+    "entry": null,
+    "kind": "weave",
+    "name": "orders_pipeline",
+    "source_ref": "<root>/orders_pipeline.weave"
+  },
   "warnings": [],
   "weaves": {}
 }

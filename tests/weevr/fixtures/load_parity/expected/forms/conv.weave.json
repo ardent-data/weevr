@@ -106,6 +106,27 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": "threads/conv.thread"
+        },
+        "kind": "thread",
+        "name": "conv",
+        "source_ref": "<root>/threads/conv.thread"
+      }
+    ],
+    "entry": null,
+    "kind": "weave",
+    "name": "conv",
+    "source_ref": "<root>/conv.weave"
+  },
   "warnings": [],
   "weaves": {}
 }

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
 from weevr.config.hydration import (
     check_column_set_references,
     check_resolve_lookups,
@@ -60,6 +61,8 @@ logger = logging.getLogger("weevr.config")
 
 COMPONENT_TYPES = ("thread", "weave", "loom")
 
+_KINDS: dict[type, ConfigKind] = {Thread: "thread", Weave: "weave", Loom: "loom"}
+
 
 @dataclass
 class ResolvedConfig:
@@ -84,33 +87,6 @@ class ResolvedConfig:
     data: dict[str, Any]
     children: list[ResolvedChild] = field(default_factory=list)
     authored: dict[str, Any] | None = None
-    warnings: list[str] = field(default_factory=list)
-
-
-@dataclass
-class HydratedConfig:
-    """A hydrated config with the children it pulls in.
-
-    The loader's own result. It deliberately is not
-    :class:`~weevr.result.LoadedConfig`: importing ``weevr.result`` reaches the
-    engine wheel's ``weevr.engine`` package, and ``load_config`` must stay
-    importable and runnable without PySpark in a full install.
-
-    Attributes:
-        model: The hydrated Thread, Weave, or Loom.
-        config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``).
-        config_name: Name of the config.
-        weaves: Hydrated weaves by name (looms only).
-        threads: Each weave's hydrated threads by weave name, then effective
-            thread name (weaves and looms).
-        warnings: Load warnings, in emission order.
-    """
-
-    model: Thread | Weave | Loom
-    config_type: str
-    config_name: str
-    weaves: dict[str, Weave] = field(default_factory=dict)
-    threads: dict[str, dict[str, Thread]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -238,7 +214,7 @@ def resolve_config(
     )
 
 
-def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
+def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[str]]:
     """Hydrate a resolved thread, weave, or loom and the children it pulls in.
 
     Hydration consumes ``resolved``: child dicts in ``resolved.data`` are
@@ -248,7 +224,8 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
         resolved: The output of :func:`resolve_config` for a component config.
 
     Returns:
-        The hydrated model with its weaves, threads, and load warnings.
+        ``(document, warnings)``: the resolved config tree, and the load
+        warnings in emission order.
 
     Raises:
         ModelValidationError: If the config or any child fails model validation.
@@ -300,13 +277,63 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
 
     warnings.extend(lookup_warnings)
 
-    return HydratedConfig(
+    return _assemble_document(resolved, model, weaves, threads), warnings
+
+
+def _assemble_document(
+    resolved: ResolvedConfig,
+    model: Thread | Weave | Loom,
+    weaves: dict[str, Weave],
+    threads: dict[str, dict[str, Thread]],
+) -> ResolvedDocument:
+    """Build the document tree from the hydrated models and the resolved children.
+
+    Children, their hydrated models and the parent's typed entries all come
+    in entry order, so they are paired by position.
+    """
+    top_file = str(resolved.location)
+
+    def thread_docs(
+        weave: Weave, by_name: dict[str, Thread], nodes: list[ResolvedChild], enclosing: str
+    ) -> dict[str, ResolvedDocument]:
+        return {
+            name: ResolvedDocument(
+                model=thread,
+                kind="thread",
+                name=name,
+                entry=EntryMeta.from_entry(entry),
+                source_ref=node.source_path or enclosing,
+            )
+            for (name, thread), entry, node in zip(
+                by_name.items(), weave.threads, nodes, strict=True
+            )
+        }
+
+    children: dict[str, ResolvedDocument] = {}
+    if isinstance(model, Weave):
+        children = thread_docs(
+            model, threads.get(resolved.config_name, {}), resolved.children, top_file
+        )
+    elif isinstance(model, Loom):
+        for (name, weave), entry, node in zip(
+            weaves.items(), model.weaves, resolved.children, strict=True
+        ):
+            weave_file = node.source_path or top_file
+            children[name] = ResolvedDocument(
+                model=weave,
+                kind="weave",
+                name=name,
+                entry=EntryMeta.from_entry(entry),
+                children=thread_docs(weave, threads.get(name, {}), node.children, weave_file),
+                source_ref=weave_file,
+            )
+
+    return ResolvedDocument(
         model=model,
-        config_type=resolved.config_type,
-        config_name=resolved.config_name,
-        weaves=weaves,
-        threads=threads,
-        warnings=warnings,
+        kind=_KINDS[type(model)],
+        name=resolved.config_name,
+        children=children,
+        source_ref=top_file,
     )
 
 
@@ -352,7 +379,7 @@ def load_resolved_config(
     runtime_params: dict[str, Any] | None = None,
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
-) -> HydratedConfig:
+) -> tuple[ResolvedDocument, list[str]]:
     """Load a typed thread, weave, or loom file with its resolved children.
 
     The engine-facing entry point: ``Context`` calls it with its project root
@@ -367,7 +394,8 @@ def load_resolved_config(
         fabric_context: Optional Fabric environment values for ``${fabric.x}``.
 
     Returns:
-        The hydrated config with its weaves, threads, and load warnings.
+        ``(document, warnings)``: the resolved config tree and the load
+        warnings.
     """
     with attribute_errors(location):
         return hydrate_resolved(
@@ -407,10 +435,9 @@ def load_resolved(
             it; defaults to the file's directory.
 
     Returns:
-        A :class:`~weevr.result.LoadedConfig` with ``model``,
-        ``resolved_threads``, ``resolved_weaves``, ``warnings``, and
-        ``execution_plan``. Warnings are also
-        logged on the ``weevr.config`` logger.
+        A :class:`~weevr.result.LoadedConfig` with ``model``, ``document``
+        (the resolved config tree), ``warnings``, and ``execution_plan``.
+        Warnings are also logged on the ``weevr.config`` logger.
 
     Raises:
         ConfigError: Unsupported extension or a name/filename mismatch, plus
@@ -424,12 +451,12 @@ def load_resolved(
         root = project_root
     else:
         root = LocalConfigLocation(Path(project_root))
-    hydrated = load_resolved_config(
+    document, warnings = load_resolved_config(
         make_location(path), runtime_params=runtime_params, project_root=root
     )
-    for warning in hydrated.warnings:
+    for warning in warnings:
         logger.warning(warning)
-    return LoadedConfig.from_hydrated(hydrated)
+    return LoadedConfig.from_document(document, warnings)
 
 
 def _apply_cascade(config_type: str, data: dict[str, Any], children: list[ResolvedChild]) -> None:

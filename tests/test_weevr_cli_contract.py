@@ -74,8 +74,11 @@ def test_error_classes_caught_by_type() -> None:
 def test_loaded_config_surface(project: Path) -> None:
     loaded = load_resolved(project / "nightly.loom", project_root=project)
     assert isinstance(loaded, LoadedConfig)
-    assert loaded.resolved_weaves
-    assert loaded.resolved_threads
+    # Deprecated until 3.0: they keep working, with a warning naming the replacement.
+    with pytest.warns(DeprecationWarning, match="document"):
+        assert loaded.resolved_weaves
+    with pytest.warns(DeprecationWarning, match="document"):
+        assert loaded.resolved_threads
     assert isinstance(loaded.warnings, tuple)
     assert isinstance(loaded.validate_plans(), tuple)
     plans = loaded.execution_plan

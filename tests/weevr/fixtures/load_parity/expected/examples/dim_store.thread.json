@@ -156,6 +156,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_store",
+    "source_ref": "<root>/dim_store.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

@@ -131,7 +131,7 @@ class TestChildThreadWarpResolution:
             {"config_version": "1.0", "threads": [{"ref": "threads/dims/dim_customer.thread"}]},
         )
         loaded = load_resolved(weave, project_root=project)
-        thread = loaded.resolved_threads["w"]["dim_customer"]
+        thread = loaded.document.weave_threads()["w"]["dim_customer"]
         assert thread.warp_binding.warp.columns[0].name == "child_dir"
 
     def test_inline_thread_uses_the_enclosing_file(self, project: Path):
@@ -142,7 +142,7 @@ class TestChildThreadWarpResolution:
             {"config_version": "1.0", "threads": [inline]},
         )
         loaded = load_resolved(weave, project_root=project)
-        thread = loaded.resolved_threads["w"]["dim_customer"]
+        thread = loaded.document.weave_threads()["w"]["dim_customer"]
         assert thread.warp_binding.warp.columns[0].name == "beside_weave"
 
 

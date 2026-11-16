@@ -82,6 +82,13 @@
     "write": null
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "warp-enforcement",
+    "source_ref": "<root>/warp-enforcement.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

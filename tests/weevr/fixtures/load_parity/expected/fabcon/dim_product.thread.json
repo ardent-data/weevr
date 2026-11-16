@@ -111,6 +111,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_product",
+    "source_ref": "<root>/dim_product.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

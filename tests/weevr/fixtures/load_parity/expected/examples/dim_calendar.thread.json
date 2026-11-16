@@ -99,6 +99,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_calendar",
+    "source_ref": "<root>/dim_calendar.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

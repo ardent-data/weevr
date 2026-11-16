@@ -311,6 +311,42 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "enrich_customers",
+        "source_ref": "<root>/enrichment_pipeline.weave"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "enrich_customers"
+          ],
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "enrich_orders",
+        "source_ref": "<root>/enrichment_pipeline.weave"
+      }
+    ],
+    "entry": null,
+    "kind": "weave",
+    "name": "enrichment_pipeline",
+    "source_ref": "<root>/enrichment_pipeline.weave"
+  },
   "warnings": [],
   "weaves": {}
 }

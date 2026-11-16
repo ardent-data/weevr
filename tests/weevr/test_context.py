@@ -546,7 +546,7 @@ class TestContextLoadChildForeach:
                 "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
             },
         )
-        thread = self._ctx(project).load("w.weave").resolved_threads["w"]["fe"]
+        thread = self._ctx(project).load("w.weave").document.weave_threads()["w"]["fe"]
         assert self._filter_exprs(thread) == ["a > 0", "b > 0"]
 
     def test_loom_expands_referenced_thread_foreach(self, tmp_path: Path) -> None:
@@ -560,7 +560,8 @@ class TestContextLoadChildForeach:
             },
         )
         resolved = self._ctx(project).load("top.loom")
-        assert self._filter_exprs(resolved.resolved_threads["w"]["fe"]) == ["a > 0", "b > 0"]
+        thread = resolved.document.weave_threads()["w"]["fe"]
+        assert self._filter_exprs(thread) == ["a > 0", "b > 0"]
 
     def test_foreach_values_from_entry_params(self, tmp_path: Path) -> None:
         """foreach values supplied through a weave entry's params expand."""
@@ -574,7 +575,7 @@ class TestContextLoadChildForeach:
             },
         )
         resolved = self._ctx(project).load("w.weave")
-        assert self._filter_exprs(resolved.resolved_threads["w"]["fe"]) == [
+        assert self._filter_exprs(resolved.document.weave_threads()["w"]["fe"]) == [
             "x > 0",
             "y > 0",
             "z > 0",
@@ -605,7 +606,7 @@ class TestContextLoadChildForeach:
         ctx = self._ctx(project)
         direct = ctx.load("fe.thread").model
         assert isinstance(direct, Thread)
-        via_weave = ctx.load("w.weave").resolved_threads["w"]["fe"]
+        via_weave = ctx.load("w.weave").document.weave_threads()["w"]["fe"]
         assert via_weave.steps == direct.steps
 
 
@@ -666,14 +667,14 @@ target:
     def test_inline_weave_threads_hydrate(self, tmp_path: Path) -> None:
         """Both the referenced and the inline thread come back hydrated."""
         loaded = self._load(tmp_path)
-        threads = loaded.resolved_threads["inline_ops"]
+        threads = loaded.document.weave_threads()["inline_ops"]
         assert set(threads) == {"orders_east", "ops_audit"}
         assert threads["orders_east"].target.alias == "gold.orders_east"
 
     def test_loom_defaults_cascade_into_inline_weave(self, tmp_path: Path) -> None:
         """Loom defaults reach threads of an inline weave."""
         loaded = self._load(tmp_path)
-        assert loaded.resolved_threads["inline_ops"]["ops_audit"].write.mode == "append"
+        assert loaded.document.weave_threads()["inline_ops"]["ops_audit"].write.mode == "append"
 
     def test_inline_weave_keeps_entry_condition(self, tmp_path: Path) -> None:
         """The weave entry's condition is preserved on the loom model."""
@@ -695,7 +696,7 @@ target:
         project.mkdir()
         (project / "x.loom").write_text(loom)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
-        return ctx.load("x.loom").resolved_threads["inline_ops"]["ops_audit"]
+        return ctx.load("x.loom").document.weave_threads()["inline_ops"]["ops_audit"]
 
     def test_inline_weave_defaults_resolve_variables(self, tmp_path: Path) -> None:
         """The inline weave's own defaults resolve ${var}; loom defaults still reach it."""

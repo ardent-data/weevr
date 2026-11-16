@@ -99,6 +99,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "stg_products",
+    "source_ref": "<root>/dimensions/stg_products.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

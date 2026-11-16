@@ -246,6 +246,68 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": null
+            },
+            "kind": "thread",
+            "name": "dim_customer",
+            "source_ref": "<root>/sales_lakehouse.loom"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "dimensions",
+        "source_ref": "<root>/sales_lakehouse.loom"
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "entry": {
+              "alias": null,
+              "condition": null,
+              "dependencies": null,
+              "params": null,
+              "ref": null
+            },
+            "kind": "thread",
+            "name": "fact_orders",
+            "source_ref": "<root>/sales_lakehouse.loom"
+          }
+        ],
+        "entry": {
+          "alias": null,
+          "condition": "table_exists('curated.dim_customer')",
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "weave",
+        "name": "facts",
+        "source_ref": "<root>/sales_lakehouse.loom"
+      }
+    ],
+    "entry": null,
+    "kind": "loom",
+    "name": "sales_lakehouse",
+    "source_ref": "<root>/sales_lakehouse.loom"
+  },
   "warnings": [
     "WARN: loom 'sales_lakehouse' declares defaults.execution (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
   ],

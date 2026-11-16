@@ -140,33 +140,33 @@ class TestLoadResolvedShapes:
 
     def test_weave_threads_keyed_by_effective_name(self, project: Path) -> None:
         loaded = load_resolved(project / "weaves/sales.weave", project_root=project)
-        threads = loaded.resolved_threads["sales"]
+        threads = loaded.document.weave_threads()["sales"]
         assert list(threads) == ["stg_orders", "orders_east", "orders_west"]
         assert all(isinstance(t, Thread) for t in threads.values())
         assert threads["orders_east"].target.alias == "gold.orders_east"
-        assert dict(loaded.resolved_weaves) == {}
+        assert dict(loaded.document.weaves()) == {}
         assert [p.weave_name for p in loaded.execution_plan] == ["sales"]
 
     def test_loom_returns_every_weave_and_plan(self, project: Path) -> None:
         loaded = load_resolved(project / "nightly.loom", project_root=project)
-        assert list(loaded.resolved_weaves) == ["sales", "inline_ops"]
-        assert all(isinstance(w, Weave) for w in loaded.resolved_weaves.values())
-        assert list(loaded.resolved_threads) == ["sales", "inline_ops"]
-        assert list(loaded.resolved_threads["inline_ops"]) == ["ops_audit", "ops_summary"]
+        assert list(loaded.document.weaves()) == ["sales", "inline_ops"]
+        assert all(isinstance(w, Weave) for w in loaded.document.weaves().values())
+        assert list(loaded.document.weave_threads()) == ["sales", "inline_ops"]
+        assert list(loaded.document.weave_threads()["inline_ops"]) == ["ops_audit", "ops_summary"]
         assert [p.weave_name for p in loaded.execution_plan] == ["sales", "inline_ops"]
 
     def test_thread_has_no_children(self, project: Path) -> None:
         loaded = load_resolved(project / "threads/stg_orders.thread", project_root=project)
         assert isinstance(loaded.model, Thread)
-        assert dict(loaded.resolved_threads) == {}
-        assert dict(loaded.resolved_weaves) == {}
+        assert dict(loaded.document.weave_threads()) == {}
+        assert dict(loaded.document.weaves()) == {}
         assert loaded.execution_plan is None
         assert loaded.model.sources["orders"].path == str(project / "data" / "orders.csv")
 
     def test_project_root_defaults_to_file_directory(self, project: Path) -> None:
         loaded = load_resolved(project / "nightly.loom")
         assert loaded.model.qualified_key == "nightly.loom"
-        assert list(loaded.resolved_weaves) == ["sales", "inline_ops"]
+        assert list(loaded.document.weaves()) == ["sales", "inline_ops"]
 
 
 class TestLoadResolvedWarnings:
@@ -188,17 +188,27 @@ class TestLoadResolvedWarnings:
 class TestLoadResolvedReadOnly:
     """The children mappings can't be mutated."""
 
-    def test_threads_outer_mapping_is_read_only(self, project: Path) -> None:
+    def test_document_children_are_read_only(self, project: Path) -> None:
+        loaded = load_resolved(project / "nightly.loom")
+        with pytest.raises(TypeError):
+            loaded.document.children["x"] = loaded.document  # type: ignore[index]
+        with pytest.raises(TypeError):
+            loaded.document.children["sales"].children["x"] = loaded.document  # type: ignore[index]
+
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_deprecated_threads_outer_mapping_is_read_only(self, project: Path) -> None:
         loaded = load_resolved(project / "nightly.loom")
         with pytest.raises(TypeError):
             loaded.resolved_threads["x"] = {}  # type: ignore[index]
 
-    def test_threads_inner_mapping_is_read_only(self, project: Path) -> None:
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_deprecated_threads_inner_mapping_is_read_only(self, project: Path) -> None:
         loaded = load_resolved(project / "nightly.loom")
         with pytest.raises(TypeError):
             loaded.resolved_threads["sales"]["x"] = None  # type: ignore[index]
 
-    def test_weaves_mapping_is_read_only(self, project: Path) -> None:
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_deprecated_weaves_mapping_is_read_only(self, project: Path) -> None:
         loaded = load_resolved(project / "nightly.loom")
         with pytest.raises(TypeError):
             loaded.resolved_weaves["x"] = None  # type: ignore[index]
@@ -295,7 +305,7 @@ class TestDuplicateWeaveNames:
             tmp_path, "  - ref: a/main.weave\n    name: staging\n  - ref: b/main.weave\n"
         )
         loaded = load_resolved(project / "all.loom", project_root=project)
-        assert {name: list(t) for name, t in loaded.resolved_threads.items()} == {
+        assert {name: list(t) for name, t in loaded.document.weave_threads().items()} == {
             "staging": ["x"],
             "main": ["y"],
         }
@@ -342,7 +352,7 @@ class TestHierarchyVariablesLoad:
         cfg.write_text('config_version: "1.0"\nthreads:\n  - ref: orders.thread\n')
         loaded = load_resolved(cfg, project_root=tmp_path)
         assert isinstance(loaded.model, Weave)
-        thread = loaded.resolved_threads["daily"]["orders"]
+        thread = loaded.document.weave_threads()["daily"]["orders"]
         assert thread.exports is not None
         assert thread.exports[0].path == self.PATH
 

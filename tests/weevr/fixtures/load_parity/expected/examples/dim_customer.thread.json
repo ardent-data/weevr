@@ -92,6 +92,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "dim_customer",
+    "source_ref": "<root>/dim_customer.thread"
+  },
   "warnings": [],
   "weaves": {}
 }

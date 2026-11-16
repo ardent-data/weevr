@@ -308,6 +308,57 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "staging_customers",
+        "source_ref": "<root>/customer_pipeline.weave"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "staging_customers"
+          ],
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "dim_customer",
+        "source_ref": "<root>/customer_pipeline.weave"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "dim_customer"
+          ],
+          "params": null,
+          "ref": null
+        },
+        "kind": "thread",
+        "name": "fact_customer_orders",
+        "source_ref": "<root>/customer_pipeline.weave"
+      }
+    ],
+    "entry": null,
+    "kind": "weave",
+    "name": "customer_pipeline",
+    "source_ref": "<root>/customer_pipeline.weave"
+  },
   "warnings": [],
   "weaves": {}
 }

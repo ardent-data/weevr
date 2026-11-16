@@ -1292,6 +1292,57 @@ class TestLoadedConfig:
             }
         )
 
+    def test_from_document_reads_everything_from_the_tree(self, sample_thread: Thread) -> None:
+        from weevr.config import ResolvedDocument
+
+        document = ResolvedDocument(model=sample_thread, kind="thread", name="dim_customer")
+        loaded = LoadedConfig.from_document(document, ["WARN: x"])
+        assert loaded.document is document
+        assert loaded.model is sample_thread
+        assert (loaded.config_type, loaded.config_name) == ("thread", "dim_customer")
+        assert loaded.warnings == ("WARN: x",)
+
+    def test_parts_build_a_tree(
+        self, sample_loom: Loom, sample_weave: Weave, sample_thread: Thread
+    ) -> None:
+        loaded = LoadedConfig(
+            sample_loom,
+            "loom",
+            "nightly",
+            threads={"dimensions": {"dim_customer": sample_thread, "unlisted": sample_thread}},
+            weaves={"dimensions": sample_weave},
+        )
+        document = loaded.document
+        assert (document.kind, document.name) == ("loom", "nightly")
+        weave = document.children["dimensions"]
+        assert weave.model is sample_weave
+        # Children no entry lists are left out.
+        assert list(weave.children) == ["dim_customer"]
+        assert weave.children["dim_customer"].model is sample_thread
+
+    def test_parts_accept_thread_dicts(self, sample_weave: Weave, sample_thread: Thread) -> None:
+        loaded = LoadedConfig(
+            sample_weave,
+            "weave",
+            "dimensions",
+            threads={"dimensions": {"dim_customer": sample_thread.model_dump()}},
+        )
+        thread = loaded.document.children["dim_customer"].model
+        assert isinstance(thread, Thread)
+        assert thread == sample_thread
+
+    def test_deprecated_views_warn(self, sample_thread: Thread) -> None:
+        loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
+        with pytest.warns(DeprecationWarning, match=r"3\.0.*document\.weave_threads\(\)"):
+            assert loaded.resolved_threads == {}
+        with pytest.warns(DeprecationWarning, match=r"3\.0.*document\.weaves\(\)"):
+            assert loaded.resolved_weaves == {}
+
+    def test_deprecated_view_docstrings(self) -> None:
+        for name in ("resolved_threads", "resolved_weaves"):
+            doc = getattr(LoadedConfig, name).__doc__
+            assert doc.startswith("Deprecated"), name
+
     def test_model_property(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
         assert loaded.model is sample_thread

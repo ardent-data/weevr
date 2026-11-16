@@ -181,6 +181,13 @@
     }
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "fact_orders",
+    "source_ref": "<root>/facts/fact_orders.thread"
+  },
   "warnings": [
     "WARN: thread 'fact_orders': source 'dim_customer' references lookup 'dim_customer', which this thread doesn't define; it must come from a weave or loom",
     "WARN: thread 'fact_orders': source 'dim_product' references lookup 'dim_product', which this thread doesn't define; it must come from a weave or loom"

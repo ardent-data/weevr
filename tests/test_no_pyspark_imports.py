@@ -139,6 +139,16 @@ def test_import_load_config_without_pyspark() -> None:
         assert hasattr(config_pkg, "load_config")
 
 
+def test_import_resolved_document_without_pyspark() -> None:
+    """The resolved config tree types import with PySpark blocked."""
+    with _block_pyspark():
+        config_pkg = importlib.import_module("weevr.config")
+        assert hasattr(config_pkg, "ResolvedDocument")
+        assert hasattr(config_pkg, "EntryMeta")
+        document = importlib.import_module("weevr.config.document")
+        assert document.ResolvedDocument is config_pkg.ResolvedDocument
+
+
 def test_import_thread_model_without_pyspark() -> None:
     """``from weevr.model.thread import Thread`` must succeed with PySpark blocked."""
     with _block_pyspark():

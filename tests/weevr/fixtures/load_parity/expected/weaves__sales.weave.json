@@ -345,6 +345,59 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": "threads/stg_orders.thread"
+        },
+        "kind": "thread",
+        "name": "stg_orders",
+        "source_ref": "<root>/threads/stg_orders.thread"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": "orders_east",
+          "condition": null,
+          "dependencies": null,
+          "params": {
+            "region": "east"
+          },
+          "ref": "threads/regional.thread"
+        },
+        "kind": "thread",
+        "name": "orders_east",
+        "source_ref": "<root>/threads/regional.thread"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": "orders_west",
+          "condition": null,
+          "dependencies": [
+            "stg_orders"
+          ],
+          "params": {
+            "region": "west"
+          },
+          "ref": "threads/regional.thread"
+        },
+        "kind": "thread",
+        "name": "orders_west",
+        "source_ref": "<root>/threads/regional.thread"
+      }
+    ],
+    "entry": null,
+    "kind": "weave",
+    "name": "sales",
+    "source_ref": "<root>/weaves/sales.weave"
+  },
   "warnings": [
     "WARN: thread 'stg_orders' declares an execution block (log_level) — thread-scoped execution settings are not applied. Move them to the top-level execution block on the loom or weave."
   ],

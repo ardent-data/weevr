@@ -502,6 +502,70 @@
       }
     }
   },
+  "tree": {
+    "children": [
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": "dimensions/stg_customers.thread"
+        },
+        "kind": "thread",
+        "name": "stg_customers",
+        "source_ref": "<root>/dimensions/stg_customers.thread"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": null,
+          "params": null,
+          "ref": "dimensions/stg_products.thread"
+        },
+        "kind": "thread",
+        "name": "stg_products",
+        "source_ref": "<root>/dimensions/stg_products.thread"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "stg_customers"
+          ],
+          "params": null,
+          "ref": "dimensions/dim_customer.thread"
+        },
+        "kind": "thread",
+        "name": "dim_customer",
+        "source_ref": "<root>/dimensions/dim_customer.thread"
+      },
+      {
+        "children": [],
+        "entry": {
+          "alias": null,
+          "condition": null,
+          "dependencies": [
+            "stg_products"
+          ],
+          "params": null,
+          "ref": "dimensions/dim_product.thread"
+        },
+        "kind": "thread",
+        "name": "dim_product",
+        "source_ref": "<root>/dimensions/dim_product.thread"
+      }
+    ],
+    "entry": null,
+    "kind": "weave",
+    "name": "dimensions",
+    "source_ref": "<root>/dimensions.weave"
+  },
   "warnings": [],
   "weaves": {}
 }

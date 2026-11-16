@@ -82,6 +82,13 @@
     "write": null
   },
   "threads": {},
+  "tree": {
+    "children": [],
+    "entry": null,
+    "kind": "thread",
+    "name": "warp-auto",
+    "source_ref": "<root>/warp-auto.thread"
+  },
   "warnings": [],
   "weaves": {}
 }
