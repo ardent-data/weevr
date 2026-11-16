@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 logger = logging.getLogger(__name__)
@@ -58,17 +59,20 @@ class CdcConfig(FrozenBase):
         has_explicit = self.operation_column is not None
 
         if has_preset and has_explicit:
-            raise ValueError(
+            raise rule_error(
+                "C402",
                 "CDC preset and explicit column mapping are mutually exclusive; "
-                "set 'preset' or 'operation_column', not both"
+                "set 'preset' or 'operation_column', not both",
             )
 
         if not has_preset and not has_explicit:
-            raise ValueError("CDC config requires either 'preset' or 'operation_column' to be set")
+            raise rule_error(
+                "C403", "CDC config requires either 'preset' or 'operation_column' to be set"
+            )
 
         if has_explicit and not (self.insert_value or self.update_value):
-            raise ValueError(
-                "Explicit CDC mapping requires at least 'insert_value' or 'update_value'"
+            raise rule_error(
+                "C403", "Explicit CDC mapping requires at least 'insert_value' or 'update_value'"
             )
 
         return self
@@ -96,7 +100,7 @@ class WatermarkStoreConfig(FrozenBase):
     @model_validator(mode="after")
     def _validate_metadata_table_path(self) -> WatermarkStoreConfig:
         if self.type == "metadata_table" and not self.table_path:
-            raise ValueError("metadata_table store type requires 'table_path' to be set")
+            raise rule_error("C403", "metadata_table store type requires 'table_path' to be set")
         return self
 
 
@@ -166,11 +170,14 @@ class LoadConfig(FrozenBase):
     def _validate_watermark_fields(self) -> LoadConfig:
         if self.mode == "incremental_watermark":
             if not self.watermark_column:
-                raise ValueError("incremental_watermark mode requires 'watermark_column' to be set")
+                raise rule_error(
+                    "C403", "incremental_watermark mode requires 'watermark_column' to be set"
+                )
             if self.watermark_type is None:
-                raise ValueError(
+                raise rule_error(
+                    "C403",
                     "incremental_watermark mode requires 'watermark_type' to be set "
-                    "alongside 'watermark_column'"
+                    "alongside 'watermark_column'",
                 )
         return self
 
@@ -178,20 +185,21 @@ class LoadConfig(FrozenBase):
     def _validate_cdc_fields(self) -> LoadConfig:
         if self.mode == "cdc":
             if self.cdc is None:
-                raise ValueError("cdc mode requires 'cdc' config to be set")
+                raise rule_error("C403", "cdc mode requires 'cdc' config to be set")
 
             if self.watermark_column:
                 if self.cdc.preset == "delta_cdf":
-                    raise ValueError(
+                    raise rule_error(
+                        "C404",
                         "watermark_column is not valid with cdc preset 'delta_cdf'; "
-                        "CDF uses commit-version tracking automatically"
+                        "CDF uses commit-version tracking automatically",
                     )
                 if self.watermark_type is None:
-                    raise ValueError(
-                        "watermark_column requires watermark_type when used with cdc mode"
+                    raise rule_error(
+                        "C403", "watermark_column requires watermark_type when used with cdc mode"
                     )
         elif self.cdc:
-            raise ValueError("'cdc' config is only valid when mode is 'cdc'")
+            raise rule_error("C404", "'cdc' config is only valid when mode is 'cdc'")
 
         return self
 
@@ -200,10 +208,11 @@ class LoadConfig(FrozenBase):
         if self.watermark_format is None:
             return self
         if self.watermark_column is None:
-            raise ValueError("watermark_format requires 'watermark_column' to be set")
+            raise rule_error("C403", "watermark_format requires 'watermark_column' to be set")
         if self.watermark_type not in ("timestamp", "date"):
-            raise ValueError(
-                "watermark_format is only valid when watermark_type is 'timestamp' or 'date'"
+            raise rule_error(
+                "C404",
+                "watermark_format is only valid when watermark_type is 'timestamp' or 'date'",
             )
         return self
 

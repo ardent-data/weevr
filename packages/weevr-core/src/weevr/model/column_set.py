@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 _log = logging.getLogger(__name__)
@@ -120,31 +121,33 @@ class ColumnSetSource(FrozenBase):
     def _validate_type_specific_fields(self) -> ColumnSetSource:
         if self.type == "yaml":
             if self.path is None:
-                raise ValueError("'path' is required when type is 'yaml'")
+                raise rule_error("C403", "'path' is required when type is 'yaml'")
             if self.connection is not None:
-                raise ValueError("'connection' is not valid for yaml sources")
+                raise rule_error("C404", "'connection' is not valid for yaml sources")
             if self.table is not None:
-                raise ValueError("'table' is not valid for yaml sources")
+                raise rule_error("C404", "'table' is not valid for yaml sources")
             if self.schema_override is not None:
-                raise ValueError("'schema' is not valid for yaml sources")
+                raise rule_error("C404", "'schema' is not valid for yaml sources")
             return self
 
         # type == "delta"
         if self.connection is not None:
             if self.alias is not None:
-                raise ValueError("'connection' and 'alias' are mutually exclusive")
+                raise rule_error("C402", "'connection' and 'alias' are mutually exclusive")
             if self.path is not None:
-                raise ValueError("'path' is not valid alongside 'connection'")
+                raise rule_error("C404", "'path' is not valid alongside 'connection'")
             if not self.table:
-                raise ValueError("'table' is required when 'connection' is set")
+                raise rule_error("C403", "'table' is required when 'connection' is set")
             return self
 
         if self.table is not None:
-            raise ValueError("'table' requires 'connection' to be set")
+            raise rule_error("C403", "'table' requires 'connection' to be set")
         if self.schema_override is not None:
-            raise ValueError("'schema' requires 'connection' to be set")
+            raise rule_error("C403", "'schema' requires 'connection' to be set")
         if self.alias is None:
-            raise ValueError("one of 'alias' or 'connection' is required when type is 'delta'")
+            raise rule_error(
+                "C403", "one of 'alias' or 'connection' is required when type is 'delta'"
+            )
         return self
 
 
@@ -208,9 +211,11 @@ class ColumnSet(FrozenBase):
         has_source = self.source is not None
         has_param = self.param is not None
         if has_source and has_param:
-            raise ValueError("'source' and 'param' are mutually exclusive — provide one, not both")
+            raise rule_error(
+                "C402", "'source' and 'param' are mutually exclusive — provide one, not both"
+            )
         if not has_source and not has_param:
-            raise ValueError("one of 'source' or 'param' must be provided")
+            raise rule_error("C403", "one of 'source' or 'param' must be provided")
         return self
 
 
@@ -328,7 +333,9 @@ class ReservedWordConfig(FrozenBase):
     def _validate_rename_strategy(self) -> ReservedWordConfig:
         """Cross-field validation for rename strategy constraints."""
         if self.strategy == "rename" and (self.rename_map is None or len(self.rename_map) == 0):
-            raise ValueError("rename_map must be provided and non-empty when strategy is 'rename'")
+            raise rule_error(
+                "C403", "rename_map must be provided and non-empty when strategy is 'rename'"
+            )
         # Warn if rename_map values are themselves reserved words
         if self.rename_map and self.strategy == "rename":
             from weevr.reserved_words import resolve_effective_words

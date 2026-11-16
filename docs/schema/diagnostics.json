@@ -218,7 +218,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "An option the step needs for its mode or its other options is not set.",
+      "summary": "An option required by the block's kind, mode or other options is not set.",
       "docs_anchor": "c403"
     },
     {
@@ -228,7 +228,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "An option is set that the step's chosen mode does not use.",
+      "summary": "An option is set that the block's kind or mode does not use.",
       "docs_anchor": "c404"
     },
     {
@@ -272,6 +272,96 @@
       "docs_anchor": "c408"
     },
     {
+      "code": "C440",
+      "name": "invalid-date-format",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A date value is not a valid YYYY-MM-DD date.",
+      "docs_anchor": "c440"
+    },
+    {
+      "code": "C441",
+      "name": "group-overlap",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A column appears in more than one group, or a single-use setting is claimed twice.",
+      "docs_anchor": "c441"
+    },
+    {
+      "code": "C442",
+      "name": "invalid-name",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A name is not a valid identifier.",
+      "docs_anchor": "c442"
+    },
+    {
+      "code": "C443",
+      "name": "baseline-check-in-pre-steps",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A check that compares against a pre-run baseline is placed where no baseline exists.",
+      "docs_anchor": "c443"
+    },
+    {
+      "code": "C444",
+      "name": "incremental-dedup-order",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A deduplication on an incremental read does not keep the latest row by the watermark.",
+      "docs_anchor": "c444"
+    },
+    {
+      "code": "C445",
+      "name": "name-collision",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A name or alias collides with another name in the same scope.",
+      "docs_anchor": "c445"
+    },
+    {
+      "code": "C446",
+      "name": "forward-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A name is used before it is declared.",
+      "docs_anchor": "c446"
+    },
+    {
+      "code": "C447",
+      "name": "duplicate-column",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A column name is declared more than once.",
+      "docs_anchor": "c447"
+    },
+    {
+      "code": "C448",
+      "name": "undeclared-column-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A key or reference names a column that is not declared.",
+      "docs_anchor": "c448"
+    },
+    {
       "code": "D101",
       "name": "circular-dependency",
       "category": "config",
@@ -300,6 +390,16 @@
       "removed_in": null,
       "summary": "A thread declares a dependency on a thread the weave does not define.",
       "docs_anchor": "d103"
+    },
+    {
+      "code": "R101",
+      "name": "lookup-key-values-overlap",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A lookup's key and value columns overlap.",
+      "docs_anchor": "r101"
     }
   ],
   "retired": []

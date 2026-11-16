@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 _ALGORITHM_LITERAL = Literal[
@@ -152,7 +153,7 @@ class SystemMemberConfig(FrozenBase):
     def sk_must_be_negative(cls, v: int) -> int:
         """Enforce that all system member SK values are negative integers."""
         if v >= 0:
-            raise ValueError(f"system member sk must be negative, got {v}")
+            raise rule_error("C105", f"system member sk must be negative, got {v}")
         return v
 
 
@@ -207,9 +208,11 @@ class ScdDateConfig(FrozenBase):
             min_date = date.fromisoformat(self.min)
             max_date = date.fromisoformat(self.max)
         except ValueError as exc:
-            raise ValueError(f"dates must be in YYYY-MM-DD format: {exc}") from exc
+            raise rule_error("C440", f"dates must be in YYYY-MM-DD format: {exc}") from exc
         if min_date >= max_date:
-            raise ValueError(f"dates.min ({self.min}) must be before dates.max ({self.max})")
+            raise rule_error(
+                "C406", f"dates.min ({self.min}) must be before dates.max ({self.max})"
+            )
         return self
 
 
@@ -329,14 +332,14 @@ class DimensionConfig(FrozenBase):
     def validate_business_key_non_empty(self) -> "DimensionConfig":
         """Validate that business_key contains at least one column."""
         if not self.business_key:
-            raise ValueError("business_key must contain at least one column")
+            raise rule_error("C401", "business_key must contain at least one column")
         return self
 
     @model_validator(mode="after")
     def validate_surrogate_key_columns_non_empty(self) -> "DimensionConfig":
         """Validate that surrogate_key.columns contains at least one column."""
         if not self.surrogate_key.columns:
-            raise ValueError("surrogate_key.columns must contain at least one column")
+            raise rule_error("C401", "surrogate_key.columns must contain at least one column")
         return self
 
     @model_validator(mode="after")
@@ -357,20 +360,23 @@ class DimensionConfig(FrozenBase):
 
         for group_name, group in self.change_detection.items():
             if self.track_history is False and group.on_change == "version":
-                raise ValueError(
+                raise rule_error(
+                    "C403",
                     f"change_detection group '{group_name}' has on_change: version "
-                    f"but track_history is False — enable track_history to use versioning"
+                    f"but track_history is False — enable track_history to use versioning",
                 )
 
             if group.columns == "auto":
                 auto_count += 1
                 if auto_count > 1:
-                    raise ValueError("at most one change_detection group may use columns: auto")
+                    raise rule_error(
+                        "C441", "at most one change_detection group may use columns: auto"
+                    )
             else:
                 for col in group.columns:  # type: ignore[union-attr]
                     if col in seen_columns:
-                        raise ValueError(
-                            f"column '{col}' appears in multiple change_detection groups"
+                        raise rule_error(
+                            "C441", f"column '{col}' appears in multiple change_detection groups"
                         )
                     seen_columns.add(col)
 

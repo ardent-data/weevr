@@ -2,6 +2,7 @@
 
 from pydantic import Field, field_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 
@@ -60,8 +61,8 @@ class FactConfig(FrozenBase):
             The validated foreign_keys value.
 
         Raises:
-            ValueError: If foreign_keys is empty.
+            PydanticCustomError: If foreign_keys is empty.
         """
         if not v:
-            raise ValueError("foreign_keys must be a non-empty list")
+            raise rule_error("C401", "foreign_keys must be a non-empty list")
         return v

@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 
@@ -40,5 +41,5 @@ class SeedConfig(FrozenBase):
     def _validate_rows_non_empty(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Ensure rows list is non-empty."""
         if not v:
-            raise ValueError("rows must contain at least one row")
+            raise rule_error("C401", "rows must contain at least one row")
         return v

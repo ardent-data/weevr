@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 _FILE_TYPES = {"csv", "json", "parquet", "excel"}
@@ -128,57 +129,63 @@ class Source(FrozenBase):
     def _validate_type_fields(self) -> "Source":
         if self.lookup:
             if self.type is not None:
-                raise ValueError("lookup sources must not set 'type'")
+                raise rule_error("C404", "lookup sources must not set 'type'")
             return self
 
         if self.connection is not None:
             if self.alias is not None:
-                raise ValueError("connection and alias are mutually exclusive")
+                raise rule_error("C402", "connection and alias are mutually exclusive")
             if not self.table:
-                raise ValueError("connection sources require 'table' to be set")
+                raise rule_error("C403", "connection sources require 'table' to be set")
             if self.type is not None and self.type != "delta":
-                raise ValueError("connection sources only support type 'delta' (or omit type)")
+                raise rule_error(
+                    "C404", "connection sources only support type 'delta' (or omit type)"
+                )
             return self
 
         if self.table is not None:
-            raise ValueError("'table' requires 'connection' to be set")
+            raise rule_error("C403", "'table' requires 'connection' to be set")
 
         if self.type in _GENERATED_TYPES:
             if not self.column:
-                raise ValueError("generated sources require 'column' to be set")
+                raise rule_error("C403", "generated sources require 'column' to be set")
             if self.start is None:
-                raise ValueError("generated sources require 'start' to be set")
+                raise rule_error("C403", "generated sources require 'start' to be set")
             if self.end is None:
-                raise ValueError("generated sources require 'end' to be set")
+                raise rule_error("C403", "generated sources require 'end' to be set")
             if self.alias is not None:
-                raise ValueError("generated sources must not set 'alias'")
+                raise rule_error("C404", "generated sources must not set 'alias'")
             if self.path is not None:
-                raise ValueError("generated sources must not set 'path'")
+                raise rule_error("C404", "generated sources must not set 'path'")
             if self.options:
-                raise ValueError("generated sources must not set 'options'")
+                raise rule_error("C404", "generated sources must not set 'options'")
             if self.dedup is not None:
-                raise ValueError("generated sources must not set 'dedup'")
+                raise rule_error("C404", "generated sources must not set 'dedup'")
             if (
                 self.type == "date_sequence"
                 and self.step is not None
                 and self.step not in _DATE_SEQUENCE_STEPS
             ):
-                raise ValueError(
+                raise rule_error(
+                    "C103",
                     f"date_sequence step must be one of {sorted(_DATE_SEQUENCE_STEPS)}, "
-                    f"got {self.step!r}"
+                    f"got {self.step!r}",
+                    expected=sorted(_DATE_SEQUENCE_STEPS),
                 )
             if (
                 self.type == "int_sequence"
                 and self.step is not None
                 and (not isinstance(self.step, int) or self.step <= 0)
             ):
-                raise ValueError(f"int_sequence step must be a positive integer, got {self.step!r}")
+                raise rule_error(
+                    "C105", f"int_sequence step must be a positive integer, got {self.step!r}"
+                )
             return self
 
         if self.type is None:
-            raise ValueError("sources require either 'type' or 'lookup'")
+            raise rule_error("C403", "sources require either 'type' or 'lookup'")
         if self.type == "delta" and not self.alias:
-            raise ValueError("delta sources require 'alias' to be set")
+            raise rule_error("C403", "delta sources require 'alias' to be set")
         if self.type in _FILE_TYPES and not self.path:
-            raise ValueError(f"{self.type} sources require 'path' to be set")
+            raise rule_error("C403", f"{self.type} sources require 'path' to be set")
         return self

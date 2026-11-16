@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 from weevr.model.types import SparkExpr
 
@@ -123,13 +124,13 @@ class Assertion(FrozenBase):
             return self
 
         if self.column is None and self.columns is None:
-            raise ValueError("fk_sentinel_rate requires 'column' or 'columns'")
+            raise rule_error("C403", "fk_sentinel_rate requires 'column' or 'columns'")
         if self.sentinel is None and self.sentinels is None:
-            raise ValueError("fk_sentinel_rate requires 'sentinel' or 'sentinels'")
+            raise rule_error("C403", "fk_sentinel_rate requires 'sentinel' or 'sentinels'")
 
         if self.column is not None and self.columns is not None:
-            raise ValueError("column and columns are mutually exclusive")
+            raise rule_error("C402", "column and columns are mutually exclusive")
         if self.sentinel is not None and self.sentinels is not None:
-            raise ValueError("sentinel and sentinels are mutually exclusive")
+            raise rule_error("C402", "sentinel and sentinels are mutually exclusive")
 
         return self
