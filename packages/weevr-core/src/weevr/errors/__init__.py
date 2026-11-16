@@ -2,6 +2,7 @@
 
 from weevr.errors.exceptions import (
     ConfigError,
+    ConfigLocationError,
     ConfigParseError,
     ConfigSchemaError,
     ConfigVersionError,
@@ -24,6 +25,7 @@ from weevr.errors.exceptions import (
 __all__ = [
     "WeevError",
     "ConfigError",
+    "ConfigLocationError",
     "ConfigParseError",
     "ConfigSchemaError",
     "ConfigVersionError",

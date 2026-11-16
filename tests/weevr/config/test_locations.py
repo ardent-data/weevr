@@ -434,3 +434,63 @@ class TestLocationLike:
         assert isinstance(loc, RemoteConfigLocation)
         assert loc.uri == "abfss://ws@host/lh/Files/p.weevr/threads/a.thread"
         assert loc.with_path("abfss://ws@host/x").uri == "abfss://ws@host/x"
+
+
+class TestLocationDiagnostics:
+    """Location failures carry codes and stay catchable as ``ValueError``."""
+
+    def test_absolute_join(self, tmp_path):
+        from weevr.config.locations import LocalConfigLocation
+        from weevr.errors import ConfigLocationError
+
+        with pytest.raises(ConfigLocationError) as exc_info:
+            LocalConfigLocation(tmp_path).join("/etc/x.thread")
+        assert isinstance(exc_info.value, ValueError)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C311"]
+
+    def test_remote_absolute_join(self):
+        from unittest.mock import MagicMock
+
+        from weevr.config.locations import RemoteConfigLocation
+        from weevr.errors import ConfigLocationError
+
+        root = RemoteConfigLocation("abfss://ws@onelake.dfs.fabric.microsoft.com/p", MagicMock())
+        for rel in ("abfss://other/x.thread", "/x.thread"):
+            with pytest.raises(ConfigLocationError) as exc_info:
+                root.join(rel)
+            assert [d.code for d in exc_info.value.diagnostics] == ["C311"]
+
+    def test_traversal_out_of_authority(self):
+        from unittest.mock import MagicMock
+
+        from weevr.config.locations import RemoteConfigLocation
+        from weevr.errors import ConfigLocationError
+
+        root = RemoteConfigLocation("abfss://ws@onelake.dfs.fabric.microsoft.com/p", MagicMock())
+        with pytest.raises(ConfigLocationError) as exc_info:
+            root.join("../../../x.thread")
+        assert [d.code for d in exc_info.value.diagnostics] == ["C303"]
+
+
+class TestConnectionPathDiagnostics:
+    """An undefined connection carries a code and stays a ``ValueError``."""
+
+    def test_undefined_connection(self):
+        from weevr.config.onelake import resolve_connection_path
+        from weevr.errors import ConfigLocationError
+
+        with pytest.raises(ConfigLocationError) as exc_info:
+            resolve_connection_path("missing", "t", None, {})
+        assert isinstance(exc_info.value, ValueError)
+        diag = exc_info.value.diagnostics[0]
+        assert diag.code == "R201"
+        assert diag.expected == ()
+
+    def test_connection_without_table(self):
+        from weevr.config.onelake import resolve_connection_path
+        from weevr.errors import ConfigLocationError
+
+        conn = {"c": {"workspace": "w", "lakehouse": "l"}}
+        with pytest.raises(ConfigLocationError) as exc_info:
+            resolve_connection_path("c", None, None, conn)  # type: ignore[arg-type]
+        assert exc_info.value.diagnostics[0].code == "C403"

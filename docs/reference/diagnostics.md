@@ -212,6 +212,12 @@ A foreach block appears where steps are not expanded (inside a 'with' sub-pipeli
 
 A named warp file is not in any searched location.
 
+### C311
+
+`absolute-path-reference` · error · stable
+
+A reference is an absolute path or URI where a path relative to the project belongs.
+
 ### C350
 
 `duplicate-weave-name` · error · stable
@@ -490,6 +496,14 @@ A thread loaded on its own has a rename step whose column set it does not define
 
 An audit template name is neither user-defined nor a built-in preset.
 
+## R2xx — Connections
+
+### R201
+
+`undefined-connection` · error · stable
+
+A source or target names a connection no scope declares.
+
 ## S1xx — Source and target existence
 
 ### S101
@@ -503,9 +517,3 @@ A source does not exist at its resolved location.
 `source-probe-failed` · error · stable
 
 A source's existence could not be checked, because probing its location failed.
-
-### S103
-
-`source-location-unresolved` · error · stable
-
-A source's location could not be resolved, so its existence was not checked.

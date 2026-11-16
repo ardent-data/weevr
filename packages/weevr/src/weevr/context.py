@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -34,6 +35,7 @@ from weevr.engine.planner import (
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
     ConfigError,
+    ConfigLocationError,
     DataValidationError,
     ExecutionError,
 )
@@ -613,8 +615,9 @@ class Context:
 
         Returns:
             One diagnostic per problem source: ``S101`` for a location that
-            does not exist, ``S102`` for one whose probe failed, ``S103`` for
-            a connection-form source whose location cannot be resolved. Each
+            does not exist, ``S102`` for one whose probe failed, and the
+            location error's own code (an undefined connection's ``R201``)
+            for a connection-form source whose location cannot be resolved. Each
             names the thread (``node``) and the source alias
             (``resolved_path``); the message gives the location.
         """
@@ -630,11 +633,12 @@ class Context:
                     continue
                 try:
                     location = self._source_location(source, thread.connections)
-                except ValueError as exc:
+                except ConfigLocationError as exc:
+                    cause = exc.diagnostics[0]
                     errors.append(
-                        diagnostic(
-                            "S103",
-                            f"Source '{source_name}' in thread '{thread_name}': {exc}",
+                        replace(
+                            cause,
+                            message=f"Source '{source_name}' in thread '{thread_name}': {exc}",
                             node=thread_name,
                             resolved_path=json_pointer(("sources", source_name)),
                         )
@@ -732,7 +736,7 @@ class Context:
             ``None`` when the source declares no probeable location.
 
         Raises:
-            ValueError: If a connection-form source can't be resolved.
+            ConfigLocationError: If a connection-form source can't be resolved.
         """
         if source.connection:
             path = resolve_connection_path(

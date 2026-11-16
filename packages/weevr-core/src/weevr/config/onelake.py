@@ -9,6 +9,8 @@ compatibility.
 
 from __future__ import annotations
 
+from weevr.diagnostics import diagnostic
+from weevr.errors.exceptions import ConfigLocationError
 from weevr.model.connection import OneLakeConnection
 
 _ONELAKE_HOST = "onelake.dfs.fabric.microsoft.com"
@@ -52,12 +54,20 @@ def resolve_connection_path(
     the lookup-and-build sequence.
 
     Raises:
-        ValueError: If the connection is undeclared or ``table`` is absent.
-            Callers wrap this in their own error types with call-site
-            context (thread name, source alias).
+        ConfigLocationError: If the connection is undeclared or ``table`` is
+            absent. It is a ``ValueError``; callers wrap it in their own
+            error types with call-site context (thread name, source alias).
     """
     if not connections or connection_name not in connections:
-        raise ValueError(f"undefined connection '{connection_name}'")
+        raise ConfigLocationError.from_diagnostic(
+            diagnostic(
+                "R201",
+                f"undefined connection '{connection_name}'",
+                expected=sorted(connections or {}),
+            )
+        )
     if table is None:
-        raise ValueError(f"connection '{connection_name}' requires 'table'")
+        raise ConfigLocationError.from_diagnostic(
+            diagnostic("C403", f"connection '{connection_name}' requires 'table'")
+        )
     return build_onelake_path(connections[connection_name], schema_override, table)

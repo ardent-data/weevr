@@ -176,6 +176,17 @@ class ModelValidationError(ConfigError):
     pass
 
 
+class ConfigLocationError(ConfigError, ValueError):
+    """Raised when a config, source or target location can't be resolved.
+
+    Covers an absolute path or URI where a relative one is required, a path
+    that climbs out of its root, and an undefined connection. It is also a
+    ``ValueError``, which callers that resolve locations already catch.
+    """
+
+    pass
+
+
 class ExecutionError(WeevError):
     """Base exception for execution-time errors.
 

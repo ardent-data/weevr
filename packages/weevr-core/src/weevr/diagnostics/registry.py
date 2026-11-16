@@ -182,6 +182,11 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A foreach block appears where steps are not expanded (inside a 'with' sub-pipeline).",
     ),
     _config("C310", "warp-not-found", "A named warp file is not in any searched location."),
+    _config(
+        "C311",
+        "absolute-path-reference",
+        "A reference is an absolute path or URI where a path relative to the project belongs.",
+    ),
     # C350–C359 — loom entries
     _config(
         "C350",
@@ -389,6 +394,10 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unknown-audit-template",
         "An audit template name is neither user-defined nor a built-in preset.",
     ),
+    # R2xx — connections
+    _config(
+        "R201", "undefined-connection", "A source or target names a connection no scope declares."
+    ),
     # D1xx — plan and dependencies
     _config(
         "D101",
@@ -412,11 +421,6 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "S102",
         "source-probe-failed",
         "A source's existence could not be checked, because probing its location failed.",
-    ),
-    _platform(
-        "S103",
-        "source-location-unresolved",
-        "A source's location could not be resolved, so its existence was not checked.",
     ),
 )
 

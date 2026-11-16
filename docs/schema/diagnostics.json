@@ -292,6 +292,16 @@
       "docs_anchor": "c310"
     },
     {
+      "code": "C311",
+      "name": "absolute-path-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A reference is an absolute path or URI where a path relative to the project belongs.",
+      "docs_anchor": "c311"
+    },
+    {
       "code": "C350",
       "name": "duplicate-weave-name",
       "category": "config",
@@ -742,6 +752,16 @@
       "docs_anchor": "r140"
     },
     {
+      "code": "R201",
+      "name": "undefined-connection",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A source or target names a connection no scope declares.",
+      "docs_anchor": "r201"
+    },
+    {
       "code": "S101",
       "name": "source-not-found",
       "category": "platform",
@@ -760,16 +780,6 @@
       "removed_in": null,
       "summary": "A source's existence could not be checked, because probing its location failed.",
       "docs_anchor": "s102"
-    },
-    {
-      "code": "S103",
-      "name": "source-location-unresolved",
-      "category": "platform",
-      "severity": "error",
-      "stability": "stable",
-      "removed_in": null,
-      "summary": "A source's location could not be resolved, so its existence was not checked.",
-      "docs_anchor": "s103"
     }
   ],
   "retired": []

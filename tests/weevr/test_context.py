@@ -1798,7 +1798,7 @@ class TestValidateModeSourceProbes:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
         (diag,) = ctx._source_existence_diagnostics({"t": thread})
-        assert diag.code == "S103"
+        assert diag.code == "R201"
         assert diag.node == "t"
 
     def test_strings_are_the_diagnostic_messages(self, spark: SparkSession, tmp_path: Path) -> None:
