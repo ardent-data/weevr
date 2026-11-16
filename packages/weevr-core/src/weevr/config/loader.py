@@ -22,7 +22,7 @@ from weevr.config.hydration import (
     hydrate_children,
     hydrate_model,
 )
-from weevr.config.inheritance import apply_inheritance
+from weevr.config.inheritance import apply_inheritance, check_defaults_shape
 from weevr.config.locations import (
     ConfigLocation,
     LocalConfigLocation,
@@ -509,9 +509,16 @@ def load_resolved(
 
 
 def _apply_cascade(config_type: str, data: dict[str, Any], children: list[ResolvedChild]) -> None:
-    """Cascade loom and weave defaults into each child thread's dict."""
+    """Cascade loom and weave defaults into each child thread's dict.
+
+    A referenced weave's ``defaults`` are checked under its own file, so a
+    malformed block is reported there rather than against the loom.
+    """
     if config_type == "loom":
         for weave in children:
+            if weave.source_path is not None:
+                with attribute_errors(weave.source_path):
+                    check_defaults_shape(weave.data.get("defaults"), "weave")
             for thread in weave.children:
                 thread.data = apply_inheritance(
                     data.get("defaults"),

@@ -116,8 +116,8 @@ def apply_inheritance(
         InheritanceError: If a ``defaults`` block holds a key the cascade
             merges with the wrong shape.
     """
-    _check_defaults_shape(loom_defaults, "loom")
-    _check_defaults_shape(weave_defaults, "weave")
+    check_defaults_shape(loom_defaults, "loom")
+    check_defaults_shape(weave_defaults, "weave")
     result = {}
 
     # Start with loom defaults
@@ -152,7 +152,7 @@ def apply_inheritance(
     return result
 
 
-def _check_defaults_shape(defaults: dict[str, Any] | None, scope: str) -> None:
+def check_defaults_shape(defaults: dict[str, Any] | None, scope: str) -> None:
     """Reject ``defaults`` keys the cascade merges but no schema has typed yet.
 
     ``defaults`` is free-form until the cascade copies it into each thread,

@@ -237,3 +237,23 @@ def test_malformed_config_raises_located_config_error(
     with pytest.raises(ConfigError) as caught:
         ENTRY_POINTS[entry](root, mutation.load, mutation.params)
     assert caught.value.file_path, f"{type(caught.value).__name__} names no file: {caught.value}"
+
+
+class TestDefaultsErrorsNameTheirFile:
+    """A malformed ``defaults`` block is reported against the file that declares it."""
+
+    def test_referenced_weave_defaults(self, tmp_path: Path) -> None:
+        root = tmp_path / "forms.weevr"
+        shutil.copytree(FORMS, root)
+        Mutation("x", CORE, _set("defaults", "target", value=5)).apply(root)
+        with pytest.raises(ConfigError, match=r"weave defaults\.target") as caught:
+            load_resolved(root / "forms.loom", project_root=root)
+        assert caught.value.file_path == str(root / CORE)
+
+    def test_loom_defaults(self, tmp_path: Path) -> None:
+        root = tmp_path / "forms.weevr"
+        shutil.copytree(FORMS, root)
+        Mutation("x", "forms.loom", _set("defaults", "target", value=5)).apply(root)
+        with pytest.raises(ConfigError, match=r"loom defaults\.target") as caught:
+            load_resolved(root / "forms.loom", project_root=root)
+        assert caught.value.file_path == str(root / "forms.loom")
