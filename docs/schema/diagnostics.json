@@ -82,6 +82,66 @@
       "docs_anchor": "c100"
     },
     {
+      "code": "C101",
+      "name": "missing-field",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A required key is missing.",
+      "docs_anchor": "c101"
+    },
+    {
+      "code": "C102",
+      "name": "wrong-type",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A value has the wrong type: one code for every type (string, number, boolean, list, mapping), and for a value no member of a union accepts.",
+      "docs_anchor": "c102"
+    },
+    {
+      "code": "C103",
+      "name": "invalid-value",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A value is not one of the allowed values.",
+      "docs_anchor": "c103"
+    },
+    {
+      "code": "C104",
+      "name": "unknown-step-type",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A pipeline or hook step names no known step type.",
+      "docs_anchor": "c104"
+    },
+    {
+      "code": "C105",
+      "name": "value-out-of-range",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A value breaks a length, range or pattern limit.",
+      "docs_anchor": "c105"
+    },
+    {
+      "code": "C110",
+      "name": "unknown-key",
+      "category": "config",
+      "severity": "error",
+      "stability": "experimental",
+      "removed_in": null,
+      "summary": "A key the schema does not define. Reserved for strict schemas.",
+      "docs_anchor": "c110"
+    },
+    {
       "code": "C201",
       "name": "missing-config-version",
       "category": "config",

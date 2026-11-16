@@ -17,6 +17,7 @@ from weevr.config.validation import (
     validate_resolve_lookups,
     validate_source_lookups,
 )
+from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
@@ -151,11 +152,21 @@ def hydrate_model(
     try:
         return _MODELS[config_type].model_validate(data)
     except ValidationError as exc:
-        raise ModelValidationError(
-            f"Model hydration failed for {config_type}: {exc}",
-            cause=exc,
-            file_path=str(source),
+        raise _hydration_error(
+            f"Model hydration failed for {config_type}: {exc}", exc, data, str(source)
         ) from exc
+
+
+def _hydration_error(
+    message: str, exc: ValidationError, data: dict[str, Any], file: str
+) -> ModelValidationError:
+    """A ``ModelValidationError`` carrying one coded diagnostic per pydantic error."""
+    return ModelValidationError(
+        message,
+        cause=exc,
+        file_path=file,
+        diagnostics=from_validation_error(exc, data, file=file),
+    )
 
 
 def hydrate_threads(
@@ -228,10 +239,11 @@ def hydrate_threads(
         try:
             thread = Thread.model_validate(thread_dict)
         except ValidationError as exc:
-            raise ModelValidationError(
+            raise _hydration_error(
                 f"Thread hydration failed for '{effective_name}': {exc}",
-                cause=exc,
-                file_path=thread_source,
+                exc,
+                thread_dict,
+                thread_source,
             ) from exc
         if bind is not None:
             bind(thread, thread_source)

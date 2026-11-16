@@ -100,6 +100,22 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "schema-violation",
         "The config does not match the schema, in a way no more specific code covers.",
     ),
+    _config("C101", "missing-field", "A required key is missing."),
+    _config(
+        "C102",
+        "wrong-type",
+        "A value has the wrong type: one code for every type (string, number, boolean, "
+        "list, mapping), and for a value no member of a union accepts.",
+    ),
+    _config("C103", "invalid-value", "A value is not one of the allowed values."),
+    _config("C104", "unknown-step-type", "A pipeline or hook step names no known step type."),
+    _config("C105", "value-out-of-range", "A value breaks a length, range or pattern limit."),
+    _config(
+        "C110",
+        "unknown-key",
+        "A key the schema does not define. Reserved for strict schemas.",
+        stability=Stability.EXPERIMENTAL,
+    ),
     # C2xx — envelope, config kind and config_version
     _config("C201", "missing-config-version", "The config has no config_version."),
     _config(

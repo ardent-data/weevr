@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
+from weevr.diagnostics import diagnostic
+from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
@@ -98,12 +101,15 @@ class LoomConfig(BaseConfig):
     audit_templates: dict[str, Any] | None = None
 
 
-def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
+def validate_schema(
+    raw: dict[str, Any], config_type: str, *, prefix: Sequence[str | int] = ()
+) -> BaseModel:
     """Validate a raw config dict against the appropriate pre-resolution schema.
 
     Args:
         raw: Raw config dictionary (variables not yet resolved)
         config_type: Type of config (thread, weave, loom, params)
+        prefix: Where ``raw`` sits in its file, for an inline body
 
     Returns:
         Validated Pydantic model instance
@@ -120,8 +126,13 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
     }
 
     if config_type not in model_map:
-        raise ConfigSchemaError(
-            f"Unknown config type '{config_type}', expected one of: {', '.join(model_map.keys())}"
+        raise ConfigSchemaError.from_diagnostic(
+            diagnostic(
+                "C204",
+                f"Unknown config type '{config_type}', expected one of: "
+                f"{', '.join(model_map.keys())}",
+                expected=list(model_map),
+            )
         )
 
     model_class = model_map[config_type]
@@ -132,10 +143,13 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
         raise ConfigSchemaError(
             f"Schema validation failed for {config_type} config: {exc}",
             cause=exc,
+            diagnostics=from_validation_error(exc, raw, prefix=prefix),
         ) from exc
 
 
-def validate_inline_thread_types(entry: dict[str, Any]) -> None:
+def validate_inline_thread_types(
+    entry: dict[str, Any], *, prefix: Sequence[str | int] = ()
+) -> None:
     """Check the value types of an inline thread body before the cascade reads it.
 
     Unlike :func:`validate_schema`, missing fields are not errors here: a
@@ -146,6 +160,7 @@ def validate_inline_thread_types(entry: dict[str, Any]) -> None:
 
     Args:
         entry: An inline thread entry from a weave's ``threads`` list.
+        prefix: Where the entry sits in the weave file (``("threads", 2)``).
 
     Raises:
         ConfigSchemaError: If a typed field holds a value of the wrong type.
@@ -159,9 +174,13 @@ def validate_inline_thread_types(entry: dict[str, Any]) -> None:
                 f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in wrong
             )
             name = entry.get("name", "")
+            diagnostics = [
+                d for d in from_validation_error(exc, entry, prefix=prefix) if d.code != "C101"
+            ]
             raise ConfigSchemaError(
                 f"Schema validation failed for inline thread '{name}': {details}",
                 cause=exc,
+                diagnostics=diagnostics,
             ) from exc
 
 

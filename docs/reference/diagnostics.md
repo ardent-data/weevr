@@ -82,6 +82,42 @@ The file extension is not one weevr loads (.thread, .weave, .loom, .warp, .yaml,
 
 The config does not match the schema, in a way no more specific code covers.
 
+### C101
+
+`missing-field` · error · stable
+
+A required key is missing.
+
+### C102
+
+`wrong-type` · error · stable
+
+A value has the wrong type: one code for every type (string, number, boolean, list, mapping), and for a value no member of a union accepts.
+
+### C103
+
+`invalid-value` · error · stable
+
+A value is not one of the allowed values.
+
+### C104
+
+`unknown-step-type` · error · stable
+
+A pipeline or hook step names no known step type.
+
+### C105
+
+`value-out-of-range` · error · stable
+
+A value breaks a length, range or pattern limit.
+
+### C110
+
+`unknown-key` · error · experimental
+
+A key the schema does not define. Reserved for strict schemas.
+
 ## C2xx — Envelope, kind and version
 
 ### C201

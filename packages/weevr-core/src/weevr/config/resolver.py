@@ -806,7 +806,7 @@ def resolve_references(
                         # resolved its variables with the weave's own defaults;
                         # validate and resolve its threads the way a weave
                         # file is.
-                        validated = validate_schema(entry, "weave")
+                        validated = validate_schema(entry, "weave", prefix=("weaves", index))
                         inline = validated.model_dump(exclude_unset=True)
                         inline["qualified_key"] = weave_name
                         if "condition" in entry:
@@ -944,7 +944,7 @@ def resolve_references(
                 if isinstance(entry, dict):
                     # The cascade and load checks read the body before
                     # hydration, so its value types are checked here.
-                    validate_inline_thread_types(entry)
+                    validate_inline_thread_types(entry, prefix=("threads", index))
                     inline = entry.copy()
                     inline["qualified_key"] = entry.get("name", "")
 
