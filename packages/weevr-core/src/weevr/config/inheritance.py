@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from weevr.config.audit_templates import merge_audit_columns_with_templates
+from weevr.errors import InheritanceError
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,13 @@ def apply_inheritance(
 
     Returns:
         Fully merged config with thread values taking precedence
+
+    Raises:
+        InheritanceError: If a ``defaults`` block holds a key the cascade
+            merges with the wrong shape.
     """
+    _check_defaults_shape(loom_defaults, "loom")
+    _check_defaults_shape(weave_defaults, "weave")
     result = {}
 
     # Start with loom defaults
@@ -95,6 +102,43 @@ def apply_inheritance(
     _cascade_target_policies(loom_defaults, weave_defaults, result)
 
     return result
+
+
+def _check_defaults_shape(defaults: dict[str, Any] | None, scope: str) -> None:
+    """Reject ``defaults`` keys the cascade merges but no schema has typed yet.
+
+    ``defaults`` is free-form until the cascade copies it into each thread,
+    so a wrong shape here would otherwise surface as a builtin error.
+
+    Raises:
+        InheritanceError: Naming the scope and the key.
+    """
+    if not defaults:
+        return
+
+    def fail(key: str, expected: str, value: Any) -> None:
+        raise InheritanceError(
+            f"{scope} defaults.{key} must be {expected}, got {type(value).__name__}",
+            config_key=f"defaults.{key}",
+        )
+
+    if "target" in defaults:
+        target = defaults["target"]
+        if not isinstance(target, dict):
+            fail("target", "a mapping", target)
+        columns = target.get("audit_columns")
+        if columns is not None and not isinstance(columns, dict):
+            fail("target.audit_columns", "a mapping", columns)
+    legacy = defaults.get("audit_columns")
+    if legacy is not None and not isinstance(legacy, dict):
+        fail("audit_columns", "a mapping", legacy)
+    if "exports" in defaults:
+        exports = defaults["exports"]
+        if not isinstance(exports, list):
+            fail("exports", "a list", exports)
+        for export in exports:
+            if not isinstance(export, dict):
+                fail("exports[]", "a mapping", export)
 
 
 def _cascade_naming(

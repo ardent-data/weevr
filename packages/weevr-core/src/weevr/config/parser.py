@@ -62,6 +62,12 @@ def parse_yaml(path: str | Path | ConfigLocation) -> dict[str, Any]:
             cause=e,
             file_path=location_str,
         ) from e
+    except UnicodeDecodeError as e:
+        raise ConfigParseError(
+            f"Config file is not valid UTF-8: {e}",
+            cause=e,
+            file_path=location_str,
+        ) from e
     except OSError as e:
         raise ConfigParseError(
             f"Failed to read config file: {e}",

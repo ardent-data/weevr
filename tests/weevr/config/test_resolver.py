@@ -812,6 +812,22 @@ class TestReferenceResolution:
         # The enclosing config's file is attached by attribute_errors.
         assert caught.value.file_path is None
 
+    @pytest.mark.parametrize("name", ["../outside", "sub/../../outside"])
+    def test_convention_weave_outside_project_rejected(self, tmp_path, name):
+        """A name-only weave entry can't reach a .weave file outside the project root."""
+        from weevr.config.resolver import resolve_references
+        from weevr.errors import ReferenceResolutionError
+
+        project = tmp_path / "proj.weevr"
+        project.mkdir()
+        (tmp_path / "outside.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - name: t\n    config_version: "1.0"\n'
+            "    sources: {s: {type: delta, alias: a.b}}\n    target: {alias: c.d}\n"
+        )
+        loom = {"config_version": "1.0", "weaves": [{"name": name}]}
+        with pytest.raises(ReferenceResolutionError, match="outside project root"):
+            resolve_references(loom, "loom", project)
+
     def test_resolve_ref_path_traversal_rejected(self, tmp_path):
         """Raise ReferenceResolutionError when ref escapes the project root."""
         from weevr.config.resolver import resolve_ref_path

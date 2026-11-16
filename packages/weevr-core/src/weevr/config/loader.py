@@ -583,7 +583,8 @@ def resolve_source_paths(
         if not isinstance(source_cfg, dict):
             continue
         path = source_cfg.get("path")
-        if path is None:
+        # Only string paths are joined; any other type fails model validation.
+        if not isinstance(path, str):
             continue
         # Skip already-absolute paths and URIs
         if os.path.isabs(path) or "://" in path:

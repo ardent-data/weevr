@@ -53,6 +53,11 @@ class ThreadConfig(BaseConfig):
     execution: dict[str, Any] | None = None
     connections: dict[str, Any] | None = None
     audit_templates: dict[str, Any] | None = None
+    lookups: dict[str, Any] | None = None
+    column_sets: dict[str, Any] | None = None
+    variables: dict[str, Any] | None = None
+    pre_steps: list[dict[str, Any]] | None = None
+    post_steps: list[dict[str, Any]] | None = None
     with_: dict[str, Any] | None = Field(
         default=None,
         alias="with",
@@ -125,6 +130,36 @@ def validate_schema(raw: dict[str, Any], config_type: str) -> BaseModel:
             f"Schema validation failed for {config_type} config: {exc}",
             cause=exc,
         ) from exc
+
+
+def validate_inline_thread_types(entry: dict[str, Any]) -> None:
+    """Check the value types of an inline thread body before the cascade reads it.
+
+    Unlike :func:`validate_schema`, missing fields are not errors here: a
+    name-only entry, or an inline body without its target, is reported by
+    model hydration with the thread's name. Only values of the wrong type
+    (``sources: [a]``, ``lookups: 5``) are rejected, because the cascade and
+    the load checks read them before hydration.
+
+    Args:
+        entry: An inline thread entry from a weave's ``threads`` list.
+
+    Raises:
+        ConfigSchemaError: If a typed field holds a value of the wrong type.
+    """
+    try:
+        ThreadConfig.model_validate(entry)
+    except ValidationError as exc:
+        wrong = [error for error in exc.errors() if error["type"] != "missing"]
+        if wrong:
+            details = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in wrong
+            )
+            name = entry.get("name", "")
+            raise ConfigSchemaError(
+                f"Schema validation failed for inline thread '{name}': {details}",
+                cause=exc,
+            ) from exc
 
 
 # ---------------------------------------------------------------------------

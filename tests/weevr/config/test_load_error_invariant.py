@@ -35,11 +35,15 @@ class Mutation:
 
     id: str
     file: str
-    edit: Edit | str
+    edit: Edit | str | bytes
     load: str = "forms.loom"
+    params: dict[str, Any] | None = None
 
     def apply(self, root: Path) -> None:
         path = root / self.file
+        if isinstance(self.edit, bytes):
+            path.write_bytes(self.edit)
+            return
         if isinstance(self.edit, str):
             path.write_text(self.edit)
             return
@@ -84,7 +88,7 @@ def _append(*keys: str, value: Any) -> Edit:
 CORE = "weaves/core.weave"
 BASE = "threads/base.thread"
 
-MUTATIONS: list[Any] = [
+MUTATIONS = [
     # Removed required keys
     Mutation("loom-no-version", "forms.loom", _drop("config_version")),
     Mutation("weave-no-version", CORE, _drop("config_version")),
@@ -142,16 +146,7 @@ MUTATIONS: list[Any] = [
     Mutation("param-wrong-type", "forms.loom", _set("params", "env", "type", value="blob")),
     # Bad foreach
     Mutation("foreach-no-values", BASE, _drop("steps", "0", "foreach", "values")),
-    pytest.param(
-        Mutation(
-            "foreach-values-string", BASE, _set("steps", "0", "foreach", "values", value="ab")
-        ),
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="loads without error: a string is iterated as its characters (load audit)",
-        ),
-        id="foreach-values-string",
-    ),
+    Mutation("foreach-values-string", BASE, _set("steps", "0", "foreach", "values", value="ab")),
     Mutation("foreach-steps-missing", BASE, _drop("steps", "0", "foreach", "steps")),
     Mutation("foreach-not-mapping", BASE, _set("steps", "0", "foreach", value=["a"])),
     # Duplicate names
@@ -161,19 +156,58 @@ MUTATIONS: list[Any] = [
         "duplicate-weave", "forms.loom", _append("weaves", value={"ref": "weaves/core.weave"})
     ),
     Mutation("thread-name-mismatch", BASE, _set("name", value="other"), load=BASE),
+    # Unvalidated inline thread bodies
+    Mutation("inline-sources-list", CORE, _set("threads", "3", "sources", value=["x"])),
+    Mutation("inline-lookups-int", CORE, _set("threads", "3", "lookups", value=5)),
+    Mutation("inline-column-sets-int", CORE, _set("threads", "3", "column_sets", value=5)),
+    Mutation("inline-exports-string", CORE, _set("threads", "3", "exports", value="x")),
+    Mutation("inline-exports-item-int", CORE, _set("threads", "3", "exports", value=[5])),
+    Mutation("inline-connections-list", CORE, _set("threads", "3", "connections", value=["a"])),
+    Mutation("inline-thread-steps-int", CORE, _set("threads", "3", "steps", value=5)),
+    # Malformed defaults blocks
+    Mutation("defaults-target-null", CORE, _set("defaults", "target", value=None)),
+    Mutation("defaults-target-string", CORE, _set("defaults", "target", value="x")),
+    Mutation(
+        "defaults-audit-columns-list",
+        CORE,
+        _set("defaults", "target", value={"audit_columns": ["a"]}),
+    ),
+    Mutation("defaults-legacy-audit-columns", CORE, _set("defaults", "audit_columns", value="a")),
+    Mutation("defaults-exports-null", CORE, _set("defaults", "exports", value=None)),
+    Mutation("defaults-exports-item-string", CORE, _set("defaults", "exports", value=["x"])),
+    # Other wrong types the load reads before model validation
+    Mutation("foreach-values-int", BASE, _set("steps", "0", "foreach", "values", value=5)),
+    Mutation("weave-ref-unhashable", CORE, _set("threads", "0", "ref", value=["a"])),
+    Mutation("loom-ref-unhashable", "forms.loom", _set("weaves", "0", "ref", value={"a": 1})),
+    Mutation(
+        "param-spec-not-mapping",
+        "forms.loom",
+        _set("params", "env", value="string"),
+        params={"env": "dev"},
+    ),
+    Mutation("source-path-int", BASE, _set("sources", "orders", value={"type": "csv", "path": 5})),
+    Mutation(
+        "lookup-source-path-int",
+        "forms.loom",
+        _set("lookups", "regions", "source", value={"type": "csv", "path": 5}),
+    ),
+    Mutation("file-not-utf8", BASE, b"config_version: '1.0'\nname: \xff\n"),
 ]
 
 
-def _load_config(root: Path, config: str) -> None:
-    load_config(root / config, project_root=root)
+Params = dict[str, Any] | None
 
 
-def _load_resolved(root: Path, config: str) -> None:
-    load_resolved(root / config, project_root=root)
+def _load_config(root: Path, config: str, params: Params = None) -> None:
+    load_config(root / config, runtime_params=params, project_root=root)
 
 
-def _context_load(root: Path, config: str) -> None:
-    Context(spark=MagicMock(spec=SparkSession), project=str(root)).load(config)
+def _load_resolved(root: Path, config: str, params: Params = None) -> None:
+    load_resolved(root / config, runtime_params=params, project_root=root)
+
+
+def _context_load(root: Path, config: str, params: Params = None) -> None:
+    Context(spark=MagicMock(spec=SparkSession), project=str(root), params=params).load(config)
 
 
 ENTRY_POINTS = {
@@ -193,9 +227,7 @@ def test_fixture_loads_unmutated(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("entry", ENTRY_POINTS, ids=str)
-@pytest.mark.parametrize(
-    "mutation", MUTATIONS, ids=lambda m: m.id if isinstance(m, Mutation) else None
-)
+@pytest.mark.parametrize("mutation", MUTATIONS, ids=lambda m: m.id)
 def test_malformed_config_raises_located_config_error(
     mutation: Mutation, entry: str, tmp_path: Path
 ) -> None:
@@ -203,5 +235,5 @@ def test_malformed_config_raises_located_config_error(
     shutil.copytree(FORMS, root)
     mutation.apply(root)
     with pytest.raises(ConfigError) as caught:
-        ENTRY_POINTS[entry](root, mutation.load)
+        ENTRY_POINTS[entry](root, mutation.load, mutation.params)
     assert caught.value.file_path, f"{type(caught.value).__name__} names no file: {caught.value}"

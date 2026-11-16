@@ -115,6 +115,15 @@ def resolve_declared_params(
     if not param_specs:
         return {}
 
+    for name, spec in param_specs.items():
+        if not isinstance(spec, dict) and not hasattr(spec, "required"):
+            raise ConfigSchemaError(
+                f"Parameter '{name}' must be a mapping with 'name' and 'type', "
+                f"got {type(spec).__name__}",
+                file_path=file_path,
+                config_key=name,
+            )
+
     runtime = runtime_params or {}
     resolved: dict[str, Any] = {}
     for name, spec in param_specs.items():
@@ -498,6 +507,23 @@ def validate_params(
                 )
 
 
+def _check_entry_refs(entries: list[Any]) -> None:
+    """Reject a child entry whose ``ref`` isn't a string, before any ref is used as a key.
+
+    Raises:
+        ReferenceResolutionError: Naming no file of its own; the enclosing
+            config's file is attached by the caller.
+    """
+    from weevr.errors import ReferenceResolutionError
+
+    for entry in entries:
+        if isinstance(entry, dict) and "ref" in entry and not isinstance(entry["ref"], str):
+            ref = entry["ref"]
+            raise ReferenceResolutionError(
+                f"Reference must be a path string, got {type(ref).__name__}: {ref!r}"
+            )
+
+
 def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLocation:
     """Resolve a path-based reference to a :class:`ConfigLocation`.
 
@@ -597,7 +623,7 @@ def resolve_references(
         parse_yaml,
         validate_config_version,
     )
-    from weevr.config.validation import validate_schema
+    from weevr.config.validation import validate_inline_thread_types, validate_schema
     from weevr.errors import ReferenceResolutionError
 
     if isinstance(project_root, Path):
@@ -612,6 +638,7 @@ def resolve_references(
     if config_type == "loom" and "weaves" in config:
         resolved_weaves = []
 
+        _check_entry_refs(config["weaves"])
         for entry in config["weaves"]:
             # Normalize: string entries become {"name": string}
             if isinstance(entry, str):
@@ -670,7 +697,19 @@ def resolve_references(
                 if isinstance(entry, dict):
                     weave_name = entry["name"]
                     convention_ref = f"{weave_name}.weave"
-                    convention_path = project_root.join(convention_ref)
+                    # Held to the same containment rule as a ref entry.
+                    try:
+                        convention_path = project_root.join(convention_ref)
+                    except ValueError as exc:
+                        raise ReferenceResolutionError(
+                            f"Weave name '{weave_name}' resolves outside project root",
+                            file_path=convention_ref,
+                        ) from exc
+                    if not convention_path.is_relative_to(project_root):
+                        raise ReferenceResolutionError(
+                            f"Weave name '{weave_name}' resolves outside project root",
+                            file_path=str(convention_path),
+                        )
                     if convention_path.exists():
                         if convention_ref in visited:
                             cycle = " -> ".join(visited) + f" -> {convention_ref}"
@@ -746,6 +785,7 @@ def resolve_references(
         resolved_threads = []
 
         # Validate: duplicate refs without aliases
+        _check_entry_refs(config["threads"])
         ref_entries = [e for e in config["threads"] if isinstance(e, dict) and e.get("ref")]
         ref_counts = Counter(e["ref"] for e in ref_entries)
         for ref_val, count in ref_counts.items():
@@ -850,6 +890,9 @@ def resolve_references(
                         "Inline thread definition requires a 'name' field",
                     )
                 if isinstance(entry, dict):
+                    # The cascade and load checks read the body before
+                    # hydration, so its value types are checked here.
+                    validate_inline_thread_types(entry)
                     inline = entry.copy()
                     inline["qualified_key"] = entry.get("name", "")
                     if "as" in entry:
