@@ -1567,7 +1567,7 @@ write:
         result = ctx.run(yaml_path, mode="preview", sample_rows=10)
 
         assert result.status == "success", result.warnings
-        meta = result._preview_metadata or {}
+        meta = result.preview_metadata or {}
         stats = meta.get("pstats", {}).get("step_stats", {})
         assert "main.map.code" in stats
         # Sample-scoped: the count reflects the 10-row sample, not the
@@ -1584,7 +1584,7 @@ write:
         result = ctx.run(yaml_path, mode="preview")
 
         assert result.status == "success"
-        meta = result._preview_metadata or {}
+        meta = result.preview_metadata or {}
         assert "step_stats" not in meta.get("pnostats", {})
 
     def test_preview_harvest_degrades_when_sampling_fails(
@@ -1631,7 +1631,7 @@ write:
         result = ctx.run(yaml_path, mode="preview")
 
         assert result.status == "success", result.warnings
-        meta = (result._preview_metadata or {}).get("pdeg", {})
+        meta = (result.preview_metadata or {}).get("pdeg", {})
         assert "samples" not in meta
         assert "step_stats" not in meta
         assert result.preview_data is not None and "pdeg" in result.preview_data
@@ -2104,8 +2104,8 @@ class TestPreviewRenderPurity:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="preview", sample_rows=50)
 
-        assert result._preview_metadata is not None
-        assert result._preview_metadata["prevp1"]["row_count"] == 25
+        assert result.preview_metadata is not None
+        assert result.preview_metadata["prevp1"]["row_count"] == 25
 
         with job_counter() as jc:
             html_first = result._repr_html_()
@@ -2136,8 +2136,8 @@ class TestPreviewRenderPurity:
 
         assert result.status == "success"
         assert not [w for w in (result.warnings or []) if "Preview failed" in w]
-        assert result._preview_metadata is not None
-        meta = result._preview_metadata["prevd1"]
+        assert result.preview_metadata is not None
+        meta = result.preview_metadata["prevd1"]
         assert "row_count" not in meta
         assert "output_schema" in meta
 
@@ -2228,8 +2228,8 @@ class TestPreviewPartialMetadata:
         result = ctx.run(yaml_path, mode="preview")
 
         assert result.status == "success"
-        assert result._preview_metadata is not None
-        meta = result._preview_metadata["prevs1"]
+        assert result.preview_metadata is not None
+        meta = result.preview_metadata["prevs1"]
         assert meta["row_count"] == 3
         assert "samples" not in meta
 

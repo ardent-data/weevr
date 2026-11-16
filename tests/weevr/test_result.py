@@ -754,7 +754,7 @@ class TestExplain:
             steps: list[Any] = []
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "Thread detail:" in text
         assert "delta:raw/customers" in text
@@ -785,7 +785,7 @@ class TestExplain:
             steps = [_FakeJoinStep(), _FakeOtherStep(), _FakeJoinStep()]
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "3 steps" in text
         assert "2 joins" in text
@@ -812,7 +812,7 @@ class TestExplain:
             steps = [_FakeJoinStep()]
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "1 step," in text
         assert "1 join" in text
@@ -875,7 +875,7 @@ class TestExplain:
             with_ = {"discounts": _FakeCTE()}
 
         result = self._make_result([plan])
-        result._resolved_threads = {"sales": _FakeThread()}
+        result.thread_models = {"sales": _FakeThread()}
         text = result.explain()
         assert "sub-pipelines:" in text
         assert "discounts \u2190 bi" in text
@@ -912,7 +912,7 @@ class TestExplain:
             with_ = {"ranked": _FakeCTE()}
 
         result = self._make_result([plan])
-        result._resolved_threads = {"t": _FakeThread()}
+        result.thread_models = {"t": _FakeThread()}
         text = result.explain()
         assert "1 step (join)" in text
         assert "1 steps" not in text
@@ -960,7 +960,7 @@ class TestExplain:
             with_ = {"discounts": _FakeCTE1(), "taxes": _FakeCTE2()}
 
         result = self._make_result([plan])
-        result._resolved_threads = {"sales": _FakeThread()}
+        result.thread_models = {"sales": _FakeThread()}
         text = result.explain()
         assert "discounts \u2190 bi" in text
         assert "taxes \u2190 pf" in text
@@ -985,7 +985,7 @@ class TestExplain:
             with_ = None
 
         result = self._make_result([plan])
-        result._resolved_threads = {"a": _FakeThread()}
+        result.thread_models = {"a": _FakeThread()}
         text = result.explain()
         assert "sub-pipelines:" not in text
 
@@ -1262,6 +1262,29 @@ class TestRunResultDag:
         assert "dag-swimlane" in diagram.svg
         assert "Weave: dims" in diagram.svg
         assert "Weave: facts" in diagram.svg
+
+
+class TestRunResultThreadModels:
+    def test_thread_models_default_to_none(self) -> None:
+        result = RunResult(
+            status="success", mode=ExecutionMode.PLAN, config_type="weave", config_name="w"
+        )
+        assert result.thread_models is None
+        assert result.preview_metadata is None
+
+    def test_thread_models_are_read_only(self) -> None:
+        thread = _plan_thread("a", "out.a")
+        result = RunResult(
+            status="success",
+            mode=ExecutionMode.PLAN,
+            config_type="weave",
+            config_name="w",
+            thread_models={"a": thread},
+        )
+        assert result.thread_models is not None
+        assert result.thread_models["a"] is thread
+        with pytest.raises(TypeError):
+            result.thread_models["b"] = thread  # type: ignore[index]
 
 
 class TestLoadedConfig:
@@ -1579,7 +1602,7 @@ class TestExplainExports:
                 "exports": exports,
             },
         )()
-        result._resolved_threads = {"stg_orders": thread_obj}
+        result.thread_models = {"stg_orders": thread_obj}
 
         text = result.explain()
         assert "exports:" in text
@@ -1672,7 +1695,7 @@ class TestSummaryPreviewMetadata:
             config_name="dim_customer",
             preview_data={"dim_customer": object()},
         )
-        result._preview_metadata = {
+        result.preview_metadata = {
             "dim_customer": {
                 "output_schema": [("id", "bigint"), ("name", "string")],
                 "row_count": 42,
@@ -1702,7 +1725,7 @@ class TestSummaryPreviewMetadata:
             config_name="dim_customer",
             preview_data={"dim_customer": object()},
         )
-        result._preview_metadata = {
+        result.preview_metadata = {
             "dim_customer": {"output_schema": [("id", "bigint")], "row_count": 0}
         }
         s = result.summary()

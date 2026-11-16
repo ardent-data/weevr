@@ -427,3 +427,29 @@ def test_context_reads_children_through_the_document() -> None:
         and node.attr in ("threads", "weaves")
     ]
     assert reads == []
+
+
+class TestRunResultThreadModels:
+    """Run results carry the loaded tree's threads as a typed, read-only mapping."""
+
+    @pytest.mark.parametrize("mode", ["validate", "plan"])
+    def test_modes_populate_thread_models_from_the_tree(self, mode: str, tmp_path: Path) -> None:
+        root = _copy_project(FORMS_PROJECT, tmp_path)
+        ctx = _context(root)
+        result = ctx.run("forms.loom", mode=mode)
+        document = ctx.load("forms.loom").document
+        expected = {
+            name: thread
+            for threads in document.weave_threads().values()
+            for name, thread in threads.items()
+        }
+        assert result.thread_models is not None
+        assert dict(result.thread_models) == expected
+        with pytest.raises(TypeError):
+            result.thread_models["x"] = None  # type: ignore[index]
+
+    def test_validate_of_a_thread_carries_the_thread(self, tmp_path: Path) -> None:
+        root = _copy_project(FORMS_PROJECT, tmp_path)
+        result = _context(root).run("threads/base.thread", mode="validate")
+        assert result.thread_models is not None
+        assert list(result.thread_models) == ["base"]

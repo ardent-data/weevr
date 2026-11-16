@@ -2346,7 +2346,7 @@ def render_plan_html(
 
     Accepts a duck-typed result object to avoid circular imports.
     Uses attributes: ``status``, ``mode``, ``config_type``, ``config_name``,
-    ``execution_plan``, ``_resolved_threads``.
+    ``execution_plan``, ``thread_models``.
 
     Args:
         result: A RunResult in plan mode.
@@ -2361,7 +2361,7 @@ def render_plan_html(
     config_type = html.escape(str(getattr(result, "config_type", "")))
     config_name = html.escape(str(getattr(result, "config_name", "")))
     plans: list[Any] = getattr(result, "execution_plan", []) or []
-    resolved = getattr(result, "_resolved_threads", None)
+    resolved = getattr(result, "thread_models", None)
 
     total_threads = sum(len(p.threads) for p in plans)
     total_cached = sum(len(p.cache_targets) for p in plans)
@@ -3014,7 +3014,7 @@ def _render_execute_html(result: Any) -> str:
     warnings: list[str] = getattr(result, "warnings", []) or []
     detail = getattr(result, "detail", None)
     telemetry = getattr(result, "telemetry", None)
-    resolved = getattr(result, "_resolved_threads", None) or {}
+    resolved = getattr(result, "thread_models", None) or {}
 
     parts.append(f'<h3 style="{_S_H3}">Execution Summary</h3>')
 
@@ -3198,7 +3198,7 @@ def _render_validate_html(result: Any) -> str:
     validation_errors: list[str] = getattr(result, "validation_errors", []) or []
     warnings: list[str] = getattr(result, "warnings", []) or []
     telemetry = getattr(result, "telemetry", None)
-    resolved = getattr(result, "_resolved_threads", None) or {}
+    resolved = getattr(result, "thread_models", None) or {}
 
     parts.append(f'<h3 style="{_S_H3}">Validation Summary</h3>')
 
@@ -3308,9 +3308,9 @@ def _render_preview_html(result: Any) -> str:
     # defined once as PreviewThreadMetadata in weevr.result (not imported —
     # weevr.result lazily imports this module, so any import edge back
     # would be cyclic).
-    preview_meta: dict[str, dict[str, Any]] = getattr(result, "_preview_metadata", None) or {}
+    preview_meta: dict[str, dict[str, Any]] = getattr(result, "preview_metadata", None) or {}
     telemetry = getattr(result, "telemetry", None)
-    resolved = getattr(result, "_resolved_threads", None) or {}
+    resolved = getattr(result, "thread_models", None) or {}
     warnings: list[str] = getattr(result, "warnings", []) or []
 
     parts.append(f'<h3 style="{_S_H3}">Preview Summary</h3>')

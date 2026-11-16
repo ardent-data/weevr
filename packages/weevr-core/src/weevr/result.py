@@ -86,6 +86,11 @@ class RunResult:
         preview_data: Output DataFrames keyed by thread name (preview mode only).
         validation_errors: Error messages from validation checks (validate mode only).
         warnings: Non-fatal messages (e.g., zero threads matched a filter).
+        thread_models: The run's threads by effective name, from the resolved
+            config tree; reports and diagrams read sources, targets and
+            steps from them. ``None`` when not populated.
+        preview_metadata: Per-thread output schema, row count, samples and
+            step stats (preview mode only).
     """
 
     __slots__ = (
@@ -100,8 +105,8 @@ class RunResult:
         "preview_data",
         "validation_errors",
         "warnings",
-        "_resolved_threads",
-        "_preview_metadata",
+        "thread_models",
+        "preview_metadata",
     )
 
     def __init__(
@@ -118,6 +123,8 @@ class RunResult:
         preview_data: dict[str, Any] | None = None,
         validation_errors: list[str] | None = None,
         warnings: list[str] | None = None,
+        thread_models: Mapping[str, Thread] | None = None,
+        preview_metadata: dict[str, PreviewThreadMetadata] | None = None,
     ) -> None:
         """Initialize a RunResult with execution outcome and telemetry."""
         self.status = status
@@ -131,8 +138,10 @@ class RunResult:
         self.preview_data = preview_data
         self.validation_errors = validation_errors
         self.warnings: list[str] = warnings if warnings is not None else []
-        self._resolved_threads: dict[str, Any] | None = None
-        self._preview_metadata: dict[str, PreviewThreadMetadata] | None = None
+        self.thread_models: Mapping[str, Thread] | None = (
+            MappingProxyType(dict(thread_models)) if thread_models is not None else None
+        )
+        self.preview_metadata = preview_metadata
 
     def dag(self, *, dark: bool | None = None) -> Any:
         """Return a DAG diagram for plan mode results.
@@ -151,8 +160,8 @@ class RunResult:
 
         plans = self.execution_plan
         if len(plans) == 1:
-            return DAGDiagram(render_dag_svg(plans[0], self._resolved_threads, dark=dark))
-        return DAGDiagram(render_loom_dag_svg(plans, self._resolved_threads, dark=dark))
+            return DAGDiagram(render_dag_svg(plans[0], self.thread_models, dark=dark))
+        return DAGDiagram(render_loom_dag_svg(plans, self.thread_models, dark=dark))
 
     def explain(self) -> str:
         """Return a detailed text breakdown of the execution plan.
@@ -225,11 +234,11 @@ class RunResult:
                     lines.append(f"  {label}: {', '.join(names)}")
 
             # Section 5: Thread detail
-            if self._resolved_threads:
+            if self.thread_models:
                 lines.append("")
                 lines.append("Thread detail:")
                 for thread_name in plan.threads:
-                    thread = self._resolved_threads.get(thread_name)
+                    thread = self.thread_models.get(thread_name)
                     if thread is None:
                         lines.append(f"  {thread_name}: (unavailable)")
                         continue
@@ -501,7 +510,7 @@ class RunResult:
         if self.preview_data:
             lines.append("")
             lines.append("Preview:")
-            preview_meta = self._preview_metadata or {}
+            preview_meta = self.preview_metadata or {}
             for name in self.preview_data:
                 meta = preview_meta.get(name) or {}
                 output_schema = meta.get("output_schema")

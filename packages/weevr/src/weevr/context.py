@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from pyspark.sql import SparkSession
@@ -356,7 +357,7 @@ class Context:
                 telemetry=engine_result.telemetry,
                 warnings=self._collect_thread_warnings(engine_result),
             )
-            result._resolved_threads = {loaded.config_name: model}
+            result.thread_models = MappingProxyType({loaded.config_name: model})
             return result
 
         if loaded.config_type == "weave":
@@ -431,7 +432,7 @@ class Context:
                 telemetry=engine_result.telemetry,
                 warnings=warnings + self._collect_thread_warnings(engine_result),
             )
-            result._resolved_threads = dict(weave_threads)
+            result.thread_models = MappingProxyType(dict(weave_threads))
             return result
 
         # loom
@@ -486,7 +487,7 @@ class Context:
         merged_threads: dict[str, Any] = {}
         for thread_map in filtered_threads.values():
             merged_threads.update(thread_map)
-        result._resolved_threads = merged_threads
+        result.thread_models = MappingProxyType(merged_threads)
         return result
 
     # ------------------------------------------------------------------
@@ -576,6 +577,7 @@ class Context:
             config_type=loaded.config_type,
             config_name=loaded.config_name,
             validation_errors=validation_errors if validation_errors else None,
+            thread_models=_thread_models(loaded),
         )
 
     def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
@@ -830,15 +832,9 @@ class Context:
             warnings=all_warnings,
         )
 
-        # Populate resolved threads for explain() thread detail
-        if loaded.config_type == "weave":
-            wt = loaded.document.weave_threads().get(loaded.config_name, {})
-            result._resolved_threads = dict(wt)
-        elif loaded.config_type == "loom":
-            merged: dict[str, Any] = {}
-            for thread_map in loaded.document.weave_threads().values():
-                merged.update(thread_map)
-            result._resolved_threads = merged
+        # Thread models for explain() thread detail
+        if loaded.config_type in ("weave", "loom"):
+            result.thread_models = MappingProxyType(_thread_models(loaded))
 
         return result
 
@@ -996,8 +992,8 @@ class Context:
             preview_data=preview_data if preview_data else None,
             warnings=warnings + errors,
         )
-        result._preview_metadata = preview_metadata if preview_metadata else None
-        result._resolved_threads = dict(all_threads)
+        result.preview_metadata = preview_metadata if preview_metadata else None
+        result.thread_models = MappingProxyType(dict(all_threads))
         return result
 
     # ------------------------------------------------------------------
@@ -1041,3 +1037,18 @@ class Context:
         for warning in warnings:
             logger.warning(warning)
         return LoadedConfig.from_document(document, warnings)
+
+
+def _thread_models(loaded: LoadedConfig) -> dict[str, Thread]:
+    """Every thread model a loaded config holds, by effective name.
+
+    A thread config gives itself; a weave its threads; a loom every weave's
+    threads, a later weave's thread winning a name clash.
+    """
+    document = loaded.document
+    if isinstance(document.model, Thread):
+        return {document.name: document.model}
+    merged: dict[str, Thread] = {}
+    for threads in document.weave_threads().values():
+        merged.update(threads)
+    return merged

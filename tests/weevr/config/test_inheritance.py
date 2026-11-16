@@ -56,9 +56,9 @@ class TestCascade:
     def test_internal_keys_preserved(self):
         """Keys prefixed with underscore should be preserved."""
         parent = {"mode": "overwrite"}
-        child = {"_resolved_threads": [{"id": 1}], "mode": "merge"}
+        child = {"_internal": [{"id": 1}], "mode": "merge"}
         result = cascade(parent, child)
-        assert result["_resolved_threads"] == [{"id": 1}]
+        assert result["_internal"] == [{"id": 1}]
         assert result["mode"] == "merge"
 
     def test_empty_parent(self):

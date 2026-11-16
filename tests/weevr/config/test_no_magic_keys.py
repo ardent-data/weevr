@@ -1,10 +1,10 @@
-"""The config load carries children in typed nodes, never in magic dict keys.
+"""Loaded children travel in typed nodes and attributes, never in magic keys.
 
 Reference resolution used to attach children and entry fields to config dicts
 under underscore keys (``_resolved_threads``, ``_resolved_weaves``,
 ``_entry_as``, ``_source_path``…) that later stages had to pop before
-hydration. This scan fails if any such key comes back anywhere in the
-packages.
+hydration, and results carried an untyped ``_resolved_threads`` attribute.
+This scan fails if any such key or attribute comes back in the packages.
 """
 
 from __future__ import annotations
@@ -21,41 +21,21 @@ MAGIC_KEYS = {"_resolved_threads", "_resolved_weaves", "_source_path"}
 MAGIC_PREFIX = "_entry_"
 
 
-def _attribute_names(tree: ast.Module) -> set[int]:
-    """Ids of string constants that name attributes, not dict keys.
-
-    ``__slots__`` entries and the name argument of ``getattr``/``setattr``/
-    ``hasattr`` are attribute names.
-    """
-    ids: set[int] = set()
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id in ("getattr", "setattr", "hasattr")
-            and len(node.args) >= 2
-        ):
-            ids.add(id(node.args[1]))
-        if (
-            isinstance(node, ast.Assign)
-            and any(isinstance(t, ast.Name) and t.id == "__slots__" for t in node.targets)
-            and isinstance(node.value, ast.Tuple | ast.List)
-        ):
-            ids.update(id(elt) for elt in node.value.elts)
-    return ids
-
-
 def magic_strings(source: str) -> list[tuple[int, str]]:
-    """Return ``(line, text)`` for every string literal that is a magic key."""
-    tree = ast.parse(source)
-    attributes = _attribute_names(tree)
+    """Return ``(line, text)`` for every magic key or attribute name in ``source``.
+
+    Catches string literals (dict keys, ``getattr`` names, ``__slots__``
+    entries, f-string prefixes) and attribute access such as
+    ``result._resolved_threads``.
+    """
     found = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value
+        elif isinstance(node, ast.Attribute):
+            text = node.attr
+        else:
             continue
-        if id(node) in attributes:
-            continue
-        text = node.value
         if text in MAGIC_KEYS or text.startswith(MAGIC_PREFIX):
             found.append((node.lineno, text))
     return sorted(found)
@@ -86,12 +66,13 @@ class TestScanner:
         source = 'd[f"_entry_{key}"] = 1\nd.pop("_entry_as", None)\n'
         assert [text for _, text in magic_strings(source)] == ["_entry_", "_entry_as"]
 
-    def test_slot_names_are_not_keys(self) -> None:
-        source = 'class C:\n    __slots__ = ("_resolved_threads",)\n'
-        assert magic_strings(source) == []
-
-    def test_getattr_names_are_not_keys(self) -> None:
-        assert magic_strings('getattr(result, "_resolved_threads", None)\n') == []
+    def test_attribute_names(self) -> None:
+        source = (
+            'class C:\n    __slots__ = ("_resolved_threads",)\n'
+            'getattr(result, "_resolved_threads", None)\n'
+            "result._resolved_threads = {}\n"
+        )
+        assert [text for _, text in magic_strings(source)] == ["_resolved_threads"] * 3
 
     def test_function_names_are_not_keys(self) -> None:
         assert magic_strings("def _entry_name(entry): ...\n_entry_name(1)\n") == []
