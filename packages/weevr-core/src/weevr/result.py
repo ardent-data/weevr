@@ -6,12 +6,12 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from weevr.engine.formatting import format_duration as _format_duration
 
 if TYPE_CHECKING:
-    from weevr.config.document import ConfigKind, ResolvedDocument
+    from weevr.config.document import ResolvedDocument
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
     from weevr.model.thread import Thread
@@ -586,8 +586,10 @@ class LoadedConfig:
         from parts. Thread and weave values may be models or their dicts.
         Children the model's entries don't list are left out of the tree.
         """
-        self._document: ResolvedDocument = _document_from_parts(
-            model, config_type, config_name, threads, weaves
+        from weevr.config.document import ResolvedDocument
+
+        self._document = ResolvedDocument.from_models(
+            model, config_type, config_name, threads=threads, weaves=weaves
         )
         # A weave or loom built without its children has no plan to build.
         self._children_given = threads is not None and (config_type != "loom" or weaves is not None)
@@ -792,60 +794,3 @@ def _warn_deprecated(name: str, replacement: str) -> None:
         DeprecationWarning,
         stacklevel=3,
     )
-
-
-def _document_from_parts(
-    model: Any,
-    config_type: str,
-    config_name: str,
-    threads: dict[str, dict[str, Any]] | None,
-    weaves: dict[str, Any] | None,
-) -> ResolvedDocument:
-    """Assemble a document tree from a model and its children by name.
-
-    Children are matched to the model's entries by effective name; a child no
-    entry names is left out, and an entry with no child has no node.
-    """
-    from weevr.config.document import EntryMeta, ResolvedDocument
-    from weevr.model.thread import Thread
-    from weevr.model.weave import Weave
-
-    def as_thread(value: Any) -> Thread:
-        return value if isinstance(value, Thread) else Thread.model_validate(value)
-
-    def thread_docs(weave: Any, by_name: dict[str, Any]) -> dict[str, ResolvedDocument]:
-        docs = {}
-        for entry in getattr(weave, "threads", None) or []:
-            name = entry.effective_name
-            if name in by_name:
-                docs[name] = ResolvedDocument(
-                    model=as_thread(by_name[name]),
-                    kind="thread",
-                    name=name,
-                    entry=EntryMeta.from_entry(entry),
-                )
-        return docs
-
-    children: dict[str, ResolvedDocument] = {}
-    if config_type == "weave":
-        children = thread_docs(model, (threads or {}).get(config_name, {}))
-    elif config_type == "loom":
-        for entry in getattr(model, "weaves", None) or []:
-            name = entry.effective_name
-            weave = (weaves or {}).get(name)
-            if weave is None:
-                continue
-            weave = weave if isinstance(weave, Weave) else Weave.model_validate(weave)
-            children[name] = ResolvedDocument(
-                model=weave,
-                kind="weave",
-                name=name,
-                entry=EntryMeta.from_entry(entry),
-                children=thread_docs(weave, (threads or {}).get(name, {})),
-            )
-    return ResolvedDocument(
-        model=model,
-        kind=cast("ConfigKind", config_type),
-        name=config_name,
-        children=children,
-    ).with_scopes()

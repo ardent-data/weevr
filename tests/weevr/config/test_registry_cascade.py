@@ -1,12 +1,13 @@
 """Lookups, column sets and variables cascade loom → weave → thread at load.
 
 Each node of the resolved tree keeps the registries it declares and the
-effective ones it sees: outer scopes merged in, inner names winning. The rules
-are the ones the engine applied at run time (``merge_resource_dicts``).
+effective ones it sees: outer scopes merged in, inner names winning. The engine
+reads these instead of merging at run time.
 """
 
 from __future__ import annotations
 
+import ast
 import logging
 import shutil
 from pathlib import Path
@@ -121,3 +122,20 @@ class TestTreeScopes:
         doc = load_resolved(root / "threads" / "base.thread", project_root=root).document
         assert doc.effective == doc.declared
         assert set(doc.effective.lookups or {}) == {"shared"}
+
+
+PACKAGES = Path(__file__).resolve().parents[3] / "packages"
+
+
+def test_one_registry_merge() -> None:
+    """The run-time merge is gone; only hook lists still resolve in the engine."""
+    defined = {
+        node.name
+        for path in PACKAGES.glob("*/src/weevr/**/*.py")
+        for node in ast.walk(ast.parse(path.read_text()))
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert "merge_resource_dicts" not in defined
+    assert {"merge_hook_lists", "cascade_registry"} <= defined
+    sources = [p.read_text() for p in PACKAGES.glob("*/src/weevr/**/*.py")]
+    assert not any("merge_resource_dicts" in text for text in sources)

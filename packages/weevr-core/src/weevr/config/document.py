@@ -177,6 +177,77 @@ class ResolvedDocument:
         }
         return replace(self, children=children, effective=effective)
 
+    @classmethod
+    def from_models(
+        cls,
+        model: Thread | Weave | Loom,
+        kind: str,
+        name: str,
+        *,
+        threads: Mapping[str, Mapping[str, Any]] | None = None,
+        weaves: Mapping[str, Any] | None = None,
+    ) -> ResolvedDocument:
+        """Assemble a tree from a model and its children by name.
+
+        For callers that hold hydrated models rather than a load's tree.
+        Children are matched to the model's entries by effective name: a
+        child no entry names is left out, and an entry with no child gets no
+        node. Thread and weave values may be models or their dicts. Effective
+        registries are computed as a load computes them; ``source_ref`` is
+        empty.
+
+        Args:
+            model: The top-level Thread, Weave, or Loom.
+            kind: ``"thread"``, ``"weave"``, or ``"loom"``.
+            name: The top-level config's name; a weave's threads are found
+                under it in ``threads``.
+            threads: Thread models by weave name, then effective name.
+            weaves: A loom's weave models by name.
+
+        Returns:
+            The tree, with effective registries.
+        """
+
+        def as_thread(value: Any) -> Thread:
+            return value if isinstance(value, Thread) else Thread.model_validate(value)
+
+        def thread_docs(weave: Any, by_name: Mapping[str, Any]) -> dict[str, ResolvedDocument]:
+            docs = {}
+            for entry in getattr(weave, "threads", None) or []:
+                if entry.effective_name in by_name:
+                    docs[entry.effective_name] = cls(
+                        model=as_thread(by_name[entry.effective_name]),
+                        kind="thread",
+                        name=entry.effective_name,
+                        entry=EntryMeta.from_entry(entry),
+                    )
+            return docs
+
+        children: dict[str, ResolvedDocument] = {}
+        if kind == "weave":
+            children = thread_docs(model, (threads or {}).get(name, {}))
+        elif kind == "loom":
+            for entry in getattr(model, "weaves", None) or []:
+                weave = (weaves or {}).get(entry.effective_name)
+                if weave is None:
+                    continue
+                weave = weave if isinstance(weave, Weave) else Weave.model_validate(weave)
+                children[entry.effective_name] = cls(
+                    model=weave,
+                    kind="weave",
+                    name=entry.effective_name,
+                    entry=EntryMeta.from_entry(entry),
+                    children=thread_docs(weave, (threads or {}).get(entry.effective_name, {})),
+                )
+        if kind not in ("thread", "weave", "loom"):
+            raise ValueError(f"Unknown config kind {kind!r}")
+        return cls(
+            model=model,
+            kind=kind,  # type: ignore[arg-type]  # checked just above
+            name=name,
+            children=children,
+        ).with_scopes()
+
     def weave_threads(self) -> dict[str, dict[str, Thread]]:
         """Each weave's thread models, by weave name then effective thread name.
 

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any, Literal
 
 from pyspark.sql import SparkSession
 
+from weevr.config.document import ResolvedDocument, ScopeRegistries
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
@@ -23,7 +24,6 @@ from weevr.engine.lookups import (
     materialize_lookups,
 )
 from weevr.engine.planner import ExecutionPlan, build_plan
-from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.engine.target_identity import resolve_target_identity
 from weevr.engine.variables import VariableContext
@@ -106,7 +106,8 @@ def execute_weave(
     pre_lookup_meta: dict[str, LookupMeta] | None = None,
     pre_resolved_column_sets: dict[str, dict[str, str]] | None = None,
     pre_column_set_results: list[ColumnSetResult] | None = None,
-    inherited_lookups: dict[str, Lookup] | None = None,
+    effective_lookups: Mapping[str, Lookup] | None = None,
+    thread_scopes: Mapping[str, ScopeRegistries] | None = None,
 ) -> WeaveResult:
     """Execute threads according to the execution plan.
 
@@ -167,10 +168,14 @@ def execute_weave(
             re-resolves them). Merged under weave-level resolutions.
         pre_column_set_results: Resolution results for the pre-resolved
             sets, carried into weave telemetry for value parity.
-        inherited_lookups: Lookup definitions from the parent scope (the
-            loom), visible to this weave's threads under the weave's own
-            (weave wins on a name clash). Not materialized or scheduled here —
-            the parent materialized them into ``pre_cached_lookups``.
+        effective_lookups: The weave's effective lookups from the resolved
+            config tree: its own over the loom's. Threads look definitions up
+            here; only ``lookups`` (the weave's own) materialize, since the
+            parent materialized its lookups into ``pre_cached_lookups``.
+            Defaults to ``lookups``.
+        thread_scopes: Each thread's effective lookups and column sets from
+            the resolved config tree, by thread name. A thread without one
+            gets its registries cascaded from this weave's.
 
     Returns:
         :class:`~weevr.engine.result.WeaveResult` with aggregate status and
@@ -215,12 +220,8 @@ def execute_weave(
     # name is still released.
     parent_seeded: dict[str, Any] = dict(pre_cached_lookups) if pre_cached_lookups else {}
     cached_lookup_dfs: dict[str, Any] = dict(parent_seeded)
-    # What threads see: parent definitions under the weave's own (weave wins).
-    thread_lookup_defs = (
-        merge_resource_dicts(inherited_lookups, lookups, "lookup", "loom", "weave")
-        if inherited_lookups
-        else lookups
-    )
+    # What threads see: the weave's effective lookups (its own over the loom's).
+    thread_lookup_defs = dict(effective_lookups) if effective_lookups is not None else lookups
 
     # Parent facts describe the parent's frame; a weave lookup of the same
     # name gets none of them (its own materialization results, if any, are
@@ -486,6 +487,7 @@ def execute_weave(
                                 column_sets=resolved_column_sets,
                                 column_set_defs=column_set_defs,
                                 connections=threads[name].connections,
+                                scope=(thread_scopes or {}).get(name),
                             )
                         ] = name
                     else:
@@ -511,6 +513,7 @@ def execute_weave(
                                 column_sets=resolved_column_sets,
                                 column_set_defs=column_set_defs,
                                 connections=threads[name].connections,
+                                scope=(thread_scopes or {}).get(name),
                             )
                         ] = name
 
@@ -735,6 +738,7 @@ def execute_loom(
     threads: dict[str, dict[str, Thread]],
     params: dict[str, Any] | None = None,
     log_level: LogLevel | None = None,
+    document: ResolvedDocument | None = None,
 ) -> LoomResult:
     """Execute weaves sequentially in declared order.
 
@@ -754,6 +758,9 @@ def execute_loom(
             restored afterward (weaves execute sequentially, so this is
             race-free). When None, YAML log levels are suppressed — the
             caller gave an explicit runtime override.
+        document: The loom's resolved config tree, the source of each weave's
+            and thread's effective lookups, column sets and variables. Built
+            from ``loom``, ``weaves`` and ``threads`` when omitted.
 
     Returns:
         :class:`~weevr.engine.result.LoomResult` with aggregate status and
@@ -761,6 +768,11 @@ def execute_loom(
     """
     start_ns = time.monotonic_ns()
     weave_results: list[WeaveResult] = []
+    tree = (
+        document
+        if document is not None
+        else ResolvedDocument.from_models(loom, "loom", loom.name, threads=threads, weaves=weaves)
+    )
 
     # Create root collector and loom span — unless the loom's effective
     # trace is off, in which case the whole run executes collector-free
@@ -873,12 +885,23 @@ def execute_loom(
                 if te.condition is not None:
                     thread_conditions[te.effective_name] = te.condition
 
-            # Merge loom and weave resources using cascade helpers (weave wins)
-            loom_cs = dict(loom.column_sets) if loom.column_sets else None
-            weave_cs = dict(weave.column_sets) if weave.column_sets else None
-            merged_column_set_defs = merge_resource_dicts(
-                loom_cs, weave_cs, "column_set", "loom", "weave"
+            # The weave's effective registries (its own over the loom's) come
+            # from the resolved config tree; its declared ones materialize.
+            weave_doc = tree.children.get(weave_name)
+            weave_scope = (
+                weave_doc.effective
+                if weave_doc is not None
+                else ScopeRegistries.declared_by(weave).under(
+                    ScopeRegistries.declared_by(loom), "loom", "weave"
+                )
             )
+            thread_scopes = (
+                {name: child.effective for name, child in weave_doc.children.items()}
+                if weave_doc is not None
+                else None
+            )
+            weave_cs = dict(weave.column_sets) if weave.column_sets else None
+            merged_column_set_defs = _as_dict(weave_scope.column_sets)
 
             # Merge loom + weave connections for weave-level column set
             # materialization. Uses the same additive-update pattern as
@@ -891,11 +914,7 @@ def execute_loom(
             if weave.connections:
                 merged_connections.update(weave.connections)
 
-            loom_vars_dict = dict(loom.variables) if loom.variables else None
-            weave_vars_dict = dict(weave.variables) if weave.variables else None
-            merged_variables = merge_resource_dicts(
-                loom_vars_dict, weave_vars_dict, "variable", "loom", "weave"
-            )
+            merged_variables = _as_dict(weave_scope.variables)
 
             # Effective execution settings for this weave: field-level merge
             # of the loom and weave top-level execution blocks.
@@ -937,7 +956,8 @@ def execute_loom(
                     ]
                     or None,
                     pre_cached_lookups=loom_cached_lookup_dfs or None,
-                    inherited_lookups=dict(loom.lookups) if loom.lookups else None,
+                    effective_lookups=weave_scope.lookups,
+                    thread_scopes=thread_scopes,
                     connections=merged_connections or None,
                     execution=effective_execution,
                 )
@@ -1053,3 +1073,8 @@ def _build_loom_telemetry(
         weave_telemetry=weave_telemetry,
         resolved_params=resolved_params,
     )
+
+
+def _as_dict[V](registry: Mapping[str, V] | None) -> dict[str, V] | None:
+    """A registry as a plain dict, ``None`` staying ``None``."""
+    return dict(registry) if registry is not None else None

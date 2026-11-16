@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.config.document import ScopeRegistries
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
@@ -24,7 +26,6 @@ from weevr.engine.planner import (
     find_in_run_producers,
     resolve_lookup_names,
 )
-from weevr.engine.resources import merge_resource_dicts
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
     ConfigError,
@@ -343,6 +344,7 @@ class Context:
                 collector=thread_collector,
                 resolved_params=self._params,
                 connections=model.connections,
+                scope=loaded.document.effective,
             )
             if engine_result.status not in ("success", "failure"):
                 raise ExecutionError(
@@ -405,6 +407,7 @@ class Context:
                 SpanCollector(generate_trace_id()) if standalone_execution.trace else None
             )
 
+            scope = loaded.document.effective
             engine_result = execute_weave(
                 self._spark,
                 plan,
@@ -415,11 +418,13 @@ class Context:
                 pre_steps=list(model.pre_steps) if model.pre_steps else None,
                 post_steps=list(model.post_steps) if model.post_steps else None,
                 lookups=dict(model.lookups) if model.lookups else None,
-                variables=dict(model.variables) if model.variables else None,
-                column_set_defs=dict(model.column_sets) if model.column_sets else None,
+                variables=_as_dict(scope.variables),
+                column_set_defs=_as_dict(scope.column_sets),
                 connections=dict(model.connections) if model.connections else None,
                 execution=standalone_execution,
                 weave_name=loaded.config_name,
+                effective_lookups=scope.lookups,
+                thread_scopes=_thread_scopes(loaded),
             )
             if engine_result.status not in ("success", "failure", "partial"):
                 raise ExecutionError(f"Unexpected weave execution status: '{engine_result.status}'")
@@ -474,6 +479,7 @@ class Context:
             filtered_threads,
             params=self._params,
             log_level=baseline_level,
+            document=loaded.document,
         )
         result = RunResult(
             status=engine_result.status,
@@ -735,29 +741,6 @@ class Context:
             result.update(thread_map)
         return result
 
-    @staticmethod
-    def _inherited_lookups(loaded: LoadedConfig) -> dict[str, dict[str, Lookup]]:
-        """Map each thread name to the lookups its weave and loom define.
-
-        Weave lookups win over loom lookups, as they do at execution. A
-        thread name shared across weaves takes the last weave's lookups,
-        matching :meth:`_collect_all_threads`.
-        """
-        loom_lookups: dict[str, Lookup] | None = None
-        if isinstance(loaded.model, Loom) and loaded.model.lookups:
-            loom_lookups = dict(loaded.model.lookups)
-
-        result: dict[str, dict[str, Lookup]] = {}
-        for weave_name, threads in loaded.document.weave_threads().items():
-            weave = loaded.model if isinstance(loaded.model, Weave) else None
-            if isinstance(loaded.model, Loom):
-                weave = loaded.document.weaves().get(weave_name)
-            weave_lookups = dict(weave.lookups) if weave and weave.lookups else None
-            merged = merge_resource_dicts(loom_lookups, weave_lookups, "lookup", "loom", "weave")
-            for thread_name in threads:
-                result[thread_name] = merged or {}
-        return result
-
     # ------------------------------------------------------------------
     # Plan mode
     # ------------------------------------------------------------------
@@ -863,7 +846,7 @@ class Context:
         all_threads, warnings = self._filter_threads(
             all_threads, tags=tags, thread_names=thread_names
         )
-        inherited_lookups = self._inherited_lookups(loaded)
+        scopes = _thread_scopes(loaded)
         # Only the selected threads run, so only they produce tables here.
         producers = build_producer_map(all_threads)
 
@@ -875,13 +858,8 @@ class Context:
             try:
                 # Resolve steps get full lookup frames: matching sampled rows
                 # against a sampled lookup would miss most valid keys.
-                visible_lookups = merge_resource_dicts(
-                    inherited_lookups.get(thread_name),
-                    dict(thread.lookups) if thread.lookups else None,
-                    "lookup",
-                    "weave",
-                    "thread",
-                )
+                scope = scopes.get(thread_name)
+                visible_lookups = _as_dict(scope.lookups) if scope is not None else None
                 # Preview doesn't feed one thread's output into the next, so a
                 # thread reading a table this run hasn't written yet has
                 # nothing to read: report it as skipped, not as a failure.
@@ -1052,3 +1030,21 @@ def _thread_models(loaded: LoadedConfig) -> dict[str, Thread]:
     for threads in document.weave_threads().values():
         merged.update(threads)
     return merged
+
+
+def _thread_scopes(loaded: LoadedConfig) -> dict[str, ScopeRegistries]:
+    """Each thread's effective lookups, column sets and variables, by effective name.
+
+    Read from the resolved config tree. A thread name shared across a loom's
+    weaves takes the last weave's thread, matching :func:`_thread_models`.
+    """
+    document = loaded.document
+    if document.kind == "thread":
+        return {document.name: document.effective}
+    weaves = document.children.values() if document.kind == "loom" else [document]
+    return {name: thread.effective for weave in weaves for name, thread in weave.children.items()}
+
+
+def _as_dict[V](registry: Mapping[str, V] | None) -> dict[str, V] | None:
+    """A registry as a plain dict, ``None`` staying ``None``."""
+    return dict(registry) if registry is not None else None
