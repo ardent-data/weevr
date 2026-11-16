@@ -190,6 +190,36 @@
       "removed_in": null,
       "summary": "A config rule was broken, in a way no more specific code covers.",
       "docs_anchor": "c400"
+    },
+    {
+      "code": "D101",
+      "name": "circular-dependency",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The threads of a weave depend on each other in a cycle.",
+      "docs_anchor": "d101"
+    },
+    {
+      "code": "D102",
+      "name": "conflicting-target-writers",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "Several threads write one target without being ordered or condition-gated.",
+      "docs_anchor": "d102"
+    },
+    {
+      "code": "D103",
+      "name": "undefined-dependency",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A thread declares a dependency on a thread the weave does not define.",
+      "docs_anchor": "d103"
     }
   ],
   "retired": []

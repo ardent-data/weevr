@@ -151,3 +151,23 @@ The config's kind could not be determined, or is not one weevr knows.
 `invalid-config` · error · stable
 
 A config rule was broken, in a way no more specific code covers.
+
+## D1xx — Plan and dependencies
+
+### D101
+
+`circular-dependency` · error · stable
+
+The threads of a weave depend on each other in a cycle.
+
+### D102
+
+`conflicting-target-writers` · error · stable
+
+Several threads write one target without being ordered or condition-gated.
+
+### D103
+
+`undefined-dependency` · error · stable
+
+A thread declares a dependency on a thread the weave does not define.

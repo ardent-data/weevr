@@ -12,6 +12,7 @@ from weevr.engine.formatting import format_duration as _format_duration
 
 if TYPE_CHECKING:
     from weevr.config.document import ResolvedDocument
+    from weevr.diagnostics import Diagnostic
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
     from weevr.model.thread import Thread
@@ -537,11 +538,14 @@ class PlanIssue:
         message: What went wrong, without the weave prefix.
         error: The exception the planner raised; ``None`` when the weave itself
             is missing from the loaded config.
+        diagnostic: The coded diagnostic behind the failure; ``None`` when the
+            planner raised an uncoded error or the weave is missing.
     """
 
     weave_name: str
     message: str
     error: Exception | None
+    diagnostic: Diagnostic | None = None
 
 
 class LoadedConfig:
@@ -718,7 +722,10 @@ class LoadedConfig:
                     weave_name=name, threads=threads, thread_entries=entries, lookups=lookups
                 )
             except Exception as exc:
-                issues.append(PlanIssue(name, str(exc), exc))
+                diagnostics = getattr(exc, "diagnostics", None)
+                issues.append(
+                    PlanIssue(name, str(exc), exc, diagnostics[0] if diagnostics else None)
+                )
         return tuple(issues)
 
     def _plan_inputs(
