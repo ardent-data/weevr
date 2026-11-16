@@ -17,6 +17,7 @@ from weevr.config.validation import (
     validate_resolve_lookups,
     validate_source_lookups,
 )
+from weevr.diagnostics.positions import place_all
 from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
@@ -134,7 +135,10 @@ def check_column_set_references(
 
 
 def hydrate_model(
-    data: dict[str, Any], config_type: str, source: ConfigLocation | str
+    data: dict[str, Any],
+    config_type: str,
+    source: ConfigLocation | str,
+    at: tuple[str | int, ...] = (),
 ) -> Thread | Weave | Loom:
     """Validate a resolved config dict into its typed model.
 
@@ -142,6 +146,7 @@ def hydrate_model(
         data: Fully resolved config dict.
         config_type: ``'thread'``, ``'weave'``, or ``'loom'``.
         source: The file the config came from, named on failure.
+        at: Where the config sits in ``source``, for an inline weave.
 
     Returns:
         The hydrated model.
@@ -153,19 +158,23 @@ def hydrate_model(
         return _MODELS[config_type].model_validate(data)
     except ValidationError as exc:
         raise _hydration_error(
-            f"Model hydration failed for {config_type}: {exc}", exc, data, str(source)
+            f"Model hydration failed for {config_type}: {exc}", exc, data, str(source), at
         ) from exc
 
 
 def _hydration_error(
-    message: str, exc: ValidationError, data: dict[str, Any], file: str
+    message: str,
+    exc: ValidationError,
+    data: dict[str, Any],
+    file: str,
+    at: tuple[str | int, ...],
 ) -> ModelValidationError:
-    """A ``ModelValidationError`` carrying one coded diagnostic per pydantic error."""
+    """A ``ModelValidationError`` carrying one placed, coded diagnostic per pydantic error."""
     return ModelValidationError(
         message,
         cause=exc,
         file_path=file,
-        diagnostics=from_validation_error(exc, data, file=file),
+        diagnostics=place_all(from_validation_error(exc, data, file=file), file, data, at),
     )
 
 
@@ -244,6 +253,7 @@ def hydrate_threads(
                 exc,
                 thread_dict,
                 thread_source,
+                child.at,
             ) from exc
         if bind is not None:
             bind(thread, thread_source)
@@ -325,7 +335,7 @@ def hydrate_children(
             weave_source = weave.source_path or str(source)
             if prepare is not None:
                 prepare(weave_dict)
-            weave_model = hydrate_model(weave_dict, "weave", weave_source)
+            weave_model = hydrate_model(weave_dict, "weave", weave_source, weave.at)
             if not isinstance(weave_model, Weave):  # pragma: no cover
                 continue
             weaves[weave_name] = weave_model

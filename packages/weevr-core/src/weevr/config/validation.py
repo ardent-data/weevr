@@ -17,12 +17,12 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
 from weevr.diagnostics import diagnostic
+from weevr.diagnostics.positions import pointed
 from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
@@ -102,14 +102,14 @@ class LoomConfig(BaseConfig):
 
 
 def validate_schema(
-    raw: dict[str, Any], config_type: str, *, prefix: Sequence[str | int] = ()
+    raw: dict[str, Any], config_type: str, *, at: tuple[str | int, ...] = ()
 ) -> BaseModel:
     """Validate a raw config dict against the appropriate pre-resolution schema.
 
     Args:
         raw: Raw config dictionary (variables not yet resolved)
         config_type: Type of config (thread, weave, loom, params)
-        prefix: Where ``raw`` sits in its file, for an inline body
+        at: Where ``raw`` sits in its file, for an inline weave
 
     Returns:
         Validated Pydantic model instance
@@ -143,13 +143,11 @@ def validate_schema(
         raise ConfigSchemaError(
             f"Schema validation failed for {config_type} config: {exc}",
             cause=exc,
-            diagnostics=from_validation_error(exc, raw, prefix=prefix),
+            diagnostics=pointed(from_validation_error(exc, raw), at),
         ) from exc
 
 
-def validate_inline_thread_types(
-    entry: dict[str, Any], *, prefix: Sequence[str | int] = ()
-) -> None:
+def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, ...] = ()) -> None:
     """Check the value types of an inline thread body before the cascade reads it.
 
     Unlike :func:`validate_schema`, missing fields are not errors here: a
@@ -160,7 +158,7 @@ def validate_inline_thread_types(
 
     Args:
         entry: An inline thread entry from a weave's ``threads`` list.
-        prefix: Where the entry sits in the weave file (``("threads", 2)``).
+        at: Where the entry sits in its file (``("threads", 2)``).
 
     Raises:
         ConfigSchemaError: If a typed field holds a value of the wrong type.
@@ -174,9 +172,9 @@ def validate_inline_thread_types(
                 f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in wrong
             )
             name = entry.get("name", "")
-            diagnostics = [
-                d for d in from_validation_error(exc, entry, prefix=prefix) if d.code != "C101"
-            ]
+            diagnostics = pointed(
+                [d for d in from_validation_error(exc, entry) if d.code != "C101"], at
+            )
             raise ConfigSchemaError(
                 f"Schema validation failed for inline thread '{name}': {details}",
                 cause=exc,

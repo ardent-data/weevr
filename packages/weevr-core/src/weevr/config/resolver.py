@@ -32,6 +32,8 @@ class ResolvedChild:
             which lives in its parent's file.
         authored: The child's config before variable substitution.
         children: A weave's threads (for a loom's weave children).
+        at: Where an inline child sits in its parent's file
+            (``("threads", 2)``); empty for a child in its own file.
     """
 
     entry: dict[str, Any]
@@ -39,6 +41,7 @@ class ResolvedChild:
     source_path: str | None = None
     authored: dict[str, Any] | None = None
     children: list["ResolvedChild"] = field(default_factory=list)
+    at: tuple[str | int, ...] = ()
 
 
 def build_param_context(
@@ -617,6 +620,7 @@ def resolve_references(
     runtime_params: dict[str, Any] | None = None,
     visited: set[str] | None = None,
     authored: dict[str, Any] | None = None,
+    at: tuple[str | int, ...] = (),
 ) -> list[ResolvedChild]:
     """Resolve references to other config files.
 
@@ -634,6 +638,8 @@ def resolve_references(
         visited: Set of already-visited ref strings (for cycle detection).
         authored: ``config`` before variable substitution, so inline
             children can keep their authored form.
+        at: Where ``config`` sits in its file; empty unless it is an
+            inline weave in a loom.
 
     Returns:
         The resolved children in entry order: a loom's weaves (each with its
@@ -806,12 +812,13 @@ def resolve_references(
                         # resolved its variables with the weave's own defaults;
                         # validate and resolve its threads the way a weave
                         # file is.
-                        validated = validate_schema(entry, "weave", prefix=("weaves", index))
+                        validated = validate_schema(entry, "weave", at=(*at, "weaves", index))
                         inline = validated.model_dump(exclude_unset=True)
                         inline["qualified_key"] = weave_name
                         if "condition" in entry:
                             inline["condition"] = entry["condition"]
                         inline_authored = authored_entry("weaves", index)
+                        inline_at = (*at, "weaves", index)
                         children.append(
                             ResolvedChild(
                                 entry=entry,
@@ -824,7 +831,9 @@ def resolve_references(
                                     runtime_params,
                                     visited.copy(),
                                     authored=inline_authored,
+                                    at=inline_at,
                                 ),
+                                at=inline_at,
                             )
                         )
                     else:
@@ -944,7 +953,7 @@ def resolve_references(
                 if isinstance(entry, dict):
                     # The cascade and load checks read the body before
                     # hydration, so its value types are checked here.
-                    validate_inline_thread_types(entry, prefix=("threads", index))
+                    validate_inline_thread_types(entry, at=(*at, "threads", index))
                     inline = entry.copy()
                     inline["qualified_key"] = entry.get("name", "")
 
@@ -962,6 +971,7 @@ def resolve_references(
                             entry=entry,
                             data=inline,
                             authored=authored_entry("threads", index),
+                            at=(*at, "threads", index),
                         )
                     )
 

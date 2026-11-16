@@ -14,7 +14,6 @@ the generic ``C400``, and error types with no mapping become ``C100``.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +21,7 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from weevr.diagnostics.diagnostic import Diagnostic
+from weevr.diagnostics.positions import ABSENT, child_of, json_pointer
 from weevr.diagnostics.registry import REGISTRY, diagnostic
 
 _CONSTRAINTS = frozenset(
@@ -42,18 +42,6 @@ _VALIDATOR_PREFIXES = ("Value error, ", "Assertion failed, ")
 _QUOTED = re.compile(r"'((?:[^'\\]|\\.)*)'")
 
 
-def json_pointer(segments: Sequence[str | int]) -> str:
-    """Render path segments as a JSON pointer (``""`` for the root).
-
-    Args:
-        segments: Keys and list indexes from the root down.
-
-    Returns:
-        The pointer, with ``~`` and ``/`` escaped.
-    """
-    return "".join("/" + str(s).replace("~", "~0").replace("/", "~1") for s in segments)
-
-
 @dataclass(frozen=True)
 class _Located:
     error: ErrorDetails
@@ -66,7 +54,6 @@ def from_validation_error(
     data: Any,
     *,
     file: str | None = None,
-    prefix: Sequence[str | int] = (),
 ) -> list[Diagnostic]:
     """Convert every error in a pydantic ``ValidationError``.
 
@@ -75,13 +62,11 @@ def from_validation_error(
         data: The input that was validated, used to tell real keys from
             union-member labels in error locations.
         file: The file the input came from.
-        prefix: Where ``data`` sits in its document, for an inline body
-            (``("threads", 2)``); prepended to every ``resolved_path``.
 
     Returns:
         One diagnostic per problem, in pydantic's order.
     """
-    located = [_locate(details, data, tuple(prefix)) for details in error.errors()]
+    located = [_locate(details, data) for details in error.errors()]
     groups: dict[tuple[str | int, ...], list[_Located]] = {}
     for item in located:
         groups.setdefault(item.path, []).append(item)
@@ -95,15 +80,15 @@ def from_validation_error(
     return diagnostics
 
 
-def _locate(details: ErrorDetails, data: Any, prefix: tuple[str | int, ...]) -> _Located:
+def _locate(details: ErrorDetails, data: Any) -> _Located:
     """Split an error location into the real path and the union labels in it."""
-    path: list[str | int] = list(prefix)
+    path: list[str | int] = []
     labels: list[str] = []
     node = data
     loc = details["loc"]
     for index, segment in enumerate(loc):
-        child = _child(node, segment)
-        if child is not _ABSENT:
+        child = child_of(node, segment)
+        if child is not ABSENT:
             path.append(segment)
             node = child
         elif index == len(loc) - 1 and isinstance(node, dict):
@@ -112,18 +97,6 @@ def _locate(details: ErrorDetails, data: Any, prefix: tuple[str | int, ...]) -> 
         else:
             labels.append(str(segment))
     return _Located(details, tuple(path), tuple(labels))
-
-
-_ABSENT = object()
-
-
-def _child(node: Any, segment: str | int) -> Any:
-    """The value at ``segment`` under ``node``, or ``_ABSENT``."""
-    if isinstance(node, dict) and segment in node:
-        return node[segment]
-    if isinstance(node, list) and isinstance(segment, int) and 0 <= segment < len(node):
-        return node[segment]
-    return _ABSENT
 
 
 def _step_context(path: tuple[str | int, ...]) -> dict[str, Any]:

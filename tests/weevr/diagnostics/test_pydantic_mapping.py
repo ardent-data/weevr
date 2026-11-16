@@ -12,7 +12,8 @@ from pydantic_core import PydanticCustomError
 
 from weevr.config import load_config
 from weevr.diagnostics import Diagnostic, track_usage
-from weevr.diagnostics.pydantic import from_validation_error, json_pointer
+from weevr.diagnostics.positions import json_pointer
+from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ModelValidationError
 from weevr.model import Thread, Weave
 
@@ -242,8 +243,6 @@ class TestPreResolutionSchema:
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(weave)
         [diag] = exc_info.value.diagnostics
-        assert (diag.code, diag.resolved_path, diag.file) == (
-            "C102",
-            "/threads/1/sources",
-            str(weave),
-        )
+        assert (diag.code, diag.resolved_path, diag.file) == ("C102", "/sources", str(weave))
+        assert diag.pointer == "/threads/1/sources"
+        assert diag.line is not None

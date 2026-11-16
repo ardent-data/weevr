@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from weevr.config.locations import ConfigLocation
+from weevr.diagnostics.positions import fill_lines
 from weevr.errors.exceptions import ConfigError
 
 
@@ -13,7 +14,8 @@ def attribute_errors(location: ConfigLocation | str) -> Iterator[None]:
 
     Only errors and diagnostics that don't already name a file are updated,
     so when blocks nest (a weave loading a referenced thread), the innermost
-    file wins.
+    file wins. Diagnostics in that file with an authored pointer also gain
+    their line and column.
 
     Args:
         location: The config file being processed.
@@ -25,4 +27,5 @@ def attribute_errors(location: ConfigLocation | str) -> Iterator[None]:
         yield
     except ConfigError as exc:
         exc.locate(str(location))
+        exc.diagnostics = fill_lines(exc.diagnostics, str(location))
         raise
