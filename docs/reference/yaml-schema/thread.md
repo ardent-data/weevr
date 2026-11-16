@@ -1262,10 +1262,11 @@ the two mechanisms are redundant.
 
 ### When load rules are checked
 
-Load-mode rules are enforced in two places:
+Load-mode rules are all enforced at config load (`load_config`,
+`load_resolved`, `Context.load`, and every `Context.run` mode), so a config
+that breaks one never starts running.
 
-- **At config load** (`load_config`, `load_resolved`, `Context.load`, and
-  `mode="validate"`):
+- **When the thread is validated**, each thread on its own:
     - `incremental_watermark` requires `watermark_column` and `watermark_type`.
     - `cdc` requires a `cdc` block, and a `cdc` block is only valid when
       `mode` is `cdc`.
@@ -1277,8 +1278,9 @@ Load-mode rules are enforced in two places:
       requires `order_by: "<watermark_column> DESC"`.
     - In `cdc` mode, the primary (first) source can't set `dedup` (the merge
       keeps the latest change per key), and `target.dimension` is rejected.
-- **When the thread starts executing** — not reported by `load_config` or
-  `mode="validate"`; the run fails with an `ExecutionError`:
+- **At the end of the load**, on every thread after loom and weave defaults
+  are applied, so an inherited `write.mode` counts. A failure raises a
+  `ConfigError` that names the thread and its file:
     - `cdc` requires `write.mode: merge`.
     - `cdc` with an explicit mapping that sets `update_value` or
       `delete_value` requires `watermark_column`, so same-key changes have a
@@ -1286,8 +1288,14 @@ Load-mode rules are enforced in two places:
     - `incremental_watermark` requires `write.mode` of `append` or `merge`;
       the default `overwrite` is rejected because each run would replace the
       target with only the new slice.
-    - `watermark_inclusive: true` with `write.mode: append` logs a warning
-      (re-read rows can duplicate).
+    - `watermark_inclusive: true` with `write.mode: append` adds a load
+      warning (re-read rows can duplicate).
+    - `incremental_parameter` with no `${param.*}` reference in the thread's
+      steps or sources, as written, adds a load warning.
+
+A `Thread` built in code and passed straight to `execute_thread` skips the
+load, so the engine still rejects the error cases above with an
+`ExecutionError` before reading anything.
 
 ```yaml
 # Incremental watermark load

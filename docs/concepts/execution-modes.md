@@ -320,9 +320,9 @@ subsequent runs, only rows where `modified_date` exceeds the stored
 watermark are read.
 
 Watermark loads require an explicit `write.mode` of `append` or `merge`.
-The default (`overwrite`) is rejected when the thread starts executing
-(not by `mode="validate"`): each run would replace the whole target with
-only the incremental slice, silently discarding all previously loaded
+The default (`overwrite`) is rejected when the config loads, in every
+mode including `mode="validate"`: each run would replace the whole target
+with only the incremental slice, silently discarding all previously loaded
 history.
 
 The watermark is persisted in a configurable state store -- either as a
@@ -353,7 +353,9 @@ params:
 ```
 
 Use this mode when the orchestration layer (Fabric pipeline, Airflow)
-controls the processing window.
+controls the processing window. A thread in this mode with no `${param.*}`
+reference in its steps or sources, as written, gets a load warning: the
+window would never reach the query.
 
 ### CDC
 

@@ -295,7 +295,7 @@ Incremental load mode and watermark tracking.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `mode` | `"full" \| "incremental_watermark" \| "incremental_parameter" \| "cdc"` | `"full"` | Load strategy |
-| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; required for generic `cdc` mappings that declare `update_value` or `delete_value` (orders same-key changes; insert-only mappings exempt; checked when the thread starts executing); rejected when `cdc.preset` is `"delta_cdf"`. |
+| `watermark_column` | `str` | `None` | Column for watermark comparison. Required for `incremental_watermark`; required for generic `cdc` mappings that declare `update_value` or `delete_value` (orders same-key changes; insert-only mappings exempt; checked at the end of the load); rejected when `cdc.preset` is `"delta_cdf"`. |
 | `watermark_type` | `"timestamp" \| "date" \| "int" \| "long"` | `None` | Watermark column data type. Required for `incremental_watermark`, and in `cdc` mode whenever `watermark_column` is set. |
 | `watermark_inclusive` | `bool` | `False` | Include rows equal to last watermark |
 | `watermark_store` | `WatermarkStoreConfig` | `None` | Watermark persistence backend |
@@ -321,9 +321,9 @@ Cross-field rules enforced at parse time:
 - `mode == "cdc"` rejects a `dedup` on the primary (first) source (the merge
   keeps the latest change per key) and rejects `target.dimension`
 
-Cross-field rules enforced when the thread starts executing (not reported
-by `load_config` or `mode="validate"`; the run fails with an
-`ExecutionError`):
+Cross-field rules checked at the end of the load, on every thread after
+loom and weave defaults apply (a `ConfigError` naming the thread, from
+`load_config`, `load_resolved`, and every `Context` mode):
 
 - `mode == "cdc"` requires `write.mode: merge`
 - `mode == "cdc"` with a generic mapping that sets `update_value` or
