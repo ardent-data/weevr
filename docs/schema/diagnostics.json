@@ -182,6 +182,116 @@
       "docs_anchor": "c204"
     },
     {
+      "code": "C205",
+      "name": "name-mismatch",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The declared name does not match the file name without its extension.",
+      "docs_anchor": "c205"
+    },
+    {
+      "code": "C301",
+      "name": "reference-not-found",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ref names a file that does not exist, or a named weave has no file or inline body.",
+      "docs_anchor": "c301"
+    },
+    {
+      "code": "C302",
+      "name": "circular-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ref leads back to a file already being loaded.",
+      "docs_anchor": "c302"
+    },
+    {
+      "code": "C303",
+      "name": "reference-outside-project",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ref or weave name resolves to a path outside the project root.",
+      "docs_anchor": "c303"
+    },
+    {
+      "code": "C304",
+      "name": "invalid-reference",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ref is not a path string.",
+      "docs_anchor": "c304"
+    },
+    {
+      "code": "C305",
+      "name": "missing-entry-name",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "An inline weave or thread entry has no name.",
+      "docs_anchor": "c305"
+    },
+    {
+      "code": "C306",
+      "name": "duplicate-entry-name",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "Two thread entries in a weave have the same effective name.",
+      "docs_anchor": "c306"
+    },
+    {
+      "code": "C307",
+      "name": "missing-entry-alias",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A thread ref appears more than once in a weave without 'as' aliases.",
+      "docs_anchor": "c307"
+    },
+    {
+      "code": "C308",
+      "name": "invalid-foreach",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A foreach block is missing a required part or has a part of the wrong shape.",
+      "docs_anchor": "c308"
+    },
+    {
+      "code": "C309",
+      "name": "foreach-not-supported",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A foreach block appears where steps are not expanded (inside a 'with' sub-pipeline).",
+      "docs_anchor": "c309"
+    },
+    {
+      "code": "C310",
+      "name": "warp-not-found",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A named warp file is not in any searched location.",
+      "docs_anchor": "c310"
+    },
+    {
       "code": "C400",
       "name": "invalid-config",
       "category": "config",
@@ -190,6 +300,56 @@
       "removed_in": null,
       "summary": "A config rule was broken, in a way no more specific code covers.",
       "docs_anchor": "c400"
+    },
+    {
+      "code": "P101",
+      "name": "missing-required-parameter",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A required parameter has no runtime value and no default.",
+      "docs_anchor": "p101"
+    },
+    {
+      "code": "P102",
+      "name": "parameter-type-mismatch",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A parameter value is not of the type its declaration names.",
+      "docs_anchor": "p102"
+    },
+    {
+      "code": "P103",
+      "name": "invalid-parameter-format",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A date or timestamp parameter is not in the expected ISO format.",
+      "docs_anchor": "p103"
+    },
+    {
+      "code": "P110",
+      "name": "unresolved-variable",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A ${...} variable has no value and no default.",
+      "docs_anchor": "p110"
+    },
+    {
+      "code": "R140",
+      "name": "unknown-audit-template",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "An audit template name is neither user-defined nor a built-in preset.",
+      "docs_anchor": "r140"
     }
   ],
   "retired": []

@@ -5,6 +5,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from weevr.config.audit_templates import merge_audit_columns_with_templates
+from weevr.diagnostics import diagnostic
+from weevr.diagnostics.positions import json_pointer
 from weevr.errors import InheritanceError
 
 logger = logging.getLogger(__name__)
@@ -164,29 +166,39 @@ def check_defaults_shape(defaults: dict[str, Any] | None, scope: str) -> None:
     if not defaults:
         return
 
-    def fail(key: str, expected: str, value: Any) -> None:
+    def fail(key: str, expected: str, value: Any, at: tuple[str | int, ...] = ()) -> None:
+        message = f"{scope} defaults.{key} must be {expected}, got {type(value).__name__}"
         raise InheritanceError(
-            f"{scope} defaults.{key} must be {expected}, got {type(value).__name__}",
+            message,
             config_key=f"defaults.{key}",
+            diagnostics=[
+                diagnostic(
+                    "C102",
+                    message,
+                    pointer=json_pointer(("defaults", *at)),
+                    expected=[expected.removeprefix("a ")],
+                    origin=__name__,
+                )
+            ],
         )
 
     if "target" in defaults:
         target = defaults["target"]
         if not isinstance(target, dict):
-            fail("target", "a mapping", target)
+            fail("target", "a mapping", target, ("target",))
         columns = target.get("audit_columns")
         if columns is not None and not isinstance(columns, dict):
-            fail("target.audit_columns", "a mapping", columns)
+            fail("target.audit_columns", "a mapping", columns, ("target", "audit_columns"))
     legacy = defaults.get("audit_columns")
     if legacy is not None and not isinstance(legacy, dict):
-        fail("audit_columns", "a mapping", legacy)
+        fail("audit_columns", "a mapping", legacy, ("audit_columns",))
     if "exports" in defaults:
         exports = defaults["exports"]
         if not isinstance(exports, list):
-            fail("exports", "a list", exports)
-        for export in exports:
+            fail("exports", "a list", exports, ("exports",))
+        for index, export in enumerate(exports):
             if not isinstance(export, dict):
-                fail("exports[]", "a mapping", export)
+                fail("exports[]", "a mapping", export, ("exports", index))
 
 
 def _cascade_naming(

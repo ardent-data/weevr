@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +32,7 @@ from weevr.config.locations import (
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.parser import (
+    TYPED_EXTENSIONS,
     detect_config_type,
     detect_config_type_from_extension,
     extract_config_version,
@@ -54,6 +55,7 @@ from weevr.config.validation import (
     validate_schema,
 )
 from weevr.config.warp import discover_warp, find_warp
+from weevr.diagnostics import diagnostic
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
 from weevr.model.warp import WarpBinding
@@ -127,9 +129,19 @@ def resolve_config(
 
     ext_type = detect_config_type_from_extension(location)
     if ext_type is None and require_typed_extension:
+        message = f"Unsupported extension '{location.suffix}'. Expected .thread, .weave, or .loom"
         raise ConfigError(
-            f"Unsupported extension '{location.suffix}'. Expected .thread, .weave, or .loom",
+            message,
             file_path=str(location),
+            diagnostics=[
+                diagnostic(
+                    "C007",
+                    message,
+                    file=str(location),
+                    pointer="",
+                    expected=sorted(TYPED_EXTENSIONS),
+                )
+            ],
         )
     config_type = ext_type if ext_type is not None else detect_config_type(raw)
 
@@ -156,10 +168,14 @@ def resolve_config(
         )
     except VariableResolutionError as exc:
         if config_type == "thread" and "param." in str(exc):
-            raise VariableResolutionError(
+            message = (
                 f"{exc}. This thread may be a template designed for "
-                f"use with 'as' and 'params' on a ThreadEntry in a weave.",
+                f"use with 'as' and 'params' on a ThreadEntry in a weave."
+            )
+            raise VariableResolutionError(
+                message,
                 config_key=getattr(exc, "config_key", None),
+                diagnostics=[replace(d, message=message) for d in exc.diagnostics],
             ) from exc
         raise
 
@@ -189,9 +205,21 @@ def resolve_config(
     if ext_type is not None:
         declared_name = data.get("name", "")
         if declared_name and declared_name != location.stem:
+            message = (
+                f"Declared name '{declared_name}' does not match filename stem '{location.stem}'"
+            )
             raise ConfigError(
-                f"Declared name '{declared_name}' does not match filename stem '{location.stem}'",
+                message,
                 file_path=str(location),
+                diagnostics=[
+                    diagnostic(
+                        "C205",
+                        message,
+                        file=str(location),
+                        pointer="/name",
+                        expected=[location.stem],
+                    )
+                ],
             )
         if not declared_name:
             data["name"] = location.stem

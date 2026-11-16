@@ -13,6 +13,7 @@ import logging
 import re
 from dataclasses import dataclass
 
+from weevr.diagnostics import diagnostic
 from weevr.errors.exceptions import ConfigError
 
 logger = logging.getLogger(__name__)
@@ -201,8 +202,12 @@ def resolve_template_columns(
             merged.update(BUILTIN_AUDIT_PRESETS[name])
         else:
             available = sorted(set(resolved_user) | set(BUILTIN_AUDIT_PRESETS))
-            raise ConfigError(
+            message = (
                 f"Audit template {name!r} not found. Available templates: {', '.join(available)}"
+            )
+            raise ConfigError(
+                message,
+                diagnostics=[diagnostic("R140", message, expected=available, origin=__name__)],
             )
 
     return merged

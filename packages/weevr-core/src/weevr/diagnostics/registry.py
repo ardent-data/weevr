@@ -133,7 +133,47 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unknown-config-kind",
         "The config's kind could not be determined, or is not one weevr knows.",
     ),
-    # C3xx — references and entry forms (config/resolver.py, macros.py, locations.py)
+    # C205–C209 — envelope (config/loader.py)
+    _config(
+        "C205",
+        "name-mismatch",
+        "The declared name does not match the file name without its extension.",
+    ),
+    # C3xx — references and entry forms (config/resolver.py, macros.py, warp.py)
+    _config(
+        "C301",
+        "reference-not-found",
+        "A ref names a file that does not exist, or a named weave has no file or inline body.",
+    ),
+    _config("C302", "circular-reference", "A ref leads back to a file already being loaded."),
+    _config(
+        "C303",
+        "reference-outside-project",
+        "A ref or weave name resolves to a path outside the project root.",
+    ),
+    _config("C304", "invalid-reference", "A ref is not a path string."),
+    _config("C305", "missing-entry-name", "An inline weave or thread entry has no name."),
+    _config(
+        "C306",
+        "duplicate-entry-name",
+        "Two thread entries in a weave have the same effective name.",
+    ),
+    _config(
+        "C307",
+        "missing-entry-alias",
+        "A thread ref appears more than once in a weave without 'as' aliases.",
+    ),
+    _config(
+        "C308",
+        "invalid-foreach",
+        "A foreach block is missing a required part or has a part of the wrong shape.",
+    ),
+    _config(
+        "C309",
+        "foreach-not-supported",
+        "A foreach block appears where steps are not expanded (inside a 'with' sub-pipeline).",
+    ),
+    _config("C310", "warp-not-found", "A named warp file is not in any searched location."),
     # C4xx — cross-field rules
     _config(
         "C400",
@@ -143,9 +183,35 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     # C401–C439 — pipeline step rules (model/pipeline.py, model/sub_pipeline.py)
     # C440–C479 — other model rules (model/*.py)
     # C480–C499 — load-time cross-field checks (config/validation.py)
-    # P1xx — variables and parameters
+    # P101–P149 — variables and parameters (config/resolver.py)
+    _config(
+        "P101",
+        "missing-required-parameter",
+        "A required parameter has no runtime value and no default.",
+    ),
+    _config(
+        "P102",
+        "parameter-type-mismatch",
+        "A parameter value is not of the type its declaration names.",
+    ),
+    _config(
+        "P103",
+        "invalid-parameter-format",
+        "A date or timestamp parameter is not in the expected ISO format.",
+    ),
+    _config(
+        "P110",
+        "unresolved-variable",
+        "A ${...} variable has no value and no default.",
+    ),
     # R101–R119 — lookup and column-set definitions (model/*.py)
     # R120–R139 — lookup and column-set references checked at load
+    # R140–R149 — audit templates (config/audit_templates.py)
+    _config(
+        "R140",
+        "unknown-audit-template",
+        "An audit template name is neither user-defined nor a built-in preset.",
+    ),
     # D1xx — plan and dependencies
     # S1xx — source existence
 )

@@ -3,7 +3,18 @@
 import copy
 from typing import Any
 
+from weevr.diagnostics import diagnostic
+from weevr.diagnostics.positions import json_pointer
 from weevr.errors.exceptions import ConfigError
+
+
+def _foreach_error(
+    code: str, message: str, pointer: str | None = None, hint: str | None = None
+) -> ConfigError:
+    return ConfigError(
+        message,
+        diagnostics=[diagnostic(code, message, pointer=pointer, hint=hint, origin=__name__)],
+    )
 
 
 def _substitute_value(obj: Any, var_name: str, value: Any) -> Any:
@@ -35,9 +46,12 @@ def reject_foreach_in_with(thread: dict[str, Any]) -> None:
     for name, sub_pipeline in sub_pipelines.items():
         steps = sub_pipeline.get("steps") if isinstance(sub_pipeline, dict) else None
         if isinstance(steps, list) and any(isinstance(s, dict) and "foreach" in s for s in steps):
-            raise ConfigError(
+            raise _foreach_error(
+                "C309",
                 f"foreach is not supported in with.{name}.steps; "
-                f"use it in the thread's top-level steps"
+                f"use it in the thread's top-level steps",
+                json_pointer(("with", name, "steps")),
+                hint="Use foreach in the thread's top-level steps.",
             )
 
 
@@ -71,18 +85,34 @@ def expand_foreach(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         foreach = item["foreach"]
         if not isinstance(foreach, dict):
-            raise ConfigError(f"foreach block at step index {i}: 'foreach' must be a mapping")
+            raise _foreach_error(
+                "C308",
+                f"foreach block at step index {i}: 'foreach' must be a mapping",
+                json_pointer(("steps", i, "foreach")),
+            )
 
         values = foreach.get("values")
         var_name = foreach.get("as")
         template_steps = foreach.get("steps")
 
         if not isinstance(values, list) or len(values) == 0:
-            raise ConfigError(f"foreach block at step index {i}: 'values' must be a non-empty list")
+            raise _foreach_error(
+                "C308",
+                f"foreach block at step index {i}: 'values' must be a non-empty list",
+                json_pointer(("steps", i, "foreach", "values")),
+            )
         if not var_name:
-            raise ConfigError(f"foreach block at step index {i}: 'as' variable name is required")
+            raise _foreach_error(
+                "C308",
+                f"foreach block at step index {i}: 'as' variable name is required",
+                json_pointer(("steps", i, "foreach", "as")),
+            )
         if not template_steps or not isinstance(template_steps, list):
-            raise ConfigError(f"foreach block at step index {i}: 'steps' must be a non-empty list")
+            raise _foreach_error(
+                "C308",
+                f"foreach block at step index {i}: 'steps' must be a non-empty list",
+                json_pointer(("steps", i, "foreach", "steps")),
+            )
 
         for value in values:
             for template in template_steps:

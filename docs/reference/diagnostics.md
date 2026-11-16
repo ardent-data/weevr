@@ -144,6 +144,74 @@ config_version names a major version this release does not read.
 
 The config's kind could not be determined, or is not one weevr knows.
 
+### C205
+
+`name-mismatch` · error · stable
+
+The declared name does not match the file name without its extension.
+
+## C3xx — References and entry forms
+
+### C301
+
+`reference-not-found` · error · stable
+
+A ref names a file that does not exist, or a named weave has no file or inline body.
+
+### C302
+
+`circular-reference` · error · stable
+
+A ref leads back to a file already being loaded.
+
+### C303
+
+`reference-outside-project` · error · stable
+
+A ref or weave name resolves to a path outside the project root.
+
+### C304
+
+`invalid-reference` · error · stable
+
+A ref is not a path string.
+
+### C305
+
+`missing-entry-name` · error · stable
+
+An inline weave or thread entry has no name.
+
+### C306
+
+`duplicate-entry-name` · error · stable
+
+Two thread entries in a weave have the same effective name.
+
+### C307
+
+`missing-entry-alias` · error · stable
+
+A thread ref appears more than once in a weave without 'as' aliases.
+
+### C308
+
+`invalid-foreach` · error · stable
+
+A foreach block is missing a required part or has a part of the wrong shape.
+
+### C309
+
+`foreach-not-supported` · error · stable
+
+A foreach block appears where steps are not expanded (inside a 'with' sub-pipeline).
+
+### C310
+
+`warp-not-found` · error · stable
+
+A named warp file is not in any searched location.
+
 ## C4xx — Config rules
 
 ### C400
@@ -151,3 +219,37 @@ The config's kind could not be determined, or is not one weevr knows.
 `invalid-config` · error · stable
 
 A config rule was broken, in a way no more specific code covers.
+
+## P1xx — Variables and parameters
+
+### P101
+
+`missing-required-parameter` · error · stable
+
+A required parameter has no runtime value and no default.
+
+### P102
+
+`parameter-type-mismatch` · error · stable
+
+A parameter value is not of the type its declaration names.
+
+### P103
+
+`invalid-parameter-format` · error · stable
+
+A date or timestamp parameter is not in the expected ISO format.
+
+### P110
+
+`unresolved-variable` · error · stable
+
+A ${...} variable has no value and no default.
+
+## R1xx — Lookups and column sets
+
+### R140
+
+`unknown-audit-template` · error · stable
+
+An audit template name is neither user-defined nor a built-in preset.

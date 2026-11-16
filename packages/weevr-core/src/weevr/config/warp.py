@@ -8,6 +8,7 @@ from pathlib import Path
 from weevr.config.locations import ConfigLocation, LocalConfigLocation
 from weevr.config.parser import parse_yaml
 from weevr.config.validation import validate_schema
+from weevr.diagnostics import diagnostic
 from weevr.errors import ConfigError
 from weevr.model.target import Target
 from weevr.model.warp import EffectiveWarp, WarpColumn, WarpConfig
@@ -168,8 +169,18 @@ def _resolve_named(
         if candidate.exists():
             return _load_warp(candidate), candidate
 
+    message = f"Warp file not found: '{name}'. Searched: " + ", ".join(str(c) for c in candidates)
     raise ConfigError(
-        f"Warp file not found: '{name}'. Searched: " + ", ".join(str(c) for c in candidates),
+        message,
+        diagnostics=[
+            diagnostic(
+                "C310",
+                message,
+                expected=[str(c) for c in candidates],
+                hint=f"Create {filename} in one of the searched locations.",
+                origin=__name__,
+            )
+        ],
     )
 
 
@@ -230,7 +241,11 @@ def _load_warp(location: ConfigLocation) -> WarpConfig:
     raw = parse_yaml(location)
     result = validate_schema(raw, "warp")
     if not isinstance(result, WarpConfig):
-        raise ConfigError(f"Expected WarpConfig from '{location}', got {type(result).__name__}")
+        message = f"Expected WarpConfig from '{location}', got {type(result).__name__}"
+        raise ConfigError(
+            message,
+            diagnostics=[diagnostic("C400", message, file=str(location), origin=__name__)],
+        )
     return result
 
 
