@@ -81,6 +81,14 @@ def _config(code: str, name: str, summary: str, **kwargs: Any) -> RegistryEntry:
     return RegistryEntry(code, name, Category.CONFIG, Severity.ERROR, summary, **kwargs)
 
 
+def _config_warning(code: str, name: str, summary: str, **kwargs: Any) -> RegistryEntry:
+    return RegistryEntry(code, name, Category.CONFIG, Severity.WARNING, summary, **kwargs)
+
+
+def _platform(code: str, name: str, summary: str, **kwargs: Any) -> RegistryEntry:
+    return RegistryEntry(code, name, Category.PLATFORM, Severity.ERROR, summary, **kwargs)
+
+
 _ENTRIES: tuple[RegistryEntry, ...] = (
     # C0xx — reading and parsing a config file
     _config("C001", "config-file-not-found", "The config file does not exist."),
@@ -174,6 +182,12 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A foreach block appears where steps are not expanded (inside a 'with' sub-pipeline).",
     ),
     _config("C310", "warp-not-found", "A named warp file is not in any searched location."),
+    # C350–C359 — loom entries
+    _config(
+        "C350",
+        "duplicate-weave-name",
+        "Two weave entries in a loom resolve to the same name.",
+    ),
     # C4xx — cross-field rules
     _config(
         "C400",
@@ -273,6 +287,65 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unresolved-variable",
         "A ${...} variable has no value and no default.",
     ),
+    _config(
+        "C480",
+        "cdc-requires-merge",
+        "A thread in cdc load mode does not write with mode 'merge'.",
+    ),
+    _config(
+        "C481",
+        "cdc-requires-watermark-column",
+        "A cdc mapping with update or delete values has no load.watermark_column to order "
+        "same-key changes.",
+    ),
+    _config(
+        "C482",
+        "incremental-watermark-overwrite",
+        "A thread in incremental_watermark load mode would overwrite its target with each "
+        "incremental slice.",
+    ),
+    _config_warning(
+        "C483",
+        "incremental-parameter-without-param",
+        "A thread in incremental_parameter load mode references no ${param.*} variable in "
+        "its steps or sources.",
+    ),
+    _config_warning(
+        "C484",
+        "watermark-inclusive-append",
+        "An inclusive watermark with write mode 'append' can duplicate rows on re-reads.",
+    ),
+    _config(
+        "C485",
+        "dimension-derived-write-field",
+        "A thread with a dimension target sets a write field the engine derives itself.",
+    ),
+    _config(
+        "C486",
+        "dimension-write-mode",
+        "A thread with a dimension target sets write.mode, but dimension targets always merge.",
+    ),
+    _config(
+        "C487",
+        "dimension-keys-field",
+        "A thread with a dimension target sets a keys field that belongs in the dimension block.",
+    ),
+    _config_warning(
+        "C490",
+        "scope-defaults-execution-ignored",
+        "A loom or weave declares defaults.execution, which thread-scoped execution does "
+        "not apply.",
+    ),
+    _config_warning(
+        "C491",
+        "thread-execution-ignored",
+        "A thread declares an execution block, which is not applied at thread scope.",
+    ),
+    _config_warning(
+        "C492",
+        "weave-trace-ineffective",
+        "A weave sets trace: true under a loom whose effective trace is false.",
+    ),
     # R101–R119 — lookup and column-set definitions (model/*.py)
     _config(
         "R101",
@@ -280,6 +353,36 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A lookup's key and value columns overlap.",
     ),
     # R120–R139 — lookup and column-set references checked at load
+    _config(
+        "R120",
+        "undefined-resolve-lookup",
+        "A resolve step names a lookup that no visible scope defines.",
+    ),
+    _config_warning(
+        "R121",
+        "undefined-resolve-lookup-ignored",
+        "A resolve step with on_failure: warn names a lookup that no visible scope defines.",
+    ),
+    _config(
+        "R122",
+        "undefined-source-lookup",
+        "A lookup-bound source names a lookup that no visible scope defines.",
+    ),
+    _config_warning(
+        "R123",
+        "source-lookup-outside-thread",
+        "A thread loaded on its own has a lookup-bound source whose lookup it does not define.",
+    ),
+    _config(
+        "R124",
+        "undefined-column-set",
+        "A rename step names a column set that no visible scope defines.",
+    ),
+    _config_warning(
+        "R125",
+        "column-set-outside-thread",
+        "A thread loaded on its own has a rename step whose column set it does not define.",
+    ),
     # R140–R149 — audit templates (config/audit_templates.py)
     _config(
         "R140",
@@ -303,6 +406,18 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A thread declares a dependency on a thread the weave does not define.",
     ),
     # S1xx — source existence
+    # S101–S119 — sources checked in validate mode (context.py)
+    _platform("S101", "source-not-found", "A source does not exist at its resolved location."),
+    _platform(
+        "S102",
+        "source-probe-failed",
+        "A source's existence could not be checked, because probing its location failed.",
+    ),
+    _platform(
+        "S103",
+        "source-location-unresolved",
+        "A source's location could not be resolved, so its existence was not checked.",
+    ),
 )
 
 RETIRED_CODES: frozenset[str] = frozenset()

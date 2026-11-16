@@ -212,6 +212,12 @@ A foreach block appears where steps are not expanded (inside a 'with' sub-pipeli
 
 A named warp file is not in any searched location.
 
+### C350
+
+`duplicate-weave-name` · error · stable
+
+Two weave entries in a loom resolve to the same name.
+
 ## C4xx — Config rules
 
 ### C400
@@ -322,6 +328,72 @@ A column name is declared more than once.
 
 A key or reference names a column that is not declared.
 
+### C480
+
+`cdc-requires-merge` · error · stable
+
+A thread in cdc load mode does not write with mode 'merge'.
+
+### C481
+
+`cdc-requires-watermark-column` · error · stable
+
+A cdc mapping with update or delete values has no load.watermark_column to order same-key changes.
+
+### C482
+
+`incremental-watermark-overwrite` · error · stable
+
+A thread in incremental_watermark load mode would overwrite its target with each incremental slice.
+
+### C483
+
+`incremental-parameter-without-param` · warning · stable
+
+A thread in incremental_parameter load mode references no ${param.*} variable in its steps or sources.
+
+### C484
+
+`watermark-inclusive-append` · warning · stable
+
+An inclusive watermark with write mode 'append' can duplicate rows on re-reads.
+
+### C485
+
+`dimension-derived-write-field` · error · stable
+
+A thread with a dimension target sets a write field the engine derives itself.
+
+### C486
+
+`dimension-write-mode` · error · stable
+
+A thread with a dimension target sets write.mode, but dimension targets always merge.
+
+### C487
+
+`dimension-keys-field` · error · stable
+
+A thread with a dimension target sets a keys field that belongs in the dimension block.
+
+### C490
+
+`scope-defaults-execution-ignored` · warning · stable
+
+A loom or weave declares defaults.execution, which thread-scoped execution does not apply.
+
+### C491
+
+`thread-execution-ignored` · warning · stable
+
+A thread declares an execution block, which is not applied at thread scope.
+
+### C492
+
+`weave-trace-ineffective` · warning · stable
+
+A weave sets trace: true under a loom whose effective trace is false.
+
 ## D1xx — Plan and dependencies
 
 ### D101
@@ -376,8 +448,64 @@ A ${...} variable has no value and no default.
 
 A lookup's key and value columns overlap.
 
+### R120
+
+`undefined-resolve-lookup` · error · stable
+
+A resolve step names a lookup that no visible scope defines.
+
+### R121
+
+`undefined-resolve-lookup-ignored` · warning · stable
+
+A resolve step with on_failure: warn names a lookup that no visible scope defines.
+
+### R122
+
+`undefined-source-lookup` · error · stable
+
+A lookup-bound source names a lookup that no visible scope defines.
+
+### R123
+
+`source-lookup-outside-thread` · warning · stable
+
+A thread loaded on its own has a lookup-bound source whose lookup it does not define.
+
+### R124
+
+`undefined-column-set` · error · stable
+
+A rename step names a column set that no visible scope defines.
+
+### R125
+
+`column-set-outside-thread` · warning · stable
+
+A thread loaded on its own has a rename step whose column set it does not define.
+
 ### R140
 
 `unknown-audit-template` · error · stable
 
 An audit template name is neither user-defined nor a built-in preset.
+
+## S1xx — Source and target existence
+
+### S101
+
+`source-not-found` · error · stable
+
+A source does not exist at its resolved location.
+
+### S102
+
+`source-probe-failed` · error · stable
+
+A source's existence could not be checked, because probing its location failed.
+
+### S103
+
+`source-location-unresolved` · error · stable
+
+A source's location could not be resolved, so its existence was not checked.

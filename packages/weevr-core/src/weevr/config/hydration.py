@@ -12,12 +12,15 @@ from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.resolver import ResolvedChild
 from weevr.config.validation import (
-    split_diagnostics,
-    validate_rename_column_sets,
-    validate_resolve_lookups,
-    validate_source_lookups,
+    in_thread,
+    partition_diagnostics,
+    rename_column_set_diagnostics,
+    render_diagnostics,
+    resolve_lookup_diagnostics,
+    source_lookup_diagnostics,
 )
-from weevr.diagnostics.positions import place_all
+from weevr.diagnostics import diagnostic
+from weevr.diagnostics.positions import json_pointer, place_all
 from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
@@ -89,14 +92,18 @@ def check_resolve_lookups(
     available = defined | {
         alias for alias, src in sources.items() if isinstance(src, dict) and src.get("lookup")
     }
-    errors, advisories = split_diagnostics(
-        validate_source_lookups(thread_dict, available_lookups=defined, standalone=standalone)
-        + validate_resolve_lookups(thread_dict, available_lookups=available)
+    errors, advisories = partition_diagnostics(
+        source_lookup_diagnostics(thread_dict, available_lookups=defined, standalone=standalone)
+        + resolve_lookup_diagnostics(thread_dict, available_lookups=available)
     )
     if errors:
-        raise ConfigError("; ".join(errors), file_path=str(source))
+        raise ConfigError(
+            "; ".join(d.message for d in errors),
+            file_path=str(source),
+            diagnostics=in_thread(errors, name, file=str(source), prefix=False),
+        )
     if warnings is not None:
-        warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
+        warnings.extend(render_diagnostics(in_thread(advisories, name)))
 
 
 def check_column_set_references(
@@ -120,18 +127,20 @@ def check_column_set_references(
         ConfigError: For a column set no visible scope defines.
     """
     available = _effective_names(outer, thread_dict.get("column_sets"), "column_set")
-    errors, advisories = split_diagnostics(
-        validate_rename_column_sets(
+    errors, advisories = partition_diagnostics(
+        rename_column_set_diagnostics(
             thread_dict, available_column_sets=available, standalone=standalone
         )
     )
     if errors:
+        located = in_thread(errors, name, file=str(source))
         raise ConfigError(
-            "; ".join(f"thread '{name}': {message}" for message in errors),
+            "; ".join(d.message for d in located),
             file_path=str(source),
+            diagnostics=located,
         )
     if warnings is not None:
-        warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
+        warnings.extend(render_diagnostics(in_thread(advisories, name)))
 
 
 def hydrate_model(
@@ -317,15 +326,22 @@ def hydrate_children(
         # Weaves are keyed by name from here on (planner, runner, results),
         # so a second entry with the same name would silently replace the first.
         defined_by: dict[str, str] = {}
-        for weave in children:
+        for index, weave in enumerate(children):
             weave_entry = weave.entry
             weave_dict = weave.data
             weave_name = _entry_name(weave_entry)
             origin = _weave_origin(weave_entry)
             if weave_name in defined_by:
-                raise ConfigError(
-                    f"Duplicate weave name '{weave_name}' in loom: {defined_by[weave_name]} "
-                    f"and {origin}. Give one entry a unique 'name:'."
+                raise ConfigError.from_diagnostic(
+                    diagnostic(
+                        "C350",
+                        f"Duplicate weave name '{weave_name}' in loom: "
+                        f"{defined_by[weave_name]} and {origin}. "
+                        f"Give one entry a unique 'name:'.",
+                        pointer=json_pointer(("weaves", index)),
+                        node=weave_name,
+                        hint="Give one entry a unique 'name:'.",
+                    )
                 )
             defined_by[weave_name] = origin
 
