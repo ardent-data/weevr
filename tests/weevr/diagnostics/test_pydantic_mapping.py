@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 import yaml
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 from pydantic_core import PydanticCustomError
 
 from weevr.config import load_config
@@ -96,8 +96,21 @@ class TestCodes:
         assert (diag.code, diag.resolved_path) == ("C105", "/execution/max_parallel_threads")
 
     def test_uncoded_validator_error_is_generic(self) -> None:
-        diag = _one(Thread, _thread(sources={"a": {"type": "delta"}}))
-        assert (diag.code, diag.resolved_path) == ("C400", "/sources/a")
+        class Plain(BaseModel):
+            value: int
+
+            @field_validator("value")
+            @classmethod
+            def _positive(cls, v: int) -> int:
+                if v <= 0:
+                    raise ValueError("value must be positive")
+                return v
+
+        data = {"value": 0}
+        with pytest.raises(ValidationError) as exc_info:
+            Plain.model_validate(data)
+        (diag,) = from_validation_error(exc_info.value, data)
+        assert (diag.code, diag.resolved_path) == ("C400", "/value")
         assert not diag.message.startswith("Value error")
 
     def test_coded_validator_error_keeps_its_code(self) -> None:

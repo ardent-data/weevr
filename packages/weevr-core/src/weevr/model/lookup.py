@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 from weevr.model.source import Source
 
@@ -85,11 +86,11 @@ class Lookup(FrozenBase):
     @model_validator(mode="after")
     def _validate_narrow_fields(self) -> "Lookup":
         if self.values and not self.key:
-            raise ValueError("'values' requires 'key' to be set")
+            raise rule_error("C403", "'values' requires 'key' to be set")
         if self.key and self.values:
             overlap = set(self.key) & set(self.values)
             if overlap:
-                raise ValueError(f"'key' and 'values' must not overlap: {sorted(overlap)}")
+                raise rule_error("R101", f"'key' and 'values' must not overlap: {sorted(overlap)}")
         if self.on_failure != "abort" and not self.unique_key:
-            raise ValueError("'on_failure' is only valid when 'unique_key' is true")
+            raise rule_error("C403", "'on_failure' is only valid when 'unique_key' is true")
         return self

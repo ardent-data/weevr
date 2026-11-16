@@ -141,10 +141,90 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A config rule was broken, in a way no more specific code covers.",
     ),
     # C401–C439 — pipeline step rules (model/pipeline.py, model/sub_pipeline.py)
+    _config(
+        "C401",
+        "empty-collection",
+        "A list, mapping or pattern that must have content is empty.",
+    ),
+    _config(
+        "C402",
+        "conflicting-options",
+        "Two or more options that exclude each other are set together.",
+    ),
+    _config(
+        "C403",
+        "missing-required-option",
+        "An option the step needs for its mode or its other options is not set.",
+    ),
+    _config(
+        "C404",
+        "option-not-applicable",
+        "An option is set that the step's chosen mode does not use.",
+    ),
+    _config(
+        "C405",
+        "values-must-differ",
+        "Two options must hold different values but are equal.",
+    ),
+    _config(
+        "C406",
+        "value-out-of-order",
+        "A lower bound is greater than its upper bound.",
+    ),
     # C440–C479 — other model rules (model/*.py)
+    _config(
+        "C440",
+        "invalid-date-format",
+        "A date value is not a valid YYYY-MM-DD date.",
+    ),
+    _config(
+        "C441",
+        "group-overlap",
+        "A column appears in more than one group, or a single-use setting is claimed twice.",
+    ),
+    _config(
+        "C442",
+        "invalid-name",
+        "A name is not a valid identifier.",
+    ),
+    _config(
+        "C443",
+        "baseline-check-in-pre-steps",
+        "A check that compares against a pre-run baseline is placed where no baseline exists.",
+    ),
+    _config(
+        "C444",
+        "incremental-dedup-order",
+        "A deduplication on an incremental read does not keep the latest row by the watermark.",
+    ),
+    _config(
+        "C445",
+        "name-collision",
+        "A name or alias collides with another name in the same scope.",
+    ),
+    _config(
+        "C446",
+        "forward-reference",
+        "A name is used before it is declared.",
+    ),
+    _config(
+        "C447",
+        "duplicate-column",
+        "A column name is declared more than once.",
+    ),
+    _config(
+        "C448",
+        "undeclared-column-reference",
+        "A key or reference names a column that is not declared.",
+    ),
     # C480–C499 — load-time cross-field checks (config/validation.py)
     # P1xx — variables and parameters
     # R101–R119 — lookup and column-set definitions (model/*.py)
+    _config(
+        "R101",
+        "lookup-key-values-overlap",
+        "A lookup's key and value columns overlap.",
+    ),
     # R120–R139 — lookup and column-set references checked at load
     # D1xx — plan and dependencies
     # S1xx — source existence

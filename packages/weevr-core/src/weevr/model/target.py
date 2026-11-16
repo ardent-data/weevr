@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 from weevr.model.dimension import DimensionConfig
 from weevr.model.fact import FactConfig
@@ -39,7 +40,7 @@ class ColumnMapping(FrozenBase):
     @model_validator(mode="after")
     def _validate_expr_drop_exclusive(self) -> "ColumnMapping":
         if self.expr is not None and self.drop:
-            raise ValueError("'expr' and 'drop=True' are mutually exclusive")
+            raise rule_error("C402", "'expr' and 'drop=True' are mutually exclusive")
         return self
 
 
@@ -182,7 +183,9 @@ class Target(FrozenBase):
         if self.audit_columns_exclude:
             for pattern in self.audit_columns_exclude:
                 if not pattern:
-                    raise ValueError("audit_columns_exclude patterns must be non-empty strings")
+                    raise rule_error(
+                        "C401", "audit_columns_exclude patterns must be non-empty strings"
+                    )
         return self
 
     @model_validator(mode="after")
@@ -194,8 +197,8 @@ class Target(FrozenBase):
         has_alias_or_path = self.alias is not None or self.path is not None
         has_connection_target = self.connection is not None and self.table is not None
         if not has_alias_or_path and not has_connection_target:
-            raise ValueError(
-                "target requires at least one of 'alias', 'path', or 'connection' + 'table'"
+            raise rule_error(
+                "C403", "target requires at least one of 'alias', 'path', or 'connection' + 'table'"
             )
         return self
 
@@ -203,16 +206,18 @@ class Target(FrozenBase):
     def _validate_connection_fields(self) -> "Target":
         """Validate cross-field rules for connection-based targets."""
         if self.connection is not None and self.alias is not None:
-            raise ValueError("'connection' and 'alias' are mutually exclusive")
+            raise rule_error("C402", "'connection' and 'alias' are mutually exclusive")
         if self.connection is not None and self.table is None:
-            raise ValueError("'connection' requires 'table'")
+            raise rule_error("C403", "'connection' requires 'table'")
         if self.table is not None and self.connection is None:
-            raise ValueError("'table' requires 'connection'")
+            raise rule_error("C403", "'table' requires 'connection'")
         return self
 
     @model_validator(mode="after")
     def _validate_dimension_fact_exclusive(self) -> "Target":
         """Validate that dimension and fact are mutually exclusive."""
         if self.dimension is not None and self.fact is not None:
-            raise ValueError("'dimension' and 'fact' are mutually exclusive on a single target")
+            raise rule_error(
+                "C402", "'dimension' and 'fact' are mutually exclusive on a single target"
+            )
         return self
