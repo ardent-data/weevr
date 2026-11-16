@@ -239,11 +239,12 @@ class ResolvedDocument:
                     entry=EntryMeta.from_entry(entry),
                     children=thread_docs(weave, (threads or {}).get(entry.effective_name, {})),
                 )
-        if kind not in ("thread", "weave", "loom"):
+        kinds: dict[str, ConfigKind] = {"thread": "thread", "weave": "weave", "loom": "loom"}
+        if kind not in kinds:
             raise ValueError(f"Unknown config kind {kind!r}")
         return cls(
             model=model,
-            kind=kind,  # type: ignore[arg-type]  # checked just above
+            kind=kinds[kind],
             name=name,
             children=children,
         ).with_scopes()
