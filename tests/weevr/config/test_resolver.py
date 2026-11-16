@@ -873,12 +873,11 @@ class TestReferenceResolution:
 
         result = resolve_references(loom_config, "loom", tmp_path)
 
-        assert "_resolved_weaves" in result
-        assert len(result["_resolved_weaves"]) == 1
-        weave = result["_resolved_weaves"][0]
-        assert "_resolved_threads" in weave
-        assert len(weave["_resolved_threads"]) == 1
-        thread = weave["_resolved_threads"][0]
+        assert len(result) == 1
+        weave = result[0]
+        assert weave.source_path == str(tmp_path / "dimensions.weave")
+        assert len(weave.children) == 1
+        thread = weave.children[0].data
         assert "customers" in thread["sources"]
 
     def test_resolve_references_missing_file(self, tmp_path):
@@ -924,17 +923,16 @@ class TestReferenceResolution:
 
         result = resolve_references(loom_config, "loom", tmp_path)
 
-        assert "_resolved_weaves" in result
-        assert len(result["_resolved_weaves"]) == 1
-        assert result["_resolved_weaves"][0]["name"] == "dimensions"
-        assert result["_resolved_weaves"][0]["qualified_key"] == "dimensions.weave"
+        assert len(result) == 1
+        assert result[0].data["name"] == "dimensions"
+        assert result[0].data["qualified_key"] == "dimensions.weave"
 
 
 class TestEntryStashPattern:
-    """Test _entry_as and _entry_params stash through resolver (M121 Task 4)."""
+    """Entry fields (``as``, ``params``) travel on the resolved child, not in its dict."""
 
     def test_ref_entry_with_as_stashed(self, tmp_path):
-        """Ref entry with 'as' produces _entry_as in resolved dict."""
+        """A ref entry's 'as' is on the child's entry; the dict carries no stash key."""
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
@@ -949,11 +947,12 @@ class TestEntryStashPattern:
             "threads": [{"ref": "sap_table.thread", "as": "sap_adr6"}],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"][0]
-        assert resolved["_entry_as"] == "sap_adr6"
+        assert result[0].entry["as"] == "sap_adr6"
+        assert result[0].source_path == str(thread_file)
+        assert not any(key.startswith("_") for key in result[0].data)
 
     def test_ref_entry_with_params_stashed(self, tmp_path):
-        """Ref entry with 'params' produces _entry_params in resolved dict."""
+        """A ref entry's 'params' are on the child's entry."""
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
@@ -970,11 +969,10 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"][0]
-        assert resolved["_entry_params"] == {"table": "ADR6"}
+        assert result[0].entry["params"] == {"table": "ADR6"}
 
     def test_ref_entry_without_as_no_stash(self, tmp_path):
-        """Ref entry without 'as' or 'params' has no _entry_as/_entry_params."""
+        """A ref entry without 'as' or 'params' has neither on its entry."""
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
@@ -989,9 +987,8 @@ class TestEntryStashPattern:
             "threads": [{"ref": "sap_table.thread"}],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"][0]
-        assert "_entry_as" not in resolved
-        assert "_entry_params" not in resolved
+        assert "as" not in result[0].entry
+        assert "params" not in result[0].entry
 
     def test_ref_entry_params_resolve_in_thread(self, tmp_path):
         """ThreadEntry params are injected and resolve ${param.x} in thread."""
@@ -1016,7 +1013,7 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"][0]
+        resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "ADR6"
 
     def test_two_phase_param_expression_resolution(self, tmp_path):
@@ -1043,7 +1040,7 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path, runtime_params={"env": "prod"})
-        resolved = result["_resolved_threads"][0]
+        resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "prod_silver"
 
     def test_literal_params_pass_through(self, tmp_path):
@@ -1069,7 +1066,7 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"][0]
+        resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "ADR6"
 
     def test_sibling_refs_same_file_no_cycle_error(self, tmp_path):
@@ -1100,7 +1097,7 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"]
+        resolved = [child.data for child in result]
         assert len(resolved) == 2
         assert resolved[0]["sources"]["data"]["alias"] == "ADR6"
         assert resolved[1]["sources"]["data"]["alias"] == "ADR2"
@@ -1146,7 +1143,7 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        assert len(result["_resolved_threads"]) == 2
+        assert len(result) == 2
 
     def test_duplicate_effective_name_raises(self, tmp_path):
         """Two entries with same effective name raise ConfigError."""
@@ -1177,7 +1174,7 @@ class TestEntryStashPattern:
             resolve_references(weave_config, "weave", tmp_path)
 
     def test_inline_entry_with_as_stashed(self):
-        """Inline entry with 'as' produces _entry_as in resolved dict."""
+        """An inline entry's 'as' is on the child's entry, which has no own file."""
         from weevr.config.resolver import resolve_references
 
         weave_config = {
@@ -1193,8 +1190,8 @@ class TestEntryStashPattern:
             ],
         }
         result = resolve_references(weave_config, "weave", Path("/tmp"))
-        resolved = result["_resolved_threads"][0]
-        assert resolved["_entry_as"] == "my_alias"
+        assert result[0].entry["as"] == "my_alias"
+        assert result[0].source_path is None
 
 
 class TestWholeValueResolution:
@@ -1660,15 +1657,15 @@ class TestThreadParameterizationE2E:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"]
+        resolved = [child.data for child in result]
 
         assert len(resolved) == 2
         assert resolved[0]["sources"]["data"]["alias"] == "raw.ADR6"
         assert resolved[0]["target"]["alias"] == "silver.ADR6"
-        assert resolved[0]["_entry_as"] == "sap_adr6"
+        assert result[0].entry["as"] == "sap_adr6"
         assert resolved[1]["sources"]["data"]["alias"] == "raw.ADR2"
         assert resolved[1]["target"]["alias"] == "silver.ADR2"
-        assert resolved[1]["_entry_as"] == "sap_adr2"
+        assert result[1].entry["as"] == "sap_adr2"
 
     def test_three_instances_same_ref(self, tmp_path):
         """Three instances of same ref all resolve independently."""
@@ -1697,7 +1694,7 @@ class TestThreadParameterizationE2E:
             ],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"]
+        resolved = [child.data for child in result]
         assert len(resolved) == 3
         assert resolved[2]["sources"]["data"]["alias"] == "stg.C"
 
@@ -1732,7 +1729,7 @@ class TestThreadParameterizationE2E:
             tmp_path,
             runtime_params={"env": "prod"},
         )
-        resolved = result["_resolved_threads"][0]
+        resolved = result[0].data
         assert resolved["sources"]["data"]["alias"] == "prod_silver.customers"
         assert resolved["target"]["alias"] == "prod_silver.dim_customers"
 
@@ -1763,11 +1760,10 @@ class TestThreadParameterizationE2E:
             "weaves": [{"ref": "silver.weave"}],
         }
         result = resolve_references(loom_config, "loom", tmp_path)
-        weave = result["_resolved_weaves"][0]
-        threads = weave["_resolved_threads"]
+        threads = result[0].children
         assert len(threads) == 2
-        assert threads[0]["_entry_as"] == "sap_adr6"
-        assert threads[1]["_entry_as"] == "sap_adr2"
+        assert threads[0].entry["as"] == "sap_adr6"
+        assert threads[1].entry["as"] == "sap_adr2"
 
     def test_standalone_template_raises(self):
         """Standalone thread with unresolved ${param.x} raises."""
@@ -1796,7 +1792,6 @@ class TestThreadParameterizationE2E:
             "threads": [{"ref": "simple.thread"}],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
-        resolved = result["_resolved_threads"]
-        assert len(resolved) == 1
-        assert "_entry_as" not in resolved[0]
-        assert "_entry_params" not in resolved[0]
+        assert len(result) == 1
+        assert "as" not in result[0].entry
+        assert "params" not in result[0].entry

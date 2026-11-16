@@ -345,3 +345,108 @@ class TestHierarchyVariablesLoad:
         thread = loaded.resolved_threads["daily"]["orders"]
         assert thread.exports is not None
         assert thread.exports[0].path == self.PATH
+
+
+class TestResolvedChildren:
+    """Resolution hands children to the cascade and hydration as typed nodes."""
+
+    @staticmethod
+    def _write(root: Path, files: dict[str, str]) -> None:
+        for name, text in files.items():
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+
+    _TEMPLATE = (
+        'config_version: "1.0"\n'
+        "params:\n  table: {name: table, type: string, required: true}\n"
+        'sources:\n  s: {type: delta, alias: "raw.${param.table}"}\n'
+        'target: {alias: "out.${param.table}"}\n'
+    )
+
+    def test_children_keep_their_authored_dicts(self, tmp_path: Path) -> None:
+        from weevr.config.loader import resolve_config
+        from weevr.config.locations import LocalConfigLocation
+
+        self._write(
+            tmp_path,
+            {
+                "t.thread": self._TEMPLATE,
+                "w.weave": (
+                    'config_version: "1.0"\n'
+                    "defaults: {schema: gold}\n"
+                    "threads:\n"
+                    "  - ref: t.thread\n    as: a\n    params: {table: A}\n"
+                    '  - name: inline\n    config_version: "1.0"\n'
+                    "    sources: {s: {type: delta, alias: raw.x}}\n"
+                    '    target: {alias: "${schema}.inline"}\n'
+                ),
+            },
+        )
+        resolved = resolve_config(LocalConfigLocation(tmp_path / "w.weave"))
+        by_file, inline = resolved.children
+
+        assert by_file.authored is not None
+        assert by_file.authored["target"]["alias"] == "out.${param.table}"
+        assert by_file.data["target"]["alias"] == "out.A"
+        assert by_file.source_path == str(tmp_path / "t.thread")
+
+        assert inline.authored is not None
+        assert inline.authored["target"]["alias"] == "${schema}.inline"
+        assert inline.data["target"]["alias"] == "gold.inline"
+        assert inline.source_path is None
+
+    def test_threads_of_an_inline_weave_keep_their_authored_dicts(self, tmp_path: Path) -> None:
+        from weevr.config.loader import resolve_config
+        from weevr.config.locations import LocalConfigLocation
+
+        self._write(
+            tmp_path,
+            {
+                "l.loom": (
+                    'config_version: "1.0"\n'
+                    "weaves:\n"
+                    '  - name: w\n    config_version: "1.0"\n'
+                    "    defaults: {schema: gold}\n"
+                    "    threads:\n"
+                    '      - name: t\n        config_version: "1.0"\n'
+                    "        sources: {s: {type: delta, alias: raw.x}}\n"
+                    '        target: {alias: "${schema}.t"}\n'
+                ),
+            },
+        )
+        resolved = resolve_config(LocalConfigLocation(tmp_path / "l.loom"))
+        (weave,) = resolved.children
+        (thread,) = weave.children
+        assert weave.source_path is None
+        assert thread.authored is not None
+        assert thread.authored["target"]["alias"] == "${schema}.t"
+        assert thread.data["target"]["alias"] == "gold.t"
+
+    def test_a_standalone_thread_keeps_its_authored_dict(self, tmp_path: Path) -> None:
+        from weevr.config.loader import resolve_config
+        from weevr.config.locations import LocalConfigLocation
+
+        self._write(tmp_path, {"t.thread": self._TEMPLATE})
+        resolved = resolve_config(
+            LocalConfigLocation(tmp_path / "t.thread"), runtime_params={"table": "B"}
+        )
+        assert resolved.children == []
+        assert resolved.authored is not None
+        assert resolved.authored["target"]["alias"] == "out.${param.table}"
+        assert resolved.data["target"]["alias"] == "out.B"
+
+    def test_no_child_dict_carries_underscore_keys(self, tmp_path: Path) -> None:
+        from weevr.config.loader import resolve_config
+        from weevr.config.locations import LocalConfigLocation
+
+        root = Path(__file__).parents[1] / "fixtures" / "load_parity" / "forms.weevr"
+        project = tmp_path / "forms.weevr"
+        shutil.copytree(root, project)
+        resolved = resolve_config(LocalConfigLocation(project / "forms.loom"))
+
+        def walk(children: list) -> list[dict]:
+            return [d for c in children for d in [c.data, *walk(c.children)]]
+
+        for data in [resolved.data, *walk(resolved.children)]:
+            assert [key for key in data if key.startswith("_")] == []

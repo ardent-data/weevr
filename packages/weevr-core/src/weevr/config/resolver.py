@@ -3,6 +3,7 @@
 import logging
 import re
 from collections import Counter
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,31 @@ from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ResolvedChild:
+    """A child config pulled in by one entry of its weave or loom.
+
+    Reference resolution returns these instead of attaching children to the
+    parent's dict; the cascade, the pre-cascade checks and hydration walk them.
+
+    Attributes:
+        entry: The parent's entry for this child, as written (a bare string
+            entry becomes ``{"name": ...}``).
+        data: The child's resolved config dict. The inheritance cascade
+            replaces it with the cascaded dict.
+        source_path: The child's own file, or ``None`` for an inline child,
+            which lives in its parent's file.
+        authored: The child's config before variable substitution.
+        children: A weave's threads (for a loom's weave children).
+    """
+
+    entry: dict[str, Any]
+    data: dict[str, Any]
+    source_path: str | None = None
+    authored: dict[str, Any] | None = None
+    children: list["ResolvedChild"] = field(default_factory=list)
 
 
 def build_param_context(
@@ -590,12 +616,13 @@ def resolve_references(
     project_root: ConfigLocation | Path,
     runtime_params: dict[str, Any] | None = None,
     visited: set[str] | None = None,
-) -> dict[str, Any]:
+    authored: dict[str, Any] | None = None,
+) -> list[ResolvedChild]:
     """Resolve references to other config files.
 
     Handles both external references (``ref`` key) and inline definitions
     (``name`` + body keys). Recursively loads referenced configs with
-    circular reference detection.
+    circular reference detection. ``config`` itself is not modified.
 
     Args:
         config: Config dict to resolve references in.
@@ -605,10 +632,12 @@ def resolve_references(
             :class:`LocalConfigLocation` for backward compatibility.
         runtime_params: Runtime parameters to pass to child configs.
         visited: Set of already-visited ref strings (for cycle detection).
+        authored: ``config`` before variable substitution, so inline
+            children can keep their authored form.
 
     Returns:
-        Config dict with resolved child configs attached under
-        ``'_resolved_threads'`` or ``'_resolved_weaves'`` keys.
+        The resolved children in entry order: a loom's weaves (each with its
+        threads) or a weave's threads. Empty for other config types.
 
     Raises:
         ReferenceResolutionError: If referenced file not found or circular
@@ -632,14 +661,19 @@ def resolve_references(
     if visited is None:
         visited = set()
 
-    result = config.copy()
+    def authored_entry(key: str, index: int) -> dict[str, Any] | None:
+        entries = (authored or {}).get(key)
+        if isinstance(entries, list) and index < len(entries):
+            entry = entries[index]
+            return entry if isinstance(entry, dict) else None
+        return None
+
+    children: list[ResolvedChild] = []
 
     # Resolve weaves in loom
     if config_type == "loom" and "weaves" in config:
-        resolved_weaves = []
-
         _check_entry_refs(config["weaves"])
-        for entry in config["weaves"]:
+        for index, entry in enumerate(config["weaves"]):
             # Normalize: string entries become {"name": string}
             if isinstance(entry, str):
                 entry = {"name": entry}
@@ -676,16 +710,23 @@ def resolve_references(
                         context = build_param_context(runtime_params, child_dict.get("defaults"))
                         resolved_child = resolve_variables(child_dict, context)
 
-                        resolved_child = resolve_references(
+                        grandchildren = resolve_references(
                             resolved_child,
                             child_type,
                             project_root,
                             runtime_params,
                             visited.copy(),
+                            authored=child_dict,
                         )
-                    resolved_child["_source_path"] = str(weave_path)
-
-                    resolved_weaves.append(resolved_child)
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=resolved_child,
+                            source_path=str(weave_path),
+                            authored=child_dict,
+                            children=grandchildren,
+                        )
+                    )
                 finally:
                     visited.discard(ref)
             else:
@@ -741,15 +782,23 @@ def resolve_references(
                                     runtime_params, child_dict.get("defaults")
                                 )
                                 resolved_child = resolve_variables(child_dict, context)
-                                resolved_child = resolve_references(
+                                grandchildren = resolve_references(
                                     resolved_child,
                                     child_type,
                                     project_root,
                                     runtime_params,
                                     visited.copy(),
+                                    authored=child_dict,
                                 )
-                            resolved_child["_source_path"] = str(convention_path)
-                            resolved_weaves.append(resolved_child)
+                            children.append(
+                                ResolvedChild(
+                                    entry=entry,
+                                    data=resolved_child,
+                                    source_path=str(convention_path),
+                                    authored=child_dict,
+                                    children=grandchildren,
+                                )
+                            )
                         finally:
                             visited.discard(convention_ref)
                     elif _is_inline_weave(entry):
@@ -762,13 +811,20 @@ def resolve_references(
                         inline["qualified_key"] = weave_name
                         if "condition" in entry:
                             inline["condition"] = entry["condition"]
-                        resolved_weaves.append(
-                            resolve_references(
-                                inline,
-                                "weave",
-                                project_root,
-                                runtime_params,
-                                visited.copy(),
+                        inline_authored = authored_entry("weaves", index)
+                        children.append(
+                            ResolvedChild(
+                                entry=entry,
+                                data=inline,
+                                authored=inline_authored,
+                                children=resolve_references(
+                                    inline,
+                                    "weave",
+                                    project_root,
+                                    runtime_params,
+                                    visited.copy(),
+                                    authored=inline_authored,
+                                ),
                             )
                         )
                     else:
@@ -778,12 +834,8 @@ def resolve_references(
                             f"weave body (threads) in the loom",
                         )
 
-        result["_resolved_weaves"] = resolved_weaves
-
     # Resolve threads in weave
     elif config_type == "weave" and "threads" in config:
-        resolved_threads = []
-
         # Validate: duplicate refs without aliases
         _check_entry_refs(config["threads"])
         ref_entries = [e for e in config["threads"] if isinstance(e, dict) and e.get("ref")]
@@ -799,7 +851,7 @@ def resolve_references(
 
         seen_effective_names: set[str] = set()
 
-        for entry in config["threads"]:
+        for index, entry in enumerate(config["threads"]):
             # Normalize: string entries become {"name": string}
             if isinstance(entry, str):
                 entry = {"name": entry}
@@ -854,8 +906,6 @@ def resolve_references(
                             child_dict, context, consumed_keys=consumed
                         )
 
-                    resolved_child["_source_path"] = str(thread_path)
-
                     # Warn on unused params with source attribution
                     _warn_unused_params(
                         consumed,
@@ -863,11 +913,6 @@ def resolve_references(
                         entry_params=resolved_entry_params,
                         thread_name=entry.get("as") or child_dict.get("name", ref),
                     )
-
-                    # Preserve entry-level overrides
-                    for key in ("dependencies", "condition", "as", "params"):
-                        if key in entry:
-                            resolved_child[f"_entry_{key}"] = entry[key]
 
                     # Track effective name uniqueness
                     effective_name = (
@@ -880,7 +925,14 @@ def resolve_references(
                         )
                     seen_effective_names.add(effective_name)
 
-                    resolved_threads.append(resolved_child)
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=resolved_child,
+                            source_path=str(thread_path),
+                            authored=child_dict,
+                        )
+                    )
                 finally:
                     visited.discard(ref)
             else:
@@ -895,8 +947,6 @@ def resolve_references(
                     validate_inline_thread_types(entry)
                     inline = entry.copy()
                     inline["qualified_key"] = entry.get("name", "")
-                    if "as" in entry:
-                        inline["_entry_as"] = entry["as"]
 
                     # Track effective name uniqueness
                     effective_name = entry.get("as") or entry.get("name", "")
@@ -907,8 +957,12 @@ def resolve_references(
                         )
                     seen_effective_names.add(effective_name)
 
-                    resolved_threads.append(inline)
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=inline,
+                            authored=authored_entry("threads", index),
+                        )
+                    )
 
-        result["_resolved_threads"] = resolved_threads
-
-    return result
+    return children

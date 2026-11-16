@@ -38,6 +38,7 @@ from weevr.config.parser import (
     validate_config_version,
 )
 from weevr.config.resolver import (
+    ResolvedChild,
     resolve_config_variables,
     resolve_declared_params,
     resolve_references,
@@ -69,8 +70,10 @@ class ResolvedConfig:
         project_root: The root child references and Source paths resolved against.
         config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``, ``"params"``).
         config_name: Name of the config (declared, else the filename stem).
-        data: The resolved config dict, with child configs attached under the
-            resolver's ``_resolved_*`` keys.
+        data: The resolved config dict.
+        children: The configs it pulls in: a loom's weaves (each with its
+            threads) or a weave's threads, cascaded.
+        authored: The config dict before variable substitution.
         warnings: Load warnings collected so far.
     """
 
@@ -79,6 +82,8 @@ class ResolvedConfig:
     config_type: str
     config_name: str
     data: dict[str, Any]
+    children: list[ResolvedChild] = field(default_factory=list)
+    authored: dict[str, Any] | None = None
     warnings: list[str] = field(default_factory=list)
 
 
@@ -182,19 +187,22 @@ def resolve_config(
         raise
 
     root = project_root if project_root is not None else location.parent
-    data = resolve_references(resolved, config_type, root, runtime_params)
+    data = resolved
+    children = resolve_references(resolved, config_type, root, runtime_params, authored=config_dict)
 
     # Execution-scope warnings come from the PRE-cascade dicts: after the
     # cascade an authored execution block is indistinguishable from one
     # injected by defaults.execution.
     warnings = (
-        collect_execution_warnings(config_type, data) if config_type in COMPONENT_TYPES else []
+        collect_execution_warnings(config_type, data, children)
+        if config_type in COMPONENT_TYPES
+        else []
     )
     # Dimension override rules apply to what each thread declares itself, so
     # they also run before the cascade adds loom/weave write and keys defaults.
     if config_type in COMPONENT_TYPES:
-        check_dimension_overrides(config_type, data, location)
-    _apply_cascade(config_type, data)
+        check_dimension_overrides(config_type, data, children, location)
+    _apply_cascade(config_type, data, children)
 
     if config_type == "thread":
         reject_foreach_in_with(data)
@@ -224,6 +232,8 @@ def resolve_config(
         config_type=config_type,
         config_name=data["name"],
         data=data,
+        children=children,
+        authored=config_dict,
         warnings=warnings,
     )
 
@@ -269,6 +279,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> HydratedConfig:
     weaves, threads = hydrate_children(
         resolved.config_type,
         resolved.data,
+        resolved.children,
         resolved.location,
         resolved.config_name,
         prepare=lambda child_dict: resolve_source_paths(child_dict, root),
@@ -421,44 +432,37 @@ def load_resolved(
     return LoadedConfig.from_hydrated(hydrated)
 
 
-def _apply_cascade(config_type: str, data: dict[str, Any]) -> None:
-    """Cascade loom and weave defaults into each child thread, in place."""
-    if config_type == "loom" and "_resolved_weaves" in data:
-        loom_defaults = data.get("defaults")
-        loom_audit_templates = data.get("audit_templates")
-        loom_connections = data.get("connections")
-        for weave in data["_resolved_weaves"]:
-            if "_resolved_threads" in weave:
-                weave_defaults = weave.get("defaults")
-                weave_audit_templates = weave.get("audit_templates")
-                weave_connections = weave.get("connections")
-                for i, thread in enumerate(weave["_resolved_threads"]):
-                    weave["_resolved_threads"][i] = apply_inheritance(
-                        loom_defaults,
-                        weave_defaults,
-                        thread,
-                        loom_audit_templates=loom_audit_templates,
-                        weave_audit_templates=weave_audit_templates,
-                        loom_connections=loom_connections,
-                        weave_connections=weave_connections,
-                    )
+def _apply_cascade(config_type: str, data: dict[str, Any], children: list[ResolvedChild]) -> None:
+    """Cascade loom and weave defaults into each child thread's dict."""
+    if config_type == "loom":
+        for weave in children:
+            for thread in weave.children:
+                thread.data = apply_inheritance(
+                    data.get("defaults"),
+                    weave.data.get("defaults"),
+                    thread.data,
+                    loom_audit_templates=data.get("audit_templates"),
+                    weave_audit_templates=weave.data.get("audit_templates"),
+                    loom_connections=data.get("connections"),
+                    weave_connections=weave.data.get("connections"),
+                )
 
-    elif config_type == "weave" and "_resolved_threads" in data:
-        weave_defaults = data.get("defaults")
-        weave_audit_templates = data.get("audit_templates")
-        weave_connections = data.get("connections")
-        for i, thread in enumerate(data["_resolved_threads"]):
-            data["_resolved_threads"][i] = apply_inheritance(
+    elif config_type == "weave":
+        for thread in children:
+            thread.data = apply_inheritance(
                 None,
-                weave_defaults,
-                thread,
-                weave_audit_templates=weave_audit_templates,
-                weave_connections=weave_connections,
+                data.get("defaults"),
+                thread.data,
+                weave_audit_templates=data.get("audit_templates"),
+                weave_connections=data.get("connections"),
             )
 
 
 def check_dimension_overrides(
-    config_type: str, resolved: dict[str, Any], location: ConfigLocation
+    config_type: str,
+    resolved: dict[str, Any],
+    children: list[ResolvedChild],
+    location: ConfigLocation,
 ) -> None:
     """Reject forbidden write/keys fields on dimension threads, from pre-cascade dicts.
 
@@ -466,46 +470,50 @@ def check_dimension_overrides(
         ConfigError: Naming the field and the thread's own file (the enclosing
             file for an inline thread).
     """
-    for thread, enclosing in _pre_cascade_threads(config_type, resolved, str(location)):
+    for thread, thread_file in _pre_cascade_threads(config_type, resolved, children, str(location)):
         errors, _ = split_diagnostics(validate_dimension_overrides(thread))
         if errors:
-            raise ConfigError("; ".join(errors), file_path=thread.get("_source_path") or enclosing)
+            raise ConfigError("; ".join(errors), file_path=thread_file)
 
 
-def collect_execution_warnings(config_type: str, resolved: dict[str, Any]) -> list[str]:
+def collect_execution_warnings(
+    config_type: str, resolved: dict[str, Any], children: list[ResolvedChild]
+) -> list[str]:
     """Gather thread-scope execution warnings from pre-cascade dicts."""
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
     if config_type == "loom":
         loom_label = f"loom '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((loom_label, resolved.get("defaults")))
-        for i, weave in enumerate(resolved.get("_resolved_weaves", [])):
-            weave_label = f"weave '{weave.get('name') or f'#{i}'}'"
-            defaults_by_scope.append((weave_label, weave.get("defaults")))
+        for i, weave in enumerate(children):
+            weave_label = f"weave '{weave.data.get('name') or f'#{i}'}'"
+            defaults_by_scope.append((weave_label, weave.data.get("defaults")))
     elif config_type == "weave":
         weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((weave_label, resolved.get("defaults")))
 
-    threads = [thread for thread, _ in _pre_cascade_threads(config_type, resolved, "")]
+    threads = [thread for thread, _ in _pre_cascade_threads(config_type, resolved, children, "")]
     return collect_execution_scope_warnings(defaults_by_scope, threads)
 
 
 def _pre_cascade_threads(
-    config_type: str, resolved: dict[str, Any], enclosing: str
+    config_type: str,
+    resolved: dict[str, Any],
+    children: list[ResolvedChild],
+    enclosing: str,
 ) -> list[tuple[dict[str, Any], str]]:
-    """Every thread dict a config pulls in, with the file that encloses it.
+    """Every thread dict a config pulls in, with the file it is written in.
 
-    The enclosing file is a referenced weave's own file, else ``enclosing``
-    (the top-level config); a thread's own ``_source_path`` takes precedence
-    where callers attribute errors.
+    That is the thread's own file, else the referenced weave file that holds
+    it inline, else ``enclosing`` (the top-level config).
     """
     if config_type == "loom":
         return [
-            (thread, weave.get("_source_path") or enclosing)
-            for weave in resolved.get("_resolved_weaves", [])
-            for thread in weave.get("_resolved_threads", [])
+            (thread.data, thread.source_path or weave.source_path or enclosing)
+            for weave in children
+            for thread in weave.children
         ]
     if config_type == "weave":
-        return [(thread, enclosing) for thread in resolved.get("_resolved_threads", [])]
+        return [(thread.data, thread.source_path or enclosing) for thread in children]
     return [(resolved, enclosing)]
 
 
