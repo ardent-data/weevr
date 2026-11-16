@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import time
-from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 from pyspark.sql import SparkSession
 
-from weevr.config.document import ScopeRegistries
+from weevr.config.document import ScopeRegistries, registry_as_dict
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
@@ -418,8 +417,8 @@ class Context:
                 pre_steps=list(model.pre_steps) if model.pre_steps else None,
                 post_steps=list(model.post_steps) if model.post_steps else None,
                 lookups=dict(model.lookups) if model.lookups else None,
-                variables=_as_dict(scope.variables),
-                column_set_defs=_as_dict(scope.column_sets),
+                variables=registry_as_dict(scope.variables),
+                column_set_defs=registry_as_dict(scope.column_sets),
                 connections=dict(model.connections) if model.connections else None,
                 execution=standalone_execution,
                 weave_name=loaded.config_name,
@@ -448,12 +447,14 @@ class Context:
 
         filtered_weaves: dict[str, Weave] = {}
         filtered_threads: dict[str, dict[str, Thread]] = {}
+        weave_models = loaded.document.weaves()
+        weave_threads = loaded.document.weave_threads()
         for weave_entry in model.weaves:
             weave_name = weave_entry.effective_name
-            weave = loaded.document.weaves().get(weave_name)
+            weave = weave_models.get(weave_name)
             if weave is None:
                 continue
-            wt = loaded.document.weave_threads().get(weave_name, {})
+            wt = weave_threads.get(weave_name, {})
             wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
             all_warnings.extend(warnings)
             if wt:
@@ -787,12 +788,14 @@ class Context:
             model = loaded.model
             if not isinstance(model, Loom):
                 raise TypeError(f"Expected Loom, got {type(model).__name__}")
+            weave_models = loaded.document.weaves()
+            weave_threads = loaded.document.weave_threads()
             for weave_entry in model.weaves:
                 weave_name = weave_entry.effective_name
-                weave = loaded.document.weaves().get(weave_name)
+                weave = weave_models.get(weave_name)
                 if weave is None:
                     continue
-                wt = loaded.document.weave_threads().get(weave_name, {})
+                wt = weave_threads.get(weave_name, {})
                 wt, warnings = self._filter_threads(wt, tags=tags, thread_names=thread_names)
                 all_warnings.extend(warnings)
                 if wt:
@@ -859,7 +862,7 @@ class Context:
                 # Resolve steps get full lookup frames: matching sampled rows
                 # against a sampled lookup would miss most valid keys.
                 scope = scopes.get(thread_name)
-                visible_lookups = _as_dict(scope.lookups) if scope is not None else None
+                visible_lookups = registry_as_dict(scope.lookups) if scope is not None else None
                 # Preview doesn't feed one thread's output into the next, so a
                 # thread reading a table this run hasn't written yet has
                 # nothing to read: report it as skipped, not as a failure.
@@ -1043,8 +1046,3 @@ def _thread_scopes(loaded: LoadedConfig) -> dict[str, ScopeRegistries]:
         return {document.name: document.effective}
     weaves = document.children.values() if document.kind == "loom" else [document]
     return {name: thread.effective for weave in weaves for name, thread in weave.children.items()}
-
-
-def _as_dict[V](registry: Mapping[str, V] | None) -> dict[str, V] | None:
-    """A registry as a plain dict, ``None`` staying ``None``."""
-    return dict(registry) if registry is not None else None

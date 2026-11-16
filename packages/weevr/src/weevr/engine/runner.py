@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pyspark.sql import SparkSession
 
-from weevr.config.document import ResolvedDocument, ScopeRegistries
+from weevr.config.document import ResolvedDocument, ScopeRegistries, registry_as_dict
 from weevr.engine.cache_manager import CacheManager
 from weevr.engine.column_sets import materialize_column_sets
 from weevr.engine.conditions import evaluate_condition
@@ -901,7 +901,7 @@ def execute_loom(
                 else None
             )
             weave_cs = dict(weave.column_sets) if weave.column_sets else None
-            merged_column_set_defs = _as_dict(weave_scope.column_sets)
+            merged_column_set_defs = registry_as_dict(weave_scope.column_sets)
 
             # Merge loom + weave connections for weave-level column set
             # materialization. Uses the same additive-update pattern as
@@ -914,7 +914,7 @@ def execute_loom(
             if weave.connections:
                 merged_connections.update(weave.connections)
 
-            merged_variables = _as_dict(weave_scope.variables)
+            merged_variables = registry_as_dict(weave_scope.variables)
 
             # Effective execution settings for this weave: field-level merge
             # of the loom and weave top-level execution blocks.
@@ -1073,8 +1073,3 @@ def _build_loom_telemetry(
         weave_telemetry=weave_telemetry,
         resolved_params=resolved_params,
     )
-
-
-def _as_dict[V](registry: Mapping[str, V] | None) -> dict[str, V] | None:
-    """A registry as a plain dict, ``None`` staying ``None``."""
-    return dict(registry) if registry is not None else None

@@ -736,6 +736,7 @@ class LoadedConfig:
             weave = document.model
             yield document.name, weave, threads, list(weave.threads), _lookups(weave)
         elif document.kind == "loom":
+            threads_by_weave = document.weave_threads()
             for weave_entry in document.model.weaves:
                 name = weave_entry.effective_name
                 child = document.children.get(name)
@@ -746,7 +747,7 @@ class LoadedConfig:
                 yield (
                     name,
                     weave,
-                    document.weave_threads()[name],
+                    threads_by_weave[name],
                     list(weave.threads),
                     _lookups(weave),
                 )

@@ -25,6 +25,7 @@ from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, ThreadEntry
 
 ConfigKind = Literal["thread", "weave", "loom"]
+_KINDS: dict[str, ConfigKind] = {"thread": "thread", "weave": "weave", "loom": "loom"}
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,14 @@ class EntryMeta:
             dependencies=tuple(entry.dependencies) if entry.dependencies is not None else None,
             condition=entry.condition,
         )
+
+
+def registry_as_dict[V](registry: Mapping[str, V] | None) -> dict[str, V] | None:
+    """A registry as a plain, mutable dict; ``None`` (no registry) stays ``None``.
+
+    For engine code that hands registries to functions taking ``dict``.
+    """
+    return dict(registry) if registry is not None else None
 
 
 def _freeze(registry: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
@@ -207,6 +216,8 @@ class ResolvedDocument:
         Returns:
             The tree, with effective registries.
         """
+        if kind not in _KINDS:
+            raise ValueError(f"Unknown config kind {kind!r}")
 
         def as_thread(value: Any) -> Thread:
             return value if isinstance(value, Thread) else Thread.model_validate(value)
@@ -239,12 +250,9 @@ class ResolvedDocument:
                     entry=EntryMeta.from_entry(entry),
                     children=thread_docs(weave, (threads or {}).get(entry.effective_name, {})),
                 )
-        kinds: dict[str, ConfigKind] = {"thread": "thread", "weave": "weave", "loom": "loom"}
-        if kind not in kinds:
-            raise ValueError(f"Unknown config kind {kind!r}")
         return cls(
             model=model,
-            kind=kinds[kind],
+            kind=_KINDS[kind],
             name=name,
             children=children,
         ).with_scopes()
