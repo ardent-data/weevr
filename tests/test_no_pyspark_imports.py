@@ -211,3 +211,72 @@ def test_pyspark_blocker_cleanup() -> None:
 
     pyspark_sql = importlib.import_module("pyspark.sql")
     assert pyspark_sql is not None
+
+
+FORMS_PROJECT = Path(__file__).parent / "weevr" / "fixtures" / "load_parity" / "forms.weevr"
+
+
+def _tree_summary(root: Path) -> dict[str, object]:
+    """Load the forms loom through the loader and reduce it to plain data.
+
+    Uses the loader's own entry point: ``load_resolved`` wraps the result in
+    ``LoadedConfig``, whose plan lives in ``weevr.engine``, and in a full
+    install the engine wheel's ``weevr.engine`` package needs PySpark. The
+    plan side is covered by the core-only install smoke
+    (``tests/integration/test_dual_install_modes.py``).
+    """
+    loader = importlib.import_module("weevr.config.loader")
+    locations = importlib.import_module("weevr.config.locations")
+    document, warnings = loader.load_resolved_config(
+        locations.LocalConfigLocation(root / "forms.loom"),
+        project_root=locations.LocalConfigLocation(root),
+    )
+
+    def registries(scope: object) -> dict[str, object]:
+        return {
+            kind: {name: value.model_dump(mode="json") for name, value in registry.items()}
+            for kind in ("lookups", "column_sets", "variables")
+            if (registry := getattr(scope, kind)) is not None
+        }
+
+    def node(doc: object) -> dict[str, object]:
+        return {
+            "kind": doc.kind,  # type: ignore[attr-defined]
+            "name": doc.name,  # type: ignore[attr-defined]
+            "model": doc.model.model_dump(mode="json"),  # type: ignore[attr-defined]
+            "effective": registries(doc.effective),  # type: ignore[attr-defined]
+            "children": [node(c) for c in doc.children.values()],  # type: ignore[attr-defined]
+        }
+
+    return {"tree": node(document), "warnings": list(warnings)}
+
+
+def _copy_forms(tmp_path: Path) -> Path:
+    import shutil
+
+    root = tmp_path / "forms.weevr"
+    shutil.copytree(FORMS_PROJECT, root)
+    return root
+
+
+def test_full_project_tree_without_pyspark(tmp_path: Path) -> None:
+    """A multi-weave loom with templates, lookups and column sets resolves without PySpark.
+
+    The document tree and every node's effective registries match the same
+    load with PySpark available.
+    """
+    root = _copy_forms(tmp_path)
+    with_spark = _tree_summary(root)
+    with _block_pyspark():
+        without_spark = _tree_summary(root)
+        assert "pyspark" not in sys.modules
+    assert without_spark == with_spark
+    assert len(with_spark["tree"]["children"]) == 3  # type: ignore[index]
+
+
+def test_full_project_tree_without_engine_wheel(tmp_path: Path) -> None:
+    """The same load runs with the engine wheel absent (a weevr-core-only install)."""
+    root = _copy_forms(tmp_path)
+    with_engine = _tree_summary(root)
+    with _block_engine_wheel():
+        assert _tree_summary(root) == with_engine
