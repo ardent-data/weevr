@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from weevr.config import load_config
 from weevr.config.parser import (
     detect_config_type,
     detect_config_type_from_extension,
@@ -267,3 +268,115 @@ class TestExtensionDetection:
 
     def test_path_with_directories(self):
         assert detect_config_type_from_extension("dims/dim_customer.thread") == "thread"
+
+
+def _only_diagnostic(exc: ConfigError):
+    assert len(exc.diagnostics) == 1
+    return exc.diagnostics[0]
+
+
+class TestParseDiagnostics:
+    """Every read, parse, version and type failure carries one coded diagnostic."""
+
+    def test_file_not_found(self):
+        with pytest.raises(ConfigParseError) as exc_info:
+            parse_yaml(FIXTURES / "nonexistent.yaml")
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C001"
+        assert diag.file == str(FIXTURES / "nonexistent.yaml")
+
+    def test_unreadable_path(self, tmp_path):
+        with pytest.raises(ConfigParseError) as exc_info:
+            parse_yaml(tmp_path)
+        assert _only_diagnostic(exc_info.value).code == "C002"
+
+    def test_not_utf8(self, tmp_path):
+        path = tmp_path / "latin.thread"
+        path.write_bytes(b"config_version: '1.0'\nname: caf\xe9\n")
+        with pytest.raises(ConfigParseError) as exc_info:
+            parse_yaml(path)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C003"
+        assert diag.file == str(path)
+
+    def test_empty_file(self, tmp_path):
+        path = tmp_path / "empty.yaml"
+        path.write_text("")
+        with pytest.raises(ConfigParseError) as exc_info:
+            parse_yaml(path)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C004"
+        assert diag.file == str(path)
+
+    def test_yaml_syntax_carries_line_and_column(self, tmp_path):
+        path = tmp_path / "broken.thread"
+        path.write_text("config_version: '1.0'\nsources:\n  a: [1, 2\n")
+        with pytest.raises(ConfigParseError) as exc_info:
+            parse_yaml(path)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C005"
+        assert diag.file == str(path)
+        assert diag.line == 4
+        assert diag.column == 1
+
+    def test_non_mapping(self, tmp_path):
+        path = tmp_path / "list.yaml"
+        path.write_text("- item1\n")
+        with pytest.raises(ConfigParseError) as exc_info:
+            parse_yaml(path)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C006"
+        assert diag.pointer == ""
+
+    def test_unsupported_extension(self):
+        with pytest.raises(ConfigError) as exc_info:
+            detect_config_type_from_extension("config.json")
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C007"
+        assert diag.file == "config.json"
+        assert diag.expected == (".thread", ".weave", ".loom", ".warp", ".yaml", ".yml")
+
+    @pytest.mark.parametrize(
+        ("raw", "code"),
+        [
+            ({"sources": {}}, "C201"),
+            ({"config_version": 1.0}, "C202"),
+            ({"config_version": "10"}, "C202"),
+            ({"config_version": "a.b"}, "C202"),
+        ],
+    )
+    def test_config_version(self, raw, code):
+        with pytest.raises(ConfigParseError) as exc_info:
+            extract_config_version(raw)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == code
+        assert diag.pointer == ("" if code == "C201" else "/config_version")
+
+    def test_unsupported_major(self):
+        with pytest.raises(ConfigVersionError) as exc_info:
+            validate_config_version((2, 0), "thread")
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C203"
+        assert diag.pointer == "/config_version"
+        assert diag.expected == ("1.x",)
+
+    def test_unknown_config_type(self):
+        with pytest.raises(ConfigVersionError) as exc_info:
+            validate_config_version((1, 0), "pipeline")
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C204"
+        assert diag.expected == ("thread", "weave", "loom", "params", "warp")
+
+    def test_undetectable_type(self):
+        with pytest.raises(ConfigParseError) as exc_info:
+            detect_config_type({})
+        assert _only_diagnostic(exc_info.value).code == "C204"
+
+    def test_load_names_the_file_on_version_errors(self, tmp_path):
+        path = tmp_path / "t.thread"
+        path.write_text("config_version: '9.0'\nsources: {}\n")
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(path)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C203"
+        assert diag.file == str(path)

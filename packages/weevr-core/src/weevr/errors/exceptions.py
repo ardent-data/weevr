@@ -2,25 +2,40 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Self
+
+from weevr.diagnostics import Diagnostic
 
 if TYPE_CHECKING:
     from weevr.model.warp import DriftReport
 
 
 class WeevError(Exception):
-    """Base exception for all weevr errors."""
+    """Base exception for all weevr errors.
 
-    def __init__(self, message: str, cause: Exception | None = None) -> None:
+    ``diagnostics`` holds the coded problems behind the error. Match on
+    their codes, not on the message or the exception class.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        *,
+        diagnostics: Iterable[Diagnostic] | None = None,
+    ) -> None:
         """Initialize WeevError.
 
         Args:
             message: Human-readable error message
             cause: Optional underlying exception that triggered this error
+            diagnostics: The coded problems behind this error
         """
         super().__init__(message)
         self.message = message
         self.cause = cause
+        self.diagnostics: list[Diagnostic] = list(diagnostics or [])
 
     def __str__(self) -> str:
         """Return string representation of the error."""
@@ -38,6 +53,8 @@ class ConfigError(WeevError):
         cause: Exception | None = None,
         file_path: str | None = None,
         config_key: str | None = None,
+        *,
+        diagnostics: Iterable[Diagnostic] | None = None,
     ) -> None:
         """Initialize ConfigError.
 
@@ -46,10 +63,34 @@ class ConfigError(WeevError):
             cause: Optional underlying exception
             file_path: Path to the config file where the error occurred
             config_key: Specific config key that caused the error
+            diagnostics: The coded problems behind this error
         """
-        super().__init__(message, cause)
+        super().__init__(message, cause, diagnostics=diagnostics)
         self.file_path = file_path
         self.config_key = config_key
+
+    @classmethod
+    def from_diagnostic(cls, diagnostic: Diagnostic, cause: Exception | None = None) -> Self:
+        """Raise-ready error for one diagnostic, using its message and file.
+
+        Args:
+            diagnostic: The problem.
+            cause: Optional underlying exception.
+
+        Returns:
+            The error, carrying ``diagnostic``.
+        """
+        return cls(diagnostic.message, cause, file_path=diagnostic.file, diagnostics=[diagnostic])
+
+    def locate(self, file_path: str) -> None:
+        """Name ``file_path`` where this error and its diagnostics name no file yet.
+
+        Args:
+            file_path: The config file being processed when the error surfaced.
+        """
+        if self.file_path is None:
+            self.file_path = file_path
+        self.diagnostics = [d.located(file_path) for d in self.diagnostics]
 
     def __str__(self) -> str:
         """Return string representation with context."""

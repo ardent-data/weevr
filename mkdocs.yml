@@ -77,6 +77,7 @@ nav:
           - State: reference/api/state.md
           - Errors: reference/api/errors.md
       - Configuration Keys: reference/configuration-keys.md
+      - Diagnostic Codes: reference/diagnostics.md
       - JSON Schema: reference/json-schema.md
       - Compatibility: reference/compatibility.md
   - Concepts:

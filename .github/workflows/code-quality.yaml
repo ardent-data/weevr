@@ -50,6 +50,9 @@ jobs:
       - name: Schema check
         run: uv run --no-sync python scripts/generate_schema.py --check
 
+      - name: Diagnostic code list check
+        run: uv run --no-sync python scripts/generate_diagnostics.py --check
+
       - name: Docstring coverage
         run: >-
           uv run --no-sync interrogate packages/weevr-core/src/weevr/
