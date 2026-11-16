@@ -743,6 +743,115 @@
         "children": [
           {
             "children": [],
+            "effective": {
+              "column_sets": {
+                "loom_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_map",
+                  "source": null
+                },
+                "shared_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "weave_shared_map",
+                  "source": null
+                },
+                "thread_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "thread_map",
+                  "source": null
+                }
+              },
+              "lookups": {
+                "regions": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": true,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.regions",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "shared": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.shared_thread",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "weave_only": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.weave_only",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                }
+              },
+              "variables": {
+                "loom_var": {
+                  "default": "a",
+                  "type": "string"
+                },
+                "shared_var": {
+                  "default": 3,
+                  "type": "int"
+                }
+              }
+            },
             "entry": {
               "alias": null,
               "condition": null,
@@ -756,6 +865,108 @@
           },
           {
             "children": [],
+            "effective": {
+              "column_sets": {
+                "loom_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_map",
+                  "source": null
+                },
+                "shared_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "weave_shared_map",
+                  "source": null
+                }
+              },
+              "lookups": {
+                "regions": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": true,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.regions",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "shared": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.shared_weave",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "weave_only": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.weave_only",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                }
+              },
+              "variables": {
+                "loom_var": {
+                  "default": "a",
+                  "type": "string"
+                },
+                "shared_var": {
+                  "default": 2,
+                  "type": "int"
+                }
+              }
+            },
             "entry": {
               "alias": "tpl_a",
               "condition": null,
@@ -773,6 +984,108 @@
           },
           {
             "children": [],
+            "effective": {
+              "column_sets": {
+                "loom_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_map",
+                  "source": null
+                },
+                "shared_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "weave_shared_map",
+                  "source": null
+                }
+              },
+              "lookups": {
+                "regions": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": true,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.regions",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "shared": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.shared_weave",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "weave_only": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.weave_only",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                }
+              },
+              "variables": {
+                "loom_var": {
+                  "default": "a",
+                  "type": "string"
+                },
+                "shared_var": {
+                  "default": 2,
+                  "type": "int"
+                }
+              }
+            },
             "entry": {
               "alias": "tpl_b",
               "condition": "table_exists('gold.base')",
@@ -788,6 +1101,108 @@
           },
           {
             "children": [],
+            "effective": {
+              "column_sets": {
+                "loom_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_map",
+                  "source": null
+                },
+                "shared_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "weave_shared_map",
+                  "source": null
+                }
+              },
+              "lookups": {
+                "regions": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": true,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.regions",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "shared": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.shared_weave",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "weave_only": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.weave_only",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                }
+              },
+              "variables": {
+                "loom_var": {
+                  "default": "a",
+                  "type": "string"
+                },
+                "shared_var": {
+                  "default": 2,
+                  "type": "int"
+                }
+              }
+            },
             "entry": {
               "alias": null,
               "condition": null,
@@ -802,6 +1217,108 @@
             "source_ref": "<root>/weaves/core.weave"
           }
         ],
+        "effective": {
+          "column_sets": {
+            "loom_map": {
+              "on_extra": "ignore",
+              "on_failure": "abort",
+              "on_unmapped": "pass_through",
+              "param": "loom_map",
+              "source": null
+            },
+            "shared_map": {
+              "on_extra": "ignore",
+              "on_failure": "abort",
+              "on_unmapped": "pass_through",
+              "param": "weave_shared_map",
+              "source": null
+            }
+          },
+          "lookups": {
+            "regions": {
+              "filter": null,
+              "key": null,
+              "materialize": true,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.regions",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            },
+            "shared": {
+              "filter": null,
+              "key": null,
+              "materialize": false,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.shared_weave",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            },
+            "weave_only": {
+              "filter": null,
+              "key": null,
+              "materialize": false,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.weave_only",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            }
+          },
+          "variables": {
+            "loom_var": {
+              "default": "a",
+              "type": "string"
+            },
+            "shared_var": {
+              "default": 2,
+              "type": "int"
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": "'dev' == 'dev'",
@@ -817,6 +1334,84 @@
         "children": [
           {
             "children": [],
+            "effective": {
+              "column_sets": {
+                "loom_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_map",
+                  "source": null
+                },
+                "shared_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_shared_map",
+                  "source": null
+                }
+              },
+              "lookups": {
+                "regions": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": true,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.regions",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "shared": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.shared_loom",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                }
+              },
+              "variables": {
+                "loom_var": {
+                  "default": "a",
+                  "type": "string"
+                },
+                "shared_var": {
+                  "default": 1,
+                  "type": "int"
+                }
+              }
+            },
             "entry": {
               "alias": null,
               "condition": null,
@@ -829,6 +1424,84 @@
             "source_ref": "<root>/threads/conv.thread"
           }
         ],
+        "effective": {
+          "column_sets": {
+            "loom_map": {
+              "on_extra": "ignore",
+              "on_failure": "abort",
+              "on_unmapped": "pass_through",
+              "param": "loom_map",
+              "source": null
+            },
+            "shared_map": {
+              "on_extra": "ignore",
+              "on_failure": "abort",
+              "on_unmapped": "pass_through",
+              "param": "loom_shared_map",
+              "source": null
+            }
+          },
+          "lookups": {
+            "regions": {
+              "filter": null,
+              "key": null,
+              "materialize": true,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.regions",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            },
+            "shared": {
+              "filter": null,
+              "key": null,
+              "materialize": false,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.shared_loom",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            }
+          },
+          "variables": {
+            "loom_var": {
+              "default": "a",
+              "type": "string"
+            },
+            "shared_var": {
+              "default": 1,
+              "type": "int"
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": null,
@@ -844,6 +1517,84 @@
         "children": [
           {
             "children": [],
+            "effective": {
+              "column_sets": {
+                "loom_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_map",
+                  "source": null
+                },
+                "shared_map": {
+                  "on_extra": "ignore",
+                  "on_failure": "abort",
+                  "on_unmapped": "pass_through",
+                  "param": "loom_shared_map",
+                  "source": null
+                }
+              },
+              "lookups": {
+                "regions": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": true,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.regions",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                },
+                "shared": {
+                  "filter": null,
+                  "key": null,
+                  "materialize": false,
+                  "on_failure": "abort",
+                  "source": {
+                    "alias": "ref.shared_inline",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "cache",
+                  "unique_key": false,
+                  "values": null
+                }
+              },
+              "variables": {
+                "loom_var": {
+                  "default": "a",
+                  "type": "string"
+                },
+                "shared_var": {
+                  "default": 1,
+                  "type": "int"
+                }
+              }
+            },
             "entry": {
               "alias": null,
               "condition": null,
@@ -856,6 +1607,84 @@
             "source_ref": "<root>/forms.loom"
           }
         ],
+        "effective": {
+          "column_sets": {
+            "loom_map": {
+              "on_extra": "ignore",
+              "on_failure": "abort",
+              "on_unmapped": "pass_through",
+              "param": "loom_map",
+              "source": null
+            },
+            "shared_map": {
+              "on_extra": "ignore",
+              "on_failure": "abort",
+              "on_unmapped": "pass_through",
+              "param": "loom_shared_map",
+              "source": null
+            }
+          },
+          "lookups": {
+            "regions": {
+              "filter": null,
+              "key": null,
+              "materialize": true,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.regions",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            },
+            "shared": {
+              "filter": null,
+              "key": null,
+              "materialize": false,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.shared_inline",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            }
+          },
+          "variables": {
+            "loom_var": {
+              "default": "a",
+              "type": "string"
+            },
+            "shared_var": {
+              "default": 1,
+              "type": "int"
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": null,
@@ -868,6 +1697,84 @@
         "source_ref": "<root>/forms.loom"
       }
     ],
+    "effective": {
+      "column_sets": {
+        "loom_map": {
+          "on_extra": "ignore",
+          "on_failure": "abort",
+          "on_unmapped": "pass_through",
+          "param": "loom_map",
+          "source": null
+        },
+        "shared_map": {
+          "on_extra": "ignore",
+          "on_failure": "abort",
+          "on_unmapped": "pass_through",
+          "param": "loom_shared_map",
+          "source": null
+        }
+      },
+      "lookups": {
+        "regions": {
+          "filter": null,
+          "key": null,
+          "materialize": true,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.regions",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        },
+        "shared": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.shared_loom",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      },
+      "variables": {
+        "loom_var": {
+          "default": "a",
+          "type": "string"
+        },
+        "shared_var": {
+          "default": 1,
+          "type": "int"
+        }
+      }
+    },
     "entry": null,
     "kind": "loom",
     "name": "forms",

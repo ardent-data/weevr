@@ -158,6 +158,49 @@
   "threads": {},
   "tree": {
     "children": [],
+    "effective": {
+      "column_sets": {
+        "thread_map": {
+          "on_extra": "ignore",
+          "on_failure": "abort",
+          "on_unmapped": "pass_through",
+          "param": "thread_map",
+          "source": null
+        }
+      },
+      "lookups": {
+        "shared": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.shared_thread",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      },
+      "variables": {
+        "shared_var": {
+          "default": 3,
+          "type": "int"
+        }
+      }
+    },
     "entry": null,
     "kind": "thread",
     "name": "base",

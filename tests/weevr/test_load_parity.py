@@ -116,13 +116,22 @@ def _entry(entry: Any) -> dict[str, Any] | None:
     }
 
 
+def _registries(scope: Any) -> dict[str, Any]:
+    return {
+        kind: {name: value.model_dump(mode="json") for name, value in registry.items()}
+        for kind in ("lookups", "column_sets", "variables")
+        if (registry := getattr(scope, kind)) is not None
+    }
+
+
 def _tree(document: Any) -> dict[str, Any]:
-    """The tree's shape: kind, entry and file per node, children in order."""
+    """The tree's shape: kind, entry, file and effective registries per node."""
     return {
         "kind": document.kind,
         "name": document.name,
         "entry": _entry(document.entry),
         "source_ref": document.source_ref,
+        "effective": _registries(document.effective),
         "children": [_tree(child) for child in document.children.values()],
     }
 
@@ -190,6 +199,49 @@ class TestCorpusAcrossEntryPoints:
         assert model.model_dump(mode="json") == resolved.model.model_dump(mode="json")
         logged = [r.getMessage() for r in caplog.records if r.name == "weevr.config"]
         assert logged == list(resolved.warnings)
+
+
+class TestRegistryCascadeMatchesEngineMerge:
+    """While both exist, the load-time cascade agrees with the engine's run-time merge."""
+
+    @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
+    def test_effective_registries_match(self, case: Case, tmp_path: Path) -> None:
+        from weevr.engine.resources import merge_resource_dicts
+
+        def merged(outer: Any, inner: Any, outer_level: str, level: str) -> dict[str, Any]:
+            return {
+                kind: merge_resource_dicts(
+                    dict(getattr(outer, kind)) if getattr(outer, kind) else None,
+                    dict(getattr(inner, kind)) if getattr(inner, kind) else None,
+                    kind,
+                    outer_level,
+                    level,
+                )
+                for kind in ("lookups", "column_sets", "variables")
+            }
+
+        def effective(scope: Any) -> dict[str, Any]:
+            return {
+                kind: dict(registry) if (registry := getattr(scope, kind)) is not None else None
+                for kind in ("lookups", "column_sets", "variables")
+            }
+
+        root = _copy_project(case.project, tmp_path)
+        document = load_resolved(
+            root / case.config, runtime_params=case.params, project_root=root
+        ).document
+
+        def check(node: Any, outer: Any, outer_level: str) -> None:
+            expected = (
+                effective(node.model)
+                if outer is None
+                else merged(outer, node.model, outer_level, node.kind)
+            )
+            assert effective(node.effective) == expected, node.name
+            for child in node.children.values():
+                check(child, node.effective, node.kind)
+
+        check(document, None, "")
 
 
 class TestDeprecatedViews:

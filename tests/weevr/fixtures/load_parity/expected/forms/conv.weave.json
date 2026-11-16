@@ -110,6 +110,7 @@
     "children": [
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -122,6 +123,7 @@
         "source_ref": "<root>/threads/conv.thread"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "weave",
     "name": "conv",

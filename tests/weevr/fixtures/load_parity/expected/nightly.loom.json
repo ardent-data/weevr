@@ -497,6 +497,7 @@
         "children": [
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -510,6 +511,7 @@
           },
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": "orders_east",
               "condition": null,
@@ -525,6 +527,7 @@
           },
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": "orders_west",
               "condition": null,
@@ -541,6 +544,7 @@
             "source_ref": "<root>/threads/regional.thread"
           }
         ],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -556,6 +560,7 @@
         "children": [
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -569,6 +574,7 @@
           },
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -583,6 +589,7 @@
             "source_ref": "<root>/nightly.loom"
           }
         ],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -595,6 +602,7 @@
         "source_ref": "<root>/nightly.loom"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "loom",
     "name": "nightly",

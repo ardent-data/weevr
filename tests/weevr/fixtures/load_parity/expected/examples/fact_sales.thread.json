@@ -271,6 +271,82 @@
   "threads": {},
   "tree": {
     "children": [],
+    "effective": {
+      "lookups": {
+        "dim_customer": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "curated.dim_customer",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        },
+        "dim_plant": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "curated.dim_plant",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        },
+        "dim_product": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "curated.dim_product",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      }
+    },
     "entry": null,
     "kind": "thread",
     "name": "fact_sales",

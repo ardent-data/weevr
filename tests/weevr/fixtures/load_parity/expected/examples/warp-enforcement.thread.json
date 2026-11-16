@@ -84,6 +84,7 @@
   "threads": {},
   "tree": {
     "children": [],
+    "effective": {},
     "entry": null,
     "kind": "thread",
     "name": "warp-enforcement",

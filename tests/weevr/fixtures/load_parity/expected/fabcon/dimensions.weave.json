@@ -506,6 +506,7 @@
     "children": [
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -519,6 +520,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -532,6 +534,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -547,6 +550,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -561,6 +565,7 @@
         "source_ref": "<root>/dimensions/dim_product.thread"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "weave",
     "name": "dimensions",

@@ -118,6 +118,7 @@
     "children": [
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -130,6 +131,7 @@
         "source_ref": "<root>/threads/pair.thread"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "weave",
     "name": "pair_file",

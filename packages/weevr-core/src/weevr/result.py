@@ -848,4 +848,4 @@ def _document_from_parts(
         kind=cast("ConfigKind", config_type),
         name=config_name,
         children=children,
-    )
+    ).with_scopes()

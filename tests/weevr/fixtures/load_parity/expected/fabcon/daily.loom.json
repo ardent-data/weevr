@@ -754,6 +754,7 @@
         "children": [
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -767,6 +768,7 @@
           },
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -780,6 +782,7 @@
           },
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -795,6 +798,7 @@
           },
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -809,6 +813,7 @@
             "source_ref": "<root>/dimensions/dim_product.thread"
           }
         ],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -824,6 +829,66 @@
         "children": [
           {
             "children": [],
+            "effective": {
+              "lookups": {
+                "dim_customer": {
+                  "filter": null,
+                  "key": [
+                    "customer_id"
+                  ],
+                  "materialize": true,
+                  "on_failure": "warn",
+                  "source": {
+                    "alias": "silver.dim_customer",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "broadcast",
+                  "unique_key": true,
+                  "values": [
+                    "customer_sk"
+                  ]
+                },
+                "dim_product": {
+                  "filter": null,
+                  "key": [
+                    "product_id"
+                  ],
+                  "materialize": true,
+                  "on_failure": "warn",
+                  "source": {
+                    "alias": "silver.dim_product",
+                    "column": null,
+                    "connection": null,
+                    "dedup": null,
+                    "end": null,
+                    "lookup": null,
+                    "options": {},
+                    "path": null,
+                    "schema_override": null,
+                    "start": null,
+                    "step": null,
+                    "table": null,
+                    "type": "delta"
+                  },
+                  "strategy": "broadcast",
+                  "unique_key": true,
+                  "values": [
+                    "product_sk"
+                  ]
+                }
+              }
+            },
             "entry": {
               "alias": null,
               "condition": null,
@@ -836,6 +901,66 @@
             "source_ref": "<root>/facts/fact_orders.thread"
           }
         ],
+        "effective": {
+          "lookups": {
+            "dim_customer": {
+              "filter": null,
+              "key": [
+                "customer_id"
+              ],
+              "materialize": true,
+              "on_failure": "warn",
+              "source": {
+                "alias": "silver.dim_customer",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "broadcast",
+              "unique_key": true,
+              "values": [
+                "customer_sk"
+              ]
+            },
+            "dim_product": {
+              "filter": null,
+              "key": [
+                "product_id"
+              ],
+              "materialize": true,
+              "on_failure": "warn",
+              "source": {
+                "alias": "silver.dim_product",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "broadcast",
+              "unique_key": true,
+              "values": [
+                "product_sk"
+              ]
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": "table_exists('silver.dim_customer')",
@@ -848,6 +973,7 @@
         "source_ref": "<root>/facts.weave"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "loom",
     "name": "daily",

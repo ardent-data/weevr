@@ -131,6 +131,7 @@
   "threads": {},
   "tree": {
     "children": [],
+    "effective": {},
     "entry": null,
     "kind": "thread",
     "name": "stg_orders_with_exports",

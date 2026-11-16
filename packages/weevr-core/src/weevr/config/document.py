@@ -5,19 +5,23 @@ a child document for each config that file pulls in: a loom's weaves, and
 each weave's threads. Every node holds the hydrated model, and every child
 records the parent entry that pulled it in as an :class:`EntryMeta`.
 
-This module imports only :mod:`weevr.model`, so it loads without PySpark or
-the engine wheel.
+It imports only :mod:`weevr.model` and the registry cascade, so it loads
+without PySpark or the engine wheel.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Literal
 
+from weevr.config.inheritance import cascade_registry
 from weevr.model import Loom, Thread, Weave
+from weevr.model.column_set import ColumnSet
+from weevr.model.lookup import Lookup
 from weevr.model.loom import WeaveEntry
+from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, ThreadEntry
 
 ConfigKind = Literal["thread", "weave", "loom"]
@@ -64,6 +68,54 @@ class EntryMeta:
         )
 
 
+def _freeze(registry: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    return MappingProxyType(dict(registry)) if registry is not None else None
+
+
+@dataclass(frozen=True)
+class ScopeRegistries:
+    """The named lookups, column sets and variables one scope has.
+
+    Each is ``None`` when the scope has none. Read-only.
+
+    Attributes:
+        lookups: Lookups by name.
+        column_sets: Column sets by name.
+        variables: Variables by name.
+    """
+
+    lookups: Mapping[str, Lookup] | None = None
+    column_sets: Mapping[str, ColumnSet] | None = None
+    variables: Mapping[str, VariableSpec] | None = None
+
+    def __post_init__(self) -> None:
+        """Freeze the registries."""
+        object.__setattr__(self, "lookups", _freeze(self.lookups))
+        object.__setattr__(self, "column_sets", _freeze(self.column_sets))
+        object.__setattr__(self, "variables", _freeze(self.variables))
+
+    @classmethod
+    def declared_by(cls, model: Thread | Weave | Loom) -> ScopeRegistries:
+        """The registries a thread, weave or loom declares itself."""
+        return cls(
+            lookups=model.lookups,
+            column_sets=model.column_sets,
+            variables=model.variables,
+        )
+
+    def under(self, outer: ScopeRegistries, outer_level: str, level: str) -> ScopeRegistries:
+        """These registries cascaded under an enclosing scope's: inner names win."""
+        return ScopeRegistries(
+            lookups=cascade_registry(outer.lookups, self.lookups, "lookup", outer_level, level),
+            column_sets=cascade_registry(
+                outer.column_sets, self.column_sets, "column_set", outer_level, level
+            ),
+            variables=cascade_registry(
+                outer.variables, self.variables, "variable", outer_level, level
+            ),
+        )
+
+
 def _frozen_children() -> Mapping[str, ResolvedDocument]:
     return MappingProxyType({})
 
@@ -83,6 +135,9 @@ class ResolvedDocument:
             entry order. Read-only; empty for a thread.
         source_ref: The file the config is written in: its own file, or for
             an inline child, the file that holds it.
+        effective: The lookups, column sets and variables this config sees:
+            its own merged over every enclosing scope's, its own names
+            winning. Computed at load.
     """
 
     model: Thread | Weave | Loom
@@ -91,10 +146,36 @@ class ResolvedDocument:
     entry: EntryMeta | None = None
     children: Mapping[str, ResolvedDocument] = field(default_factory=_frozen_children)
     source_ref: str = ""
+    effective: ScopeRegistries = field(default_factory=ScopeRegistries)
 
     def __post_init__(self) -> None:
         """Freeze ``children`` so the tree can't be changed through it."""
         object.__setattr__(self, "children", MappingProxyType(dict(self.children)))
+
+    @property
+    def declared(self) -> ScopeRegistries:
+        """The lookups, column sets and variables this config declares itself."""
+        return ScopeRegistries.declared_by(self.model)
+
+    def with_scopes(
+        self, outer: ScopeRegistries | None = None, outer_level: str = ""
+    ) -> ResolvedDocument:
+        """Return this tree with every node's effective registries computed.
+
+        Args:
+            outer: The enclosing scope's effective registries; ``None`` for
+                the loaded file itself.
+            outer_level: The enclosing scope's kind, for shadowing logs.
+
+        Returns:
+            A copy of the tree with ``effective`` set on every node.
+        """
+        declared = self.declared
+        effective = declared if outer is None else declared.under(outer, outer_level, self.kind)
+        children = {
+            name: child.with_scopes(effective, self.kind) for name, child in self.children.items()
+        }
+        return replace(self, children=children, effective=effective)
 
     def weave_threads(self) -> dict[str, dict[str, Thread]]:
         """Each weave's thread models, by weave name then effective thread name.

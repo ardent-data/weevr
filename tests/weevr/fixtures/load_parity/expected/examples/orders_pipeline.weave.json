@@ -306,6 +306,18 @@
     "children": [
       {
         "children": [],
+        "effective": {
+          "variables": {
+            "batch_ts": {
+              "default": null,
+              "type": "timestamp"
+            },
+            "record_count": {
+              "default": null,
+              "type": "int"
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": null,
@@ -319,6 +331,18 @@
       },
       {
         "children": [],
+        "effective": {
+          "variables": {
+            "batch_ts": {
+              "default": null,
+              "type": "timestamp"
+            },
+            "record_count": {
+              "default": null,
+              "type": "int"
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": null,
@@ -333,6 +357,18 @@
         "source_ref": "<root>/orders_pipeline.weave"
       }
     ],
+    "effective": {
+      "variables": {
+        "batch_ts": {
+          "default": null,
+          "type": "timestamp"
+        },
+        "record_count": {
+          "default": null,
+          "type": "int"
+        }
+      }
+    },
     "entry": null,
     "kind": "weave",
     "name": "orders_pipeline",

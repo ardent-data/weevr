@@ -312,6 +312,7 @@
     "children": [
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -325,6 +326,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -340,6 +342,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -354,6 +357,7 @@
         "source_ref": "<root>/customer_pipeline.weave"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "weave",
     "name": "customer_pipeline",

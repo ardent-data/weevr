@@ -235,7 +235,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
         # A standalone thread sees only its own lookups at run time
         check_resolve_lookups(
             resolved.data,
-            set(),
+            None,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -243,7 +243,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
         )
         check_column_set_references(
             resolved.data,
-            set(),
+            None,
             resolved.location,
             resolved.config_name,
             lookup_warnings,
@@ -334,7 +334,7 @@ def _assemble_document(
         name=resolved.config_name,
         children=children,
         source_ref=top_file,
-    )
+    ).with_scopes()
 
 
 def bind_thread_warp(thread: Thread, thread_file: ConfigLocation, root: ConfigLocation) -> None:

@@ -252,6 +252,7 @@
         "children": [
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -264,6 +265,7 @@
             "source_ref": "<root>/sales_lakehouse.loom"
           }
         ],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -279,6 +281,7 @@
         "children": [
           {
             "children": [],
+            "effective": {},
             "entry": {
               "alias": null,
               "condition": null,
@@ -291,6 +294,7 @@
             "source_ref": "<root>/sales_lakehouse.loom"
           }
         ],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": "table_exists('curated.dim_customer')",
@@ -303,6 +307,7 @@
         "source_ref": "<root>/sales_lakehouse.loom"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "loom",
     "name": "sales_lakehouse",

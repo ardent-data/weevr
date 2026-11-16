@@ -315,6 +315,58 @@
     "children": [
       {
         "children": [],
+        "effective": {
+          "lookups": {
+            "country_codes": {
+              "filter": null,
+              "key": null,
+              "materialize": true,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.country_codes",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "broadcast",
+              "unique_key": false,
+              "values": null
+            },
+            "region_mapping": {
+              "filter": null,
+              "key": null,
+              "materialize": false,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.region_mapping",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": null,
@@ -328,6 +380,58 @@
       },
       {
         "children": [],
+        "effective": {
+          "lookups": {
+            "country_codes": {
+              "filter": null,
+              "key": null,
+              "materialize": true,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.country_codes",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "broadcast",
+              "unique_key": false,
+              "values": null
+            },
+            "region_mapping": {
+              "filter": null,
+              "key": null,
+              "materialize": false,
+              "on_failure": "abort",
+              "source": {
+                "alias": "ref.region_mapping",
+                "column": null,
+                "connection": null,
+                "dedup": null,
+                "end": null,
+                "lookup": null,
+                "options": {},
+                "path": null,
+                "schema_override": null,
+                "start": null,
+                "step": null,
+                "table": null,
+                "type": "delta"
+              },
+              "strategy": "cache",
+              "unique_key": false,
+              "values": null
+            }
+          }
+        },
         "entry": {
           "alias": null,
           "condition": null,
@@ -342,6 +446,58 @@
         "source_ref": "<root>/enrichment_pipeline.weave"
       }
     ],
+    "effective": {
+      "lookups": {
+        "country_codes": {
+          "filter": null,
+          "key": null,
+          "materialize": true,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.country_codes",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "broadcast",
+          "unique_key": false,
+          "values": null
+        },
+        "region_mapping": {
+          "filter": null,
+          "key": null,
+          "materialize": false,
+          "on_failure": "abort",
+          "source": {
+            "alias": "ref.region_mapping",
+            "column": null,
+            "connection": null,
+            "dedup": null,
+            "end": null,
+            "lookup": null,
+            "options": {},
+            "path": null,
+            "schema_override": null,
+            "start": null,
+            "step": null,
+            "table": null,
+            "type": "delta"
+          },
+          "strategy": "cache",
+          "unique_key": false,
+          "values": null
+        }
+      }
+    },
     "entry": null,
     "kind": "weave",
     "name": "enrichment_pipeline",

@@ -349,6 +349,7 @@
     "children": [
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": null,
           "condition": null,
@@ -362,6 +363,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": "orders_east",
           "condition": null,
@@ -377,6 +379,7 @@
       },
       {
         "children": [],
+        "effective": {},
         "entry": {
           "alias": "orders_west",
           "condition": null,
@@ -393,6 +396,7 @@
         "source_ref": "<root>/threads/regional.thread"
       }
     ],
+    "effective": {},
     "entry": null,
     "kind": "weave",
     "name": "sales",

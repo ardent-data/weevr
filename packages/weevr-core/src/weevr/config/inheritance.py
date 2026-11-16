@@ -1,12 +1,60 @@
 """Config inheritance cascade logic."""
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from weevr.config.audit_templates import merge_audit_columns_with_templates
 from weevr.errors import InheritanceError
 
 logger = logging.getLogger(__name__)
+
+
+def cascade_registry[V](
+    outer: Mapping[str, V] | None,
+    inner: Mapping[str, V] | None,
+    resource_type: str,
+    outer_level: str,
+    inner_level: str,
+    *,
+    log_shadowing: bool = True,
+) -> dict[str, V] | None:
+    """Merge a named registry (lookups, column sets, variables) into an inner scope.
+
+    The one cascade rule for registries: inner names win, outer names are
+    inherited. Both absent gives ``None``; an absent or empty inner registry
+    inherits the outer one. Values are kept, not copied, so an inherited
+    entry is the same object at every scope.
+
+    Args:
+        outer: The enclosing scope's effective registry.
+        inner: The registry the inner scope declares.
+        resource_type: What the registry holds, for log messages.
+        outer_level: The enclosing scope's level (``"loom"``, ``"weave"``).
+        inner_level: The inner scope's level (``"weave"``, ``"thread"``).
+        log_shadowing: Log each inner name that shadows an outer one at
+            DEBUG.
+
+    Returns:
+        The inner scope's effective registry, or ``None`` if neither scope
+        declares one.
+    """
+    if outer is None and inner is None:
+        return None
+    if not inner:
+        return dict(outer) if outer else None
+    if not outer:
+        return dict(inner)
+    if log_shadowing:
+        for key in inner:
+            if key in outer:
+                logger.debug(
+                    "Resource '%s' in %s shadows %s-level definition",
+                    key,
+                    inner_level,
+                    outer_level,
+                )
+    return {**outer, **inner}
 
 
 def cascade(parent: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:

@@ -118,6 +118,7 @@
   "threads": {},
   "tree": {
     "children": [],
+    "effective": {},
     "entry": null,
     "kind": "thread",
     "name": "stg_customers",
