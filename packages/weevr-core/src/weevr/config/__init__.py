@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
-from weevr.config.document import EntryMeta, ResolvedDocument
+from weevr.config.document import EntryMeta, ResolvedDocument, ScopeRegistries
 from weevr.config.loader import COMPONENT_TYPES as _COMPONENT_TYPES
 from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
@@ -15,7 +15,13 @@ from weevr.model import Loom, Thread, Weave
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["EntryMeta", "ResolvedDocument", "load_config", "load_resolved"]
+__all__ = [
+    "EntryMeta",
+    "ResolvedDocument",
+    "ScopeRegistries",
+    "load_config",
+    "load_resolved",
+]
 
 
 def load_config(
