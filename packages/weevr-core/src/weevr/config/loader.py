@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -48,12 +48,15 @@ from weevr.config.resolver import (
 from weevr.config.validation import (
     collect_execution_scope_warnings,
     collect_trace_composition_warnings,
-    incremental_diagnostics,
-    split_diagnostics,
-    validate_dimension_overrides,
+    dimension_override_diagnostics,
+    in_thread,
+    incremental_thread_diagnostics,
+    partition_diagnostics,
+    render_diagnostics,
     validate_schema,
 )
 from weevr.config.warp import discover_warp, find_warp
+from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
 from weevr.model.warp import WarpBinding
@@ -300,13 +303,15 @@ def check_incremental(
         model = thread.model
         if not isinstance(model, Thread) or model.load is None or model.load.mode == "full":
             continue
-        errors, advisories = split_diagnostics(incremental_diagnostics(model, authored))
+        errors, advisories = partition_diagnostics(incremental_thread_diagnostics(model, authored))
         if errors:
+            located = in_thread(errors, thread.name, file=thread.source_ref or None)
             raise ConfigError(
-                "; ".join(f"thread '{thread.name}': {message}" for message in errors),
+                "; ".join(d.message for d in located),
                 file_path=thread.source_ref,
+                diagnostics=located,
             )
-        warnings.extend(f"WARN: thread '{thread.name}': {message}" for message in advisories)
+        warnings.extend(render_diagnostics(in_thread(advisories, thread.name)))
 
 
 def _threads_with_authored(
@@ -553,10 +558,28 @@ def check_dimension_overrides(
         ConfigError: Naming the field and the thread's own file (the enclosing
             file for an inline thread).
     """
-    for thread, thread_file in _pre_cascade_threads(config_type, resolved, children, str(location)):
-        errors, _ = split_diagnostics(validate_dimension_overrides(thread))
+    for thread, thread_file, at in _pre_cascade_threads(
+        config_type, resolved, children, str(location)
+    ):
+        errors = [d for d in dimension_override_diagnostics(thread) if d.is_error]
         if errors:
-            raise ConfigError("; ".join(errors), file_path=thread_file)
+            located = fill_lines(
+                [
+                    replace(
+                        d,
+                        file=thread_file,
+                        node=thread.get("name") or None,
+                        pointer=json_pointer(at + parse_pointer(d.resolved_path or "")),
+                    )
+                    for d in errors
+                ],
+                thread_file,
+            )
+            raise ConfigError(
+                "; ".join(d.message for d in located),
+                file_path=thread_file,
+                diagnostics=located,
+            )
 
 
 def collect_execution_warnings(
@@ -574,7 +597,7 @@ def collect_execution_warnings(
         weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((weave_label, resolved.get("defaults")))
 
-    threads = [thread for thread, _ in _pre_cascade_threads(config_type, resolved, children, "")]
+    threads = [thread for thread, _, _ in _pre_cascade_threads(config_type, resolved, children, "")]
     return collect_execution_scope_warnings(defaults_by_scope, threads)
 
 
@@ -583,21 +606,30 @@ def _pre_cascade_threads(
     resolved: dict[str, Any],
     children: list[ResolvedChild],
     enclosing: str,
-) -> list[tuple[dict[str, Any], str]]:
-    """Every thread dict a config pulls in, with the file it is written in.
+) -> list[tuple[dict[str, Any], str, tuple[str | int, ...]]]:
+    """Every thread dict a config pulls in, with its file and where it sits there.
 
-    That is the thread's own file, else the referenced weave file that holds
-    it inline, else ``enclosing`` (the top-level config).
+    The file is the thread's own, else the referenced weave file that holds
+    it inline, else ``enclosing`` (the top-level config). The position is
+    empty for a thread in its own file, else the path to the inline thread
+    (through an inline weave, when the weave is inline too).
     """
     if config_type == "loom":
         return [
-            (thread.data, thread.source_path or weave.source_path or enclosing)
+            (
+                thread.data,
+                thread.source_path or weave.source_path or enclosing,
+                () if thread.source_path else (() if weave.source_path else weave.at) + thread.at,
+            )
             for weave in children
             for thread in weave.children
         ]
     if config_type == "weave":
-        return [(thread.data, thread.source_path or enclosing) for thread in children]
-    return [(resolved, enclosing)]
+        return [
+            (thread.data, thread.source_path or enclosing, () if thread.source_path else thread.at)
+            for thread in children
+        ]
+    return [(resolved, enclosing, ())]
 
 
 def compute_qualified_key(file_path: ConfigLocation, project_root: ConfigLocation) -> str:

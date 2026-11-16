@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
-from weevr.diagnostics import diagnostic
-from weevr.diagnostics.positions import pointed
+from weevr.diagnostics import Diagnostic, Severity, diagnostic
+from weevr.diagnostics.positions import json_pointer, pointed
 from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
@@ -183,6 +185,67 @@ def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, 
 
 
 # ---------------------------------------------------------------------------
+# Rendering and grouping coded diagnostics
+# ---------------------------------------------------------------------------
+
+
+def render_diagnostics(diagnostics: Sequence[Diagnostic]) -> list[str]:
+    """Render diagnostics as the ``"ERROR: …"`` / ``"WARN: …"`` strings validators return.
+
+    Args:
+        diagnostics: Coded diagnostics; info diagnostics are left out.
+
+    Returns:
+        One prefixed string per error or warning, in order.
+    """
+    rendered: list[str] = []
+    for d in diagnostics:
+        if d.severity is Severity.ERROR:
+            rendered.append(f"ERROR: {d.message}")
+        elif d.severity is Severity.WARNING:
+            rendered.append(f"WARN: {d.message}")
+    return rendered
+
+
+def partition_diagnostics(
+    diagnostics: Sequence[Diagnostic],
+) -> tuple[list[Diagnostic], list[Diagnostic]]:
+    """Split diagnostics into ``(errors, warnings)``; info diagnostics are dropped."""
+    errors = [d for d in diagnostics if d.severity is Severity.ERROR]
+    warnings = [d for d in diagnostics if d.severity is Severity.WARNING]
+    return errors, warnings
+
+
+def in_thread(
+    diagnostics: Sequence[Diagnostic],
+    name: str,
+    *,
+    file: str | None = None,
+    prefix: bool = True,
+) -> list[Diagnostic]:
+    """Attribute diagnostics to a thread.
+
+    Args:
+        diagnostics: Diagnostics from a check run on one thread.
+        name: The thread's effective name; becomes each diagnostic's ``node``.
+        file: The file the thread is written in, set where a diagnostic names none.
+        prefix: Lead each message with ``thread '<name>': ``.
+
+    Returns:
+        The attributed diagnostics.
+    """
+    result: list[Diagnostic] = []
+    for d in diagnostics:
+        updated = replace(
+            d,
+            node=d.node or name,
+            message=f"thread '{name}': {d.message}" if prefix else d.message,
+        )
+        result.append(updated.located(file) if file is not None else updated)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Post-resolution cross-cutting validators for incremental processing
 # ---------------------------------------------------------------------------
 
@@ -200,36 +263,41 @@ def _contains_param_reference(obj: Any) -> bool:
     return False
 
 
-def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
-    """Validate incremental processing cross-cutting constraints.
+def incremental_config_diagnostics(thread_config: dict[str, Any]) -> list[Diagnostic]:
+    """Check incremental processing cross-cutting constraints, as coded diagnostics.
 
     Called after variable resolution on the full thread config dict.
 
-    Returns a list of diagnostic messages. Messages starting with
-    ``"ERROR:"`` are fatal; ``"WARN:"`` are advisory.
-
     Rules:
     - ``incremental_parameter`` mode should reference at least one ``${param.*}``
-      variable in steps or sources (WARN if missing).
-    - ``cdc`` mode requires ``write.mode: merge`` (ERROR if not).
+      variable in steps or sources (warning ``C483`` if missing).
+    - ``cdc`` mode requires ``write.mode: merge`` (``C480``).
     - ``cdc`` mode with an explicit mapping declaring ``update_value`` or
       ``delete_value`` requires ``watermark_column`` — same-key changes have
-      no defined order without it (ERROR). Insert-only mappings and the
+      no defined order without it (``C481``). Insert-only mappings and the
       ``delta_cdf`` preset are exempt.
     - ``incremental_watermark`` mode with an effective ``write.mode: overwrite``
       (explicit or defaulted) would replace the target with each incremental
-      slice (ERROR).
-    - ``watermark_inclusive=True`` with ``write.mode: append`` is risky (WARN).
+      slice (``C482``).
+    - ``watermark_inclusive=True`` with ``write.mode: append`` is risky
+      (warning ``C484``).
+
+    Args:
+        thread_config: The resolved thread config dict.
+
+    Returns:
+        Every rule that failed, in rule order.
     """
-    diagnostics: list[str] = []
+    found: list[Diagnostic] = []
 
     load = thread_config.get("load")
     if not load:
-        return diagnostics
+        return found
 
     mode = load.get("mode", "full")
     write = thread_config.get("write", {}) or {}
     write_mode = write.get("mode", "overwrite")
+    mode_pointer = "/load/mode"
 
     if mode == "incremental_parameter":
         # Scan steps + sources for ${param.} references
@@ -240,56 +308,78 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
             # Also check serialized config as string fallback
             config_str = json.dumps(thread_config)
             if "${param." not in config_str:
-                diagnostics.append(
-                    "WARN: incremental_parameter mode but no ${param.*} "
-                    "references found in steps or sources"
+                found.append(
+                    diagnostic(
+                        "C483",
+                        "incremental_parameter mode but no ${param.*} "
+                        "references found in steps or sources",
+                        resolved_path=mode_pointer,
+                    )
                 )
 
     if mode == "cdc" and write_mode != "merge":
-        diagnostics.append(f"ERROR: cdc mode requires write.mode='merge', got '{write_mode}'")
+        found.append(
+            diagnostic(
+                "C480",
+                f"cdc mode requires write.mode='merge', got '{write_mode}'",
+                resolved_path="/write/mode",
+                expected=["merge"],
+            )
+        )
 
     if mode == "cdc":
         cdc = load.get("cdc") or {}
         is_generic = cdc.get("operation_column") is not None
         has_collision_ops = cdc.get("update_value") or cdc.get("delete_value")
         if is_generic and has_collision_ops and not load.get("watermark_column"):
-            diagnostics.append(
-                "ERROR: cdc mode with update_value/delete_value requires "
-                "load.watermark_column to order same-key changes"
+            found.append(
+                diagnostic(
+                    "C481",
+                    "cdc mode with update_value/delete_value requires "
+                    "load.watermark_column to order same-key changes",
+                    resolved_path="/load/watermark_column",
+                )
             )
 
     if mode == "incremental_watermark" and write_mode == "overwrite":
         provenance = "" if "mode" in write else " (the default)"
-        diagnostics.append(
-            "ERROR: incremental_watermark mode requires write.mode='append' or "
-            f"'merge', got 'overwrite'{provenance}"
+        found.append(
+            diagnostic(
+                "C482",
+                "incremental_watermark mode requires write.mode='append' or "
+                f"'merge', got 'overwrite'{provenance}",
+                resolved_path="/write/mode",
+                expected=["append", "merge"],
+            )
         )
 
     if load.get("watermark_inclusive") and write_mode == "append":
-        diagnostics.append(
-            "WARN: watermark_inclusive=True with write.mode='append' "
-            "may cause duplicate rows on re-reads; prefer merge or overwrite"
+        found.append(
+            diagnostic(
+                "C484",
+                "watermark_inclusive=True with write.mode='append' "
+                "may cause duplicate rows on re-reads; prefer merge or overwrite",
+                resolved_path="/load/watermark_inclusive",
+            )
         )
 
-    return diagnostics
+    return found
 
 
-def incremental_diagnostics(thread: Thread, authored: dict[str, Any] | None = None) -> list[str]:
-    """Run :func:`validate_incremental_config` on a hydrated thread.
+def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
+    """Validate incremental processing cross-cutting constraints.
 
-    The load and the engine build the check's input the same way: load
-    and write settings from the hydrated (cascaded) thread, steps and
-    sources from ``authored``, the thread as written. The ``${param.*}``
-    rule needs the written form: after substitution a parameterized filter
-    looks like a literal one. Without ``authored`` that rule always warns.
+    Called after variable resolution on the full thread config dict.
 
-    Args:
-        thread: The hydrated thread.
-        authored: The thread's config dict before variable substitution.
-
-    Returns:
-        The diagnostics, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+    Returns a list of diagnostic messages. Messages starting with
+    ``"ERROR:"`` are fatal; ``"WARN:"`` are advisory. See
+    :func:`incremental_config_diagnostics` for the rules and their codes.
     """
+    return render_diagnostics(incremental_config_diagnostics(thread_config))
+
+
+def _incremental_input(thread: Thread, authored: dict[str, Any] | None) -> dict[str, Any]:
+    """Build the incremental check's input from a hydrated thread."""
     load = thread.load
     load_raw: dict[str, Any] = {"mode": load.mode if load is not None else "full"}
     if load is not None:
@@ -304,7 +394,43 @@ def incremental_diagnostics(thread: Thread, authored: dict[str, Any] | None = No
     written = authored or {}
     config["steps"] = written.get("steps", [])
     config["sources"] = written.get("sources", {})
-    return validate_incremental_config(config)
+    return config
+
+
+def incremental_thread_diagnostics(
+    thread: Thread, authored: dict[str, Any] | None = None
+) -> list[Diagnostic]:
+    """Run :func:`incremental_config_diagnostics` on a hydrated thread.
+
+    The load and the engine build the check's input the same way: load
+    and write settings from the hydrated (cascaded) thread, steps and
+    sources from ``authored``, the thread as written. The ``${param.*}``
+    rule needs the written form: after substitution a parameterized filter
+    looks like a literal one. Without ``authored`` that rule always warns.
+
+    Args:
+        thread: The hydrated thread.
+        authored: The thread's config dict before variable substitution.
+
+    Returns:
+        The diagnostics, errors and warnings.
+    """
+    return incremental_config_diagnostics(_incremental_input(thread, authored))
+
+
+def incremental_diagnostics(thread: Thread, authored: dict[str, Any] | None = None) -> list[str]:
+    """Run :func:`validate_incremental_config` on a hydrated thread.
+
+    See :func:`incremental_thread_diagnostics` for how the input is built.
+
+    Args:
+        thread: The hydrated thread.
+        authored: The thread's config dict before variable substitution.
+
+    Returns:
+        The diagnostics, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+    """
+    return render_diagnostics(incremental_thread_diagnostics(thread, authored))
 
 
 # ---------------------------------------------------------------------------
@@ -318,66 +444,93 @@ _DIMENSION_FORBIDDEN_WRITE_FIELDS = ("match_keys", "on_match")
 _DIMENSION_FORBIDDEN_KEYS_FIELDS = ("business_key", "surrogate_key", "change_detection")
 
 
-def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
-    """Validate write/keys override constraints when a dimension block is present.
+def dimension_override_diagnostics(thread_config: dict[str, Any]) -> list[Diagnostic]:
+    """Check write/keys override constraints when a dimension block is present.
 
     Called after variable resolution on the full thread config dict.
 
-    Returns a list of diagnostic messages. Messages starting with
-    ``"ERROR:"`` are fatal; ``"WARN:"`` are advisory.
-
     Rules (only applied when ``target.dimension`` is present):
 
-    - ``write.match_keys`` → ERROR (engine derives from business_key)
-    - ``write.on_match`` → ERROR (engine derives from on_change behaviour)
-    - ``write.mode`` → ERROR (dimension targets always merge)
-    - ``keys.business_key`` → ERROR (declared in dimension block)
-    - ``keys.surrogate_key`` → ERROR (declared in dimension block)
-    - ``keys.change_detection`` → ERROR (declared in dimension block)
+    - ``write.match_keys`` and ``write.on_match`` → ``C485`` (engine derives them)
+    - ``write.mode`` → ``C486`` (dimension targets always merge)
+    - ``keys.business_key``, ``keys.surrogate_key`` and ``keys.change_detection``
+      → ``C487`` (declared in the dimension block)
+
+    Each diagnostic's ``resolved_path`` is the offending field, relative to the
+    thread.
+
+    Args:
+        thread_config: The thread config dict.
+
+    Returns:
+        Every forbidden field found, in rule order.
     """
-    diagnostics: list[str] = []
+    found: list[Diagnostic] = []
 
     target = thread_config.get("target") or {}
     if "dimension" not in target:
-        return diagnostics
+        return found
 
     write = thread_config.get("write") or {}
     keys = thread_config.get("keys") or {}
 
     for field in _DIMENSION_FORBIDDEN_WRITE_FIELDS:
         if field in write:
-            diagnostics.append(
-                f"ERROR: write.{field} cannot be set when target.dimension is present "
-                f"(the engine derives it from the dimension block)"
+            found.append(
+                diagnostic(
+                    "C485",
+                    f"write.{field} cannot be set when target.dimension is present "
+                    f"(the engine derives it from the dimension block)",
+                    resolved_path=f"/write/{field}",
+                )
             )
 
     if "mode" in write:
-        diagnostics.append(
-            f"ERROR: write.mode '{write['mode']}' cannot be set when target.dimension is "
-            f"present (dimension targets always merge); remove write.mode"
+        found.append(
+            diagnostic(
+                "C486",
+                f"write.mode '{write['mode']}' cannot be set when target.dimension is "
+                f"present (dimension targets always merge); remove write.mode",
+                resolved_path="/write/mode",
+            )
         )
 
     for field in _DIMENSION_FORBIDDEN_KEYS_FIELDS:
         if field in keys:
-            diagnostics.append(
-                f"ERROR: keys.{field} cannot be set when target.dimension is present "
-                f"(declare it inside the dimension block instead)"
+            found.append(
+                diagnostic(
+                    "C487",
+                    f"keys.{field} cannot be set when target.dimension is present "
+                    f"(declare it inside the dimension block instead)",
+                    resolved_path=f"/keys/{field}",
+                )
             )
 
-    return diagnostics
+    return found
+
+
+def validate_dimension_overrides(thread_config: dict[str, Any]) -> list[str]:
+    """Validate write/keys override constraints when a dimension block is present.
+
+    Called after variable resolution on the full thread config dict.
+
+    Returns a list of diagnostic messages, each ``"ERROR:"`` prefixed. See
+    :func:`dimension_override_diagnostics` for the rules and their codes.
+    """
+    return render_diagnostics(dimension_override_diagnostics(thread_config))
 
 
 # ---------------------------------------------------------------------------
-# Post-resolution cross-cutting validators for resolve step lookups
+# Post-resolution cross-cutting validators for lookup and column-set references
 # ---------------------------------------------------------------------------
 
 
-def validate_resolve_lookups(
+def resolve_lookup_diagnostics(
     thread_config: dict[str, Any],
     *,
     available_lookups: set[str],
-) -> list[str]:
-    """Validate that resolve steps reference lookup names the thread can see.
+) -> list[Diagnostic]:
+    """Check that resolve steps reference lookup names the thread can see.
 
     Called during the shared config load on each resolved thread dict, after
     ``foreach`` expansion. Covers the main pipeline and every ``with:``
@@ -390,11 +543,12 @@ def validate_resolve_lookups(
             source aliases.
 
     Returns:
-        List of diagnostic messages. ``"ERROR:"`` prefixed entries are
-        fatal; a single-mode step with ``on_failure: warn`` gets a ``"WARN:"``
-        instead, since it runs on and assigns ``on_unknown`` to every row.
+        One diagnostic per undefined name: ``R120`` (error), or ``R121``
+        (warning) for a single-mode step with ``on_failure: warn``, which
+        runs on and assigns ``on_unknown`` to every row. Each carries the
+        available names as ``expected``.
     """
-    diagnostics: list[str] = []
+    found: list[Diagnostic] = []
     steps = list(thread_config.get("steps") or [])
     # Resolved dicts carry the block as ``with_`` (the model field); raw YAML as ``with``
     sub_pipelines = thread_config.get("with_") or thread_config.get("with") or {}
@@ -411,35 +565,61 @@ def validate_resolve_lookups(
         if not isinstance(resolve, dict):
             continue
 
-        # (name, level): a single-mode warn step runs on; batch always aborts
+        # (name, code): a single-mode warn step runs on; batch always aborts
         references: list[tuple[str, str]] = []
         if "lookup" in resolve and isinstance(resolve["lookup"], str):
-            level = "WARN" if resolve.get("on_failure") == "warn" else "ERROR"
-            references.append((resolve["lookup"], level))
+            code = "R121" if resolve.get("on_failure") == "warn" else "R120"
+            references.append((resolve["lookup"], code))
         batch = resolve.get("batch")
         if isinstance(batch, list):
             for item in batch:
                 if isinstance(item, dict) and "lookup" in item:
-                    references.append((item["lookup"], "ERROR"))
+                    references.append((item["lookup"], "R120"))
 
-        for name, level in references:
+        for name, code in references:
             if name not in available_lookups:
-                diagnostics.append(
-                    f"{level}: resolve step references undefined lookup "
-                    f"'{name}'; available lookups: "
-                    f"{sorted(available_lookups) or '(none)'}"
+                found.append(
+                    diagnostic(
+                        code,
+                        f"resolve step references undefined lookup "
+                        f"'{name}'; available lookups: "
+                        f"{sorted(available_lookups) or '(none)'}",
+                        step_type="resolve",
+                        expected=sorted(available_lookups),
+                    )
                 )
 
-    return diagnostics
+    return found
 
 
-def validate_rename_column_sets(
+def validate_resolve_lookups(
+    thread_config: dict[str, Any],
+    *,
+    available_lookups: set[str],
+) -> list[str]:
+    """Validate that resolve steps reference lookup names the thread can see.
+
+    Args:
+        thread_config: Resolved thread configuration dictionary.
+        available_lookups: Names a resolve step can use.
+
+    Returns:
+        List of diagnostic messages. ``"ERROR:"`` prefixed entries are
+        fatal; a single-mode step with ``on_failure: warn`` gets a ``"WARN:"``
+        instead. See :func:`resolve_lookup_diagnostics`.
+    """
+    return render_diagnostics(
+        resolve_lookup_diagnostics(thread_config, available_lookups=available_lookups)
+    )
+
+
+def rename_column_set_diagnostics(
     thread_config: dict[str, Any],
     *,
     available_column_sets: set[str],
     standalone: bool = False,
-) -> list[str]:
-    """Validate that rename steps name column sets the thread can see.
+) -> list[Diagnostic]:
+    """Check that rename steps name column sets the thread can see.
 
     Covers the main pipeline and every ``with:`` sub-pipeline. A set that
     is defined but resolves to no mapping at run time (an optional
@@ -455,7 +635,10 @@ def validate_rename_column_sets(
             instead of failing, since such a thread is valid in its weave.
 
     Returns:
-        List of diagnostic messages, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+        One diagnostic per undefined name: ``R124`` (error) or, when
+        ``standalone``, ``R125`` (warning). Each carries the step's
+        zero-based ``step_index`` within its pipeline and ``step_type``
+        ``rename``; errors also carry the available names as ``expected``.
     """
     pipelines: list[tuple[str, Any]] = [("", thread_config.get("steps"))]
     # Resolved dicts carry the block as ``with_`` (the model field); raw YAML as ``with``
@@ -465,8 +648,8 @@ def validate_rename_column_sets(
             if isinstance(sub, dict):
                 pipelines.append((f"with.{sub_name} ", sub.get("steps")))
 
-    diagnostics: list[str] = []
-    available = sorted(available_column_sets) or "(none)"
+    found: list[Diagnostic] = []
+    available = sorted(available_column_sets)
     for prefix, steps in pipelines:
         if not isinstance(steps, list):
             continue
@@ -477,16 +660,103 @@ def validate_rename_column_sets(
                 continue
             where = f"{prefix}step {index}"
             if standalone:
-                diagnostics.append(
-                    f"WARN: rename {where} references column set '{name}', which this "
-                    f"thread doesn't define; it must come from a weave or loom"
+                found.append(
+                    diagnostic(
+                        "R125",
+                        f"rename {where} references column set '{name}', which this "
+                        f"thread doesn't define; it must come from a weave or loom",
+                        step_index=index - 1,
+                        step_type="rename",
+                    )
                 )
             else:
-                diagnostics.append(
-                    f"ERROR: rename {where} references undefined column set '{name}'; "
-                    f"available column sets: {available}"
+                found.append(
+                    diagnostic(
+                        "R124",
+                        f"rename {where} references undefined column set '{name}'; "
+                        f"available column sets: {available or '(none)'}",
+                        step_index=index - 1,
+                        step_type="rename",
+                        expected=available,
+                    )
                 )
-    return diagnostics
+    return found
+
+
+def validate_rename_column_sets(
+    thread_config: dict[str, Any],
+    *,
+    available_column_sets: set[str],
+    standalone: bool = False,
+) -> list[str]:
+    """Validate that rename steps name column sets the thread can see.
+
+    Args:
+        thread_config: Resolved thread configuration dictionary.
+        available_column_sets: Names defined by the thread and, unless
+            ``standalone``, its weave and loom.
+        standalone: The thread was loaded from its own file; missing names
+            warn instead of failing.
+
+    Returns:
+        List of diagnostic messages, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+        See :func:`rename_column_set_diagnostics`.
+    """
+    return render_diagnostics(
+        rename_column_set_diagnostics(
+            thread_config, available_column_sets=available_column_sets, standalone=standalone
+        )
+    )
+
+
+def source_lookup_diagnostics(
+    thread_config: dict[str, Any],
+    *,
+    available_lookups: set[str],
+    standalone: bool = False,
+) -> list[Diagnostic]:
+    """Check that lookup-bound sources name lookups the thread can see.
+
+    Args:
+        thread_config: Resolved thread configuration dictionary.
+        available_lookups: Names defined by the thread and, unless
+            ``standalone``, its weave and loom.
+        standalone: The thread was loaded from its own file, so a weave or
+            loom that defines the lookup can't be seen. Missing names warn
+            instead of failing, since such a thread is valid in its weave.
+
+    Returns:
+        One diagnostic per undefined name: ``R122`` (error) or, when
+        ``standalone``, ``R123`` (warning). Errors carry the available names
+        as ``expected``.
+    """
+    found: list[Diagnostic] = []
+    sources = thread_config.get("sources") or {}
+    available = sorted(available_lookups)
+    for alias, source in sources.items():
+        name = source.get("lookup") if isinstance(source, dict) else None
+        if name is None or name in available_lookups:
+            continue
+        if standalone:
+            found.append(
+                diagnostic(
+                    "R123",
+                    f"source '{alias}' references lookup '{name}', which this thread "
+                    f"doesn't define; it must come from a weave or loom",
+                    resolved_path=json_pointer(("sources", alias, "lookup")),
+                )
+            )
+        else:
+            found.append(
+                diagnostic(
+                    "R122",
+                    f"source '{alias}' references undefined lookup '{name}'; "
+                    f"available lookups: {available or '(none)'}",
+                    resolved_path=json_pointer(("sources", alias, "lookup")),
+                    expected=available,
+                )
+            )
+    return found
 
 
 def validate_source_lookups(
@@ -501,30 +771,18 @@ def validate_source_lookups(
         thread_config: Resolved thread configuration dictionary.
         available_lookups: Names defined by the thread and, unless
             ``standalone``, its weave and loom.
-        standalone: The thread was loaded from its own file, so a weave or
-            loom that defines the lookup can't be seen. Missing names warn
-            instead of failing, since such a thread is valid in its weave.
+        standalone: The thread was loaded from its own file; missing names
+            warn instead of failing.
 
     Returns:
         List of diagnostic messages, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+        See :func:`source_lookup_diagnostics`.
     """
-    diagnostics: list[str] = []
-    sources = thread_config.get("sources") or {}
-    for alias, source in sources.items():
-        name = source.get("lookup") if isinstance(source, dict) else None
-        if name is None or name in available_lookups:
-            continue
-        if standalone:
-            diagnostics.append(
-                f"WARN: source '{alias}' references lookup '{name}', which this thread "
-                f"doesn't define; it must come from a weave or loom"
-            )
-        else:
-            diagnostics.append(
-                f"ERROR: source '{alias}' references undefined lookup '{name}'; "
-                f"available lookups: {sorted(available_lookups) or '(none)'}"
-            )
-    return diagnostics
+    return render_diagnostics(
+        source_lookup_diagnostics(
+            thread_config, available_lookups=available_lookups, standalone=standalone
+        )
+    )
 
 
 def split_diagnostics(diagnostics: list[str]) -> tuple[list[str], list[str]]:
@@ -538,17 +796,17 @@ def split_diagnostics(diagnostics: list[str]) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
-def collect_execution_scope_warnings(
+def execution_scope_diagnostics(
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]],
     threads: list[dict[str, Any]],
-) -> list[str]:
-    """Collect warnings for execution settings that will not apply.
+) -> list[Diagnostic]:
+    """Check for execution settings that will not apply.
 
     Thread-scoped ``execution:`` blocks are declared but uniformly not
     applied in v1.x, whether authored on the thread or arrived via a
-    ``defaults.execution`` cascade. Warnings are deduplicated per origin:
-    one per scope whose ``defaults`` carries an ``execution`` block, and
-    one per thread that authored its own block.
+    ``defaults.execution`` cascade. Diagnostics are deduplicated per origin:
+    one (``C490``) per scope whose ``defaults`` carries an ``execution``
+    block, and one (``C491``) per thread that authored its own block.
 
     Args:
         defaults_by_scope: ``(scope label, defaults dict)`` pairs for each
@@ -557,17 +815,21 @@ def collect_execution_scope_warnings(
             so an ``execution`` key means the thread authored it.
 
     Returns:
-        Warning strings, one per distinct origin.
+        Warning diagnostics, one per distinct origin.
     """
-    warnings: list[str] = []
+    found: list[Diagnostic] = []
 
     for scope_label, defaults in defaults_by_scope:
         if defaults and isinstance(defaults.get("execution"), dict):
             fields = ", ".join(sorted(defaults["execution"]))
-            warnings.append(
-                f"WARN: {scope_label} declares defaults.execution ({fields}) — "
-                f"thread-scoped execution settings are not applied. Move them "
-                f"to the top-level execution block on the loom or weave."
+            found.append(
+                diagnostic(
+                    "C490",
+                    f"{scope_label} declares defaults.execution ({fields}) — "
+                    f"thread-scoped execution settings are not applied. Move them "
+                    f"to the top-level execution block on the loom or weave.",
+                    hint="Move the settings to the top-level execution block.",
+                )
             )
 
     for i, thread in enumerate(threads):
@@ -575,20 +837,44 @@ def collect_execution_scope_warnings(
         if isinstance(execution, dict) and execution:
             name = thread.get("name") or f"#{i}"
             fields = ", ".join(sorted(execution))
-            warnings.append(
-                f"WARN: thread '{name}' declares an execution block ({fields}) — "
-                f"thread-scoped execution settings are not applied. Move them "
-                f"to the top-level execution block on the loom or weave."
+            found.append(
+                diagnostic(
+                    "C491",
+                    f"thread '{name}' declares an execution block ({fields}) — "
+                    f"thread-scoped execution settings are not applied. Move them "
+                    f"to the top-level execution block on the loom or weave.",
+                    node=thread.get("name") or None,
+                    resolved_path="/execution",
+                    hint="Move the settings to the top-level execution block.",
+                )
             )
 
-    return warnings
+    return found
 
 
-def collect_trace_composition_warnings(
+def collect_execution_scope_warnings(
+    defaults_by_scope: list[tuple[str, dict[str, Any] | None]],
+    threads: list[dict[str, Any]],
+) -> list[str]:
+    """Collect warnings for execution settings that will not apply.
+
+    Args:
+        defaults_by_scope: ``(scope label, defaults dict)`` pairs for each
+            enclosing scope.
+        threads: Raw thread config dicts *before* the inheritance cascade.
+
+    Returns:
+        ``"WARN:"`` strings, one per distinct origin. See
+        :func:`execution_scope_diagnostics`.
+    """
+    return render_diagnostics(execution_scope_diagnostics(defaults_by_scope, threads))
+
+
+def trace_composition_diagnostics(
     loom_execution: Any,
     weave_executions: dict[str, Any],
-) -> list[str]:
-    """Warn when a weave's explicit ``trace: true`` cannot re-enable tracing.
+) -> list[Diagnostic]:
+    """Warn (``C492``) when a weave's explicit ``trace: true`` cannot re-enable tracing.
 
     The root span collector exists (or not) for the whole run: under a loom
     whose effective ``trace`` is false there is nothing for a weave to
@@ -600,17 +886,39 @@ def collect_trace_composition_warnings(
             weave name.
 
     Returns:
-        Warning strings, one per weave with an ineffective ``trace: true``.
+        Warning diagnostics, one per weave with an ineffective ``trace: true``.
     """
     if resolve_effective_execution(None, loom_execution).trace:
         return []
 
-    warnings: list[str] = []
+    found: list[Diagnostic] = []
     for weave_name, execution in weave_executions.items():
         if execution is not None and "trace" in execution.model_fields_set and execution.trace:
-            warnings.append(
-                f"WARN: weave '{weave_name}' sets trace: true, but the loom's "
-                f"effective trace is false — tracing cannot be re-enabled "
-                f"per-weave and no telemetry will be collected."
+            found.append(
+                diagnostic(
+                    "C492",
+                    f"weave '{weave_name}' sets trace: true, but the loom's "
+                    f"effective trace is false — tracing cannot be re-enabled "
+                    f"per-weave and no telemetry will be collected.",
+                    node=weave_name,
+                )
             )
-    return warnings
+    return found
+
+
+def collect_trace_composition_warnings(
+    loom_execution: Any,
+    weave_executions: dict[str, Any],
+) -> list[str]:
+    """Warn when a weave's explicit ``trace: true`` cannot re-enable tracing.
+
+    Args:
+        loom_execution: The loom's hydrated ``ExecutionConfig`` (or None).
+        weave_executions: Hydrated weave ``ExecutionConfig`` (or None) by
+            weave name.
+
+    Returns:
+        ``"WARN:"`` strings, one per weave with an ineffective ``trace: true``.
+        See :func:`trace_composition_diagnostics`.
+    """
+    return render_diagnostics(trace_composition_diagnostics(loom_execution, weave_executions))

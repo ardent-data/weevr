@@ -15,8 +15,14 @@ from weevr.config.document import ScopeRegistries, registry_as_dict
 from weevr.config.loader import load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
-from weevr.config.validation import split_diagnostics, validate_rename_column_sets
+from weevr.config.validation import (
+    in_thread,
+    partition_diagnostics,
+    rename_column_set_diagnostics,
+)
 from weevr.delta import probe_delta_table_exists
+from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics.positions import json_pointer
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import (
@@ -306,15 +312,18 @@ class Context:
         model = loaded.model
         if loaded.config_type != "thread" or not isinstance(model, Thread):
             return
-        errors, _ = split_diagnostics(
-            validate_rename_column_sets(
+        errors, _ = partition_diagnostics(
+            rename_column_set_diagnostics(
                 model.model_dump(), available_column_sets=set(model.column_sets or {})
             )
         )
         if errors:
+            file = str(self._resolve_config_path(path))
+            located = in_thread(errors, loaded.config_name, file=file)
             raise ConfigError(
-                "; ".join(f"thread '{loaded.config_name}': {message}" for message in errors),
-                file_path=str(self._resolve_config_path(path)),
+                "; ".join(d.message for d in located),
+                file_path=file,
+                diagnostics=located,
             )
 
     # ------------------------------------------------------------------
@@ -574,8 +583,8 @@ class Context:
                 )
 
         all_threads = self._collect_all_threads(loaded)
-        source_errors = self._check_source_existence(all_threads)
-        validation_errors.extend(source_errors)
+        source_errors = self._source_existence_diagnostics(all_threads)
+        validation_errors.extend(d.message for d in source_errors)
 
         status = "failure" if validation_errors else "success"
         return RunResult(
@@ -590,12 +599,26 @@ class Context:
     def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
         """Check that all sources referenced by threads exist.
 
+        The messages of :meth:`_source_existence_diagnostics`, one per problem.
+        """
+        return [d.message for d in self._source_existence_diagnostics(threads)]
+
+    def _source_existence_diagnostics(self, threads: dict[str, Thread]) -> list[Diagnostic]:
+        """Check that all sources referenced by threads exist, as coded diagnostics.
+
         Existence is a metadata question: Delta sources, including
         connection-form ones, go through the catalog or Delta-log check,
         file sources through a filesystem probe — no reads, no schema
         inference, no Spark jobs.
+
+        Returns:
+            One diagnostic per problem source: ``S101`` for a location that
+            does not exist, ``S102`` for one whose probe failed, ``S103`` for
+            a connection-form source whose location cannot be resolved. Each
+            names the thread (``node``) and the source alias
+            (``resolved_path``); the message gives the location.
         """
-        errors: list[str] = []
+        errors: list[Diagnostic] = []
         checked: set[str] = set()
         # Sources another thread in this run writes are created by the run
         # itself, in dependency order — they need not exist yet.
@@ -608,7 +631,14 @@ class Context:
                 try:
                     location = self._source_location(source, thread.connections)
                 except ValueError as exc:
-                    errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
+                    errors.append(
+                        diagnostic(
+                            "S103",
+                            f"Source '{source_name}' in thread '{thread_name}': {exc}",
+                            node=thread_name,
+                            resolved_path=json_pointer(("sources", source_name)),
+                        )
+                    )
                     continue
                 if location is None:
                     continue
@@ -624,14 +654,24 @@ class Context:
                 except Exception as exc:
                     logger.warning("Existence probe failed for '%s': %s", resolve_path, exc)
                     errors.append(
-                        f"Source '{source_name}' in thread '{thread_name}' "
-                        f"could not be verified: {resolve_path}"
+                        diagnostic(
+                            "S102",
+                            f"Source '{source_name}' in thread '{thread_name}' "
+                            f"could not be verified: {resolve_path}",
+                            node=thread_name,
+                            resolved_path=json_pointer(("sources", source_name)),
+                        )
                     )
                     continue
                 if not exists:
                     errors.append(
-                        f"Source '{source_name}' in thread '{thread_name}' "
-                        f"not found: {resolve_path}"
+                        diagnostic(
+                            "S101",
+                            f"Source '{source_name}' in thread '{thread_name}' "
+                            f"not found: {resolve_path}",
+                            node=thread_name,
+                            resolved_path=json_pointer(("sources", source_name)),
+                        )
                     )
         return errors
 

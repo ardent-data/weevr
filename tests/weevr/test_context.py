@@ -1761,6 +1761,56 @@ class TestValidateModeSourceProbes:
         assert "not found" not in errors[0]
         assert location in errors[0]
 
+    def test_missing_sources_carry_not_found_code(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        tgt = str(tmp_path / "tgt")
+        missing_delta = str(tmp_path / "no_delta")
+        missing_csv = str(tmp_path / "no.csv")
+        threads = {
+            "d": self._thread_with_source("delta", missing_delta, tgt),
+            "c": self._thread_with_source("csv", missing_csv, tgt),
+        }
+        diags = ctx._source_existence_diagnostics(threads)
+        assert [d.code for d in diags] == ["S101", "S101"]
+        assert [d.node for d in diags] == ["d", "c"]
+        assert all(d.category.value == "platform" and d.is_error for d in diags)
+        assert all(d.resolved_path == "/sources/main" for d in diags)
+        assert missing_delta in diags[0].message
+        assert missing_csv in diags[1].message
+
+    @pytest.mark.parametrize("source_type", ["csv", "delta"])
+    def test_failed_probe_carries_probe_failed_code(
+        self, spark: SparkSession, tmp_path: Path, source_type: str
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {
+            "t": self._thread_with_source(
+                source_type, "nosuchscheme://bucket/orders", str(tmp_path / "tgt")
+            )
+        }
+        (diag,) = ctx._source_existence_diagnostics(threads)
+        assert diag.code == "S102"
+        assert diag.node == "t"
+
+    def test_unresolvable_connection_is_coded(self, spark: SparkSession, tmp_path: Path) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
+        (diag,) = ctx._source_existence_diagnostics({"t": thread})
+        assert diag.code == "S103"
+        assert diag.node == "t"
+
+    def test_strings_are_the_diagnostic_messages(self, spark: SparkSession, tmp_path: Path) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {
+            "d": self._thread_with_source(
+                "delta", str(tmp_path / "no_delta"), str(tmp_path / "tgt")
+            )
+        }
+        diags = ctx._source_existence_diagnostics(threads)
+        assert ctx._check_source_existence(threads) == [d.message for d in diags]
+
     def test_shared_connection_location_is_probed_once(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
