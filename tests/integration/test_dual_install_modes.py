@@ -357,7 +357,8 @@ def test_core_only_install_loads_a_whole_project(
         return json.loads(result.stdout)
 
     core_only = summary(str(python))
-    assert core_only.pop("pyspark_loaded") is False
+    pyspark_loaded = core_only.pop("pyspark_loaded")
+    assert pyspark_loaded is False
     full = summary(sys.executable)
     full.pop("pyspark_loaded")
     assert core_only == full
