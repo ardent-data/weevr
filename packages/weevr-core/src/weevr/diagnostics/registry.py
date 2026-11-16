@@ -141,6 +141,30 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A config rule was broken, in a way no more specific code covers.",
     ),
     # C401–C439 — pipeline step rules (model/pipeline.py, model/sub_pipeline.py)
+    _config(
+        "C401", "empty-collection", "A list, mapping or pattern that must have content is empty."
+    ),
+    _config(
+        "C402",
+        "conflicting-options",
+        "Two or more options that exclude each other are set together.",
+    ),
+    _config(
+        "C403",
+        "missing-required-option",
+        "An option the step needs for its mode or its other options is not set.",
+    ),
+    _config(
+        "C404",
+        "option-not-applicable",
+        "An option is set that the step's chosen mode does not use.",
+    ),
+    _config("C405", "values-must-differ", "Two options must hold different values but are equal."),
+    _config("C406", "value-out-of-order", "A lower bound is greater than its upper bound."),
+    _config("C407", "invalid-format-pattern", "A format pattern contains characters it may not."),
+    _config(
+        "C408", "missing-column-placeholder", "An expression lacks its required {col} placeholder."
+    ),
     # C440–C479 — other model rules (model/*.py)
     # C480–C499 — load-time cross-field checks (config/validation.py)
     # P1xx — variables and parameters

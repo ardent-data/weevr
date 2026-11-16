@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 from weevr.model.pipeline import Step
 
@@ -38,5 +39,5 @@ class SubPipeline(FrozenBase):
     def _steps_not_empty(cls, v: list[Any]) -> list[Any]:
         """Require at least one step."""
         if not v:
-            raise ValueError("steps must not be empty")
+            raise rule_error("C401", "steps must not be empty")
         return v

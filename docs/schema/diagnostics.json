@@ -192,6 +192,86 @@
       "docs_anchor": "c400"
     },
     {
+      "code": "C401",
+      "name": "empty-collection",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A list, mapping or pattern that must have content is empty.",
+      "docs_anchor": "c401"
+    },
+    {
+      "code": "C402",
+      "name": "conflicting-options",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "Two or more options that exclude each other are set together.",
+      "docs_anchor": "c402"
+    },
+    {
+      "code": "C403",
+      "name": "missing-required-option",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "An option the step needs for its mode or its other options is not set.",
+      "docs_anchor": "c403"
+    },
+    {
+      "code": "C404",
+      "name": "option-not-applicable",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "An option is set that the step's chosen mode does not use.",
+      "docs_anchor": "c404"
+    },
+    {
+      "code": "C405",
+      "name": "values-must-differ",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "Two options must hold different values but are equal.",
+      "docs_anchor": "c405"
+    },
+    {
+      "code": "C406",
+      "name": "value-out-of-order",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A lower bound is greater than its upper bound.",
+      "docs_anchor": "c406"
+    },
+    {
+      "code": "C407",
+      "name": "invalid-format-pattern",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A format pattern contains characters it may not.",
+      "docs_anchor": "c407"
+    },
+    {
+      "code": "C408",
+      "name": "missing-column-placeholder",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "An expression lacks its required {col} placeholder.",
+      "docs_anchor": "c408"
+    },
+    {
       "code": "D101",
       "name": "circular-dependency",
       "category": "config",

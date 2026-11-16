@@ -152,6 +152,54 @@ The config's kind could not be determined, or is not one weevr knows.
 
 A config rule was broken, in a way no more specific code covers.
 
+### C401
+
+`empty-collection` · error · stable
+
+A list, mapping or pattern that must have content is empty.
+
+### C402
+
+`conflicting-options` · error · stable
+
+Two or more options that exclude each other are set together.
+
+### C403
+
+`missing-required-option` · error · stable
+
+An option the step needs for its mode or its other options is not set.
+
+### C404
+
+`option-not-applicable` · error · stable
+
+An option is set that the step's chosen mode does not use.
+
+### C405
+
+`values-must-differ` · error · stable
+
+Two options must hold different values but are equal.
+
+### C406
+
+`value-out-of-order` · error · stable
+
+A lower bound is greater than its upper bound.
+
+### C407
+
+`invalid-format-pattern` · error · stable
+
+A format pattern contains characters it may not.
+
+### C408
+
+`missing-column-placeholder` · error · stable
+
+An expression lacks its required {col} placeholder.
+
 ## D1xx — Plan and dependencies
 
 ### D101
