@@ -9,3 +9,5 @@ load:
   mode: incremental_watermark
   watermark_column: event_ts
   watermark_type: timestamp
+write:
+  mode: append

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -25,6 +25,9 @@ from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
 from weevr.model.warp import WarpConfig
+
+if TYPE_CHECKING:
+    from weevr.model.thread import Thread
 
 
 class BaseConfig(BaseModel):
@@ -252,6 +255,39 @@ def validate_incremental_config(thread_config: dict[str, Any]) -> list[str]:
         )
 
     return diagnostics
+
+
+def incremental_diagnostics(thread: Thread, authored: dict[str, Any] | None = None) -> list[str]:
+    """Run :func:`validate_incremental_config` on a hydrated thread.
+
+    The load and the engine build the check's input the same way: load
+    and write settings from the hydrated (cascaded) thread, steps and
+    sources from ``authored``, the thread as written. The ``${param.*}``
+    rule needs the written form: after substitution a parameterized filter
+    looks like a literal one. Without ``authored`` that rule always warns.
+
+    Args:
+        thread: The hydrated thread.
+        authored: The thread's config dict before variable substitution.
+
+    Returns:
+        The diagnostics, ``"ERROR:"`` or ``"WARN:"`` prefixed.
+    """
+    load = thread.load
+    load_raw: dict[str, Any] = {"mode": load.mode if load is not None else "full"}
+    if load is not None:
+        load_raw["watermark_inclusive"] = load.watermark_inclusive
+        if load.watermark_column is not None:
+            load_raw["watermark_column"] = load.watermark_column
+        if load.cdc is not None:
+            load_raw["cdc"] = load.cdc.model_dump()
+    config: dict[str, Any] = {"load": load_raw}
+    if thread.write is not None:
+        config["write"] = {"mode": thread.write.mode}
+    written = authored or {}
+    config["steps"] = written.get("steps", [])
+    config["sources"] = written.get("sources", {})
+    return validate_incremental_config(config)
 
 
 # ---------------------------------------------------------------------------

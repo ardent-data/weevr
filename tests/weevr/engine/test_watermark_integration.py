@@ -259,7 +259,7 @@ class TestWatermarkHwmFromSource:
 
 
 class TestWatermarkOverwriteRejected:
-    """incremental_watermark + overwrite fails fast at executor entry."""
+    """incremental_watermark + overwrite fails at executor entry for a thread built in code."""
 
     def test_overwrite_write_mode_raises_before_any_write(
         self, spark: SparkSession, tmp_delta_path

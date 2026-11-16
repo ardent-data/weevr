@@ -239,9 +239,11 @@ def execute_thread(
 
     load_mode = thread.load.mode if thread.load else "full"
 
-    # Fail-fast: validate incremental config cross-cutting constraints
+    # The load rejects these settings for every config it loads; this guard
+    # covers threads built in code and passed here directly, where an
+    # incremental slice could otherwise overwrite the whole target.
     if load_mode != "full":
-        _validate_incremental(thread, load_mode)
+        _reject_invalid_incremental(thread)
 
     # --- Thread-level resource lifecycle ---
     thread_variable_ctx = _build_thread_variable_context(thread)
@@ -1951,32 +1953,6 @@ def _build_audit_context(
     )
 
 
-def _validate_incremental(thread: Thread, load_mode: str) -> None:
-    """Run cross-cutting incremental config validation at executor entry."""
-    from weevr.config.validation import validate_incremental_config
-
-    load_raw: dict[str, object] = {"mode": load_mode}
-    if thread.load is not None:
-        load_raw["watermark_inclusive"] = thread.load.watermark_inclusive
-        if thread.load.watermark_column is not None:
-            load_raw["watermark_column"] = thread.load.watermark_column
-        if thread.load.cdc is not None:
-            load_raw["cdc"] = thread.load.cdc.model_dump()
-    raw: dict[str, object] = {"load": load_raw}
-    if thread.write is not None:
-        raw["write"] = {"mode": thread.write.mode}
-    diagnostics = validate_incremental_config(raw)
-    errors = [d for d in diagnostics if d.startswith("ERROR:")]
-    if errors:
-        raise ExecutionError(
-            "; ".join(errors),
-            thread_name=thread.name,
-        )
-    for diag in diagnostics:
-        if diag.startswith("WARN:"):
-            logger.warning("Thread '%s': %s", thread.name, diag)
-
-
 def _validate_cdc_write_config(thread: Thread) -> WriteConfig:
     """Validate and return write config for CDC merge, failing fast if misconfigured."""
     if thread.write is None:
@@ -2103,3 +2079,18 @@ def _build_telemetry(
         drift_action_taken=drift_action_taken,
         step_stats=step_stats,
     )
+
+
+def _reject_invalid_incremental(thread: Thread) -> None:
+    """Raise for incremental settings that can never run safely.
+
+    Errors only: warnings are reported by the load.
+
+    Raises:
+        ExecutionError: Naming the thread and every failed rule.
+    """
+    from weevr.config.validation import incremental_diagnostics, split_diagnostics
+
+    errors, _ = split_diagnostics(incremental_diagnostics(thread))
+    if errors:
+        raise ExecutionError("; ".join(errors), thread_name=thread.name)

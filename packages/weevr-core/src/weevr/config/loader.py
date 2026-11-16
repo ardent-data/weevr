@@ -48,6 +48,7 @@ from weevr.config.resolver import (
 from weevr.config.validation import (
     collect_execution_scope_warnings,
     collect_trace_composition_warnings,
+    incremental_diagnostics,
     split_diagnostics,
     validate_dimension_overrides,
     validate_schema,
@@ -277,7 +278,55 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
 
     warnings.extend(lookup_warnings)
 
-    return _assemble_document(resolved, model, weaves, threads), warnings
+    document = _assemble_document(resolved, model, weaves, threads)
+    check_incremental(resolved, document, warnings)
+    return document, warnings
+
+
+def check_incremental(
+    resolved: ResolvedConfig, document: ResolvedDocument, warnings: list[str]
+) -> None:
+    """Run the incremental-load checks on every thread the config pulls in.
+
+    Each thread is checked as the engine runs it (hydrated, after the
+    cascade), except that the ``${param.*}`` rule reads its steps and
+    sources as written, before substitution.
+
+    Raises:
+        ConfigError: For an incremental setting that can never run, naming
+            the thread and the file it is written in.
+    """
+    for thread, authored in _threads_with_authored(resolved, document):
+        model = thread.model
+        if not isinstance(model, Thread) or model.load is None or model.load.mode == "full":
+            continue
+        errors, advisories = split_diagnostics(incremental_diagnostics(model, authored))
+        if errors:
+            raise ConfigError(
+                "; ".join(f"thread '{thread.name}': {message}" for message in errors),
+                file_path=thread.source_ref,
+            )
+        warnings.extend(f"WARN: thread '{thread.name}': {message}" for message in advisories)
+
+
+def _threads_with_authored(
+    resolved: ResolvedConfig, document: ResolvedDocument
+) -> list[tuple[ResolvedDocument, dict[str, Any] | None]]:
+    """Each thread node of the tree with its dict as written."""
+    if document.kind == "thread":
+        return [(document, resolved.authored)]
+    if document.kind == "weave":
+        weaves = [(document, resolved.children)]
+    else:
+        weaves = [
+            (weave, node.children)
+            for weave, node in zip(document.children.values(), resolved.children, strict=True)
+        ]
+    return [
+        (thread, node.authored)
+        for weave, nodes in weaves
+        for thread, node in zip(weave.children.values(), nodes, strict=True)
+    ]
 
 
 def _assemble_document(
