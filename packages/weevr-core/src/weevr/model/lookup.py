@@ -92,5 +92,5 @@ class Lookup(FrozenBase):
             if overlap:
                 raise rule_error("R101", f"'key' and 'values' must not overlap: {sorted(overlap)}")
         if self.on_failure != "abort" and not self.unique_key:
-            raise rule_error("C403", "'on_failure' is only valid when 'unique_key' is true")
+            raise rule_error("C404", "'on_failure' is only valid when 'unique_key' is true")
         return self

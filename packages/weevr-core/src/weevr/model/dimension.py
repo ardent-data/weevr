@@ -208,7 +208,7 @@ class ScdDateConfig(FrozenBase):
             min_date = date.fromisoformat(self.min)
             max_date = date.fromisoformat(self.max)
         except ValueError as exc:
-            raise rule_error("C440", f"dates must be in YYYY-MM-DD format: {exc}") from exc
+            raise rule_error("C103", f"dates must be in YYYY-MM-DD format: {exc}") from exc
         if min_date >= max_date:
             raise rule_error(
                 "C406", f"dates.min ({self.min}) must be before dates.max ({self.max})"
@@ -370,13 +370,13 @@ class DimensionConfig(FrozenBase):
                 auto_count += 1
                 if auto_count > 1:
                     raise rule_error(
-                        "C441", "at most one change_detection group may use columns: auto"
+                        "C402", "at most one change_detection group may use columns: auto"
                     )
             else:
                 for col in group.columns:  # type: ignore[union-attr]
                     if col in seen_columns:
                         raise rule_error(
-                            "C441", f"column '{col}' appears in multiple change_detection groups"
+                            "C440", f"column '{col}' appears in multiple change_detection groups"
                         )
                     seen_columns.add(col)
 

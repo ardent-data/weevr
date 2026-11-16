@@ -98,7 +98,7 @@ A value has the wrong type: one code for every type (string, number, boolean, li
 
 `invalid-value` · error · stable
 
-A value is not one of the allowed values.
+A value is not allowed: not one of the allowed values, or not in the required form.
 
 ### C104
 
@@ -266,69 +266,39 @@ Two options must hold different values but are equal.
 
 `value-out-of-order` · error · stable
 
-A lower bound is greater than its upper bound.
-
-### C407
-
-`invalid-format-pattern` · error · stable
-
-A format pattern contains characters it may not.
-
-### C408
-
-`missing-column-placeholder` · error · stable
-
-An expression lacks its required {col} placeholder.
+A range's start comes after its end, or equals it where the rule needs a strict order.
 
 ### C440
 
-`invalid-date-format` · error · stable
+`column-in-several-groups` · error · stable
 
-A date value is not a valid YYYY-MM-DD date.
+A column is listed in more than one group where each column may belong to only one.
 
 ### C441
-
-`group-overlap` · error · stable
-
-A column appears in more than one group, or a single-use setting is claimed twice.
-
-### C442
-
-`invalid-name` · error · stable
-
-A name is not a valid identifier.
-
-### C443
-
-`baseline-check-in-pre-steps` · error · stable
-
-A check that compares against a pre-run baseline is placed where no baseline exists.
-
-### C444
 
 `incremental-dedup-order` · error · stable
 
 A deduplication on an incremental read does not keep the latest row by the watermark.
 
-### C445
+### C442
 
 `name-collision` · error · stable
 
 A name or alias collides with another name in the same scope.
 
-### C446
+### C443
 
 `forward-reference` · error · stable
 
 A name is used before it is declared.
 
-### C447
+### C444
 
 `duplicate-column` · error · stable
 
 A column name is declared more than once.
 
-### C448
+### C445
 
 `undeclared-column-reference` · error · stable
 

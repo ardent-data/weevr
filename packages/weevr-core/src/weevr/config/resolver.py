@@ -294,7 +294,9 @@ def _resolved_at_execution(var_name: str) -> bool:
     return var_name in HIERARCHY_CONTEXT_KEYS
 
 
-def _unresolved(var_name: str, context: dict[str, Any], at: tuple[str | int, ...]) -> Any:
+def _unresolved(
+    var_name: str, context: dict[str, Any], at: tuple[str | int, ...]
+) -> VariableResolutionError:
     """The error for a ``${var}`` with no value, pointing at the string that holds it."""
     message = _unresolved_variable_message(var_name, context)
     return VariableResolutionError(

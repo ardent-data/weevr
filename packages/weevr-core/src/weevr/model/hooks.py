@@ -235,7 +235,7 @@ def reject_pre_step_baseline_checks(steps: list[Any] | None) -> list[Any] | None
         if isinstance(step, QualityGateStep) and step.check == "row_count_delta":
             label = f"pre_steps[{i}]" + (f" ({step.name!r})" if step.name else "")
             raise rule_error(
-                "C443",
+                "C404",
                 f"{label}: row_count_delta compares against the row count taken before "
                 "the threads run, so it only works in post_steps. Move it to "
                 "post_steps, or use check: row_count for absolute bounds in a pre-step.",

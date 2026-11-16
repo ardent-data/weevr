@@ -103,7 +103,7 @@ class WarpConfig(FrozenBase):
                 duplicates.append(name)
             seen.add(name)
         if duplicates:
-            raise rule_error("C447", f"Duplicate column names: {', '.join(duplicates)}")
+            raise rule_error("C444", f"Duplicate column names: {', '.join(duplicates)}")
         return self
 
     @model_validator(mode="after")
@@ -114,14 +114,14 @@ class WarpConfig(FrozenBase):
         col_names = {col.name for col in self.columns}
         if self.keys.surrogate and self.keys.surrogate not in col_names:
             raise rule_error(
-                "C448",
+                "C445",
                 f"keys.surrogate '{self.keys.surrogate}' does not reference a declared column",
             )
         if self.keys.business:
             missing = [k for k in self.keys.business if k not in col_names]
             if missing:
                 raise rule_error(
-                    "C448", f"keys.business references undeclared columns: {', '.join(missing)}"
+                    "C445", f"keys.business references undeclared columns: {', '.join(missing)}"
                 )
         return self
 

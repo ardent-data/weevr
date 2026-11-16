@@ -104,7 +104,7 @@ class Export(FrozenBase):
         - ``name`` must be a valid Python identifier.
         """
         if not self.name.isidentifier():
-            raise rule_error("C442", f"Export name '{self.name}' is not a valid identifier")
+            raise rule_error("C103", f"Export name '{self.name}' is not a valid identifier")
 
         if self.alias is not None and self.type != "delta":
             raise rule_error(

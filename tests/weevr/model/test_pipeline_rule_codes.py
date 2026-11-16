@@ -88,9 +88,9 @@ CASES: list[tuple[str, str, dict[str, Any]]] = [
     ),
     ("C105", "format", {"c": {"pattern": "{0:3}"}}),
     ("C105", "format", {"c": {"pattern": "{1:0}"}}),
-    ("C407", "format", {"c": {"number": "abc"}}),
-    ("C408", "string_ops", {"columns": ["a"], "expr": "upper(x)"}),
-    ("C408", "date_ops", {"columns": ["a"], "expr": "to_date(x)"}),
+    ("C103", "format", {"c": {"number": "abc"}}),
+    ("C103", "string_ops", {"columns": ["a"], "expr": "upper(x)"}),
+    ("C103", "date_ops", {"columns": ["a"], "expr": "to_date(x)"}),
     ("C102", "join", {"source": "a", "type": "inner", "on": "id"}),
 ]
 
@@ -117,11 +117,11 @@ def test_empty_sub_pipeline_steps() -> None:
     assert [d.code for d in diagnostics] == ["C401"]
 
 
-SHARED_SCHEMA_CODES = {"C102", "C105"}
+SHARED_SCHEMA_CODES = {"C102", "C103", "C105"}
 
 
 def test_codes_are_registered_in_the_step_range() -> None:
-    """Step rules use their own block, or a shared wrong-type or range code."""
+    """Step rules use their own block, or a shared schema code."""
     used = {code for code, _, _ in CASES}
     assert used <= set(REGISTRY)
     assert all("C401" <= code <= "C439" for code in used - SHARED_SCHEMA_CODES)

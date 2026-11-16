@@ -657,7 +657,7 @@ class FormatSpec(FrozenBase):
             invalid = set(v) - allowed
             if invalid:
                 raise rule_error(
-                    "C407",
+                    "C103",
                     f"number pattern contains invalid characters: "
                     f"{', '.join(sorted(repr(c) for c in invalid))}",
                 )
@@ -979,7 +979,7 @@ class StringOpsParams(FrozenBase):
     @classmethod
     def _expr_has_col_placeholder(cls, v: str) -> str:
         if "{col}" not in v:
-            raise rule_error("C408", "expr must contain '{col}' placeholder")
+            raise rule_error("C103", "expr must contain '{col}' placeholder")
         return v
 
 
@@ -998,7 +998,7 @@ class DateOpsParams(FrozenBase):
     @classmethod
     def _expr_has_col_placeholder(cls, v: str) -> str:
         if "{col}" not in v:
-            raise rule_error("C408", "expr must contain '{col}' placeholder")
+            raise rule_error("C103", "expr must contain '{col}' placeholder")
         return v
 
 

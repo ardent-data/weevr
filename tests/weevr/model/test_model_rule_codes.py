@@ -165,14 +165,14 @@ COLUMN_SET_CASES = [
     (
         Lookup,
         {"source": {"type": "delta", "alias": "a"}, "on_failure": "warn"},
-        "C403",
+        "C404",
         "",
     ),
 ]
 
 DIMENSION_CASES = [
     (SystemMemberConfig, {"sk": 1, "code": "c", "label": "l"}, "C105", "/sk"),
-    (ScdDateConfig, {"min": "nope"}, "C440", ""),
+    (ScdDateConfig, {"min": "nope"}, "C103", ""),
     (ScdDateConfig, {"min": "2030-01-01", "max": "2020-01-01"}, "C406", ""),
     (DimensionConfig, _dim(business_key=[]), "C401", ""),
     (
@@ -196,7 +196,7 @@ DIMENSION_CASES = [
                 "h": {"columns": "auto", "on_change": "overwrite"},
             },
         ),
-        "C441",
+        "C402",
         "",
     ),
     (
@@ -207,7 +207,7 @@ DIMENSION_CASES = [
                 "h": {"columns": ["a"], "on_change": "overwrite"},
             }
         ),
-        "C441",
+        "C440",
         "",
     ),
     (FactConfig, {"foreign_keys": []}, "C401", "/foreign_keys"),
@@ -215,7 +215,7 @@ DIMENSION_CASES = [
 ]
 
 EXPORT_CASES = [
-    (Export, _exp(name="not valid"), "C442", ""),
+    (Export, _exp(name="not valid"), "C103", ""),
     (Export, _exp(alias="a"), "C404", ""),
     (Export, _exp(connection="c", table="t"), "C404", ""),
     (Export, _exp(type="delta", path=None, connection="c", table="t", alias="a"), "C402", ""),
@@ -238,7 +238,7 @@ HOOK_CASES = [
     (
         Thread,
         _t(pre_steps=[{**_GATE, "check": "row_count_delta", "target": "t"}]),
-        "C443",
+        "C404",
         "/pre_steps",
     ),
 ]
@@ -304,7 +304,7 @@ THREAD_CASES = [
                 "watermark_type": "date",
             },
         ),
-        "C444",
+        "C441",
         "",
     ),
     (
@@ -328,16 +328,16 @@ THREAD_CASES = [
     (
         Thread,
         _t(**{"with": {"a": {"from": "a", "steps": [{"filter": {"expr": "1=1"}}]}}}),
-        "C445",
+        "C442",
         "",
     ),
     (
         Thread,
         _t(**{"with": {"c": {"from": "zzz", "steps": [{"filter": {"expr": "1=1"}}]}}}),
-        "C446",
+        "C443",
         "",
     ),
-    (Thread, _with_alias("a"), "C445", ""),
+    (Thread, _with_alias("a"), "C442", ""),
     (
         Thread,
         _t(
@@ -347,7 +347,7 @@ THREAD_CASES = [
                 {"join": {"source": "b", "type": "left", "on": ["id"], "alias": "j"}},
             ],
         ),
-        "C445",
+        "C442",
         "",
     ),
 ]
@@ -371,17 +371,17 @@ VALIDATION_CASES = [
 
 _COLS = [{"name": "a", "type": "int"}, {"name": "b", "type": "int"}]
 WARP_CASES = [
-    (WarpConfig, {"config_version": "1.0", "columns": _COLS + _COLS[:1]}, "C447", ""),
+    (WarpConfig, {"config_version": "1.0", "columns": _COLS + _COLS[:1]}, "C444", ""),
     (
         WarpConfig,
         {"config_version": "1.0", "columns": _COLS, "keys": {"surrogate": "zz"}},
-        "C448",
+        "C445",
         "",
     ),
     (
         WarpConfig,
         {"config_version": "1.0", "columns": _COLS, "keys": {"business": ["a", "zz"]}},
-        "C448",
+        "C445",
         "",
     ),
 ]
@@ -438,7 +438,7 @@ def test_step_expected_values_travel_with_invalid_step() -> None:
 
 def test_every_code_this_area_uses_is_exercised() -> None:
     covered = {case[2] for case in ALL_CASES}
-    own = {f"C{n}" for n in range(440, 449)} | {"R101"}
+    own = {f"C{n}" for n in range(440, 446)} | {"R101"}
     shared = {"C103", "C105", "C401", "C402", "C403", "C404", "C406"}
     assert covered == own | shared
     assert covered <= set(REGISTRY)

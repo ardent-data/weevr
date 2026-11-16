@@ -115,7 +115,11 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A value has the wrong type: one code for every type (string, number, boolean, "
         "list, mapping), and for a value no member of a union accepts.",
     ),
-    _config("C103", "invalid-value", "A value is not one of the allowed values."),
+    _config(
+        "C103",
+        "invalid-value",
+        "A value is not allowed: not one of the allowed values, or not in the required form.",
+    ),
     _config("C104", "unknown-step-type", "A pipeline or hook step names no known step type."),
     _config("C105", "value-out-of-range", "A value breaks a length, range or pattern limit."),
     _config(
@@ -219,79 +223,43 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "An option is set that the block's kind or mode does not use.",
     ),
     _config("C405", "values-must-differ", "Two options must hold different values but are equal."),
-    _config("C406", "value-out-of-order", "A lower bound is greater than its upper bound."),
-    _config("C407", "invalid-format-pattern", "A format pattern contains characters it may not."),
     _config(
-        "C408", "missing-column-placeholder", "An expression lacks its required {col} placeholder."
+        "C406",
+        "value-out-of-order",
+        "A range's start comes after its end, or equals it where the rule needs a strict order.",
     ),
     # C440–C479 — other model rules (model/*.py)
     _config(
         "C440",
-        "invalid-date-format",
-        "A date value is not a valid YYYY-MM-DD date.",
+        "column-in-several-groups",
+        "A column is listed in more than one group where each column may belong to only one.",
     ),
     _config(
         "C441",
-        "group-overlap",
-        "A column appears in more than one group, or a single-use setting is claimed twice.",
-    ),
-    _config(
-        "C442",
-        "invalid-name",
-        "A name is not a valid identifier.",
-    ),
-    _config(
-        "C443",
-        "baseline-check-in-pre-steps",
-        "A check that compares against a pre-run baseline is placed where no baseline exists.",
-    ),
-    _config(
-        "C444",
         "incremental-dedup-order",
         "A deduplication on an incremental read does not keep the latest row by the watermark.",
     ),
     _config(
-        "C445",
+        "C442",
         "name-collision",
         "A name or alias collides with another name in the same scope.",
     ),
     _config(
-        "C446",
+        "C443",
         "forward-reference",
         "A name is used before it is declared.",
     ),
     _config(
-        "C447",
+        "C444",
         "duplicate-column",
         "A column name is declared more than once.",
     ),
     _config(
-        "C448",
+        "C445",
         "undeclared-column-reference",
         "A key or reference names a column that is not declared.",
     ),
     # C480–C499 — load-time cross-field checks (config/validation.py)
-    # P101–P149 — variables and parameters (config/resolver.py)
-    _config(
-        "P101",
-        "missing-required-parameter",
-        "A required parameter has no runtime value and no default.",
-    ),
-    _config(
-        "P102",
-        "parameter-type-mismatch",
-        "A parameter value is not of the type its declaration names.",
-    ),
-    _config(
-        "P103",
-        "invalid-parameter-format",
-        "A date or timestamp parameter is not in the expected ISO format.",
-    ),
-    _config(
-        "P110",
-        "unresolved-variable",
-        "A ${...} variable has no value and no default.",
-    ),
     _config(
         "C480",
         "cdc-requires-merge",
@@ -350,6 +318,27 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "C492",
         "weave-trace-ineffective",
         "A weave sets trace: true under a loom whose effective trace is false.",
+    ),
+    # P101–P149 — variables and parameters (config/resolver.py)
+    _config(
+        "P101",
+        "missing-required-parameter",
+        "A required parameter has no runtime value and no default.",
+    ),
+    _config(
+        "P102",
+        "parameter-type-mismatch",
+        "A parameter value is not of the type its declaration names.",
+    ),
+    _config(
+        "P103",
+        "invalid-parameter-format",
+        "A date or timestamp parameter is not in the expected ISO format.",
+    ),
+    _config(
+        "P110",
+        "unresolved-variable",
+        "A ${...} variable has no value and no default.",
     ),
     # R101–R119 — lookup and column-set definitions (model/*.py)
     _config(

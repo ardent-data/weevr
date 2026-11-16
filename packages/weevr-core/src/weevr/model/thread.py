@@ -216,7 +216,7 @@ class Thread(FrozenBase):
         actual = " ".join((primary.dedup.order_by or "").split())
         if actual.lower() != required.lower():
             raise rule_error(
-                "C444",
+                "C441",
                 f"source '{alias}' dedups an incremental_watermark read without keeping "
                 f"the latest row by the watermark column, so later changes would be "
                 f'lost; set dedup order_by: "{required}"',
@@ -263,7 +263,7 @@ class Thread(FrozenBase):
         if collisions:
             collision_list = ", ".join(sorted(collisions))
             raise rule_error(
-                "C445", f"with: CTE name(s) collide with source name(s): {collision_list}"
+                "C442", f"with: CTE name(s) collide with source name(s): {collision_list}"
             )
 
         # 2. Forward reference check: iterate CTEs in declaration order
@@ -271,7 +271,7 @@ class Thread(FrozenBase):
         for cte_name, sub_pipeline in self.with_.items():
             if sub_pipeline.from_ not in available:
                 raise rule_error(
-                    "C446",
+                    "C443",
                     f"with: CTE '{cte_name}' references '{sub_pipeline.from_}' which is not "
                     f"declared above it (forward reference or unknown name)",
                 )
@@ -318,10 +318,10 @@ class Thread(FrozenBase):
                     alias = step.join.alias
                     if alias in namespace:
                         raise rule_error(
-                            "C445", f"join alias '{alias}' collides with a source or CTE name"
+                            "C442", f"join alias '{alias}' collides with a source or CTE name"
                         )
                     if alias in seen_aliases:
                         raise rule_error(
-                            "C445", f"join alias '{alias}' is used more than once across the thread"
+                            "C442", f"join alias '{alias}' is used more than once across the thread"
                         )
                     seen_aliases.add(alias)
