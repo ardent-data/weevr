@@ -280,8 +280,14 @@ class Context:
             result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
             return result
 
-        loaded = self._load(path)
-        self._check_standalone_column_sets(loaded, path)
+        try:
+            loaded = self._load(path)
+            self._check_standalone_column_sets(loaded, path)
+        except ConfigError as exc:
+            # Report the plan problems of the files that did load with the
+            # load problems, so one failed run lists everything to fix.
+            exc.diagnostics = [*exc.diagnostics, *self._plan_problems(path)]
+            raise
 
         # Single application point for the effective YAML log level —
         # before mode dispatch, so all four modes behave identically.
@@ -1114,7 +1120,16 @@ class Context:
             logger.warning(warning)
         return LoadedConfig.from_document(document, warnings)
 
-    def _load_for_validate(self, path: str | Path) -> tuple[LoadedConfig | None, list[Diagnostic]]:
+    def _plan_problems(self, path: str | Path) -> list[Diagnostic]:
+        """Plan problems of the files of a config that do load, for a failed run."""
+        loaded, _ = self._load_for_validate(path, log_warnings=False)
+        if loaded is None:
+            return []
+        return [i.diagnostic for i in loaded.validate_plans() if i.diagnostic is not None]
+
+    def _load_for_validate(
+        self, path: str | Path, *, log_warnings: bool = True
+    ) -> tuple[LoadedConfig | None, list[Diagnostic]]:
         """Load for validate mode: problems are returned, not raised.
 
         Returns:
@@ -1129,8 +1144,9 @@ class Context:
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
         )
-        for warning in render_diagnostics(warnings):
-            logger.warning(warning)
+        if log_warnings:
+            for warning in render_diagnostics(warnings):
+                logger.warning(warning)
         if document is None:
             return None, errors
         return LoadedConfig.from_document(document, warnings), errors

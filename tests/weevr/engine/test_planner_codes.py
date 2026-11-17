@@ -84,7 +84,7 @@ class TestPlanIssueDiagnostic:
         (issue,) = loaded.validate_plans()
         assert issue.weave_name == "cyc"
         assert isinstance(issue.error, ConfigError)
-        assert issue.message == str(issue.error)
+        assert issue.message == issue.error.plain_text()
         assert issue.diagnostic is not None
         assert issue.diagnostic.code == "D101"
         assert issue.diagnostic is issue.error.diagnostics[0]

@@ -237,7 +237,7 @@ threads: not_a_list
 
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(bad_file)
-        assert "Schema validation failed" in str(exc_info.value)
+        assert "Schema validation failed" in exc_info.value.message
 
     def test_unresolved_variable(self, tmp_path):
         """Raise VariableResolutionError for missing variable."""
@@ -752,7 +752,7 @@ class TestLoadConfigErrorFileAttribution:
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(thread)
         assert exc_info.value.file_path == str(thread)
-        assert f"in {thread}" in str(exc_info.value)
+        assert f"in {thread}" in exc_info.value.plain_text()
 
     def test_version_error_names_file(self, tmp_path):
         """An unsupported config_version carries the loaded file's path."""

@@ -744,6 +744,7 @@ class LoadedConfig:
         """
         from weevr.diagnostics import diagnostic
         from weevr.engine.planner import build_plan
+        from weevr.errors import WeevError
 
         issues: list[PlanIssue] = []
         for name, weave, threads, entries, lookups in self._plan_inputs():
@@ -758,9 +759,10 @@ class LoadedConfig:
                     weave_name=name, threads=threads, thread_entries=entries, lookups=lookups
                 )
             except Exception as exc:
+                text = exc.plain_text() if isinstance(exc, WeevError) else str(exc)
                 coded = getattr(exc, "diagnostics", None)
-                issue = coded[0] if coded else diagnostic("D100", str(exc), node=name)
-                issues.append(PlanIssue(name, str(exc), exc, issue))
+                issue = coded[0] if coded else diagnostic("D100", text, node=name)
+                issues.append(PlanIssue(name, text, exc, issue))
         return tuple(issues)
 
     def _plan_inputs(

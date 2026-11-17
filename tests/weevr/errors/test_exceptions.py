@@ -429,12 +429,33 @@ class TestDiagnostics:
         assert WeevError("boom").diagnostics == []
         assert ConfigError("boom").diagnostics == []
 
-    def test_message_and_str_unchanged(self):
+    def test_message_unchanged_and_str_lists_diagnostics(self):
         from weevr.diagnostics import diagnostic
 
-        exc = ConfigError("boom", file_path="a.thread", diagnostics=[diagnostic("C001", "x")])
+        exc = ConfigError(
+            "boom", file_path="a.thread", diagnostics=[diagnostic("C001", "x", file="a.thread")]
+        )
         assert exc.message == "boom"
-        assert str(exc) == "boom in a.thread"
+        assert str(exc) == "C001 config-file-not-found: x (a.thread)"
+
+    def test_str_lists_every_diagnostic_on_its_own_line(self):
+        from weevr.diagnostics import diagnostic
+
+        exc = ConfigError(
+            "boom",
+            diagnostics=[
+                diagnostic("C101", "a", file="t.thread", line=3, column=1),
+                diagnostic("D101", "b"),
+            ],
+        )
+        assert str(exc).splitlines() == [
+            "2 config problems:",
+            "  - C101 missing-field: a (t.thread:3:1)",
+            "  - D101 circular-dependency: b",
+        ]
+
+    def test_str_without_diagnostics_is_unchanged(self):
+        assert str(ConfigError("boom", file_path="a.thread")) == "boom in a.thread"
 
     def test_from_diagnostic(self):
         from weevr.diagnostics import diagnostic

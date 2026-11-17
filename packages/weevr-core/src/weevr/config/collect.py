@@ -102,7 +102,7 @@ def combine(errors: Sequence[ConfigError]) -> ConfigError:
     owned = [(d, error) for error in errors for d in error.diagnostics]
     owned.sort(key=lambda pair: _position(pair[0]))
     first = owned[0][1] if owned else errors[0]
-    message = f"{len(errors)} config problems:\n" + "\n".join(f"- {e}" for e in errors)
+    message = f"{len(errors)} config problems: " + "; ".join(e.message for e in errors)
     return type(first)(
         message,
         first,

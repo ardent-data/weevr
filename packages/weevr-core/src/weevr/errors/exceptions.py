@@ -11,6 +11,13 @@ if TYPE_CHECKING:
     from weevr.model.warp import DriftReport
 
 
+def _render(diagnostics: list[Diagnostic]) -> str:
+    if len(diagnostics) == 1:
+        return str(diagnostics[0])
+    lines = "\n".join(f"  - {d}" for d in diagnostics)
+    return f"{len(diagnostics)} config problems:\n{lines}"
+
+
 class WeevError(Exception):
     """Base exception for all weevr errors.
 
@@ -38,7 +45,17 @@ class WeevError(Exception):
         self.diagnostics: list[Diagnostic] = list(diagnostics or [])
 
     def __str__(self) -> str:
-        """Return string representation of the error."""
+        """Return string representation of the error.
+
+        With diagnostics, one line per diagnostic (``code name: message
+        (file:line:column)``), so a traceback lists every problem.
+        """
+        if self.diagnostics:
+            return _render(self.diagnostics)
+        return self.plain_text()
+
+    def plain_text(self) -> str:
+        """The error as text without its diagnostics: the message and its cause."""
         if self.cause:
             return f"{self.message} (caused by: {self.cause})"
         return self.message
@@ -93,7 +110,16 @@ class ConfigError(WeevError):
         self.diagnostics = [d.located(file_path) for d in self.diagnostics]
 
     def __str__(self) -> str:
-        """Return string representation with context."""
+        """Return string representation with context.
+
+        With diagnostics, one line per diagnostic, as for :class:`WeevError`.
+        """
+        if self.diagnostics:
+            return _render(self.diagnostics)
+        return self.plain_text()
+
+    def plain_text(self) -> str:
+        """The error as text without its diagnostics: message, file, key and cause."""
         parts = [self.message]
         if self.file_path:
             parts.append(f"in {self.file_path}")

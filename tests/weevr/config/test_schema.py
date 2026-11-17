@@ -371,7 +371,7 @@ class TestValidateSchema:
         }
         with pytest.raises(ConfigSchemaError) as exc_info:
             validate_schema(data, "weave")
-        assert "Schema validation failed" in str(exc_info.value)
+        assert "Schema validation failed" in exc_info.value.message
 
     def test_type_mismatch_wrapped(self):
         """Type mismatch wrapped in ConfigSchemaError."""
@@ -381,7 +381,7 @@ class TestValidateSchema:
         }
         with pytest.raises(ConfigSchemaError) as exc_info:
             validate_schema(data, "weave")
-        assert "validation failed" in str(exc_info.value).lower()
+        assert "validation failed" in exc_info.value.message.lower()
 
     def test_thread_with_exports(self):
         """Thread config with exports list passes schema validation."""

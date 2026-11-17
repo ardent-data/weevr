@@ -128,7 +128,21 @@ class TestRunModesStillRaise:
     """Execute, plan and preview raise for config problems, as before."""
 
     @pytest.mark.parametrize("mode", ["execute", "plan", "preview"])
-    def test_raises(self, spark: SparkSession, project: Path, mode: str) -> None:
+    def test_raises_with_load_and_plan_problems(
+        self, spark: SparkSession, project: Path, mode: str
+    ) -> None:
         with pytest.raises(ConfigError) as exc_info:
             Context(spark, project).run("w.weave", mode=mode)
-        assert "C103" in {d.code for d in exc_info.value.diagnostics}
+        exc = exc_info.value
+        assert {d.code for d in exc.diagnostics} == {"C103", "D101"}
+        lines = str(exc).splitlines()
+        assert lines[0] == "2 config problems:"
+        assert any(line.startswith("  - C103 invalid-value: ") for line in lines)
+        assert any(line.startswith("  - D101 circular-dependency: ") for line in lines)
+
+    def test_context_load_raises_load_problems_only(
+        self, spark: SparkSession, project: Path
+    ) -> None:
+        with pytest.raises(ConfigError) as exc_info:
+            Context(spark, project).load("w.weave")
+        assert {d.code for d in exc_info.value.diagnostics} == {"C103"}
