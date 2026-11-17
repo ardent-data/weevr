@@ -655,13 +655,6 @@ class Context:
             thread_models=_thread_models(loaded),
         )
 
-    def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
-        """Check that all sources referenced by threads exist.
-
-        The messages of :meth:`_source_existence_diagnostics`, one per problem.
-        """
-        return [d.message for d in self._source_existence_diagnostics(threads)]
-
     def _source_existence_diagnostics(self, threads: dict[str, Thread]) -> list[Diagnostic]:
         """Check that all sources referenced by threads exist, as coded diagnostics.
 

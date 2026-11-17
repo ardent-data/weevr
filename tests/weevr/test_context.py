@@ -12,6 +12,7 @@ from pyspark.sql import SparkSession
 
 from weevr.context import Context
 from weevr.delta import resolve_delta_table
+from weevr.diagnostics import Diagnostic
 from weevr.errors import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -728,6 +729,11 @@ target:
 # ---------------------------------------------------------------------------
 # Integration tests — require Spark
 # ---------------------------------------------------------------------------
+
+
+def _messages(diagnostics: list[Diagnostic]) -> list[str]:
+    """The messages of the given diagnostics."""
+    return [d.message for d in diagnostics]
 
 
 def _errors(result: RunResult) -> list[str] | None:
@@ -1675,14 +1681,14 @@ class TestValidateModeSourceProbes:
             "c": self._thread_with_source("csv", str(csv_src), tgt),
             "j": self._thread_with_source("json", str(json_src), tgt),
         }
-        assert ctx._check_source_existence(present) == []
+        assert _messages(ctx._source_existence_diagnostics(present)) == []
 
         missing = {
             "d": self._thread_with_source("delta", str(tmp_path / "no_delta"), tgt),
             "c": self._thread_with_source("csv", str(tmp_path / "no.csv"), tgt),
             "j": self._thread_with_source("json", str(tmp_path / "no.json"), tgt),
         }
-        errors = ctx._check_source_existence(missing)
+        errors = _messages(ctx._source_existence_diagnostics(missing))
         assert len(errors) == 3
         assert all("not found" in e for e in errors)
 
@@ -1702,7 +1708,7 @@ class TestValidateModeSourceProbes:
             "j": self._thread_with_source("json", str(json_src), tgt),
         }
         with job_counter() as jc:
-            assert ctx._check_source_existence(threads) == []
+            assert _messages(ctx._source_existence_diagnostics(threads)) == []
         assert jc.jobs == 0
 
     @staticmethod
@@ -1728,7 +1734,7 @@ class TestValidateModeSourceProbes:
             patch("weevr.context.resolve_connection_path", return_value=one_row_src),
             job_counter() as jc,
         ):
-            assert ctx._check_source_existence(threads) == []
+            assert _messages(ctx._source_existence_diagnostics(threads)) == []
         assert jc.jobs == 0
 
     def test_missing_connection_table_is_reported(
@@ -1738,7 +1744,7 @@ class TestValidateModeSourceProbes:
         missing = str(tmp_path / "no_table")
         threads = {"t": self._connection_thread(str(tmp_path / "tgt"))}
         with patch("weevr.context.resolve_connection_path", return_value=missing):
-            errors = ctx._check_source_existence(threads)
+            errors = _messages(ctx._source_existence_diagnostics(threads))
         assert len(errors) == 1
         assert all(text in errors[0] for text in ("'main'", "'t'", "not found", missing))
 
@@ -1747,7 +1753,7 @@ class TestValidateModeSourceProbes:
     ) -> None:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
-        errors = ctx._check_source_existence({"t": thread})
+        errors = _messages(ctx._source_existence_diagnostics({"t": thread}))
         assert len(errors) == 1
         assert "undefined connection 'nope'" in errors[0]
 
@@ -1759,7 +1765,7 @@ class TestValidateModeSourceProbes:
         location = "nosuchscheme://bucket/orders"
         tgt = str(tmp_path / "tgt")
         threads = {"t": self._thread_with_source(source_type, location, tgt)}
-        errors = ctx._check_source_existence(threads)
+        errors = _messages(ctx._source_existence_diagnostics(threads))
         assert len(errors) == 1
         assert "could not be verified" in errors[0]
         assert "not found" not in errors[0]
@@ -1805,16 +1811,6 @@ class TestValidateModeSourceProbes:
         assert diag.code == "R201"
         assert diag.node == "t"
 
-    def test_strings_are_the_diagnostic_messages(self, spark: SparkSession, tmp_path: Path) -> None:
-        ctx = Context(spark=spark, project=_project_dir(tmp_path))
-        threads = {
-            "d": self._thread_with_source(
-                "delta", str(tmp_path / "no_delta"), str(tmp_path / "tgt")
-            )
-        }
-        diags = ctx._source_existence_diagnostics(threads)
-        assert ctx._check_source_existence(threads) == [d.message for d in diags]
-
     def test_shared_connection_location_is_probed_once(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
     ) -> None:
@@ -1824,7 +1820,7 @@ class TestValidateModeSourceProbes:
             patch("weevr.context.resolve_connection_path", return_value=one_row_src),
             patch.object(ctx, "_source_location_exists", return_value=True) as probe,
         ):
-            ctx._check_source_existence({"a": thread, "b": thread})
+            _messages(ctx._source_existence_diagnostics({"a": thread, "b": thread}))
         probe.assert_called_once_with("delta", one_row_src)
 
     def test_validate_mode_existing_but_empty_directory_counts_as_present(
@@ -1842,7 +1838,7 @@ class TestValidateModeSourceProbes:
 
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         threads = {"c": self._thread_with_source("csv", str(empty_dir), tgt)}
-        assert ctx._check_source_existence(threads) == []
+        assert _messages(ctx._source_existence_diagnostics(threads)) == []
 
 
 def _in_run_weave(project: Path, src: str, lake: Path, weave: str = "orders") -> Path:
@@ -1921,7 +1917,9 @@ class TestValidateInRunSources:
             }
         )
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
-        assert ctx._check_source_existence({"writer": writer, "reader": reader}) == []
+        assert (
+            _messages(ctx._source_existence_diagnostics({"writer": writer, "reader": reader})) == []
+        )
 
     def test_thread_reading_its_own_target_is_still_probed(
         self, spark: SparkSession, tmp_path: Path
