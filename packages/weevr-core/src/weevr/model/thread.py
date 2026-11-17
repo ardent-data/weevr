@@ -96,6 +96,14 @@ class Thread(FrozenBase):
             raise ValueError("sources must contain at least one entry")
         return v
 
+    @field_validator("exports")
+    @classmethod
+    def _drop_disabled_exports(cls, v: list[Export] | None) -> list[Export] | None:
+        # A disabled export is never run, whichever path built the thread.
+        if v is None:
+            return None
+        return [export for export in v if export.enabled]
+
     with_: dict[str, SubPipeline] | None = Field(
         default=None,
         alias="with",

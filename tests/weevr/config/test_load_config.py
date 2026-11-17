@@ -63,6 +63,35 @@ target:
         assert result.sources["data"].alias == "bronze.customers"
         assert result.target.path == "/data/dev_output"
 
+    def test_standalone_thread_drops_disabled_export(self, tmp_path):
+        """A thread loaded on its own does not keep an export with enabled: false."""
+        thread_file = tmp_path / "thread.thread"
+        thread_file.write_text(
+            """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  path: /data/output
+exports:
+  - name: archive
+    type: parquet
+    path: /data/archive
+  - name: extract
+    type: csv
+    path: /data/extract
+    enabled: false
+"""
+        )
+
+        result = load_config(thread_file)
+
+        assert isinstance(result, Thread)
+        assert result.exports is not None
+        assert [e.name for e in result.exports] == ["archive"]
+
     def test_load_thread_with_runtime_params(self, tmp_path):
         """load_config resolves variables from runtime params."""
         thread_file = tmp_path / "thread.yaml"
