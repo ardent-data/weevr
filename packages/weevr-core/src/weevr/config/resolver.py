@@ -299,11 +299,13 @@ def _unresolved(
     var_name: str, context: dict[str, Any], at: tuple[str | int, ...]
 ) -> VariableResolutionError:
     """The error for a ``${var}`` with no value, pointing at the string that holds it."""
+    from weevr.config.validation import authored_path
+
     message = _unresolved_variable_message(var_name, context)
     return VariableResolutionError(
         message,
         config_key=var_name,
-        diagnostics=[diagnostic("P110", message, pointer=json_pointer(at))],
+        diagnostics=[diagnostic("P110", message, pointer=json_pointer(authored_path(at)))],
     )
 
 

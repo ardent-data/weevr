@@ -421,3 +421,25 @@ class TestEnvelopeAndRegistries:
         diag = _only(exc.value)
         assert diag.code == "C310"
         assert diag.file == str(path)
+
+
+def test_unresolved_variable_under_with_points_at_the_authored_key(tmp_path: Path) -> None:
+    import yaml
+
+    from weevr.config import load_config
+    from weevr.errors import VariableResolutionError
+
+    thread = {
+        "config_version": "1.0",
+        "sources": {"main": {"type": "delta", "alias": "raw.a"}},
+        "target": {"alias": "out.a"},
+        "with": {"orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${nope}'"}}]}},
+    }
+    path = tmp_path / "t.thread"
+    path.write_text(yaml.safe_dump(thread, sort_keys=False))
+    with pytest.raises(VariableResolutionError) as exc_info:
+        load_config(path)
+    (diag,) = exc_info.value.diagnostics
+    assert diag.code == "P110"
+    assert diag.pointer == "/with/orders/steps/0/filter/expr"
+    assert diag.line is not None

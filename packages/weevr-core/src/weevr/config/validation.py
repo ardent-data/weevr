@@ -104,6 +104,31 @@ class LoomConfig(BaseConfig):
     audit_templates: dict[str, Any] | None = None
 
 
+def _dumped_to_authored() -> dict[str, str]:
+    """Field names the pre-resolution schemas dump under a name other than the authored key."""
+    names: dict[str, str] = {}
+    for model in (ThreadConfig, WeaveConfig, LoomConfig, ParamsConfig, WarpConfig):
+        for name, info in model.model_fields.items():
+            if info.alias and info.alias != name:
+                names[name] = info.alias
+    return names
+
+
+def authored_path(segments: Sequence[str | int]) -> tuple[str | int, ...]:
+    """A path into a schema-dumped config, each key as the author wrote it (``with_`` → ``with``).
+
+    Args:
+        segments: Keys and list indexes into the dict ``validate_schema(...).model_dump()`` returns.
+
+    Returns:
+        The same path in the authored document.
+    """
+    return tuple(_DUMPED_TO_AUTHORED.get(s, s) if isinstance(s, str) else s for s in segments)
+
+
+_DUMPED_TO_AUTHORED: dict[str, str] = _dumped_to_authored()
+
+
 def validate_schema(
     raw: dict[str, Any], config_type: str, *, at: tuple[str | int, ...] = ()
 ) -> BaseModel:
