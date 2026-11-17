@@ -255,7 +255,7 @@ class TestPreResolutionSchema:
         )
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(weave)
-        [diag] = exc_info.value.diagnostics
-        assert (diag.code, diag.resolved_path, diag.file) == ("C102", "/sources", str(weave))
+        [diag] = [d for d in exc_info.value.diagnostics if d.code == "C102"]
+        assert (diag.resolved_path, diag.file) == ("/sources", str(weave))
         assert diag.pointer == "/threads/1/sources"
         assert diag.line is not None

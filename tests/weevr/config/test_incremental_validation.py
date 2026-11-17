@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from weevr.config import load_config, load_resolved
-from weevr.config.validation import validate_incremental_config
+from weevr.config.validation import render_diagnostics, validate_incremental_config
 from weevr.errors import ConfigError
 
 
@@ -372,12 +372,12 @@ class TestIncrementalParameterWarning:
     def test_param_using_thread_does_not_warn(self, tmp_path: Path) -> None:
         root = _project(tmp_path, {"t.thread": _PARAM_THREAD})
         loaded = load_resolved(root / "t.thread", project_root=root)
-        assert not any(self._MESSAGE in w for w in loaded.warnings)
+        assert not any(self._MESSAGE in w for w in render_diagnostics(loaded.diagnostics))
 
     def test_param_free_thread_warns(self, tmp_path: Path) -> None:
         root = _project(tmp_path, {"t.thread": _PARAM_FREE_THREAD})
         loaded = load_resolved(root / "t.thread", project_root=root)
-        assert [w for w in loaded.warnings if self._MESSAGE in w] == [
+        assert [w for w in render_diagnostics(loaded.diagnostics) if self._MESSAGE in w] == [
             f"WARN: thread 't': {self._MESSAGE} found in steps or sources"
         ]
 
@@ -393,7 +393,7 @@ class TestIncrementalParameterWarning:
             },
         )
         loaded = load_resolved(root / "w.weave", project_root=root)
-        assert not any(self._MESSAGE in w for w in loaded.warnings)
+        assert not any(self._MESSAGE in w for w in render_diagnostics(loaded.diagnostics))
 
     def test_load_config_logs_the_warning(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

@@ -1319,11 +1319,25 @@ class TestLoadedConfig:
         from weevr.config import ResolvedDocument
 
         document = ResolvedDocument(model=sample_thread, kind="thread", name="dim_customer")
-        loaded = LoadedConfig.from_document(document, ["WARN: x"])
+        from weevr.diagnostics import Severity, diagnostic
+
+        warning = diagnostic("C491", "x", severity=Severity.WARNING)
+        loaded = LoadedConfig.from_document(document, [warning])
         assert loaded.document is document
         assert loaded.model is sample_thread
         assert (loaded.config_type, loaded.config_name) == ("thread", "dim_customer")
-        assert loaded.warnings == ("WARN: x",)
+        assert loaded.diagnostics == (warning,)
+
+    def test_warnings_is_a_deprecated_string_view(self, sample_thread: Thread) -> None:
+        from weevr.config import ResolvedDocument
+        from weevr.diagnostics import Severity, diagnostic
+
+        document = ResolvedDocument(model=sample_thread, kind="thread", name="t")
+        loaded = LoadedConfig.from_document(
+            document, [diagnostic("C491", "thread 't': x", severity=Severity.WARNING)]
+        )
+        with pytest.deprecated_call(match="diagnostics"):
+            assert loaded.warnings == ("WARN: thread 't': x",)
 
     def test_parts_build_a_tree(
         self, sample_loom: Loom, sample_weave: Weave, sample_thread: Thread

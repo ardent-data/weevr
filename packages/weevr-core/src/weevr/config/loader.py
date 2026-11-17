@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.collect import collecting
 from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
 from weevr.config.hydration import (
     check_column_set_references,
@@ -47,17 +48,17 @@ from weevr.config.resolver import (
     validate_params,
 )
 from weevr.config.validation import (
-    collect_execution_scope_warnings,
-    collect_trace_composition_warnings,
     dimension_override_diagnostics,
+    execution_scope_diagnostics,
     in_thread,
     incremental_thread_diagnostics,
     partition_diagnostics,
     render_diagnostics,
+    trace_composition_diagnostics,
     validate_schema,
 )
 from weevr.config.warp import discover_warp, find_warp
-from weevr.diagnostics import diagnostic
+from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
@@ -93,7 +94,7 @@ class ResolvedConfig:
     data: dict[str, Any]
     children: list[ResolvedChild] = field(default_factory=list)
     authored: dict[str, Any] | None = None
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[Diagnostic] = field(default_factory=list)
 
 
 def resolve_config(
@@ -246,7 +247,7 @@ def resolve_config(
     )
 
 
-def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[str]]:
+def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[Diagnostic]]:
     """Hydrate a resolved thread, weave, or loom and the children it pulls in.
 
     Hydration consumes ``resolved``: child dicts in ``resolved.data`` are
@@ -262,7 +263,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
     Raises:
         ModelValidationError: If the config or any child fails model validation.
     """
-    lookup_warnings: list[str] = []
+    lookup_warnings: list[Diagnostic] = []
     if resolved.config_type == "thread":
         # A standalone thread sees only its own lookups at run time
         check_resolve_lookups(
@@ -301,7 +302,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
     # explicit trace: true under a traceless loom is a no-op.
     if isinstance(model, Loom):
         warnings.extend(
-            collect_trace_composition_warnings(
+            trace_composition_diagnostics(
                 model.execution,
                 {name: w.execution for name, w in weaves.items()},
             )
@@ -315,7 +316,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
 
 
 def check_incremental(
-    resolved: ResolvedConfig, document: ResolvedDocument, warnings: list[str]
+    resolved: ResolvedConfig, document: ResolvedDocument, warnings: list[Diagnostic]
 ) -> None:
     """Run the incremental-load checks on every thread the config pulls in.
 
@@ -339,7 +340,7 @@ def check_incremental(
                 file_path=thread.source_ref,
                 diagnostics=located,
             )
-        warnings.extend(render_diagnostics(in_thread(advisories, thread.name)))
+        warnings.extend(in_thread(advisories, thread.name))
 
 
 def _threads_with_authored(
@@ -461,11 +462,12 @@ def load_resolved_config(
     runtime_params: dict[str, Any] | None = None,
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
-) -> tuple[ResolvedDocument, list[str]]:
+) -> tuple[ResolvedDocument, list[Diagnostic]]:
     """Load a typed thread, weave, or loom file with its resolved children.
 
     The engine-facing entry point: ``Context`` calls it with its project root
-    and Fabric context. Errors name the file they were found in. Warnings are
+    and Fabric context. Errors name the file they were found in; every
+    problem in the project is raised together in one error. Warnings are
     returned, not logged.
 
     Args:
@@ -479,7 +481,7 @@ def load_resolved_config(
         ``(document, warnings)``: the resolved config tree and the load
         warnings.
     """
-    with attribute_errors(location):
+    with attribute_errors(location), collecting():
         return hydrate_resolved(
             resolve_config(
                 location,
@@ -536,7 +538,7 @@ def load_resolved(
     document, warnings = load_resolved_config(
         make_location(path), runtime_params=runtime_params, project_root=root
     )
-    for warning in warnings:
+    for warning in render_diagnostics(warnings):
         logger.warning(warning)
     return LoadedConfig.from_document(document, warnings)
 
@@ -612,7 +614,7 @@ def check_dimension_overrides(
 
 def collect_execution_warnings(
     config_type: str, resolved: dict[str, Any], children: list[ResolvedChild]
-) -> list[str]:
+) -> list[Diagnostic]:
     """Gather thread-scope execution warnings from pre-cascade dicts."""
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
     if config_type == "loom":
@@ -626,7 +628,7 @@ def collect_execution_warnings(
         defaults_by_scope.append((weave_label, resolved.get("defaults")))
 
     threads = [thread for thread, _, _ in _pre_cascade_threads(config_type, resolved, children, "")]
-    return collect_execution_scope_warnings(defaults_by_scope, threads)
+    return execution_scope_diagnostics(defaults_by_scope, threads)
 
 
 def _pre_cascade_threads(

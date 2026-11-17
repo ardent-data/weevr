@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
@@ -564,13 +564,15 @@ class LoadedConfig:
         document: The resolved config tree.
         resolved_threads: Deprecated; use ``document``.
         resolved_weaves: Deprecated; use ``document``.
-        warnings: Load warnings.
+        diagnostics: The load's warning diagnostics.
+        warnings: Deprecated; use ``diagnostics``.
     """
 
     __slots__ = (
         "_document",
         "_children_given",
         "_warnings",
+        "_diagnostics",
         "_execution_plan",
         "_plan_built",
     )
@@ -598,18 +600,19 @@ class LoadedConfig:
         # A weave or loom built without its children has no plan to build.
         self._children_given = threads is not None and (config_type != "loom" or weaves is not None)
         self._warnings: tuple[str, ...] = tuple(warnings or ())
+        self._diagnostics: tuple[Diagnostic, ...] = ()
         self._execution_plan: list[Any] | None = None
         self._plan_built = False
 
     @classmethod
     def from_document(
-        cls, document: ResolvedDocument, warnings: list[str] | tuple[str, ...] = ()
+        cls, document: ResolvedDocument, diagnostics: Sequence[Diagnostic] = ()
     ) -> LoadedConfig:
-        """Wrap a resolved config tree and its load warnings.
+        """Wrap a resolved config tree and its load diagnostics.
 
         Args:
             document: The tree the config loader returned.
-            warnings: The load warnings, in emission order.
+            diagnostics: The load's warning diagnostics, in emission order.
 
         Returns:
             The loaded config.
@@ -617,7 +620,8 @@ class LoadedConfig:
         loaded = cls.__new__(cls)
         loaded._document = document
         loaded._children_given = True
-        loaded._warnings = tuple(warnings)
+        loaded._diagnostics = tuple(diagnostics)
+        loaded._warnings = tuple(f"WARN: {d.message}" for d in loaded._diagnostics)
         loaded._execution_plan = None
         loaded._plan_built = False
         return loaded
@@ -669,8 +673,17 @@ class LoadedConfig:
         return MappingProxyType(self._document.weaves())
 
     @property
+    def diagnostics(self) -> tuple[Diagnostic, ...]:
+        """The load's warning diagnostics, in order. Errors raise instead of loading."""
+        return self._diagnostics
+
+    @property
     def warnings(self) -> tuple[str, ...]:
-        """Load warnings (execution-scope, trace-composition, then resolve-lookup), in order."""
+        """Deprecated: use ``diagnostics``. Removed in 3.0.
+
+        Load warnings as ``"WARN: …"`` strings, one per warning diagnostic.
+        """
+        _warn_deprecated("warnings", "diagnostics")
         return self._warnings
 
     @property

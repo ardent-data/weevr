@@ -8,7 +8,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from weevr.config import load_config, load_resolved
-from weevr.config.validation import validate_rename_column_sets
+from weevr.config.validation import render_diagnostics, validate_rename_column_sets
 from weevr.context import Context
 from weevr.errors import ConfigError
 
@@ -98,7 +98,7 @@ class TestColumnSetReferencesOnLoad:
             loom=sets if level == "loom" else None,
         )
         loaded = load_resolved(project / "l.loom", project_root=project)
-        assert not [w for w in loaded.warnings if "std" in w]
+        assert not [w for w in render_diagnostics(loaded.diagnostics) if "std" in w]
 
     def test_loom_set_not_visible_to_weave_loaded_alone(self, make_project: MakeProject):
         project = make_project(_thread([_rename("std")]), loom={"column_sets": {"std": _SET}})
@@ -109,12 +109,14 @@ class TestColumnSetReferencesOnLoad:
     def test_loaded_alone_warns_and_loads(self, make_project: MakeProject):
         project = make_project(_thread([_rename("std")]))
         loaded = load_resolved(project / "fact.thread", project_root=project)
-        assert any("'std'" in w and w.startswith("WARN") for w in loaded.warnings)
+        assert any(
+            "'std'" in w and w.startswith("WARN") for w in render_diagnostics(loaded.diagnostics)
+        )
 
     def test_loaded_alone_with_its_own_set_stays_quiet(self, make_project: MakeProject):
         project = make_project(_thread([_rename("std")], column_sets={"std": _SET}))
         loaded = load_resolved(project / "fact.thread", project_root=project)
-        assert not [w for w in loaded.warnings if "std" in w]
+        assert not [w for w in render_diagnostics(loaded.diagnostics) if "std" in w]
 
     @pytest.mark.parametrize("entry", ["w.weave", "l.loom"])
     def test_with_sub_pipeline_undefined_fails_through_a_parent(

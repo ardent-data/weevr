@@ -15,6 +15,7 @@ from weevr.config.validation import (
     execution_scope_diagnostics,
     incremental_config_diagnostics,
     rename_column_set_diagnostics,
+    render_diagnostics,
     resolve_lookup_diagnostics,
     source_lookup_diagnostics,
     trace_composition_diagnostics,
@@ -225,7 +226,9 @@ class TestLoadReportsEveryError:
         )
         project = make_project(thread)
         loaded = load_resolved(project / "w.weave", project_root=project)
-        assert [w for w in loaded.warnings if "incremental_parameter" in w] == [
+        assert [
+            w for w in render_diagnostics(loaded.diagnostics) if "incremental_parameter" in w
+        ] == [
             "WARN: thread 'fact': incremental_parameter mode but no ${param.*} "
             "references found in steps or sources"
         ]
@@ -253,7 +256,7 @@ class TestLoadReportsEveryError:
     def test_standalone_warning_strings_are_unchanged(self, make_project: MakeProject) -> None:
         project = make_project(_thread([{"rename": {"column_set": "std"}}]))
         loaded = load_resolved(project / "fact.thread", project_root=project)
-        (warning,) = [w for w in loaded.warnings if "'std'" in w]
+        (warning,) = [w for w in render_diagnostics(loaded.diagnostics) if "'std'" in w]
         assert warning.startswith("WARN: thread 'fact': rename step 1 references column set")
 
     def test_duplicate_weave_name_points_at_the_entry(self, tmp_path: Path) -> None:

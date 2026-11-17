@@ -10,6 +10,7 @@ import pytest
 
 from weevr.config import load_config, load_resolved
 from weevr.config.loader import resolve_source_paths
+from weevr.config.validation import render_diagnostics
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Thread, Weave
 
@@ -177,11 +178,14 @@ class TestLoadResolvedWarnings:
     ) -> None:
         with caplog.at_level(logging.WARNING, logger="weevr.config"):
             loaded = load_resolved(project / "weaves/sales.weave", project_root=project)
-        assert isinstance(loaded.warnings, tuple)
-        assert len(loaded.warnings) == 1
-        assert "thread 'stg_orders' declares an execution block" in loaded.warnings[0]
+        assert isinstance(loaded.diagnostics, tuple)
+        assert len(render_diagnostics(loaded.diagnostics)) == 1
+        assert (
+            "thread 'stg_orders' declares an execution block"
+            in render_diagnostics(loaded.diagnostics)[0]
+        )
         assert [r.message for r in caplog.records if r.name == "weevr.config"] == list(
-            loaded.warnings
+            render_diagnostics(loaded.diagnostics)
         )
 
 

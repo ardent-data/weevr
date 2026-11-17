@@ -20,6 +20,7 @@ from weevr.config.validation import (
     in_thread,
     partition_diagnostics,
     rename_column_set_diagnostics,
+    render_diagnostics,
 )
 from weevr.delta import probe_delta_table_exists
 from weevr.diagnostics import Diagnostic, diagnostic
@@ -1059,7 +1060,7 @@ class Context:
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
         )
-        for warning in warnings:
+        for warning in render_diagnostics(warnings):
             logger.warning(warning)
         return LoadedConfig.from_document(document, warnings)
 

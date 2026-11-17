@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.collect import skip_on_error
 from weevr.config.inheritance import cascade_registry
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
@@ -15,11 +16,10 @@ from weevr.config.validation import (
     in_thread,
     partition_diagnostics,
     rename_column_set_diagnostics,
-    render_diagnostics,
     resolve_lookup_diagnostics,
     source_lookup_diagnostics,
 )
-from weevr.diagnostics import diagnostic
+from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer, place_all
 from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigError, ModelValidationError
@@ -70,7 +70,7 @@ def check_resolve_lookups(
     outer: Mapping[str, Any] | None,
     source: ConfigLocation | str,
     name: str,
-    warnings: list[str] | None,
+    warnings: list[Diagnostic] | None,
     *,
     standalone: bool = False,
 ) -> None:
@@ -103,7 +103,7 @@ def check_resolve_lookups(
             diagnostics=in_thread(errors, name, file=str(source), prefix=False),
         )
     if warnings is not None:
-        warnings.extend(render_diagnostics(in_thread(advisories, name)))
+        warnings.extend(in_thread(advisories, name))
 
 
 def check_column_set_references(
@@ -111,7 +111,7 @@ def check_column_set_references(
     outer: Mapping[str, Any] | None,
     source: ConfigLocation | str,
     name: str,
-    warnings: list[str] | None,
+    warnings: list[Diagnostic] | None,
     *,
     standalone: bool = False,
 ) -> None:
@@ -140,7 +140,7 @@ def check_column_set_references(
             diagnostics=located,
         )
     if warnings is not None:
-        warnings.extend(render_diagnostics(in_thread(advisories, name)))
+        warnings.extend(in_thread(advisories, name))
 
 
 def hydrate_model(
@@ -192,7 +192,7 @@ def hydrate_threads(
     source: ConfigLocation | str,
     prepare: ChildPreparer | None = None,
     outer_lookups: Mapping[str, Any] | None = None,
-    warnings: list[str] | None = None,
+    warnings: list[Diagnostic] | None = None,
     bind: ThreadBinder | None = None,
     outer_column_sets: Mapping[str, Any] | None = None,
 ) -> dict[str, Thread]:
@@ -223,50 +223,53 @@ def hydrate_threads(
     """
     result: dict[str, Thread] = {}
     for child in children:
-        entry = child.entry
-        thread_dict = child.data
-        entry_as = entry.get("as")
-        thread_source = child.source_path or str(source)
+        with skip_on_error():
+            entry = child.entry
+            thread_dict = child.data
+            entry_as = entry.get("as")
+            thread_source = child.source_path or str(source)
 
-        # Effective name: as > name > stem
-        effective_name = entry_as or _entry_name(entry)
+            # Effective name: as > name > stem
+            effective_name = entry_as or _entry_name(entry)
 
-        if not thread_dict.get("name") or entry_as:
-            thread_dict["name"] = effective_name
+            if not thread_dict.get("name") or entry_as:
+                thread_dict["name"] = effective_name
 
-        # Set template_ref for telemetry provenance
-        ref = entry.get("ref")
-        if ref:
-            thread_dict["template_ref"] = ref
+            # Set template_ref for telemetry provenance
+            ref = entry.get("ref")
+            if ref:
+                thread_dict["template_ref"] = ref
 
-        # Expand foreach macros, as a directly loaded thread does at step 8b.
-        steps = thread_dict.get("steps")
-        with attribute_errors(thread_source, child.at):
-            reject_foreach_in_with(thread_dict)
-            if isinstance(steps, list):
-                thread_dict["steps"] = expand_foreach(steps)
+            # Expand foreach macros, as a directly loaded thread does at step 8b.
+            steps = thread_dict.get("steps")
+            with attribute_errors(thread_source, child.at):
+                reject_foreach_in_with(thread_dict)
+                if isinstance(steps, list):
+                    thread_dict["steps"] = expand_foreach(steps)
 
-        check_resolve_lookups(thread_dict, outer_lookups, thread_source, effective_name, warnings)
-        check_column_set_references(
-            thread_dict, outer_column_sets, thread_source, effective_name, warnings
-        )
+            check_resolve_lookups(
+                thread_dict, outer_lookups, thread_source, effective_name, warnings
+            )
+            check_column_set_references(
+                thread_dict, outer_column_sets, thread_source, effective_name, warnings
+            )
 
-        if prepare is not None:
-            prepare(thread_dict)
+            if prepare is not None:
+                prepare(thread_dict)
 
-        try:
-            thread = Thread.model_validate(thread_dict)
-        except ValidationError as exc:
-            raise _hydration_error(
-                f"Thread hydration failed for '{effective_name}': {exc}",
-                exc,
-                thread_dict,
-                thread_source,
-                child.at,
-            ) from exc
-        if bind is not None:
-            bind(thread, thread_source)
-        result[effective_name] = thread
+            try:
+                thread = Thread.model_validate(thread_dict)
+            except ValidationError as exc:
+                raise _hydration_error(
+                    f"Thread hydration failed for '{effective_name}': {exc}",
+                    exc,
+                    thread_dict,
+                    thread_source,
+                    child.at,
+                ) from exc
+            if bind is not None:
+                bind(thread, thread_source)
+            result[effective_name] = thread
     return result
 
 
@@ -277,7 +280,7 @@ def hydrate_children(
     source: ConfigLocation | str,
     name: str,
     prepare: ChildPreparer | None = None,
-    warnings: list[str] | None = None,
+    warnings: list[Diagnostic] | None = None,
     bind: ThreadBinder | None = None,
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
     """Hydrate the weaves and threads a weave or loom pulls in.
@@ -327,57 +330,58 @@ def hydrate_children(
         # so a second entry with the same name would silently replace the first.
         defined_by: dict[str, str] = {}
         for index, weave in enumerate(children):
-            weave_entry = weave.entry
-            weave_dict = weave.data
-            weave_name = _entry_name(weave_entry)
-            origin = _weave_origin(weave_entry)
-            if weave_name in defined_by:
-                raise ConfigError.from_diagnostic(
-                    diagnostic(
-                        "C350",
-                        f"Duplicate weave name '{weave_name}' in loom: "
-                        f"{defined_by[weave_name]} and {origin}. "
-                        f"Give one entry a unique 'name:'.",
-                        pointer=json_pointer(("weaves", index)),
-                        node=weave_name,
-                        hint="Give one entry a unique 'name:'.",
+            with skip_on_error():
+                weave_entry = weave.entry
+                weave_dict = weave.data
+                weave_name = _entry_name(weave_entry)
+                origin = _weave_origin(weave_entry)
+                if weave_name in defined_by:
+                    raise ConfigError.from_diagnostic(
+                        diagnostic(
+                            "C350",
+                            f"Duplicate weave name '{weave_name}' in loom: "
+                            f"{defined_by[weave_name]} and {origin}. "
+                            f"Give one entry a unique 'name:'.",
+                            pointer=json_pointer(("weaves", index)),
+                            node=weave_name,
+                            hint="Give one entry a unique 'name:'.",
+                        )
                     )
+                defined_by[weave_name] = origin
+
+                if not weave_dict.get("name"):
+                    weave_dict["name"] = weave_name
+                # Inline weaves have no file of their own; they live in the loom.
+                weave_source = weave.source_path or str(source)
+                if prepare is not None:
+                    prepare(weave_dict)
+                weave_model = hydrate_model(weave_dict, "weave", weave_source, weave.at)
+                if not isinstance(weave_model, Weave):  # pragma: no cover
+                    continue
+                weaves[weave_name] = weave_model
+
+                threads[weave_name] = hydrate_threads(
+                    weave.children,
+                    weave_source,
+                    prepare,
+                    outer_lookups=cascade_registry(
+                        resolved.get("lookups"),
+                        weave_dict.get("lookups"),
+                        "lookup",
+                        "loom",
+                        "weave",
+                        log_shadowing=False,
+                    ),
+                    warnings=warnings,
+                    bind=bind,
+                    outer_column_sets=cascade_registry(
+                        resolved.get("column_sets"),
+                        weave_dict.get("column_sets"),
+                        "column_set",
+                        "loom",
+                        "weave",
+                        log_shadowing=False,
+                    ),
                 )
-            defined_by[weave_name] = origin
-
-            if not weave_dict.get("name"):
-                weave_dict["name"] = weave_name
-            # Inline weaves have no file of their own; they live in the loom.
-            weave_source = weave.source_path or str(source)
-            if prepare is not None:
-                prepare(weave_dict)
-            weave_model = hydrate_model(weave_dict, "weave", weave_source, weave.at)
-            if not isinstance(weave_model, Weave):  # pragma: no cover
-                continue
-            weaves[weave_name] = weave_model
-
-            threads[weave_name] = hydrate_threads(
-                weave.children,
-                weave_source,
-                prepare,
-                outer_lookups=cascade_registry(
-                    resolved.get("lookups"),
-                    weave_dict.get("lookups"),
-                    "lookup",
-                    "loom",
-                    "weave",
-                    log_shadowing=False,
-                ),
-                warnings=warnings,
-                bind=bind,
-                outer_column_sets=cascade_registry(
-                    resolved.get("column_sets"),
-                    weave_dict.get("column_sets"),
-                    "column_set",
-                    "loom",
-                    "weave",
-                    log_shadowing=False,
-                ),
-            )
 
     return weaves, threads
