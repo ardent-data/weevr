@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 
@@ -61,13 +62,13 @@ class WriteConfig(FrozenBase):
     @model_validator(mode="after")
     def _validate_merge_keys(self) -> WriteConfig:
         if self.mode == "merge" and not self.match_keys:
-            raise ValueError("merge mode requires 'match_keys' to be set")
+            raise rule_error("C403", "merge mode requires 'match_keys' to be set")
         return self
 
     @model_validator(mode="after")
     def _validate_soft_delete(self) -> WriteConfig:
         if self.on_no_match_source == "soft_delete" and not self.soft_delete_column:
-            raise ValueError(
-                "on_no_match_source='soft_delete' requires 'soft_delete_column' to be set"
+            raise rule_error(
+                "C403", "on_no_match_source='soft_delete' requires 'soft_delete_column' to be set"
             )
         return self

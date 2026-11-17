@@ -31,6 +31,7 @@ from pyspark.sql import SparkSession
 from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, FABCON_DIR, REQUIRED_PARAMS
 
 from weevr.config import load_config, load_resolved
+from weevr.config.validation import render_diagnostics
 from weevr.context import Context
 from weevr.result import LoadedConfig
 
@@ -175,7 +176,7 @@ class TestCorpusAcrossEntryPoints:
         root = _copy_project(case.project, tmp_path)
         loaded = _context(root, case.params).load(case.config)
         snapshot = _snapshot(loaded, root)
-        snapshot["warnings"] = _mask(list(loaded.warnings), root)
+        snapshot["warnings"] = _mask(list(render_diagnostics(loaded.diagnostics)), root)
         _write_or_compare(case.golden, snapshot)
 
     @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
@@ -184,7 +185,7 @@ class TestCorpusAcrossEntryPoints:
         via_context = _context(root, case.params).load(case.config)
         direct = load_resolved(root / case.config, runtime_params=case.params, project_root=root)
         assert _snapshot(direct, root) == _snapshot(via_context, root)
-        assert direct.warnings == via_context.warnings
+        assert render_diagnostics(direct.diagnostics) == render_diagnostics(via_context.diagnostics)
 
     @pytest.mark.parametrize("case", CORPUS, ids=lambda c: c.id)
     def test_load_config_matches_load_resolved(
@@ -198,7 +199,7 @@ class TestCorpusAcrossEntryPoints:
         assert not isinstance(model, dict)
         assert model.model_dump(mode="json") == resolved.model.model_dump(mode="json")
         logged = [r.getMessage() for r in caplog.records if r.name == "weevr.config"]
-        assert logged == list(resolved.warnings)
+        assert logged == list(render_diagnostics(resolved.diagnostics))
 
 
 class TestDeprecatedViews:
@@ -345,7 +346,10 @@ class TestValidateWording:
     def _dag_errors(project: Path, config: str) -> list[str]:
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
         result = ctx.run(config, mode="validate")
-        return [e for e in result.validation_errors or [] if e.startswith("DAG validation")]
+        # The legacy wording lives on in the deprecated string view.
+        with pytest.deprecated_call():
+            errors = result.validation_errors or []
+        return [e for e in errors if e.startswith("DAG validation")]
 
     def test_weave_cycle_wording(self, tmp_path: Path) -> None:
         errors = self._dag_errors(self._project(tmp_path), "cyc.weave")
@@ -387,8 +391,10 @@ class TestValidateWording:
             weaves={"cyc": full.document.weaves()["cyc"]},
         )
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
-        result = ctx._run_validate(loaded)
-        assert "Weave 'dup' not found" in (result.validation_errors or [])
+        result = ctx._run_validate(loaded, [])
+        with pytest.deprecated_call():
+            assert "Weave 'dup' not found" in (result.validation_errors or [])
+        assert "D104" in {d.code for d in result.diagnostics}
 
 
 _LOAD_STEPS = (

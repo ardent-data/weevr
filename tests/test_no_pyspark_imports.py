@@ -149,6 +149,20 @@ def test_import_resolved_document_without_pyspark() -> None:
         assert document.ResolvedDocument is config_pkg.ResolvedDocument
 
 
+def test_import_diagnostics_without_pyspark() -> None:
+    """``weevr.diagnostics`` imports with PySpark blocked."""
+    with _block_pyspark():
+        diagnostics = importlib.import_module("weevr.diagnostics")
+        assert hasattr(diagnostics, "Diagnostic")
+
+
+def test_import_diagnostics_without_engine_wheel() -> None:
+    """``weevr.diagnostics`` imports in a core-only install."""
+    with _block_engine_wheel():
+        diagnostics = importlib.import_module("weevr.diagnostics")
+        assert hasattr(diagnostics, "diagnostic")
+
+
 def test_import_thread_model_without_pyspark() -> None:
     """``from weevr.model.thread import Thread`` must succeed with PySpark blocked."""
     with _block_pyspark():

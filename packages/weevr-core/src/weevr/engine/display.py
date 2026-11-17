@@ -3195,7 +3195,8 @@ def _render_validate_html(result: Any) -> str:
     status = str(getattr(result, "status", ""))
     config_type = html.escape(str(getattr(result, "config_type", "")))
     config_name = html.escape(str(getattr(result, "config_name", "")))
-    validation_errors: list[str] = getattr(result, "validation_errors", []) or []
+    diagnostics = getattr(result, "diagnostics", None) or []
+    validation_errors = [str(d) for d in diagnostics if d.is_error]
     warnings: list[str] = getattr(result, "warnings", []) or []
     telemetry = getattr(result, "telemetry", None)
     resolved = getattr(result, "thread_models", None) or {}

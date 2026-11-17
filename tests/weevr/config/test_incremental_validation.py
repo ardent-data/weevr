@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from weevr.config import load_config, load_resolved
-from weevr.config.validation import validate_incremental_config
+from weevr.config.validation import render_diagnostics, validate_incremental_config
 from weevr.errors import ConfigError
 
 
@@ -348,7 +348,7 @@ class TestIncrementalChecksAtLoad:
         )
         load_resolved(root / "w.weave", project_root=root)
 
-    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    @pytest.mark.parametrize("mode", ["execute", "plan", "preview"])
     def test_every_context_mode_fails_at_load(self, mode: str, tmp_path: Path) -> None:
         """Execute used to raise ExecutionError at thread start; now every mode fails at load."""
         from unittest.mock import MagicMock
@@ -363,6 +363,20 @@ class TestIncrementalChecksAtLoad:
             Context(spark=spark, project=str(root)).run("t.thread", mode=mode)
         spark.read.assert_not_called()
 
+    def test_validate_reports_it(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from pyspark.sql import SparkSession
+
+        from weevr.context import Context
+
+        root = _project(tmp_path, {"t.thread": _CDC_OVERWRITE})
+        result = Context(spark=MagicMock(spec=SparkSession), project=str(root)).run(
+            "t.thread", mode="validate"
+        )
+        assert result.status == "failure"
+        assert [(d.code, d.file) for d in result.diagnostics] == [("C480", str(root / "t.thread"))]
+
 
 class TestIncrementalParameterWarning:
     """The "no ${param.*}" warning reads the thread as written, before substitution."""
@@ -372,12 +386,12 @@ class TestIncrementalParameterWarning:
     def test_param_using_thread_does_not_warn(self, tmp_path: Path) -> None:
         root = _project(tmp_path, {"t.thread": _PARAM_THREAD})
         loaded = load_resolved(root / "t.thread", project_root=root)
-        assert not any(self._MESSAGE in w for w in loaded.warnings)
+        assert not any(self._MESSAGE in w for w in render_diagnostics(loaded.diagnostics))
 
     def test_param_free_thread_warns(self, tmp_path: Path) -> None:
         root = _project(tmp_path, {"t.thread": _PARAM_FREE_THREAD})
         loaded = load_resolved(root / "t.thread", project_root=root)
-        assert [w for w in loaded.warnings if self._MESSAGE in w] == [
+        assert [w for w in render_diagnostics(loaded.diagnostics) if self._MESSAGE in w] == [
             f"WARN: thread 't': {self._MESSAGE} found in steps or sources"
         ]
 
@@ -393,7 +407,7 @@ class TestIncrementalParameterWarning:
             },
         )
         loaded = load_resolved(root / "w.weave", project_root=root)
-        assert not any(self._MESSAGE in w for w in loaded.warnings)
+        assert not any(self._MESSAGE in w for w in render_diagnostics(loaded.diagnostics))
 
     def test_load_config_logs_the_warning(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

@@ -9,9 +9,17 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.audit_templates import HIERARCHY_CONTEXT_KEYS
+from weevr.config.collect import skip_on_error
 from weevr.config.locations import ConfigLocation
 from weevr.config.parser import TYPED_EXTENSIONS
-from weevr.errors import ConfigError, ConfigSchemaError, VariableResolutionError
+from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics.positions import json_pointer
+from weevr.errors import (
+    ConfigError,
+    ConfigSchemaError,
+    ReferenceResolutionError,
+    VariableResolutionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +40,8 @@ class ResolvedChild:
             which lives in its parent's file.
         authored: The child's config before variable substitution.
         children: A weave's threads (for a loom's weave children).
+        at: Where an inline child sits in its parent's file
+            (``("threads", 2)``); empty for a child in its own file.
     """
 
     entry: dict[str, Any]
@@ -39,6 +49,7 @@ class ResolvedChild:
     source_path: str | None = None
     authored: dict[str, Any] | None = None
     children: list["ResolvedChild"] = field(default_factory=list)
+    at: tuple[str | int, ...] = ()
 
 
 def build_param_context(
@@ -143,11 +154,23 @@ def resolve_declared_params(
 
     for name, spec in param_specs.items():
         if not isinstance(spec, dict) and not hasattr(spec, "required"):
-            raise ConfigSchemaError(
+            message = (
                 f"Parameter '{name}' must be a mapping with 'name' and 'type', "
-                f"got {type(spec).__name__}",
+                f"got {type(spec).__name__}"
+            )
+            raise ConfigSchemaError(
+                message,
                 file_path=file_path,
                 config_key=name,
+                diagnostics=[
+                    diagnostic(
+                        "C102",
+                        message,
+                        file=file_path,
+                        pointer=json_pointer(("params", name)),
+                        expected=["mapping"],
+                    )
+                ],
             )
 
     runtime = runtime_params or {}
@@ -167,13 +190,26 @@ def resolve_declared_params(
 
         required = _spec_field(spec, "required", default=True)
         if required:
+            message = f"Required parameter '{name}' is missing (no runtime value and no default)"
             raise ConfigSchemaError(
-                f"Required parameter '{name}' is missing (no runtime value and no default)",
+                message,
                 file_path=file_path,
                 config_key=name,
+                diagnostics=[_missing_parameter(name, message, file_path)],
             )
         # Optional with no default → omit
     return resolved
+
+
+def _missing_parameter(name: str, message: str, file: str | None) -> Diagnostic:
+    """The diagnostic for a required parameter with no value, at its declaration."""
+    return diagnostic(
+        "P101",
+        message,
+        file=file,
+        pointer=json_pointer(("params", name)),
+        hint=f"Pass a value for '{name}' at run time, or give it a default.",
+    )
 
 
 def _warn_unused_params(
@@ -259,10 +295,25 @@ def _resolved_at_execution(var_name: str) -> bool:
     return var_name in HIERARCHY_CONTEXT_KEYS
 
 
+def _unresolved(
+    var_name: str, context: dict[str, Any], at: tuple[str | int, ...]
+) -> VariableResolutionError:
+    """The error for a ``${var}`` with no value, pointing at the string that holds it."""
+    from weevr.config.validation import authored_path
+
+    message = _unresolved_variable_message(var_name, context)
+    return VariableResolutionError(
+        message,
+        config_key=var_name,
+        diagnostics=[diagnostic("P110", message, pointer=json_pointer(authored_path(at)))],
+    )
+
+
 def resolve_variables(
     config: dict[str, Any] | list[Any] | str | Any,
     context: dict[str, Any],
     consumed_keys: set[str] | None = None,
+    at: tuple[str | int, ...] = (),
 ) -> Any:
     """Recursively resolve variable references in config.
 
@@ -281,6 +332,8 @@ def resolve_variables(
         consumed_keys: Optional set to track which context keys were consumed
             during resolution. When provided, each resolved dotted key is
             added to the set for post-resolution unused-param analysis.
+        at: Where ``config`` sits in its file, so an unresolved variable can
+            point at the value that holds it.
 
     Returns:
         Config with all variables resolved
@@ -289,10 +342,15 @@ def resolve_variables(
         VariableResolutionError: If variable not found and no default provided
     """
     if isinstance(config, dict):
-        return {k: resolve_variables(v, context, consumed_keys) for k, v in config.items()}
+        return {
+            k: resolve_variables(v, context, consumed_keys, (*at, k)) for k, v in config.items()
+        }
 
     elif isinstance(config, list):
-        return [resolve_variables(item, context, consumed_keys) for item in config]
+        return [
+            resolve_variables(item, context, consumed_keys, (*at, i))
+            for i, item in enumerate(config)
+        ]
 
     elif isinstance(config, str):
         # Whole-value check: if the entire string is a single ${param} reference,
@@ -313,10 +371,7 @@ def resolve_variables(
                         return default_value
                     if _resolved_at_execution(var_name):
                         return config
-                    raise VariableResolutionError(
-                        _unresolved_variable_message(var_name, context),
-                        config_key=var_name,
-                    ) from exc
+                    raise _unresolved(var_name, context, at) from exc
             # var.* / run.* fall through to the existing sub() path below
 
         # Find all variable references in the string
@@ -339,10 +394,7 @@ def resolve_variables(
                     return default_value
                 if _resolved_at_execution(var_name):
                     return match.group(0)
-                raise VariableResolutionError(
-                    _unresolved_variable_message(var_name, context),
-                    config_key=var_name,
-                ) from exc
+                raise _unresolved(var_name, context, at) from exc
 
         return VARIABLE_PATTERN.sub(replace_var, config)
 
@@ -387,14 +439,16 @@ def resolve_config_variables(
     """
     defaults = config.get("defaults")
 
-    def resolve(target: Any, scope_defaults: dict[str, Any] | None) -> Any:
+    def resolve(
+        target: Any, scope_defaults: dict[str, Any] | None, where: tuple[str | int, ...] = ()
+    ) -> Any:
         context = build_param_context(
             runtime_params,
             scope_defaults,
             fabric_context=fabric_context,
             entry_params=entry_params,
         )
-        return resolve_variables(target, context)
+        return resolve_variables(target, context, at=where)
 
     weaves = config.get("weaves")
     if config_type != "loom" or not isinstance(weaves, list):
@@ -409,7 +463,7 @@ def resolve_config_variables(
     for i, entry in inline.items():
         own = entry.get("defaults")
         weave_defaults = {**(defaults or {}), **(own if isinstance(own, dict) else {})}
-        resolved["weaves"][i] = resolve(entry, weave_defaults)
+        resolved["weaves"][i] = resolve(entry, weave_defaults, ("weaves", i))
     return resolved
 
 
@@ -447,9 +501,11 @@ def validate_params(
                 context[param_name] = default
                 continue
             else:
+                message = f"Required parameter '{param_name}' is missing"
                 raise ConfigSchemaError(
-                    f"Required parameter '{param_name}' is missing",
+                    message,
                     config_key=param_name,
+                    diagnostics=[_missing_parameter(param_name, message, None)],
                 )
 
         # Skip validation if param not present (and not required)
@@ -461,30 +517,34 @@ def validate_params(
         # Type validation
         if param_type == "string":
             if not isinstance(value, str):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected string, got {type(value).__name__}",
-                    config_key=param_name,
                 )
 
         elif param_type == "int":
             if not isinstance(value, int) or isinstance(value, bool):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected int, got {type(value).__name__}",
-                    config_key=param_name,
                 )
 
         elif param_type == "float":
             if not isinstance(value, (int, float)) or isinstance(value, bool):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected float, got {type(value).__name__}",
-                    config_key=param_name,
                 )
 
         elif param_type == "bool":
             if not isinstance(value, bool):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected bool, got {type(value).__name__}",
-                    config_key=param_name,
                 )
 
         elif param_type == "date":
@@ -492,15 +552,17 @@ def validate_params(
                 try:
                     datetime.strptime(value, "%Y-%m-%d")
                 except ValueError as e:
-                    raise ConfigSchemaError(
+                    raise _parameter_error(
+                        "P103",
+                        param_name,
                         f"Parameter '{param_name}' invalid date format, expected YYYY-MM-DD",
                         cause=e,
-                        config_key=param_name,
                     ) from e
             elif not isinstance(value, date):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected date or ISO date string",
-                    config_key=param_name,
                 )
 
         elif param_type == "timestamp":
@@ -508,49 +570,124 @@ def validate_params(
                 try:
                     datetime.fromisoformat(value)
                 except ValueError as e:
-                    raise ConfigSchemaError(
+                    raise _parameter_error(
+                        "P103",
+                        param_name,
                         f"Parameter '{param_name}' invalid timestamp format, "
                         "expected ISO format (YYYY-MM-DDTHH:MM:SS)",
                         cause=e,
-                        config_key=param_name,
                     ) from e
             elif not isinstance(value, datetime):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected timestamp or ISO timestamp string",
-                    config_key=param_name,
                 )
 
         elif param_type == "list[string]":
             if not isinstance(value, list):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected list, got {type(value).__name__}",
-                    config_key=param_name,
                 )
             if not all(isinstance(item, str) for item in value):
-                raise ConfigSchemaError(
+                raise _parameter_error(
+                    "P102",
+                    param_name,
                     f"Parameter '{param_name}' expected list of strings",
-                    config_key=param_name,
                 )
 
 
-def _check_entry_refs(entries: list[Any]) -> None:
+def _parameter_error(
+    code: str, name: str, message: str, cause: Exception | None = None
+) -> ConfigSchemaError:
+    """A parameter value that has the wrong type or format, pointed at its declaration."""
+    return ConfigSchemaError(
+        message,
+        cause=cause,
+        config_key=name,
+        diagnostics=[
+            diagnostic(code, message, pointer=json_pointer(("params", name)), origin=__name__)
+        ],
+    )
+
+
+def _reference_error(
+    code: str,
+    message: str,
+    *,
+    pointer: str | None = None,
+    file_path: str | None = None,
+    expected: list[str] | None = None,
+    hint: str | None = None,
+) -> ReferenceResolutionError:
+    """A reference failure, located at the entry that holds it.
+
+    ``file_path`` stays on the error as the file the reference points at; the
+    diagnostic names no file, so the config being loaded is attached to it.
+    """
+    return ReferenceResolutionError(
+        message,
+        file_path=file_path,
+        diagnostics=[
+            diagnostic(
+                code,
+                message,
+                pointer=pointer,
+                expected=expected,
+                hint=hint,
+                origin=__name__,
+            )
+        ],
+    )
+
+
+def _entry_error(
+    code: str, message: str, pointer: str | None = None, hint: str | None = None
+) -> ConfigError:
+    """A malformed weave or thread entry, located at the entry."""
+    return ConfigError(
+        message,
+        diagnostics=[diagnostic(code, message, pointer=pointer, hint=hint, origin=__name__)],
+    )
+
+
+def _circular_reference(
+    ref: str, visited: dict[str, None], pointer: str
+) -> ReferenceResolutionError:
+    """The error for a ref that leads back to a file already being loaded."""
+    chain = list(visited)
+    cycle = [*chain[chain.index(ref) :], ref] if ref in chain else [*chain, ref]
+    return _reference_error(
+        "C302",
+        f"Circular reference detected: {' -> '.join([*chain, ref])}",
+        pointer=pointer,
+        file_path=ref,
+        expected=cycle,
+    )
+
+
+def _check_entry_refs(entries: list[Any], at: tuple[str | int, ...] = ()) -> None:
     """Reject a child entry whose ``ref`` isn't a string, before any ref is used as a key.
 
     Raises:
         ReferenceResolutionError: Naming no file of its own; the enclosing
             config's file is attached by the caller.
     """
-    from weevr.errors import ReferenceResolutionError
-
-    for entry in entries:
+    for index, entry in enumerate(entries):
         if isinstance(entry, dict) and "ref" in entry and not isinstance(entry["ref"], str):
             ref = entry["ref"]
-            raise ReferenceResolutionError(
-                f"Reference must be a path string, got {type(ref).__name__}: {ref!r}"
+            raise _reference_error(
+                "C304",
+                f"Reference must be a path string, got {type(ref).__name__}: {ref!r}",
+                pointer=json_pointer((*at, index, "ref")),
             )
 
 
-def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLocation:
+def resolve_ref_path(
+    ref: str, project_root: ConfigLocation | Path, pointer: str | None = None
+) -> ConfigLocation:
     """Resolve a path-based reference to a :class:`ConfigLocation`.
 
     Args:
@@ -559,6 +696,8 @@ def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLoc
         project_root: The ``.weevr`` project directory. A bare
             :class:`pathlib.Path` is wrapped in a
             :class:`LocalConfigLocation` for backward compatibility.
+        pointer: Where the ``ref`` sits in the referencing file, for the
+            diagnostic of any failure.
 
     Returns:
         Resolved location for the referenced config file.
@@ -570,13 +709,14 @@ def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLoc
         ConfigError: If the reference does not have a typed extension.
     """
     from weevr.config.locations import LocalConfigLocation
-    from weevr.errors import ReferenceResolutionError
 
     # Child entries reach here as unvalidated dicts, so the YAML may hold
     # any type. No file is named: the enclosing config's file is attached.
     if not isinstance(ref, str):
-        raise ReferenceResolutionError(
-            f"Reference must be a path string, got {type(ref).__name__}: {ref!r}"
+        raise _reference_error(
+            "C304",
+            f"Reference must be a path string, got {type(ref).__name__}: {ref!r}",
+            pointer=pointer,
         )
 
     if isinstance(project_root, Path):
@@ -584,27 +724,43 @@ def resolve_ref_path(ref: str, project_root: ConfigLocation | Path) -> ConfigLoc
 
     suffix = Path(ref).suffix.lower()
     if suffix not in TYPED_EXTENSIONS:
+        message = f"Unsupported extension '{suffix}'. Expected .thread, .weave, or .loom"
         raise ConfigError(
-            f"Unsupported extension '{suffix}'. Expected .thread, .weave, or .loom",
+            message,
             file_path=ref,
+            diagnostics=[
+                diagnostic(
+                    "C007",
+                    message,
+                    pointer=pointer,
+                    expected=sorted(TYPED_EXTENSIONS),
+                    origin=__name__,
+                )
+            ],
         )
 
     try:
         resolved = project_root.join(ref)
     except ValueError as exc:
-        raise ReferenceResolutionError(
+        raise _reference_error(
+            "C303",
             f"Reference '{ref}' resolves outside project root",
+            pointer=pointer,
             file_path=ref,
         ) from exc
 
     if not resolved.is_relative_to(project_root):
-        raise ReferenceResolutionError(
+        raise _reference_error(
+            "C303",
             f"Reference '{ref}' resolves outside project root",
+            pointer=pointer,
             file_path=str(resolved),
         )
     if not resolved.exists():
-        raise ReferenceResolutionError(
+        raise _reference_error(
+            "C301",
             f"Referenced file not found: {ref}",
+            pointer=pointer,
             file_path=str(resolved),
         )
     return resolved
@@ -615,8 +771,9 @@ def resolve_references(
     config_type: str,
     project_root: ConfigLocation | Path,
     runtime_params: dict[str, Any] | None = None,
-    visited: set[str] | None = None,
+    visited: dict[str, None] | None = None,
     authored: dict[str, Any] | None = None,
+    at: tuple[str | int, ...] = (),
 ) -> list[ResolvedChild]:
     """Resolve references to other config files.
 
@@ -631,9 +788,11 @@ def resolve_references(
             :class:`pathlib.Path` is wrapped in a
             :class:`LocalConfigLocation` for backward compatibility.
         runtime_params: Runtime parameters to pass to child configs.
-        visited: Set of already-visited ref strings (for cycle detection).
+        visited: Refs already being loaded, in load order (for cycle detection).
         authored: ``config`` before variable substitution, so inline
             children can keep their authored form.
+        at: Where ``config`` sits in its file; empty unless it is an
+            inline weave in a loom.
 
     Returns:
         The resolved children in entry order: a loom's weaves (each with its
@@ -653,13 +812,12 @@ def resolve_references(
         validate_config_version,
     )
     from weevr.config.validation import validate_inline_thread_types, validate_schema
-    from weevr.errors import ReferenceResolutionError
 
     if isinstance(project_root, Path):
         project_root = LocalConfigLocation(project_root)
 
     if visited is None:
-        visited = set()
+        visited = {}
 
     def authored_entry(key: str, index: int) -> dict[str, Any] | None:
         entries = (authored or {}).get(key)
@@ -672,297 +830,330 @@ def resolve_references(
 
     # Resolve weaves in loom
     if config_type == "loom" and "weaves" in config:
-        _check_entry_refs(config["weaves"])
+        _check_entry_refs(config["weaves"], (*at, "weaves"))
         for index, entry in enumerate(config["weaves"]):
-            # Normalize: string entries become {"name": string}
-            if isinstance(entry, str):
-                entry = {"name": entry}
+            with skip_on_error():
+                # Normalize: string entries become {"name": string}
+                if isinstance(entry, str):
+                    entry = {"name": entry}
 
-            if isinstance(entry, dict) and "ref" in entry:
-                # External reference
-                ref = entry["ref"]
-                if ref in visited:
-                    cycle = " -> ".join(visited) + f" -> {ref}"
-                    raise ReferenceResolutionError(
-                        f"Circular reference detected: {cycle}",
-                        file_path=ref,
-                    )
+                if isinstance(entry, dict) and "ref" in entry:
+                    # External reference
+                    ref = entry["ref"]
+                    ref_pointer = json_pointer((*at, "weaves", index, "ref"))
+                    if ref in visited:
+                        raise _circular_reference(ref, visited, ref_pointer)
 
-                weave_path = resolve_ref_path(ref, project_root)
-                visited.add(ref)
-                try:
-                    with attribute_errors(weave_path):
-                        raw = parse_yaml(weave_path)
-                        version = extract_config_version(raw)
-                        ext_type = detect_config_type_from_extension(weave_path)
-                        child_type = ext_type if ext_type else "weave"
-                        validate_config_version(version, child_type)
-                        validated = validate_schema(raw, child_type)
-                        child_dict = validated.model_dump(exclude_unset=True)
-
-                        # Inject name from filename stem
-                        if not child_dict.get("name"):
-                            child_dict["name"] = weave_path.stem
-
-                        # Set qualified key
-                        child_dict["qualified_key"] = ref
-
-                        context = build_param_context(runtime_params, child_dict.get("defaults"))
-                        resolved_child = resolve_variables(child_dict, context)
-
-                        grandchildren = resolve_references(
-                            resolved_child,
-                            child_type,
-                            project_root,
-                            runtime_params,
-                            visited.copy(),
-                            authored=child_dict,
-                        )
-                    children.append(
-                        ResolvedChild(
-                            entry=entry,
-                            data=resolved_child,
-                            source_path=str(weave_path),
-                            authored=child_dict,
-                            children=grandchildren,
-                        )
-                    )
-                finally:
-                    visited.discard(ref)
-            else:
-                # Name-only entry — resolve by convention to {name}.weave
-                if isinstance(entry, dict) and not entry.get("name"):
-                    raise ConfigError(
-                        "Inline weave definition requires a 'name' field",
-                    )
-                if isinstance(entry, dict):
-                    weave_name = entry["name"]
-                    convention_ref = f"{weave_name}.weave"
-                    # Held to the same containment rule as a ref entry.
+                    weave_path = resolve_ref_path(ref, project_root, ref_pointer)
+                    visited[ref] = None
                     try:
-                        convention_path = project_root.join(convention_ref)
-                    except ValueError as exc:
-                        raise ReferenceResolutionError(
-                            f"Weave name '{weave_name}' resolves outside project root",
-                            file_path=convention_ref,
-                        ) from exc
-                    if not convention_path.is_relative_to(project_root):
-                        raise ReferenceResolutionError(
-                            f"Weave name '{weave_name}' resolves outside project root",
-                            file_path=str(convention_path),
-                        )
-                    if convention_path.exists():
-                        if convention_ref in visited:
-                            cycle = " -> ".join(visited) + f" -> {convention_ref}"
-                            raise ReferenceResolutionError(
-                                f"Circular reference detected: {cycle}",
-                                file_path=convention_ref,
+                        with attribute_errors(weave_path):
+                            raw = parse_yaml(weave_path)
+                            version = extract_config_version(raw)
+                            ext_type = detect_config_type_from_extension(weave_path)
+                            child_type = ext_type if ext_type else "weave"
+                            validate_config_version(version, child_type)
+                            validated = validate_schema(raw, child_type)
+                            child_dict = validated.model_dump(exclude_unset=True)
+
+                            # Inject name from filename stem
+                            if not child_dict.get("name"):
+                                child_dict["name"] = weave_path.stem
+
+                            # Set qualified key
+                            child_dict["qualified_key"] = ref
+
+                            context = build_param_context(
+                                runtime_params, child_dict.get("defaults")
                             )
+                            resolved_child = resolve_variables(child_dict, context)
 
-                        # Load the weave file by convention
-                        visited.add(convention_ref)
-                        try:
-                            with attribute_errors(convention_path):
-                                conv_raw = parse_yaml(convention_path)
-                                conv_version = extract_config_version(conv_raw)
-                                conv_type = detect_config_type_from_extension(convention_path)
-                                child_type = conv_type if conv_type else "weave"
-                                validate_config_version(conv_version, child_type)
-                                validated = validate_schema(conv_raw, child_type)
-                                child_dict = validated.model_dump(exclude_unset=True)
-                                if not child_dict.get("name"):
-                                    child_dict["name"] = weave_name
-                                child_dict["qualified_key"] = convention_ref
-
-                                # Preserve entry-level overrides (condition)
-                                if "condition" in entry:
-                                    child_dict["condition"] = entry["condition"]
-
-                                context = build_param_context(
-                                    runtime_params, child_dict.get("defaults")
-                                )
-                                resolved_child = resolve_variables(child_dict, context)
-                                grandchildren = resolve_references(
-                                    resolved_child,
-                                    child_type,
-                                    project_root,
-                                    runtime_params,
-                                    visited.copy(),
-                                    authored=child_dict,
-                                )
-                            children.append(
-                                ResolvedChild(
-                                    entry=entry,
-                                    data=resolved_child,
-                                    source_path=str(convention_path),
-                                    authored=child_dict,
-                                    children=grandchildren,
-                                )
+                            grandchildren = resolve_references(
+                                resolved_child,
+                                child_type,
+                                project_root,
+                                runtime_params,
+                                visited.copy(),
+                                authored=child_dict,
                             )
-                        finally:
-                            visited.discard(convention_ref)
-                    elif _is_inline_weave(entry):
-                        # Inline weave body. resolve_config_variables already
-                        # resolved its variables with the weave's own defaults;
-                        # validate and resolve its threads the way a weave
-                        # file is.
-                        validated = validate_schema(entry, "weave")
-                        inline = validated.model_dump(exclude_unset=True)
-                        inline["qualified_key"] = weave_name
-                        if "condition" in entry:
-                            inline["condition"] = entry["condition"]
-                        inline_authored = authored_entry("weaves", index)
                         children.append(
                             ResolvedChild(
                                 entry=entry,
-                                data=inline,
-                                authored=inline_authored,
-                                children=resolve_references(
-                                    inline,
-                                    "weave",
-                                    project_root,
-                                    runtime_params,
-                                    visited.copy(),
-                                    authored=inline_authored,
-                                ),
+                                data=resolved_child,
+                                source_path=str(weave_path),
+                                authored=child_dict,
+                                children=grandchildren,
                             )
                         )
-                    else:
-                        raise ReferenceResolutionError(
-                            f"Weave '{weave_name}' has no definition: expected "
-                            f"'{convention_ref}' in the project root or an inline "
-                            f"weave body (threads) in the loom",
+                    finally:
+                        visited.pop(ref, None)
+                else:
+                    # Name-only entry — resolve by convention to {name}.weave
+                    if isinstance(entry, dict) and not entry.get("name"):
+                        raise _entry_error(
+                            "C305",
+                            "Inline weave definition requires a 'name' field",
+                            json_pointer((*at, "weaves", index)),
                         )
+                    if isinstance(entry, dict):
+                        weave_name = entry["name"]
+                        convention_ref = f"{weave_name}.weave"
+                        # Held to the same containment rule as a ref entry.
+                        try:
+                            convention_path = project_root.join(convention_ref)
+                        except ValueError as exc:
+                            raise _reference_error(
+                                "C303",
+                                f"Weave name '{weave_name}' resolves outside project root",
+                                pointer=json_pointer((*at, "weaves", index, "name")),
+                                file_path=convention_ref,
+                            ) from exc
+                        if not convention_path.is_relative_to(project_root):
+                            raise _reference_error(
+                                "C303",
+                                f"Weave name '{weave_name}' resolves outside project root",
+                                pointer=json_pointer((*at, "weaves", index, "name")),
+                                file_path=str(convention_path),
+                            )
+                        if convention_path.exists():
+                            if convention_ref in visited:
+                                raise _circular_reference(
+                                    convention_ref,
+                                    visited,
+                                    json_pointer((*at, "weaves", index, "name")),
+                                )
+
+                            # Load the weave file by convention
+                            visited[convention_ref] = None
+                            try:
+                                with attribute_errors(convention_path):
+                                    conv_raw = parse_yaml(convention_path)
+                                    conv_version = extract_config_version(conv_raw)
+                                    conv_type = detect_config_type_from_extension(convention_path)
+                                    child_type = conv_type if conv_type else "weave"
+                                    validate_config_version(conv_version, child_type)
+                                    validated = validate_schema(conv_raw, child_type)
+                                    child_dict = validated.model_dump(exclude_unset=True)
+                                    if not child_dict.get("name"):
+                                        child_dict["name"] = weave_name
+                                    child_dict["qualified_key"] = convention_ref
+
+                                    # Preserve entry-level overrides (condition)
+                                    if "condition" in entry:
+                                        child_dict["condition"] = entry["condition"]
+
+                                    context = build_param_context(
+                                        runtime_params, child_dict.get("defaults")
+                                    )
+                                    resolved_child = resolve_variables(child_dict, context)
+                                    grandchildren = resolve_references(
+                                        resolved_child,
+                                        child_type,
+                                        project_root,
+                                        runtime_params,
+                                        visited.copy(),
+                                        authored=child_dict,
+                                    )
+                                children.append(
+                                    ResolvedChild(
+                                        entry=entry,
+                                        data=resolved_child,
+                                        source_path=str(convention_path),
+                                        authored=child_dict,
+                                        children=grandchildren,
+                                    )
+                                )
+                            finally:
+                                visited.pop(convention_ref, None)
+                        elif _is_inline_weave(entry):
+                            # Inline weave body. resolve_config_variables already
+                            # resolved its variables with the weave's own defaults;
+                            # validate and resolve its threads the way a weave
+                            # file is.
+                            validated = validate_schema(entry, "weave", at=(*at, "weaves", index))
+                            inline = validated.model_dump(exclude_unset=True)
+                            inline["qualified_key"] = weave_name
+                            if "condition" in entry:
+                                inline["condition"] = entry["condition"]
+                            inline_authored = authored_entry("weaves", index)
+                            inline_at = (*at, "weaves", index)
+                            children.append(
+                                ResolvedChild(
+                                    entry=entry,
+                                    data=inline,
+                                    authored=inline_authored,
+                                    children=resolve_references(
+                                        inline,
+                                        "weave",
+                                        project_root,
+                                        runtime_params,
+                                        visited.copy(),
+                                        authored=inline_authored,
+                                        at=inline_at,
+                                    ),
+                                    at=inline_at,
+                                )
+                            )
+                        else:
+                            raise _reference_error(
+                                "C301",
+                                f"Weave '{weave_name}' has no definition: expected "
+                                f"'{convention_ref}' in the project root or an inline "
+                                f"weave body (threads) in the loom",
+                                pointer=json_pointer((*at, "weaves", index)),
+                                hint=f"Add {convention_ref} or give the weave an inline body.",
+                            )
 
     # Resolve threads in weave
     elif config_type == "weave" and "threads" in config:
         # Validate: duplicate refs without aliases
-        _check_entry_refs(config["threads"])
+        _check_entry_refs(config["threads"], (*at, "threads"))
         ref_entries = [e for e in config["threads"] if isinstance(e, dict) and e.get("ref")]
         ref_counts = Counter(e["ref"] for e in ref_entries)
         for ref_val, count in ref_counts.items():
             if count > 1:
                 aliases = [e.get("as") for e in ref_entries if e["ref"] == ref_val]
                 if not all(aliases):
-                    raise ConfigError(
+                    first = next(
+                        i
+                        for i, e in enumerate(config["threads"])
+                        if isinstance(e, dict) and e.get("ref") == ref_val and not e.get("as")
+                    )
+                    raise _entry_error(
+                        "C307",
                         f"Thread ref '{ref_val}' appears multiple times without "
-                        f"'as' aliases. Use 'as' to give each instance a unique name."
+                        f"'as' aliases. Use 'as' to give each instance a unique name.",
+                        json_pointer((*at, "threads", first)),
+                        hint="Add an 'as' alias to each instance.",
                     )
 
         seen_effective_names: set[str] = set()
 
         for index, entry in enumerate(config["threads"]):
-            # Normalize: string entries become {"name": string}
-            if isinstance(entry, str):
-                entry = {"name": entry}
+            with skip_on_error():
+                # Normalize: string entries become {"name": string}
+                if isinstance(entry, str):
+                    entry = {"name": entry}
 
-            if isinstance(entry, dict) and "ref" in entry:
-                # External reference
-                ref = entry["ref"]
-                if ref in visited:
-                    cycle = " -> ".join(visited) + f" -> {ref}"
-                    raise ReferenceResolutionError(
-                        f"Circular reference detected: {cycle}",
-                        file_path=ref,
-                    )
+                if isinstance(entry, dict) and "ref" in entry:
+                    # External reference
+                    ref = entry["ref"]
+                    ref_pointer = json_pointer((*at, "threads", index, "ref"))
+                    if ref in visited:
+                        raise _circular_reference(ref, visited, ref_pointer)
 
-                thread_path = resolve_ref_path(ref, project_root)
-                visited.add(ref)
-                try:
-                    # Two-phase param resolution: resolve expressions
-                    # in entry param values against parent context first,
-                    # then inject resolved values into thread's param context.
-                    # Entry params belong to this weave, so they resolve
-                    # outside the referenced thread's attribution scope.
-                    raw_entry_params = entry.get("params")
-                    resolved_entry_params = None
-                    if raw_entry_params:
-                        parent_context = build_param_context(runtime_params, config.get("defaults"))
-                        resolved_entry_params = resolve_variables(raw_entry_params, parent_context)
+                    thread_path = resolve_ref_path(ref, project_root, ref_pointer)
+                    visited[ref] = None
+                    try:
+                        # Two-phase param resolution: resolve expressions
+                        # in entry param values against parent context first,
+                        # then inject resolved values into thread's param context.
+                        # Entry params belong to this weave, so they resolve
+                        # outside the referenced thread's attribution scope.
+                        raw_entry_params = entry.get("params")
+                        resolved_entry_params = None
+                        if raw_entry_params:
+                            parent_context = build_param_context(
+                                runtime_params, config.get("defaults")
+                            )
+                            resolved_entry_params = resolve_variables(
+                                raw_entry_params,
+                                parent_context,
+                                at=(*at, "threads", index, "params"),
+                            )
 
-                    with attribute_errors(thread_path):
-                        raw = parse_yaml(thread_path)
-                        version = extract_config_version(raw)
-                        ext_type = detect_config_type_from_extension(thread_path)
-                        child_type = ext_type if ext_type else "thread"
-                        validate_config_version(version, child_type)
-                        validated = validate_schema(raw, child_type)
-                        child_dict = validated.model_dump(exclude_unset=True)
+                        with attribute_errors(thread_path):
+                            raw = parse_yaml(thread_path)
+                            version = extract_config_version(raw)
+                            ext_type = detect_config_type_from_extension(thread_path)
+                            child_type = ext_type if ext_type else "thread"
+                            validate_config_version(version, child_type)
+                            validated = validate_schema(raw, child_type)
+                            child_dict = validated.model_dump(exclude_unset=True)
 
-                        # Inject name from filename stem
-                        if not child_dict.get("name"):
-                            child_dict["name"] = thread_path.stem
+                            # Inject name from filename stem
+                            if not child_dict.get("name"):
+                                child_dict["name"] = thread_path.stem
 
-                        # Set qualified key
-                        child_dict["qualified_key"] = ref
+                            # Set qualified key
+                            child_dict["qualified_key"] = ref
 
-                        context = build_param_context(
-                            runtime_params,
-                            child_dict.get("defaults"),
+                            context = build_param_context(
+                                runtime_params,
+                                child_dict.get("defaults"),
+                                entry_params=resolved_entry_params,
+                            )
+                            consumed: set[str] = set()
+                            resolved_child = resolve_variables(
+                                child_dict, context, consumed_keys=consumed
+                            )
+
+                        # Warn on unused params with source attribution
+                        _warn_unused_params(
+                            consumed,
+                            context,
                             entry_params=resolved_entry_params,
-                        )
-                        consumed: set[str] = set()
-                        resolved_child = resolve_variables(
-                            child_dict, context, consumed_keys=consumed
+                            thread_name=entry.get("as") or child_dict.get("name", ref),
                         )
 
-                    # Warn on unused params with source attribution
-                    _warn_unused_params(
-                        consumed,
-                        context,
-                        entry_params=resolved_entry_params,
-                        thread_name=entry.get("as") or child_dict.get("name", ref),
-                    )
-
-                    # Track effective name uniqueness
-                    effective_name = (
-                        entry.get("as") or resolved_child.get("name") or thread_path.stem
-                    )
-                    if effective_name in seen_effective_names:
-                        raise ConfigError(
-                            f"Duplicate effective thread name '{effective_name}' "
-                            f"in weave. Use 'as' to give each instance a unique name."
+                        # Track effective name uniqueness
+                        effective_name = (
+                            entry.get("as") or resolved_child.get("name") or thread_path.stem
                         )
-                    seen_effective_names.add(effective_name)
+                        if effective_name in seen_effective_names:
+                            raise _entry_error(
+                                "C306",
+                                f"Duplicate effective thread name '{effective_name}' "
+                                f"in weave. Use 'as' to give each instance a unique name.",
+                                json_pointer((*at, "threads", index)),
+                                hint="Use 'as' to give each instance a unique name.",
+                            )
+                        seen_effective_names.add(effective_name)
 
-                    children.append(
-                        ResolvedChild(
-                            entry=entry,
-                            data=resolved_child,
-                            source_path=str(thread_path),
-                            authored=child_dict,
+                        children.append(
+                            ResolvedChild(
+                                entry=entry,
+                                data=resolved_child,
+                                source_path=str(thread_path),
+                                authored=child_dict,
+                            )
                         )
-                    )
-                finally:
-                    visited.discard(ref)
-            else:
-                # Inline definition — must have name
-                if isinstance(entry, dict) and not entry.get("name"):
-                    raise ConfigError(
-                        "Inline thread definition requires a 'name' field",
-                    )
-                if isinstance(entry, dict):
-                    # The cascade and load checks read the body before
-                    # hydration, so its value types are checked here.
-                    validate_inline_thread_types(entry)
-                    inline = entry.copy()
-                    inline["qualified_key"] = entry.get("name", "")
+                    finally:
+                        visited.pop(ref, None)
+                else:
+                    # Inline definition — must have name
+                    if isinstance(entry, dict) and not entry.get("name"):
+                        raise _entry_error(
+                            "C305",
+                            "Inline thread definition requires a 'name' field",
+                            json_pointer((*at, "threads", index)),
+                        )
+                    if isinstance(entry, dict):
+                        # The cascade and load checks read the body before
+                        # hydration, so its value types are checked here.
+                        validate_inline_thread_types(entry, at=(*at, "threads", index))
+                        inline = entry.copy()
+                        inline["qualified_key"] = entry.get("name", "")
 
-                    # Track effective name uniqueness
-                    effective_name = entry.get("as") or entry.get("name", "")
-                    if effective_name in seen_effective_names:
-                        raise ConfigError(
-                            f"Duplicate effective thread name '{effective_name}' "
-                            f"in weave. Use 'as' to give each instance a unique name."
-                        )
-                    seen_effective_names.add(effective_name)
+                        # Track effective name uniqueness
+                        effective_name = entry.get("as") or entry.get("name", "")
+                        if effective_name in seen_effective_names:
+                            raise _entry_error(
+                                "C306",
+                                f"Duplicate effective thread name '{effective_name}' "
+                                f"in weave. Use 'as' to give each instance a unique name.",
+                                json_pointer((*at, "threads", index)),
+                                hint="Use 'as' to give each instance a unique name.",
+                            )
+                        seen_effective_names.add(effective_name)
 
-                    children.append(
-                        ResolvedChild(
-                            entry=entry,
-                            data=inline,
-                            authored=authored_entry("threads", index),
+                        children.append(
+                            ResolvedChild(
+                                entry=entry,
+                                data=inline,
+                                authored=authored_entry("threads", index),
+                                at=(*at, "threads", index),
+                            )
                         )
-                    )
 
     return children

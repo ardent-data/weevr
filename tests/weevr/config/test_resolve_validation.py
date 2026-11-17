@@ -10,7 +10,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from weevr.config import load_config, load_resolved
-from weevr.config.validation import validate_resolve_lookups
+from weevr.config.validation import render_diagnostics, validate_resolve_lookups
 from weevr.context import Context
 from weevr.errors import ConfigError
 
@@ -219,7 +219,9 @@ class TestResolveLookupsOnLoad:
         step = {**_RESOLVE, "lookup": "nope", "on_failure": "warn"}
         proj = project(_thread([{"resolve": step}]))
         loaded = load_resolved(proj / "w.weave", project_root=proj)
-        assert any("nope" in w and w.startswith("WARN:") for w in loaded.warnings)
+        assert any(
+            "nope" in w and w.startswith("WARN:") for w in render_diagnostics(loaded.diagnostics)
+        )
         with caplog.at_level(logging.WARNING, logger="weevr"):
             load_config(proj / "w.weave", project_root=proj)
         assert any("nope" in r.getMessage() for r in caplog.records)
@@ -239,8 +241,9 @@ class TestResolveLookupsOnLoad:
     def test_context_validate_reports_it(self, project: ProjectBuilder) -> None:
         proj = project(_thread([{"resolve": {**_RESOLVE, "lookup": "nope"}}]))
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(proj))
-        with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
-            ctx.run("w.weave", mode="validate")
+        result = ctx.run("w.weave", mode="validate")
+        assert result.status == "failure"
+        assert "R120" in {d.code for d in result.diagnostics}
 
 
 class TestResolveLookupsInlineAndWith:
@@ -329,14 +332,17 @@ class TestSourceLookupsAtLoad:
             loom=lookups if level == "loom" else None,
         )
         loaded = load_resolved(project / "l.loom", project_root=project)
-        assert not [w for w in loaded.warnings if "dim_codes" in w]
+        assert not [w for w in render_diagnostics(loaded.diagnostics) if "dim_codes" in w]
 
     def test_loaded_alone_warns_and_loads(self, make_project):
         project = make_project(self._thread())
         loaded = load_resolved(project / "fact.thread", project_root=project)
-        assert any("dim_codes" in w and w.startswith("WARN") for w in loaded.warnings)
+        assert any(
+            "dim_codes" in w and w.startswith("WARN")
+            for w in render_diagnostics(loaded.diagnostics)
+        )
 
     def test_loaded_alone_with_its_own_lookup_stays_quiet(self, make_project):
         project = make_project(self._thread(lookups={"dim_codes": self.LOOKUP}))
         loaded = load_resolved(project / "fact.thread", project_root=project)
-        assert not [w for w in loaded.warnings if "dim_codes" in w]
+        assert not [w for w in render_diagnostics(loaded.diagnostics) if "dim_codes" in w]

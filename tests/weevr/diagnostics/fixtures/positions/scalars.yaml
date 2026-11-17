@@ -1,0 +1,11 @@
+config_version: "1.0"
+"quoted key": 1
+'single/quoted': 2
+description: |
+  line one
+  line two
+next: after
+folded: >
+  folded
+  text
+last: "${param.x}"

@@ -164,7 +164,7 @@ is then validated through the typed Pydantic model (`Thread`, `Weave`,
 or `Loom`). Semantic errors at this stage raise `ModelValidationError`.
 For a weave or loom, every child it pulls in, whether referenced or
 inline, is hydrated and validated the same way, so a broken child fails
-the whole load. The error's `file_path` names the child's own file, or
+the load. The error's `file_path` names the child's own file, or
 the file containing an inline definition.
 Finally, incremental-mode constraints that span `load` and `write` (for
 example, CDC requires merge write mode, and watermark loads reject the
@@ -173,6 +173,25 @@ after the cascade, so defaults count. A violation raises a `ConfigError`
 naming the thread and the file it is written in, from every entry point
 and in every `Context` mode. Advisory findings join the load warnings. See
 [When load rules are checked](../reference/yaml-schema/thread.md#when-load-rules-are-checked).
+
+### Every problem, located
+
+A load doesn't stop at the first broken file. A child that fails a stage
+is left out of the later stages, and its siblings carry on, so one load
+reports every problem in the project in one `ConfigError`. Each problem is
+a diagnostic with a stable code (see
+[Diagnostic Codes](../reference/diagnostics.md)) and where it was written:
+the authored `file`, a JSON `pointer`, and the `line` and `column`.
+
+A value a thread inherits from a weave or loom default isn't written in
+the thread's file. Its diagnostic names the thread's file and pointer
+with no line, and sets `location_fallback`. The same flag marks a value
+that came from a `${…}` reference (the line is the reference's), and a
+problem under a step list that `foreach` expanded, where step indexes no
+longer match the file, so the diagnostic points at the step list.
+
+A key the removed-key table lists fails with `C111` (removed) or `C112`
+(renamed), naming what to write instead.
 
 ## Loading without running
 
@@ -192,7 +211,7 @@ the difference is what comes back and what's needed:
 `load_resolved()` suits tools that check or plan configs outside the engine,
 such as a CLI or a CI step. It takes `.thread`, `.weave`, and `.loom` files
 and returns the hydrated model, every child thread and weave, the load
-warnings, and the execution plan:
+warnings (as diagnostics), and the execution plan:
 
 ```python
 from pathlib import Path
@@ -205,22 +224,25 @@ loaded = load_resolved(project / "nightly.loom", project_root=project)
 for weave_name, threads in loaded.document.weave_threads().items():
     print(weave_name, list(threads))
 
-for warning in loaded.warnings:
-    print(warning)
+for warning in loaded.diagnostics:
+    print(warning)  # C491 thread-execution-ignored: ...
 
 for issue in loaded.validate_plans():
-    print(f"{issue.weave_name}: {issue.message}")
+    print(issue.diagnostic)  # D101 circular-dependency: ...
 ```
 
 `validate_plans()` builds every weave's execution plan and returns one
 `PlanIssue` per weave that fails — a dependency cycle, two threads writing
 the same target without an ordering, or a Lookup problem — instead of
-stopping at the first. `execution_plan` raises on the first failure.
+stopping at the first; each issue's `diagnostic` carries its code.
+`execution_plan` raises on the first failure. `LoadedConfig.warnings` is
+deprecated: it returns the same strings as before and will be removed in
+weevr 3.0.
 
 A source `lookup:` must name a lookup the thread can see. Through a weave or
 loom, an undefined name fails the load. A thread file loaded on its own can't
 see those parents, so a name it doesn't define itself adds a warning to
-`LoadedConfig.warnings` instead: the thread is valid in a weave that defines
+`LoadedConfig.diagnostics` instead: the thread is valid in a weave that defines
 the lookup, but running it alone fails. A `resolve` step's `lookup` is stricter:
 it fails the load even when the thread is loaded on its own.
 
@@ -277,7 +299,8 @@ weave models by name.
 | `config/document.py` | The resolved config tree: `ResolvedDocument`, `EntryMeta`, and each node's registries |
 | `config/macros.py` | `foreach` block expansion in step lists; rejects `foreach` in `with:` sub-pipelines |
 | `config/hydration.py` | Hydrates resolved dicts into typed models, including referenced and inline children |
-| `config/attribution.py` | Attaches the source file to config errors raised while loading it |
+| `config/attribution.py` | Attaches the source file, and each diagnostic's line, to config errors raised while loading it |
+| `config/collect.py` | Collects every child's errors in one load and raises them together |
 | `config/audit_templates.py` | Audit template presets, context variables, and template merge helpers |
 | `config/onelake.py` | Spark-free OneLake path construction shared by the runtime and the planner |
 | `config/fabric.py` | Engine wheel. Builds `${fabric.*}` context from Fabric runtime variables |

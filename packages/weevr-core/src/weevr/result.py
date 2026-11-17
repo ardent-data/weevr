@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
@@ -12,6 +12,7 @@ from weevr.engine.formatting import format_duration as _format_duration
 
 if TYPE_CHECKING:
     from weevr.config.document import ResolvedDocument
+    from weevr.diagnostics import Diagnostic
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
     from weevr.model.thread import Thread
@@ -84,7 +85,10 @@ class RunResult:
         telemetry: Structured telemetry data (execute mode only).
         execution_plan: Resolved execution plans (plan mode only).
         preview_data: Output DataFrames keyed by thread name (preview mode only).
-        validation_errors: Error messages from validation checks (validate mode only).
+        diagnostics: Coded config problems: load warnings in every mode, and
+            in validate mode every config, plan and source-existence problem.
+        validation_errors: Deprecated; use ``diagnostics``. Error messages
+            from validation checks (validate mode only).
         warnings: Non-fatal messages (e.g., zero threads matched a filter).
         thread_models: The run's threads by effective name, from the resolved
             config tree; reports and diagrams read sources, targets and
@@ -103,7 +107,8 @@ class RunResult:
         "telemetry",
         "execution_plan",
         "preview_data",
-        "validation_errors",
+        "diagnostics",
+        "_validation_errors",
         "warnings",
         "thread_models",
         "preview_metadata",
@@ -125,6 +130,7 @@ class RunResult:
         warnings: list[str] | None = None,
         thread_models: Mapping[str, Thread] | None = None,
         preview_metadata: dict[str, PreviewThreadMetadata] | None = None,
+        diagnostics: Sequence[Diagnostic] | None = None,
     ) -> None:
         """Initialize a RunResult with execution outcome and telemetry."""
         self.status = status
@@ -136,12 +142,22 @@ class RunResult:
         self.telemetry = telemetry
         self.execution_plan = execution_plan
         self.preview_data = preview_data
-        self.validation_errors = validation_errors
+        self._validation_errors = validation_errors
+        self.diagnostics: list[Diagnostic] = list(diagnostics or [])
         self.warnings: list[str] = warnings if warnings is not None else []
         self.thread_models: Mapping[str, Thread] | None = (
             MappingProxyType(dict(thread_models)) if thread_models is not None else None
         )
         self.preview_metadata = preview_metadata
+
+    @property
+    def validation_errors(self) -> list[str] | None:
+        """Deprecated: use ``diagnostics``. Removed in 3.0.
+
+        Validate mode's error messages; ``None`` when there are none.
+        """
+        _warn_deprecated_result("validation_errors", "diagnostics")
+        return self._validation_errors
 
     def dag(self, *, dark: bool | None = None) -> Any:
         """Return a DAG diagram for plan mode results.
@@ -316,9 +332,12 @@ class RunResult:
         elif self.mode is ExecutionMode.PREVIEW:
             lines.extend(self._summary_preview())
 
-        if self.warnings:
+        config_warnings = [d for d in self.diagnostics if not d.is_error]
+        if self.warnings or config_warnings:
             lines.append("")
             lines.append("Warnings:")
+            for d in config_warnings:
+                lines.append(f"  - {d}")
             for w in self.warnings:
                 lines.append(f"  - {w}")
 
@@ -459,10 +478,11 @@ class RunResult:
             f"Scope:  {self.config_type}:{self.config_name}",
         ]
 
-        if self.validation_errors:
+        errors = [d for d in self.diagnostics if d.is_error]
+        if errors:
             lines.append("Errors:")
-            for err in self.validation_errors:
-                lines.append(f"  - {err}")
+            for d in errors:
+                lines.append(f"  - {d}")
         else:
             lines.append("Checks: config schema \u2713 | DAG \u2713 | sources \u2713")
 
@@ -523,6 +543,28 @@ class RunResult:
         return lines
 
 
+def _loaded_entries(weave: Any, threads: Mapping[str, Any]) -> list[Any]:
+    """A weave's thread entries for planning, without threads a collecting load skipped.
+
+    A thread that failed to load has an entry but no model. It is left out,
+    and so are dependencies on it: it is defined, just broken, and its load
+    error already reports it.
+    """
+    entries = list(weave.threads)
+    skipped = {entry.effective_name for entry in entries} - set(threads)
+    if not skipped:
+        return entries
+    kept = []
+    for entry in entries:
+        if entry.effective_name in skipped:
+            continue
+        if entry.dependencies:
+            deps = [dep for dep in entry.dependencies if dep not in skipped]
+            entry = entry.model_copy(update={"dependencies": deps})
+        kept.append(entry)
+    return kept
+
+
 def _lookups(weave: Any) -> dict[str, Any] | None:
     """A weave's Lookups as a plain dict, or ``None`` when it declares none."""
     return dict(weave.lookups) if weave.lookups else None
@@ -537,11 +579,14 @@ class PlanIssue:
         message: What went wrong, without the weave prefix.
         error: The exception the planner raised; ``None`` when the weave itself
             is missing from the loaded config.
+        diagnostic: The coded diagnostic behind the failure: the planner's own
+            code, ``D104`` for a missing weave, or the generic ``D100``.
     """
 
     weave_name: str
     message: str
     error: Exception | None
+    diagnostic: Diagnostic | None = None
 
 
 class LoadedConfig:
@@ -560,13 +605,15 @@ class LoadedConfig:
         document: The resolved config tree.
         resolved_threads: Deprecated; use ``document``.
         resolved_weaves: Deprecated; use ``document``.
-        warnings: Load warnings.
+        diagnostics: The load's warning diagnostics.
+        warnings: Deprecated; use ``diagnostics``.
     """
 
     __slots__ = (
         "_document",
         "_children_given",
         "_warnings",
+        "_diagnostics",
         "_execution_plan",
         "_plan_built",
     )
@@ -594,18 +641,19 @@ class LoadedConfig:
         # A weave or loom built without its children has no plan to build.
         self._children_given = threads is not None and (config_type != "loom" or weaves is not None)
         self._warnings: tuple[str, ...] = tuple(warnings or ())
+        self._diagnostics: tuple[Diagnostic, ...] = ()
         self._execution_plan: list[Any] | None = None
         self._plan_built = False
 
     @classmethod
     def from_document(
-        cls, document: ResolvedDocument, warnings: list[str] | tuple[str, ...] = ()
+        cls, document: ResolvedDocument, diagnostics: Sequence[Diagnostic] = ()
     ) -> LoadedConfig:
-        """Wrap a resolved config tree and its load warnings.
+        """Wrap a resolved config tree and its load diagnostics.
 
         Args:
             document: The tree the config loader returned.
-            warnings: The load warnings, in emission order.
+            diagnostics: The load's warning diagnostics, in emission order.
 
         Returns:
             The loaded config.
@@ -613,7 +661,8 @@ class LoadedConfig:
         loaded = cls.__new__(cls)
         loaded._document = document
         loaded._children_given = True
-        loaded._warnings = tuple(warnings)
+        loaded._diagnostics = tuple(diagnostics)
+        loaded._warnings = tuple(f"WARN: {d.message}" for d in loaded._diagnostics)
         loaded._execution_plan = None
         loaded._plan_built = False
         return loaded
@@ -665,8 +714,17 @@ class LoadedConfig:
         return MappingProxyType(self._document.weaves())
 
     @property
+    def diagnostics(self) -> tuple[Diagnostic, ...]:
+        """The load's warning diagnostics, in order. Errors raise instead of loading."""
+        return self._diagnostics
+
+    @property
     def warnings(self) -> tuple[str, ...]:
-        """Load warnings (execution-scope, trace-composition, then resolve-lookup), in order."""
+        """Deprecated: use ``diagnostics``. Removed in 3.0.
+
+        Load warnings as ``"WARN: …"`` strings, one per warning diagnostic.
+        """
+        _warn_deprecated("warnings", "diagnostics")
         return self._warnings
 
     @property
@@ -706,20 +764,40 @@ class LoadedConfig:
         Returns:
             The issues found; empty when every plan builds and for thread configs.
         """
+        from weevr.diagnostics import diagnostic
         from weevr.engine.planner import build_plan
+        from weevr.errors import WeevError
 
         issues: list[PlanIssue] = []
         for name, weave, threads, entries, lookups in self._plan_inputs():
+            file = self._weave_file(name)
             if weave is None:
-                issues.append(PlanIssue(name, f"Weave '{name}' not found", None))
+                message = f"Weave '{name}' not found"
+                missing = diagnostic(
+                    "D104", message, node=name, file=self._document.source_ref or None
+                )
+                issues.append(PlanIssue(name, message, None, missing))
                 continue
             try:
                 build_plan(
                     weave_name=name, threads=threads, thread_entries=entries, lookups=lookups
                 )
             except Exception as exc:
-                issues.append(PlanIssue(name, str(exc), exc))
+                text = exc.plain_text() if isinstance(exc, WeevError) else str(exc)
+                coded = getattr(exc, "diagnostics", None)
+                issue = coded[0] if coded else diagnostic("D100", text, node=name)
+                if file is not None:
+                    issue = issue.located(file)
+                issues.append(PlanIssue(name, text, exc, issue))
         return tuple(issues)
+
+    def _weave_file(self, name: str) -> str | None:
+        """The file a weave is written in, from the tree; ``None`` when the tree doesn't know."""
+        document = self._document
+        node = document if document.kind == "weave" else document.children.get(name)
+        if node is None:
+            return None
+        return node.source_ref or None
 
     def _plan_inputs(
         self,
@@ -734,7 +812,7 @@ class LoadedConfig:
         if document.kind == "weave":
             threads = document.weave_threads()[document.name]
             weave = document.model
-            yield document.name, weave, threads, list(weave.threads), _lookups(weave)
+            yield document.name, weave, threads, _loaded_entries(weave, threads), _lookups(weave)
         elif document.kind == "loom":
             threads_by_weave = document.weave_threads()
             for weave_entry in document.model.weaves:
@@ -744,13 +822,8 @@ class LoadedConfig:
                     yield name, None, {}, [], None
                     continue
                 weave = child.model
-                yield (
-                    name,
-                    weave,
-                    threads_by_weave[name],
-                    list(weave.threads),
-                    _lookups(weave),
-                )
+                threads = threads_by_weave[name]
+                yield name, weave, threads, _loaded_entries(weave, threads), _lookups(weave)
 
     def flow(self, *, dark: bool | None = None) -> Any:
         """Return a thread flow diagram for thread configs.
@@ -784,6 +857,17 @@ class LoadedConfig:
                 f"'{type(self).__name__}' object has no attribute '{name}' "
                 f"(underlying {model_type} model does not have this attribute either)"
             ) from None
+
+
+def _warn_deprecated_result(name: str, replacement: str) -> None:
+    import warnings
+
+    warnings.warn(
+        f"RunResult.{name} is deprecated and will be removed in weevr 3.0; "
+        f"use RunResult.{replacement} instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def _warn_deprecated(name: str, replacement: str) -> None:

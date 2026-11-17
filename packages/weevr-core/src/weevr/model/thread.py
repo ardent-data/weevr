@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.audit import AuditTemplate
 from weevr.model.base import FrozenBase
 from weevr.model.column_set import ColumnSet
@@ -93,7 +94,7 @@ class Thread(FrozenBase):
     @classmethod
     def _sources_non_empty(cls, v: dict[str, Source]) -> dict[str, Source]:
         if not v:
-            raise ValueError("sources must contain at least one entry")
+            raise rule_error("C401", "sources must contain at least one entry")
         return v
 
     with_: dict[str, SubPipeline] | None = Field(
@@ -214,10 +215,11 @@ class Thread(FrozenBase):
         required = f"{wm_col} DESC"
         actual = " ".join((primary.dedup.order_by or "").split())
         if actual.lower() != required.lower():
-            raise ValueError(
+            raise rule_error(
+                "C441",
                 f"source '{alias}' dedups an incremental_watermark read without keeping "
                 f"the latest row by the watermark column, so later changes would be "
-                f'lost; set dedup order_by: "{required}"'
+                f'lost; set dedup order_by: "{required}"',
             )
         return self
 
@@ -232,14 +234,16 @@ class Thread(FrozenBase):
             return self
         alias, primary = next(iter(self.sources.items()))
         if primary.dedup is not None:
-            raise ValueError(
+            raise rule_error(
+                "C404",
                 f"source '{alias}' sets dedup, which is not supported with load.mode: cdc; "
-                f"remove it, since the CDC merge keeps the latest change per key"
+                f"remove it, since the CDC merge keeps the latest change per key",
             )
         if self.target.dimension is not None:
-            raise ValueError(
+            raise rule_error(
+                "C404",
                 "target.dimension is not supported with load.mode: cdc; the dimension merge "
-                "ignores the operation column, so deletes would become upserts"
+                "ignores the operation column, so deletes would become upserts",
             )
         return self
 
@@ -258,15 +262,18 @@ class Thread(FrozenBase):
         collisions = cte_names & source_names
         if collisions:
             collision_list = ", ".join(sorted(collisions))
-            raise ValueError(f"with: CTE name(s) collide with source name(s): {collision_list}")
+            raise rule_error(
+                "C442", f"with: CTE name(s) collide with source name(s): {collision_list}"
+            )
 
         # 2. Forward reference check: iterate CTEs in declaration order
         available: set[str] = set(source_names)
         for cte_name, sub_pipeline in self.with_.items():
             if sub_pipeline.from_ not in available:
-                raise ValueError(
+                raise rule_error(
+                    "C443",
                     f"with: CTE '{cte_name}' references '{sub_pipeline.from_}' which is not "
-                    f"declared above it (forward reference or unknown name)"
+                    f"declared above it (forward reference or unknown name)",
                 )
             available.add(cte_name)
 
@@ -310,9 +317,11 @@ class Thread(FrozenBase):
                 if isinstance(step, JoinStep) and step.join.alias is not None:
                     alias = step.join.alias
                     if alias in namespace:
-                        raise ValueError(f"join alias '{alias}' collides with a source or CTE name")
+                        raise rule_error(
+                            "C442", f"join alias '{alias}' collides with a source or CTE name"
+                        )
                     if alias in seen_aliases:
-                        raise ValueError(
-                            f"join alias '{alias}' is used more than once across the thread"
+                        raise rule_error(
+                            "C442", f"join alias '{alias}' is used more than once across the thread"
                         )
                     seen_aliases.add(alias)

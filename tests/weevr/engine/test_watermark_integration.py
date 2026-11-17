@@ -401,14 +401,23 @@ class TestWatermarkTypeRequiredEndToEnd:
             counts.append(spark.read.format("delta").load(str(target)).count())
         assert counts == [2, 2, 2]
 
-    @pytest.mark.parametrize("mode", ["execute", "validate"])
     def test_missing_watermark_type_is_rejected_before_reading(
-        self, spark: SparkSession, tmp_path, mode: str
+        self, spark: SparkSession, tmp_path
     ) -> None:
         """Without a type the thread is rejected at load and the target is never written."""
         project, thread, target = self._project(tmp_path, spark, watermark_type=None)
         ctx = Context(spark=spark, project=str(project))
         with pytest.raises(ModelValidationError, match="watermark_type") as exc_info:
-            ctx.run("t.thread", mode=mode)
+            ctx.run("t.thread", mode="execute")
         assert exc_info.value.file_path == str(thread)
+        assert not target.exists()
+
+    def test_validate_reports_the_missing_watermark_type(
+        self, spark: SparkSession, tmp_path
+    ) -> None:
+        project, thread, target = self._project(tmp_path, spark, watermark_type=None)
+        result = Context(spark=spark, project=str(project)).run("t.thread", mode="validate")
+        assert result.status == "failure"
+        (diag,) = result.diagnostics
+        assert (diag.code, diag.file) == ("C403", str(thread))
         assert not target.exists()

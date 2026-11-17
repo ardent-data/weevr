@@ -134,12 +134,12 @@ class TestBrokenExamplesFail:
             "target:\n  alias: cur.s\n"
         )
         root = self._project(tmp_path, {"t.thread": body})
-        with pytest.raises(ModelValidationError, match=r"steps\.0[\s\S]*expected tags"):
+        with pytest.raises(ModelValidationError, match="C104 unknown-step-type"):
             load_config(root / "t.thread", project_root=root)
 
     def test_weave_entry_without_file_or_body(self, tmp_path: Path) -> None:
         """A weave entry that names a thread with no file and no inline body fails."""
         body = 'config_version: "1.0"\nthreads:\n  - name: ghost\n'
         root = self._project(tmp_path, {"w.weave": body})
-        with pytest.raises(ModelValidationError, match="Thread hydration failed for 'ghost'"):
+        with pytest.raises(ModelValidationError, match="C101 missing-field"):
             load_config(root / "w.weave", project_root=root)

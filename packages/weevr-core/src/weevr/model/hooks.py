@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Discriminator, Field, Tag, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 
@@ -108,27 +109,27 @@ class QualityGateStep(FrozenBase):
 
         if check == "source_freshness":
             if not self.source:
-                raise ValueError("source_freshness requires 'source'")
+                raise rule_error("C403", "source_freshness requires 'source'")
             if not self.max_age:
-                raise ValueError("source_freshness requires 'max_age'")
+                raise rule_error("C403", "source_freshness requires 'max_age'")
 
         elif check == "row_count_delta":
             if not self.target:
-                raise ValueError("row_count_delta requires 'target'")
+                raise rule_error("C403", "row_count_delta requires 'target'")
 
         elif check == "row_count":
             if not self.target:
-                raise ValueError("row_count requires 'target'")
+                raise rule_error("C403", "row_count requires 'target'")
             if self.min_count is None and self.max_count is None:
-                raise ValueError("row_count requires at least 'min_count' or 'max_count'")
+                raise rule_error("C403", "row_count requires at least 'min_count' or 'max_count'")
 
         elif check == "table_exists":
             if not self.source:
-                raise ValueError("table_exists requires 'source'")
+                raise rule_error("C403", "table_exists requires 'source'")
 
         elif check == "expression":
             if not self.sql:
-                raise ValueError("expression requires 'sql'")
+                raise rule_error("C403", "expression requires 'sql'")
 
         return self
 
@@ -228,15 +229,16 @@ def reject_pre_step_baseline_checks(steps: list[Any] | None) -> list[Any] | None
         ``steps`` unchanged.
 
     Raises:
-        ValueError: If any step is a ``row_count_delta`` quality gate.
+        PydanticCustomError: If any step is a ``row_count_delta`` quality gate.
     """
     for i, step in enumerate(steps or []):
         if isinstance(step, QualityGateStep) and step.check == "row_count_delta":
             label = f"pre_steps[{i}]" + (f" ({step.name!r})" if step.name else "")
-            raise ValueError(
+            raise rule_error(
+                "C404",
                 f"{label}: row_count_delta compares against the row count taken before "
                 "the threads run, so it only works in post_steps. Move it to "
-                "post_steps, or use check: row_count for absolute bounds in a pre-step."
+                "post_steps, or use check: row_count for absolute bounds in a pre-step.",
             )
     return steps
 

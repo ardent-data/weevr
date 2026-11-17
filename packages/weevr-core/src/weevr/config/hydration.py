@@ -7,16 +7,21 @@ from typing import Any
 from pydantic import ValidationError
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.collect import skip_on_error
 from weevr.config.inheritance import cascade_registry
 from weevr.config.locations import ConfigLocation
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.resolver import ResolvedChild
 from weevr.config.validation import (
-    split_diagnostics,
-    validate_rename_column_sets,
-    validate_resolve_lookups,
-    validate_source_lookups,
+    in_thread,
+    partition_diagnostics,
+    rename_column_set_diagnostics,
+    resolve_lookup_diagnostics,
+    source_lookup_diagnostics,
 )
+from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics.positions import json_pointer, place_all
+from weevr.diagnostics.pydantic import from_validation_error
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
 
@@ -42,6 +47,11 @@ def _entry_name(entry: Any) -> str:
     return str(entry)
 
 
+def child_name(child: ResolvedChild) -> str:
+    """A resolved child's effective name: its entry's ``as``, else name, else ``ref`` stem."""
+    return child.entry.get("as") or _entry_name(child.entry)
+
+
 def _weave_origin(entry: Any) -> str:
     """Describe where a loom's weave entry comes from, for error messages."""
     if isinstance(entry, dict) and entry.get("ref"):
@@ -65,7 +75,7 @@ def check_resolve_lookups(
     outer: Mapping[str, Any] | None,
     source: ConfigLocation | str,
     name: str,
-    warnings: list[str] | None,
+    warnings: list[Diagnostic] | None,
     *,
     standalone: bool = False,
 ) -> None:
@@ -87,14 +97,18 @@ def check_resolve_lookups(
     available = defined | {
         alias for alias, src in sources.items() if isinstance(src, dict) and src.get("lookup")
     }
-    errors, advisories = split_diagnostics(
-        validate_source_lookups(thread_dict, available_lookups=defined, standalone=standalone)
-        + validate_resolve_lookups(thread_dict, available_lookups=available)
+    errors, advisories = partition_diagnostics(
+        source_lookup_diagnostics(thread_dict, available_lookups=defined, standalone=standalone)
+        + resolve_lookup_diagnostics(thread_dict, available_lookups=available)
     )
     if errors:
-        raise ConfigError("; ".join(errors), file_path=str(source))
+        raise ConfigError(
+            "; ".join(d.message for d in errors),
+            file_path=str(source),
+            diagnostics=in_thread(errors, name, file=str(source), prefix=False),
+        )
     if warnings is not None:
-        warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
+        warnings.extend(in_thread(advisories, name))
 
 
 def check_column_set_references(
@@ -102,7 +116,7 @@ def check_column_set_references(
     outer: Mapping[str, Any] | None,
     source: ConfigLocation | str,
     name: str,
-    warnings: list[str] | None,
+    warnings: list[Diagnostic] | None,
     *,
     standalone: bool = False,
 ) -> None:
@@ -118,22 +132,27 @@ def check_column_set_references(
         ConfigError: For a column set no visible scope defines.
     """
     available = _effective_names(outer, thread_dict.get("column_sets"), "column_set")
-    errors, advisories = split_diagnostics(
-        validate_rename_column_sets(
+    errors, advisories = partition_diagnostics(
+        rename_column_set_diagnostics(
             thread_dict, available_column_sets=available, standalone=standalone
         )
     )
     if errors:
+        located = in_thread(errors, name, file=str(source))
         raise ConfigError(
-            "; ".join(f"thread '{name}': {message}" for message in errors),
+            "; ".join(d.message for d in located),
             file_path=str(source),
+            diagnostics=located,
         )
     if warnings is not None:
-        warnings.extend(f"WARN: thread '{name}': {message}" for message in advisories)
+        warnings.extend(in_thread(advisories, name))
 
 
 def hydrate_model(
-    data: dict[str, Any], config_type: str, source: ConfigLocation | str
+    data: dict[str, Any],
+    config_type: str,
+    source: ConfigLocation | str,
+    at: tuple[str | int, ...] = (),
 ) -> Thread | Weave | Loom:
     """Validate a resolved config dict into its typed model.
 
@@ -141,6 +160,7 @@ def hydrate_model(
         data: Fully resolved config dict.
         config_type: ``'thread'``, ``'weave'``, or ``'loom'``.
         source: The file the config came from, named on failure.
+        at: Where the config sits in ``source``, for an inline weave.
 
     Returns:
         The hydrated model.
@@ -151,11 +171,25 @@ def hydrate_model(
     try:
         return _MODELS[config_type].model_validate(data)
     except ValidationError as exc:
-        raise ModelValidationError(
-            f"Model hydration failed for {config_type}: {exc}",
-            cause=exc,
-            file_path=str(source),
+        raise _hydration_error(
+            f"Model hydration failed for {config_type}: {exc}", exc, data, str(source), at
         ) from exc
+
+
+def _hydration_error(
+    message: str,
+    exc: ValidationError,
+    data: dict[str, Any],
+    file: str,
+    at: tuple[str | int, ...],
+) -> ModelValidationError:
+    """A ``ModelValidationError`` carrying one placed, coded diagnostic per pydantic error."""
+    return ModelValidationError(
+        message,
+        cause=exc,
+        file_path=file,
+        diagnostics=place_all(from_validation_error(exc, data, file=file), file, data, at),
+    )
 
 
 def hydrate_threads(
@@ -163,7 +197,7 @@ def hydrate_threads(
     source: ConfigLocation | str,
     prepare: ChildPreparer | None = None,
     outer_lookups: Mapping[str, Any] | None = None,
-    warnings: list[str] | None = None,
+    warnings: list[Diagnostic] | None = None,
     bind: ThreadBinder | None = None,
     outer_column_sets: Mapping[str, Any] | None = None,
 ) -> dict[str, Thread]:
@@ -194,48 +228,53 @@ def hydrate_threads(
     """
     result: dict[str, Thread] = {}
     for child in children:
-        entry = child.entry
-        thread_dict = child.data
-        entry_as = entry.get("as")
-        thread_source = child.source_path or str(source)
+        with skip_on_error():
+            entry = child.entry
+            thread_dict = child.data
+            entry_as = entry.get("as")
+            thread_source = child.source_path or str(source)
 
-        # Effective name: as > name > stem
-        effective_name = entry_as or _entry_name(entry)
+            # Effective name: as > name > stem
+            effective_name = entry_as or _entry_name(entry)
 
-        if not thread_dict.get("name") or entry_as:
-            thread_dict["name"] = effective_name
+            if not thread_dict.get("name") or entry_as:
+                thread_dict["name"] = effective_name
 
-        # Set template_ref for telemetry provenance
-        ref = entry.get("ref")
-        if ref:
-            thread_dict["template_ref"] = ref
+            # Set template_ref for telemetry provenance
+            ref = entry.get("ref")
+            if ref:
+                thread_dict["template_ref"] = ref
 
-        # Expand foreach macros, as a directly loaded thread does at step 8b.
-        steps = thread_dict.get("steps")
-        with attribute_errors(thread_source):
-            reject_foreach_in_with(thread_dict)
-            if isinstance(steps, list):
-                thread_dict["steps"] = expand_foreach(steps)
+            # Expand foreach macros, as a directly loaded thread does at step 8b.
+            steps = thread_dict.get("steps")
+            with attribute_errors(thread_source, child.at):
+                reject_foreach_in_with(thread_dict)
+                if isinstance(steps, list):
+                    thread_dict["steps"] = expand_foreach(steps)
 
-        check_resolve_lookups(thread_dict, outer_lookups, thread_source, effective_name, warnings)
-        check_column_set_references(
-            thread_dict, outer_column_sets, thread_source, effective_name, warnings
-        )
+            check_resolve_lookups(
+                thread_dict, outer_lookups, thread_source, effective_name, warnings
+            )
+            check_column_set_references(
+                thread_dict, outer_column_sets, thread_source, effective_name, warnings
+            )
 
-        if prepare is not None:
-            prepare(thread_dict)
+            if prepare is not None:
+                prepare(thread_dict)
 
-        try:
-            thread = Thread.model_validate(thread_dict)
-        except ValidationError as exc:
-            raise ModelValidationError(
-                f"Thread hydration failed for '{effective_name}': {exc}",
-                cause=exc,
-                file_path=thread_source,
-            ) from exc
-        if bind is not None:
-            bind(thread, thread_source)
-        result[effective_name] = thread
+            try:
+                thread = Thread.model_validate(thread_dict)
+            except ValidationError as exc:
+                raise _hydration_error(
+                    f"Thread hydration failed for '{effective_name}': {exc}",
+                    exc,
+                    thread_dict,
+                    thread_source,
+                    child.at,
+                ) from exc
+            if bind is not None:
+                bind(thread, thread_source)
+            result[effective_name] = thread
     return result
 
 
@@ -246,7 +285,7 @@ def hydrate_children(
     source: ConfigLocation | str,
     name: str,
     prepare: ChildPreparer | None = None,
-    warnings: list[str] | None = None,
+    warnings: list[Diagnostic] | None = None,
     bind: ThreadBinder | None = None,
 ) -> tuple[dict[str, Weave], dict[str, dict[str, Thread]]]:
     """Hydrate the weaves and threads a weave or loom pulls in.
@@ -295,51 +334,59 @@ def hydrate_children(
         # Weaves are keyed by name from here on (planner, runner, results),
         # so a second entry with the same name would silently replace the first.
         defined_by: dict[str, str] = {}
-        for weave in children:
-            weave_entry = weave.entry
-            weave_dict = weave.data
-            weave_name = _entry_name(weave_entry)
-            origin = _weave_origin(weave_entry)
-            if weave_name in defined_by:
-                raise ConfigError(
-                    f"Duplicate weave name '{weave_name}' in loom: {defined_by[weave_name]} "
-                    f"and {origin}. Give one entry a unique 'name:'."
+        for index, weave in enumerate(children):
+            with skip_on_error():
+                weave_entry = weave.entry
+                weave_dict = weave.data
+                weave_name = _entry_name(weave_entry)
+                origin = _weave_origin(weave_entry)
+                if weave_name in defined_by:
+                    raise ConfigError.from_diagnostic(
+                        diagnostic(
+                            "C350",
+                            f"Duplicate weave name '{weave_name}' in loom: "
+                            f"{defined_by[weave_name]} and {origin}. "
+                            f"Give one entry a unique 'name:'.",
+                            pointer=json_pointer(("weaves", index)),
+                            node=weave_name,
+                            hint="Give one entry a unique 'name:'.",
+                        )
+                    )
+                defined_by[weave_name] = origin
+
+                if not weave_dict.get("name"):
+                    weave_dict["name"] = weave_name
+                # Inline weaves have no file of their own; they live in the loom.
+                weave_source = weave.source_path or str(source)
+                if prepare is not None:
+                    prepare(weave_dict)
+                weave_model = hydrate_model(weave_dict, "weave", weave_source, weave.at)
+                if not isinstance(weave_model, Weave):  # pragma: no cover
+                    continue
+                weaves[weave_name] = weave_model
+
+                threads[weave_name] = hydrate_threads(
+                    weave.children,
+                    weave_source,
+                    prepare,
+                    outer_lookups=cascade_registry(
+                        resolved.get("lookups"),
+                        weave_dict.get("lookups"),
+                        "lookup",
+                        "loom",
+                        "weave",
+                        log_shadowing=False,
+                    ),
+                    warnings=warnings,
+                    bind=bind,
+                    outer_column_sets=cascade_registry(
+                        resolved.get("column_sets"),
+                        weave_dict.get("column_sets"),
+                        "column_set",
+                        "loom",
+                        "weave",
+                        log_shadowing=False,
+                    ),
                 )
-            defined_by[weave_name] = origin
-
-            if not weave_dict.get("name"):
-                weave_dict["name"] = weave_name
-            # Inline weaves have no file of their own; they live in the loom.
-            weave_source = weave.source_path or str(source)
-            if prepare is not None:
-                prepare(weave_dict)
-            weave_model = hydrate_model(weave_dict, "weave", weave_source)
-            if not isinstance(weave_model, Weave):  # pragma: no cover
-                continue
-            weaves[weave_name] = weave_model
-
-            threads[weave_name] = hydrate_threads(
-                weave.children,
-                weave_source,
-                prepare,
-                outer_lookups=cascade_registry(
-                    resolved.get("lookups"),
-                    weave_dict.get("lookups"),
-                    "lookup",
-                    "loom",
-                    "weave",
-                    log_shadowing=False,
-                ),
-                warnings=warnings,
-                bind=bind,
-                outer_column_sets=cascade_registry(
-                    resolved.get("column_sets"),
-                    weave_dict.get("column_sets"),
-                    "column_set",
-                    "loom",
-                    "weave",
-                    log_shadowing=False,
-                ),
-            )
 
     return weaves, threads

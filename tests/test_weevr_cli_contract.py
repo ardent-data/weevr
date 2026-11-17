@@ -79,7 +79,8 @@ def test_loaded_config_surface(project: Path) -> None:
         assert loaded.resolved_weaves
     with pytest.warns(DeprecationWarning, match="document"):
         assert loaded.resolved_threads
-    assert isinstance(loaded.warnings, tuple)
+    with pytest.deprecated_call():
+        assert isinstance(loaded.warnings, tuple)
     assert isinstance(loaded.validate_plans(), tuple)
     plans = loaded.execution_plan
     assert plans
@@ -148,5 +149,7 @@ def test_load_warnings_logged_under_weevr(project: Path, caplog: pytest.LogCaptu
     with caplog.at_level(logging.WARNING, logger="weevr"):
         loaded = load_resolved(project / "nightly.loom", project_root=project)
     logged = [r.getMessage() for r in caplog.records if r.name.startswith("weevr")]
-    assert loaded.warnings
-    assert logged == list(loaded.warnings)
+    with pytest.deprecated_call():
+        warnings = loaded.warnings
+    assert warnings
+    assert logged == list(warnings)

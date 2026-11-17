@@ -80,14 +80,15 @@ preview_phase -> preview_stop: {style.stroke-dash: 3; style.stroke: "#6A1B9A"}
 | Mode | What happens | Result contains |
 |------|-------------|-----------------|
 | `execute` | Full execution: read, transform, write (default) | Status, row counts, telemetry |
-| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets), and check that every source exists (a metadata probe — no data is read). Sources another thread in the run writes don't need to exist yet | `validation_errors` list |
+| `validate` | Parse config, resolve references, check DAG (cycles, duplicate targets), and check that every source exists (a metadata probe — no data is read). Sources another thread in the run writes don't need to exist yet. Never raises for a config problem | `diagnostics` list |
 | `plan` | Build the execution plan and return it without running | `execution_plan` list, `summary()` with cache markers, `explain()` for detailed breakdown |
 | `preview` | Run transforms against sampled data, skip writes | `preview_data` DataFrames |
 
 ```python
 # Validate config without touching data
 result = ctx.run("nightly.loom", mode="validate")
-print(result.validation_errors)
+for d in result.diagnostics:
+    print(d)  # C101 missing-field: Field required (orders.thread:2:1)
 
 # Inspect the execution plan
 result = ctx.run("nightly.loom", mode="plan")
@@ -97,6 +98,20 @@ print(result.explain())  # detailed: dependencies, cache targets, thread detail
 # Preview transforms without writing
 result = ctx.run("nightly.loom", mode="preview")
 ```
+
+Validate mode reports every config problem in one result and never
+raises for one: load errors (parse, schema, references, rules), plan
+problems (cycles, unordered writers) and missing sources all land in
+`result.diagnostics`, and `status` is `"failure"` when any is an error.
+Files that fail to load are left out; the rest are still planned and
+probed. Load warnings are included too. Only failures that aren't config
+problems, such as a lost Spark session, raise. Each diagnostic has a
+stable code — see [Diagnostic Codes](../reference/diagnostics.md).
+
+The other modes raise one `ConfigError` listing every problem, so a
+notebook cell stops with the full list. `result.validation_errors` is
+deprecated: it returns the same strings as before and will be removed in
+weevr 3.0.
 
 Preview limits every source, including lookup-bound sources, to `sample_rows`
 (100 by default). A `resolve` step matches those rows against the full lookup,

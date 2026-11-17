@@ -4,7 +4,8 @@ Each mutation breaks one file of the ``forms`` fixture project (see
 ``tests/weevr/test_load_parity.py``) and loads a config that reaches it through
 ``load_config``, ``load_resolved`` and ``Context.load``. Every load must raise
 a :class:`~weevr.errors.ConfigError` subclass that names a file, never a bare
-``KeyError``, ``TypeError`` or ``AttributeError``.
+``KeyError``, ``TypeError`` or ``AttributeError``, and every diagnostic it
+carries has a registered, specific code and names a file.
 """
 
 from __future__ import annotations
@@ -22,7 +23,10 @@ from pyspark.sql import SparkSession
 
 from weevr.config import load_config, load_resolved
 from weevr.context import Context
+from weevr.diagnostics import REGISTRY
 from weevr.errors import ConfigError
+
+GENERIC_CODES = {"C100", "C400"}
 
 FORMS = Path(__file__).parents[1] / "fixtures" / "load_parity" / "forms.weevr"
 
@@ -237,6 +241,12 @@ def test_malformed_config_raises_located_config_error(
     with pytest.raises(ConfigError) as caught:
         ENTRY_POINTS[entry](root, mutation.load, mutation.params)
     assert caught.value.file_path, f"{type(caught.value).__name__} names no file: {caught.value}"
+    diagnostics = caught.value.diagnostics
+    assert diagnostics, f"{type(caught.value).__name__} carries no diagnostic: {caught.value}"
+    for diag in diagnostics:
+        assert diag.code in REGISTRY, f"unregistered code {diag.code}"
+        assert diag.code not in GENERIC_CODES, f"generic {diag.code}: {diag.message}"
+        assert diag.file, f"{diag.code} names no file: {diag.message}"
 
 
 class TestDefaultsErrorsNameTheirFile:

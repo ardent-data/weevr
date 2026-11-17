@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from weevr.diagnostics import diagnostic
 from weevr.engine.planner import ExecutionPlan
 from weevr.engine.result import ThreadResult, WeaveResult
 from weevr.errors import ConfigError
@@ -134,7 +135,7 @@ class TestRunResult:
         assert result.telemetry is None
         assert result.execution_plan is None
         assert result.preview_data is None
-        assert result.validation_errors is None
+        assert result.diagnostics == []
         assert result.warnings == []
 
     def test_validate_mode(self) -> None:
@@ -147,7 +148,8 @@ class TestRunResult:
         )
         assert result.status == "failure"
         assert result.mode == ExecutionMode.VALIDATE
-        assert result.validation_errors == ["Source 'raw' not found"]
+        with pytest.deprecated_call(match="diagnostics"):
+            assert result.validation_errors == ["Source 'raw' not found"]
         assert result.detail is None
 
     def test_plan_mode(self) -> None:
@@ -307,11 +309,11 @@ class TestRunResult:
             mode=ExecutionMode.VALIDATE,
             config_type="thread",
             config_name="dim_customer",
-            validation_errors=["Source 'raw' not found: /data/raw"],
+            diagnostics=[diagnostic("S101", "Source 'raw' not found: /data/raw", node="t")],
         )
         s = result.summary()
         assert "Errors:" in s
-        assert "Source 'raw' not found" in s
+        assert "S101 source-not-found: Source 'raw' not found" in s
 
     def test_summary_plan(self) -> None:
         plan = ExecutionPlan(
@@ -1026,7 +1028,7 @@ class TestReprHtml:
             mode=ExecutionMode.VALIDATE,
             config_type="weave",
             config_name="test",
-            validation_errors=["Missing source: raw_customers"],
+            diagnostics=[diagnostic("S101", "Missing source: raw_customers")],
         )
         html_out = result._repr_html_()
         assert html_out is not None
@@ -1319,11 +1321,25 @@ class TestLoadedConfig:
         from weevr.config import ResolvedDocument
 
         document = ResolvedDocument(model=sample_thread, kind="thread", name="dim_customer")
-        loaded = LoadedConfig.from_document(document, ["WARN: x"])
+        from weevr.diagnostics import Severity, diagnostic
+
+        warning = diagnostic("C491", "x", severity=Severity.WARNING)
+        loaded = LoadedConfig.from_document(document, [warning])
         assert loaded.document is document
         assert loaded.model is sample_thread
         assert (loaded.config_type, loaded.config_name) == ("thread", "dim_customer")
-        assert loaded.warnings == ("WARN: x",)
+        assert loaded.diagnostics == (warning,)
+
+    def test_warnings_is_a_deprecated_string_view(self, sample_thread: Thread) -> None:
+        from weevr.config import ResolvedDocument
+        from weevr.diagnostics import Severity, diagnostic
+
+        document = ResolvedDocument(model=sample_thread, kind="thread", name="t")
+        loaded = LoadedConfig.from_document(
+            document, [diagnostic("C491", "thread 't': x", severity=Severity.WARNING)]
+        )
+        with pytest.deprecated_call(match="diagnostics"):
+            assert loaded.warnings == ("WARN: thread 't': x",)
 
     def test_parts_build_a_tree(
         self, sample_loom: Loom, sample_weave: Weave, sample_thread: Thread
@@ -1794,9 +1810,14 @@ class TestValidatePlans:
             threads={"ok": {"a": _plan_thread("a", "out.a")}},
             weaves={"ok": Weave(name="ok", config_version="1.0", threads=[ThreadEntry(name="a")])},
         )
-        assert loaded.validate_plans() == (
-            PlanIssue(weave_name="gone", message="Weave 'gone' not found", error=None),
+        (issue,) = loaded.validate_plans()
+        assert (issue.weave_name, issue.message, issue.error) == (
+            "gone",
+            "Weave 'gone' not found",
+            None,
         )
+        assert issue.diagnostic is not None
+        assert issue.diagnostic.code == "D104"
 
     def test_clean_weave_has_no_issues(self) -> None:
         weave = Weave(name="w", config_version="1.0", threads=[ThreadEntry(name="a")])

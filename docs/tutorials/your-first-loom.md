@@ -216,8 +216,10 @@ Besides `execute` (the default), weevr supports three additional modes that are
 useful during development:
 
 ```python
-# Validate config without touching data
+# Validate config without touching data; lists every problem it finds
 result = ctx.run("daily.loom", mode="validate")
+for d in result.diagnostics:
+    print(d)
 
 # Show the execution plan (DAG order) without running
 result = ctx.run("daily.loom", mode="plan")

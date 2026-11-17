@@ -5,18 +5,28 @@ from __future__ import annotations
 import logging
 import os
 import time
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.config.collect import diagnostics_of
 from weevr.config.document import ScopeRegistries, registry_as_dict
-from weevr.config.loader import load_resolved_config
+from weevr.config.loader import collect_resolved_config, load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
-from weevr.config.validation import split_diagnostics, validate_rename_column_sets
+from weevr.config.parser import TYPED_EXTENSIONS
+from weevr.config.validation import (
+    in_thread,
+    partition_diagnostics,
+    rename_column_set_diagnostics,
+    render_diagnostics,
+)
 from weevr.delta import probe_delta_table_exists
+from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics.positions import json_pointer
 from weevr.engine.executor import execute_thread, resolve_with_block
 from weevr.engine.lookups import resolve_lookup_frames
 from weevr.engine.planner import (
@@ -28,6 +38,7 @@ from weevr.engine.planner import (
 from weevr.engine.runner import execute_loom, execute_weave
 from weevr.errors import (
     ConfigError,
+    ConfigLocationError,
     DataValidationError,
     ExecutionError,
 )
@@ -244,11 +255,15 @@ class Context:
             sample_rows: Maximum rows for preview mode (default 100).
 
         Returns:
-            A :class:`RunResult` describing the outcome.
+            A :class:`RunResult` describing the outcome. In ``"validate"``
+            mode, every config problem — load, plan and source existence — is
+            in ``RunResult.diagnostics`` and nothing is raised for them.
 
         Raises:
             ValueError: If *mode* is invalid or both *tags* and *threads*
                 are provided.
+            ConfigError: In ``"execute"``, ``"plan"`` and ``"preview"`` modes,
+                when the config has problems; ``.diagnostics`` lists them all.
         """
         try:
             resolved_mode = ExecutionMode(mode)
@@ -260,8 +275,19 @@ class Context:
             raise ValueError("'tags' and 'threads' are mutually exclusive")
 
         start_ns = time.monotonic_ns()
-        loaded = self._load(path)
-        self._check_standalone_column_sets(loaded, path)
+        if resolved_mode is ExecutionMode.VALIDATE:
+            result = self._validate(path)
+            result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+            return result
+
+        try:
+            loaded = self._load(path)
+            self._check_standalone_column_sets(loaded, path)
+        except ConfigError as exc:
+            # Report the plan problems of the files that did load with the
+            # load problems, so one failed run lists everything to fix.
+            exc.diagnostics = [*exc.diagnostics, *self._plan_problems(path)]
+            raise
 
         # Single application point for the effective YAML log level —
         # before mode dispatch, so all four modes behave identically.
@@ -270,8 +296,6 @@ class Context:
         try:
             if resolved_mode is ExecutionMode.EXECUTE:
                 result = self._run_execute(loaded, tags=tags, thread_names=threads)
-            elif resolved_mode is ExecutionMode.VALIDATE:
-                result = self._run_validate(loaded)
             elif resolved_mode is ExecutionMode.PLAN:
                 result = self._run_plan(loaded, tags=tags, thread_names=threads)
             else:
@@ -287,9 +311,11 @@ class Context:
                 config_name=loaded.config_name,
                 duration_ms=duration_ms,
                 warnings=[str(exc)],
+                diagnostics=loaded.diagnostics,
             )
 
         result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+        result.diagnostics = [*loaded.diagnostics, *result.diagnostics]
         return result
 
     def _check_standalone_column_sets(self, loaded: LoadedConfig, path: str | Path) -> None:
@@ -306,15 +332,18 @@ class Context:
         model = loaded.model
         if loaded.config_type != "thread" or not isinstance(model, Thread):
             return
-        errors, _ = split_diagnostics(
-            validate_rename_column_sets(
+        errors, _ = partition_diagnostics(
+            rename_column_set_diagnostics(
                 model.model_dump(), available_column_sets=set(model.column_sets or {})
             )
         )
         if errors:
+            file = str(self._resolve_config_path(path))
+            located = in_thread(errors, loaded.config_name, file=file)
             raise ConfigError(
-                "; ".join(f"thread '{loaded.config_name}': {message}" for message in errors),
-                file_path=str(self._resolve_config_path(path)),
+                "; ".join(d.message for d in located),
+                file_path=file,
+                diagnostics=located,
             )
 
     # ------------------------------------------------------------------
@@ -559,11 +588,48 @@ class Context:
     # Validate mode
     # ------------------------------------------------------------------
 
-    def _run_validate(self, loaded: LoadedConfig) -> RunResult:
-        """Validate config, DAG, and source existence without executing."""
-        validation_errors: list[str] = []
+    def _validate(self, path: str | Path) -> RunResult:
+        """Validate mode: report every config, plan and source problem; raise for none.
+
+        Files that fail to load are reported and left out; the plan and
+        source checks run on the rest. Only failures that aren't config
+        problems (a lost Spark session) raise.
+        """
+        loaded, errors = self._load_for_validate(path)
+        if loaded is None:
+            return RunResult(
+                status="failure",
+                mode=ExecutionMode.VALIDATE,
+                config_type=TYPED_EXTENSIONS.get(Path(str(path)).suffix.lower(), ""),
+                config_name=Path(str(path)).stem,
+                validation_errors=[d.message for d in errors] or None,
+                diagnostics=errors,
+            )
+        try:
+            self._check_standalone_column_sets(loaded, path)
+        except ConfigError as exc:
+            errors.extend(diagnostics_of([exc]))
+        self._apply_effective_log_level(loaded)
+        try:
+            return self._run_validate(loaded, errors)
+        except (ExecutionError, DataValidationError) as exc:
+            return RunResult(
+                status="failure",
+                mode=ExecutionMode.VALIDATE,
+                config_type=loaded.config_type,
+                config_name=loaded.config_name,
+                warnings=[str(exc)],
+                diagnostics=[*errors, *loaded.diagnostics],
+            )
+
+    def _run_validate(self, loaded: LoadedConfig, load_errors: list[Diagnostic]) -> RunResult:
+        """Check the DAG and source existence of a loaded config, beside its load problems."""
+        diagnostics: list[Diagnostic] = [*load_errors, *loaded.diagnostics]
+        validation_errors: list[str] = [d.message for d in load_errors]
 
         for issue in loaded.validate_plans():
+            if issue.diagnostic is not None:
+                diagnostics.append(issue.diagnostic)
             if issue.error is None:
                 validation_errors.append(issue.message)
             elif loaded.config_type == "weave":
@@ -574,28 +640,38 @@ class Context:
                 )
 
         all_threads = self._collect_all_threads(loaded)
-        source_errors = self._check_source_existence(all_threads)
-        validation_errors.extend(source_errors)
+        source_errors = self._source_existence_diagnostics(all_threads)
+        diagnostics.extend(source_errors)
+        validation_errors.extend(d.message for d in source_errors)
 
-        status = "failure" if validation_errors else "success"
+        failed = any(d.is_error for d in diagnostics)
         return RunResult(
-            status=status,
+            status="failure" if failed else "success",
             mode=ExecutionMode.VALIDATE,
             config_type=loaded.config_type,
             config_name=loaded.config_name,
             validation_errors=validation_errors if validation_errors else None,
+            diagnostics=diagnostics,
             thread_models=_thread_models(loaded),
         )
 
-    def _check_source_existence(self, threads: dict[str, Thread]) -> list[str]:
-        """Check that all sources referenced by threads exist.
+    def _source_existence_diagnostics(self, threads: dict[str, Thread]) -> list[Diagnostic]:
+        """Check that all sources referenced by threads exist, as coded diagnostics.
 
         Existence is a metadata question: Delta sources, including
         connection-form ones, go through the catalog or Delta-log check,
         file sources through a filesystem probe — no reads, no schema
         inference, no Spark jobs.
+
+        Returns:
+            One diagnostic per problem source: ``S101`` for a location that
+            does not exist, ``S102`` for one whose probe failed, and the
+            location error's own code (an undefined connection's ``R201``)
+            for a connection-form source whose location cannot be resolved. Each
+            names the thread (``node``) and the source alias
+            (``resolved_path``); the message gives the location.
         """
-        errors: list[str] = []
+        errors: list[Diagnostic] = []
         checked: set[str] = set()
         # Sources another thread in this run writes are created by the run
         # itself, in dependency order — they need not exist yet.
@@ -607,8 +683,16 @@ class Context:
                     continue
                 try:
                     location = self._source_location(source, thread.connections)
-                except ValueError as exc:
-                    errors.append(f"Source '{source_name}' in thread '{thread_name}': {exc}")
+                except ConfigLocationError as exc:
+                    cause = exc.diagnostics[0]
+                    errors.append(
+                        replace(
+                            cause,
+                            message=f"Source '{source_name}' in thread '{thread_name}': {exc}",
+                            node=thread_name,
+                            resolved_path=json_pointer(("sources", source_name)),
+                        )
+                    )
                     continue
                 if location is None:
                     continue
@@ -624,14 +708,24 @@ class Context:
                 except Exception as exc:
                     logger.warning("Existence probe failed for '%s': %s", resolve_path, exc)
                     errors.append(
-                        f"Source '{source_name}' in thread '{thread_name}' "
-                        f"could not be verified: {resolve_path}"
+                        diagnostic(
+                            "S102",
+                            f"Source '{source_name}' in thread '{thread_name}' "
+                            f"could not be verified: {resolve_path}",
+                            node=thread_name,
+                            resolved_path=json_pointer(("sources", source_name)),
+                        )
                     )
                     continue
                 if not exists:
                     errors.append(
-                        f"Source '{source_name}' in thread '{thread_name}' "
-                        f"not found: {resolve_path}"
+                        diagnostic(
+                            "S101",
+                            f"Source '{source_name}' in thread '{thread_name}' "
+                            f"not found: {resolve_path}",
+                            node=thread_name,
+                            resolved_path=json_pointer(("sources", source_name)),
+                        )
                     )
         return errors
 
@@ -692,7 +786,7 @@ class Context:
             ``None`` when the source declares no probeable location.
 
         Raises:
-            ValueError: If a connection-form source can't be resolved.
+            ConfigLocationError: If a connection-form source can't be resolved.
         """
         if source.connection:
             path = resolve_connection_path(
@@ -1015,9 +1109,40 @@ class Context:
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
         )
-        for warning in warnings:
+        for warning in render_diagnostics(warnings):
             logger.warning(warning)
         return LoadedConfig.from_document(document, warnings)
+
+    def _plan_problems(self, path: str | Path) -> list[Diagnostic]:
+        """Plan problems of the files of a config that do load, for a failed run."""
+        loaded, _ = self._load_for_validate(path, log_warnings=False)
+        if loaded is None:
+            return []
+        return [i.diagnostic for i in loaded.validate_plans() if i.diagnostic is not None]
+
+    def _load_for_validate(
+        self, path: str | Path, *, log_warnings: bool = True
+    ) -> tuple[LoadedConfig | None, list[Diagnostic]]:
+        """Load for validate mode: problems are returned, not raised.
+
+        Returns:
+            ``(loaded, errors)``: the config without the files that failed,
+            or ``None`` when the file itself failed; and the error diagnostics.
+        """
+        from weevr.config.fabric import build_fabric_context
+
+        document, warnings, errors = collect_resolved_config(
+            self._resolve_config_path(path),
+            runtime_params=self._params,
+            project_root=self._project_root,
+            fabric_context=build_fabric_context(self._spark),
+        )
+        if log_warnings:
+            for warning in render_diagnostics(warnings):
+                logger.warning(warning)
+        if document is None:
+            return None, errors
+        return LoadedConfig.from_document(document, warnings), errors
 
 
 def _thread_models(loaded: LoadedConfig) -> dict[str, Thread]:

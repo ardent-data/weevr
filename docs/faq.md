@@ -313,14 +313,16 @@ Use validate mode:
 ```python
 result = ctx.run("nightly.loom", mode="validate")
 print(result.status)
-print(result.validation_errors)
+for d in result.diagnostics:
+    print(d)
 ```
 
 Validate mode parses the config, resolves variables and references, checks
 the DAG for cycles, and verifies that sources exist (tables and paths,
 including connection-form sources; lookup-bound sources are skipped) -- all
-without reading or writing any data. Use it in CI or as a pre-flight check before
-production runs.
+without reading or writing any data. It reports every problem with a stable
+code and its file and line, and never raises for a config problem. Use it in
+CI or as a pre-flight check before production runs.
 
 You can also use plan mode to see the execution order without running:
 

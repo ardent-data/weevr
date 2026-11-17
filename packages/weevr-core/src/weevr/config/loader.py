@@ -10,15 +10,17 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
+from weevr.config.collect import collecting, diagnostics_of
 from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
 from weevr.config.hydration import (
     check_column_set_references,
     check_resolve_lookups,
+    child_name,
     hydrate_children,
     hydrate_model,
 )
@@ -32,6 +34,7 @@ from weevr.config.locations import (
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.parser import (
+    TYPED_EXTENSIONS,
     detect_config_type,
     detect_config_type_from_extension,
     extract_config_version,
@@ -46,14 +49,18 @@ from weevr.config.resolver import (
     validate_params,
 )
 from weevr.config.validation import (
-    collect_execution_scope_warnings,
-    collect_trace_composition_warnings,
-    incremental_diagnostics,
-    split_diagnostics,
-    validate_dimension_overrides,
+    dimension_override_diagnostics,
+    execution_scope_diagnostics,
+    in_thread,
+    incremental_thread_diagnostics,
+    partition_diagnostics,
+    render_diagnostics,
+    trace_composition_diagnostics,
     validate_schema,
 )
 from weevr.config.warp import discover_warp, find_warp
+from weevr.diagnostics import Diagnostic, diagnostic
+from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
 from weevr.model.warp import WarpBinding
@@ -88,7 +95,7 @@ class ResolvedConfig:
     data: dict[str, Any]
     children: list[ResolvedChild] = field(default_factory=list)
     authored: dict[str, Any] | None = None
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[Diagnostic] = field(default_factory=list)
 
 
 def resolve_config(
@@ -127,9 +134,19 @@ def resolve_config(
 
     ext_type = detect_config_type_from_extension(location)
     if ext_type is None and require_typed_extension:
+        message = f"Unsupported extension '{location.suffix}'. Expected .thread, .weave, or .loom"
         raise ConfigError(
-            f"Unsupported extension '{location.suffix}'. Expected .thread, .weave, or .loom",
+            message,
             file_path=str(location),
+            diagnostics=[
+                diagnostic(
+                    "C007",
+                    message,
+                    file=str(location),
+                    pointer="",
+                    expected=sorted(TYPED_EXTENSIONS),
+                )
+            ],
         )
     config_type = ext_type if ext_type is not None else detect_config_type(raw)
 
@@ -156,10 +173,14 @@ def resolve_config(
         )
     except VariableResolutionError as exc:
         if config_type == "thread" and "param." in str(exc):
-            raise VariableResolutionError(
+            message = (
                 f"{exc}. This thread may be a template designed for "
-                f"use with 'as' and 'params' on a ThreadEntry in a weave.",
+                f"use with 'as' and 'params' on a ThreadEntry in a weave."
+            )
+            raise VariableResolutionError(
+                message,
                 config_key=getattr(exc, "config_key", None),
+                diagnostics=[replace(d, message=message) for d in exc.diagnostics],
             ) from exc
         raise
 
@@ -189,9 +210,21 @@ def resolve_config(
     if ext_type is not None:
         declared_name = data.get("name", "")
         if declared_name and declared_name != location.stem:
+            message = (
+                f"Declared name '{declared_name}' does not match filename stem '{location.stem}'"
+            )
             raise ConfigError(
-                f"Declared name '{declared_name}' does not match filename stem '{location.stem}'",
+                message,
                 file_path=str(location),
+                diagnostics=[
+                    diagnostic(
+                        "C205",
+                        message,
+                        file=str(location),
+                        pointer="/name",
+                        expected=[location.stem],
+                    )
+                ],
             )
         if not declared_name:
             data["name"] = location.stem
@@ -215,7 +248,7 @@ def resolve_config(
     )
 
 
-def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[str]]:
+def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[Diagnostic]]:
     """Hydrate a resolved thread, weave, or loom and the children it pulls in.
 
     Hydration consumes ``resolved``: child dicts in ``resolved.data`` are
@@ -231,7 +264,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
     Raises:
         ModelValidationError: If the config or any child fails model validation.
     """
-    lookup_warnings: list[str] = []
+    lookup_warnings: list[Diagnostic] = []
     if resolved.config_type == "thread":
         # A standalone thread sees only its own lookups at run time
         check_resolve_lookups(
@@ -270,7 +303,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
     # explicit trace: true under a traceless loom is a no-op.
     if isinstance(model, Loom):
         warnings.extend(
-            collect_trace_composition_warnings(
+            trace_composition_diagnostics(
                 model.execution,
                 {name: w.execution for name, w in weaves.items()},
             )
@@ -284,7 +317,7 @@ def hydrate_resolved(resolved: ResolvedConfig) -> tuple[ResolvedDocument, list[s
 
 
 def check_incremental(
-    resolved: ResolvedConfig, document: ResolvedDocument, warnings: list[str]
+    resolved: ResolvedConfig, document: ResolvedDocument, warnings: list[Diagnostic]
 ) -> None:
     """Run the incremental-load checks on every thread the config pulls in.
 
@@ -300,13 +333,15 @@ def check_incremental(
         model = thread.model
         if not isinstance(model, Thread) or model.load is None or model.load.mode == "full":
             continue
-        errors, advisories = split_diagnostics(incremental_diagnostics(model, authored))
+        errors, advisories = partition_diagnostics(incremental_thread_diagnostics(model, authored))
         if errors:
+            located = in_thread(errors, thread.name, file=thread.source_ref or None)
             raise ConfigError(
-                "; ".join(f"thread '{thread.name}': {message}" for message in errors),
+                "; ".join(d.message for d in located),
                 file_path=thread.source_ref,
+                diagnostics=located,
             )
-        warnings.extend(f"WARN: thread '{thread.name}': {message}" for message in advisories)
+        warnings.extend(in_thread(advisories, thread.name))
 
 
 def _threads_with_authored(
@@ -318,15 +353,21 @@ def _threads_with_authored(
     if document.kind == "weave":
         weaves = [(document, resolved.children)]
     else:
+        weave_nodes = {child_name(node): node for node in resolved.children}
         weaves = [
-            (weave, node.children)
-            for weave, node in zip(document.children.values(), resolved.children, strict=True)
+            (weave, weave_nodes[name].children)
+            for name, weave in document.children.items()
+            if name in weave_nodes
         ]
-    return [
-        (thread, node.authored)
-        for weave, nodes in weaves
-        for thread, node in zip(weave.children.values(), nodes, strict=True)
-    ]
+    pairs: list[tuple[ResolvedDocument, dict[str, Any] | None]] = []
+    for weave, nodes in weaves:
+        by_name = {child_name(node): node for node in nodes}
+        pairs.extend(
+            (thread, by_name[name].authored)
+            for name, thread in weave.children.items()
+            if name in by_name
+        )
+    return pairs
 
 
 def _assemble_document(
@@ -337,26 +378,29 @@ def _assemble_document(
 ) -> ResolvedDocument:
     """Build the document tree from the hydrated models and the resolved children.
 
-    Children, their hydrated models and the parent's typed entries all come
-    in entry order, so they are paired by position.
+    Children are paired with the parent's typed entries by effective name;
+    a child a collecting load skipped after it failed gets no node.
     """
     top_file = str(resolved.location)
 
     def thread_docs(
         weave: Weave, by_name: dict[str, Thread], nodes: list[ResolvedChild], enclosing: str
     ) -> dict[str, ResolvedDocument]:
-        return {
-            name: ResolvedDocument(
+        node_by_name = {child_name(node): node for node in nodes}
+        docs: dict[str, ResolvedDocument] = {}
+        for entry in weave.threads:
+            name = entry.effective_name
+            thread, node = by_name.get(name), node_by_name.get(name)
+            if thread is None or node is None:
+                continue  # skipped by a collecting load after it failed
+            docs[name] = ResolvedDocument(
                 model=thread,
                 kind="thread",
                 name=name,
                 entry=EntryMeta.from_entry(entry),
                 source_ref=node.source_path or enclosing,
             )
-            for (name, thread), entry, node in zip(
-                by_name.items(), weave.threads, nodes, strict=True
-            )
-        }
+        return docs
 
     children: dict[str, ResolvedDocument] = {}
     if isinstance(model, Weave):
@@ -364,9 +408,12 @@ def _assemble_document(
             model, threads.get(resolved.config_name, {}), resolved.children, top_file
         )
     elif isinstance(model, Loom):
-        for (name, weave), entry, node in zip(
-            weaves.items(), model.weaves, resolved.children, strict=True
-        ):
+        weave_nodes = {child_name(node): node for node in resolved.children}
+        for entry in model.weaves:
+            name = entry.effective_name
+            weave, node = weaves.get(name), weave_nodes.get(name)
+            if weave is None or node is None:
+                continue  # skipped by a collecting load after it failed
             weave_file = node.source_path or top_file
             children[name] = ResolvedDocument(
                 model=weave,
@@ -428,11 +475,12 @@ def load_resolved_config(
     runtime_params: dict[str, Any] | None = None,
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
-) -> tuple[ResolvedDocument, list[str]]:
+) -> tuple[ResolvedDocument, list[Diagnostic]]:
     """Load a typed thread, weave, or loom file with its resolved children.
 
     The engine-facing entry point: ``Context`` calls it with its project root
-    and Fabric context. Errors name the file they were found in. Warnings are
+    and Fabric context. Errors name the file they were found in; every
+    problem in the project is raised together in one error. Warnings are
     returned, not logged.
 
     Args:
@@ -446,7 +494,7 @@ def load_resolved_config(
         ``(document, warnings)``: the resolved config tree and the load
         warnings.
     """
-    with attribute_errors(location):
+    with collecting(), attribute_errors(location):
         return hydrate_resolved(
             resolve_config(
                 location,
@@ -456,6 +504,48 @@ def load_resolved_config(
                 require_typed_extension=True,
             )
         )
+
+
+def collect_resolved_config(
+    location: ConfigLocation,
+    *,
+    runtime_params: dict[str, Any] | None = None,
+    project_root: ConfigLocation | None = None,
+    fabric_context: dict[str, Any] | None = None,
+) -> tuple[ResolvedDocument | None, list[Diagnostic], list[Diagnostic]]:
+    """Load like :func:`load_resolved_config`, returning problems instead of raising.
+
+    For validate mode, which reports every problem. Files that fail are left
+    out of the tree; the rest load as usual.
+
+    Args:
+        location: The config file (``.thread``, ``.weave``, or ``.loom``).
+        runtime_params: Runtime parameter overrides.
+        project_root: Root for child references and Source paths. Defaults to
+            the file's directory.
+        fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+
+    Returns:
+        ``(document, warnings, errors)``: the tree, ``None`` when the file
+        itself failed; the load warnings; and the error diagnostics, ordered
+        by file and position.
+    """
+    errors: list[ConfigError] = []
+    loaded: tuple[ResolvedDocument, list[Diagnostic]] | None = None
+    with collecting(into=errors), attribute_errors(location):
+        loaded = hydrate_resolved(
+            resolve_config(
+                location,
+                runtime_params=runtime_params,
+                project_root=project_root,
+                fabric_context=fabric_context,
+                require_typed_extension=True,
+            )
+        )
+    found = diagnostics_of(errors)
+    if loaded is None:
+        return None, [], found
+    return loaded[0], loaded[1], found
 
 
 def load_resolved(
@@ -503,7 +593,7 @@ def load_resolved(
     document, warnings = load_resolved_config(
         make_location(path), runtime_params=runtime_params, project_root=root
     )
-    for warning in warnings:
+    for warning in render_diagnostics(warnings):
         logger.warning(warning)
     return LoadedConfig.from_document(document, warnings)
 
@@ -553,15 +643,33 @@ def check_dimension_overrides(
         ConfigError: Naming the field and the thread's own file (the enclosing
             file for an inline thread).
     """
-    for thread, thread_file in _pre_cascade_threads(config_type, resolved, children, str(location)):
-        errors, _ = split_diagnostics(validate_dimension_overrides(thread))
+    for thread, thread_file, at in _pre_cascade_threads(
+        config_type, resolved, children, str(location)
+    ):
+        errors = [d for d in dimension_override_diagnostics(thread) if d.is_error]
         if errors:
-            raise ConfigError("; ".join(errors), file_path=thread_file)
+            located = fill_lines(
+                [
+                    replace(
+                        d,
+                        file=thread_file,
+                        node=thread.get("name") or None,
+                        pointer=json_pointer(at + parse_pointer(d.resolved_path or "")),
+                    )
+                    for d in errors
+                ],
+                thread_file,
+            )
+            raise ConfigError(
+                "; ".join(d.message for d in located),
+                file_path=thread_file,
+                diagnostics=located,
+            )
 
 
 def collect_execution_warnings(
     config_type: str, resolved: dict[str, Any], children: list[ResolvedChild]
-) -> list[str]:
+) -> list[Diagnostic]:
     """Gather thread-scope execution warnings from pre-cascade dicts."""
     defaults_by_scope: list[tuple[str, dict[str, Any] | None]] = []
     if config_type == "loom":
@@ -574,8 +682,8 @@ def collect_execution_warnings(
         weave_label = f"weave '{resolved.get('name') or '(unnamed)'}'"
         defaults_by_scope.append((weave_label, resolved.get("defaults")))
 
-    threads = [thread for thread, _ in _pre_cascade_threads(config_type, resolved, children, "")]
-    return collect_execution_scope_warnings(defaults_by_scope, threads)
+    threads = [thread for thread, _, _ in _pre_cascade_threads(config_type, resolved, children, "")]
+    return execution_scope_diagnostics(defaults_by_scope, threads)
 
 
 def _pre_cascade_threads(
@@ -583,21 +691,30 @@ def _pre_cascade_threads(
     resolved: dict[str, Any],
     children: list[ResolvedChild],
     enclosing: str,
-) -> list[tuple[dict[str, Any], str]]:
-    """Every thread dict a config pulls in, with the file it is written in.
+) -> list[tuple[dict[str, Any], str, tuple[str | int, ...]]]:
+    """Every thread dict a config pulls in, with its file and where it sits there.
 
-    That is the thread's own file, else the referenced weave file that holds
-    it inline, else ``enclosing`` (the top-level config).
+    The file is the thread's own, else the referenced weave file that holds
+    it inline, else ``enclosing`` (the top-level config). The position is
+    empty for a thread in its own file, else the path to the inline thread
+    (through an inline weave, when the weave is inline too).
     """
     if config_type == "loom":
         return [
-            (thread.data, thread.source_path or weave.source_path or enclosing)
+            (
+                thread.data,
+                thread.source_path or weave.source_path or enclosing,
+                () if thread.source_path else (() if weave.source_path else weave.at) + thread.at,
+            )
             for weave in children
             for thread in weave.children
         ]
     if config_type == "weave":
-        return [(thread.data, thread.source_path or enclosing) for thread in children]
-    return [(resolved, enclosing)]
+        return [
+            (thread.data, thread.source_path or enclosing, () if thread.source_path else thread.at)
+            for thread in children
+        ]
+    return [(resolved, enclosing, ())]
 
 
 def compute_qualified_key(file_path: ConfigLocation, project_root: ConfigLocation) -> str:

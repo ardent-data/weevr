@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 
@@ -102,7 +103,7 @@ class WarpConfig(FrozenBase):
                 duplicates.append(name)
             seen.add(name)
         if duplicates:
-            raise ValueError(f"Duplicate column names: {', '.join(duplicates)}")
+            raise rule_error("C444", f"Duplicate column names: {', '.join(duplicates)}")
         return self
 
     @model_validator(mode="after")
@@ -112,14 +113,15 @@ class WarpConfig(FrozenBase):
             return self
         col_names = {col.name for col in self.columns}
         if self.keys.surrogate and self.keys.surrogate not in col_names:
-            raise ValueError(
-                f"keys.surrogate '{self.keys.surrogate}' does not reference a declared column"
+            raise rule_error(
+                "C445",
+                f"keys.surrogate '{self.keys.surrogate}' does not reference a declared column",
             )
         if self.keys.business:
             missing = [k for k in self.keys.business if k not in col_names]
             if missing:
-                raise ValueError(
-                    f"keys.business references undeclared columns: {', '.join(missing)}"
+                raise rule_error(
+                    "C445", f"keys.business references undeclared columns: {', '.join(missing)}"
                 )
         return self
 

@@ -1,0 +1,12 @@
+config_version: "1.0"
+defaults: &src
+  type: delta
+  alias: raw.orders
+sources:
+  orders: *src
+  returns:
+    <<: *src
+    alias: raw.returns
+tags:
+  - &t first
+  - *t

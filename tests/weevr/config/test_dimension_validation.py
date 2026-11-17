@@ -265,5 +265,6 @@ class TestDimensionRulesOnLoad:
     def test_context_validate_reports_it(self, make_project: MakeProject) -> None:
         project = make_project(_dim_thread(keys={"business_key": ["id"]}), thread_file="dim.thread")
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
-        with pytest.raises(ConfigError, match=r"keys\.business_key"):
-            ctx.run("w.weave", mode="validate")
+        result = ctx.run("w.weave", mode="validate")
+        assert result.status == "failure"
+        assert "C487" in {d.code for d in result.diagnostics}

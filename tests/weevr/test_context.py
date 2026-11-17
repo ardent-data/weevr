@@ -12,6 +12,7 @@ from pyspark.sql import SparkSession
 
 from weevr.context import Context
 from weevr.delta import resolve_delta_table
+from weevr.diagnostics import Diagnostic
 from weevr.errors import ConfigError, ExecutionError
 from weevr.model.source import Source
 from weevr.model.target import Target
@@ -730,6 +731,16 @@ target:
 # ---------------------------------------------------------------------------
 
 
+def _messages(diagnostics: list[Diagnostic]) -> list[str]:
+    """The messages of the given diagnostics."""
+    return [d.message for d in diagnostics]
+
+
+def _errors(result: RunResult) -> list[str] | None:
+    """The messages of a result's error diagnostics; ``None`` when there are none."""
+    return [d.message for d in result.diagnostics if d.is_error] or None
+
+
 def _project_dir(tmp_path: Path) -> Path:
     """Create and return a .weevr project directory in tmp_path."""
     project = tmp_path / "test.weevr"
@@ -1020,7 +1031,7 @@ class TestValidateMode:
 
         assert result.status == "success"
         assert result.mode == ExecutionMode.VALIDATE
-        assert result.validation_errors is None
+        assert _errors(result) is None
 
     def test_validate_valid_weave(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1034,7 +1045,7 @@ class TestValidateMode:
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "success"
-        assert result.validation_errors is None
+        assert _errors(result) is None
 
     def test_validate_duplicate_target_threads(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1050,11 +1061,9 @@ class TestValidateMode:
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert any(
-            "load_jan" in e and "load_feb" in e and "DAG validation failed" in e
-            for e in result.validation_errors
-        )
+        (conflict,) = [d for d in result.diagnostics if d.code == "D102"]
+        assert conflict.expected is not None
+        assert {"load_jan", "load_feb"} <= set(conflict.expected)
 
     def test_validate_missing_source(self, spark: SparkSession, tmp_path: Path) -> None:
         tgt = str(tmp_path / "tgt_miss")
@@ -1063,8 +1072,9 @@ class TestValidateMode:
         result = ctx.run(yaml_path, mode="validate")
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert any("not found" in e for e in result.validation_errors)
+        errors = _errors(result)
+        assert errors is not None
+        assert any("not found" in e for e in errors)
 
     def test_validate_accepts_condition_gated_same_target_writers(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1095,7 +1105,7 @@ threads:
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "success"
-        assert result.validation_errors is None
+        assert _errors(result) is None
 
 
 @pytest.mark.spark
@@ -1671,14 +1681,14 @@ class TestValidateModeSourceProbes:
             "c": self._thread_with_source("csv", str(csv_src), tgt),
             "j": self._thread_with_source("json", str(json_src), tgt),
         }
-        assert ctx._check_source_existence(present) == []
+        assert _messages(ctx._source_existence_diagnostics(present)) == []
 
         missing = {
             "d": self._thread_with_source("delta", str(tmp_path / "no_delta"), tgt),
             "c": self._thread_with_source("csv", str(tmp_path / "no.csv"), tgt),
             "j": self._thread_with_source("json", str(tmp_path / "no.json"), tgt),
         }
-        errors = ctx._check_source_existence(missing)
+        errors = _messages(ctx._source_existence_diagnostics(missing))
         assert len(errors) == 3
         assert all("not found" in e for e in errors)
 
@@ -1698,7 +1708,7 @@ class TestValidateModeSourceProbes:
             "j": self._thread_with_source("json", str(json_src), tgt),
         }
         with job_counter() as jc:
-            assert ctx._check_source_existence(threads) == []
+            assert _messages(ctx._source_existence_diagnostics(threads)) == []
         assert jc.jobs == 0
 
     @staticmethod
@@ -1724,7 +1734,7 @@ class TestValidateModeSourceProbes:
             patch("weevr.context.resolve_connection_path", return_value=one_row_src),
             job_counter() as jc,
         ):
-            assert ctx._check_source_existence(threads) == []
+            assert _messages(ctx._source_existence_diagnostics(threads)) == []
         assert jc.jobs == 0
 
     def test_missing_connection_table_is_reported(
@@ -1734,7 +1744,7 @@ class TestValidateModeSourceProbes:
         missing = str(tmp_path / "no_table")
         threads = {"t": self._connection_thread(str(tmp_path / "tgt"))}
         with patch("weevr.context.resolve_connection_path", return_value=missing):
-            errors = ctx._check_source_existence(threads)
+            errors = _messages(ctx._source_existence_diagnostics(threads))
         assert len(errors) == 1
         assert all(text in errors[0] for text in ("'main'", "'t'", "not found", missing))
 
@@ -1743,7 +1753,7 @@ class TestValidateModeSourceProbes:
     ) -> None:
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
-        errors = ctx._check_source_existence({"t": thread})
+        errors = _messages(ctx._source_existence_diagnostics({"t": thread}))
         assert len(errors) == 1
         assert "undefined connection 'nope'" in errors[0]
 
@@ -1755,11 +1765,51 @@ class TestValidateModeSourceProbes:
         location = "nosuchscheme://bucket/orders"
         tgt = str(tmp_path / "tgt")
         threads = {"t": self._thread_with_source(source_type, location, tgt)}
-        errors = ctx._check_source_existence(threads)
+        errors = _messages(ctx._source_existence_diagnostics(threads))
         assert len(errors) == 1
         assert "could not be verified" in errors[0]
         assert "not found" not in errors[0]
         assert location in errors[0]
+
+    def test_missing_sources_carry_not_found_code(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        tgt = str(tmp_path / "tgt")
+        missing_delta = str(tmp_path / "no_delta")
+        missing_csv = str(tmp_path / "no.csv")
+        threads = {
+            "d": self._thread_with_source("delta", missing_delta, tgt),
+            "c": self._thread_with_source("csv", missing_csv, tgt),
+        }
+        diags = ctx._source_existence_diagnostics(threads)
+        assert [d.code for d in diags] == ["S101", "S101"]
+        assert [d.node for d in diags] == ["d", "c"]
+        assert all(d.category.value == "platform" and d.is_error for d in diags)
+        assert all(d.resolved_path == "/sources/main" for d in diags)
+        assert missing_delta in diags[0].message
+        assert missing_csv in diags[1].message
+
+    @pytest.mark.parametrize("source_type", ["csv", "delta"])
+    def test_failed_probe_carries_probe_failed_code(
+        self, spark: SparkSession, tmp_path: Path, source_type: str
+    ) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        threads = {
+            "t": self._thread_with_source(
+                source_type, "nosuchscheme://bucket/orders", str(tmp_path / "tgt")
+            )
+        }
+        (diag,) = ctx._source_existence_diagnostics(threads)
+        assert diag.code == "S102"
+        assert diag.node == "t"
+
+    def test_unresolvable_connection_is_coded(self, spark: SparkSession, tmp_path: Path) -> None:
+        ctx = Context(spark=spark, project=_project_dir(tmp_path))
+        thread = self._connection_thread(str(tmp_path / "tgt"), connection="nope")
+        (diag,) = ctx._source_existence_diagnostics({"t": thread})
+        assert diag.code == "R201"
+        assert diag.node == "t"
 
     def test_shared_connection_location_is_probed_once(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1770,7 +1820,7 @@ class TestValidateModeSourceProbes:
             patch("weevr.context.resolve_connection_path", return_value=one_row_src),
             patch.object(ctx, "_source_location_exists", return_value=True) as probe,
         ):
-            ctx._check_source_existence({"a": thread, "b": thread})
+            _messages(ctx._source_existence_diagnostics({"a": thread, "b": thread}))
         probe.assert_called_once_with("delta", one_row_src)
 
     def test_validate_mode_existing_but_empty_directory_counts_as_present(
@@ -1788,7 +1838,7 @@ class TestValidateModeSourceProbes:
 
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         threads = {"c": self._thread_with_source("csv", str(empty_dir), tgt)}
-        assert ctx._check_source_existence(threads) == []
+        assert _messages(ctx._source_existence_diagnostics(threads)) == []
 
 
 def _in_run_weave(project: Path, src: str, lake: Path, weave: str = "orders") -> Path:
@@ -1809,8 +1859,8 @@ class TestValidateInRunSources:
         weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
         result = Context(spark=spark, project=project).run(weave, mode="validate")
 
-        assert result.status == "success", result.validation_errors
-        assert result.validation_errors is None
+        assert result.status == "success", _errors(result)
+        assert _errors(result) is None
 
     def test_missing_external_source_still_fails(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1824,10 +1874,11 @@ class TestValidateInRunSources:
         result = Context(spark=spark, project=project).run(weave, mode="validate")
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert len(result.validation_errors) == 1
-        assert "dim_x" in result.validation_errors[0]
-        assert "not found" in result.validation_errors[0]
+        errors = _errors(result)
+        assert errors is not None
+        assert len(errors) == 1
+        assert "dim_x" in errors[0]
+        assert "not found" in errors[0]
 
     def test_loom_reads_earlier_weave_target(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1841,7 +1892,7 @@ class TestValidateInRunSources:
         loom = _create_loom_yaml(project, "nightly", ["silver", "gold"])
         result = Context(spark=spark, project=project).run(loom, mode="validate")
 
-        assert result.status == "success", result.validation_errors
+        assert result.status == "success", _errors(result)
 
     def test_connection_form_reader_of_connection_form_writer(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1866,7 +1917,9 @@ class TestValidateInRunSources:
             }
         )
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
-        assert ctx._check_source_existence({"writer": writer, "reader": reader}) == []
+        assert (
+            _messages(ctx._source_existence_diagnostics({"writer": writer, "reader": reader})) == []
+        )
 
     def test_thread_reading_its_own_target_is_still_probed(
         self, spark: SparkSession, tmp_path: Path
@@ -1878,8 +1931,9 @@ class TestValidateInRunSources:
         )
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert any("not found" in e for e in result.validation_errors)
+        errors = _errors(result)
+        assert errors is not None
+        assert any("not found" in e for e in errors)
 
 
 @pytest.mark.spark

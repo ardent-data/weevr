@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from weevr.diagnostics.rules import rule_error
 from weevr.model.base import FrozenBase
 
 # Supported export formats — all Fabric-native Spark formats.
@@ -103,30 +104,36 @@ class Export(FrozenBase):
         - ``name`` must be a valid Python identifier.
         """
         if not self.name.isidentifier():
-            raise ValueError(f"Export name '{self.name}' is not a valid identifier")
+            raise rule_error("C103", f"Export name '{self.name}' is not a valid identifier")
 
         if self.alias is not None and self.type != "delta":
-            raise ValueError(
-                f"Export '{self.name}': alias is only valid for delta type, got type='{self.type}'"
+            raise rule_error(
+                "C404",
+                f"Export '{self.name}': alias is only valid for delta type, got type='{self.type}'",
             )
 
         if self.connection is not None and self.type != "delta":
-            raise ValueError(
+            raise rule_error(
+                "C404",
                 f"Export '{self.name}': connection is only valid for delta type, "
-                f"got type='{self.type}'"
+                f"got type='{self.type}'",
             )
 
         if self.connection is not None and self.alias is not None:
-            raise ValueError(f"Export '{self.name}': connection and alias are mutually exclusive")
+            raise rule_error(
+                "C402", f"Export '{self.name}': connection and alias are mutually exclusive"
+            )
 
         if self.connection is not None and self.path is not None:
-            raise ValueError(f"Export '{self.name}': connection and path are mutually exclusive")
+            raise rule_error(
+                "C402", f"Export '{self.name}': connection and path are mutually exclusive"
+            )
 
         if self.connection is not None and not self.table:
-            raise ValueError(f"Export '{self.name}': connection requires table to be set")
+            raise rule_error("C403", f"Export '{self.name}': connection requires table to be set")
 
         if self.table is not None and not self.connection:
-            raise ValueError(f"Export '{self.name}': table requires connection to be set")
+            raise rule_error("C403", f"Export '{self.name}': table requires connection to be set")
 
         if self.enabled:
             has_path = bool(self.path)
@@ -134,10 +141,11 @@ class Export(FrozenBase):
             has_connection = bool(self.connection)
             destinations = sum([has_path, has_alias, has_connection])
             if destinations != 1:
-                raise ValueError(
+                raise rule_error(
+                    "C403" if destinations == 0 else "C402",
                     f"Export '{self.name}': exactly one of 'path', 'alias', or 'connection' "
                     f"must be set (got path={has_path}, alias={has_alias}, "
-                    f"connection={has_connection})"
+                    f"connection={has_connection})",
                 )
 
         return self

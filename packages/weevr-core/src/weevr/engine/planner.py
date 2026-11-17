@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from weevr.config.onelake import resolve_connection_path
+from weevr.diagnostics import diagnostic
 from weevr.errors.exceptions import ConfigError
 from weevr.model.base import FrozenBase
 from weevr.model.lookup import Lookup
@@ -223,9 +224,15 @@ def _build_explicit_index(
         if entry.dependencies:
             for dep in entry.dependencies:
                 if dep not in threads:
-                    raise ConfigError(
-                        f"Thread '{effective_name}' declares explicit dependency on '{dep}', "
-                        f"but '{dep}' is not defined in the weave"
+                    raise ConfigError.from_diagnostic(
+                        diagnostic(
+                            "D103",
+                            f"Thread '{effective_name}' declares explicit dependency on "
+                            f"'{dep}', but '{dep}' is not defined in the weave",
+                            node=effective_name,
+                            expected=sorted(threads),
+                            hint=f"Define thread '{dep}' in the weave or remove the dependency.",
+                        )
                     )
             explicit_index[effective_name] = list(entry.dependencies)
     return explicit_index
@@ -330,13 +337,23 @@ def _build_target_index(
             conditional_writers[path] = sorted(writers)
             continue
         names = ", ".join(f"'{n}'" for n in sorted(writers))
-        raise ConfigError(
-            f"Threads {names} all write target '{path}' in weave "
-            f"'{weave_name}' but are not ordered by explicit dependencies, "
-            f"so concurrent writes would corrupt the target. Declare "
-            f"explicit dependencies to serialize the writers, give each "
-            f"thread its own target, or put a mutually exclusive condition "
-            f"on every writer."
+        raise ConfigError.from_diagnostic(
+            diagnostic(
+                "D102",
+                f"Threads {names} all write target '{path}' in weave "
+                f"'{weave_name}' but are not ordered by explicit dependencies, "
+                f"so concurrent writes would corrupt the target. Declare "
+                f"explicit dependencies to serialize the writers, give each "
+                f"thread its own target, or put a mutually exclusive condition "
+                f"on every writer.",
+                node=weave_name,
+                expected=sorted(writers),
+                hint=(
+                    "Declare explicit dependencies to serialize the writers, give each "
+                    "thread its own target, or put a mutually exclusive condition on "
+                    "every writer."
+                ),
+            )
         )
     return target_index, conditional_writers
 
@@ -757,7 +774,15 @@ def build_plan(
     cycle = _detect_cycles(thread_names, dependencies)
     if cycle is not None:
         cycle_path = " → ".join(cycle)
-        raise ConfigError(f"Circular dependency detected in weave '{weave_name}': {cycle_path}")
+        raise ConfigError.from_diagnostic(
+            diagnostic(
+                "D101",
+                f"Circular dependency detected in weave '{weave_name}': {cycle_path}",
+                node=weave_name,
+                expected=cycle,
+                hint="Remove one dependency in the cycle.",
+            )
+        )
 
     # 4. Build reverse graph (dependents)
     dependents = _build_dependents(thread_names, dependencies)

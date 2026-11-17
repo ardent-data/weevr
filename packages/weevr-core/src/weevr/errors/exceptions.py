@@ -2,28 +2,60 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Self
+
+from weevr.diagnostics import Diagnostic
 
 if TYPE_CHECKING:
     from weevr.model.warp import DriftReport
 
 
-class WeevError(Exception):
-    """Base exception for all weevr errors."""
+def _render(diagnostics: list[Diagnostic]) -> str:
+    if len(diagnostics) == 1:
+        return str(diagnostics[0])
+    lines = "\n".join(f"  - {d}" for d in diagnostics)
+    return f"{len(diagnostics)} config problems:\n{lines}"
 
-    def __init__(self, message: str, cause: Exception | None = None) -> None:
+
+class WeevError(Exception):
+    """Base exception for all weevr errors.
+
+    ``diagnostics`` holds the coded problems behind the error. Match on
+    their codes, not on the message or the exception class.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        cause: Exception | None = None,
+        *,
+        diagnostics: Iterable[Diagnostic] | None = None,
+    ) -> None:
         """Initialize WeevError.
 
         Args:
             message: Human-readable error message
             cause: Optional underlying exception that triggered this error
+            diagnostics: The coded problems behind this error
         """
         super().__init__(message)
         self.message = message
         self.cause = cause
+        self.diagnostics: list[Diagnostic] = list(diagnostics or [])
 
     def __str__(self) -> str:
-        """Return string representation of the error."""
+        """Return string representation of the error.
+
+        With diagnostics, one line per diagnostic (``code name: message
+        (file:line:column)``), so a traceback lists every problem.
+        """
+        if self.diagnostics:
+            return _render(self.diagnostics)
+        return self.plain_text()
+
+    def plain_text(self) -> str:
+        """The error as text without its diagnostics: the message and its cause."""
         if self.cause:
             return f"{self.message} (caused by: {self.cause})"
         return self.message
@@ -38,6 +70,8 @@ class ConfigError(WeevError):
         cause: Exception | None = None,
         file_path: str | None = None,
         config_key: str | None = None,
+        *,
+        diagnostics: Iterable[Diagnostic] | None = None,
     ) -> None:
         """Initialize ConfigError.
 
@@ -46,13 +80,46 @@ class ConfigError(WeevError):
             cause: Optional underlying exception
             file_path: Path to the config file where the error occurred
             config_key: Specific config key that caused the error
+            diagnostics: The coded problems behind this error
         """
-        super().__init__(message, cause)
+        super().__init__(message, cause, diagnostics=diagnostics)
         self.file_path = file_path
         self.config_key = config_key
 
+    @classmethod
+    def from_diagnostic(cls, diagnostic: Diagnostic, cause: Exception | None = None) -> Self:
+        """Raise-ready error for one diagnostic, using its message and file.
+
+        Args:
+            diagnostic: The problem.
+            cause: Optional underlying exception.
+
+        Returns:
+            The error, carrying ``diagnostic``.
+        """
+        return cls(diagnostic.message, cause, file_path=diagnostic.file, diagnostics=[diagnostic])
+
+    def locate(self, file_path: str) -> None:
+        """Name ``file_path`` where this error and its diagnostics name no file yet.
+
+        Args:
+            file_path: The config file being processed when the error surfaced.
+        """
+        if self.file_path is None:
+            self.file_path = file_path
+        self.diagnostics = [d.located(file_path) for d in self.diagnostics]
+
     def __str__(self) -> str:
-        """Return string representation with context."""
+        """Return string representation with context.
+
+        With diagnostics, one line per diagnostic, as for :class:`WeevError`.
+        """
+        if self.diagnostics:
+            return _render(self.diagnostics)
+        return self.plain_text()
+
+    def plain_text(self) -> str:
+        """The error as text without its diagnostics: message, file, key and cause."""
         parts = [self.message]
         if self.file_path:
             parts.append(f"in {self.file_path}")
@@ -130,6 +197,17 @@ class ModelValidationError(ConfigError):
     This occurs after variable resolution and inheritance, when the concrete
     values are validated through the Pydantic domain model (Thread, Weave, or
     Loom). Semantic constraints that span multiple fields are checked here.
+    """
+
+    pass
+
+
+class ConfigLocationError(ConfigError, ValueError):
+    """Raised when a config, source or target location can't be resolved.
+
+    Covers an absolute path or URI where a relative one is required, a path
+    that climbs out of its root, and an undefined connection. It is also a
+    ``ValueError``, which callers that resolve locations already catch.
     """
 
     pass

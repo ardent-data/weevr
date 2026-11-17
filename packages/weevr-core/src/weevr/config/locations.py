@@ -22,6 +22,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from weevr.diagnostics import diagnostic
+from weevr.errors.exceptions import ConfigLocationError
+
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
 
@@ -128,7 +131,7 @@ class LocalConfigLocation(ConfigLocation):
             ValueError: If ``rel`` is an absolute path.
         """
         if Path(rel).is_absolute():
-            raise ValueError(f"Cannot join absolute path '{rel}' to a config location")
+            raise _absolute_join(rel, "path")
         return LocalConfigLocation(self._path / rel)
 
     def exists(self) -> bool:
@@ -197,6 +200,17 @@ class LocalConfigLocation(ConfigLocation):
 # ---------------------------------------------------------------------------
 
 
+def _absolute_join(rel: str, kind: str) -> ConfigLocationError:
+    """The error for joining an absolute path or URI where a relative one belongs."""
+    return ConfigLocationError.from_diagnostic(
+        diagnostic(
+            "C311",
+            f"Cannot join absolute {kind} '{rel}' to a config location",
+            hint="Write the reference relative to the project root.",
+        )
+    )
+
+
 def _split_scheme(uri: str) -> tuple[str, str]:
     """Split ``scheme://rest`` into ``("scheme://", "rest")``.
 
@@ -252,7 +266,9 @@ def _normalize_uri_path(rest: str) -> str:
             continue
         if seg == "..":
             if not out:
-                raise ValueError(f"Path traversal escapes URI authority: {rest!r}")
+                raise ConfigLocationError.from_diagnostic(
+                    diagnostic("C303", f"Path traversal escapes URI authority: {rest!r}")
+                )
             out.pop()
             continue
         out.append(seg)
@@ -339,9 +355,9 @@ class RemoteConfigLocation(ConfigLocation):
                 walks above the URI authority via ``..``.
         """
         if "://" in rel:
-            raise ValueError(f"Cannot join absolute URI '{rel}' to a config location")
+            raise _absolute_join(rel, "URI")
         if rel.startswith("/"):
-            raise ValueError(f"Cannot join absolute path '{rel}' to a config location")
+            raise _absolute_join(rel, "path")
 
         scheme, rest = _split_scheme(self._uri)
         joined = rest.rstrip("/") + "/" + rel.lstrip("/")
