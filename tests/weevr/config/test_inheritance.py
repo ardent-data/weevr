@@ -531,6 +531,51 @@ class TestAuditColumnsInheritance:
 class TestExportsInheritance:
     """Test additive cascade for exports across loom → weave → thread."""
 
+    _ARCHIVE: dict[str, Any] = {"name": "archive", "type": "parquet", "path": "/archive"}
+
+    @pytest.mark.parametrize("value", [False, "false", "False", "OFF", "no", "n", "f", "0", 0, 0.0])
+    @pytest.mark.parametrize("level", ["loom", "weave", "thread"])
+    def test_enabled_read_as_false_suppresses(self, level: str, value: Any):
+        """Any enabled value the model reads as false drops the export at every level."""
+        exports = [{**self._ARCHIVE, "enabled": value}]
+        loom: dict[str, Any] | None = {"exports": exports} if level == "loom" else None
+        weave: dict[str, Any] | None = {"exports": exports} if level == "weave" else None
+        thread: dict[str, Any] = {"target": {"alias": "data.out"}}
+        if level == "thread":
+            thread["exports"] = exports
+        result = apply_inheritance(loom, weave, thread)
+        assert result["exports"] == []
+
+    def test_string_false_override_suppresses_inherited(self):
+        """A name-only override with a string enabled drops the inherited export."""
+        weave: dict[str, Any] = {"exports": [dict(self._ARCHIVE)]}
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [{"name": "archive", "enabled": "false"}],
+        }
+        result = apply_inheritance(None, weave, thread)
+        assert result["exports"] == []
+
+    @pytest.mark.parametrize("value", [True, "true", "yes", 1])
+    def test_enabled_read_as_true_keeps_export(self, value: Any):
+        """An enabled value the model reads as true keeps the export."""
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [{**self._ARCHIVE, "enabled": value}],
+        }
+        result = apply_inheritance(None, None, thread)
+        assert [e["name"] for e in result["exports"]] == ["archive"]
+
+    @pytest.mark.parametrize("value", ["maybe", " false", None])
+    def test_unreadable_enabled_is_kept_for_the_model(self, value: Any):
+        """A value the model can't read as a bool is kept, so model validation reports it."""
+        thread: dict[str, Any] = {
+            "target": {"alias": "data.out"},
+            "exports": [{**self._ARCHIVE, "enabled": value}],
+        }
+        result = apply_inheritance(None, None, thread)
+        assert [e["name"] for e in result["exports"]] == ["archive"]
+
     def test_loom_only(self):
         """Loom exports cascade into thread config."""
         loom: dict[str, Any] = {

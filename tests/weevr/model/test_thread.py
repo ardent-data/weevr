@@ -297,6 +297,33 @@ class TestThreadCacheField:
         assert t.cache is True
 
 
+class TestThreadExportsField:
+    """Tests for the Thread.exports field."""
+
+    _ARCHIVE = {"name": "archive", "type": "parquet", "path": "Files/archive"}
+    _EXTRACT = {"name": "extract", "type": "csv", "path": "Files/extract"}
+
+    def test_disabled_export_is_dropped(self):
+        """A disabled export is not part of the thread's exports."""
+        t = Thread.model_validate(
+            {**_MINIMAL, "exports": [self._ARCHIVE, {**self._EXTRACT, "enabled": False}]}
+        )
+        assert t.exports is not None
+        assert [e.name for e in t.exports] == ["archive"]
+
+    def test_all_disabled_leaves_no_exports_to_run(self):
+        """A thread whose exports are all disabled has nothing to export."""
+        t = Thread.model_validate(
+            {**_MINIMAL, "exports": [{"name": "archive", "type": "parquet", "enabled": False}]}
+        )
+        assert not t.exports
+
+    def test_no_exports_stays_none(self):
+        """A thread without exports keeps exports=None."""
+        t = Thread.model_validate(_MINIMAL)
+        assert t.exports is None
+
+
 class TestThreadSharedResourceFields:
     """Tests for Thread shared resource fields."""
 

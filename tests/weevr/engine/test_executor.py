@@ -1,5 +1,7 @@
 """Tests for execute_thread() — thread executor orchestration."""
 
+from pathlib import Path
+
 import pytest
 from pyspark.sql import SparkSession
 
@@ -485,6 +487,27 @@ class TestExecuteThreadExports:
         # Verify export data was written
         exported = spark.read.parquet(exp_path)
         assert exported.count() == 2
+
+    def test_disabled_export_not_written(
+        self, spark: SparkSession, tmp_delta_path, two_row_src
+    ) -> None:
+        """A disabled export on a thread is skipped; the enabled one is written."""
+        tgt = tmp_delta_path("exp_disabled_tgt")
+        on_path = tmp_delta_path("exp_disabled_on")
+        off_path = tmp_delta_path("exp_disabled_off")
+
+        exports = [
+            Export(name="archive", type="parquet", path=on_path),
+            Export(name="extract", type="parquet", path=off_path, enabled=False),
+        ]
+        thread = _make_thread("export_disabled", two_row_src, tgt, exports=exports)
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert result.telemetry is not None
+        assert [r.name for r in result.telemetry.export_results] == ["archive"]
+        assert spark.read.parquet(on_path).count() == 2
+        assert not any(Path(off_path).iterdir())
 
     def test_export_warn_continues(self, spark: SparkSession, tmp_delta_path, one_row_src) -> None:
         """Export with on_failure=warn logs error but thread succeeds."""
