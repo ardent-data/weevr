@@ -120,6 +120,7 @@ def build_position_map(text: str) -> PositionMap:
 
 
 def _position(node: yaml.Node) -> tuple[int, int]:
+    """A node's 1-based (line, column)."""
     return (node.start_mark.line + 1, node.start_mark.column + 1)
 
 
@@ -130,6 +131,7 @@ def _walk(
     lengths: dict[str, int],
     substituted: set[str],
 ) -> None:
+    """Record the position of every entry under ``node``, keyed by pointer."""
     if isinstance(node, yaml.MappingNode):
         for key_node, value_node in node.value:
             if not isinstance(key_node, yaml.ScalarNode):
@@ -187,6 +189,7 @@ def child_of(node: Any, segment: str | int) -> Any:
 
 
 def _value_at(data: Any, segments: Segments) -> Any:
+    """The value at ``segments`` under ``data``, or :data:`ABSENT`."""
     node = data
     for segment in segments:
         node = child_of(node, segment)
@@ -333,6 +336,7 @@ def fill_lines(diagnostics: Sequence[Diagnostic], file: str) -> list[Diagnostic]
 
 
 def _with_line(diagnostic: Diagnostic, positions: PositionMap) -> Diagnostic:
+    """Add the line and column of the diagnostic's pointer, when the map has it."""
     segments = parse_pointer(diagnostic.pointer or "")
     line_column = _line_column(diagnostic.code, segments, positions)
     if line_column is None:

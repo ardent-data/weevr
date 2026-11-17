@@ -45,6 +45,7 @@ def attribute_errors(location: ConfigLocation | str, at: Segments = ()) -> Itera
 
 
 def _attribute(exc: ConfigError, file: str, at: Segments) -> None:
+    """Prefix pointers with ``at``, name ``file``, and add lines from its position map."""
     if at:
         exc.diagnostics = [
             replace(d, pointer=json_pointer(at + parse_pointer(d.pointer)))

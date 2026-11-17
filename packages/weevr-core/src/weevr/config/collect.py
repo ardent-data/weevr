@@ -80,6 +80,7 @@ def recorded() -> list[ConfigError] | None:
 
 
 def _position(diagnostic: Diagnostic) -> tuple[str, int, int]:
+    """Sort key: file, then line, then column (unknown sorts first)."""
     return (diagnostic.file or "", diagnostic.line or 0, diagnostic.column or 0)
 
 

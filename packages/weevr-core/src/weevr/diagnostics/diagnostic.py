@@ -126,4 +126,5 @@ class Diagnostic:
 
 
 def _as_tuple(values: Iterable[Any]) -> tuple[str, ...]:
+    """Freeze values into a tuple of strings."""
     return tuple(str(value) for value in values)

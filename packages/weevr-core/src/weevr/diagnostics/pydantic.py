@@ -44,6 +44,8 @@ _QUOTED = re.compile(r"'((?:[^'\\]|\\.)*)'")
 
 @dataclass(frozen=True)
 class _Located:
+    """A pydantic error with its real path and the union labels it passed."""
+
     error: ErrorDetails
     path: tuple[str | int, ...]
     labels: tuple[str, ...]
@@ -114,6 +116,7 @@ def _step_context(path: tuple[str | int, ...]) -> dict[str, Any]:
 
 
 def _code(error_type: str) -> str:
+    """The registered code for a pydantic error type."""
     if error_type in REGISTRY:
         return error_type
     if error_type == "missing":
@@ -137,6 +140,7 @@ def _code(error_type: str) -> str:
 
 
 def _expected(details: ErrorDetails) -> list[str] | None:
+    """Allowed values a pydantic error states, when it states any."""
     ctx = details.get("ctx") or {}
     if details["type"] in REGISTRY:
         expected = ctx.get("expected")
@@ -150,11 +154,13 @@ def _expected(details: ErrorDetails) -> list[str] | None:
 
 
 def _hint(details: ErrorDetails) -> str | None:
+    """The hint a coded validator error carries."""
     hint = (details.get("ctx") or {}).get("hint")
     return str(hint) if hint is not None and details["type"] in REGISTRY else None
 
 
 def _message(details: ErrorDetails) -> str:
+    """The error message without pydantic's validator prefix."""
     message = details["msg"]
     for prefix in _VALIDATOR_PREFIXES:
         if message.startswith(prefix):
@@ -163,6 +169,7 @@ def _message(details: ErrorDetails) -> str:
 
 
 def _convert(item: _Located, file: str | None) -> Diagnostic:
+    """One diagnostic for one located pydantic error."""
     return diagnostic(
         _code(item.error["type"]),
         _message(item.error),

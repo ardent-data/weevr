@@ -78,14 +78,17 @@ class RegistryEntry:
 
 
 def _config(code: str, name: str, summary: str, **kwargs: Any) -> RegistryEntry:
+    """A config-category entry with error severity."""
     return RegistryEntry(code, name, Category.CONFIG, Severity.ERROR, summary, **kwargs)
 
 
 def _config_warning(code: str, name: str, summary: str, **kwargs: Any) -> RegistryEntry:
+    """A config-category entry with warning severity."""
     return RegistryEntry(code, name, Category.CONFIG, Severity.WARNING, summary, **kwargs)
 
 
 def _platform(code: str, name: str, summary: str, **kwargs: Any) -> RegistryEntry:
+    """A platform-category entry with error severity."""
     return RegistryEntry(code, name, Category.PLATFORM, Severity.ERROR, summary, **kwargs)
 
 

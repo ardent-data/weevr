@@ -82,6 +82,7 @@ def removed_key_diagnostics(
 
 
 def _matches(node: Any, pattern: Segments, at: Segments) -> Iterator[Segments]:
+    """Every concrete path under ``node`` that ``pattern`` matches."""
     if not pattern:
         yield at
         return
@@ -103,6 +104,7 @@ def _matches(node: Any, pattern: Segments, at: Segments) -> Iterator[Segments]:
 
 
 def _diagnostic(row: RemovedKey, matched: Segments, at: Segments) -> Diagnostic:
+    """The removed-key or renamed-key diagnostic for one match."""
     pointer = json_pointer((*at, *matched))
     if row.replacement is not None:
         replacement = json_pointer(
