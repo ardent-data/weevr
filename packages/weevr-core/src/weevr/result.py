@@ -543,6 +543,28 @@ class RunResult:
         return lines
 
 
+def _loaded_entries(weave: Any, threads: Mapping[str, Any]) -> list[Any]:
+    """A weave's thread entries for planning, without threads a collecting load skipped.
+
+    A thread that failed to load has an entry but no model. It is left out,
+    and so are dependencies on it: it is defined, just broken, and its load
+    error already reports it.
+    """
+    entries = list(weave.threads)
+    skipped = {entry.effective_name for entry in entries} - set(threads)
+    if not skipped:
+        return entries
+    kept = []
+    for entry in entries:
+        if entry.effective_name in skipped:
+            continue
+        if entry.dependencies:
+            deps = [dep for dep in entry.dependencies if dep not in skipped]
+            entry = entry.model_copy(update={"dependencies": deps})
+        kept.append(entry)
+    return kept
+
+
 def _lookups(weave: Any) -> dict[str, Any] | None:
     """A weave's Lookups as a plain dict, or ``None`` when it declares none."""
     return dict(weave.lookups) if weave.lookups else None
@@ -790,7 +812,7 @@ class LoadedConfig:
         if document.kind == "weave":
             threads = document.weave_threads()[document.name]
             weave = document.model
-            yield document.name, weave, threads, list(weave.threads), _lookups(weave)
+            yield document.name, weave, threads, _loaded_entries(weave, threads), _lookups(weave)
         elif document.kind == "loom":
             threads_by_weave = document.weave_threads()
             for weave_entry in document.model.weaves:
@@ -800,13 +822,8 @@ class LoadedConfig:
                     yield name, None, {}, [], None
                     continue
                 weave = child.model
-                yield (
-                    name,
-                    weave,
-                    threads_by_weave[name],
-                    list(weave.threads),
-                    _lookups(weave),
-                )
+                threads = threads_by_weave[name]
+                yield name, weave, threads, _loaded_entries(weave, threads), _lookups(weave)
 
     def flow(self, *, dark: bool | None = None) -> Any:
         """Return a thread flow diagram for thread configs.

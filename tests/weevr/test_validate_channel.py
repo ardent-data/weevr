@@ -148,3 +148,26 @@ class TestRunModesStillRaise:
         with pytest.raises(ConfigError) as exc_info:
             Context(spark, project).load("w.weave")
         assert {d.code for d in exc_info.value.diagnostics} == {"C103"}
+
+
+class TestSkippedThreads:
+    """A thread skipped after a load error isn't reported again as an undefined dependency."""
+
+    def test_dependency_on_a_broken_thread_is_not_d103(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "p.weevr"
+        out = tmp_path / "out"
+        _write(root / "a.thread", _thread("raw.a", str(out / "a"), write={"mode": "bogus"}))
+        _write(root / "b.thread", _thread("raw.b", str(out / "b")))
+        _write(
+            root / "w.weave",
+            {
+                "config_version": "1.0",
+                "threads": [{"ref": "a.thread"}, {"ref": "b.thread", "dependencies": ["a"]}],
+            },
+        )
+        result = Context(spark, root).run("w.weave", mode="validate")
+        codes = {d.code for d in result.diagnostics}
+        assert "C103" in codes
+        assert "D103" not in codes
