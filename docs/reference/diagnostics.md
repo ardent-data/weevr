@@ -22,7 +22,8 @@ Stability: **stable** codes keep their meaning; **experimental** codes
 may change before they are marked stable; **deprecated** codes are no
 longer emitted from the version shown.
 
-The same list is available as JSON in
+The record each problem is reported as is described in the
+[Diagnostics API](api/diagnostics.md). The same list is available as JSON in
 [`diagnostics.json`](https://github.com/ardent-data/weevr/blob/main/docs/schema/diagnostics.json).
 
 !!! note "Generated page"

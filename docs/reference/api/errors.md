@@ -11,7 +11,8 @@ such as `C101` (`missing-field`) or `D101` (`circular-dependency`). An
 exception carries its diagnostics in `.diagnostics`. Codes are the
 contract: a code never changes meaning and is never reused. Message text
 is written for people and may be reworded in any release, so don't match
-on it. Look up any code in [Diagnostic Codes](../diagnostics.md).
+on it. Look up any code in [Diagnostic Codes](../diagnostics.md); the
+record itself is in the [Diagnostics API](diagnostics.md).
 
 Each diagnostic names where the problem is: the authored `file`, a JSON
 `pointer` into it, and the `line` and `column`, plus `resolved_path` into

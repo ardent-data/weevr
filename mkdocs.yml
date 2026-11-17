@@ -76,6 +76,7 @@ nav:
           - Telemetry: reference/api/telemetry.md
           - State: reference/api/state.md
           - Errors: reference/api/errors.md
+          - Diagnostics: reference/api/diagnostics.md
       - Configuration Keys: reference/configuration-keys.md
       - Diagnostic Codes: reference/diagnostics.md
       - JSON Schema: reference/json-schema.md

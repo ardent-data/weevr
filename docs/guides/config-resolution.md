@@ -211,7 +211,7 @@ the difference is what comes back and what's needed:
 `load_resolved()` suits tools that check or plan configs outside the engine,
 such as a CLI or a CI step. It takes `.thread`, `.weave`, and `.loom` files
 and returns the hydrated model, every child thread and weave, the load
-warnings, and the execution plan:
+warnings (as diagnostics), and the execution plan:
 
 ```python
 from pathlib import Path
@@ -224,22 +224,25 @@ loaded = load_resolved(project / "nightly.loom", project_root=project)
 for weave_name, threads in loaded.document.weave_threads().items():
     print(weave_name, list(threads))
 
-for warning in loaded.warnings:
-    print(warning)
+for warning in loaded.diagnostics:
+    print(warning)  # C491 thread-execution-ignored: ...
 
 for issue in loaded.validate_plans():
-    print(f"{issue.weave_name}: {issue.message}")
+    print(issue.diagnostic)  # D101 circular-dependency: ...
 ```
 
 `validate_plans()` builds every weave's execution plan and returns one
 `PlanIssue` per weave that fails — a dependency cycle, two threads writing
 the same target without an ordering, or a Lookup problem — instead of
-stopping at the first. `execution_plan` raises on the first failure.
+stopping at the first; each issue's `diagnostic` carries its code.
+`execution_plan` raises on the first failure. `LoadedConfig.warnings` is
+deprecated: it returns the same strings as before and will be removed in
+weevr 3.0.
 
 A source `lookup:` must name a lookup the thread can see. Through a weave or
 loom, an undefined name fails the load. A thread file loaded on its own can't
 see those parents, so a name it doesn't define itself adds a warning to
-`LoadedConfig.warnings` instead: the thread is valid in a weave that defines
+`LoadedConfig.diagnostics` instead: the thread is valid in a weave that defines
 the lookup, but running it alone fails. A `resolve` step's `lookup` is stricter:
 it fails the load even when the thread is loaded on its own.
 
