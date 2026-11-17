@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -163,6 +164,16 @@ class TestCollector:
         assert isinstance(combined, ModelValidationError)
         assert [(d.file, d.line) for d in combined.diagnostics] == [("a", 9), ("b", 1), ("b", 3)]
 
+    def test_combine_keeps_an_uncoded_error(self) -> None:
+        plain = ConfigError("plain problem", file_path="a.thread")
+        coded = ConfigError.from_diagnostic(diagnostic("C400", "coded problem", file="b.thread"))
+        combined = combine([plain, coded])
+        assert [(d.code, d.file) for d in combined.diagnostics] == [
+            ("C400", "a.thread"),
+            ("C400", "b.thread"),
+        ]
+        assert "plain problem" in str(combined)
+
     def test_combine_of_one_is_unchanged(self) -> None:
         error = ConfigError("boom")
         assert combine([error]) is error
@@ -179,13 +190,20 @@ class TestCollectInto:
             raise ConfigError.from_diagnostic(diagnostic("C004", "y"))
         assert [e.diagnostics[0].code for e in found] == ["C001", "C004"]
 
-    def test_stray_error_after_a_skip_is_swallowed(self) -> None:
+    def test_stray_error_after_a_skip_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         found: list[ConfigError] = []
-        with collecting(into=found):
+        with caplog.at_level(logging.WARNING, logger="weevr.config"), collecting(into=found):
             with skip_on_error():
                 raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
             raise KeyError("missing child")
         assert len(found) == 1
+        (record,) = [r for r in caplog.records if r.name == "weevr.config.collect"]
+        assert record.exc_info is not None
+        assert record.exc_info[0] is KeyError
+
+    def test_into_inside_an_outer_collecting_is_refused(self) -> None:
+        with pytest.raises(RuntimeError), collecting(), collecting(into=[]):
+            pass
 
     def test_stray_error_with_nothing_recorded_propagates(self) -> None:
         with pytest.raises(KeyError), collecting(into=[]):

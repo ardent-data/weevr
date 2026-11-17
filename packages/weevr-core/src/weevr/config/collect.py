@@ -12,12 +12,15 @@ propagate as they always have.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.errors.exceptions import ConfigError
+
+logger = logging.getLogger(__name__)
 
 _collected: ContextVar[list[ConfigError] | None] = ContextVar("weevr_collected", default=None)
 
@@ -26,7 +29,7 @@ _collected: ContextVar[list[ConfigError] | None] = ContextVar("weevr_collected",
 def collecting(into: list[ConfigError] | None = None) -> Iterator[None]:
     """Run a load that reports every problem it finds in one error.
 
-    Nested uses join the outermost one.
+    Nested uses join the outermost one; ``into`` is only allowed outermost.
 
     Args:
         into: Collect instead of raising: the errors found, including one
@@ -36,8 +39,11 @@ def collecting(into: list[ConfigError] | None = None) -> Iterator[None]:
     Raises:
         ConfigError: Without ``into``, the errors recorded inside the block,
             combined, plus any error that ends the block.
+        RuntimeError: If ``into`` is passed inside another :func:`collecting`.
     """
     if _collected.get() is not None:
+        if into is not None:
+            raise RuntimeError("collecting(into=...) can't run inside another collecting()")
         yield
         return
     errors: list[ConfigError] = []
@@ -53,6 +59,13 @@ def collecting(into: list[ConfigError] | None = None) -> Iterator[None]:
             # A child was skipped, and a later stage tripped over its
             # absence: the recorded problems are the cause worth reporting.
             raise combine(errors) from exc
+        # Reporting instead of raising: keep the recorded problems, but don't
+        # let a failure they may not explain disappear without a trace.
+        logger.warning(
+            "Load stopped after %d config problem(s) by an unexpected error",
+            len(errors),
+            exc_info=exc,
+        )
     finally:
         _collected.reset(token)
     if into is not None:
@@ -100,7 +113,7 @@ def combine(errors: Sequence[ConfigError]) -> ConfigError:
     """
     if len(errors) == 1:
         return errors[0]
-    owned = [(d, error) for error in errors for d in error.diagnostics]
+    owned = [(d, error) for error in errors for d in diagnostics_of([error])]
     owned.sort(key=lambda pair: _position(pair[0]))
     first = owned[0][1] if owned else errors[0]
     message = f"{len(errors)} config problems: " + "; ".join(e.message for e in errors)
