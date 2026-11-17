@@ -4,12 +4,16 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+from pydantic import TypeAdapter, ValidationError
+
 from weevr.config.audit_templates import merge_audit_columns_with_templates
 from weevr.diagnostics import diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import InheritanceError
 
 logger = logging.getLogger(__name__)
+
+_BOOL = TypeAdapter(bool)
 
 
 def cascade_registry[V](
@@ -449,8 +453,9 @@ def _cascade_exports(
 
     Like audit columns, exports use additive merge: each level extends the
     export set. Same-named exports at a lower level override the definition
-    from a higher level. Exports with ``enabled: false`` are removed from
-    the final list.
+    from a higher level. Exports whose ``enabled`` the model reads as false
+    (``false``, ``"no"``, ``0``, ...) are removed from the final list, so a
+    name-only override can switch off an inherited export.
 
     Cascade order: loom defaults → weave defaults → thread config.
     """
@@ -474,7 +479,20 @@ def _cascade_exports(
         return
 
     # Filter out disabled exports and write the resolved list
-    thread_config["exports"] = [e for e in merged.values() if e.get("enabled", True) is not False]
+    thread_config["exports"] = [e for e in merged.values() if not _export_disabled(e)]
+
+
+def _export_disabled(export: dict[str, Any]) -> bool:
+    """Return whether an export's ``enabled`` value reads as false.
+
+    Uses the same bool coercion as ``Export.enabled``, so the cascade and the
+    model agree on string and numeric forms. A value the model can't read as a
+    bool counts as enabled here and fails model validation instead.
+    """
+    try:
+        return _BOOL.validate_python(export.get("enabled", True)) is False
+    except ValidationError:
+        return False
 
 
 def _cascade_connections(

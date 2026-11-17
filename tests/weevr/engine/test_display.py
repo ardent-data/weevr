@@ -24,6 +24,7 @@ from weevr.engine.display import (
     render_waterfall_svg,
 )
 from weevr.engine.planner import ExecutionPlan
+from weevr.model.thread import Thread
 
 _SAMPLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
 
@@ -1114,6 +1115,23 @@ class TestRenderFlowSvg:
         assert ">csv_feed<" in svg
         assert ">parquet<" in svg
         assert ">csv<" in svg
+
+    def test_disabled_export_has_no_node(self) -> None:
+        """A disabled export on a real thread renders no export node."""
+        thread = Thread.model_validate(
+            {
+                "config_version": "1.0",
+                "sources": {"customers": {"type": "delta", "alias": "raw.customers"}},
+                "target": {"alias": "test"},
+                "exports": [
+                    {"name": "archive", "type": "parquet", "path": "Files/a"},
+                    {"name": "csv_feed", "type": "csv", "path": "Files/c", "enabled": False},
+                ],
+            }
+        )
+        svg = render_flow_svg(thread)
+        assert ">archive<" in svg
+        assert ">csv_feed<" not in svg
 
     def test_all_new_nodes_together(self) -> None:
         """Thread with validations, assertions, and exports renders all nodes."""

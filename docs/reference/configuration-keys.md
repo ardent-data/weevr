@@ -155,7 +155,7 @@ same post-mapping, audit-injected DataFrame as the primary target.
 | `mode` | `str` | `"overwrite"` | Write mode (only `overwrite` in v1) |
 | `partition_by` | `list[str]` | `None` | Partition columns (independent of primary target) |
 | `on_failure` | `str` | `"warn"` | `abort` fails the thread; `warn` logs and continues |
-| `enabled` | `bool` | `True` | Set to `false` to suppress an inherited export |
+| `enabled` | `bool` | `True` | Set to `false` to skip the export, whether declared here or inherited |
 | `options` | `dict[str, str]` | `None` | Format-specific Spark DataFrameWriter options |
 
 When an export is enabled, exactly one destination must be set: `path`,
