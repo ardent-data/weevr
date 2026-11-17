@@ -3240,7 +3240,7 @@ and re-run the thread.</p>
 <td><code>enabled</code></td>
 <td>No</td>
 <td><code>true</code></td>
-<td>Set to <code>false</code> to suppress an inherited export.</td>
+<td>Set to <code>false</code> to skip the export, whether declared here or inherited.</td>
 </tr>
 <tr>
 <td><code>options</code></td>
@@ -3283,7 +3283,8 @@ or loom, which leaves an empty segment in the path (for example
 <ul>
 <li>Each level can define exports; all are collected by name.</li>
 <li>Same-named exports at a lower level override the higher-level definition.</li>
-<li><code>enabled: false</code> at any level suppresses an inherited export.</li>
+<li><code>enabled: false</code> at any level skips the export, including one inherited from a
+  higher level.</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># loom defaults — applies to all threads</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">defaults</span><span class="p">:</span>
