@@ -79,6 +79,16 @@ class Diagnostic:
         if self.expected is not None and not isinstance(self.expected, tuple):
             object.__setattr__(self, "expected", _as_tuple(self.expected))
 
+    def __str__(self) -> str:
+        """One readable line: ``C101 missing-field: message (file:line:column)``."""
+        text = f"{self.code} {self.name}: {self.message}"
+        if self.file is None:
+            return text
+        where = self.file
+        if self.line is not None:
+            where += f":{self.line}" + (f":{self.column}" if self.column is not None else "")
+        return f"{text} ({where})"
+
     @property
     def is_error(self) -> bool:
         """Whether this diagnostic has error severity."""

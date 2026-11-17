@@ -552,6 +552,16 @@
       "docs_anchor": "c492"
     },
     {
+      "code": "D100",
+      "name": "plan-failed",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave's plan could not be built, in a way no more specific code covers.",
+      "docs_anchor": "d100"
+    },
+    {
       "code": "D101",
       "name": "circular-dependency",
       "category": "config",
@@ -580,6 +590,16 @@
       "removed_in": null,
       "summary": "A thread declares a dependency on a thread the weave does not define.",
       "docs_anchor": "d103"
+    },
+    {
+      "code": "D104",
+      "name": "weave-not-found",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A loom lists a weave the loaded config does not hold.",
+      "docs_anchor": "d104"
     },
     {
       "code": "P101",

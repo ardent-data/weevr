@@ -91,3 +91,13 @@ def test_located_fills_only_missing_file() -> None:
 def test_is_error() -> None:
     assert diagnostic("C001", "missing").is_error
     assert not diagnostic("C001", "missing", severity=Severity.WARNING).is_error
+
+
+def test_str_is_one_readable_line() -> None:
+    assert str(diagnostic("C001", "missing")) == "C001 config-file-not-found: missing"
+    assert str(diagnostic("C001", "missing", file="a.thread")) == (
+        "C001 config-file-not-found: missing (a.thread)"
+    )
+    assert str(diagnostic("C101", "x", file="a.thread", line=3, column=5)) == (
+        "C101 missing-field: x (a.thread:3:5)"
+    )

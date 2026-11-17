@@ -47,6 +47,11 @@ def _entry_name(entry: Any) -> str:
     return str(entry)
 
 
+def child_name(child: ResolvedChild) -> str:
+    """A resolved child's effective name: its entry's ``as``, else name, else ``ref`` stem."""
+    return child.entry.get("as") or _entry_name(child.entry)
+
+
 def _weave_origin(entry: Any) -> str:
     """Describe where a loom's weave entry comes from, for error messages."""
     if isinstance(entry, dict) and entry.get("ref"):

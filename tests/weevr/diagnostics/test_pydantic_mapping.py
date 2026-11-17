@@ -241,7 +241,7 @@ class TestPreResolutionSchema:
         assert [d.code for d in exc_info.value.diagnostics] == ["C204"]
 
     def test_inline_thread_points_into_the_weave(self, tmp_path: Path) -> None:
-        from weevr.errors import ConfigSchemaError
+        from weevr.errors import ConfigError
 
         weave = tmp_path / "w.weave"
         weave.write_text(
@@ -253,7 +253,7 @@ class TestPreResolutionSchema:
                 }
             )
         )
-        with pytest.raises(ConfigSchemaError) as exc_info:
+        with pytest.raises(ConfigError) as exc_info:
             load_config(weave)
         [diag] = [d for d in exc_info.value.diagnostics if d.code == "C102"]
         assert (diag.resolved_path, diag.file) == ("/sources", str(weave))

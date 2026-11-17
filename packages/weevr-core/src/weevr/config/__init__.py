@@ -80,7 +80,7 @@ def load_config(
         root = project_root
     else:
         root = LocalConfigLocation(Path(project_root))
-    with attribute_errors(file_path), collecting():
+    with collecting(), attribute_errors(file_path):
         resolved = _resolve_config(file_path, runtime_params=runtime_params, project_root=root)
         if resolved.config_type not in _COMPONENT_TYPES:
             return resolved.data

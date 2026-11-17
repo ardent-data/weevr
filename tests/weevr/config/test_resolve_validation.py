@@ -241,8 +241,9 @@ class TestResolveLookupsOnLoad:
     def test_context_validate_reports_it(self, project: ProjectBuilder) -> None:
         proj = project(_thread([{"resolve": {**_RESOLVE, "lookup": "nope"}}]))
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(proj))
-        with pytest.raises(ConfigError, match="undefined lookup 'nope'"):
-            ctx.run("w.weave", mode="validate")
+        result = ctx.run("w.weave", mode="validate")
+        assert result.status == "failure"
+        assert "R120" in {d.code for d in result.diagnostics}
 
 
 class TestResolveLookupsInlineAndWith:

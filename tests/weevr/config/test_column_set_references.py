@@ -148,7 +148,7 @@ class TestStandaloneThreadRun:
     def _ctx(project: Path) -> Context:
         return Context(spark=MagicMock(spec=SparkSession), project=str(project))
 
-    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    @pytest.mark.parametrize("mode", ["execute", "plan", "preview"])
     def test_run_fails_before_any_mode_runs(self, make_project: MakeProject, mode: str):
         # The weave defines the set, but the thread is run on its own
         project = make_project(_thread([_rename("std")]), weave={"column_sets": {"std": _SET}})
@@ -157,11 +157,18 @@ class TestStandaloneThreadRun:
         assert exc.value.file_path == str(project / "fact.thread")
         assert "thread 'fact'" in str(exc.value)
 
+    def test_validate_reports_it(self, make_project: MakeProject):
+        project = make_project(_thread([_rename("std")]), weave={"column_sets": {"std": _SET}})
+        result = self._ctx(project).run("fact.thread", mode="validate")
+        assert result.status == "failure"
+        (diag,) = [d for d in result.diagnostics if d.code == "R124"]
+        assert (diag.file, diag.node) == (str(project / "fact.thread"), "fact")
+
     def test_with_sub_pipeline_checked(self, make_project: MakeProject):
         thread = _thread([], **{"with": {"orders": {"from": "main", "steps": [_rename("nope")]}}})
         project = make_project(thread)
-        with pytest.raises(ConfigError, match="rename with.orders step 1"):
-            self._ctx(project).run("fact.thread", mode="validate")
+        result = self._ctx(project).run("fact.thread", mode="validate")
+        assert "R124" in {d.code for d in result.diagnostics}
 
     def test_own_set_runs(self, make_project: MakeProject):
         project = make_project(_thread([_rename("std")], column_sets={"std": _SET}))

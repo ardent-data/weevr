@@ -15,11 +15,12 @@ from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
-from weevr.config.collect import collecting
+from weevr.config.collect import collecting, diagnostics_of
 from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
 from weevr.config.hydration import (
     check_column_set_references,
     check_resolve_lookups,
+    child_name,
     hydrate_children,
     hydrate_model,
 )
@@ -352,15 +353,21 @@ def _threads_with_authored(
     if document.kind == "weave":
         weaves = [(document, resolved.children)]
     else:
+        weave_nodes = {child_name(node): node for node in resolved.children}
         weaves = [
-            (weave, node.children)
-            for weave, node in zip(document.children.values(), resolved.children, strict=True)
+            (weave, weave_nodes[name].children)
+            for name, weave in document.children.items()
+            if name in weave_nodes
         ]
-    return [
-        (thread, node.authored)
-        for weave, nodes in weaves
-        for thread, node in zip(weave.children.values(), nodes, strict=True)
-    ]
+    pairs: list[tuple[ResolvedDocument, dict[str, Any] | None]] = []
+    for weave, nodes in weaves:
+        by_name = {child_name(node): node for node in nodes}
+        pairs.extend(
+            (thread, by_name[name].authored)
+            for name, thread in weave.children.items()
+            if name in by_name
+        )
+    return pairs
 
 
 def _assemble_document(
@@ -371,26 +378,29 @@ def _assemble_document(
 ) -> ResolvedDocument:
     """Build the document tree from the hydrated models and the resolved children.
 
-    Children, their hydrated models and the parent's typed entries all come
-    in entry order, so they are paired by position.
+    Children are paired with the parent's typed entries by effective name;
+    a child a collecting load skipped after it failed gets no node.
     """
     top_file = str(resolved.location)
 
     def thread_docs(
         weave: Weave, by_name: dict[str, Thread], nodes: list[ResolvedChild], enclosing: str
     ) -> dict[str, ResolvedDocument]:
-        return {
-            name: ResolvedDocument(
+        node_by_name = {child_name(node): node for node in nodes}
+        docs: dict[str, ResolvedDocument] = {}
+        for entry in weave.threads:
+            name = entry.effective_name
+            thread, node = by_name.get(name), node_by_name.get(name)
+            if thread is None or node is None:
+                continue  # skipped by a collecting load after it failed
+            docs[name] = ResolvedDocument(
                 model=thread,
                 kind="thread",
                 name=name,
                 entry=EntryMeta.from_entry(entry),
                 source_ref=node.source_path or enclosing,
             )
-            for (name, thread), entry, node in zip(
-                by_name.items(), weave.threads, nodes, strict=True
-            )
-        }
+        return docs
 
     children: dict[str, ResolvedDocument] = {}
     if isinstance(model, Weave):
@@ -398,9 +408,12 @@ def _assemble_document(
             model, threads.get(resolved.config_name, {}), resolved.children, top_file
         )
     elif isinstance(model, Loom):
-        for (name, weave), entry, node in zip(
-            weaves.items(), model.weaves, resolved.children, strict=True
-        ):
+        weave_nodes = {child_name(node): node for node in resolved.children}
+        for entry in model.weaves:
+            name = entry.effective_name
+            weave, node = weaves.get(name), weave_nodes.get(name)
+            if weave is None or node is None:
+                continue  # skipped by a collecting load after it failed
             weave_file = node.source_path or top_file
             children[name] = ResolvedDocument(
                 model=weave,
@@ -481,7 +494,7 @@ def load_resolved_config(
         ``(document, warnings)``: the resolved config tree and the load
         warnings.
     """
-    with attribute_errors(location), collecting():
+    with collecting(), attribute_errors(location):
         return hydrate_resolved(
             resolve_config(
                 location,
@@ -491,6 +504,48 @@ def load_resolved_config(
                 require_typed_extension=True,
             )
         )
+
+
+def collect_resolved_config(
+    location: ConfigLocation,
+    *,
+    runtime_params: dict[str, Any] | None = None,
+    project_root: ConfigLocation | None = None,
+    fabric_context: dict[str, Any] | None = None,
+) -> tuple[ResolvedDocument | None, list[Diagnostic], list[Diagnostic]]:
+    """Load like :func:`load_resolved_config`, returning problems instead of raising.
+
+    For validate mode, which reports every problem. Files that fail are left
+    out of the tree; the rest load as usual.
+
+    Args:
+        location: The config file (``.thread``, ``.weave``, or ``.loom``).
+        runtime_params: Runtime parameter overrides.
+        project_root: Root for child references and Source paths. Defaults to
+            the file's directory.
+        fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+
+    Returns:
+        ``(document, warnings, errors)``: the tree, ``None`` when the file
+        itself failed; the load warnings; and the error diagnostics, ordered
+        by file and position.
+    """
+    errors: list[ConfigError] = []
+    loaded: tuple[ResolvedDocument, list[Diagnostic]] | None = None
+    with collecting(into=errors), attribute_errors(location):
+        loaded = hydrate_resolved(
+            resolve_config(
+                location,
+                runtime_params=runtime_params,
+                project_root=project_root,
+                fabric_context=fabric_context,
+                require_typed_extension=True,
+            )
+        )
+    found = diagnostics_of(errors)
+    if loaded is None:
+        return None, [], found
+    return loaded[0], loaded[1], found
 
 
 def load_resolved(

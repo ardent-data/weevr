@@ -348,7 +348,7 @@ class TestIncrementalChecksAtLoad:
         )
         load_resolved(root / "w.weave", project_root=root)
 
-    @pytest.mark.parametrize("mode", ["execute", "validate", "plan", "preview"])
+    @pytest.mark.parametrize("mode", ["execute", "plan", "preview"])
     def test_every_context_mode_fails_at_load(self, mode: str, tmp_path: Path) -> None:
         """Execute used to raise ExecutionError at thread start; now every mode fails at load."""
         from unittest.mock import MagicMock
@@ -362,6 +362,20 @@ class TestIncrementalChecksAtLoad:
         with pytest.raises(ConfigError, match=r"thread 't'.*cdc mode"):
             Context(spark=spark, project=str(root)).run("t.thread", mode=mode)
         spark.read.assert_not_called()
+
+    def test_validate_reports_it(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from pyspark.sql import SparkSession
+
+        from weevr.context import Context
+
+        root = _project(tmp_path, {"t.thread": _CDC_OVERWRITE})
+        result = Context(spark=MagicMock(spec=SparkSession), project=str(root)).run(
+            "t.thread", mode="validate"
+        )
+        assert result.status == "failure"
+        assert [(d.code, d.file) for d in result.diagnostics] == [("C480", str(root / "t.thread"))]
 
 
 class TestIncrementalParameterWarning:

@@ -372,6 +372,12 @@ A weave sets trace: true under a loom whose effective trace is false.
 
 ## D1xx — Plan and dependencies
 
+### D100
+
+`plan-failed` · error · stable
+
+A weave's plan could not be built, in a way no more specific code covers.
+
 ### D101
 
 `circular-dependency` · error · stable
@@ -389,6 +395,12 @@ Several threads write one target without being ordered or condition-gated.
 `undefined-dependency` · error · stable
 
 A thread declares a dependency on a thread the weave does not define.
+
+### D104
+
+`weave-not-found` · error · stable
+
+A loom lists a weave the loaded config does not hold.
 
 ## P1xx — Variables and parameters
 

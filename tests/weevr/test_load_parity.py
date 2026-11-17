@@ -346,7 +346,10 @@ class TestValidateWording:
     def _dag_errors(project: Path, config: str) -> list[str]:
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
         result = ctx.run(config, mode="validate")
-        return [e for e in result.validation_errors or [] if e.startswith("DAG validation")]
+        # The legacy wording lives on in the deprecated string view.
+        with pytest.deprecated_call():
+            errors = result.validation_errors or []
+        return [e for e in errors if e.startswith("DAG validation")]
 
     def test_weave_cycle_wording(self, tmp_path: Path) -> None:
         errors = self._dag_errors(self._project(tmp_path), "cyc.weave")
@@ -388,8 +391,10 @@ class TestValidateWording:
             weaves={"cyc": full.document.weaves()["cyc"]},
         )
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
-        result = ctx._run_validate(loaded)
-        assert "Weave 'dup' not found" in (result.validation_errors or [])
+        result = ctx._run_validate(loaded, [])
+        with pytest.deprecated_call():
+            assert "Weave 'dup' not found" in (result.validation_errors or [])
+        assert "D104" in {d.code for d in result.diagnostics}
 
 
 _LOAD_STEPS = (

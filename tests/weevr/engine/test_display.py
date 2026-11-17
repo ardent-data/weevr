@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from weevr.diagnostics import diagnostic
 from weevr.engine.display import (
     DAGDiagram,
     FlowDiagram,
@@ -715,7 +716,7 @@ class TestRenderResultHtml:
                 "status": "success",
                 "config_type": "weave",
                 "config_name": "test",
-                "validation_errors": [],
+                "diagnostics": [],
                 "warnings": [],
             },
         )()
@@ -732,7 +733,7 @@ class TestRenderResultHtml:
                 "status": "failure",
                 "config_type": "weave",
                 "config_name": "test",
-                "validation_errors": ["bad config"],
+                "diagnostics": [diagnostic("C400", "bad config")],
                 "warnings": [],
             },
         )()
@@ -806,7 +807,7 @@ class TestRenderResultHtml:
                 "status": "failure",
                 "config_type": "weave",
                 "config_name": "<script>x</script>",
-                "validation_errors": ["<img onerror=alert(1)>"],
+                "diagnostics": [diagnostic("C400", "<img onerror=alert(1)>")],
                 "warnings": [],
             },
         )()
@@ -1917,7 +1918,7 @@ class TestModeMatrix:
                 "status": "success",
                 "config_type": "weave",
                 "config_name": "test",
-                "validation_errors": [],
+                "diagnostics": [],
                 "warnings": [],
                 "telemetry": None,
                 "thread_models": {"dim_cust": thread_model},

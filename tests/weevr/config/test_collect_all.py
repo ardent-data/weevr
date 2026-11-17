@@ -166,3 +166,27 @@ class TestCollector:
     def test_combine_of_one_is_unchanged(self) -> None:
         error = ConfigError("boom")
         assert combine([error]) is error
+
+
+class TestCollectInto:
+    """``collecting(into=...)`` hands the errors back instead of raising."""
+
+    def test_recorded_and_ending_errors_are_returned(self) -> None:
+        found: list[ConfigError] = []
+        with collecting(into=found):
+            with skip_on_error():
+                raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
+            raise ConfigError.from_diagnostic(diagnostic("C004", "y"))
+        assert [e.diagnostics[0].code for e in found] == ["C001", "C004"]
+
+    def test_stray_error_after_a_skip_is_swallowed(self) -> None:
+        found: list[ConfigError] = []
+        with collecting(into=found):
+            with skip_on_error():
+                raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
+            raise KeyError("missing child")
+        assert len(found) == 1
+
+    def test_stray_error_with_nothing_recorded_propagates(self) -> None:
+        with pytest.raises(KeyError), collecting(into=[]):
+            raise KeyError("bug")

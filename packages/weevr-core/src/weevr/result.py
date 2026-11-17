@@ -85,7 +85,10 @@ class RunResult:
         telemetry: Structured telemetry data (execute mode only).
         execution_plan: Resolved execution plans (plan mode only).
         preview_data: Output DataFrames keyed by thread name (preview mode only).
-        validation_errors: Error messages from validation checks (validate mode only).
+        diagnostics: Coded config problems: load warnings in every mode, and
+            in validate mode every config, plan and source-existence problem.
+        validation_errors: Deprecated; use ``diagnostics``. Error messages
+            from validation checks (validate mode only).
         warnings: Non-fatal messages (e.g., zero threads matched a filter).
         thread_models: The run's threads by effective name, from the resolved
             config tree; reports and diagrams read sources, targets and
@@ -104,7 +107,8 @@ class RunResult:
         "telemetry",
         "execution_plan",
         "preview_data",
-        "validation_errors",
+        "diagnostics",
+        "_validation_errors",
         "warnings",
         "thread_models",
         "preview_metadata",
@@ -126,6 +130,7 @@ class RunResult:
         warnings: list[str] | None = None,
         thread_models: Mapping[str, Thread] | None = None,
         preview_metadata: dict[str, PreviewThreadMetadata] | None = None,
+        diagnostics: Sequence[Diagnostic] | None = None,
     ) -> None:
         """Initialize a RunResult with execution outcome and telemetry."""
         self.status = status
@@ -137,12 +142,22 @@ class RunResult:
         self.telemetry = telemetry
         self.execution_plan = execution_plan
         self.preview_data = preview_data
-        self.validation_errors = validation_errors
+        self._validation_errors = validation_errors
+        self.diagnostics: list[Diagnostic] = list(diagnostics or [])
         self.warnings: list[str] = warnings if warnings is not None else []
         self.thread_models: Mapping[str, Thread] | None = (
             MappingProxyType(dict(thread_models)) if thread_models is not None else None
         )
         self.preview_metadata = preview_metadata
+
+    @property
+    def validation_errors(self) -> list[str] | None:
+        """Deprecated: use ``diagnostics``. Removed in 3.0.
+
+        Validate mode's error messages; ``None`` when there are none.
+        """
+        _warn_deprecated_result("validation_errors", "diagnostics")
+        return self._validation_errors
 
     def dag(self, *, dark: bool | None = None) -> Any:
         """Return a DAG diagram for plan mode results.
@@ -317,9 +332,12 @@ class RunResult:
         elif self.mode is ExecutionMode.PREVIEW:
             lines.extend(self._summary_preview())
 
-        if self.warnings:
+        config_warnings = [d for d in self.diagnostics if not d.is_error]
+        if self.warnings or config_warnings:
             lines.append("")
             lines.append("Warnings:")
+            for d in config_warnings:
+                lines.append(f"  - {d}")
             for w in self.warnings:
                 lines.append(f"  - {w}")
 
@@ -460,10 +478,11 @@ class RunResult:
             f"Scope:  {self.config_type}:{self.config_name}",
         ]
 
-        if self.validation_errors:
+        errors = [d for d in self.diagnostics if d.is_error]
+        if errors:
             lines.append("Errors:")
-            for err in self.validation_errors:
-                lines.append(f"  - {err}")
+            for d in errors:
+                lines.append(f"  - {d}")
         else:
             lines.append("Checks: config schema \u2713 | DAG \u2713 | sources \u2713")
 
@@ -538,8 +557,8 @@ class PlanIssue:
         message: What went wrong, without the weave prefix.
         error: The exception the planner raised; ``None`` when the weave itself
             is missing from the loaded config.
-        diagnostic: The coded diagnostic behind the failure; ``None`` when the
-            planner raised an uncoded error or the weave is missing.
+        diagnostic: The coded diagnostic behind the failure: the planner's own
+            code, ``D104`` for a missing weave, or the generic ``D100``.
     """
 
     weave_name: str
@@ -723,22 +742,25 @@ class LoadedConfig:
         Returns:
             The issues found; empty when every plan builds and for thread configs.
         """
+        from weevr.diagnostics import diagnostic
         from weevr.engine.planner import build_plan
 
         issues: list[PlanIssue] = []
         for name, weave, threads, entries, lookups in self._plan_inputs():
             if weave is None:
-                issues.append(PlanIssue(name, f"Weave '{name}' not found", None))
+                message = f"Weave '{name}' not found"
+                issues.append(
+                    PlanIssue(name, message, None, diagnostic("D104", message, node=name))
+                )
                 continue
             try:
                 build_plan(
                     weave_name=name, threads=threads, thread_entries=entries, lookups=lookups
                 )
             except Exception as exc:
-                diagnostics = getattr(exc, "diagnostics", None)
-                issues.append(
-                    PlanIssue(name, str(exc), exc, diagnostics[0] if diagnostics else None)
-                )
+                coded = getattr(exc, "diagnostics", None)
+                issue = coded[0] if coded else diagnostic("D100", str(exc), node=name)
+                issues.append(PlanIssue(name, str(exc), exc, issue))
         return tuple(issues)
 
     def _plan_inputs(
@@ -804,6 +826,17 @@ class LoadedConfig:
                 f"'{type(self).__name__}' object has no attribute '{name}' "
                 f"(underlying {model_type} model does not have this attribute either)"
             ) from None
+
+
+def _warn_deprecated_result(name: str, replacement: str) -> None:
+    import warnings
+
+    warnings.warn(
+        f"RunResult.{name} is deprecated and will be removed in weevr 3.0; "
+        f"use RunResult.{replacement} instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def _warn_deprecated(name: str, replacement: str) -> None:

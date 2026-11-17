@@ -16,21 +16,26 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from weevr.diagnostics import Diagnostic
+from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.errors.exceptions import ConfigError
 
 _collected: ContextVar[list[ConfigError] | None] = ContextVar("weevr_collected", default=None)
 
 
 @contextmanager
-def collecting() -> Iterator[None]:
+def collecting(into: list[ConfigError] | None = None) -> Iterator[None]:
     """Run a load that reports every problem it finds in one error.
 
     Nested uses join the outermost one.
 
+    Args:
+        into: Collect instead of raising: the errors found, including one
+            that ends the block, are appended here and nothing is raised.
+            For a caller that reports problems rather than stopping on them.
+
     Raises:
-        ConfigError: The errors recorded inside the block, combined, plus
-            any error that ends the block.
+        ConfigError: Without ``into``, the errors recorded inside the block,
+            combined, plus any error that ends the block.
     """
     if _collected.get() is not None:
         yield
@@ -44,12 +49,15 @@ def collecting() -> Iterator[None]:
     except Exception as exc:
         if not errors:
             raise
-        # A child was skipped, and a later stage tripped over its absence:
-        # the recorded problems are the cause worth reporting.
-        raise combine(errors) from exc
+        if into is None:
+            # A child was skipped, and a later stage tripped over its
+            # absence: the recorded problems are the cause worth reporting.
+            raise combine(errors) from exc
     finally:
         _collected.reset(token)
-    if errors:
+    if into is not None:
+        into.extend(errors)
+    elif errors:
         raise combine(errors)
 
 
@@ -101,3 +109,24 @@ def combine(errors: Sequence[ConfigError]) -> ConfigError:
         file_path=first.file_path,
         diagnostics=[d for d, _ in owned],
     )
+
+
+def diagnostics_of(errors: Sequence[ConfigError]) -> list[Diagnostic]:
+    """Every diagnostic the errors carry, ordered by file, then position.
+
+    An error that carries none is reported under the generic ``C400`` with
+    its message and file, so no problem is dropped from a report.
+
+    Args:
+        errors: Config errors.
+
+    Returns:
+        The diagnostics.
+    """
+    found: list[Diagnostic] = []
+    for error in errors:
+        found.extend(
+            error.diagnostics
+            or [diagnostic("C400", error.message, file=error.file_path, origin=__name__)]
+        )
+    return sorted(found, key=_position)

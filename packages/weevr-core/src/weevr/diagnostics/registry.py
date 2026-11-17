@@ -389,6 +389,11 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     ),
     # D1xx — plan and dependencies
     _config(
+        "D100",
+        "plan-failed",
+        "A weave's plan could not be built, in a way no more specific code covers.",
+    ),
+    _config(
         "D101",
         "circular-dependency",
         "The threads of a weave depend on each other in a cycle.",
@@ -403,6 +408,7 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "undefined-dependency",
         "A thread declares a dependency on a thread the weave does not define.",
     ),
+    _config("D104", "weave-not-found", "A loom lists a weave the loaded config does not hold."),
     # S1xx — source existence
     # S101–S119 — sources checked in validate mode (context.py)
     _platform("S101", "source-not-found", "A source does not exist at its resolved location."),

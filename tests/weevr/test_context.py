@@ -730,6 +730,11 @@ target:
 # ---------------------------------------------------------------------------
 
 
+def _errors(result: RunResult) -> list[str] | None:
+    """The messages of a result's error diagnostics; ``None`` when there are none."""
+    return [d.message for d in result.diagnostics if d.is_error] or None
+
+
 def _project_dir(tmp_path: Path) -> Path:
     """Create and return a .weevr project directory in tmp_path."""
     project = tmp_path / "test.weevr"
@@ -1020,7 +1025,7 @@ class TestValidateMode:
 
         assert result.status == "success"
         assert result.mode == ExecutionMode.VALIDATE
-        assert result.validation_errors is None
+        assert _errors(result) is None
 
     def test_validate_valid_weave(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1034,7 +1039,7 @@ class TestValidateMode:
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "success"
-        assert result.validation_errors is None
+        assert _errors(result) is None
 
     def test_validate_duplicate_target_threads(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1050,11 +1055,9 @@ class TestValidateMode:
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert any(
-            "load_jan" in e and "load_feb" in e and "DAG validation failed" in e
-            for e in result.validation_errors
-        )
+        (conflict,) = [d for d in result.diagnostics if d.code == "D102"]
+        assert conflict.expected is not None
+        assert {"load_jan", "load_feb"} <= set(conflict.expected)
 
     def test_validate_missing_source(self, spark: SparkSession, tmp_path: Path) -> None:
         tgt = str(tmp_path / "tgt_miss")
@@ -1063,8 +1066,9 @@ class TestValidateMode:
         result = ctx.run(yaml_path, mode="validate")
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert any("not found" in e for e in result.validation_errors)
+        errors = _errors(result)
+        assert errors is not None
+        assert any("not found" in e for e in errors)
 
     def test_validate_accepts_condition_gated_same_target_writers(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1095,7 +1099,7 @@ threads:
         result = ctx.run(weave_yaml, mode="validate")
 
         assert result.status == "success"
-        assert result.validation_errors is None
+        assert _errors(result) is None
 
 
 @pytest.mark.spark
@@ -1859,8 +1863,8 @@ class TestValidateInRunSources:
         weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
         result = Context(spark=spark, project=project).run(weave, mode="validate")
 
-        assert result.status == "success", result.validation_errors
-        assert result.validation_errors is None
+        assert result.status == "success", _errors(result)
+        assert _errors(result) is None
 
     def test_missing_external_source_still_fails(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1874,10 +1878,11 @@ class TestValidateInRunSources:
         result = Context(spark=spark, project=project).run(weave, mode="validate")
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert len(result.validation_errors) == 1
-        assert "dim_x" in result.validation_errors[0]
-        assert "not found" in result.validation_errors[0]
+        errors = _errors(result)
+        assert errors is not None
+        assert len(errors) == 1
+        assert "dim_x" in errors[0]
+        assert "not found" in errors[0]
 
     def test_loom_reads_earlier_weave_target(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1891,7 +1896,7 @@ class TestValidateInRunSources:
         loom = _create_loom_yaml(project, "nightly", ["silver", "gold"])
         result = Context(spark=spark, project=project).run(loom, mode="validate")
 
-        assert result.status == "success", result.validation_errors
+        assert result.status == "success", _errors(result)
 
     def test_connection_form_reader_of_connection_form_writer(
         self, spark: SparkSession, tmp_path: Path, one_row_src: str
@@ -1928,8 +1933,9 @@ class TestValidateInRunSources:
         )
 
         assert result.status == "failure"
-        assert result.validation_errors is not None
-        assert any("not found" in e for e in result.validation_errors)
+        errors = _errors(result)
+        assert errors is not None
+        assert any("not found" in e for e in errors)
 
 
 @pytest.mark.spark

@@ -12,10 +12,12 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
+from weevr.config.collect import diagnostics_of
 from weevr.config.document import ScopeRegistries, registry_as_dict
-from weevr.config.loader import load_resolved_config
+from weevr.config.loader import collect_resolved_config, load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
+from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.config.validation import (
     in_thread,
     partition_diagnostics,
@@ -253,11 +255,15 @@ class Context:
             sample_rows: Maximum rows for preview mode (default 100).
 
         Returns:
-            A :class:`RunResult` describing the outcome.
+            A :class:`RunResult` describing the outcome. In ``"validate"``
+            mode, every config problem — load, plan and source existence — is
+            in ``RunResult.diagnostics`` and nothing is raised for them.
 
         Raises:
             ValueError: If *mode* is invalid or both *tags* and *threads*
                 are provided.
+            ConfigError: In ``"execute"``, ``"plan"`` and ``"preview"`` modes,
+                when the config has problems; ``.diagnostics`` lists them all.
         """
         try:
             resolved_mode = ExecutionMode(mode)
@@ -269,6 +275,11 @@ class Context:
             raise ValueError("'tags' and 'threads' are mutually exclusive")
 
         start_ns = time.monotonic_ns()
+        if resolved_mode is ExecutionMode.VALIDATE:
+            result = self._validate(path)
+            result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+            return result
+
         loaded = self._load(path)
         self._check_standalone_column_sets(loaded, path)
 
@@ -279,8 +290,6 @@ class Context:
         try:
             if resolved_mode is ExecutionMode.EXECUTE:
                 result = self._run_execute(loaded, tags=tags, thread_names=threads)
-            elif resolved_mode is ExecutionMode.VALIDATE:
-                result = self._run_validate(loaded)
             elif resolved_mode is ExecutionMode.PLAN:
                 result = self._run_plan(loaded, tags=tags, thread_names=threads)
             else:
@@ -296,9 +305,11 @@ class Context:
                 config_name=loaded.config_name,
                 duration_ms=duration_ms,
                 warnings=[str(exc)],
+                diagnostics=loaded.diagnostics,
             )
 
         result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+        result.diagnostics = [*loaded.diagnostics, *result.diagnostics]
         return result
 
     def _check_standalone_column_sets(self, loaded: LoadedConfig, path: str | Path) -> None:
@@ -571,11 +582,48 @@ class Context:
     # Validate mode
     # ------------------------------------------------------------------
 
-    def _run_validate(self, loaded: LoadedConfig) -> RunResult:
-        """Validate config, DAG, and source existence without executing."""
-        validation_errors: list[str] = []
+    def _validate(self, path: str | Path) -> RunResult:
+        """Validate mode: report every config, plan and source problem; raise for none.
+
+        Files that fail to load are reported and left out; the plan and
+        source checks run on the rest. Only failures that aren't config
+        problems (a lost Spark session) raise.
+        """
+        loaded, errors = self._load_for_validate(path)
+        if loaded is None:
+            return RunResult(
+                status="failure",
+                mode=ExecutionMode.VALIDATE,
+                config_type=TYPED_EXTENSIONS.get(Path(str(path)).suffix.lower(), ""),
+                config_name=Path(str(path)).stem,
+                validation_errors=[d.message for d in errors] or None,
+                diagnostics=errors,
+            )
+        try:
+            self._check_standalone_column_sets(loaded, path)
+        except ConfigError as exc:
+            errors.extend(diagnostics_of([exc]))
+        self._apply_effective_log_level(loaded)
+        try:
+            return self._run_validate(loaded, errors)
+        except (ExecutionError, DataValidationError) as exc:
+            return RunResult(
+                status="failure",
+                mode=ExecutionMode.VALIDATE,
+                config_type=loaded.config_type,
+                config_name=loaded.config_name,
+                warnings=[str(exc)],
+                diagnostics=[*errors, *loaded.diagnostics],
+            )
+
+    def _run_validate(self, loaded: LoadedConfig, load_errors: list[Diagnostic]) -> RunResult:
+        """Check the DAG and source existence of a loaded config, beside its load problems."""
+        diagnostics: list[Diagnostic] = [*load_errors, *loaded.diagnostics]
+        validation_errors: list[str] = [d.message for d in load_errors]
 
         for issue in loaded.validate_plans():
+            if issue.diagnostic is not None:
+                diagnostics.append(issue.diagnostic)
             if issue.error is None:
                 validation_errors.append(issue.message)
             elif loaded.config_type == "weave":
@@ -587,15 +635,17 @@ class Context:
 
         all_threads = self._collect_all_threads(loaded)
         source_errors = self._source_existence_diagnostics(all_threads)
+        diagnostics.extend(source_errors)
         validation_errors.extend(d.message for d in source_errors)
 
-        status = "failure" if validation_errors else "success"
+        failed = any(d.is_error for d in diagnostics)
         return RunResult(
-            status=status,
+            status="failure" if failed else "success",
             mode=ExecutionMode.VALIDATE,
             config_type=loaded.config_type,
             config_name=loaded.config_name,
             validation_errors=validation_errors if validation_errors else None,
+            diagnostics=diagnostics,
             thread_models=_thread_models(loaded),
         )
 
@@ -1063,6 +1113,27 @@ class Context:
         for warning in render_diagnostics(warnings):
             logger.warning(warning)
         return LoadedConfig.from_document(document, warnings)
+
+    def _load_for_validate(self, path: str | Path) -> tuple[LoadedConfig | None, list[Diagnostic]]:
+        """Load for validate mode: problems are returned, not raised.
+
+        Returns:
+            ``(loaded, errors)``: the config without the files that failed,
+            or ``None`` when the file itself failed; and the error diagnostics.
+        """
+        from weevr.config.fabric import build_fabric_context
+
+        document, warnings, errors = collect_resolved_config(
+            self._resolve_config_path(path),
+            runtime_params=self._params,
+            project_root=self._project_root,
+            fabric_context=build_fabric_context(self._spark),
+        )
+        for warning in render_diagnostics(warnings):
+            logger.warning(warning)
+        if document is None:
+            return None, errors
+        return LoadedConfig.from_document(document, warnings), errors
 
 
 def _thread_models(loaded: LoadedConfig) -> dict[str, Thread]:

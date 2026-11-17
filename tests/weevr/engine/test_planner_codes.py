@@ -91,3 +91,15 @@ class TestPlanIssueDiagnostic:
 
     def test_diagnostic_defaults_to_none(self) -> None:
         assert PlanIssue("w", "m", None).diagnostic is None
+
+
+def test_missing_weave_issue_is_coded() -> None:
+    from weevr.model import Loom
+    from weevr.result import LoadedConfig
+
+    loom = Loom.model_validate({"config_version": "1.0", "name": "l", "weaves": ["w"]})
+    loaded = LoadedConfig(loom, "loom", "l", threads={}, weaves={})
+    (issue,) = loaded.validate_plans()
+    assert issue.error is None
+    assert issue.diagnostic is not None
+    assert (issue.diagnostic.code, issue.diagnostic.node) == ("D104", "w")
