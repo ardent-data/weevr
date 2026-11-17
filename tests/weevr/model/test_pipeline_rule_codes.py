@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import ast
+import inspect
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-import weevr.model as model_pkg
+import weevr.model.pipeline as pipeline_module
 from weevr.diagnostics.pydantic import from_validation_error
 from weevr.diagnostics.registry import REGISTRY
 from weevr.model import Thread
@@ -129,7 +130,7 @@ def test_codes_are_registered_in_the_step_range() -> None:
 
 @pytest.mark.parametrize("module", ["pipeline.py", "sub_pipeline.py"])
 def test_validators_do_not_raise_plain_errors(module: str) -> None:
-    tree = ast.parse((Path(next(iter(model_pkg.__path__))) / module).read_text())
+    tree = ast.parse((Path(inspect.getfile(pipeline_module)).parent / module).read_text())
     offenders: list[int] = []
     for func in ast.walk(tree):
         if not isinstance(func, ast.FunctionDef):

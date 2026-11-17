@@ -20,8 +20,8 @@ from typing import Any
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from weevr.diagnostics.diagnostic import Diagnostic
 from weevr.diagnostics.positions import ABSENT, child_of, json_pointer
+from weevr.diagnostics.record import Diagnostic
 from weevr.diagnostics.registry import REGISTRY, diagnostic
 
 _CONSTRAINTS = frozenset(

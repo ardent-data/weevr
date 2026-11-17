@@ -21,7 +21,7 @@ from typing import Any
 
 import yaml
 
-from weevr.diagnostics.diagnostic import Diagnostic
+from weevr.diagnostics.record import Diagnostic
 
 Segments = tuple[str | int, ...]
 

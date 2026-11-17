@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import pytest
 import yaml
@@ -32,6 +32,16 @@ def _thread(**extra: Any) -> dict[str, Any]:
 def _write(path: Path, data: dict[str, Any] | str) -> Path:
     path.write_text(data if isinstance(data, str) else yaml.safe_dump(data, sort_keys=False))
     return path
+
+
+def _fail(code: str, message: str, **fields: Any) -> NoReturn:
+    """Raise a config error carrying one diagnostic."""
+    raise ConfigError.from_diagnostic(diagnostic(code, message, **fields))
+
+
+def _fail_with(error: Exception) -> NoReturn:
+    """Raise ``error``."""
+    raise error
 
 
 @pytest.fixture
@@ -123,33 +133,33 @@ class TestCollector:
 
     def test_skip_on_error_outside_collecting_raises(self) -> None:
         with pytest.raises(ConfigError), skip_on_error():
-            raise ConfigError("boom")
+            _fail_with(ConfigError("boom"))
 
     def test_collecting_raises_everything_recorded(self) -> None:
         with pytest.raises(ConfigError) as exc_info, collecting():
             for code in ("C001", "C004"):
                 with skip_on_error():
-                    raise ConfigError.from_diagnostic(diagnostic(code, "x", file=f"{code}.y"))
+                    _fail(code, "x", file=f"{code}.y")
         assert [d.code for d in exc_info.value.diagnostics] == ["C001", "C004"]
 
     def test_nested_collecting_joins_the_outer(self) -> None:
         with pytest.raises(ConfigError) as exc_info, collecting():
             with skip_on_error():
-                raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
+                _fail("C001", "x")
             with collecting(), skip_on_error():
-                raise ConfigError.from_diagnostic(diagnostic("C004", "y"))
+                _fail("C004", "y")
         assert len(exc_info.value.diagnostics) == 2
 
     def test_stray_error_after_a_skip_reports_the_recorded_problems(self) -> None:
         with pytest.raises(ConfigError) as exc_info, collecting():
             with skip_on_error():
-                raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
-            raise KeyError("missing child")
+                _fail("C001", "x")
+            _fail_with(KeyError("missing child"))
         assert isinstance(exc_info.value.__cause__, KeyError)
 
     def test_stray_error_with_nothing_recorded_propagates(self) -> None:
         with pytest.raises(KeyError), collecting():
-            raise KeyError("bug")
+            _fail_with(KeyError("bug"))
 
     def test_combine_orders_by_file_then_line(self) -> None:
         late = ConfigParseError.from_diagnostic(diagnostic("C005", "x", file="b", line=3))
@@ -186,16 +196,16 @@ class TestCollectInto:
         found: list[ConfigError] = []
         with collecting(into=found):
             with skip_on_error():
-                raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
-            raise ConfigError.from_diagnostic(diagnostic("C004", "y"))
+                _fail("C001", "x")
+            _fail("C004", "y")
         assert [e.diagnostics[0].code for e in found] == ["C001", "C004"]
 
     def test_stray_error_after_a_skip_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         found: list[ConfigError] = []
         with caplog.at_level(logging.WARNING, logger="weevr.config"), collecting(into=found):
             with skip_on_error():
-                raise ConfigError.from_diagnostic(diagnostic("C001", "x"))
-            raise KeyError("missing child")
+                _fail("C001", "x")
+            _fail_with(KeyError("missing child"))
         assert len(found) == 1
         (record,) = [r for r in caplog.records if r.name == "weevr.config.collect"]
         assert record.exc_info is not None
@@ -207,4 +217,4 @@ class TestCollectInto:
 
     def test_stray_error_with_nothing_recorded_propagates(self) -> None:
         with pytest.raises(KeyError), collecting(into=[]):
-            raise KeyError("bug")
+            _fail_with(KeyError("bug"))

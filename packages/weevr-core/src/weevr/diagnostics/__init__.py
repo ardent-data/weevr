@@ -4,7 +4,7 @@ Match on :attr:`Diagnostic.code`, never on message text. The published code
 list is generated from :data:`REGISTRY`.
 """
 
-from weevr.diagnostics.diagnostic import Category, Diagnostic, Severity
+from weevr.diagnostics.record import Category, Diagnostic, Severity
 from weevr.diagnostics.registry import (
     DOCS_BASE_URL,
     REGISTRY,

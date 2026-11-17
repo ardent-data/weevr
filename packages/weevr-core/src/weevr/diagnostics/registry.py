@@ -28,7 +28,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any
 
-from weevr.diagnostics.diagnostic import Category, Diagnostic, Severity
+from weevr.diagnostics.record import Category, Diagnostic, Severity
 
 DOCS_BASE_URL = "https://ardent-data.github.io/weevr/latest/reference/diagnostics/"
 """The published code list; each code's entry is at ``#<code in lowercase>``."""

@@ -14,8 +14,8 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from weevr.diagnostics.diagnostic import Diagnostic
 from weevr.diagnostics.positions import Segments, json_pointer, parse_pointer
+from weevr.diagnostics.record import Diagnostic
 from weevr.diagnostics.registry import diagnostic
 
 WILDCARD = "*"
