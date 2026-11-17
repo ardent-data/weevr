@@ -142,6 +142,26 @@
       "docs_anchor": "c110"
     },
     {
+      "code": "C111",
+      "name": "removed-key",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A key this version no longer reads; the hint says why it was removed.",
+      "docs_anchor": "c111"
+    },
+    {
+      "code": "C112",
+      "name": "renamed-key",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A key this version reads under a new name; expected names the new key.",
+      "docs_anchor": "c112"
+    },
+    {
       "code": "C201",
       "name": "missing-config-version",
       "category": "config",
@@ -752,5 +772,6 @@
       "docs_anchor": "s102"
     }
   ],
-  "retired": []
+  "retired": [],
+  "removed_keys": []
 }

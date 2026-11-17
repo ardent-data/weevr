@@ -128,6 +128,16 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "A key the schema does not define. Reserved for strict schemas.",
         stability=Stability.EXPERIMENTAL,
     ),
+    _config(
+        "C111",
+        "removed-key",
+        "A key this version no longer reads; the hint says why it was removed.",
+    ),
+    _config(
+        "C112",
+        "renamed-key",
+        "A key this version reads under a new name; expected names the new key.",
+    ),
     # C2xx — envelope, config kind and config_version
     _config("C201", "missing-config-version", "The config has no config_version."),
     _config(

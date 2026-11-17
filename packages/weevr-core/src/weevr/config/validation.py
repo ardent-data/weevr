@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, ValidationError
 from weevr.diagnostics import Diagnostic, Severity, diagnostic
 from weevr.diagnostics.positions import json_pointer, pointed
 from weevr.diagnostics.pydantic import from_validation_error
+from weevr.diagnostics.removed_keys import removed_key_diagnostics
 from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
@@ -138,15 +139,22 @@ def validate_schema(
         )
 
     model_class = model_map[config_type]
+    removed = removed_key_diagnostics(raw, config_type, at=at)
 
     try:
-        return model_class.model_validate(raw)
+        validated = model_class.model_validate(raw)
     except ValidationError as exc:
         raise ConfigSchemaError(
             f"Schema validation failed for {config_type} config: {exc}",
             cause=exc,
-            diagnostics=pointed(from_validation_error(exc, raw), at),
+            diagnostics=[*removed, *pointed(from_validation_error(exc, raw), at)],
         ) from exc
+    if removed:
+        raise ConfigSchemaError(
+            f"{config_type} config uses keys this version no longer reads",
+            diagnostics=removed,
+        )
+    return validated
 
 
 def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, ...] = ()) -> None:
@@ -165,6 +173,7 @@ def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, 
     Raises:
         ConfigSchemaError: If a typed field holds a value of the wrong type.
     """
+    removed = removed_key_diagnostics(entry, "thread", at=at)
     try:
         ThreadConfig.model_validate(entry)
     except ValidationError as exc:
@@ -174,14 +183,18 @@ def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, 
                 f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in wrong
             )
             name = entry.get("name", "")
-            diagnostics = pointed(
-                [d for d in from_validation_error(exc, entry) if d.code != "C101"], at
-            )
+            wrong_type = [d for d in from_validation_error(exc, entry) if d.code != "C101"]
+            diagnostics = [*removed, *pointed(wrong_type, at)]
             raise ConfigSchemaError(
                 f"Schema validation failed for inline thread '{name}': {details}",
                 cause=exc,
                 diagnostics=diagnostics,
             ) from exc
+    if removed:
+        raise ConfigSchemaError(
+            f"Inline thread '{entry.get('name', '')}' uses keys this version no longer reads",
+            diagnostics=removed,
+        )
 
 
 # ---------------------------------------------------------------------------

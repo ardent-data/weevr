@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from weevr.diagnostics import REGISTRY, RETIRED_CODES, RegistryEntry, Stability
+from weevr.diagnostics.removed_keys import REMOVED_KEYS, RemovedKey
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = ROOT / "docs" / "reference" / "diagnostics.md"
@@ -94,8 +95,37 @@ def render_json() -> str:
         "format_version": FORMAT_VERSION,
         "codes": [_entry_json(entry) for entry in sorted(REGISTRY.values(), key=_sort_key)],
         "retired": sorted(RETIRED_CODES),
+        "removed_keys": [_removed_json(row) for row in REMOVED_KEYS],
     }
     return json.dumps(data, indent=2) + "\n"
+
+
+def _removed_json(row: RemovedKey) -> dict[str, object]:
+    return {
+        "kind": row.kind,
+        "path": row.path,
+        "replacement": row.replacement,
+        "reason": row.reason,
+        "removed_in": row.removed_in,
+    }
+
+
+def _removed_section() -> list[str]:
+    lines = [
+        "## Removed and renamed keys\n",
+        "A key listed here fails the load with `C111` (removed) or `C112` (renamed),",
+        "naming what to write instead. `*` matches any one key or list item.\n",
+    ]
+    if not REMOVED_KEYS:
+        lines.append("No keys have been removed or renamed yet.\n")
+        return lines
+    lines.append("| Kind | Key | Replacement or reason | Removed in |")
+    lines.append("|------|-----|-----------------------|------------|")
+    for row in REMOVED_KEYS:
+        change = f"`{row.replacement}`" if row.replacement else row.reason
+        lines.append(f"| {row.kind} | `{row.path}` | {change} | {row.removed_in} |")
+    lines.append("")
+    return lines
 
 
 def _sort_key(entry: RegistryEntry) -> tuple[str, str]:
@@ -121,6 +151,7 @@ def render_page() -> str:
             lines.append(f"### {entry.code}\n")
             lines.append(f"`{entry.name}` · {entry.severity.value} · {_stability(entry)}\n")
             lines.append(f"{entry.summary}\n")
+    lines.extend(_removed_section())
     if RETIRED_CODES:
         lines.append("## Retired codes\n")
         lines.append("These codes are no longer used and will not be reused.\n")

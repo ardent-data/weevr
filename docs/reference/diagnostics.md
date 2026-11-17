@@ -118,6 +118,18 @@ A value breaks a length, range or pattern limit.
 
 A key the schema does not define. Reserved for strict schemas.
 
+### C111
+
+`removed-key` · error · stable
+
+A key this version no longer reads; the hint says why it was removed.
+
+### C112
+
+`renamed-key` · error · stable
+
+A key this version reads under a new name; expected names the new key.
+
 ## C2xx — Envelope, kind and version
 
 ### C201
@@ -499,3 +511,10 @@ A source does not exist at its resolved location.
 `source-probe-failed` · error · stable
 
 A source's existence could not be checked, because probing its location failed.
+
+## Removed and renamed keys
+
+A key listed here fails the load with `C111` (removed) or `C112` (renamed),
+naming what to write instead. `*` matches any one key or list item.
+
+No keys have been removed or renamed yet.
