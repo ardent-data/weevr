@@ -4,6 +4,48 @@ The `weevr.errors` module defines the exception hierarchy used throughout
 the framework. All weevr-specific exceptions inherit from a common base
 class for consistent error handling.
 
+## Diagnostics: match on codes, not messages
+
+Every config problem weevr reports is a **diagnostic** with a stable code,
+such as `C101` (`missing-field`) or `D101` (`circular-dependency`). An
+exception carries its diagnostics in `.diagnostics`. Codes are the
+contract: a code never changes meaning and is never reused. Message text
+is written for people and may be reworded in any release, so don't match
+on it. Look up any code in [Diagnostic Codes](../diagnostics.md).
+
+Each diagnostic names where the problem is: the authored `file`, a JSON
+`pointer` into it, and the `line` and `column`, plus `resolved_path` into
+the resolved document. `expected` lists allowed keys or values when they
+are known, and `hint` says what to change. `location_fallback` is `True`
+when the value came from elsewhere (a weave or loom default, or a
+parameter), so `file` and `pointer` name the config that received it.
+
+One load reports every problem in the project together. The exception
+has the class of its first problem, so existing `except` clauses keep
+working, and printing it lists one problem per line:
+
+```text
+2 config problems:
+  - C103 invalid-value: Input should be 'overwrite', 'append' or 'merge' (orders.thread:9:3)
+  - C101 missing-field: Field required (customers.thread:2:1)
+```
+
+```python
+from weevr.config import load_config
+from weevr.errors import ConfigError
+
+try:
+    load_config("project.weevr/nightly.loom")
+except ConfigError as e:
+    for d in e.diagnostics:
+        print(d.code, d.file, d.line, d.expected)
+```
+
+`e.message` is unchanged and `e.plain_text()` returns the error as text
+without its diagnostics. `e.cause` still holds the underlying exception
+(for a schema error, pydantic's `ValidationError`) for debugging; it is
+not part of the contract.
+
 ::: weevr.errors
     options:
       members: true
@@ -33,6 +75,7 @@ WeevError: WeevError {
     InheritanceError
     ModelValidationError
     LookupResolutionError
+    ConfigLocationError
   }
   ExecutionError: ExecutionError {
     SparkError
@@ -59,9 +102,9 @@ from weevr.errors import WeevError
 try:
     result = ctx.run("daily.loom")
 except WeevError as e:
-    print(f"weevr error: {e}")
-    if e.cause:
-        print(f"  caused by: {e.cause}")
+    print(e)  # one line per diagnostic
+    for d in e.diagnostics:
+        print(d.code, d.file, d.line)
 ```
 
 **Related:** All exceptions below inherit from `WeevError`.
@@ -342,16 +385,37 @@ typed model (Thread, Weave, or Loom).
 
 **Resolution:**
 
-1. Check the error message for the specific field that failed
+1. Check each diagnostic's code, `file` and `line` for the field that failed
 2. Verify that resolved variable values produce valid combinations
 3. Run with `mode="validate"` to test config without executing
 
 **Example:**
 
 ```python
-# Validate config without running — catches ModelValidationError early
+# Validate config without running — reports every problem, raises none
 result = ctx.run("daily.loom", mode="validate")
+for d in result.diagnostics:
+    print(d)
 ```
+
+---
+
+### ConfigLocationError
+
+Raised when a config, source or target location can't be resolved. It is
+also a `ValueError`.
+
+**Common causes:**
+
+- An absolute path or URI where a path relative to the project belongs
+  (`C311`)
+- A path that climbs out of its root (`C303`)
+- A source or target naming a connection no scope declares (`R201`)
+
+**Resolution:**
+
+1. Write references relative to the project root
+2. Declare the connection in the thread, weave or loom `connections` block
 
 ---
 

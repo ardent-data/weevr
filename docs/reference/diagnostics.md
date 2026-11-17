@@ -92,7 +92,8 @@ A required key is missing.
 
 `wrong-type` · error · stable
 
-A value has the wrong type: one code for every type (string, number, boolean, list, mapping), and for a value no member of a union accepts.
+A value has the wrong type: one code for every type (string, number, boolean, list, mapping), and
+for a value no member of a union accepts.
 
 ### C103
 
@@ -338,7 +339,8 @@ A thread in incremental_watermark load mode would overwrite its target with each
 
 `incremental-parameter-without-param` · warning · stable
 
-A thread in incremental_parameter load mode references no ${param.*} variable in its steps or sources.
+A thread in incremental_parameter load mode references no ${param.*} variable in its steps or
+sources.
 
 ### C484
 

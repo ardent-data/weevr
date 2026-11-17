@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sys
+import textwrap
 from pathlib import Path
 
 from weevr.diagnostics import REGISTRY, RETIRED_CODES, RegistryEntry, Stability
@@ -150,7 +151,7 @@ def render_page() -> str:
         for entry in entries:
             lines.append(f"### {entry.code}\n")
             lines.append(f"`{entry.name}` · {entry.severity.value} · {_stability(entry)}\n")
-            lines.append(f"{entry.summary}\n")
+            lines.append(textwrap.fill(entry.summary, width=100) + "\n")
     lines.extend(_removed_section())
     if RETIRED_CODES:
         lines.append("## Retired codes\n")
