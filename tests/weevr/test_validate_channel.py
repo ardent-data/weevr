@@ -72,6 +72,8 @@ class TestValidateReports:
         (schema,) = [d for d in result.diagnostics if d.code == "C103"]
         assert schema.file == str(project / "broken.thread")
         assert schema.line is not None
+        (cycle,) = [d for d in result.diagnostics if d.code == "D101"]
+        assert cycle.file == str(project / "w.weave")
 
     def test_a_file_that_fails_to_parse_is_reported(
         self, spark: SparkSession, tmp_path: Path

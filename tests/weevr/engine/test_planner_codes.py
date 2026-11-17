@@ -103,3 +103,34 @@ def test_missing_weave_issue_is_coded() -> None:
     assert issue.error is None
     assert issue.diagnostic is not None
     assert (issue.diagnostic.code, issue.diagnostic.node) == ("D104", "w")
+
+
+def test_cycle_diagnostic_names_the_weave_file(tmp_path) -> None:
+    import yaml
+
+    from weevr.config import load_resolved
+
+    def thread(name: str) -> dict:
+        return {
+            "config_version": "1.0",
+            "sources": {"s": {"type": "delta", "alias": f"raw.{name}"}},
+            "target": {"alias": f"out.{name}"},
+        }
+
+    for name in ("a", "b"):
+        (tmp_path / f"{name}.thread").write_text(yaml.safe_dump(thread(name)))
+    weave = tmp_path / "w.weave"
+    weave.write_text(
+        yaml.safe_dump(
+            {
+                "config_version": "1.0",
+                "threads": [
+                    {"ref": "a.thread", "dependencies": ["b"]},
+                    {"ref": "b.thread", "dependencies": ["a"]},
+                ],
+            }
+        )
+    )
+    (issue,) = load_resolved(weave, project_root=tmp_path).validate_plans()
+    assert issue.diagnostic is not None
+    assert (issue.diagnostic.code, issue.diagnostic.file) == ("D101", str(weave))

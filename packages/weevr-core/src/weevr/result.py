@@ -748,11 +748,13 @@ class LoadedConfig:
 
         issues: list[PlanIssue] = []
         for name, weave, threads, entries, lookups in self._plan_inputs():
+            file = self._weave_file(name)
             if weave is None:
                 message = f"Weave '{name}' not found"
-                issues.append(
-                    PlanIssue(name, message, None, diagnostic("D104", message, node=name))
+                missing = diagnostic(
+                    "D104", message, node=name, file=self._document.source_ref or None
                 )
+                issues.append(PlanIssue(name, message, None, missing))
                 continue
             try:
                 build_plan(
@@ -762,8 +764,18 @@ class LoadedConfig:
                 text = exc.plain_text() if isinstance(exc, WeevError) else str(exc)
                 coded = getattr(exc, "diagnostics", None)
                 issue = coded[0] if coded else diagnostic("D100", text, node=name)
+                if file is not None:
+                    issue = issue.located(file)
                 issues.append(PlanIssue(name, text, exc, issue))
         return tuple(issues)
+
+    def _weave_file(self, name: str) -> str | None:
+        """The file a weave is written in, from the tree; ``None`` when the tree doesn't know."""
+        document = self._document
+        node = document if document.kind == "weave" else document.children.get(name)
+        if node is None:
+            return None
+        return node.source_ref or None
 
     def _plan_inputs(
         self,
