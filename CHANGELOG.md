@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.4](https://github.com/ardent-data/weevr/compare/weevr-v1.21.3...weevr-v1.21.4) (2026-11-17)
+
+
+### Bug Fixes
+
+* **config:** honor enabled false on every export ([#319](https://github.com/ardent-data/weevr/issues/319)) ([621e9f5](https://github.com/ardent-data/weevr/commit/621e9f5c6191f75c7b73e8d3dbd0a2bc3738f673))
+
 ## [1.21.3](https://github.com/ardent-data/weevr/compare/weevr-v1.21.2...weevr-v1.21.3) (2026-11-15)
 
 
