@@ -56,7 +56,7 @@ exports:
 | `mode` | No | `overwrite` | Write mode. Only `overwrite` in v1. |
 | `partition_by` | No | — | Partition columns, independent of primary target. |
 | `on_failure` | No | `warn` | `abort` fails the thread; `warn` logs and continues. |
-| `enabled` | No | `true` | Set to `false` to suppress an inherited export. |
+| `enabled` | No | `true` | Set to `false` to skip the export, whether declared here or inherited. |
 | `options` | No | — | Format-specific Spark DataFrameWriter options. |
 
 ## Format Notes
@@ -98,7 +98,8 @@ Exports cascade additively through loom → weave → thread:
 
 - Each level can define exports; all are collected by name.
 - Same-named exports at a lower level override the higher-level definition.
-- `enabled: false` at any level suppresses an inherited export.
+- `enabled: false` at any level skips the export, including one inherited from a
+  higher level.
 
 ```yaml
 # loom defaults — applies to all threads
