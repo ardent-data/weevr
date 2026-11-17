@@ -443,3 +443,39 @@ def test_unresolved_variable_under_with_points_at_the_authored_key(tmp_path: Pat
     assert diag.code == "P110"
     assert diag.pointer == "/with/orders/steps/0/filter/expr"
     assert diag.line is not None
+
+
+def test_a_user_key_named_with_underscore_keeps_its_name(tmp_path: Path) -> None:
+    import yaml
+
+    from weevr.config import load_config
+    from weevr.errors import VariableResolutionError
+
+    thread = {
+        "config_version": "1.0",
+        "sources": {"main": {"type": "delta", "alias": "raw.a"}},
+        "target": {"alias": "out.a"},
+        "steps": [{"derive": {"columns": {"with_": "'${nope}'"}}}],
+    }
+    path = tmp_path / "t.thread"
+    path.write_text(yaml.safe_dump(thread, sort_keys=False))
+    with pytest.raises(VariableResolutionError) as exc_info:
+        load_config(path)
+    (diag,) = exc_info.value.diagnostics
+    assert diag.pointer == "/steps/0/derive/columns/with_"
+    assert diag.line is not None
+
+
+def test_authored_path_translates_only_schema_fields() -> None:
+    from weevr.config.validation import authored_path
+
+    assert authored_path(("with_", "orders")) == ("with", "orders")
+    assert authored_path(("threads", 2, "with_", "x")) == ("threads", 2, "with", "x")
+    assert authored_path(("steps", 0, "derive", "columns", "with_")) == (
+        "steps",
+        0,
+        "derive",
+        "columns",
+        "with_",
+    )
+    assert authored_path(("threads", 2, "params", "with_")) == ("threads", 2, "params", "with_")

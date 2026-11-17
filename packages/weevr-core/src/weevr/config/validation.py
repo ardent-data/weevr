@@ -115,7 +115,12 @@ def _dumped_to_authored() -> dict[str, str]:
 
 
 def authored_path(segments: Sequence[str | int]) -> tuple[str | int, ...]:
-    """A path into a schema-dumped config, each key as the author wrote it (``with_`` → ``with``).
+    """A path into a schema-dumped config, its field keys as the author wrote them.
+
+    Only a config's own fields are renamed (``with_`` → ``with``): the first
+    segment, or the one right after ``threads/<n>`` for an inline thread. A key
+    the author named ``with_`` inside a free-form mapping (columns, params) is
+    left as it is.
 
     Args:
         segments: Keys and list indexes into the dict ``validate_schema(...).model_dump()`` returns.
@@ -123,7 +128,14 @@ def authored_path(segments: Sequence[str | int]) -> tuple[str | int, ...]:
     Returns:
         The same path in the authored document.
     """
-    return tuple(_DUMPED_TO_AUTHORED.get(s, s) if isinstance(s, str) else s for s in segments)
+    path = list(segments)
+    for index, segment in enumerate(path):
+        is_field = index == 0 or (
+            index >= 2 and path[index - 2] == "threads" and isinstance(path[index - 1], int)
+        )
+        if is_field and isinstance(segment, str):
+            path[index] = _DUMPED_TO_AUTHORED.get(segment, segment)
+    return tuple(path)
 
 
 _DUMPED_TO_AUTHORED: dict[str, str] = _dumped_to_authored()
