@@ -288,8 +288,9 @@ depends on what was executed:
 - **load_mode** -- The load mode used (full, incremental, CDC)
 - **watermark_column**, **watermark_previous_value**,
   **watermark_new_value** -- Watermark state for incremental loads
-- **cdc_inserts**, **cdc_updates**, **cdc_deletes** -- CDC operation
-  counts
+- **cdc_inserts**, **cdc_updates**, **cdc_deletes** -- Target rows the
+  CDC merge inserted, updated, and deleted (soft deletes count as
+  deletes)
 - **rows_after_transforms** -- Row count after pipeline transforms,
   before validation
 - **audit_columns_applied** -- Names of audit columns injected
