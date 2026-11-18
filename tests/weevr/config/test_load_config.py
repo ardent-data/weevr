@@ -63,6 +63,35 @@ target:
         assert result.sources["data"].alias == "bronze.customers"
         assert result.target.path == "/data/dev_output"
 
+    def test_standalone_thread_drops_disabled_export(self, tmp_path):
+        """A thread loaded on its own does not keep an export with enabled: false."""
+        thread_file = tmp_path / "thread.thread"
+        thread_file.write_text(
+            """
+config_version: "1.0"
+sources:
+  data:
+    type: delta
+    alias: raw.customers
+target:
+  path: /data/output
+exports:
+  - name: archive
+    type: parquet
+    path: /data/archive
+  - name: extract
+    type: csv
+    path: /data/extract
+    enabled: false
+"""
+        )
+
+        result = load_config(thread_file)
+
+        assert isinstance(result, Thread)
+        assert result.exports is not None
+        assert [e.name for e in result.exports] == ["archive"]
+
     def test_load_thread_with_runtime_params(self, tmp_path):
         """load_config resolves variables from runtime params."""
         thread_file = tmp_path / "thread.yaml"
@@ -644,6 +673,58 @@ connections:
         )
         with pytest.raises(ConfigSchemaError, match="expected int"):
             load_config(loom_file, runtime_params={"max_rows": "abc"}, project_root=project)
+
+
+class TestLoadConfigExportEnabled:
+    """A weave's export is suppressed by any enabled value the model reads as false."""
+
+    def _project(self, tmp_path: Path, enabled: str) -> Path:
+        (tmp_path / "t.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  data:\n    type: delta\n    alias: raw\n"
+            "target:\n  alias: out\n"
+        )
+        (tmp_path / "w.weave").write_text(
+            'config_version: "1.0"\n'
+            "defaults:\n  exports:\n"
+            "    - name: archive\n      type: parquet\n      path: /data/archive\n"
+            f"      enabled: {enabled}\n"
+            "params:\n  write_archive:\n    name: write_archive\n    type: string\n"
+            "    required: false\n"
+            "threads:\n  - ref: t.thread\n"
+        )
+        return tmp_path / "w.weave"
+
+    def test_param_default_false_suppresses(self, tmp_path):
+        """enabled: ${param.x:-false} with no runtime value drops the export."""
+        weave = self._project(tmp_path, '"${param.write_archive:-false}"')
+        result = load_resolved(weave, project_root=tmp_path)
+        assert not result.document.weave_threads()["w"]["t"].exports
+
+    def test_param_runtime_true_keeps(self, tmp_path):
+        """enabled: ${param.x:-false} with x=true at runtime keeps the export."""
+        weave = self._project(tmp_path, '"${param.write_archive:-false}"')
+        result = load_resolved(
+            weave, runtime_params={"write_archive": "true"}, project_root=tmp_path
+        )
+        exports = result.document.weave_threads()["w"]["t"].exports
+        assert exports is not None
+        assert [e.name for e in exports] == ["archive"]
+
+    def test_name_only_string_override_suppresses(self, tmp_path):
+        """A thread override naming the export with enabled: "false" drops it."""
+        weave = self._project(tmp_path, "true")
+        with (tmp_path / "t.thread").open("a") as thread_file:
+            thread_file.write('exports:\n  - name: archive\n    enabled: "false"\n')
+        result = load_resolved(weave, project_root=tmp_path)
+        assert not result.document.weave_threads()["w"]["t"].exports
+
+    def test_unreadable_enabled_still_fails(self, tmp_path):
+        """An enabled value the model can't read as a bool still fails the load."""
+        weave = self._project(tmp_path, "maybe")
+        with pytest.raises(ConfigError) as exc_info:
+            load_resolved(weave, project_root=tmp_path)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C102"]
 
 
 class TestLoadConfigWeaveDeclaredParams:
