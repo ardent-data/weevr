@@ -1563,3 +1563,160 @@ class TestCdfFirstRun:
         )
         with pytest.raises(ExecutionError, match=r"500.*ahead.*latest version 1"):
             execute_thread(spark, self._thread(src, tgt, store))
+
+
+class TestCdcAbsentKey:
+    """Changes for keys the target doesn't hold yet merge to their final state."""
+
+    @staticmethod
+    def _generic(
+        *,
+        insert_value: str | None = "I",
+        on_delete: Literal["hard_delete", "soft_delete"] = "hard_delete",
+    ) -> tuple[CdcConfig, LoadConfig]:
+        cdc_config = CdcConfig(
+            operation_column="op",
+            insert_value=insert_value,
+            update_value="U",
+            delete_value="D",
+            on_delete=on_delete,
+        )
+        load_config = LoadConfig(
+            mode="cdc",
+            cdc=cdc_config,
+            watermark_column="seq",
+            watermark_type="int",
+        )
+        return cdc_config, load_config
+
+    @staticmethod
+    def _rows(spark: SparkSession, path: str) -> dict[int, str]:
+        return {r["id"]: r["name"] for r in spark.read.format("delta").load(path).collect()}
+
+    def test_insert_then_update_of_new_key_lands(self, spark: SparkSession, tmp_delta_path) -> None:
+        """An insert then an update of a new key in one window lands the updated row."""
+        tgt = tmp_delta_path("absent_iu_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 2, "name": "Bob", "op": "I", "seq": 1},
+                {"id": 2, "name": "Bobby", "op": "U", "seq": 2},
+            ]
+        )
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        assert self._rows(spark, tgt) == {1: "Alice", 2: "Bobby"}
+
+    def test_cdf_insert_then_update_of_new_key_lands(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A CDF insert then update of a new key lands the post-image."""
+        tgt = tmp_delta_path("absent_cdf_iu_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice"}])
+        cdf_df = spark.createDataFrame(
+            [
+                {"id": 2, "name": "Bob", "_change_type": "insert", "_commit_version": 5},
+                {"id": 2, "name": "Bob", "_change_type": "update_preimage", "_commit_version": 6},
+                {
+                    "id": 2,
+                    "name": "Bobby",
+                    "_change_type": "update_postimage",
+                    "_commit_version": 6,
+                },
+            ]
+        )
+        cdc_config = CdcConfig(preset="delta_cdf", on_delete="hard_delete")
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdf_df, tgt, write_config, cdc_config)
+
+        assert self._rows(spark, tgt) == {1: "Alice", 2: "Bobby"}
+
+    def test_bare_update_of_absent_key_inserts(self, spark: SparkSession, tmp_delta_path) -> None:
+        """An update for a key the target never received inserts it."""
+        tgt = tmp_delta_path("absent_u_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+        cdc_df = spark.createDataFrame([{"id": 3, "name": "Cara", "op": "U", "seq": 1}])
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        assert self._rows(spark, tgt) == {1: "Alice", 3: "Cara"}
+
+    def test_update_only_mapping_inserts_absent_key(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """A mapping with no insert value still inserts an update for an absent key."""
+        tgt = tmp_delta_path("absent_uonly_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Alicia", "op": "U", "seq": 1},
+                {"id": 3, "name": "Cara", "op": "U", "seq": 1},
+            ]
+        )
+        cdc_config, load_config = self._generic(insert_value=None)
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        assert self._rows(spark, tgt) == {1: "Alicia", 3: "Cara"}
+
+    @pytest.mark.parametrize("on_delete", ["hard_delete", "soft_delete"])
+    def test_delete_of_absent_key_is_a_no_op(
+        self,
+        spark: SparkSession,
+        tmp_delta_path,
+        on_delete: Literal["hard_delete", "soft_delete"],
+    ) -> None:
+        """A delete for a key the target lacks inserts nothing."""
+        tgt = tmp_delta_path(f"absent_d_{on_delete}_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0, "is_deleted": False}])
+        cdc_df = spark.createDataFrame(
+            [{"id": 4, "name": "Dave", "op": "D", "seq": 1, "is_deleted": False}]
+        )
+        cdc_config, load_config = self._generic(on_delete=on_delete)
+        write_config = WriteConfig(mode="merge", match_keys=["id"], soft_delete_column="is_deleted")
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        assert self._rows(spark, tgt) == {1: "Alice"}
+
+    def test_upserted_row_carries_soft_delete_active_value(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """An upserted update is seeded with soft_delete_active_value, like an insert."""
+        tgt = tmp_delta_path("absent_active_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0, "is_deleted": False}])
+        cdc_df = spark.createDataFrame([{"id": 5, "name": "Eve", "op": "U", "seq": 1}])
+        cdc_config, load_config = self._generic(on_delete="soft_delete")
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            soft_delete_column="is_deleted",
+            soft_delete_value=True,
+            soft_delete_active_value=False,
+        )
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        rows = {r["id"]: r["is_deleted"] for r in spark.read.format("delta").load(tgt).collect()}
+        assert rows == {1: False, 5: False}
+
+    def test_insert_for_existing_key_changes_nothing(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """An insert whose key is already in the target leaves the row as it was."""
+        tgt = tmp_delta_path("absent_matched_i_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+        cdc_df = spark.createDataFrame([{"id": 1, "name": "Imposter", "op": "I", "seq": 1}])
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
+
+        assert self._rows(spark, tgt) == {1: "Alice"}

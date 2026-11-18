@@ -503,6 +503,10 @@ def execute_cdc_merge(
     A generic mapping without a watermark column (insert-only feeds) is
     not reduced — every row is treated as an event.
 
+    An insert or update whose key is not in the target inserts the row; a
+    matched update or delete applies to the existing row; a matched insert
+    and an unmatched delete change nothing.
+
     Args:
         spark: Active SparkSession.
         df: Source DataFrame containing CDC rows with operation column.
@@ -679,11 +683,16 @@ def execute_cdc_merge(
                     set={write_config.soft_delete_column: F.lit(write_config.soft_delete_value)},
                 )
 
-        if insert_val or seeded_first_write:
+        # A key the target lacks takes its final state from an insert or an
+        # update: the per-key reduction folds an insert followed by an update
+        # into the update alone, and an update can arrive for a key the target
+        # never received. An unmatched delete has nothing to remove.
+        upsert_vals = [v for v in (insert_val, update_val) if v]
+        if upsert_vals or seeded_first_write:
             insert_set: dict[str, str | Column] = {
                 c: F.col(f"source.{quote_identifier(c)}") for c in data_cols
             }
-            # When soft_delete_active_value is set, seed the flag on new inserts.
+            # When soft_delete_active_value is set, seed the flag on new rows.
             if (
                 write_config.soft_delete_column
                 and write_config.soft_delete_active_value is not None
@@ -695,8 +704,8 @@ def execute_cdc_merge(
                 escaped_del = (delete_val or "").replace("'", "''")
                 insert_condition = f"source.{quoted_op} != '{escaped_del}'" if delete_val else None
             else:
-                escaped_ins = (insert_val or "").replace("'", "''")
-                insert_condition = f"source.{quoted_op} = '{escaped_ins}'"
+                quoted_vals = ", ".join("'" + v.replace("'", "''") + "'" for v in upsert_vals)
+                insert_condition = f"source.{quoted_op} IN ({quoted_vals})"
             merger = merger.whenNotMatchedInsert(condition=insert_condition, values=insert_set)
 
         merger.execute()
