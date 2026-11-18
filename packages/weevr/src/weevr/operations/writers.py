@@ -434,6 +434,32 @@ def _cdc_data_columns(df: DataFrame, op_col: str) -> list[str]:
     return [c for c in df.columns if c not in meta_cols]
 
 
+def _cdc_merge_counts(
+    metrics: dict[str, str] | None,
+    soft_deleted: int,
+    *,
+    fallback: dict[str, int],
+) -> dict[str, int]:
+    """Target rows a CDC merge inserted, updated, and deleted.
+
+    Read from the merge commit's metrics, so an update that inserts an
+    absent key counts as an insert, and a matched insert or an unmatched
+    delete counts as nothing. Delta folds soft deletes into the matched
+    updates; ``soft_deleted`` (the delete rows that matched a target row)
+    moves them back to deletes. When the commit can't be attributed
+    (``metrics`` is None), the change window's operation counts in
+    ``fallback`` are returned instead.
+    """
+    if metrics is None or "numTargetRowsMatchedUpdated" not in metrics:
+        return fallback
+    matched_updated = int(metrics.get("numTargetRowsMatchedUpdated", 0))
+    return {
+        "inserts": int(metrics.get("numTargetRowsInserted", 0)),
+        "updates": matched_updated - soft_deleted,
+        "deletes": int(metrics.get("numTargetRowsDeleted", 0)) + soft_deleted,
+    }
+
+
 def seed_cdc_target(
     spark: SparkSession,
     df: DataFrame,
@@ -524,7 +550,10 @@ def execute_cdc_merge(
             every non-delete row, as a first write to a missing target does.
 
     Returns:
-        Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}``.
+        Dict with counts: ``{"inserts": N, "updates": N, "deletes": N}`` —
+        the target rows inserted, updated, and deleted (soft deletes count
+        as deletes). When the merge commit can't be attributed, the reduced
+        window's operation counts instead.
 
     Raises:
         ExecutionError: If the merge operation fails.
@@ -606,7 +635,9 @@ def execute_cdc_merge(
         )
 
     try:
-        # Count operations in a single pass over the (reduced) window
+        # Count operations in a single pass over the (reduced) window. The
+        # merge path reports rows changed from its commit metrics; these
+        # operation counts are its fallback when the commit can't be read.
         op_counts: dict[str, int] = {
             row[0]: row[1] for row in df.groupBy(F.col(op_col)).count().collect()
         }
@@ -636,7 +667,9 @@ def execute_cdc_merge(
                 cdc_writer.save(target_path)
             if handle is not None:
                 handle.mark_exists()
-            return counts
+            # Every non-delete row was written; nothing existed to update or delete.
+            written = sum(n for op, n in op_counts.items() if op != delete_val)
+            return {"inserts": written, "updates": 0, "deletes": 0}
 
         delta_table = resolve_delta_table(spark, target_path)
         merger = delta_table.alias("target").merge(
@@ -708,10 +741,33 @@ def execute_cdc_merge(
                 insert_condition = f"source.{quoted_op} IN ({quoted_vals})"
             merger = merger.whenNotMatchedInsert(condition=insert_condition, values=insert_set)
 
-        merger.execute()
-        if handle is not None:
+        if not op_counts:
+            # Empty window: some Delta versions write no commit for a merge
+            # with an empty source, so there are no metrics to read.
+            merger.execute()
             handle.mark_exists()
-        return counts
+            return counts
+
+        # Delta reports a soft delete as a matched update, so count the
+        # delete rows that match a target row before the merge changes it.
+        soft_deleted = 0
+        if cdc_config.on_delete == "soft_delete" and delete_val and op_counts.get(delete_val):
+            soft_deleted = (
+                df.filter(F.col(op_col) == delete_val)
+                .select(*write_config.match_keys)
+                .join(
+                    delta_table.toDF().select(*write_config.match_keys),
+                    on=write_config.match_keys,
+                    how="left_semi",
+                )
+                .count()
+            )
+
+        pre_version = handle.current_version()
+        merger.execute()
+        handle.mark_exists()
+        metrics = handle.commit_metrics_after(pre_version)
+        return _cdc_merge_counts(metrics, soft_deleted, fallback=counts)
 
     except ExecutionError:
         raise

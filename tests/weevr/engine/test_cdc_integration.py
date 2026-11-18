@@ -18,6 +18,7 @@ from weevr.model.target import Target
 from weevr.model.thread import Thread
 from weevr.model.write import WriteConfig
 from weevr.operations.readers import read_cdc_source
+from weevr.operations.target_handle import TargetHandle
 from weevr.operations.writers import execute_cdc_merge
 from weevr.state.metadata_table import MetadataTableStore
 from weevr.state.table_properties import TablePropertiesStore
@@ -139,7 +140,8 @@ class TestCdcGenericMerge:
         counts = execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config)
 
         assert counts["inserts"] == 1
-        assert counts["deletes"] == 1
+        # The target didn't exist, so the delete removed nothing
+        assert counts["deletes"] == 0
 
         result = spark.read.format("delta").load(tgt)
         assert result.count() == 1
@@ -299,7 +301,8 @@ class TestCdcInsertOnly:
 
         counts = execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config)
 
-        assert counts["inserts"] == 2
+        # id=1 already exists, so its insert changes nothing and isn't counted
+        assert counts["inserts"] == 1
         result = spark.read.format("delta").load(tgt)
         assert result.count() == 2
 
@@ -1720,3 +1723,156 @@ class TestCdcAbsentKey:
         execute_cdc_merge(spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config)
 
         assert self._rows(spark, tgt) == {1: "Alice"}
+
+
+class TestCdcMergeCounts:
+    """CDC counts report the target rows the merge inserted, updated, and deleted."""
+
+    @staticmethod
+    def _generic(
+        on_delete: Literal["hard_delete", "soft_delete"] = "hard_delete",
+    ) -> tuple[CdcConfig, LoadConfig]:
+        cdc_config = CdcConfig(
+            operation_column="op",
+            insert_value="I",
+            update_value="U",
+            delete_value="D",
+            on_delete=on_delete,
+        )
+        load_config = LoadConfig(
+            mode="cdc",
+            cdc=cdc_config,
+            watermark_column="seq",
+            watermark_type="int",
+        )
+        return cdc_config, load_config
+
+    def test_counts_rows_changed_not_change_rows(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Upserted updates count as inserts; matched inserts and absent deletes count nothing."""
+        tgt = tmp_delta_path("cnt_mixed_tgt")
+        create_delta_table(
+            spark,
+            tgt,
+            [
+                {"id": 1, "name": "Alice", "seq": 0},
+                {"id": 2, "name": "Bob", "seq": 0},
+                {"id": 3, "name": "Cara", "seq": 0},
+            ],
+        )
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Alicia", "op": "U", "seq": 1},  # matched update
+                {"id": 2, "name": "Bob", "op": "D", "seq": 1},  # matched delete
+                {"id": 3, "name": "Imposter", "op": "I", "seq": 1},  # matched insert: no-op
+                {"id": 4, "name": "Dave", "op": "I", "seq": 1},  # insert
+                {"id": 5, "name": "Eve", "op": "U", "seq": 1},  # upserted update
+                {"id": 6, "name": "Finn", "op": "D", "seq": 1},  # absent delete: no-op
+            ]
+        )
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        counts = execute_cdc_merge(
+            spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+        )
+
+        assert counts == {"inserts": 2, "updates": 1, "deletes": 1}
+
+    def test_soft_deletes_count_as_deletes(self, spark: SparkSession, tmp_delta_path) -> None:
+        """Soft-deleted rows count as deletes, not as the updates Delta reports them as."""
+        tgt = tmp_delta_path("cnt_soft_tgt")
+        create_delta_table(
+            spark,
+            tgt,
+            [
+                {"id": 1, "name": "Alice", "seq": 0, "is_deleted": False},
+                {"id": 2, "name": "Bob", "seq": 0, "is_deleted": False},
+            ],
+        )
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Alicia", "op": "U", "seq": 1, "is_deleted": False},
+                {"id": 2, "name": "Bob", "op": "D", "seq": 1, "is_deleted": False},
+                {"id": 9, "name": "Gone", "op": "D", "seq": 1, "is_deleted": False},
+            ]
+        )
+        cdc_config, load_config = self._generic(on_delete="soft_delete")
+        write_config = WriteConfig(
+            mode="merge",
+            match_keys=["id"],
+            soft_delete_column="is_deleted",
+            soft_delete_value=True,
+        )
+
+        counts = execute_cdc_merge(
+            spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+        )
+
+        assert counts == {"inserts": 0, "updates": 1, "deletes": 1}
+
+    def test_first_write_counts_rows_written(self, spark: SparkSession, tmp_delta_path) -> None:
+        """A first write counts every row it writes as an insert."""
+        tgt = tmp_delta_path("cnt_first_tgt")
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Alice", "op": "I", "seq": 1},
+                {"id": 2, "name": "Bob", "op": "U", "seq": 1},
+                {"id": 3, "name": "Cara", "op": "D", "seq": 1},
+            ]
+        )
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        counts = execute_cdc_merge(
+            spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+        )
+
+        assert counts == {"inserts": 2, "updates": 0, "deletes": 0}
+        assert spark.read.format("delta").load(tgt).count() == 2
+
+    def test_empty_window_counts_zero_without_metrics_read(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """An empty window leaves the target as it was and counts zero.
+
+        Delta writes no commit for a merge with an empty source on some
+        versions, so the counts must not depend on reading one.
+        """
+        tgt = tmp_delta_path("cnt_empty_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+        cdc_df = spark.createDataFrame([], "id BIGINT, name STRING, op STRING, seq BIGINT")
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        with patch.object(TargetHandle, "commit_metrics_after") as metrics:
+            counts = execute_cdc_merge(
+                spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+            )
+
+        metrics.assert_not_called()
+        assert counts == {"inserts": 0, "updates": 0, "deletes": 0}
+        assert spark.read.format("delta").load(tgt).count() == 1
+
+    def test_unavailable_metrics_fall_back_to_change_rows(
+        self, spark: SparkSession, tmp_delta_path
+    ) -> None:
+        """Without attributable commit metrics, counts fall back to the window's operations."""
+        tgt = tmp_delta_path("cnt_fallback_tgt")
+        create_delta_table(spark, tgt, [{"id": 1, "name": "Alice", "seq": 0}])
+        cdc_df = spark.createDataFrame(
+            [
+                {"id": 1, "name": "Alicia", "op": "U", "seq": 1},
+                {"id": 5, "name": "Eve", "op": "U", "seq": 1},
+            ]
+        )
+        cdc_config, load_config = self._generic()
+        write_config = WriteConfig(mode="merge", match_keys=["id"])
+
+        with patch.object(TargetHandle, "commit_metrics_after", return_value=None):
+            counts = execute_cdc_merge(
+                spark, cdc_df, tgt, write_config, cdc_config, load_config=load_config
+            )
+
+        assert counts == {"inserts": 0, "updates": 2, "deletes": 0}
+        rows = {r["id"]: r["name"] for r in spark.read.format("delta").load(tgt).collect()}
+        assert rows == {1: "Alicia", 5: "Eve"}
