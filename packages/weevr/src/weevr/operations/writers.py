@@ -446,18 +446,42 @@ def _cdc_merge_counts(
     absent key counts as an insert, and a matched insert or an unmatched
     delete counts as nothing. Delta folds soft deletes into the matched
     updates; ``soft_deleted`` (the delete rows that matched a target row)
-    moves them back to deletes. When the commit can't be attributed
-    (``metrics`` is None), the change window's operation counts in
-    ``fallback`` are returned instead.
+    moves them back to deletes. It is counted before the merge, so a
+    concurrent commit can push it above the matched updates; it is capped
+    there, keeping every count non-negative. When the commit can't be
+    attributed (``metrics`` is None), the change window's operation counts
+    in ``fallback`` are returned instead.
     """
     if metrics is None or "numTargetRowsMatchedUpdated" not in metrics:
         return fallback
     matched_updated = int(metrics.get("numTargetRowsMatchedUpdated", 0))
+    soft_deleted = min(soft_deleted, matched_updated)
     return {
         "inserts": int(metrics.get("numTargetRowsInserted", 0)),
         "updates": matched_updated - soft_deleted,
         "deletes": int(metrics.get("numTargetRowsDeleted", 0)) + soft_deleted,
     }
+
+
+def _count_matched_deletes(
+    df: DataFrame,
+    target: DataFrame,
+    match_keys: list[str],
+    op_col: str,
+    delete_val: str,
+) -> int:
+    """Count the window's delete rows whose key is in the target.
+
+    A further pass over ``df``; callers run it only for soft deletes, which
+    Delta's merge metrics report as matched updates. NULL keys match
+    nothing, as in the merge condition.
+    """
+    return (
+        df.filter(F.col(op_col) == delete_val)
+        .select(*match_keys)
+        .join(target.select(*match_keys), on=match_keys, how="left_semi")
+        .count()
+    )
 
 
 def seed_cdc_target(
@@ -665,8 +689,7 @@ def execute_cdc_merge(
                 cdc_writer.saveAsTable(target_path)
             else:
                 cdc_writer.save(target_path)
-            if handle is not None:
-                handle.mark_exists()
+            handle.mark_exists()
             # Every non-delete row was written; nothing existed to update or delete.
             written = sum(n for op, n in op_counts.items() if op != delete_val)
             return {"inserts": written, "updates": 0, "deletes": 0}
@@ -752,15 +775,8 @@ def execute_cdc_merge(
         # delete rows that match a target row before the merge changes it.
         soft_deleted = 0
         if cdc_config.on_delete == "soft_delete" and delete_val and op_counts.get(delete_val):
-            soft_deleted = (
-                df.filter(F.col(op_col) == delete_val)
-                .select(*write_config.match_keys)
-                .join(
-                    delta_table.toDF().select(*write_config.match_keys),
-                    on=write_config.match_keys,
-                    how="left_semi",
-                )
-                .count()
+            soft_deleted = _count_matched_deletes(
+                df, delta_table.toDF(), write_config.match_keys, op_col, delete_val
             )
 
         pre_version = handle.current_version()
