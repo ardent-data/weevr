@@ -89,9 +89,9 @@ class ThreadTelemetry(FrozenBase):
         watermark_new_value: New HWM value captured during this run.
         watermark_persisted: Whether watermark state was successfully persisted.
         watermark_first_run: Whether this was the first run (no prior state).
-        cdc_inserts: Number of CDC insert operations.
-        cdc_updates: Number of CDC update operations.
-        cdc_deletes: Number of CDC delete operations.
+        cdc_inserts: Target rows the CDC merge inserted.
+        cdc_updates: Target rows the CDC merge updated.
+        cdc_deletes: Target rows the CDC merge deleted or soft-deleted.
         resolved_params: Runtime parameter values that drove this execution.
             Populated on the outermost telemetry object only (thread-level runs).
         audit_columns_applied: Names of audit columns injected into the output

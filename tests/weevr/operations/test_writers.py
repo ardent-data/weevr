@@ -8,7 +8,12 @@ from spark_helpers import create_delta_table
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.types import SparkExpr
 from weevr.model.write import WriteConfig
-from weevr.operations.writers import apply_target_mapping, quote_identifier, write_target
+from weevr.operations.writers import (
+    _cdc_merge_counts,
+    apply_target_mapping,
+    quote_identifier,
+    write_target,
+)
 
 
 class TestQuoteIdentifier:
@@ -1078,3 +1083,36 @@ class TestVersionReadFailureDistinction:
         messages = " ".join(r.message for r in caplog.records)
         assert "unreadable" in messages
         assert "foreign commit" not in messages  # never the phantom diagnosis
+
+
+class TestCdcMergeCountsFromMetrics:
+    """CDC counts derived from merge commit metrics (no Spark)."""
+
+    def test_soft_deletes_move_from_updates_to_deletes(self) -> None:
+        metrics = {
+            "numTargetRowsInserted": "2",
+            "numTargetRowsMatchedUpdated": "5",
+            "numTargetRowsDeleted": "0",
+        }
+
+        counts = _cdc_merge_counts(metrics, 2, fallback={})
+
+        assert counts == {"inserts": 2, "updates": 3, "deletes": 2}
+
+    def test_counts_never_go_negative(self) -> None:
+        """A soft-delete count above the matched updates is capped, never negative."""
+        metrics = {
+            "numTargetRowsInserted": "0",
+            "numTargetRowsMatchedUpdated": "1",
+            "numTargetRowsDeleted": "0",
+        }
+
+        counts = _cdc_merge_counts(metrics, 3, fallback={})
+
+        assert counts == {"inserts": 0, "updates": 0, "deletes": 1}
+
+    def test_missing_metrics_return_the_fallback(self) -> None:
+        fallback = {"inserts": 1, "updates": 2, "deletes": 3}
+
+        assert _cdc_merge_counts(None, 0, fallback=fallback) is fallback
+        assert _cdc_merge_counts({"numOutputRows": "4"}, 0, fallback=fallback) is fallback

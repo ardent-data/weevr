@@ -423,6 +423,12 @@ by operation precedence — a delete outranks an update, which outranks an
 insert — so a key that changes many times between runs merges cleanly to
 its final state.
 
+An insert or update for a key the target doesn't hold yet inserts the row,
+so a key inserted and then updated in one window lands with its updated
+values. A delete for a key the target doesn't hold changes nothing, and so
+does an insert for a key it already holds. The run's insert, update, and
+delete counts are the target rows the merge changed.
+
 A change row whose ordering value is NULL (or unparseable under
 `watermark_format`) fails the merge with a clear error: a change that
 cannot be placed in the sequence cannot be merged safely.
