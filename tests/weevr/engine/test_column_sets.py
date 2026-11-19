@@ -962,3 +962,31 @@ class TestYamlColumnSetFile:
 
         assert result.status == "success"
         assert sorted(spark.read.format("delta").load(tgt).columns) == ["customer_id", "other"]
+
+    def test_relative_path_from_a_project_file(self, spark: SparkSession, tmp_path) -> None:
+        """A thread file's relative YAML path resolves against the project root and renames."""
+        from weevr.config import load_config
+        from weevr.engine.executor import execute_thread
+
+        project = tmp_path / "cs.weevr"
+        (project / "maps").mkdir(parents=True)
+        (project / "maps/names.yaml").write_text(
+            "- source_name: cust_id\n  target_name: customer_id\n"
+        )
+        src = str(tmp_path / "rel_cs_src")
+        tgt = str(tmp_path / "rel_cs_tgt")
+        spark.createDataFrame([{"cust_id": 1}]).write.format("delta").save(src)
+        (project / "orders.thread").write_text(
+            'config_version: "1.0"\n'
+            f"sources:\n  main:\n    type: delta\n    alias: {src}\n"
+            "steps:\n  - rename:\n      column_set: names\n"
+            f"target:\n  path: {tgt}\n"
+            "write:\n  mode: overwrite\n"
+            "column_sets:\n  names:\n    source:\n      type: yaml\n      path: maps/names.yaml\n"
+        )
+
+        thread = load_config(project / "orders.thread", project_root=project)
+        result = execute_thread(spark, thread)  # type: ignore[arg-type]
+
+        assert result.status == "success"
+        assert spark.read.format("delta").load(tgt).columns == ["customer_id"]
