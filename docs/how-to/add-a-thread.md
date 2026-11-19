@@ -66,8 +66,9 @@ sources:
     alias: bronze.customers
 ```
 
-Source types include `delta`, `csv`, `json`, `parquet`, and `excel`. Delta
-sources use `alias` for table resolution; file sources use `path`.
+Source types are `delta`, `csv`, `json`, `parquet`, `date_sequence`, and
+`int_sequence`; any other type fails at config load. Delta sources use `alias`
+for table resolution; file sources use `path`.
 
 ## Step 2 -- Define transformation steps
 

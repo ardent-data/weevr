@@ -146,7 +146,7 @@ loaded config.
 validated against the filename stem (mismatch raises `ConfigError`;
 missing name is injected from the stem), and `qualified_key` is set to the
 file's path relative to the project root. Relative `path` values on file
-sources (CSV, JSON, Parquet, Excel) are resolved against the project root,
+sources (CSV, JSON, Parquet) are resolved against the project root,
 both a thread's sources and the source of every lookup, whether the thread,
 weave, or loom declares it. The `path` of a YAML column set at any level
 resolves the same way. The fully resolved dictionary

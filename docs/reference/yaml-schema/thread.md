@@ -51,10 +51,10 @@ subsequent steps (e.g. in join, union). The value is a `Source` object.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"excel"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. |
+| `type` | `string` | conditional | -- | Source type: `"delta"`, `"csv"`, `"json"`, `"parquet"`, `"date_sequence"`, `"int_sequence"`. Required when neither `lookup` nor `connection` is set. Any other `type` fails config load. |
 | `lookup` | `string` | conditional | `null` | Lookup name. Mutually exclusive with `type`. Resolved from the nearest `lookups` map (thread, weave, or loom level) at execution time. An undefined name fails the config load; see [Loading without running](../../guides/config-resolution.md#loading-without-running) for a thread loaded on its own. |
 | `alias` | `string` | conditional | `null` | Delta table to read: a table name such as `schema.table` (read from the metastore) or a table path. A path is used as given, never joined to the project root; see [How relative locations resolve](#how-relative-locations-resolve). Required when `type` is `"delta"` without a `connection`. Mutually exclusive with `connection`. |
-| `path` | `string` | conditional | `null` | File path. A relative path is joined to the project root. Required for file-based types (`csv`, `json`, `parquet`, `excel`). |
+| `path` | `string` | conditional | `null` | File path. A relative path is joined to the project root. Required for file-based types (`csv`, `json`, `parquet`). |
 | `options` | `dict[string, any]` | no | `{}` | Reader options passed to Spark (e.g. `header`, `delimiter`) |
 | `dedup` | `DedupConfig` | no | `null` | Deduplication applied immediately after reading |
 | `connection` | `string` | conditional | `null` | Name of a connection declared in `connections:`. Requires `table`. Mutually exclusive with `alias`. Connection sources read Delta tables only: omit `type` or set it to `"delta"`. |
@@ -944,7 +944,7 @@ of the project; tables live in the lakehouse.
 
 | Where | Relative value resolves against |
 |-------|---------------------------------|
-| Source `path` (csv, json, parquet, excel), on a thread source or a lookup's source at any level | The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a `Files/...` path in that lakehouse. |
+| Source `path` (csv, json, parquet), on a thread source or a lookup's source at any level | The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a `Files/...` path in that lakehouse. |
 | YAML column set `path`, at any level | The project root, the same as a source `path`. |
 | Delta source `alias`, target `alias` or `path` | Spark's default filesystem, unchanged. In a Fabric notebook that is the attached default lakehouse, so `Tables/stg_customers` is that lakehouse's table. Run locally, it is the process's working directory. |
 
