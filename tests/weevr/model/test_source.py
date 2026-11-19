@@ -99,6 +99,8 @@ class TestSource:
             {"type": "parqet", "path": "/data/a"},
             {"type": "api"},
             {"type": ""},
+            {"type": "foo", "lookup": "ref_categories"},
+            {"type": "foo", "connection": "lake", "table": "orders"},
         ],
     )
     def test_unsupported_type_raises_at_type(self, kwargs):
@@ -119,8 +121,8 @@ class TestSource:
         assert "Excel" in msg
         assert "CSV or Parquet" in msg
 
-    def test_explicit_null_type_with_lookup(self):
-        """An explicit null type passes the type check."""
+    def test_lookup_accepts_explicit_null_type(self):
+        """A lookup source accepts an explicit null type."""
         s = Source(type=None, lookup="ref_categories")
         assert s.type is None
 

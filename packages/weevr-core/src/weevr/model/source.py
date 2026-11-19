@@ -6,9 +6,11 @@ from pydantic import Field, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 
-_FILE_TYPES = {"csv", "json", "parquet"}
+FILE_SOURCE_TYPES = frozenset({"csv", "json", "parquet"})
+"""Source types read from files at ``path``."""
 _GENERATED_TYPES = {"date_sequence", "int_sequence"}
-_SOURCE_TYPES = ("delta", "csv", "json", "parquet", "date_sequence", "int_sequence")
+SOURCE_TYPES = ("delta", "csv", "json", "parquet", "date_sequence", "int_sequence")
+"""Every source ``type`` the reader supports; any other value fails config load."""
 _DATE_SEQUENCE_STEPS = {"day", "week", "month", "year"}
 
 
@@ -131,9 +133,9 @@ class Source(FrozenBase):
     @field_validator("type")
     @classmethod
     def _validate_type(cls, value: str | None) -> str | None:
-        if value is None or value in _SOURCE_TYPES:
+        if value is None or value in SOURCE_TYPES:
             return value
-        allowed = ", ".join(_SOURCE_TYPES)
+        allowed = ", ".join(SOURCE_TYPES)
         message = f"unsupported source type {value!r}; expected one of: {allowed}"
         if value == "excel":
             message += ". Excel files are not supported; convert them to CSV or Parquet"
@@ -194,6 +196,6 @@ class Source(FrozenBase):
             raise ValueError("sources require either 'type' or 'lookup'")
         if self.type == "delta" and not self.alias:
             raise ValueError("delta sources require 'alias' to be set")
-        if self.type in _FILE_TYPES and not self.path:
+        if self.type in FILE_SOURCE_TYPES and not self.path:
             raise ValueError(f"{self.type} sources require 'path' to be set")
         return self
