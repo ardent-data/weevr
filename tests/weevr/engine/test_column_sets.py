@@ -82,27 +82,6 @@ class TestResolveColumnSetDeltaSource:
         assert result == {"col_a": "renamed_a", "col_b": "renamed_b"}
         mock_read.assert_called_once()
 
-    @patch("weevr.engine.column_sets.read_source")
-    def test_yaml_source_returns_dict(self, mock_read):
-        """YAML source: behaves the same as Delta (both go through read_source)."""
-        selected_df = MagicMock()
-        row = MagicMock()
-        row.__getitem__ = lambda self, key: "x" if key == "source_name" else "y"
-        selected_df.collect.return_value = [row]
-
-        raw_df = MagicMock()
-        raw_df.filter.return_value = raw_df
-        raw_df.select.return_value = selected_df
-        mock_read.return_value = raw_df
-
-        spark = MagicMock()
-        cs = _make_column_set(cs_type="yaml", alias=None, path="/some/file.yaml")
-
-        result = resolve_column_set(spark, "yaml_set", cs, {})
-
-        assert result == {"x": "y"}
-        mock_read.assert_called_once()
-
     @patch("weevr.engine.column_sets.F.expr")
     @patch("weevr.engine.column_sets.read_source")
     def test_alias_path_filter_and_custom_columns_after_branch_split(self, mock_read, mock_expr):
@@ -844,3 +823,142 @@ class TestResolveOncePerScope:
         out_cols = spark.read.format("delta").load(tgt).columns
         assert "renamed_by_loom" in out_cols  # pre-resolved mapping served
         assert materialize_spy == []  # nothing re-resolved at weave scope
+
+
+@pytest.mark.spark
+class TestYamlColumnSetFile:
+    """YAML column sets read their mapping from the file."""
+
+    @staticmethod
+    def _write(tmp_path, text: str, name: str = "cols.yaml") -> str:
+        path = tmp_path / name
+        path.write_text(text)
+        return str(path)
+
+    def test_rows_become_the_mapping(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(
+            tmp_path,
+            "- source_name: cust_id\n  target_name: customer_id\n"
+            "- source_name: cust_nm\n  target_name: customer_name\n",
+        )
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        with patch("weevr.engine.column_sets.read_source") as mock_read:
+            result = resolve_column_set(spark, "yaml_set", cs, {})
+
+        assert result == {"cust_id": "customer_id", "cust_nm": "customer_name"}
+        mock_read.assert_not_called()
+
+    def test_custom_from_and_to_columns(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(tmp_path, "- raw: a\n  friendly: alpha\n  note: ignored\n")
+        cs = _make_column_set(
+            cs_type="yaml", alias=None, path=path, from_column="raw", to_column="friendly"
+        )
+
+        assert resolve_column_set(spark, "yaml_set", cs, {}) == {"a": "alpha"}
+
+    def test_filter_compares_string_values(self, spark: SparkSession, tmp_path) -> None:
+        """Rows missing a key get null for it; values are compared as strings."""
+        path = self._write(
+            tmp_path,
+            "- source_name: a\n  target_name: alpha\n  level: 2\n"
+            "- source_name: b\n  target_name: beta\n  level: 3\n"
+            "- source_name: c\n  target_name: gamma\n",
+        )
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path, cs_filter="level = '2'")
+
+        assert resolve_column_set(spark, "yaml_set", cs, {}) == {"a": "alpha"}
+
+    def test_non_string_scalars_are_stringified(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(tmp_path, "- source_name: 1\n  target_name: true\n")
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        assert resolve_column_set(spark, "yaml_set", cs, {}) == {"1": "True"}
+
+    @pytest.mark.parametrize("text", ["", "[]\n"])
+    @pytest.mark.parametrize(("on_failure", "expected"), [("warn", {}), ("skip", None)])
+    def test_empty_file_is_no_rows(
+        self, spark: SparkSession, tmp_path, text: str, on_failure: str, expected
+    ) -> None:
+        path = self._write(tmp_path, text)
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path, on_failure=on_failure)
+
+        assert resolve_column_set(spark, "yaml_set", cs, {}) == expected
+
+    def test_empty_file_aborts_as_no_rows(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(tmp_path, "[]\n")
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        with pytest.raises(ExecutionError, match="0 rows"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "source_name: a\ntarget_name: b\n",  # a mapping, not a list
+            "- just a string\n",  # a row that isn't a mapping
+            "- source_name: a\n",  # a row without the to-column
+            "- [unclosed\n",  # not valid YAML
+        ],
+    )
+    @pytest.mark.parametrize(("on_failure", "expected"), [("warn", {}), ("skip", None)])
+    def test_unreadable_file_honours_on_failure(
+        self, spark: SparkSession, tmp_path, text: str, on_failure: str, expected
+    ) -> None:
+        path = self._write(tmp_path, text)
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path, on_failure=on_failure)
+
+        assert resolve_column_set(spark, "yaml_set", cs, {}) == expected
+
+    @pytest.mark.parametrize(
+        "text", ["source_name: a\ntarget_name: b\n", "- source_name: a\n", "- [unclosed\n"]
+    )
+    def test_unreadable_file_aborts_naming_the_set(
+        self, spark: SparkSession, tmp_path, text: str
+    ) -> None:
+        path = self._write(tmp_path, text)
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        with pytest.raises(ExecutionError, match="yaml_set"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    def test_missing_file_aborts_naming_the_set(self, spark: SparkSession, tmp_path) -> None:
+        cs = _make_column_set(cs_type="yaml", alias=None, path=str(tmp_path / "missing.yaml"))
+
+        with pytest.raises(ExecutionError, match="yaml_set"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    def test_duplicate_from_value_raises(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(
+            tmp_path,
+            "- source_name: a\n  target_name: x\n- source_name: a\n  target_name: y\n",
+        )
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        with pytest.raises(ConfigError, match="duplicate"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    def test_thread_renames_through_a_yaml_column_set(self, spark: SparkSession, tmp_path) -> None:
+        from weevr.engine.executor import execute_thread
+        from weevr.model.thread import Thread
+
+        src = str(tmp_path / "yaml_cs_src")
+        tgt = str(tmp_path / "yaml_cs_tgt")
+        spark.createDataFrame([{"cust_id": 1, "other": 2}]).write.format("delta").save(src)
+        path = self._write(tmp_path, "- source_name: cust_id\n  target_name: customer_id\n")
+        thread = Thread.model_validate(
+            {
+                "name": "yaml_cs_thread",
+                "config_version": "1",
+                "sources": {"main": {"type": "delta", "alias": src}},
+                "steps": [{"rename": {"column_set": "names"}}],
+                "target": {"path": tgt},
+                "write": {"mode": "overwrite"},
+                "column_sets": {"names": {"source": {"type": "yaml", "path": path}}},
+            }
+        )
+
+        result = execute_thread(spark, thread)
+
+        assert result.status == "success"
+        assert sorted(spark.read.format("delta").load(tgt).columns) == ["customer_id", "other"]
