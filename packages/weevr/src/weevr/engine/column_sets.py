@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
+import yaml
 from pyspark.sql import functions as F
+from pyspark.sql.types import StringType, StructField, StructType
 
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.column_set import ColumnSet
@@ -16,7 +19,7 @@ from weevr.telemetry.results import ColumnSetResult
 from weevr.telemetry.span import SpanStatus
 
 if TYPE_CHECKING:
-    from pyspark.sql import SparkSession
+    from pyspark.sql import DataFrame, SparkSession
 
     from weevr.telemetry.collector import SpanCollector
 
@@ -37,8 +40,10 @@ def resolve_column_set(
     Supports three resolution paths:
 
     - **param**: read the mapping dict directly from ``resolved_params``.
-    - **delta / yaml source**: call ``read_source()``, apply an optional filter,
+    - **delta source**: call ``read_source()``, apply an optional filter,
       select the from/to columns, and collect rows into a dict.
+    - **yaml source**: read the file's list of rows into a DataFrame of
+      string columns, then filter, select, and collect as for Delta.
 
     Args:
         spark: Active SparkSession (used for source-backed column sets).
@@ -144,6 +149,81 @@ def _resolve_from_param(
     return dict(value)
 
 
+def _read_yaml_rows(spark: SparkSession, path: str | None, required: list[str]) -> DataFrame:
+    """Read a YAML column-set file into a DataFrame of string columns.
+
+    The file is a YAML list of mappings, one per row. The columns are the
+    union of every row's keys (plus ``required``); every value is a string,
+    and a key a row lacks is null. An empty file or empty list is no rows.
+
+    Args:
+        spark: Active SparkSession; reads the file wherever a file source can.
+        path: Location of the YAML file.
+        required: Keys every row must carry (the from and to columns).
+
+    Returns:
+        A DataFrame with one row per list entry.
+
+    Raises:
+        ExecutionError: If the path is unset or names more than one file, or
+            the document is not a list of mappings that carry ``required``
+            with non-null values and keys that stay distinct as strings.
+        yaml.YAMLError: If the file is not valid YAML.
+    """
+    if path is None:
+        raise ExecutionError("YAML column set requires 'path' to be set")
+    from weevr.config.paths import resolve_fuse_path
+
+    files = spark.read.text(resolve_fuse_path(path, spark), wholetext=True).collect()
+    if len(files) > 1:
+        raise ExecutionError(f"YAML column set path '{path}' must name a single file")
+    document = yaml.safe_load(files[0][0]) if files else None
+    if document is None:
+        document = []
+    if not isinstance(document, list):
+        raise ExecutionError(
+            f"YAML column set file '{path}' must be a list of rows, got {type(document).__name__}"
+        )
+
+    columns = list(required)
+    rows: list[dict[str, Any]] = []
+    for index, entry in enumerate(document):
+        if not isinstance(entry, dict):
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} must be a mapping, "
+                f"got {type(entry).__name__}"
+            )
+        row = {str(key): value for key, value in entry.items()}
+        if len(row) != len(entry):
+            counts = Counter(str(key) for key in entry)
+            keys = sorted(key for key, count in counts.items() if count > 1)
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} has keys that collide as "
+                f"strings: {keys}"
+            )
+        missing = [key for key in required if key not in row]
+        if missing:
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} is missing {missing} "
+                f"(YAML reads unquoted keys such as on, yes, and no as true or false; "
+                f"put such a key in quotes)"
+            )
+        nulls = [key for key in required if row[key] is None]
+        if nulls:
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} has a null value for {nulls}"
+            )
+        columns.extend(key for key in row if key not in columns)
+        rows.append(row)
+
+    schema = StructType([StructField(column, StringType()) for column in columns])
+    values = [
+        tuple(None if row.get(column) is None else str(row[column]) for column in columns)
+        for row in rows
+    ]
+    return spark.createDataFrame(values, schema)
+
+
 def _resolve_from_source(
     spark: SparkSession,
     name: str,
@@ -151,6 +231,10 @@ def _resolve_from_source(
     connections: dict[str, OneLakeConnection] | None = None,
 ) -> dict[str, str] | None:
     """Resolve a column set by reading a Delta or YAML source.
+
+    Delta sources go through ``read_source``; a YAML file is read by
+    ``_read_yaml_rows``. Both then share the filter, select, empty-rows,
+    duplicate, and ``on_failure`` handling.
 
     Args:
         spark: Active SparkSession.
@@ -182,9 +266,12 @@ def _resolve_from_source(
                 schema=cs.schema_override,
                 table=cs.table,
             )
+            df = read_source(spark, name, source, connections=connections)
+        elif cs.type == "yaml":
+            df = _read_yaml_rows(spark, cs.path, [cs.from_column, cs.to_column])
         else:
             source = Source(type=cs.type, alias=cs.alias, path=cs.path)
-        df = read_source(spark, name, source, connections=connections)
+            df = read_source(spark, name, source, connections=connections)
 
         if cs.filter:
             df = df.filter(F.expr(cs.filter))
