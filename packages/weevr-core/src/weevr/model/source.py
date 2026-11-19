@@ -2,12 +2,13 @@
 
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from weevr.model.base import FrozenBase
 
-_FILE_TYPES = {"csv", "json", "parquet", "excel"}
+_FILE_TYPES = {"csv", "json", "parquet"}
 _GENERATED_TYPES = {"date_sequence", "int_sequence"}
+_SOURCE_TYPES = ("delta", "csv", "json", "parquet", "date_sequence", "int_sequence")
 _DATE_SEQUENCE_STEPS = {"day", "week", "month", "year"}
 
 
@@ -42,9 +43,11 @@ class Source(FrozenBase):
       named connection rather than an inline alias.
     - ``table`` without ``connection`` is rejected.
     - ``connection`` and ``alias`` are mutually exclusive.
+    - ``type``, when set, must be one of ``delta``, ``csv``, ``json``, ``parquet``,
+      ``date_sequence``, or ``int_sequence``.
     - If neither ``lookup`` nor ``connection`` is set: ``type`` is required.
     - ``type == "delta"`` without ``connection`` requires ``alias`` to be set.
-    - ``type`` in file types (csv, json, parquet, excel) requires ``path`` to be set.
+    - ``type`` in file types (csv, json, parquet) requires ``path`` to be set.
     - Generated types (``date_sequence``, ``int_sequence``) require ``column``,
       ``start``, and ``end``; ``alias``, ``path``, ``dedup``, ``connection``, and
       non-empty ``options`` are rejected.
@@ -56,7 +59,8 @@ class Source(FrozenBase):
     type: str | None = Field(
         default=None,
         description=(
-            "Source type: delta, csv, json, parquet, excel, date_sequence, or int_sequence."
+            "Source type: delta, csv, json, parquet, date_sequence, or int_sequence. "
+            "Any other value fails config load."
         ),
     )
     alias: str | None = Field(
@@ -65,7 +69,7 @@ class Source(FrozenBase):
     )
     path: str | None = Field(
         default=None,
-        description="File path. Required for file-based sources (csv, json, parquet, excel).",
+        description="File path. Required for file-based sources (csv, json, parquet).",
     )
     options: dict[str, Any] = Field(
         default_factory=dict,
@@ -123,6 +127,17 @@ class Source(FrozenBase):
     )
 
     model_config = {"frozen": True, "populate_by_name": True}
+
+    @field_validator("type")
+    @classmethod
+    def _validate_type(cls, value: str | None) -> str | None:
+        if value is None or value in _SOURCE_TYPES:
+            return value
+        allowed = ", ".join(_SOURCE_TYPES)
+        message = f"unsupported source type {value!r}; expected one of: {allowed}"
+        if value == "excel":
+            message += ". Excel files are not supported; convert them to CSV or Parquet"
+        raise ValueError(message)
 
     @model_validator(mode="after")
     def _validate_type_fields(self) -> "Source":
