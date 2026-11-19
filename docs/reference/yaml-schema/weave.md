@@ -224,9 +224,18 @@ column_sets:
 
 Every value is read as a string, so a `filter` compares strings
 (`level = '2'`, not `level = 2`). A key that a row leaves out is null for
-that row. An empty file or an empty list returns no rows. A file that
-isn't a list of mappings, or a row that lacks the from or to column, is
-an unreadable source. Both follow `on_failure`.
+that row. An empty file or an empty list returns no rows. The following
+make the file an unreadable source:
+
+- The file isn't a list of mappings.
+- A row lacks the from or to column, or has a null value in either.
+- Two of a row's keys are the same once read as strings, such as `1`
+  and `'1'`.
+- The `path` matches more than one file.
+
+Both cases follow `on_failure`. YAML reads unquoted keys such as `on`,
+`yes`, and `no` as true or false, so put a column with one of those names
+in quotes (`'on': ...`).
 
 ---
 
