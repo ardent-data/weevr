@@ -13,7 +13,7 @@ from spark_helpers import create_delta_table
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
-from weevr.model.source import DedupConfig, Source
+from weevr.model.source import SOURCE_TYPES, DedupConfig, Source
 from weevr.operations.readers import (
     build_watermark_filter,
     read_cdc_source,
@@ -132,6 +132,30 @@ class TestFileSource:
 
         with pytest.raises(ExecutionError, match="Unsupported source type: 'avro'"):
             read_source(spark, "bad_type", source)
+
+
+@pytest.mark.spark
+class TestEverySourceTypeReads:
+    """Every source type the model accepts has a reader branch."""
+
+    @staticmethod
+    def _source_for(source_type: str, spark: SparkSession, tmp_path) -> Source:
+        data_path = str(tmp_path / source_type)
+        if source_type == "delta":
+            create_delta_table(spark, data_path, [{"id": 1}])
+            return Source(type="delta", alias=data_path)
+        if source_type in {"csv", "json", "parquet"}:
+            spark.createDataFrame([{"id": 1}]).write.format(source_type).save(data_path)
+            return Source(type=source_type, path=data_path)
+        if source_type == "date_sequence":
+            return Source(type=source_type, column="id", start="2026-01-01", end="2026-01-01")
+        return Source(type=source_type, column="id", start=1, end=1)
+
+    @pytest.mark.parametrize("source_type", SOURCE_TYPES)
+    def test_source_type_reads(self, spark: SparkSession, tmp_path, source_type: str) -> None:
+        source = self._source_for(source_type, spark, tmp_path)
+        df = read_source(spark, source_type, source)
+        assert df.count() == 1
 
 
 @pytest.mark.spark

@@ -12,7 +12,7 @@ from weevr.delta import is_table_alias, resolve_delta_table
 from weevr.errors.exceptions import ExecutionError
 from weevr.model.connection import OneLakeConnection
 from weevr.model.load import CdcConfig, LoadConfig
-from weevr.model.source import DedupConfig, Source
+from weevr.model.source import FILE_SOURCE_TYPES, DedupConfig, Source
 from weevr.state.hwm import hwm_literal, max_hwm
 from weevr.state.watermark import WatermarkState
 
@@ -124,7 +124,7 @@ def _read_raw(
 
         return spark.read.format("delta").load(resolve_fuse_path(source.alias, spark))
 
-    if source.type in {"csv", "json", "parquet"}:
+    if source.type in FILE_SOURCE_TYPES:
         if source.path is None:
             raise ExecutionError(f"'{source.type}' source requires 'path' to be set")
         from weevr.config.paths import resolve_fuse_path

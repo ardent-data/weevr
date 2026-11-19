@@ -76,12 +76,55 @@ class TestSource:
         with pytest.raises(ValidationError, match="path"):
             Source(type="parquet")
 
-    def test_custom_type_no_alias_or_path(self):
-        """Custom source type passes without alias or path requirement."""
-        s = Source(type="api")
-        assert s.type == "api"
-        assert s.alias is None
-        assert s.path is None
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"type": "delta", "alias": "raw.orders"},
+            {"type": "csv", "path": "/data/a.csv"},
+            {"type": "json", "path": "/data/a.json"},
+            {"type": "parquet", "path": "/data/a"},
+            {"type": "date_sequence", "column": "d", "start": "2026-01-01", "end": "2026-01-31"},
+            {"type": "int_sequence", "column": "n", "start": 1, "end": 10},
+        ],
+    )
+    def test_supported_types_load(self, kwargs):
+        """Every type the reader supports loads with its required fields."""
+        assert Source(**kwargs).type == kwargs["type"]
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"type": "excel", "path": "/data/book.xlsx"},
+            {"type": "foo", "alias": "x"},
+            {"type": "parqet", "path": "/data/a"},
+            {"type": "api"},
+            {"type": ""},
+            {"type": "foo", "lookup": "ref_categories"},
+            {"type": "foo", "connection": "lake", "table": "orders"},
+        ],
+    )
+    def test_unsupported_type_raises_at_type(self, kwargs):
+        """An unsupported type fails on the type field and names the allowed types."""
+        with pytest.raises(ValidationError) as exc_info:
+            Source(**kwargs)
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert errors[0]["loc"] == ("type",)
+        for allowed in ("delta", "csv", "json", "parquet", "date_sequence", "int_sequence"):
+            assert allowed in errors[0]["msg"]
+
+    def test_excel_error_suggests_conversion(self):
+        """The excel error says Excel isn't supported and suggests CSV or Parquet."""
+        with pytest.raises(ValidationError) as exc_info:
+            Source(type="excel", path="/data/book.xlsx")
+        msg = exc_info.value.errors()[0]["msg"]
+        assert "Excel" in msg
+        assert "CSV or Parquet" in msg
+
+    def test_lookup_accepts_explicit_null_type(self):
+        """A lookup source accepts an explicit null type."""
+        s = Source(type=None, lookup="ref_categories")
+        assert s.type is None
 
     def test_source_with_options(self):
         """Source accepts arbitrary options dict."""
@@ -116,7 +159,7 @@ class TestSource:
 
     def test_default_options_is_empty_dict(self):
         """options defaults to empty dict, not None."""
-        s = Source(type="api")
+        s = Source(type="delta", alias="raw.orders")
         assert s.options == {}
 
 
