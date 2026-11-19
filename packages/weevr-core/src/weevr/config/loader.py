@@ -748,7 +748,7 @@ def resolve_source_paths(
 
     Modifies the config dict in place, prepending the project root to
     any relative ``path`` values in file-based sources (csv, json,
-    parquet, excel): the entries under ``sources``, the ``source`` of
+    parquet): the entries under ``sources``, the ``source`` of
     each entry under ``lookups``, and the ``source`` of each YAML entry
     under ``column_sets``. Absolute paths and URIs are left as they are.
 

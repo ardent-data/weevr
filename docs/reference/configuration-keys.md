@@ -208,7 +208,7 @@ set to `date_sequence` or `int_sequence`).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | `str` | conditional | Source type: `delta`, `csv`, `json`, `parquet`, `excel`, `date_sequence`, `int_sequence`. Required when neither `lookup` nor `connection` is set. |
+| `type` | `str` | conditional | Source type: `delta`, `csv`, `json`, `parquet`, `date_sequence`, `int_sequence`. Required when neither `lookup` nor `connection` is set. Any other value fails config load. |
 | `lookup` | `str` | `None` | Lookup name (thread-, weave-, or loom-level). Mutually exclusive with `type`. |
 | `alias` | `str` | `None` | Table alias (required for `delta` without `connection`). Mutually exclusive with `connection`. |
 | `path` | `str` | `None` | File path (required for file-based types) |

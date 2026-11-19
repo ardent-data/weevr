@@ -309,6 +309,24 @@ steps:
         with pytest.raises(ModelValidationError):
             load_config(thread_file)
 
+    def test_unsupported_source_type_fails_at_load(self, tmp_path):
+        """A source with an unsupported type fails at load, before any read."""
+        thread_file = tmp_path / "thread.yaml"
+        thread_file.write_text(
+            """
+config_version: "1.0"
+sources:
+  book:
+    type: excel
+    path: /data/book.xlsx
+target:
+  alias: test
+"""
+        )
+
+        with pytest.raises(ModelValidationError, match="unsupported source type"):
+            load_config(thread_file)
+
 
 class TestLoadConfigForeach:
     """Test foreach macro expansion in the load_config pipeline."""
