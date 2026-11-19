@@ -124,6 +124,73 @@ class TestResolveLookupSourcePaths:
         assert config == {"lookups": {"regions": lookup}}
 
 
+class TestResolveColumnSetSourcePaths:
+    """resolve_source_paths joins relative YAML column-set paths to the project root."""
+
+    def test_relative_yaml_column_set_path_resolved(self, tmp_path: Path) -> None:
+        config: dict = {
+            "column_sets": {"names": {"source": {"type": "yaml", "path": "maps/names.yaml"}}}
+        }
+        resolve_source_paths(config, tmp_path)
+        expected = str(tmp_path / "maps/names.yaml")
+        assert config["column_sets"]["names"]["source"]["path"] == expected
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            {"type": "yaml", "path": "/absolute/maps/names.yaml"},
+            {"type": "yaml", "path": "abfss://ws@onelake.dfs.fabric.microsoft.com/lh/Files/n.yaml"},
+            {"type": "delta", "alias": "ref.names"},
+            {"type": "delta", "connection": "ref_lh", "table": "names"},
+        ],
+        ids=["absolute", "uri", "delta-alias", "delta-connection"],
+    )
+    def test_other_column_set_sources_unchanged(self, source: dict) -> None:
+        config: dict = {"column_sets": {"names": {"source": dict(source)}}}
+        resolve_source_paths(config, Path("/project.weevr"))
+        assert config["column_sets"]["names"]["source"] == source
+
+    @pytest.mark.parametrize("column_set", [{}, {"source": None}, {"param": "p"}, "names"])
+    def test_malformed_or_param_column_set_skipped(self, column_set: object) -> None:
+        config: dict = {"column_sets": {"names": column_set}}
+        resolve_source_paths(config, Path("/project.weevr"))
+        assert config == {"column_sets": {"names": column_set}}
+
+    def test_joined_at_loom_child_weave_and_child_thread(self, tmp_path: Path) -> None:
+        """Each level that declares a YAML column set gets its path joined, child files too."""
+        project = tmp_path / "cs.weevr"
+        (project / "weaves").mkdir(parents=True)
+        (project / "threads").mkdir()
+
+        def _column_sets(path: str) -> str:
+            return f"column_sets:\n  names:\n    source:\n      type: yaml\n      path: {path}\n"
+
+        (project / "nightly.loom").write_text(
+            'config_version: "1.0"\nweaves:\n  - ref: weaves/sales.weave\n'
+            + _column_sets("maps/loom.yaml")
+        )
+        (project / "weaves/sales.weave").write_text(
+            'config_version: "1.0"\nthreads:\n  - ref: threads/orders.thread\n'
+            + _column_sets("maps/weave.yaml")
+        )
+        (project / "threads/orders.thread").write_text(
+            'config_version: "1.0"\n'
+            "sources:\n  main:\n    type: delta\n    alias: raw.orders\n"
+            "steps:\n  - rename:\n      column_set: names\n"
+            "target:\n  alias: stg.orders\n" + _column_sets("maps/thread.yaml")
+        )
+
+        loaded = load_resolved(project / "nightly.loom", project_root=project)
+
+        def _path(model: object) -> str:
+            return model.column_sets["names"].source.path  # type: ignore[attr-defined]
+
+        assert _path(loaded.model) == str(project / "maps/loom.yaml")
+        assert _path(loaded.resolved_weaves["sales"]) == str(project / "maps/weave.yaml")
+        thread = loaded.resolved_threads["sales"]["orders"]
+        assert _path(thread) == str(project / "maps/thread.yaml")
+
+
 FIXTURE_PROJECT = Path(__file__).parent.parent / "fixtures" / "load_parity" / "parity.weevr"
 
 

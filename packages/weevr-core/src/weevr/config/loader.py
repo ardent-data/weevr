@@ -540,9 +540,9 @@ def resolve_source_paths(
 
     Modifies the config dict in place, prepending the project root to
     any relative ``path`` values in file-based sources (csv, json,
-    parquet, excel): the entries under ``sources`` and the ``source`` of
-    each entry under ``lookups``. Absolute paths and URIs are left as
-    they are.
+    parquet, excel): the entries under ``sources``, the ``source`` of
+    each entry under ``lookups``, and the ``source`` of each YAML entry
+    under ``column_sets``. Absolute paths and URIs are left as they are.
 
     Args:
         config_dict: Thread, weave, or loom configuration dict
@@ -577,6 +577,14 @@ def resolve_source_paths(
             lookup_cfg.get("source")
             for lookup_cfg in lookups.values()
             if isinstance(lookup_cfg, dict)
+        )
+    # Only a YAML column set has a path; Delta ones name a table and are skipped below.
+    column_sets = config_dict.get("column_sets")
+    if isinstance(column_sets, dict):
+        source_cfgs.extend(
+            column_set_cfg.get("source")
+            for column_set_cfg in column_sets.values()
+            if isinstance(column_set_cfg, dict)
         )
 
     for source_cfg in source_cfgs:
