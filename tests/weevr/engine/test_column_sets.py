@@ -922,6 +922,47 @@ class TestYamlColumnSetFile:
         with pytest.raises(ExecutionError, match="yaml_set"):
             resolve_column_set(spark, "yaml_set", cs, {})
 
+    def test_unquoted_bool_like_key_error_says_to_quote(
+        self, spark: SparkSession, tmp_path
+    ) -> None:
+        """YAML 1.1 reads an unquoted `on:` key as a boolean; the error says to quote it."""
+        path = self._write(tmp_path, "- source_name: a\n  on: b\n")
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path, to_column="on")
+
+        with pytest.raises(ExecutionError, match="in quotes"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    def test_keys_that_collide_as_strings_are_rejected(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(tmp_path, "- source_name: a\n  target_name: b\n  1: x\n  '1': y\n")
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        with pytest.raises(ExecutionError, match="'1'"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    @pytest.mark.parametrize(
+        "text",
+        ["- source_name: a\n  target_name: null\n", "- source_name: ~\n  target_name: b\n"],
+        ids=["null-to", "null-from"],
+    )
+    def test_null_from_or_to_value_is_rejected(
+        self, spark: SparkSession, tmp_path, text: str
+    ) -> None:
+        path = self._write(tmp_path, text)
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path)
+
+        with pytest.raises(ExecutionError, match="null"):
+            resolve_column_set(spark, "yaml_set", cs, {})
+
+    def test_null_in_another_column_stays_null(self, spark: SparkSession, tmp_path) -> None:
+        path = self._write(
+            tmp_path,
+            "- source_name: a\n  target_name: alpha\n  note: null\n"
+            "- source_name: b\n  target_name: beta\n  note: keep\n",
+        )
+        cs = _make_column_set(cs_type="yaml", alias=None, path=path, cs_filter="note IS NULL")
+
+        assert resolve_column_set(spark, "yaml_set", cs, {}) == {"a": "alpha"}
+
     def test_missing_file_aborts_naming_the_set(self, spark: SparkSession, tmp_path) -> None:
         cs = _make_column_set(cs_type="yaml", alias=None, path=str(tmp_path / "missing.yaml"))
 

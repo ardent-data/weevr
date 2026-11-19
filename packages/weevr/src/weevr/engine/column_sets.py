@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 import yaml
@@ -165,7 +166,8 @@ def _read_yaml_rows(spark: SparkSession, path: str | None, required: list[str]) 
 
     Raises:
         ExecutionError: If the path is unset or names more than one file, or
-            the document is not a list of mappings that carry ``required``.
+            the document is not a list of mappings that carry ``required``
+            with non-null values and keys that stay distinct as strings.
         yaml.YAMLError: If the file is not valid YAML.
     """
     if path is None:
@@ -192,9 +194,25 @@ def _read_yaml_rows(spark: SparkSession, path: str | None, required: list[str]) 
                 f"got {type(entry).__name__}"
             )
         row = {str(key): value for key, value in entry.items()}
+        if len(row) != len(entry):
+            counts = Counter(str(key) for key in entry)
+            keys = sorted(key for key, count in counts.items() if count > 1)
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} has keys that collide as "
+                f"strings: {keys}"
+            )
         missing = [key for key in required if key not in row]
         if missing:
-            raise ExecutionError(f"YAML column set file '{path}': row {index} is missing {missing}")
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} is missing {missing} "
+                f"(YAML reads unquoted keys such as on, yes, and no as true or false; "
+                f"put such a key in quotes)"
+            )
+        nulls = [key for key in required if row[key] is None]
+        if nulls:
+            raise ExecutionError(
+                f"YAML column set file '{path}': row {index} has a null value for {nulls}"
+            )
         columns.extend(key for key in row if key not in columns)
         rows.append(row)
 
