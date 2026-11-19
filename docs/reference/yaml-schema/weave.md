@@ -191,6 +191,43 @@ steps:
         MANUAL_COL: manual_override  # static wins
 ```
 
+### YAML column set files
+
+A `yaml` column set reads its mapping from a file that ships with the
+project. A relative `path` resolves against the project root, like a
+source file's `path`; absolute paths and URIs are used as given. The file
+is a list of rows. Each row is a mapping whose keys are columns, and
+`from_column` and `to_column` (default `source_name` and `target_name`)
+pick the pair:
+
+```yaml
+# mappings/hr_columns.yaml
+- source_name: EMP_ID
+  target_name: employee_id
+  domain: hr
+- source_name: EMP_NM
+  target_name: employee_name
+  domain: hr
+- source_name: CC
+  target_name: cost_center
+  domain: finance
+```
+
+```yaml
+column_sets:
+  hr_mappings:
+    source:
+      type: yaml
+      path: mappings/hr_columns.yaml
+      filter: "domain = 'hr'"
+```
+
+Every value is read as a string, so a `filter` compares strings
+(`level = '2'`, not `level = 2`). A key that a row leaves out is null for
+that row. An empty file or an empty list returns no rows. A file that
+isn't a list of mappings, or a row that lacks the from or to column, is
+an unreadable source. Both follow `on_failure`.
+
 ---
 
 ## pre_steps / post_steps (HookStep)
