@@ -6536,6 +6536,10 @@ of the project; tables live in the lakehouse.</p>
 <td>The project root, the folder that holds the project's configs. In Fabric, a project under the default lakehouse resolves to a <code>Files/...</code> path in that lakehouse.</td>
 </tr>
 <tr>
+<td>YAML column set <code>path</code>, at any level</td>
+<td>The project root, the same as a source <code>path</code>.</td>
+</tr>
+<tr>
 <td>Delta source <code>alias</code>, target <code>alias</code> or <code>path</code></td>
 <td>Spark's default filesystem, unchanged. In a Fabric notebook that is the attached default lakehouse, so <code>Tables/stg_customers</code> is that lakehouse's table. Run locally, it is the process's working directory.</td>
 </tr>
