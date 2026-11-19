@@ -8467,9 +8467,11 @@ or a generated sequence (with <code>type</code> set to <code>date_sequence</code
   named connection rather than an inline alias.</li>
 <li><code>table</code> without <code>connection</code> is rejected.</li>
 <li><code>connection</code> and <code>alias</code> are mutually exclusive.</li>
+<li><code>type</code>, when set, must be one of <code>delta</code>, <code>csv</code>, <code>json</code>, <code>parquet</code>,
+  <code>date_sequence</code>, or <code>int_sequence</code>.</li>
 <li>If neither <code>lookup</code> nor <code>connection</code> is set: <code>type</code> is required.</li>
 <li><code>type == "delta"</code> without <code>connection</code> requires <code>alias</code> to be set.</li>
-<li><code>type</code> in file types (csv, json, parquet, excel) requires <code>path</code> to be set.</li>
+<li><code>type</code> in file types (csv, json, parquet) requires <code>path</code> to be set.</li>
 <li>Generated types (<code>date_sequence</code>, <code>int_sequence</code>) require <code>column</code>,
   <code>start</code>, and <code>end</code>; <code>alias</code>, <code>path</code>, <code>dedup</code>, <code>connection</code>, and
   non-empty <code>options</code> are rejected.</li>
