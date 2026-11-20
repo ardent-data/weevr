@@ -132,7 +132,7 @@ def _gh_fetch(endpoint: str) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     """Run the ``lookup`` or ``record`` subcommand."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n", 1)[0])
     sub = parser.add_subparsers(dest="command", required=True)
     find = sub.add_parser("lookup", help="find a trusted passing run")
     find.add_argument("fingerprint")

@@ -187,7 +187,7 @@ def fingerprint(root: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     """Print the fingerprint; with ``--explain``, report details on stderr."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n", 1)[0])
     parser.add_argument("path", nargs="?", default=".", help="checkout root (default: .)")
     parser.add_argument("--explain", action="store_true", help="report details on stderr")
     args = parser.parse_args(argv)
