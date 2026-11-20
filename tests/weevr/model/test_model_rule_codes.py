@@ -20,7 +20,7 @@ from weevr.model.hooks import QualityGateStep
 from weevr.model.load import CdcConfig, LoadConfig, WatermarkStoreConfig
 from weevr.model.lookup import Lookup
 from weevr.model.seed import SeedConfig
-from weevr.model.source import Source
+from weevr.model.source import SOURCE_TYPES, Source
 from weevr.model.target import ColumnMapping, Target
 from weevr.model.thread import Thread
 from weevr.model.validation import Assertion
@@ -121,6 +121,8 @@ SOURCE_CASES = [
     (Source, {"type": "delta"}, "C403", ""),
     (Source, {"type": "parquet"}, "C403", ""),
     (Source, {"connection": "c", "table": "t", "type": "parquet"}, "C404", ""),
+    (Source, {"type": "excel", "path": "p"}, "C103", "/type"),
+    (Source, {"type": "foo", "lookup": "l"}, "C103", "/type"),
     (
         Source,
         {
@@ -434,6 +436,25 @@ def test_step_expected_values_travel_with_invalid_step() -> None:
         Source.model_validate(data)
     (diag,) = from_validation_error(exc_info.value, data)
     assert diag.expected == ("day", "month", "week", "year")
+
+
+def test_unsupported_source_type_lists_allowed_types() -> None:
+    data = {"type": "parqet", "path": "p"}
+    with pytest.raises(ValidationError) as exc_info:
+        Source.model_validate(data)
+    (diag,) = from_validation_error(exc_info.value, data)
+    assert diag.expected == SOURCE_TYPES
+    assert diag.hint is None
+
+
+def test_excel_source_type_carries_a_hint() -> None:
+    data = {"type": "excel", "path": "p"}
+    with pytest.raises(ValidationError) as exc_info:
+        Source.model_validate(data)
+    (diag,) = from_validation_error(exc_info.value, data)
+    assert diag.code == "C103"
+    assert diag.expected == SOURCE_TYPES
+    assert diag.hint is not None
 
 
 def test_every_code_this_area_uses_is_exercised() -> None:
