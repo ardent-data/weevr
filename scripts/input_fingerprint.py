@@ -57,8 +57,6 @@ ALLOWLIST = frozenset(
 )
 
 VERSION_MARKER = "x-release-please-version"
-BLOCK_START = "x-release-please-start-version"
-BLOCK_END = "x-release-please-end"
 PLACEHOLDER = "<release-version>"
 SEMVER = re.compile(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?")
 LOCK_JSONPATH = re.compile(r"^\$\.package\[\?\(@\.name\.value==['\"]([^'\"]+)['\"]\)\]\.version$")
@@ -123,15 +121,11 @@ def _normalization_rules(root: Path) -> tuple[set[str], dict[str, set[str]]]:
 
 
 def _normalize_generic(text: str) -> str:
+    # Only marker lines; the start/end block form isn't used here, so it's hashed.
     out: list[str] = []
-    in_block = False
     for line in text.splitlines(keepends=True):
-        if BLOCK_START in line:
-            in_block = True
-        if in_block or VERSION_MARKER in line:
+        if VERSION_MARKER in line:
             line = SEMVER.sub(PLACEHOLDER, line)
-        if BLOCK_END in line:
-            in_block = False
         out.append(line)
     return "".join(out)
 

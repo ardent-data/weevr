@@ -175,6 +175,19 @@ def test_release_version_bump_keeps_fingerprint(repo: Path) -> None:
     assert fingerprint(repo) == before
 
 
+def test_block_markers_are_not_normalized(repo: Path) -> None:
+    # Only lines carrying the x-release-please-version marker are normalized.
+    # Nothing in weevr uses the start/end block form, so a version inside one
+    # is hashed like any other content.
+    block = "<!-- x-release-please-start-version -->\nweevr {v}\n<!-- x-release-please-end -->\n"
+    path = repo / "docs/reference/compatibility.md"
+    base = path.read_text()
+    path.write_text(base + block.replace("{v}", "1.0.0"))
+    before = fingerprint(repo)
+    path.write_text(base + block.replace("{v}", "1.0.1"))
+    assert fingerprint(repo) != before
+
+
 def test_non_marker_pyproject_line_changes_fingerprint(repo: Path) -> None:
     before = fingerprint(repo)
     path = repo / "packages/weevr/pyproject.toml"
