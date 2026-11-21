@@ -66,7 +66,7 @@ line limit. Run `uv run ruff format .` before committing to apply it.
 ### Type checking
 
 ```bash
-uv run pyright
+uv run pyright .
 ```
 
 Pyright runs in standard mode. It checks `weevr-core` against Python 3.12,
@@ -353,7 +353,7 @@ All pull requests run the following checks in GitHub Actions:
 |---------------------|---------|
 | Lint                | `uv run ruff check .` |
 | Format              | `uv run ruff format --check .` |
-| Type check          | `uv run pyright` |
+| Type check          | `uv run pyright .` |
 | Tests               | `uv run pytest` |
 | Docstring coverage  | `uv run interrogate packages/weevr-core/src/weevr/ packages/weevr/src/weevr/ --fail-under 90` |
 | DCO sign-off        | GitHub App check |
