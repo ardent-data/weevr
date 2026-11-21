@@ -114,6 +114,17 @@ UV_PROJECT_ENVIRONMENT=.venv-rt2 uv sync --no-dev --group rt2 --python 3.13
 UV_PROJECT_ENVIRONMENT=.venv-rt2 uv run --no-sync pytest -m spark -n 2
 ```
 
+CI doesn't test the same inputs twice. The Spark Tests workflow fingerprints every file a test
+can read (`scripts/input_fingerprint.py`), and when an earlier run of the same fingerprint passed in
+the last 14 days, it reuses that run: the `spark-tests` check is green and its summary links the
+run it reused. A merge of an up-to-date pull request, and the release commit after it, usually
+reuse the pull request's run. To force a full run, start Spark Tests by hand with `fresh` set,
+from the Actions tab or with:
+
+```bash
+gh workflow run spark-tests.yaml -f fresh=true --ref <branch>
+```
+
 ### JSON schema check
 
 If your changes touch any model files under

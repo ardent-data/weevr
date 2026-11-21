@@ -16,6 +16,14 @@ on:
       - ".python-version"
       - ".tool-versions"
       - ".github/workflows/spark-tests.yaml"
+  # Start a run by hand. With fresh, it runs in full even when a passing run
+  # of the same test inputs exists (chasing a flaky test, suspected drift).
+  workflow_dispatch:
+    inputs:
+      fresh:
+        description: Run the full suite even if a passing run of the same inputs exists
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,8 +31,56 @@ permissions:
 # Spark (on both Fabric runtime stacks) and fast tests run as parallel jobs;
 # the Runtime 1.3 Spark job and the fast job write coverage data, which the
 # spark-tests job combines to enforce the coverage gate.
+#
+# A run whose test inputs match an earlier passing run reuses it instead of
+# testing again. The fingerprint job hashes the inputs
+# (scripts/input_fingerprint.py) and looks for a trusted spark-pass-<fingerprint>
+# record (scripts/spark_reuse.py). When it finds one, the test jobs are skipped
+# and the spark-tests gate reports success with a link to the run it reused.
+# Otherwise everything runs as before, and a passing gate writes the record.
 jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      fingerprint: ${{ steps.fp.outputs.fingerprint }}
+      reuse_url: ${{ steps.lookup.outputs.reuse_url }}
+      reuse_run_id: ${{ steps.lookup.outputs.reuse_run_id }}
+      reason: ${{ steps.lookup.outputs.reason }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Standard library only, so the runner's python3 is enough. A failure
+      # leaves the fingerprint empty, which the lookup reports as a
+      # lookup-error: the run goes full rather than failing.
+      - name: Fingerprint the test inputs
+        id: fp
+        run: |
+          if fp=$(python3 scripts/input_fingerprint.py --explain); then
+            echo "fingerprint=$fp" >> "$GITHUB_OUTPUT"
+          else
+            echo "fingerprint=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Look for a passing run of the same inputs
+        id: lookup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINGERPRINT: ${{ steps.fp.outputs.fingerprint }}
+          FRESH: ${{ inputs.fresh }}
+        run: |
+          args=()
+          if [ "$FRESH" = "true" ]; then args+=(--fresh); fi
+          python3 scripts/spark_reuse.py lookup "$FINGERPRINT" "${args[@]}" >> "$GITHUB_OUTPUT"
+
   spark-suite:
+    needs: fingerprint
+    if: needs.fingerprint.outputs.reuse_url == ''
     runs-on: ubuntu-latest
 
     steps:
@@ -93,6 +149,8 @@ jobs:
   # Delta 4.2: the engine package's rt2 group). Coverage comes from the
   # Runtime 1.3 job; this one only has to pass.
   spark-suite-rt2:
+    needs: fingerprint
+    if: needs.fingerprint.outputs.reuse_url == ''
     runs-on: ubuntu-latest
 
     env:
@@ -142,6 +200,8 @@ jobs:
         run: uv run --no-sync pytest -m spark -n 2
 
   fast-coverage:
+    needs: fingerprint
+    if: needs.fingerprint.outputs.reuse_url == ''
     runs-on: ubuntu-latest
 
     steps:
@@ -177,18 +237,58 @@ jobs:
           include-hidden-files: true
 
   spark-tests:
-    needs: [spark-suite, spark-suite-rt2, fast-coverage]
+    needs: [fingerprint, spark-suite, spark-suite-rt2, fast-coverage]
     # Run even when a test job fails, so a failure reports here as a failed
     # gate rather than a skipped one; skip only when the run is cancelled.
+    # On reuse the test jobs are skipped on purpose and aren't checked.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
 
     steps:
+      - name: Report the reuse decision
+        env:
+          FINGERPRINT: ${{ needs.fingerprint.outputs.fingerprint }}
+          REASON: ${{ needs.fingerprint.outputs.reason }}
+        run: |
+          {
+            echo "### Spark Tests"
+            echo ""
+            echo "- fingerprint: \`${FINGERPRINT:-none}\`"
+            echo "- reason: ${REASON:-fingerprint job failed}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reuse: fetch the record the earlier run wrote and report it. The
+      # coverage gate is reused too: same inputs, same coverage.
+      - name: Download the reused record
+        if: needs.fingerprint.outputs.reuse_url != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: spark-pass-${{ needs.fingerprint.outputs.fingerprint }}
+          run-id: ${{ needs.fingerprint.outputs.reuse_run_id }}
+          github-token: ${{ github.token }}
+          path: reused
+
+      - name: Report the reused run
+        if: needs.fingerprint.outputs.reuse_url != ''
+        env:
+          REUSE_URL: ${{ needs.fingerprint.outputs.reuse_url }}
+        run: |
+          {
+            echo "- reused: $REUSE_URL"
+            echo "- source sha: $(jq -r .sha reused/spark-pass.json)"
+            echo "- source event: $(jq -r .event reused/spark-pass.json)"
+            echo "- coverage gate: reused ($(jq -r .coverage reused/spark-pass.json)%)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Require every test job to pass
         if: >-
+          needs.fingerprint.outputs.reuse_url == '' && (
           needs.spark-suite.result != 'success' ||
           needs.spark-suite-rt2.result != 'success' ||
-          needs.fast-coverage.result != 'success'
+          needs.fast-coverage.result != 'success')
         run: |
           echo "spark-suite: ${{ needs.spark-suite.result }}"
           echo "spark-suite-rt2: ${{ needs.spark-suite-rt2.result }}"
@@ -198,13 +298,18 @@ jobs:
       # Sources are needed for the report; both test jobs checked out to the
       # same runner path, so their data files combine without remapping.
       - uses: actions/checkout@v7
+        if: needs.fingerprint.outputs.reuse_url == ''
+        with:
+          persist-credentials: false
 
       - name: Install uv
+        if: needs.fingerprint.outputs.reuse_url == ''
         uses: astral-sh/setup-uv@v7
         with:
           version-file: ".tool-versions"
 
       - name: Download coverage data
+        if: needs.fingerprint.outputs.reuse_url == ''
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
@@ -214,6 +319,40 @@ jobs:
       # Pinned to the coverage version in uv.lock; uvx avoids syncing the
       # whole dev environment (PySpark included) just to combine.
       - name: Combine coverage and enforce the gate
+        id: coverage
+        if: needs.fingerprint.outputs.reuse_url == ''
         run: |
           uvx coverage@7.13.3 combine coverage-data/.coverage.spark coverage-data/.coverage.fast
           uvx coverage@7.13.3 report --fail-under=90 --show-missing --skip-covered
+          echo "total=$(uvx coverage@7.13.3 report --format=total)" >> "$GITHUB_OUTPUT"
+
+      # Record the pass so later runs of the same inputs can reuse it. Fork
+      # PRs don't record (the lookup wouldn't trust their record anyway), and
+      # nothing is recorded without a fingerprint. Records expire after 14
+      # days, which bounds drift in the runner image and floating actions.
+      - name: Write the reuse record
+        id: record
+        if: >-
+          needs.fingerprint.outputs.reuse_url == '' &&
+          needs.fingerprint.outputs.fingerprint != '' &&
+          (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          FINGERPRINT: ${{ needs.fingerprint.outputs.fingerprint }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          COVERAGE: ${{ steps.coverage.outputs.total }}
+        run: |
+          python3 scripts/spark_reuse.py record spark-pass.json \
+            --fingerprint "$FINGERPRINT" --run-url "$RUN_URL" --sha "$SHA" \
+            --event "$EVENT" --coverage "$COVERAGE"
+          echo "- recorded: \`spark-pass-$FINGERPRINT\` (14 days)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the reuse record
+        if: steps.record.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: spark-pass-${{ needs.fingerprint.outputs.fingerprint }}
+          path: spark-pass.json
+          retention-days: 14

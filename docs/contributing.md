@@ -127,6 +127,18 @@ PySpark 4.1.1 and Delta 4.2.0, declared as the engine package's `rt2`
 dependency group. CI runs the default suite and the Spark suite on both
 stacks.
 
+CI doesn't test the same inputs twice. The Spark Tests workflow fingerprints
+every file a test can read (`scripts/input_fingerprint.py`), and when an earlier
+run of the same fingerprint passed in the last 14 days, it reuses that run: the
+`spark-tests` check is green and its summary links the run it reused. A merge of
+an up-to-date pull request, and the release commit after it, usually reuse the
+pull request's run. To force a full run, start Spark Tests by hand with `fresh`
+set, from the Actions tab or with:
+
+```bash
+gh workflow run spark-tests.yaml -f fresh=true --ref <branch>
+```
+
 Build the Runtime 2.0 stack in its own environment, so it doesn't replace the
 default one:
 
