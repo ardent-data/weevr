@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.21.5](https://github.com/ardent-data/weevr/compare/weevr-v1.21.4...weevr-v1.21.5) (2026-11-21)
+
+
+### Bug Fixes
+
+* **engine:** read YAML column sets from their file ([#325](https://github.com/ardent-data/weevr/issues/325)) ([9b8f443](https://github.com/ardent-data/weevr/commit/9b8f443a9ca87fbdb5b86c6efb2bc605552300b8))
+* **model:** reject unsupported source types at load ([#327](https://github.com/ardent-data/weevr/issues/327)) ([6091a6e](https://github.com/ardent-data/weevr/commit/6091a6e32d474b0ce7e5a44c88af48ffac5e395a))
+* **operations:** insert CDC updates for keys missing from the target ([#322](https://github.com/ardent-data/weevr/issues/322)) ([475faf8](https://github.com/ardent-data/weevr/commit/475faf80c2b89c4d65bcbe260ab4d3b86ed78747))
+
 ## [1.21.4](https://github.com/ardent-data/weevr/compare/weevr-v1.21.3...weevr-v1.21.4) (2026-11-17)
 
 
