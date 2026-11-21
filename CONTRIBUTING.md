@@ -93,7 +93,7 @@ Drop `--check` to apply the formatting.
 ### Type checking
 
 ```bash
-uv run pyright
+uv run pyright .
 ```
 
 ### Tests
