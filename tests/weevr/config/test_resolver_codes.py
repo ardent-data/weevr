@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_config
 from weevr.config.attribution import attribute_errors
 from weevr.config.audit_templates import resolve_template_columns
@@ -222,6 +222,54 @@ class TestReferences:
         diag = _only(exc.value)
         assert diag.code == "C303"
         assert diag.pointer == "/threads/0/ref"
+
+    @pytest.mark.parametrize(
+        "ref",
+        [
+            "item://lake/x.thread",
+            "pkg://acme/x.thread",
+            "abfss://c@a.dfs.core.windows.net/x.thread",
+            "made-up+scheme.1://x",
+        ],
+    )
+    def test_ref_with_scheme_is_unsupported(self, tmp_path, ref):
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_ref_path(ref, tmp_path, "/threads/0/ref")
+        diag = _only(exc.value)
+        assert diag.code == "C312"
+        assert diag.pointer == "/threads/0/ref"
+
+    def test_ref_scheme_through_weave_entry(self, tmp_path):
+        weave = _weave([{"name": "a"}, {"ref": "item://x/y.thread"}])
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_references(weave, "weave", tmp_path)
+        diag = _only(exc.value)
+        assert diag.code == "C312"
+        assert diag.pointer == "/threads/1/ref"
+
+    def test_absolute_path_ref_stays_c311(self, tmp_path):
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_ref_path("/x/y.thread", tmp_path, "/threads/0/ref")
+        assert _only(exc.value).code == "C311"
+
+    def test_ref_resolves_from_project_root_whatever_the_document_folder(self, tmp_path):
+        """The same ref reads the same from documents in different folders (root-relative)."""
+        write_project(tmp_path)
+        _write(tmp_path / "threads" / "shared.thread", THREAD_BODY)
+        ref = {"ref": "threads/shared.thread"}
+        _write(tmp_path / "weaves" / "deep" / "a.weave", _weave([ref]))
+        _write(tmp_path / "b.weave", _weave([ref]))
+        _write(
+            tmp_path / "looms" / "main.loom",
+            {
+                "config_version": "2.0",
+                "weaves": [{"ref": "weaves/deep/a.weave"}, {"ref": "b.weave"}],
+            },
+        )
+        # A document-relative reading would look for looms/weaves/deep/a.weave and
+        # weaves/deep/threads/shared.thread; both loads must find the files instead.
+        load_config(tmp_path / "looms" / "main.loom")
+        load_config(tmp_path / "weaves" / "deep" / "a.weave")
 
     def test_weave_name_outside_project(self, tmp_path):
         project = tmp_path / "proj"

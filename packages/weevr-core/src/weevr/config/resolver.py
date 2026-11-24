@@ -685,6 +685,36 @@ def _check_entry_refs(entries: list[Any], at: tuple[str | int, ...] = ()) -> Non
             )
 
 
+_SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*)://")
+
+
+def _reference_scheme(ref: str) -> str | None:
+    """The ``scheme`` of a ``scheme://path`` reference, or ``None`` when it has none."""
+    match = _SCHEME.match(ref)
+    return match.group(1) if match else None
+
+
+def _outside_root(ref: str, pointer: str | None) -> ReferenceResolutionError:
+    """The error for a reference that resolves outside the project root."""
+    return _reference_error(
+        "C303",
+        f"Reference '{ref}' resolves outside project root",
+        pointer=pointer,
+        file_path=ref,
+    )
+
+
+def _unsupported_scheme(ref: str, scheme: str, pointer: str | None) -> ReferenceResolutionError:
+    """The error for a reference that names a scheme; no scheme is supported."""
+    return _reference_error(
+        "C312",
+        f"Unsupported reference scheme '{scheme}' in '{ref}'",
+        pointer=pointer,
+        file_path=ref,
+        hint="Write the reference as a path relative to the project root.",
+    )
+
+
 def resolve_ref_path(
     ref: str, project_root: ConfigLocation | Path, pointer: str | None = None
 ) -> ConfigLocation:
@@ -703,12 +733,13 @@ def resolve_ref_path(
         Resolved location for the referenced config file.
 
     Raises:
-        ReferenceResolutionError: If the reference isn't a string, or the
+        ReferenceResolutionError: If the reference isn't a string (C304),
+            names a ``scheme://`` (C312), is an absolute path (C311), or the
             referenced file does not exist or resolves outside the project
-            root.
+            root (C303).
         ConfigError: If the reference does not have a typed extension.
     """
-    from weevr.config.locations import LocalConfigLocation
+    from weevr.config.locations import ConfigLocationError, LocalConfigLocation
 
     # Child entries reach here as unvalidated dicts, so the YAML may hold
     # any type. No file is named: the enclosing config's file is attached.
@@ -718,6 +749,11 @@ def resolve_ref_path(
             f"Reference must be a path string, got {type(ref).__name__}: {ref!r}",
             pointer=pointer,
         )
+
+    # A scheme is refused before any path handling, whatever it names.
+    scheme = _reference_scheme(ref)
+    if scheme is not None:
+        raise _unsupported_scheme(ref, scheme, pointer)
 
     if isinstance(project_root, Path):
         project_root = LocalConfigLocation(project_root)
@@ -741,13 +777,18 @@ def resolve_ref_path(
 
     try:
         resolved = project_root.join(ref)
+    except ConfigLocationError as exc:
+        if any(d.code == "C311" for d in exc.diagnostics):
+            raise _reference_error(
+                "C311",
+                f"Reference '{ref}' is an absolute path",
+                pointer=pointer,
+                file_path=ref,
+                hint="Write the reference relative to the project root.",
+            ) from exc
+        raise _outside_root(ref, pointer) from exc
     except ValueError as exc:
-        raise _reference_error(
-            "C303",
-            f"Reference '{ref}' resolves outside project root",
-            pointer=pointer,
-            file_path=ref,
-        ) from exc
+        raise _outside_root(ref, pointer) from exc
 
     if not resolved.is_relative_to(project_root):
         raise _reference_error(

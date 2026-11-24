@@ -265,6 +265,12 @@ A named warp file is not in any searched location.
 
 A reference is an absolute path or URI where a path relative to the project belongs.
 
+### C312
+
+`unsupported-reference-scheme` · error · stable
+
+A reference names a scheme (scheme://) where a project-relative path belongs.
+
 ### C350
 
 `duplicate-weave-name` · error · stable

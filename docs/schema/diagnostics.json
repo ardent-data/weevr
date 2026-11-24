@@ -372,6 +372,16 @@
       "docs_anchor": "c311"
     },
     {
+      "code": "C312",
+      "name": "unsupported-reference-scheme",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A reference names a scheme (scheme://) where a project-relative path belongs.",
+      "docs_anchor": "c312"
+    },
+    {
       "code": "C350",
       "name": "duplicate-weave-name",
       "category": "config",
