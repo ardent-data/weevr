@@ -1,0 +1,67 @@
+{
+  "config_name": "stg_customers",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "name": "stg_customers",
+    "qualified_key": "dimensions/stg_customers.thread",
+    "sources": {
+      "customers": {
+        "options": {
+          "header": true,
+          "inferSchema": true
+        },
+        "path": "<root>/data/customers.csv",
+        "type": "csv"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "status = 'active'"
+        }
+      },
+      {
+        "dedup": {
+          "keys": [
+            "customer_id"
+          ],
+          "order_by": "signup_date DESC"
+        }
+      },
+      {
+        "derive": {
+          "columns": {
+            "full_name": "concat(first_name, ' ', last_name)"
+          }
+        }
+      },
+      {
+        "select": {
+          "columns": [
+            "customer_id",
+            "first_name",
+            "last_name",
+            "full_name",
+            "email",
+            "signup_date"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "customer_id": "int",
+            "signup_date": "date"
+          }
+        }
+      }
+    ],
+    "target": {
+      "alias": "staging.stg_customers"
+    },
+    "write": {}
+  },
+  "threads": {},
+  "weaves": {}
+}

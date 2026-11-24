@@ -1,0 +1,75 @@
+{
+  "config_name": "dim_store",
+  "config_type": "thread",
+  "model": {
+    "assertions": [
+      {
+        "columns": [
+          "store_id",
+          "store_name"
+        ],
+        "severity": "error",
+        "type": "column_not_null"
+      },
+      {
+        "min": 1,
+        "type": "row_count"
+      },
+      {
+        "columns": [
+          "store_id"
+        ],
+        "severity": "error",
+        "type": "unique"
+      }
+    ],
+    "config_version": "2.0",
+    "name": "dim_store",
+    "qualified_key": "dim_store.thread",
+    "sources": {
+      "stores": {
+        "alias": "raw.stores",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "store_id",
+            "store_name",
+            "city",
+            "state",
+            "square_footage",
+            "open_date"
+          ]
+        }
+      },
+      {
+        "cast": {
+          "columns": {
+            "square_footage": "int"
+          }
+        }
+      }
+    ],
+    "target": {
+      "alias": "curated.dim_store"
+    },
+    "validations": [
+      {
+        "name": "store_id_not_null",
+        "rule": "store_id IS NOT NULL",
+        "severity": "fatal"
+      },
+      {
+        "name": "square_footage_positive",
+        "rule": "square_footage > 0",
+        "severity": "warn"
+      }
+    ],
+    "write": {}
+  },
+  "threads": {},
+  "weaves": {}
+}

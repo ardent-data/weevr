@@ -1,0 +1,112 @@
+{
+  "config_name": "fact_sales",
+  "config_type": "thread",
+  "model": {
+    "assertions": [
+      {
+        "column": "plant_id",
+        "max_rate": 0.05,
+        "message": "plant FK invalid rate exceeded",
+        "sentinel": -4,
+        "type": "fk_sentinel_rate"
+      },
+      {
+        "columns": [
+          "plant_id",
+          "customer_id",
+          "product_id"
+        ],
+        "max_rate": 0.1,
+        "message": "FK unresolved rate exceeded",
+        "sentinels": {
+          "invalid": {
+            "value": -4
+          },
+          "unknown": {
+            "value": -1
+          }
+        },
+        "type": "fk_sentinel_rate"
+      }
+    ],
+    "config_version": "2.0",
+    "lookups": {
+      "dim_customer": {
+        "source": {
+          "alias": "curated.dim_customer",
+          "type": "delta"
+        }
+      },
+      "dim_plant": {
+        "source": {
+          "alias": "curated.dim_plant",
+          "type": "delta"
+        }
+      },
+      "dim_product": {
+        "source": {
+          "alias": "curated.dim_product",
+          "type": "delta"
+        }
+      }
+    },
+    "name": "fact_sales",
+    "qualified_key": "fact_sales.thread",
+    "sources": {
+      "sales": {
+        "alias": "raw.sales",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "resolve": {
+          "lookup": "dim_plant",
+          "match": {
+            "plant_code": "plant_code"
+          },
+          "name": "plant_id",
+          "pk": "id"
+        }
+      },
+      {
+        "resolve": {
+          "lookup": "dim_customer",
+          "match": {
+            "customer_code": "natural_id",
+            "region": "region_code"
+          },
+          "name": "customer_id",
+          "normalize": "trim_lower",
+          "pk": "id"
+        }
+      },
+      {
+        "resolve": {
+          "effective": {
+            "current": {
+              "column": "is_current"
+            }
+          },
+          "include": [
+            "product_name",
+            "category"
+          ],
+          "include_prefix": "product_",
+          "lookup": "dim_product",
+          "match": {
+            "product_code": "product_code"
+          },
+          "name": "product_id",
+          "pk": "id"
+        }
+      }
+    ],
+    "target": {
+      "alias": "curated.fact_sales"
+    },
+    "write": {}
+  },
+  "threads": {},
+  "weaves": {}
+}

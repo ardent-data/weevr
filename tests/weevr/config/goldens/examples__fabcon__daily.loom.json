@@ -1,0 +1,424 @@
+{
+  "config_name": "daily",
+  "config_type": "loom",
+  "model": {
+    "config_version": "2.0",
+    "defaults": {
+      "execution": {
+        "log_level": "standard"
+      },
+      "naming": {
+        "columns": "snake_case"
+      },
+      "write": {
+        "mode": "overwrite"
+      }
+    },
+    "execution": {},
+    "name": "daily",
+    "params": {
+      "lakehouse_path": {
+        "description": "Root path for the lakehouse storage layer",
+        "name": "lakehouse_path",
+        "type": "string"
+      },
+      "run_date": {
+        "default": "2026-01-01",
+        "description": "Logical run date for the pipeline",
+        "name": "run_date",
+        "required": false,
+        "type": "date"
+      }
+    },
+    "qualified_key": "daily.loom",
+    "weaves": [
+      {
+        "ref": "dimensions.weave"
+      },
+      {
+        "condition": {
+          "when": "table_exists('silver.dim_customer')"
+        },
+        "ref": "facts.weave"
+      }
+    ]
+  },
+  "threads": {
+    "dimensions": {
+      "dim_customer": {
+        "config_version": "2.0",
+        "execution": {},
+        "keys": {
+          "business_key": [
+            "customer_id"
+          ],
+          "change_detection": {
+            "algorithm": "xxhash64",
+            "columns": [
+              "first_name",
+              "last_name",
+              "full_name",
+              "email"
+            ],
+            "name": "row_hash"
+          },
+          "surrogate_key": {
+            "algorithm": "xxhash64",
+            "name": "customer_sk"
+          }
+        },
+        "name": "dim_customer",
+        "qualified_key": "dimensions/dim_customer.thread",
+        "sources": {
+          "customers": {
+            "alias": "staging.stg_customers",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "select": {
+              "columns": [
+                "customer_id",
+                "first_name",
+                "last_name",
+                "full_name",
+                "email",
+                "signup_date"
+              ]
+            }
+          }
+        ],
+        "target": {
+          "alias": "silver.dim_customer",
+          "naming": {
+            "columns": "snake_case"
+          }
+        },
+        "template_ref": "dimensions/dim_customer.thread",
+        "write": {
+          "match_keys": [
+            "customer_id"
+          ],
+          "mode": "merge"
+        }
+      },
+      "dim_product": {
+        "config_version": "2.0",
+        "execution": {},
+        "keys": {
+          "business_key": [
+            "product_id"
+          ],
+          "surrogate_key": {
+            "algorithm": "xxhash64",
+            "name": "product_sk"
+          }
+        },
+        "name": "dim_product",
+        "qualified_key": "dimensions/dim_product.thread",
+        "sources": {
+          "products": {
+            "alias": "staging.stg_products",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "select": {
+              "columns": [
+                "product_id",
+                "product_name",
+                "category",
+                "unit_price",
+                "supplier"
+              ]
+            }
+          }
+        ],
+        "target": {
+          "alias": "silver.dim_product",
+          "naming": {
+            "columns": "snake_case"
+          }
+        },
+        "template_ref": "dimensions/dim_product.thread",
+        "write": {
+          "match_keys": [
+            "product_id"
+          ],
+          "mode": "merge"
+        }
+      },
+      "stg_customers": {
+        "config_version": "2.0",
+        "execution": {},
+        "name": "stg_customers",
+        "qualified_key": "dimensions/stg_customers.thread",
+        "sources": {
+          "customers": {
+            "options": {
+              "header": true,
+              "inferSchema": true
+            },
+            "path": "<root>/data/customers.csv",
+            "type": "csv"
+          }
+        },
+        "steps": [
+          {
+            "filter": {
+              "expr": "status = 'active'"
+            }
+          },
+          {
+            "dedup": {
+              "keys": [
+                "customer_id"
+              ],
+              "order_by": "signup_date DESC"
+            }
+          },
+          {
+            "derive": {
+              "columns": {
+                "full_name": "concat(first_name, ' ', last_name)"
+              }
+            }
+          },
+          {
+            "select": {
+              "columns": [
+                "customer_id",
+                "first_name",
+                "last_name",
+                "full_name",
+                "email",
+                "signup_date"
+              ]
+            }
+          },
+          {
+            "cast": {
+              "columns": {
+                "customer_id": "int",
+                "signup_date": "date"
+              }
+            }
+          }
+        ],
+        "target": {
+          "alias": "staging.stg_customers",
+          "naming": {
+            "columns": "snake_case"
+          }
+        },
+        "template_ref": "dimensions/stg_customers.thread",
+        "write": {}
+      },
+      "stg_products": {
+        "config_version": "2.0",
+        "execution": {},
+        "name": "stg_products",
+        "qualified_key": "dimensions/stg_products.thread",
+        "sources": {
+          "products": {
+            "alias": "raw.products",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "select": {
+              "columns": [
+                "product_id",
+                "product_name",
+                "category",
+                "unit_price",
+                "supplier"
+              ]
+            }
+          },
+          {
+            "cast": {
+              "columns": {
+                "unit_price": "decimal(10,2)"
+              }
+            }
+          }
+        ],
+        "target": {
+          "alias": "staging.stg_products",
+          "naming": {
+            "columns": "snake_case"
+          }
+        },
+        "template_ref": "dimensions/stg_products.thread",
+        "write": {}
+      }
+    },
+    "facts": {
+      "fact_orders": {
+        "config_version": "2.0",
+        "execution": {},
+        "name": "fact_orders",
+        "qualified_key": "facts/fact_orders.thread",
+        "sources": {
+          "dim_customer": {
+            "lookup": "dim_customer"
+          },
+          "dim_product": {
+            "lookup": "dim_product"
+          },
+          "orders": {
+            "alias": "raw.orders",
+            "type": "delta"
+          }
+        },
+        "steps": [
+          {
+            "join": {
+              "on": [
+                {
+                  "left": "customer_id",
+                  "right": "customer_id"
+                }
+              ],
+              "source": "dim_customer",
+              "type": "left"
+            }
+          },
+          {
+            "join": {
+              "on": [
+                {
+                  "left": "product_id",
+                  "right": "product_id"
+                }
+              ],
+              "source": "dim_product",
+              "type": "left"
+            }
+          },
+          {
+            "derive": {
+              "columns": {
+                "order_total": "quantity * unit_price"
+              }
+            }
+          },
+          {
+            "select": {
+              "columns": [
+                "order_id",
+                "order_date",
+                "customer_id",
+                "customer_sk",
+                "product_id",
+                "product_sk",
+                "quantity",
+                "unit_price",
+                "order_total"
+              ]
+            }
+          },
+          {
+            "cast": {
+              "columns": {
+                "order_total": "decimal(12,2)",
+                "unit_price": "decimal(10,2)"
+              }
+            }
+          }
+        ],
+        "target": {
+          "alias": "silver.fact_orders",
+          "naming": {
+            "columns": "snake_case"
+          },
+          "partition_by": [
+            "order_date"
+          ]
+        },
+        "template_ref": "facts/fact_orders.thread",
+        "write": {}
+      }
+    }
+  },
+  "weaves": {
+    "dimensions": {
+      "config_version": "2.0",
+      "name": "dimensions",
+      "qualified_key": "dimensions.weave",
+      "threads": [
+        {
+          "name": "stg_customers",
+          "ref": "dimensions/stg_customers.thread"
+        },
+        {
+          "name": "stg_products",
+          "ref": "dimensions/stg_products.thread"
+        },
+        {
+          "dependencies": [
+            "stg_customers"
+          ],
+          "name": "dim_customer",
+          "ref": "dimensions/dim_customer.thread"
+        },
+        {
+          "dependencies": [
+            "stg_products"
+          ],
+          "name": "dim_product",
+          "ref": "dimensions/dim_product.thread"
+        }
+      ]
+    },
+    "facts": {
+      "config_version": "2.0",
+      "lookups": {
+        "dim_customer": {
+          "key": [
+            "customer_id"
+          ],
+          "materialize": true,
+          "on_failure": "warn",
+          "source": {
+            "alias": "silver.dim_customer",
+            "type": "delta"
+          },
+          "strategy": "broadcast",
+          "unique_key": true,
+          "values": [
+            "customer_sk"
+          ]
+        },
+        "dim_product": {
+          "key": [
+            "product_id"
+          ],
+          "materialize": true,
+          "on_failure": "warn",
+          "source": {
+            "alias": "silver.dim_product",
+            "type": "delta"
+          },
+          "strategy": "broadcast",
+          "unique_key": true,
+          "values": [
+            "product_sk"
+          ]
+        }
+      },
+      "name": "facts",
+      "qualified_key": "facts.weave",
+      "threads": [
+        {
+          "name": "fact_orders",
+          "ref": "facts/fact_orders.thread"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "config_name": "dim_calendar",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "name": "dim_calendar",
+    "qualified_key": "dim_calendar.thread",
+    "sources": {
+      "dates": {
+        "column": "calendar_date",
+        "end": "2099-12-31",
+        "start": "1970-01-01",
+        "step": "day",
+        "type": "date_sequence"
+      }
+    },
+    "steps": [
+      {
+        "derive": {
+          "columns": {
+            "calendar_id": "cast(date_format(calendar_date, 'yyyyMMdd') as int)\n",
+            "day_name": "date_format(calendar_date, 'EEEE')",
+            "day_of_month": "dayofmonth(calendar_date)",
+            "day_of_week": "dayofweek(calendar_date)",
+            "fiscal_quarter": "case when month(calendar_date) >= 7\nthen quarter(calendar_date) - 2\nelse quarter(calendar_date) + 2 end\n",
+            "fiscal_year": "case when month(calendar_date) >= 7\nthen year(calendar_date) + 1\nelse year(calendar_date) end\n",
+            "is_weekend": "case when dayofweek(calendar_date) in (1, 7)\nthen true else false end\n",
+            "month": "month(calendar_date)",
+            "month_name": "date_format(calendar_date, 'MMMM')",
+            "quarter": "quarter(calendar_date)",
+            "week_of_year": "weekofyear(calendar_date)",
+            "year": "year(calendar_date)"
+          }
+        }
+      }
+    ],
+    "target": {
+      "alias": "gold.dim_calendar"
+    },
+    "write": {}
+  },
+  "threads": {},
+  "weaves": {}
+}

@@ -1,0 +1,59 @@
+{
+  "config_name": "dim_customer",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "keys": {
+      "business_key": [
+        "customer_id"
+      ],
+      "change_detection": {
+        "algorithm": "xxhash64",
+        "columns": [
+          "first_name",
+          "last_name",
+          "full_name",
+          "email"
+        ],
+        "name": "row_hash"
+      },
+      "surrogate_key": {
+        "algorithm": "xxhash64",
+        "name": "customer_sk"
+      }
+    },
+    "name": "dim_customer",
+    "qualified_key": "dimensions/dim_customer.thread",
+    "sources": {
+      "customers": {
+        "alias": "staging.stg_customers",
+        "type": "delta"
+      }
+    },
+    "steps": [
+      {
+        "select": {
+          "columns": [
+            "customer_id",
+            "first_name",
+            "last_name",
+            "full_name",
+            "email",
+            "signup_date"
+          ]
+        }
+      }
+    ],
+    "target": {
+      "alias": "silver.dim_customer"
+    },
+    "write": {
+      "match_keys": [
+        "customer_id"
+      ],
+      "mode": "merge"
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}

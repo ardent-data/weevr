@@ -1,0 +1,38 @@
+{
+  "config_name": "stg_orders",
+  "config_type": "thread",
+  "model": {
+    "config_version": "2.0",
+    "execution": {
+      "log_level": "minimal"
+    },
+    "name": "stg_orders",
+    "qualified_key": "threads/stg_orders.thread",
+    "sources": {
+      "orders": {
+        "options": {
+          "header": true
+        },
+        "path": "<root>/data/orders.csv",
+        "type": "csv"
+      }
+    },
+    "steps": [
+      {
+        "filter": {
+          "expr": "order_id is not null"
+        }
+      },
+      {
+        "filter": {
+          "expr": "customer_id is not null"
+        }
+      }
+    ],
+    "target": {
+      "alias": "stg.orders"
+    }
+  },
+  "threads": {},
+  "weaves": {}
+}
