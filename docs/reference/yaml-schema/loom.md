@@ -10,7 +10,8 @@ runtime settings that cascade down through weaves to threads.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
+| `kind` | `string` | yes | -- | Document kind: `loom` |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"2.0"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
 | `qualified_key` | `string` | -- | set by loader | Read-only. The loom file's path relative to the project root (for example `looms/nightly.loom`). Populated at load; not set in YAML. |
 | `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave entries. Strings are shorthand for `{ name: "<value>" }`. Use `ref` for an external file, `name` alone for `<name>.weave` in the project root, or `name` plus a weave body for an inline weave. |
@@ -158,7 +159,8 @@ weave field wins), and it never applies at thread scope. See the
 ## Complete example
 
 ```yaml
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 name: daily_etl
 
 weaves:
@@ -227,13 +229,13 @@ An inline weave keeps a small weave in the loom file itself:
 weaves:
   - ref: ingest_raw.weave
   - name: ops_audit
-    config_version: "1.0"
+    config_version: "2.0"
     condition:
       when: "table_exists('ops.audit_events')"
     threads:
       - ref: threads/audit_events.thread
       - name: audit_summary
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           events:
             type: delta

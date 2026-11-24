@@ -17,11 +17,12 @@ pipeline execution.
 
 ## Warp file structure
 
-A `.warp` file is a YAML document with `config_version: "1.0"` and
+A `.warp` file is a YAML document with `config_version: "2.0"` and
 a list of column declarations.
 
 ```yaml
-config_version: "1.0"
+kind: warp
+config_version: "2.0"
 description: "Customer dimension schema contract"
 
 columns:
@@ -59,7 +60,8 @@ keys:
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `config_version` | Yes | — | Schema version (`"1.0"`) |
+| `kind` | Yes | — | Document kind: `warp` |
+| `config_version` | Yes | — | Schema version (`"2.0"`) |
 | `description` | No | — | Human-readable description of the contract |
 | `columns` | Yes | — | Column declarations (see above) |
 | `keys` | No | — | Surrogate and business key metadata (see below) |

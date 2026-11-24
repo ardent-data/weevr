@@ -30,7 +30,8 @@ Define a thread — the smallest unit of work — using a `.thread` file:
 
 ```yaml
 # dim_customer.thread
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   raw_customers:
     type: delta

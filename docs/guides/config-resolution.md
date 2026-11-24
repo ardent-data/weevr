@@ -408,7 +408,8 @@ name under the `${param.x}` namespace, scoped to that file:
 
 ```yaml
 # silver.loom
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 weaves:
   - ref: bronze_to_silver.weave
 

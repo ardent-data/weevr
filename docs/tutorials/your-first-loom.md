@@ -67,7 +67,8 @@ Create `staging/stg_customers.thread`:
 
 <!-- weevr-snippet: {path: staging/stg_customers.thread} -->
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   raw_customers:
@@ -124,7 +125,8 @@ Create `staging.weave`:
 
 <!-- weevr-snippet: {path: staging.weave} -->
 ```yaml
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 
 threads:
   - ref: staging/stg_customers.thread
@@ -141,7 +143,8 @@ Create `daily.loom`:
 
 <!-- weevr-snippet: {path: daily.loom} -->
 ```yaml
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 
 weaves:
   - ref: staging.weave

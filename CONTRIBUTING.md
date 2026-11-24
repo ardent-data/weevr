@@ -307,7 +307,8 @@ valid weevr config that loads on its own. A thread, for example, needs at minimu
 
 ```yaml
 # examples/my_example.thread
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: my_example   # must match the filename stem, or omit it
 sources:
   source_table:

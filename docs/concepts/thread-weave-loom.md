@@ -80,7 +80,8 @@ pipeline.select -> target.table: write (merge)
 
 ```yaml
 # dimensions/dim_customer.thread
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   customers:
     type: delta
@@ -126,7 +127,8 @@ Key responsibilities:
 
 ```yaml
 # dimensions.weave
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 threads:
   - ref: dimensions/dim_customer.thread
   - ref: dimensions/dim_product.thread
@@ -153,7 +155,8 @@ Key responsibilities:
 
 ```yaml
 # nightly.loom
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 weaves:
   - ref: dimensions.weave
   - ref: facts.weave

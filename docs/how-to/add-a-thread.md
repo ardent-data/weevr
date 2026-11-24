@@ -52,7 +52,8 @@ Declare each data source your thread needs. The first source listed becomes the
 primary DataFrame that flows through the pipeline.
 
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   orders:
@@ -145,7 +146,8 @@ use paths relative to the project root, with typed extensions:
 
 ```yaml
 # orders.weave
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 
 threads:
   - ref: orders/fact_orders.thread

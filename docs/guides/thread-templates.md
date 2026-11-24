@@ -17,7 +17,8 @@ values via `params`:
 
 ```yaml
 # silver.weave
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 threads:
   - ref: silver/sap_table.thread
     as: sap_adr6
@@ -37,7 +38,8 @@ injected values:
 
 ```yaml
 # silver/sap_table.thread
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   sap_data:
     type: delta

@@ -117,7 +117,8 @@ reference it from thread sources:
 
 ```yaml
 # orders.weave
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 
 lookups:
   dim_product:

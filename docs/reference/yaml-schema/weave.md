@@ -10,7 +10,8 @@ runtime settings.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
+| `kind` | `string` | yes | -- | Document kind: `weave` |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"2.0"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
 | `qualified_key` | `string` | -- | set by loader | Read-only. The weave file's path relative to the project root (for example `weaves/daily.weave`); an inline weave uses its name. Populated at load; not set in YAML. |
 | `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (local name references). Use `ref` for external file references. |
@@ -418,7 +419,8 @@ strategy descriptions and YAML examples.
 ## Complete example
 
 ```yaml
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: sales_pipeline
 
 lookups:

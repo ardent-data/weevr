@@ -162,7 +162,8 @@ except ConfigError as e:
 # This file is saved as "orders/fact_orders.thread"
 # but declares a different name — triggers ConfigError
 name: wrong_name  # should be "fact_orders" or omitted
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   orders:
     type: delta
@@ -193,7 +194,7 @@ Raised when a YAML file cannot be read or parsed.
 1. Verify the file exists at the expected path
 2. Validate YAML syntax with a linter or `yamllint`
 3. Ensure the file starts with key-value pairs (a YAML mapping)
-4. Add `config_version: "1.0"` as the first field
+4. Add `config_version: "2.0"` as the first field
 
 **Example:**
 
@@ -205,7 +206,8 @@ sources:
     alias: raw.orders
 
 # Fixed
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   orders:
     type: delta
@@ -241,7 +243,8 @@ Raised when the configuration structure does not match the expected schema.
 
 ```yaml
 # Invalid — thread missing required 'target' field
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   orders:
     type: delta
@@ -272,13 +275,14 @@ Raised when the `config_version` is not supported.
 
 **Resolution:**
 
-1. Set `config_version: "1.0"` — this is the only supported version
+1. Set `config_version: "2.0"` — this is the only supported version
 2. Check that the file extension matches the intended config type
 
 **Example:**
 
 ```yaml
 # Invalid — unsupported version
+kind: thread
 config_version: "2.0"
 sources:
   orders:
@@ -286,7 +290,7 @@ sources:
     alias: raw.orders
 
 # Fixed
-config_version: "1.0"
+config_version: "2.0"
 ```
 
 ---
@@ -351,7 +355,8 @@ references are detected.
 <!-- weevr-snippet: {expect: ReferenceResolutionError} -->
 ```yaml
 # Weave referencing a non-existent thread
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 threads:
   - ref: orders/fact_orders.thread  # file must exist at this path
 

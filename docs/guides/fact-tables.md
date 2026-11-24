@@ -86,7 +86,8 @@ Accumulating snapshot patterns use `fact:` combined with
 ## Example: Transactional Fact
 
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   orders:
     type: delta

@@ -14,7 +14,8 @@ Threads can be used as **parameterized templates** via `as` and `params` on
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
+| `kind` | `string` | yes | -- | Document kind: `thread` |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"2.0"`) |
 | `name` | `string` | no | `""` | Human-readable thread name. Typically set by the weave that references this thread. |
 | `qualified_key` | `string` | -- | set by loader | Read-only. The thread file's path relative to the project root (for example `threads/orders.thread`). Populated at load; not set in YAML. |
 | `template_ref` | `string` | -- | set by loader | Read-only. The `ref` of the weave entry that loaded this thread, for telemetry and display. Populated at load; not set in YAML. |
@@ -1628,7 +1629,8 @@ target:
 ## Complete example
 
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   orders:

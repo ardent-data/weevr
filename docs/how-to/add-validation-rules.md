@@ -58,7 +58,8 @@ Add a `validations` section to your thread YAML. Each rule needs a `name`, a
 `rule` expression (Spark SQL boolean), and a `severity`:
 
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   customers:
