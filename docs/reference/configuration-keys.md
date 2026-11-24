@@ -4,7 +4,10 @@ This page provides a consolidated reference of every configuration field
 across all weevr models. Fields are grouped by the model they belong to.
 
 For YAML syntax and complete examples, see the schema reference pages:
-[Thread](yaml-schema/thread.md) | [Weave](yaml-schema/weave.md) | [Loom](yaml-schema/loom.md)
+[Thread](yaml-schema/thread.md) | [Weave](yaml-schema/weave.md) | [Loom](yaml-schema/loom.md) | [Project](yaml-schema/project.md)
+
+For how a project is laid out on disk and in Fabric, see
+[Project layout](project-layout.md).
 
 ```d2
 direction: down
@@ -98,6 +101,31 @@ data_flow.Thread -> behavior.ValidationRule: "0..*" {style.stroke: "#388E3C"}
 data_flow.Thread -> behavior.FailureConfig: "0..1" {style.stroke: "#388E3C"}
 data_flow.Thread -> behavior.Export: "0..*" {style.stroke: "#388E3C"}
 ```
+
+---
+
+## Project
+
+The project document, `weevr.yaml` (`kind: project`). See
+[Project layout](project-layout.md) and the [Project schema](yaml-schema/project.md).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `kind` | `str` | `project` | Document kind |
+| `config_version` | `str` | *required* | Schema version identifier |
+| `id` | `UUID` | *required* | Project identity, generated once |
+| `name` | `str` | *required* | Project name; schema-safe identifier, also the default run-store schema suffix |
+| `description` | `str` | `None` | What the project is for |
+| `requires_weevr` | `str` | `None` | PEP 440 specifier the installed weevr must satisfy |
+| `run_store` | `RunStore` | `None` | Run-store settings; omitted means the container default |
+
+### RunStore
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `connection` | `str` | `None` | Connection whose lakehouse holds the run store |
+| `layout` | `str` | `per_project` | `per_project` or `shared` |
+| `schema` | `str` | `None` | Shared schema (default `weevr`), or per-project name override |
 
 ---
 
