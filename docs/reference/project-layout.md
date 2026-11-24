@@ -95,7 +95,8 @@ weaves:
 ```
 
 A bare `name:` with neither `ref:` nor an inline body fails with
-[`C313`](diagnostics.md#c313): write `ref: <name>.weave`. See the
+[`C313`](diagnostics.md#c313): write `ref: <name>.weave` for a weave entry or
+`ref: <name>.thread` for a thread entry. See the
 [Loom](yaml-schema/loom.md) and [Weave](yaml-schema/weave.md) schemas for the
 entry keys.
 
