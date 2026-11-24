@@ -80,6 +80,7 @@ nav:
       - Configuration Keys: reference/configuration-keys.md
       - Diagnostic Codes: reference/diagnostics.md
       - JSON Schema: reference/json-schema.md
+      - Migration Rules: reference/migration-rules.md
       - Compatibility: reference/compatibility.md
   - Concepts:
       - Why weevr: concepts/why-weevr.md
