@@ -58,6 +58,7 @@ from weevr.model.pipeline import (
     UnpivotStep,
     WindowStep,
 )
+from weevr.model.project import Project, RunStore
 from weevr.model.source import DedupConfig, Source
 from weevr.model.sub_pipeline import SubPipeline
 from weevr.model.target import ColumnMapping, Target
@@ -75,6 +76,8 @@ __all__ = [
     "Thread",
     "Weave",
     "Loom",
+    "Project",
+    "RunStore",
     # Failure handling
     "FailureConfig",
     # Weave thread entry

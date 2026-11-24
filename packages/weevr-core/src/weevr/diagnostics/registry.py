@@ -159,7 +159,7 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unknown-config-kind",
         "The config's kind is not one weevr knows.",
     ),
-    # C205–C209 — envelope (config/loader.py)
+    # C205–C209 — envelope (config/loader.py, config/project.py)
     _config(
         "C205",
         "name-mismatch",
@@ -174,6 +174,19 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "C207",
         "kind-extension-mismatch",
         "The declared kind disagrees with the file's typed extension; expected names the kind.",
+    ),
+    _config(
+        "C208",
+        "engine-version-unsatisfied",
+        "The installed weevr is outside the project's requires_weevr specifier; the message "
+        "names both.",
+    ),
+    # C210– — project document (config/project.py)
+    _config(
+        "C210",
+        "reserved-project-block",
+        "weevr.yaml declares a project-scope block (connections, params, defaults, "
+        "audit_templates) that is reserved and not yet supported.",
     ),
     # C3xx — references and entry forms (config/resolver.py, macros.py, warp.py)
     _config(

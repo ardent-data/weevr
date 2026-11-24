@@ -232,6 +232,26 @@
       "docs_anchor": "c207"
     },
     {
+      "code": "C208",
+      "name": "engine-version-unsatisfied",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The installed weevr is outside the project's requires_weevr specifier; the message names both.",
+      "docs_anchor": "c208"
+    },
+    {
+      "code": "C210",
+      "name": "reserved-project-block",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is reserved and not yet supported.",
+      "docs_anchor": "c210"
+    },
+    {
       "code": "C301",
       "name": "reference-not-found",
       "category": "config",

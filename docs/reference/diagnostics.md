@@ -177,6 +177,19 @@ The document declares no kind. The hint names the weevr-cli migrate command.
 
 The declared kind disagrees with the file's typed extension; expected names the kind.
 
+### C208
+
+`engine-version-unsatisfied` · error · stable
+
+The installed weevr is outside the project's requires_weevr specifier; the message names both.
+
+### C210
+
+`reserved-project-block` · error · stable
+
+weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is
+reserved and not yet supported.
+
 ## C3xx — References and entry forms
 
 ### C301

@@ -11,9 +11,11 @@ from weevr.config.parser import (
     parse_yaml,
     read_envelope,
 )
+from weevr.config.project import check_engine_floor
 from weevr.config.validation import validate_schema
 from weevr.diagnostics import diagnostic
 from weevr.errors import ConfigError
+from weevr.model.project import Project
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -29,7 +31,9 @@ def load_document(
     The file is parsed, its envelope checked (version, then kind, then the
     match with a typed extension), then its body validated against the
     kind's schema, so an unversioned or v1 document gets the migration
-    error rather than a schema error. Errors name ``location``.
+    error rather than a schema error. A project document's engine floor
+    (``requires_weevr``) is then checked against the installed weevr.
+    Errors name ``location``.
 
     Args:
         location: The document's file.
@@ -49,7 +53,10 @@ def load_document(
         if ext_type is None and require_typed_extension:
             raise _untyped_extension(location)
         kind = read_envelope(raw, ext_type)
-        return kind, validate_schema(raw, kind)
+        model = validate_schema(raw, kind)
+        if isinstance(model, Project):
+            check_engine_floor(model)
+        return kind, model
 
 
 def _untyped_extension(location: ConfigLocation) -> ConfigError:

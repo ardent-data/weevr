@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
+from weevr.config.project import split_reserved_blocks
 from weevr.diagnostics import Diagnostic, Severity, diagnostic
 from weevr.diagnostics.positions import json_pointer, pointed
 from weevr.diagnostics.pydantic import from_validation_error
@@ -30,6 +31,7 @@ from weevr.diagnostics.removed_keys import removed_key_diagnostics
 from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
+from weevr.model.project import Project
 from weevr.model.warp import WarpConfig
 
 if TYPE_CHECKING:
@@ -148,7 +150,7 @@ def validate_schema(
 
     Args:
         raw: Raw config dictionary (variables not yet resolved)
-        config_type: Type of config (thread, weave, loom, params)
+        config_type: Type of config (thread, weave, loom, params, warp, project)
         at: Where ``raw`` sits in its file, for an inline weave
 
     Returns:
@@ -163,6 +165,7 @@ def validate_schema(
         "loom": LoomConfig,
         "params": ParamsConfig,
         "warp": WarpConfig,
+        "project": Project,
     }
 
     if config_type not in model_map:
@@ -177,6 +180,9 @@ def validate_schema(
 
     model_class = model_map[config_type]
     removed = removed_key_diagnostics(raw, config_type, at=at)
+    if config_type == "project":
+        raw, reserved = split_reserved_blocks(raw)
+        removed = [*removed, *reserved]
 
     try:
         validated = model_class.model_validate(raw)
@@ -188,7 +194,7 @@ def validate_schema(
         ) from exc
     if removed:
         raise ConfigSchemaError(
-            f"{config_type} config uses keys this version no longer reads",
+            f"{config_type} config uses keys this version does not read",
             diagnostics=removed,
         )
     return validated

@@ -12,14 +12,16 @@ always reflect the accepted configuration surface.
 | [`thread.json`][thread] | Thread configuration |
 | [`weave.json`][weave] | Weave configuration |
 | [`loom.json`][loom] | Loom configuration |
-| [`weevr.json`][combined] | Combined (all three) |
+| [`weevr.json`][combined] | Combined (all of them) |
 | [`warp.json`][warp] | Warp schema contract |
+| [`project.json`][project] | Project document (`weevr.yaml`) |
 
 [thread]: https://github.com/ardent-data/weevr/blob/main/docs/schema/thread.json
 [weave]: https://github.com/ardent-data/weevr/blob/main/docs/schema/weave.json
 [loom]: https://github.com/ardent-data/weevr/blob/main/docs/schema/loom.json
 [combined]: https://github.com/ardent-data/weevr/blob/main/docs/schema/weevr.json
 [warp]: https://github.com/ardent-data/weevr/blob/main/docs/schema/warp.json
+[project]: https://github.com/ardent-data/weevr/blob/main/docs/schema/project.json
 
 ## Usage with LLMs
 
