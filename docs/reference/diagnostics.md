@@ -271,6 +271,12 @@ A reference is an absolute path or URI where a path relative to the project belo
 
 A reference names a scheme (scheme://) where a project-relative path belongs.
 
+### C313
+
+`name-only-entry` · error · stable
+
+A weave entry names a weave but carries neither ref: nor an inline body.
+
 ### C350
 
 `duplicate-weave-name` · error · stable

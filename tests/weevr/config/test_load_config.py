@@ -1063,13 +1063,13 @@ class TestLoadConfigReferencedFileAttribution:
             load_config(loom, project_root=tmp_path)
         assert exc_info.value.file_path == str(weave)
 
-    def test_convention_weave_error_names_weave(self, tmp_path):
-        """A weave found by name convention names its own file."""
-        weave = self._write(tmp_path, "w.weave", 'config_version: "9.0"\nthreads: []\n')
-        loom = self._loom_of(tmp_path, "w")
-        with pytest.raises(ConfigVersionError) as exc_info:
+    def test_name_only_weave_is_not_loaded_by_convention(self, tmp_path):
+        """A name-only entry fails even when a same-named weave file exists."""
+        self._write(tmp_path, "w.weave", 'config_version: "9.0"\nthreads: []\n')
+        loom = self._loom_of(tmp_path, "name: w")
+        with pytest.raises(ConfigError) as exc_info:
             load_config(loom, project_root=tmp_path)
-        assert exc_info.value.file_path == str(weave)
+        assert exc_info.value.diagnostics[0].code == "C313"
 
     def test_entry_params_error_names_weave(self, tmp_path):
         """An unresolvable entry params expression belongs to the weave."""
@@ -1384,17 +1384,19 @@ class TestLoadConfigInlineWeaves:
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
 
     def test_name_only_weave_without_file_raises(self, tmp_path):
-        """A name-only weave entry with no file and no body names the missing file."""
+        """A name-only weave entry with no file and no body fails as name-only."""
         loom = self._loom(tmp_path, "  - name: missing\n")
-        with pytest.raises(ReferenceResolutionError, match=r"missing\.weave") as exc_info:
+        with pytest.raises(ReferenceResolutionError) as exc_info:
             load_config(loom, project_root=tmp_path)
+        assert exc_info.value.diagnostics[0].code == "C313"
         assert exc_info.value.file_path == str(loom)
 
     def test_string_weave_entry_without_file_raises(self, tmp_path):
         """The string shorthand for a weave entry with no file also raises."""
         loom = self._loom(tmp_path, "  - missing\n")
-        with pytest.raises(ReferenceResolutionError, match=r"missing\.weave"):
+        with pytest.raises(ReferenceResolutionError) as exc_info:
             load_config(loom, project_root=tmp_path)
+        assert exc_info.value.diagnostics[0].code == "C313"
 
 
 class TestLoadConfigRelativePathAttribution:

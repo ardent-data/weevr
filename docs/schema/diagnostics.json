@@ -382,6 +382,16 @@
       "docs_anchor": "c312"
     },
     {
+      "code": "C313",
+      "name": "name-only-entry",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave entry names a weave but carries neither ref: nor an inline body.",
+      "docs_anchor": "c313"
+    },
+    {
       "code": "C350",
       "name": "duplicate-weave-name",
       "category": "config",

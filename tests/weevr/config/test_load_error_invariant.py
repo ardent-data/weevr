@@ -129,7 +129,7 @@ MUTATIONS = [
     # Unknown child references
     Mutation("missing-thread-ref", CORE, _set("threads", "0", "ref", value="threads/nope.thread")),
     Mutation("missing-weave-ref", "forms.loom", _set("weaves", "0", "ref", value="nope.weave")),
-    Mutation("missing-convention-weave", "forms.loom", _set("weaves", "1", value={"name": "nope"})),
+    Mutation("name-only-weave", "forms.loom", _set("weaves", "1", value={"name": "nope"})),
     Mutation("ref-wrong-extension", CORE, _set("threads", "0", "ref", value="threads/base.txt")),
     Mutation("ref-not-string", CORE, _set("threads", "0", "ref", value=5)),
     Mutation("missing-lookup", BASE, _set("sources", "region", "lookup", value="nope")),

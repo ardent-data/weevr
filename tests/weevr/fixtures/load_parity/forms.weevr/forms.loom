@@ -1,5 +1,5 @@
-# Entry forms x scopes: a file-referenced weave with a condition, a weave
-# found by convention, and an inline weave; lookups, column sets and
+# Entry forms x scopes: file-referenced weaves (one with a condition) and an
+# inline weave; lookups, column sets and
 # variables declared at loom, weave and thread level with shadowing.
 kind: loom
 config_version: "2.0"
@@ -42,7 +42,7 @@ weaves:
   - ref: weaves/core.weave
     condition:
       when: "'${param.env}' == 'dev'"
-  - name: conv
+  - ref: conv.weave
   - name: inline_w
     config_version: "2.0"
     lookups:

@@ -817,22 +817,6 @@ class TestReferenceResolution:
         # The enclosing config's file is attached by attribute_errors.
         assert caught.value.file_path is None
 
-    @pytest.mark.parametrize("name", ["../outside", "sub/../../outside"])
-    def test_convention_weave_outside_project_rejected(self, tmp_path, name):
-        """A name-only weave entry can't reach a .weave file outside the project root."""
-        from weevr.config.resolver import resolve_references
-        from weevr.errors import ReferenceResolutionError
-
-        project = write_project(tmp_path / "proj.weevr")
-        write_document(
-            tmp_path / "outside.weave",
-            'config_version: "2.0"\nthreads:\n  - name: t\n    config_version: "2.0"\n'
-            "    sources: {s: {type: delta, alias: a.b}}\n    target: {alias: c.d}\n",
-        )
-        loom = {"config_version": "2.0", "weaves": [{"name": name}]}
-        with pytest.raises(ReferenceResolutionError, match="outside project root"):
-            resolve_references(loom, "loom", project)
-
     def test_resolve_ref_path_traversal_rejected(self, tmp_path):
         """Raise ReferenceResolutionError when ref escapes the project root."""
         from weevr.config.resolver import resolve_ref_path
@@ -915,8 +899,8 @@ class TestReferenceResolution:
         result = resolve_variables(config, context)
         assert result["path"] == "/data/${var.filename}"
 
-    def test_convention_based_loom_weave_resolution(self, tmp_path):
-        """Loom name-only weave entries resolve via {name}.weave convention."""
+    def test_ref_loom_weave_resolution(self, tmp_path):
+        """Loom ref weave entries resolve the referenced file."""
         from weevr.config.resolver import resolve_references
 
         # Create a weave file at the project root
@@ -925,7 +909,7 @@ class TestReferenceResolution:
 
         loom_config = {
             "config_version": "2.0",
-            "weaves": [{"name": "dimensions"}],
+            "weaves": [{"ref": "dimensions.weave"}],
         }
 
         result = resolve_references(loom_config, "loom", tmp_path)

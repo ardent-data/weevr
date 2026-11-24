@@ -239,6 +239,11 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unsupported-reference-scheme",
         "A reference names a scheme (scheme://) where a project-relative path belongs.",
     ),
+    _config(
+        "C313",
+        "name-only-entry",
+        "A weave entry names a weave but carries neither ref: nor an inline body.",
+    ),
     # C350–C359 — loom entries
     _config(
         "C350",

@@ -2,7 +2,7 @@
 
 The corpus is every example config, the ``load_parity`` fixture project, and
 the ``forms`` project (each entry form at each scope: inline, file-referenced
-and convention weaves; inline, file-referenced and ``as``/``params`` template
+weaves; inline, file-referenced and ``as``/``params`` template
 threads; ``foreach``; defaults; lookups, column sets and variables declared at
 every level with shadowing; dependencies and conditions on entries).
 

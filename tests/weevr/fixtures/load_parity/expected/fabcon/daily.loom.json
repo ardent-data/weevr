@@ -67,15 +67,15 @@
     "weaves": [
       {
         "condition": null,
-        "name": "dimensions",
-        "ref": null
+        "name": "",
+        "ref": "dimensions.weave"
       },
       {
         "condition": {
           "when": "table_exists('silver.dim_customer')"
         },
-        "name": "facts",
-        "ref": null
+        "name": "",
+        "ref": "facts.weave"
       }
     ]
   },
@@ -825,7 +825,7 @@
           "condition": null,
           "dependencies": null,
           "params": null,
-          "ref": null
+          "ref": "dimensions.weave"
         },
         "kind": "weave",
         "name": "dimensions",
@@ -972,7 +972,7 @@
           "condition": "table_exists('silver.dim_customer')",
           "dependencies": null,
           "params": null,
-          "ref": null
+          "ref": "facts.weave"
         },
         "kind": "weave",
         "name": "facts",

@@ -183,13 +183,30 @@ class TestReferences:
         assert diag.pointer == "/threads/1/ref"
         assert diag.line == 5
 
-    def test_weave_without_definition(self, tmp_path):
+    @pytest.mark.parametrize("with_file", [False, True])
+    def test_name_only_entry(self, tmp_path, with_file):
+        if with_file:
+            _write(tmp_path / "ghost.weave", {"config_version": "2.0", "threads": []})
         loom = {"config_version": "2.0", "weaves": [{"name": "ghost"}]}
         with pytest.raises(ReferenceResolutionError) as exc:
             resolve_references(loom, "loom", tmp_path)
         diag = _only(exc.value)
-        assert diag.code == "C301"
+        assert diag.code == "C313"
         assert diag.pointer == "/weaves/0"
+        assert diag.hint == "ref: ghost.weave"
+
+    def test_inline_body_wins_over_same_named_file(self, tmp_path):
+        _write(
+            tmp_path / "a.weave",
+            {"config_version": "2.0", "threads": [{"ref": "missing.thread"}]},
+        )
+        loom = {
+            "config_version": "2.0",
+            "weaves": [{"name": "a", "config_version": "2.0", "threads": []}],
+        }
+        (child,) = resolve_references(loom, "loom", tmp_path)
+        assert child.source_path is None
+        assert child.data["threads"] == []
 
     def test_unsupported_ref_extension_reuses_c007(self, tmp_path):
         with pytest.raises(ConfigError) as exc:
@@ -271,16 +288,6 @@ class TestReferences:
         load_config(tmp_path / "looms" / "main.loom")
         load_config(tmp_path / "weaves" / "deep" / "a.weave")
 
-    def test_weave_name_outside_project(self, tmp_path):
-        project = tmp_path / "proj"
-        project.mkdir()
-        loom = {"config_version": "2.0", "weaves": [{"name": "../outside"}]}
-        with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(loom, "loom", project)
-        diag = _only(exc.value)
-        assert diag.code == "C303"
-        assert diag.pointer == "/weaves/0/name"
-
     def test_circular_reference_through_load_names_file(self, tmp_path):
         _write(tmp_path / "a.weave", _weave([{"ref": "a.weave"}]))
         loom = _write(
@@ -303,16 +310,6 @@ class TestReferences:
         diag = _only(exc.value)
         assert diag.code == "C302"
         assert diag.expected == ("b.weave", "c.weave", "b.weave")
-
-    def test_circular_convention_reference(self, tmp_path):
-        _write(tmp_path / "a.weave", {"config_version": "2.0", "threads": []})
-        loom = {"config_version": "2.0", "weaves": [{"name": "a"}]}
-        with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(loom, "loom", tmp_path, visited={"a.weave": None})
-        diag = _only(exc.value)
-        assert diag.code == "C302"
-        assert diag.expected == ("a.weave", "a.weave")
-        assert diag.pointer == "/weaves/0/name"
 
 
 class TestEntryForms:
