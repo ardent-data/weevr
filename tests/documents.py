@@ -16,17 +16,12 @@ from typing import Any
 
 import yaml
 
-KIND_BY_SUFFIX: dict[str, str] = {
-    ".thread": "thread",
-    ".weave": "weave",
-    ".loom": "loom",
-    ".warp": "warp",
-}
+from weevr.config.parser import TYPED_EXTENSIONS
 
 _ROOT_KIND = re.compile(r"^kind\s*:", re.M)
 
 
-def with_kind(body: str | Mapping[str, Any], kind: str) -> str:
+def _with_kind(body: str | Mapping[str, Any], kind: str) -> str:
     """Return ``body`` as YAML text that declares ``kind`` first, unless it declares one.
 
     Args:
@@ -62,10 +57,10 @@ def write_document(path: Path, body: str | Mapping[str, Any], *, kind: str | Non
     Raises:
         ValueError: ``path`` has no typed extension and no ``kind`` was given.
     """
-    resolved = kind or KIND_BY_SUFFIX.get(path.suffix.lower())
+    resolved = kind or TYPED_EXTENSIONS.get(path.suffix.lower())
     if resolved is None:
         raise ValueError(f"write_document needs kind= for {path.name}")
-    path.write_text(with_kind(body, resolved))
+    path.write_text(_with_kind(body, resolved))
     return path
 
 

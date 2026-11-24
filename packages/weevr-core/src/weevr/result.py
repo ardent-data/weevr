@@ -627,7 +627,8 @@ class LoadedConfig:
         config_name: Name derived from the config file path.
         document: The resolved config tree.
         project: The project document the load ran under, or ``None``.
-        project_root: The project root the load resolved against.
+        project_root: The project root the load resolved against; ``None``
+            when unknown.
         resolved_threads: Deprecated; use ``document``.
         resolved_weaves: Deprecated; use ``document``.
         diagnostics: The load's warning diagnostics.
@@ -708,8 +709,8 @@ class LoadedConfig:
         return self._document.project
 
     @property
-    def project_root(self) -> str:
-        """The project root references and Source paths resolved against; empty if unknown."""
+    def project_root(self) -> str | None:
+        """The project root references and Source paths resolved against; ``None`` if unknown."""
         return self._document.project_root
 
     @property

@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 
-import weevr.config.project as project_module
 from documents import write_document
 from weevr.config.document_load import load_document
 from weevr.config.locations import make_location
@@ -39,7 +38,7 @@ def _diagnostics(tmp_path: Path, body: dict[str, Any]) -> list[tuple[str, str | 
 @pytest.fixture
 def installed(monkeypatch: pytest.MonkeyPatch) -> Any:
     def _set(version: str) -> None:
-        monkeypatch.setattr(project_module, "installed_weevr_version", lambda: version)
+        monkeypatch.setattr("weevr.config.project.installed_weevr_version", lambda: version)
 
     return _set
 
@@ -138,7 +137,7 @@ class TestEngineFloor:
         def _missing(name: str) -> str:
             raise PackageNotFoundError(name)
 
-        monkeypatch.setattr(project_module, "version", _missing)
+        monkeypatch.setattr("weevr.config.project.version", _missing)
         project = Project.model_validate({"kind": "project", **_body(requires_weevr=">=2")})
         with pytest.raises(ConfigError) as exc_info:
             check_engine_floor(project)

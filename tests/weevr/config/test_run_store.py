@@ -392,3 +392,17 @@ def test_result_is_frozen() -> None:
         store.base = "x"  # type: ignore[misc]
     with pytest.raises(TypeError):
         store.tables["quarantine"] = store.tables["quarantine"]  # type: ignore[index]
+
+
+def test_run_store_api_is_exported_from_weevr_config() -> None:
+    from weevr import config
+
+    exported = {
+        "RUN_STORE_TABLES": RUN_STORE_TABLES,
+        "RunStoreLocation": RunStoreLocation,
+        "TableLocation": TableLocation,
+        "resolve_run_store": resolve_run_store,
+    }
+    for name, value in exported.items():
+        assert name in config.__all__
+        assert getattr(config, name) is value

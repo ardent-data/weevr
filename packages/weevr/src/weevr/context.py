@@ -162,19 +162,10 @@ class Context:
             ConfigError: No ``weevr.yaml`` at the resolved directory (C209,
                 listing what was probed), or it fails to load.
         """
-        root = self._project_directory(project, workspace, lakehouse)
+        root, missing_hint = self._project_directory(project, workspace, lakehouse)
         loaded = read_project(root)
         if loaded is None:
-            tier_one = str(root).startswith(_DEFAULT_LAKEHOUSE_FILES)
-            raise project_root_not_found(
-                [root.join(PROJECT_FILE)],
-                hint=(
-                    "Add a weevr.yaml to that default lakehouse folder, or pass workspace "
-                    "and lakehouse, or a direct project path."
-                )
-                if tier_one
-                else None,
-            )
+            raise project_root_not_found([root.join(PROJECT_FILE)], hint=missing_hint)
         return root, loaded
 
     def _project_directory(
@@ -182,8 +173,13 @@ class Context:
         project: str | Path,
         workspace: str | None,
         lakehouse: str | None,
-    ) -> ConfigLocation:
-        """The project directory named by ``project``, before ``weevr.yaml`` is probed."""
+    ) -> tuple[ConfigLocation, str | None]:
+        """The project directory named by ``project``, before ``weevr.yaml`` is probed.
+
+        Returns:
+            The directory, and the hint for a missing ``weevr.yaml`` there —
+            set only when the default-lakehouse tier produced the directory.
+        """
         project_str = str(project)
 
         # Tier 3: Direct path — absolute, or an existing relative directory when no
@@ -192,7 +188,7 @@ class Context:
             workspace is None and lakehouse is None and os.path.isdir(project_str)
         )
         if direct:
-            return LocalConfigLocation(Path(project_str))
+            return LocalConfigLocation(Path(project_str)), None
 
         # Normalize: strip .weevr suffix if already present so Tier 1/2
         # don't produce a double extension (e.g. "my_project.weevr.weevr").
@@ -204,10 +200,14 @@ class Context:
                 f"abfss://{workspace}@onelake.dfs.fabric.microsoft.com"
                 f"/{lakehouse}/Files/{base_name}.weevr"
             )
-            return RemoteConfigLocation(uri, self._spark)
+            return RemoteConfigLocation(uri, self._spark), None
 
         # Tier 1: Default lakehouse
-        return LocalConfigLocation(Path(f"{_DEFAULT_LAKEHOUSE_FILES}{base_name}.weevr"))
+        return (
+            LocalConfigLocation(Path(f"{_DEFAULT_LAKEHOUSE_FILES}{base_name}.weevr")),
+            "Add a weevr.yaml to that default lakehouse folder, or pass workspace "
+            "and lakehouse, or a direct project path.",
+        )
 
     @property
     def spark(self) -> SparkSession:
@@ -1188,12 +1188,18 @@ class Context:
         for warning in render_diagnostics(warnings):
             logger.warning(warning)
         loaded = LoadedConfig.from_document(document, warnings)
-        # Only a config that declares connections replaces the registry, so loading a
-        # thread or weave afterwards doesn't clear what a loom declared.
+        self._remember_connections(loaded)
+        return loaded
+
+    def _remember_connections(self, loaded: LoadedConfig) -> None:
+        """Keep the connections a loaded config declares for the Run Store.
+
+        Only a config that declares connections replaces the registry, so loading a
+        thread or weave afterwards doesn't clear what a loom declared.
+        """
         connections = getattr(loaded.model, "connections", None)
         if connections:
             self._connections = connections
-        return loaded
 
     def _plan_problems(self, path: str | Path) -> list[Diagnostic]:
         """Plan problems of the files of a config that do load, for a failed run."""
@@ -1226,11 +1232,7 @@ class Context:
         if document is None:
             return None, errors
         loaded = LoadedConfig.from_document(document, warnings)
-        # Only a config that declares connections replaces the registry, so loading a
-        # thread or weave afterwards doesn't clear what a loom declared.
-        connections = getattr(loaded.model, "connections", None)
-        if connections:
-            self._connections = connections
+        self._remember_connections(loaded)
         return loaded, errors
 
 

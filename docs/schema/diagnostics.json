@@ -388,7 +388,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "A weave entry names a weave but carries neither ref: nor an inline body.",
+      "summary": "A weave or thread entry gives a name but carries neither ref: nor an inline body.",
       "docs_anchor": "c313"
     },
     {

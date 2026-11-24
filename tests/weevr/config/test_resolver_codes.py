@@ -170,7 +170,8 @@ class TestReferences:
         assert diag.pointer == "/threads/0/ref"
 
     def test_ref_not_found_in_weave_names_file_and_pointer(self, tmp_path):
-        weave = _write(tmp_path / "w.weave", _weave([{"name": "a"}, {"ref": "gone.thread"}]))
+        _write(tmp_path / "a.thread", THREAD_BODY)
+        weave = _write(tmp_path / "w.weave", _weave([{"ref": "a.thread"}, {"ref": "gone.thread"}]))
         config = yaml.safe_load(weave.read_text())
         with (
             pytest.raises(ReferenceResolutionError) as exc,
@@ -194,6 +195,45 @@ class TestReferences:
         assert diag.code == "C313"
         assert diag.pointer == "/weaves/0"
         assert diag.hint == "ref: ghost.weave"
+
+    @pytest.mark.parametrize("with_file", [False, True])
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            "t",
+            {"name": "t"},
+            {"name": "t", "as": "t2", "dependencies": ["a"], "condition": {"when": "true"}},
+            {"name": "t", "params": {"region": "us"}},
+        ],
+    )
+    def test_name_only_thread_entry(self, tmp_path, entry, with_file):
+        if with_file:
+            _write(tmp_path / "t.thread", THREAD_BODY)
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_references(_weave([entry]), "weave", tmp_path)
+        diag = _only(exc.value)
+        assert diag.code == "C313"
+        assert diag.pointer == "/threads/0"
+        assert diag.hint == "ref: t.thread"
+
+    def test_name_only_thread_entry_in_weave_file_is_one_code(self, tmp_path):
+        _write(tmp_path / "t.thread", THREAD_BODY)
+        weave = _write(tmp_path / "w.weave", _weave(["t"]))
+        with pytest.raises(ConfigError) as exc:
+            load_config(weave, project_root=tmp_path)
+        diag = _only(exc.value)
+        assert (diag.code, diag.pointer, diag.file) == ("C313", "/threads/0", str(weave))
+
+    def test_inline_thread_with_entry_keys_and_body_still_loads(self, tmp_path):
+        weave = _weave([{"name": "t", "dependencies": [], **THREAD_BODY}])
+        (child,) = resolve_references(weave, "weave", tmp_path)
+        assert child.source_path is None
+        assert child.data["name"] == "t"
+
+    def test_aliased_refs_to_one_thread_still_load(self, tmp_path):
+        _write(tmp_path / "t.thread", THREAD_BODY)
+        weave = _weave([{"ref": "t.thread", "as": "a"}, {"ref": "t.thread", "as": "b"}])
+        assert len(resolve_references(weave, "weave", tmp_path)) == 2
 
     def test_inline_body_wins_over_same_named_file(self, tmp_path):
         _write(
@@ -257,7 +297,7 @@ class TestReferences:
         assert diag.pointer == "/threads/0/ref"
 
     def test_ref_scheme_through_weave_entry(self, tmp_path):
-        weave = _weave([{"name": "a"}, {"ref": "item://x/y.thread"}])
+        weave = _weave([{"name": "a", **THREAD_BODY}, {"ref": "item://x/y.thread"}])
         with pytest.raises(ReferenceResolutionError) as exc:
             resolve_references(weave, "weave", tmp_path)
         diag = _only(exc.value)

@@ -242,7 +242,7 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     _config(
         "C313",
         "name-only-entry",
-        "A weave entry names a weave but carries neither ref: nor an inline body.",
+        "A weave or thread entry gives a name but carries neither ref: nor an inline body.",
     ),
     # C350–C359 — loom entries
     _config(

@@ -1386,6 +1386,12 @@ class TestLoadedConfig:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
         assert loaded.model is sample_thread
 
+    def test_unknown_project_root_is_none(self, sample_thread: Thread) -> None:
+        """Assembled without a load, the root is unknown — None, as on RunResult."""
+        loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
+        assert loaded.project_root is None
+        assert loaded.document.project_root is None
+
     def test_config_type(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
         assert loaded.config_type == "thread"

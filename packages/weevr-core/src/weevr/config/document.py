@@ -152,7 +152,8 @@ class ResolvedDocument:
             project root; ``None`` when the root has none. Set on the loaded
             file's node only.
         project_root: The project root the load resolved references and
-            Source paths against. Set on the loaded file's node only.
+            Source paths against; ``None`` when unknown. Set on the loaded
+            file's node only.
     """
 
     model: Thread | Weave | Loom
@@ -163,7 +164,7 @@ class ResolvedDocument:
     source_ref: str = ""
     effective: ScopeRegistries = field(default_factory=ScopeRegistries)
     project: Project | None = None
-    project_root: str = ""
+    project_root: str | None = None
 
     def __post_init__(self) -> None:
         """Freeze ``children`` so the tree can't be changed through it."""

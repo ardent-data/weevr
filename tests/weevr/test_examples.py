@@ -27,7 +27,7 @@ from validate_examples_core import (
 
 from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
-from weevr.errors import ConfigError, ModelValidationError
+from weevr.errors import ConfigError, ModelValidationError, ReferenceResolutionError
 from weevr.model import Loom, Thread, Weave
 
 
@@ -141,5 +141,6 @@ class TestBrokenExamplesFail:
         """A weave entry that names a thread with no file and no inline body fails."""
         body = 'config_version: "2.0"\nthreads:\n  - name: ghost\n'
         root = self._project(tmp_path, {"w.weave": body})
-        with pytest.raises(ModelValidationError, match="C101 missing-field"):
+        with pytest.raises(ReferenceResolutionError) as exc_info:
             load_config(root / "w.weave", project_root=root)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C313"]

@@ -403,10 +403,33 @@ def resolve_variables(
         return config
 
 
+# Keys an entry carries about its place in the parent, not about the child's body.
+_WEAVE_ENTRY_KEYS = frozenset({"name", "condition"})
+_THREAD_ENTRY_KEYS = frozenset({"name", "as", "params", "dependencies", "condition"})
+
+
+def _has_inline_body(entry: Any, entry_keys: frozenset[str]) -> bool:
+    """Whether a child entry carries an inline body: no ``ref`` and a key beyond ``entry_keys``."""
+    return isinstance(entry, dict) and "ref" not in entry and bool(set(entry) - entry_keys)
+
+
 def _is_inline_weave(entry: Any) -> bool:
     """Whether a loom weave entry carries an inline weave body."""
-    return (
-        isinstance(entry, dict) and "ref" not in entry and bool(set(entry) - {"name", "condition"})
+    return _has_inline_body(entry, _WEAVE_ENTRY_KEYS)
+
+
+def _is_inline_thread(entry: Any) -> bool:
+    """Whether a weave thread entry carries an inline thread body."""
+    return _has_inline_body(entry, _THREAD_ENTRY_KEYS)
+
+
+def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionError:
+    """A weave or thread entry that names a child but has neither ``ref`` nor a body."""
+    return _reference_error(
+        "C313",
+        f"{kind.capitalize()} entry '{name}' has a name but no body",
+        pointer=pointer,
+        hint=f"ref: {name}.{kind}",
     )
 
 
@@ -918,51 +941,50 @@ def resolve_references(
                         )
                     finally:
                         visited.pop(ref, None)
+                elif not isinstance(entry, dict):
+                    # Schema validation rejects other entry types before resolution.
+                    continue
+                elif not entry.get("name"):
+                    raise _entry_error(
+                        "C305",
+                        "Inline weave definition requires a 'name' field",
+                        json_pointer((*at, "weaves", index)),
+                    )
+                elif not _is_inline_weave(entry):
+                    # A bare name is not a reference: no file is loaded by name.
+                    raise _name_only_entry(
+                        "weave", entry["name"], json_pointer((*at, "weaves", index))
+                    )
                 else:
-                    # Inline weave body. A bare ``name:`` is not a reference.
-                    if isinstance(entry, dict) and not entry.get("name"):
-                        raise _entry_error(
-                            "C305",
-                            "Inline weave definition requires a 'name' field",
-                            json_pointer((*at, "weaves", index)),
-                        )
-                    if isinstance(entry, dict) and _is_inline_weave(entry):
-                        weave_name = entry["name"]
-                        # resolve_config_variables already resolved its variables
-                        # with the weave's own defaults; validate and resolve its
-                        # threads the way a weave file is.
-                        validated = validate_schema(entry, "weave", at=(*at, "weaves", index))
-                        inline = validated.model_dump(exclude_unset=True)
-                        inline["qualified_key"] = weave_name
-                        if "condition" in entry:
-                            inline["condition"] = entry["condition"]
-                        inline_authored = authored_entry("weaves", index)
-                        inline_at = (*at, "weaves", index)
-                        children.append(
-                            ResolvedChild(
-                                entry=entry,
-                                data=inline,
+                    # Inline weave body.
+                    weave_name = entry["name"]
+                    # resolve_config_variables already resolved its variables
+                    # with the weave's own defaults; validate and resolve its
+                    # threads the way a weave file is.
+                    validated = validate_schema(entry, "weave", at=(*at, "weaves", index))
+                    inline = validated.model_dump(exclude_unset=True)
+                    inline["qualified_key"] = weave_name
+                    if "condition" in entry:
+                        inline["condition"] = entry["condition"]
+                    inline_authored = authored_entry("weaves", index)
+                    inline_at = (*at, "weaves", index)
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=inline,
+                            authored=inline_authored,
+                            children=resolve_references(
+                                inline,
+                                "weave",
+                                project_root,
+                                runtime_params,
+                                visited.copy(),
                                 authored=inline_authored,
-                                children=resolve_references(
-                                    inline,
-                                    "weave",
-                                    project_root,
-                                    runtime_params,
-                                    visited.copy(),
-                                    authored=inline_authored,
-                                    at=inline_at,
-                                ),
                                 at=inline_at,
-                            )
+                            ),
+                            at=inline_at,
                         )
-                    elif isinstance(entry, dict):
-                        weave_name = entry["name"]
-                        raise _reference_error(
-                            "C313",
-                            f"Weave entry '{weave_name}' has a name but no body",
-                            pointer=json_pointer((*at, "weaves", index)),
-                            hint=f"ref: {weave_name}.weave",
-                        )
+                    )
 
     # Resolve threads in weave
     elif config_type == "weave" and "threads" in config:
@@ -1075,40 +1097,47 @@ def resolve_references(
                         )
                     finally:
                         visited.pop(ref, None)
+                elif not isinstance(entry, dict):
+                    # Schema validation rejects other entry types before resolution.
+                    continue
+                elif not entry.get("name"):
+                    raise _entry_error(
+                        "C305",
+                        "Inline thread definition requires a 'name' field",
+                        json_pointer((*at, "threads", index)),
+                    )
+                elif not _is_inline_thread(entry):
+                    # A bare name is not a reference: no file is loaded by name.
+                    raise _name_only_entry(
+                        "thread", entry["name"], json_pointer((*at, "threads", index))
+                    )
                 else:
-                    # Inline definition — must have name
-                    if isinstance(entry, dict) and not entry.get("name"):
+                    # Inline thread body.
+                    # The cascade and load checks read the body before
+                    # hydration, so its value types are checked here.
+                    validate_inline_thread_types(entry, at=(*at, "threads", index))
+                    inline = entry.copy()
+                    inline["qualified_key"] = entry.get("name", "")
+
+                    # Track effective name uniqueness
+                    effective_name = entry.get("as") or entry.get("name", "")
+                    if effective_name in seen_effective_names:
                         raise _entry_error(
-                            "C305",
-                            "Inline thread definition requires a 'name' field",
+                            "C306",
+                            f"Duplicate effective thread name '{effective_name}' "
+                            f"in weave. Use 'as' to give each instance a unique name.",
                             json_pointer((*at, "threads", index)),
+                            hint="Use 'as' to give each instance a unique name.",
                         )
-                    if isinstance(entry, dict):
-                        # The cascade and load checks read the body before
-                        # hydration, so its value types are checked here.
-                        validate_inline_thread_types(entry, at=(*at, "threads", index))
-                        inline = entry.copy()
-                        inline["qualified_key"] = entry.get("name", "")
+                    seen_effective_names.add(effective_name)
 
-                        # Track effective name uniqueness
-                        effective_name = entry.get("as") or entry.get("name", "")
-                        if effective_name in seen_effective_names:
-                            raise _entry_error(
-                                "C306",
-                                f"Duplicate effective thread name '{effective_name}' "
-                                f"in weave. Use 'as' to give each instance a unique name.",
-                                json_pointer((*at, "threads", index)),
-                                hint="Use 'as' to give each instance a unique name.",
-                            )
-                        seen_effective_names.add(effective_name)
-
-                        children.append(
-                            ResolvedChild(
-                                entry=entry,
-                                data=inline,
-                                authored=authored_entry("threads", index),
-                                at=(*at, "threads", index),
-                            )
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=inline,
+                            authored=authored_entry("threads", index),
+                            at=(*at, "threads", index),
                         )
+                    )
 
     return children

@@ -189,6 +189,23 @@ class TestContextValidation:
         probed = "/lakehouse/default/Files/nonexistent.weevr/weevr.yaml"
         assert list(diag.expected or ()) == [probed]
 
+    def test_direct_path_under_default_lakehouse_gets_the_direct_path_hint(self) -> None:
+        """The hint follows the tier that resolved the directory, not its path prefix."""
+
+        def c209(project: str) -> Diagnostic:
+            with pytest.raises(ConfigError) as exc_info:
+                Context(spark=MagicMock(spec=SparkSession), project=project)
+            [diag] = exc_info.value.diagnostics
+            assert diag.code == "C209"
+            return diag
+
+        under_prefix = c209("/lakehouse/default/Files/direct.weevr")
+        assert list(under_prefix.expected or ()) == [
+            "/lakehouse/default/Files/direct.weevr/weevr.yaml"
+        ]
+        assert under_prefix.hint == c209("/elsewhere/direct.weevr").hint
+        assert under_prefix.hint != c209("direct").hint
+
 
 @contextmanager
 def _default_lakehouse_project(root: Path) -> Iterator[None]:

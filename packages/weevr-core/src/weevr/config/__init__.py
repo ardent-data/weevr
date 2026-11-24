@@ -14,20 +14,30 @@ from weevr.config.loader import load_resolved
 from weevr.config.loader import resolve_config as _resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
 from weevr.config.root import find_project_root
+from weevr.config.run_store import (
+    RUN_STORE_TABLES,
+    RunStoreLocation,
+    TableLocation,
+    resolve_run_store,
+)
 from weevr.config.validation import render_diagnostics
 from weevr.model import Loom, Thread, Weave
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "RUN_STORE_TABLES",
     "DiscoveredDocument",
     "EntryMeta",
     "ResolvedDocument",
+    "RunStoreLocation",
     "ScopeRegistries",
+    "TableLocation",
     "discover_documents",
     "find_project_root",
     "load_config",
     "load_resolved",
+    "resolve_run_store",
 ]
 
 

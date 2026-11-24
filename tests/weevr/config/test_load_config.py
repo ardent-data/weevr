@@ -1710,7 +1710,7 @@ def test_pre_step_row_count_delta_fails_at_load(tmp_path: Path) -> None:
     write_document(
         weave,
         "config_version: '2.0'\n"
-        "threads: [t1]\n"
+        "threads: [{ref: t1.thread}]\n"
         "pre_steps:\n"
         "  - type: quality_gate\n"
         "    check: row_count_delta\n"

@@ -19,6 +19,7 @@ from typing import Any
 
 import yaml
 
+# Deliberately independent of weevr.config.parser: a standalone reference for weevr-cli.
 KIND_BY_SUFFIX = {".thread": "thread", ".weave": "weave", ".loom": "loom", ".warp": "warp"}
 YAML_SUFFIXES = (".yaml", ".yml")
 KINDS = ("thread", "weave", "loom", "warp", "params")

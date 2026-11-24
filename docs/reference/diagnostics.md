@@ -275,7 +275,7 @@ A reference names a scheme (scheme://) where a project-relative path belongs.
 
 `name-only-entry` · error · stable
 
-A weave entry names a weave but carries neither ref: nor an inline body.
+A weave or thread entry gives a name but carries neither ref: nor an inline body.
 
 ### C350
 
