@@ -34,11 +34,11 @@ from weevr.config.locations import (
     make_location,
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
+from weevr.config.params import ParamScope
 from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
     ResolvedChild,
     resolve_config_variables,
-    resolve_declared_params,
     resolve_references,
     validate_params,
 )
@@ -170,13 +170,9 @@ def resolve_config(
     config_dict = validated.model_dump(exclude_unset=True)
 
     declared_param_specs = config_dict.get("params")
-    resolved_declared_params = resolve_declared_params(
-        declared_param_specs,
-        runtime_params,
-        file_path=str(location),
-    )
+    scope = ParamScope.root(runtime_params).child(declared_param_specs, file=str(location))
     # Type validation only — required-missing already raised above.
-    validate_params(declared_param_specs, resolved_declared_params)
+    validate_params(declared_param_specs, scope.values())
 
     try:
         resolved = resolve_config_variables(
@@ -184,7 +180,8 @@ def resolve_config(
             config_type,
             runtime_params,
             fabric_context=fabric_context,
-            entry_params=resolved_declared_params or None,
+            scope=scope,
+            file=str(location),
         )
     except VariableResolutionError as exc:
         if config_type == "thread" and "param." in str(exc):
@@ -200,7 +197,15 @@ def resolve_config(
         raise
 
     data = resolved
-    children = resolve_references(resolved, config_type, root, runtime_params, authored=config_dict)
+    children = resolve_references(
+        resolved,
+        config_type,
+        root,
+        runtime_params,
+        authored=config_dict,
+        scope=scope,
+        file=str(location),
+    )
 
     # Execution-scope warnings come from the PRE-cascade dicts: after the
     # cascade an authored execution block is indistinguishable from one
