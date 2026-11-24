@@ -150,19 +150,26 @@ config_version is not a 'major.minor' string of integers.
 
 `unsupported-config-version` · error · stable
 
-config_version names a major version this release does not read.
+config_version names a major version this release does not read. A 1.x version is a v1 document; the
+hint names the weevr-cli migrate command.
 
 ### C204
 
 `unknown-config-kind` · error · stable
 
-The config's kind could not be determined, or is not one weevr knows.
+The config's kind is not one weevr knows.
 
 ### C205
 
 `name-mismatch` · error · stable
 
 The declared name does not match the file name without its extension.
+
+### C206
+
+`missing-kind` · error · stable
+
+The document declares no kind. The hint names the weevr-cli migrate command.
 
 ### C207
 
@@ -526,4 +533,10 @@ A source's existence could not be checked, because probing its location failed.
 A key listed here fails the load with `C111` (removed) or `C112` (renamed),
 naming what to write instead. `*` matches any one key or list item.
 
-No keys have been removed or renamed yet.
+| Kind | Key | Replacement or reason | Removed in |
+|------|-----|-----------------------|------------|
+| thread | `/type` | `/kind` | 2.0 |
+| weave | `/type` | `/kind` | 2.0 |
+| loom | `/type` | `/kind` | 2.0 |
+| params | `/type` | `/kind` | 2.0 |
+| warp | `/type` | `/kind` | 2.0 |

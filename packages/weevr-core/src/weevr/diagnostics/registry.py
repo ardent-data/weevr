@@ -151,18 +151,24 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     _config(
         "C203",
         "unsupported-config-version",
-        "config_version names a major version this release does not read.",
+        "config_version names a major version this release does not read. A 1.x version "
+        "is a v1 document; the hint names the weevr-cli migrate command.",
     ),
     _config(
         "C204",
         "unknown-config-kind",
-        "The config's kind could not be determined, or is not one weevr knows.",
+        "The config's kind is not one weevr knows.",
     ),
     # C205–C209 — envelope (config/loader.py)
     _config(
         "C205",
         "name-mismatch",
         "The declared name does not match the file name without its extension.",
+    ),
+    _config(
+        "C206",
+        "missing-kind",
+        "The document declares no kind. The hint names the weevr-cli migrate command.",
     ),
     _config(
         "C207",

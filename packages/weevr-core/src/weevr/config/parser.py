@@ -136,8 +136,14 @@ SUPPORTED_VERSIONS: dict[str, tuple[int, int]] = {
     "params": (2, 0),
 }
 
-# v1 documents keep loading until the v1 path is removed.
-_V1_MAJOR = 1
+# The config_version major this release reads, for every kind.
+CONFIG_MAJOR = 2
+
+MIGRATE_HINT = (
+    "This is a weevr 1.x document. Run `weevr migrate` (weevr-cli) to rewrite it for "
+    "weevr 2, or keep running it on weevr 1.x."
+)
+"""The hint on a v1 or kind-less document: the weevr-cli command that upgrades it."""
 
 
 def validate_config_version(version: tuple[int, int], config_type: str) -> None:
@@ -160,28 +166,34 @@ def validate_config_version(version: tuple[int, int], config_type: str) -> None:
                 expected=list(SUPPORTED_VERSIONS),
             )
         )
+    _check_major(version, SUPPORTED_VERSIONS[config_type][0], f"{config_type} config")
 
-    supported = SUPPORTED_VERSIONS[config_type]
+
+def _check_major(version: tuple[int, int], supported: int, label: str) -> None:
+    """Raise C203 unless ``version`` has the ``supported`` major.
+
+    An older major is a v1 document, so its error carries the migrate hint.
+    """
     major, minor = version
-
-    if major not in (supported[0], _V1_MAJOR):
-        raise ConfigVersionError.from_diagnostic(
-            diagnostic(
-                "C203",
-                f"Unsupported {config_type} config version {major}.{minor}. "
-                f"Expected major version {supported[0]}.x",
-                pointer="/config_version",
-                expected=[f"{supported[0]}.x"],
-            )
+    if major == supported:
+        return
+    raise ConfigVersionError.from_diagnostic(
+        diagnostic(
+            "C203",
+            f"Unsupported {label} version {major}.{minor}. Expected major version {supported}.x",
+            pointer="/config_version",
+            expected=[f"{supported}.x"],
+            hint=MIGRATE_HINT if major < supported else None,
         )
+    )
 
 
-def document_kind(raw: dict[str, Any], ext_type: str | None) -> str:
-    """The kind of a parsed document: its declared ``kind``, else its extension.
+def read_envelope(raw: dict[str, Any], ext_type: str | None) -> str:
+    """Check a document's envelope and return its kind.
 
-    ``kind`` is authoritative; a typed extension is a convention it must agree
-    with. A document without ``kind`` falls back to its typed extension, then
-    to detection from its structure.
+    The version is checked before the kind, so a v1 document (which has no
+    ``kind``) gets the migration error rather than a missing-kind one; the
+    kind is checked before it is matched against the typed extension.
 
     Args:
         raw: Parsed document.
@@ -192,11 +204,48 @@ def document_kind(raw: dict[str, Any], ext_type: str | None) -> str:
         The document kind.
 
     Raises:
-        ConfigParseError: ``kind`` is not a known kind (C204) or disagrees
-            with the typed extension (C207).
+        ConfigParseError: ``config_version`` is missing (C201) or malformed
+            (C202); ``kind`` is missing (C206), unknown (C204), or disagrees
+            with the extension (C207).
+        ConfigVersionError: The major version is not one this release reads
+            (C203).
+    """
+    version = extract_config_version(raw)
+    _check_major(version, CONFIG_MAJOR, "config")
+    kind = document_kind(raw, ext_type)
+    validate_config_version(version, kind)
+    return kind
+
+
+def document_kind(raw: dict[str, Any], ext_type: str | None) -> str:
+    """The kind a document declares, checked against its typed extension.
+
+    ``kind`` is required and authoritative; a typed extension is a convention
+    it must agree with. Neither the extension nor the document's structure
+    stands in for a missing ``kind``.
+
+    Args:
+        raw: Parsed document.
+        ext_type: The kind its typed extension names, or ``None`` for
+            ``.yaml``/``.yml``.
+
+    Returns:
+        The document kind.
+
+    Raises:
+        ConfigParseError: ``kind`` is missing (C206), not a known kind (C204),
+            or disagrees with the typed extension (C207).
     """
     if "kind" not in raw:
-        return ext_type if ext_type is not None else detect_config_type(raw)
+        raise ConfigParseError.from_diagnostic(
+            diagnostic(
+                "C206",
+                "Missing required field 'kind'",
+                pointer="",
+                expected=list(SUPPORTED_VERSIONS),
+                hint=MIGRATE_HINT,
+            )
+        )
 
     kind = raw["kind"]
     if not isinstance(kind, str) or kind not in SUPPORTED_VERSIONS:
@@ -218,6 +267,23 @@ def document_kind(raw: dict[str, Any], ext_type: str | None) -> str:
             )
         )
     return kind
+
+
+def declared_kind(location: ConfigLocation) -> str | None:
+    """The known kind a document declares, read for display without validating it.
+
+    Args:
+        location: The document's file.
+
+    Returns:
+        Its declared ``kind``, or ``None`` when the file can't be read or
+        declares no known kind.
+    """
+    try:
+        kind = parse_yaml(location).get("kind")
+    except ConfigError:
+        return None
+    return kind if isinstance(kind, str) and kind in SUPPORTED_VERSIONS else None
 
 
 # Typed extensions map file suffix to config type
@@ -258,44 +324,5 @@ def detect_config_type_from_extension(
             f"Unsupported extension '{suffix}'. Expected .thread, .weave, .loom, or .warp",
             file=display,
             expected=[*TYPED_EXTENSIONS, ".yaml", ".yml"],
-        )
-    )
-
-
-def detect_config_type(raw: dict[str, Any]) -> str:
-    """Detect the type of config from its structure.
-
-    Args:
-        raw: Parsed config dictionary
-
-    Returns:
-        Config type: 'thread', 'weave', 'loom', or 'params'
-
-    Raises:
-        ConfigParseError: If config type cannot be determined
-    """
-    # Check for explicit type field
-    if "type" in raw:
-        config_type = raw["type"]
-        if config_type in SUPPORTED_VERSIONS:
-            return config_type
-
-    # Detect by structure
-    if "weaves" in raw:
-        return "loom"
-    elif "threads" in raw:
-        return "weave"
-    elif "sources" in raw or "target" in raw:
-        return "thread"
-    elif "config_version" in raw and len(raw) > 1:
-        # Params file: has config_version plus other key-value pairs
-        return "params"
-
-    raise ConfigParseError.from_diagnostic(
-        diagnostic(
-            "C204",
-            "Unable to detect config type. Expected 'threads', 'weaves', "
-            "'sources'/'target', or a params file structure",
-            pointer="",
         )
     )

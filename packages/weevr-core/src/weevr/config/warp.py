@@ -5,10 +5,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from weevr.config.attribution import attribute_errors
+from weevr.config.document_load import load_document
 from weevr.config.locations import ConfigLocation, LocalConfigLocation
-from weevr.config.parser import document_kind, parse_yaml
-from weevr.config.validation import validate_schema
 from weevr.diagnostics import diagnostic
 from weevr.errors import ConfigError
 from weevr.model.target import Target
@@ -239,10 +237,7 @@ def _load_warp(location: ConfigLocation) -> WarpConfig:
     Returns:
         Validated WarpConfig instance.
     """
-    raw = parse_yaml(location)
-    with attribute_errors(location):
-        document_kind(raw, "warp")
-        result = validate_schema(raw, "warp")
+    _, result = load_document(location)
     if not isinstance(result, WarpConfig):
         message = f"Expected WarpConfig from '{location}', got {type(result).__name__}"
         raise ConfigError(

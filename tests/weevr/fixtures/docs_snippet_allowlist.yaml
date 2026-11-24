@@ -26,5 +26,3 @@
   reason: References weave files the page doesn't show.
 - key: reference/yaml-schema/weave.md#0bb6f8bf
   reason: References thread files the page doesn't show.
-- key: release-notes/1.13.md#aba5fb8b
-  reason: Template thread with required params; it loads through the weave shown above it.

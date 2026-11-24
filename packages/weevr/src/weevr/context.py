@@ -17,7 +17,7 @@ from weevr.config.document import ScopeRegistries, registry_as_dict
 from weevr.config.loader import collect_resolved_config, load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
-from weevr.config.parser import TYPED_EXTENSIONS
+from weevr.config.parser import TYPED_EXTENSIONS, declared_kind
 from weevr.config.validation import (
     in_thread,
     partition_diagnostics,
@@ -600,7 +600,7 @@ class Context:
             return RunResult(
                 status="failure",
                 mode=ExecutionMode.VALIDATE,
-                config_type=TYPED_EXTENSIONS.get(Path(str(path)).suffix.lower(), ""),
+                config_type=_display_kind(self._resolve_config_path(path)),
                 config_name=Path(str(path)).stem,
                 validation_errors=[d.message for d in errors] or None,
                 diagnostics=errors,
@@ -1143,6 +1143,11 @@ class Context:
         if document is None:
             return None, errors
         return LoadedConfig.from_document(document, warnings), errors
+
+
+def _display_kind(location: ConfigLocation) -> str:
+    """The kind of a document that failed to load: declared, else by typed extension."""
+    return declared_kind(location) or TYPED_EXTENSIONS.get(location.suffix.lower(), "")
 
 
 def _thread_models(loaded: LoadedConfig) -> dict[str, Thread]:

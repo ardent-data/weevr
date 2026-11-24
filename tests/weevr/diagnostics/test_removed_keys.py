@@ -44,6 +44,17 @@ def test_shipped_table_is_valid() -> None:
         assert row.path.startswith("/")
 
 
+@pytest.mark.parametrize("kind", ["thread", "weave", "loom", "params", "warp"])
+def test_root_type_is_renamed_to_kind(kind: str) -> None:
+    """Every kind that accepted a root ``type:`` in v1 reports it renamed to ``/kind``."""
+    [diag] = removed_key_diagnostics({"type": kind, "config_version": "2.0"}, kind)
+    assert (diag.code, diag.pointer, diag.expected) == ("C112", "/type", ("/kind",))
+
+
+def test_nested_type_is_not_renamed() -> None:
+    assert removed_key_diagnostics(_thread(), "thread") == []
+
+
 def test_row_needs_a_replacement_or_a_reason() -> None:
     with pytest.raises(ValueError):
         RemovedKey("thread", "/x", removed_in="2.0")

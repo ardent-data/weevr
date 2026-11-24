@@ -804,14 +804,8 @@ def resolve_references(
         ConfigError: If an inline definition is missing a ``name`` field.
     """
     from weevr.config.attribution import attribute_errors
+    from weevr.config.document_load import load_document
     from weevr.config.locations import LocalConfigLocation
-    from weevr.config.parser import (
-        detect_config_type_from_extension,
-        document_kind,
-        extract_config_version,
-        parse_yaml,
-        validate_config_version,
-    )
     from weevr.config.validation import validate_inline_thread_types, validate_schema
 
     if isinstance(project_root, Path):
@@ -849,12 +843,7 @@ def resolve_references(
                     visited[ref] = None
                     try:
                         with attribute_errors(weave_path):
-                            raw = parse_yaml(weave_path)
-                            version = extract_config_version(raw)
-                            ext_type = detect_config_type_from_extension(weave_path)
-                            child_type = document_kind(raw, ext_type)
-                            validate_config_version(version, child_type)
-                            validated = validate_schema(raw, child_type)
+                            child_type, validated = load_document(weave_path)
                             child_dict = validated.model_dump(exclude_unset=True)
 
                             # Inject name from filename stem
@@ -928,12 +917,7 @@ def resolve_references(
                             visited[convention_ref] = None
                             try:
                                 with attribute_errors(convention_path):
-                                    conv_raw = parse_yaml(convention_path)
-                                    conv_version = extract_config_version(conv_raw)
-                                    conv_type = detect_config_type_from_extension(convention_path)
-                                    child_type = document_kind(conv_raw, conv_type)
-                                    validate_config_version(conv_version, child_type)
-                                    validated = validate_schema(conv_raw, child_type)
+                                    child_type, validated = load_document(convention_path)
                                     child_dict = validated.model_dump(exclude_unset=True)
                                     if not child_dict.get("name"):
                                         child_dict["name"] = weave_name
@@ -1064,12 +1048,7 @@ def resolve_references(
                             )
 
                         with attribute_errors(thread_path):
-                            raw = parse_yaml(thread_path)
-                            version = extract_config_version(raw)
-                            ext_type = detect_config_type_from_extension(thread_path)
-                            child_type = document_kind(raw, ext_type)
-                            validate_config_version(version, child_type)
-                            validated = validate_schema(raw, child_type)
+                            child_type, validated = load_document(thread_path)
                             child_dict = validated.model_dump(exclude_unset=True)
 
                             # Inject name from filename stem

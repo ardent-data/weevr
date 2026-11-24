@@ -257,14 +257,13 @@ class TestLoadConfigErrorHandling:
         """Raise ConfigParseError for missing config_version."""
         with pytest.raises(ConfigParseError) as exc_info:
             load_config(FIXTURES / "missing_version.yaml")
-        assert "Missing required field 'config_version'" in str(exc_info.value)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C201"]
 
     def test_unsupported_version(self):
         """Raise ConfigVersionError for unsupported version."""
         with pytest.raises(ConfigVersionError) as exc_info:
             load_config(FIXTURES / "bad_version.yaml")
-        assert "Unsupported" in str(exc_info.value)
-        assert "99.0" in str(exc_info.value)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C203"]
 
     def test_schema_validation_failure(self, tmp_path):
         """Raise ConfigSchemaError for structurally invalid schema."""
@@ -510,6 +509,83 @@ class TestLoadConfigTypedExtensions:
         assert isinstance(result, Loom)
         assert result.name == "nightly"
         assert result.qualified_key == "nightly.loom"
+
+
+_V1_THREAD = (
+    'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+    "    alias: raw.customers\ntarget:\n  alias: test\n"
+)
+
+
+class TestLoadConfigEnvelope:
+    """v1 and kind-less documents fail at the envelope, naming the file and the migrate command."""
+
+    @pytest.mark.parametrize("name", ["legacy.thread", "legacy.yaml"])
+    def test_v1_document_without_kind_is_c203(self, tmp_path, name):
+        path = tmp_path / name
+        path.write_text(_V1_THREAD)
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(path)
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C203"
+        assert diag.file == str(path)
+        assert diag.hint is not None and "weevr migrate" in diag.hint
+
+    def test_v1_document_with_kind_is_c203(self, tmp_path):
+        path = tmp_path / "legacy.thread"
+        path.write_text("kind: thread\n" + _V1_THREAD)
+        with pytest.raises(ConfigVersionError) as exc_info:
+            load_config(path)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C203"]
+
+    @pytest.mark.parametrize("name", ["no_kind.thread", "no_kind.yaml"])
+    def test_v2_document_without_kind_is_c206(self, tmp_path, name):
+        path = tmp_path / name
+        path.write_text(_V1_THREAD.replace('"1.0"', '"2.0"'))
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(path)
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C206"
+        assert diag.file == str(path)
+        assert diag.hint is not None and "weevr migrate" in diag.hint
+
+    def test_referenced_thread_without_kind_names_thread(self, tmp_path):
+        thread = tmp_path / "t.thread"
+        thread.write_text(_V1_THREAD.replace('"1.0"', '"2.0"'))
+        weave = tmp_path / "w.weave"
+        write_document(weave, 'config_version: "2.0"\nthreads:\n  - ref: t.thread\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(weave, project_root=tmp_path)
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C206"
+        assert diag.file == str(thread)
+
+    @pytest.mark.parametrize(
+        ("name", "body"),
+        [
+            ("t.thread", _V1_THREAD.replace('"1.0"', '"2.0"')),
+            ("w.weave", 'config_version: "2.0"\nthreads: []\n'),
+            ("l.loom", 'config_version: "2.0"\nweaves: []\n'),
+        ],
+    )
+    def test_root_type_is_renamed_to_kind(self, tmp_path, name, body):
+        """A v1 root ``type:`` is reported as renamed to ``kind``, beside a declared kind."""
+        path = tmp_path / name
+        kind = path.suffix.lstrip(".")
+        write_document(path, f"type: {kind}\n{body}")
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(path)
+        c112 = [d for d in exc_info.value.diagnostics if d.code == "C112"]
+        assert len(c112) == 1
+        assert c112[0].pointer == "/type"
+        assert c112[0].expected == ("/kind",)
+        assert c112[0].file == str(path)
+
+    def test_nested_type_keys_are_not_renamed(self, tmp_path):
+        """``type:`` inside a source stays a valid key."""
+        path = tmp_path / "t.thread"
+        write_document(path, _V1_THREAD.replace('"1.0"', '"2.0"'))
+        assert isinstance(load_config(path), Thread)
 
 
 class TestLoadConfigLoomDeclaredParams:

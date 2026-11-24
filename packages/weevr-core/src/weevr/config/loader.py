@@ -17,6 +17,7 @@ from typing import Any
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting, diagnostics_of
 from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
+from weevr.config.document_load import load_document
 from weevr.config.hydration import (
     check_column_set_references,
     check_resolve_lookups,
@@ -33,14 +34,7 @@ from weevr.config.locations import (
     make_location,
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
-from weevr.config.parser import (
-    TYPED_EXTENSIONS,
-    detect_config_type_from_extension,
-    document_kind,
-    extract_config_version,
-    parse_yaml,
-    validate_config_version,
-)
+from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
     ResolvedChild,
     resolve_config_variables,
@@ -56,7 +50,6 @@ from weevr.config.validation import (
     partition_diagnostics,
     render_diagnostics,
     trace_composition_diagnostics,
-    validate_schema,
 )
 from weevr.config.warp import discover_warp, find_warp
 from weevr.diagnostics import Diagnostic, diagnostic
@@ -120,7 +113,7 @@ def resolve_config(
             the file's directory.
         fabric_context: Optional Fabric environment values for ``${fabric.x}``.
         require_typed_extension: Reject files without a ``.thread``, ``.weave``,
-            or ``.loom`` extension instead of detecting the type from content.
+            or ``.loom`` extension instead of reading the kind from the envelope.
 
     Returns:
         The resolved config.
@@ -129,29 +122,9 @@ def resolve_config(
         ConfigError: Unsupported extension or a name/filename mismatch.
         VariableResolutionError: A variable has no value and no default.
     """
-    raw = parse_yaml(location)
-    version = extract_config_version(raw)
-
-    ext_type = detect_config_type_from_extension(location)
-    if ext_type is None and require_typed_extension:
-        message = f"Unsupported extension '{location.suffix}'. Expected .thread, .weave, or .loom"
-        raise ConfigError(
-            message,
-            file_path=str(location),
-            diagnostics=[
-                diagnostic(
-                    "C007",
-                    message,
-                    file=str(location),
-                    pointer="",
-                    expected=sorted(TYPED_EXTENSIONS),
-                )
-            ],
-        )
-    config_type = document_kind(raw, ext_type)
-
-    validate_config_version(version, config_type)
-    validated = validate_schema(raw, config_type)
+    config_type, validated = load_document(
+        location, require_typed_extension=require_typed_extension
+    )
     config_dict = validated.model_dump(exclude_unset=True)
 
     declared_param_specs = config_dict.get("params")
@@ -207,7 +180,7 @@ def resolve_config(
         if isinstance(data.get("steps"), list):
             data["steps"] = expand_foreach(data["steps"])
 
-    if ext_type is not None:
+    if detect_config_type_from_extension(location) is not None:
         declared_name = data.get("name", "")
         if declared_name and declared_name != location.stem:
             message = (

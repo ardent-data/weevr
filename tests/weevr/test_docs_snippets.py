@@ -183,7 +183,15 @@ def _allowlist() -> dict[str, str]:
     return {entry["key"]: entry["reason"] for entry in entries}
 
 
-SNIPPETS = [s for page in sorted(DOCS.rglob("*.md")) for s in extract_snippets(page)]
+# Release notes are history: their configs show the version they shipped in.
+HISTORY = DOCS / "release-notes"
+
+SNIPPETS = [
+    s
+    for page in sorted(DOCS.rglob("*.md"))
+    if not page.is_relative_to(HISTORY)
+    for s in extract_snippets(page)
+]
 
 
 def test_docs_have_complete_snippets() -> None:

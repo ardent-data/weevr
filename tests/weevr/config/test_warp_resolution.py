@@ -260,3 +260,27 @@ class TestNonLocalLocations:
         )
         assert warp is not None
         assert warp.columns[0].name == "remote"
+
+
+class TestWarpEnvelope:
+    """A warp file goes through the envelope, and its errors name the warp file."""
+
+    @pytest.mark.parametrize(
+        ("text", "code"),
+        [
+            ('config_version: "1.0"\ncolumns:\n  - name: a\n    type: string\n', "C203"),
+            ('config_version: "2.0"\ncolumns:\n  - name: a\n    type: string\n', "C206"),
+            (
+                'kind: warp\ntype: warp\nconfig_version: "2.0"\n'
+                "columns:\n  - name: a\n    type: string\n",
+                "C112",
+            ),
+        ],
+    )
+    def test_error_names_the_warp_file(self, tmp_path: Path, text: str, code: str):
+        warp = tmp_path / "dim_customer.warp"
+        warp.write_text(text)
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_warp("dim_customer", tmp_path, tmp_path)
+        [diag] = [d for d in exc_info.value.diagnostics if d.code == code]
+        assert diag.file == str(warp)

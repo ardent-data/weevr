@@ -16,9 +16,9 @@ from weevr.result import ExecutionMode
 pytestmark = pytest.mark.spark
 
 
-def _write(path: Path, data: dict[str, Any] | str) -> Path:
+def _write(path: Path, data: dict[str, Any] | str, kind: str | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    write_document(path, data)
+    write_document(path, data, kind=kind)
     return path
 
 
@@ -84,6 +84,24 @@ class TestValidateReports:
         assert result.status == "failure"
         assert _codes(result) == {"C005"}
         assert (result.config_type, result.config_name) == ("thread", "t")
+
+    def test_config_type_of_a_failed_yaml_document_is_its_kind(
+        self, spark: SparkSession, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "p.weevr"
+        _write(root / "t.yaml", "config_version: '2.0'\nthreads: []\n", kind="weave")
+        result = Context(spark, root).run("t.yaml", mode="validate")
+        assert result.status == "failure"
+        assert (result.config_type, result.config_name) == ("weave", "t")
+
+    def test_v1_document_is_the_migration_error(self, spark: SparkSession, tmp_path: Path) -> None:
+        root = tmp_path / "p.weevr"
+        path = root / "t.thread"
+        path.parent.mkdir(parents=True)
+        path.write_text("config_version: '1.0'\nsources: {}\ntarget: {}\n")
+        result = Context(spark, root).run("t.thread", mode="validate")
+        assert _codes(result) == {"C203"}
+        assert result.config_type == "thread"
 
     def test_standalone_column_set_error_is_reported(
         self, spark: SparkSession, tmp_path: Path

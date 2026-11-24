@@ -48,7 +48,13 @@ class RemovedKey:
             raise ValueError(f"Removed key '{self.path}' needs a replacement or a reason")
 
 
-REMOVED_KEYS: tuple[RemovedKey, ...] = ()
+REMOVED_KEYS: tuple[RemovedKey, ...] = (
+    # A root ``type:`` named the document kind in v1; the envelope's ``kind`` replaced it.
+    *(
+        RemovedKey(kind, "/type", replacement="/kind", removed_in="2.0")
+        for kind in ("thread", "weave", "loom", "params", "warp")
+    ),
+)
 """Every removed or renamed key, by the topic that removed it. Rows are only added."""
 
 
