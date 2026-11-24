@@ -140,7 +140,7 @@ except ConfigError as e:
 
 **Common causes:**
 
-- Project directory missing `.weevr` extension
+- No `weevr.yaml` at the project root (`C209`)
 - Unsupported file extension (not `.thread`, `.weave`, or `.loom`)
 - Declared config name does not match filename stem
 - Circular dependency detected in weave thread ordering
@@ -151,7 +151,7 @@ except ConfigError as e:
 
 **Resolution:**
 
-1. Verify the project directory ends with `.weevr`
+1. Verify the project directory contains `weevr.yaml`
 2. Check that all config files use typed extensions
 3. Ensure the `name:` field matches the filename (or omit it)
 

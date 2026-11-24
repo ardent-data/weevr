@@ -210,7 +210,9 @@ the difference is what comes back and what's needed:
 | `load_resolved()` | No | `LoadedConfig`, with the resolved config tree |
 
 `load_resolved()` suits tools that check or plan configs outside the engine,
-such as a CLI or a CI step. It takes `.thread`, `.weave`, and `.loom` files
+such as a CLI or a CI step. When you load a bare file without `project_root`,
+weevr walks up from it for `weevr.yaml`; if none is found, the file's folder
+is the root and there is no project. It takes `.thread`, `.weave`, and `.loom` files
 and returns the hydrated model, every child thread and weave, the load
 warnings (as diagnostics), and the execution plan:
 

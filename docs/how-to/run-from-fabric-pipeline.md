@@ -29,7 +29,7 @@ pipeline: Fabric Data Pipeline {
 
 lakehouse: Lakehouse {
   style.fill: "#E8F5E9"
-  configs: "Files/\n  my-project.weevr/\n    nightly.loom\n    dimensions.weave\n    ..." {style.fill: "#C8E6C9"}
+  configs: "Files/\n  my-project.weevr/\n    weevr.yaml\n    nightly.loom\n    dimensions.weave\n    ..." {style.fill: "#C8E6C9"}
   tables: "Tables/\n  bronze.*/\n  silver.*/" {style.fill: "#C8E6C9"}
 }
 
@@ -87,9 +87,9 @@ Call `ctx.run()` with the path to your loom config:
 result = ctx.run("nightly.loom")
 ```
 
-The path resolves relative to the project root -- the `.weevr` directory you
-gave to `Context`. For projects loaded via `workspace=` and `lakehouse=`, the
-project root is the remote `abfss://` URI for the project directory, not the
+The path resolves relative to the project root -- the project directory
+(the one holding `weevr.yaml`) you gave to `Context`. For projects loaded via `workspace=` and
+`lakehouse=`, the project root is the remote `abfss://` URI for the project directory, not the
 notebook's working directory. Use a relative subdirectory if your config
 files live below the project root (for example `nightly/full.loom`).
 

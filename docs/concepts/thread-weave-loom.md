@@ -270,8 +270,10 @@ Loom default:   write.mode = overwrite
 ## Project -- the solution boundary
 
 Above the loom sits the **project**, a conceptual boundary that groups
-related looms. A project is not a configuration file -- it is the directory
-structure that provides the namespace for configuration resolution.
+related looms. A project is a directory whose root holds a `weevr.yaml` file
+(`kind: project`). That file marks the root that `ref:` paths resolve against.
+Every document, including `weevr.yaml`, opens with `kind:` and
+`config_version: "2.0"`. See [Project layout](../reference/project-layout.md).
 
 See the [YAML Schema Reference](../reference/yaml-schema/thread.md)
 for full details on configuration file structure and reference resolution.

@@ -28,12 +28,13 @@ weevr 2 runs on Runtime 2.0; on Runtime 1.3, use weevr 1.x. See
 
 ## Project structure
 
-Create a project directory with a `.weevr` extension. Config files use typed
-extensions (`.thread`, `.weave`, `.loom`) and can be organized in any directory
-layout within the project:
+Create a project directory. Its `weevr.yaml` file marks it as the project root.
+Config files use typed extensions (`.thread`, `.weave`, `.loom`) and can be
+organized in any directory layout within the project:
 
 ```text
 my-project.weevr/
+  weevr.yaml
   staging/
     stg_customers.thread
   staging.weave
@@ -42,9 +43,22 @@ my-project.weevr/
     customers.csv
 ```
 
-The `.weevr` directory is the project root. Config types are identified by
-file extension, so you can organize files in any folder structure that suits
-your team.
+The directory holding `weevr.yaml` is the project root. The `.weevr` suffix on
+the folder name is a naming convention, not a requirement. Create `weevr.yaml`
+with a project identity:
+
+```text
+kind: project
+config_version: "2.0"
+id: 3b7e1c52-9d4a-4f60-8a1e-5c2d7b9f0a14
+name: my_project
+```
+
+Generate your own `id` once and keep it. See
+[Project layout](../reference/project-layout.md) and the
+[project schema](../reference/yaml-schema/project.md) for the other keys.
+Config types are identified by file extension, so you can organize files in
+any folder structure that suits your team.
 
 ## Step 1 -- Create source data
 
@@ -174,9 +188,10 @@ print(result.summary())
 ```
 
 !!! info "Project resolution"
-    The `project` argument tells weevr where your `.weevr` directory lives.
-    All config paths resolve relative to the project root. In Fabric, the
-    project directory sits in the Lakehouse Files section.
+    The `project` argument tells weevr where your project directory lives, and
+    that directory must contain `weevr.yaml` (otherwise construction fails with
+    `C209`). All config paths resolve relative to the project root. In Fabric,
+    the project directory sits in the Lakehouse Files section.
 
 ## Step 6 -- Verify the output
 

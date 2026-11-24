@@ -14,7 +14,7 @@ runtime settings.
 | `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"2.0"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
 | `qualified_key` | `string` | -- | set by loader | Read-only. The weave file's path relative to the project root (for example `weaves/daily.weave`); an inline weave uses its name. Populated at load; not set in YAML. |
-| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (local name references). Use `ref` for external file references. |
+| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread entries: `ref` to a `.thread` file, or an inline thread. A plain string is shorthand for `{ name: "<value>" }`, an inline thread with no body; it never loads a file by name, so use `ref` for files. |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Named lookup sources shared across threads in this weave |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets for bulk rename from external dictionaries. Shared across threads in this weave. |
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Weave-scoped typed variables, settable by hook steps |
@@ -31,9 +31,11 @@ runtime settings.
 
 ## threads (ThreadEntry)
 
-Each entry in the `threads` list is either a plain string (shorthand) or a
-`ThreadEntry` object. Use `ref` to reference an external `.thread` file, or
-`name` for inline thread definitions within the weave.
+Each entry in the `threads` list is a `ThreadEntry` object (or a plain string,
+shorthand for `{ name: "<value>" }`). Use `ref` to reference an external
+`.thread` file, relative to the project root, or `name` plus a thread body for
+an inline thread. A name alone never loads a `.thread` file: without a body
+the entry fails as an incomplete inline thread.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
