@@ -19,7 +19,7 @@ _SET = {"param": "cs_map"}
 
 def _thread(steps: list[dict], **extra: Any) -> dict[str, Any]:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.sales"}},
         "steps": steps,
         "target": {"alias": "gold.fact_sales"},
@@ -197,7 +197,7 @@ class TestColumnSetReferencesThroughContext:
         tgt = tmp_path / "tgt"
         spark.createDataFrame([{"a": 1}]).write.format("delta").save(src)
         thread = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": src}},
             "steps": [_rename("nope")],
             "target": {"path": str(tgt)},

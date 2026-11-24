@@ -25,6 +25,7 @@ from validate_examples_core import (
     validate_warp,
 )
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
@@ -115,7 +116,7 @@ class TestBrokenExamplesFail:
         root = tmp_path / "p.weevr"
         root.mkdir()
         for name, body in files.items():
-            (root / name).write_text(body)
+            write_document(root / name, body)
         return root
 
     def test_name_not_matching_filename(self, tmp_path: Path) -> None:
@@ -128,7 +129,7 @@ class TestBrokenExamplesFail:
     def test_invalid_step(self, tmp_path: Path) -> None:
         """A step in an outdated shape fails."""
         body = (
-            'config_version: "1.0"\n'
+            'config_version: "2.0"\n'
             "sources:\n  s:\n    type: delta\n    alias: raw.s\n"
             "steps:\n  - operation: select\n    columns: [a]\n"
             "target:\n  alias: cur.s\n"
@@ -139,7 +140,7 @@ class TestBrokenExamplesFail:
 
     def test_weave_entry_without_file_or_body(self, tmp_path: Path) -> None:
         """A weave entry that names a thread with no file and no inline body fails."""
-        body = 'config_version: "1.0"\nthreads:\n  - name: ghost\n'
+        body = 'config_version: "2.0"\nthreads:\n  - name: ghost\n'
         root = self._project(tmp_path, {"w.weave": body})
         with pytest.raises(ModelValidationError, match="C101 missing-field"):
             load_config(root / "w.weave", project_root=root)

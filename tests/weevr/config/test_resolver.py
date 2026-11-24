@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from documents import write_document
 from weevr.config.audit_templates import (
     CONTEXT_VARIABLE_FIELDS,
     HIERARCHY_CONTEXT_KEYS,
@@ -218,14 +219,15 @@ class TestUnusedParamWarnings:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "simple.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "simple.thread",
@@ -245,15 +247,16 @@ class TestUnusedParamWarnings:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "parameterized.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${param.table}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "parameterized.thread",
@@ -273,16 +276,17 @@ class TestUnusedParamWarnings:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "with_default.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "defaults:\n  env: dev\n"
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${env}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "with_default.thread"},
             ],
@@ -308,15 +312,16 @@ class TestStandaloneTemplateErrors:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "template.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${param.table}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [{"ref": "template.thread"}],
         }
         with pytest.raises(VariableResolutionError, match="param.table"):
@@ -772,7 +777,7 @@ class TestReferenceResolution:
 
         thread_file = tmp_path / "dimensions" / "dim_customer.thread"
         thread_file.parent.mkdir(parents=True)
-        thread_file.write_text('config_version: "1.0"\nsources:\n  data:\n    type: delta\n')
+        write_document(thread_file, 'config_version: "2.0"\nsources:\n  data:\n    type: delta\n')
         result = resolve_ref_path("dimensions/dim_customer.thread", tmp_path)
         assert str(result) == str(tmp_path / "dimensions" / "dim_customer.thread")
 
@@ -781,7 +786,7 @@ class TestReferenceResolution:
         from weevr.config.resolver import resolve_ref_path
 
         weave_file = tmp_path / "dimensions.weave"
-        weave_file.write_text('config_version: "1.0"\nthreads: []\n')
+        write_document(weave_file, 'config_version: "2.0"\nthreads: []\n')
         result = resolve_ref_path("dimensions.weave", tmp_path)
         assert str(result) == str(weave_file)
 
@@ -820,11 +825,12 @@ class TestReferenceResolution:
 
         project = tmp_path / "proj.weevr"
         project.mkdir()
-        (tmp_path / "outside.weave").write_text(
-            'config_version: "1.0"\nthreads:\n  - name: t\n    config_version: "1.0"\n'
-            "    sources: {s: {type: delta, alias: a.b}}\n    target: {alias: c.d}\n"
+        write_document(
+            tmp_path / "outside.weave",
+            'config_version: "2.0"\nthreads:\n  - name: t\n    config_version: "2.0"\n'
+            "    sources: {s: {type: delta, alias: a.b}}\n    target: {alias: c.d}\n",
         )
-        loom = {"config_version": "1.0", "weaves": [{"name": name}]}
+        loom = {"config_version": "2.0", "weaves": [{"name": name}]}
         with pytest.raises(ReferenceResolutionError, match="outside project root"):
             resolve_references(loom, "loom", project)
 
@@ -845,7 +851,7 @@ class TestReferenceResolution:
         from weevr.config.resolver import resolve_ref_path
 
         thread_file = tmp_path / "dim.thread"
-        thread_file.write_text('config_version: "1.0"\n')
+        write_document(thread_file, 'config_version: "2.0"\n')
         loc = LocalConfigLocation(tmp_path)
         result = resolve_ref_path("dim.thread", loc)
         assert isinstance(result, LocalConfigLocation)
@@ -857,17 +863,20 @@ class TestReferenceResolution:
 
         # Create thread file
         thread_file = tmp_path / "dim_customer.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\nsources:\n  customers:\n    type: delta\n'
-            "    alias: raw_customers\ntarget: {}\n"
+        write_document(
+            thread_file,
+            'config_version: "2.0"\nsources:\n  customers:\n    type: delta\n'
+            "    alias: raw_customers\ntarget: {}\n",
         )
 
         # Create weave file referencing the thread
         weave_file = tmp_path / "dimensions.weave"
-        weave_file.write_text('config_version: "1.0"\nthreads:\n  - ref: dim_customer.thread\n')
+        write_document(
+            weave_file, 'config_version: "2.0"\nthreads:\n  - ref: dim_customer.thread\n'
+        )
 
         loom_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": [{"ref": "dimensions.weave"}],
         }
 
@@ -886,7 +895,7 @@ class TestReferenceResolution:
         from weevr.errors import ReferenceResolutionError
 
         config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": [{"ref": "nonexistent.weave"}],
         }
 
@@ -914,10 +923,10 @@ class TestReferenceResolution:
 
         # Create a weave file at the project root
         weave_file = tmp_path / "dimensions.weave"
-        weave_file.write_text('config_version: "1.0"\nthreads: []\n')
+        write_document(weave_file, 'config_version: "2.0"\nthreads: []\n')
 
         loom_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": [{"name": "dimensions"}],
         }
 
@@ -936,14 +945,15 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [{"ref": "sap_table.thread", "as": "sap_adr6"}],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
@@ -956,14 +966,15 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "sap_table.thread", "params": {"table": "ADR6"}},
             ],
@@ -976,14 +987,15 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [{"ref": "sap_table.thread"}],
         }
         result = resolve_references(weave_config, "weave", tmp_path)
@@ -995,15 +1007,16 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${param.table}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "sap_table.thread",
@@ -1021,15 +1034,16 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${param.target_schema}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "defaults": {"env": "prod"},
             "threads": [
                 {
@@ -1048,15 +1062,16 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${param.table}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "sap_table.thread",
@@ -1074,15 +1089,16 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n"
             "    alias: ${param.table}\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "sap_table.thread",
@@ -1108,14 +1124,15 @@ class TestEntryStashPattern:
         from weevr.errors import ConfigError
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "sap_table.thread"},
                 {"ref": "sap_table.thread"},
@@ -1129,14 +1146,15 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "sap_table.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "sap_table.thread", "as": "instance_a"},
                 {"ref": "sap_table.thread", "as": "instance_b"},
@@ -1151,20 +1169,22 @@ class TestEntryStashPattern:
         from weevr.errors import ConfigError
 
         thread_a = tmp_path / "a.thread"
-        thread_a.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_a,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
         thread_b = tmp_path / "b.thread"
-        thread_b.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_b,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "a.thread", "as": "same_name"},
                 {"ref": "b.thread", "as": "same_name"},
@@ -1178,12 +1198,12 @@ class TestEntryStashPattern:
         from weevr.config.resolver import resolve_references
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "name": "inline_thread",
                     "as": "my_alias",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"d": {"type": "delta", "alias": "r"}},
                     "target": {},
                 },
@@ -1277,7 +1297,7 @@ class TestWholeValueResolution:
 
 
 _MINIMAL_THREAD = {
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"data": {"type": "delta", "alias": "raw.data"}},
     "target": {"alias": "test"},
 }
@@ -1624,14 +1644,15 @@ class TestThreadParameterizationE2E:
     def _write_template(self, tmp_path, name="template.thread"):
         """Write a parameterized template thread file."""
         f = tmp_path / name
-        f.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            f,
+            'config_version: "2.0"\n'
             "sources:\n"
             "  data:\n"
             "    type: delta\n"
             "    alias: ${param.schema}.${param.table_name}\n"
             "target:\n"
-            "  alias: silver.${param.table_name}\n"
+            "  alias: silver.${param.table_name}\n",
         )
         return f
 
@@ -1642,7 +1663,7 @@ class TestThreadParameterizationE2E:
         self._write_template(tmp_path)
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "template.thread",
@@ -1674,7 +1695,7 @@ class TestThreadParameterizationE2E:
         self._write_template(tmp_path)
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "template.thread",
@@ -1703,18 +1724,19 @@ class TestThreadParameterizationE2E:
         from weevr.config.resolver import resolve_references
 
         f = tmp_path / "schema_thread.thread"
-        f.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            f,
+            'config_version: "2.0"\n'
             "sources:\n"
             "  data:\n"
             "    type: delta\n"
             "    alias: ${param.target_schema}.customers\n"
             "target:\n"
-            "  alias: ${param.target_schema}.dim_customers\n"
+            "  alias: ${param.target_schema}.dim_customers\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {
                     "ref": "schema_thread.thread",
@@ -1740,8 +1762,9 @@ class TestThreadParameterizationE2E:
         self._write_template(tmp_path)
 
         weave_file = tmp_path / "silver.weave"
-        weave_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            weave_file,
+            'config_version: "2.0"\n'
             "threads:\n"
             "  - ref: template.thread\n"
             "    as: sap_adr6\n"
@@ -1752,11 +1775,11 @@ class TestThreadParameterizationE2E:
             "    as: sap_adr2\n"
             "    params:\n"
             "      schema: raw\n"
-            "      table_name: ADR2\n"
+            "      table_name: ADR2\n",
         )
 
         loom_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": [{"ref": "silver.weave"}],
         }
         result = resolve_references(loom_config, "loom", tmp_path)
@@ -1768,7 +1791,7 @@ class TestThreadParameterizationE2E:
     def test_standalone_template_raises(self):
         """Standalone thread with unresolved ${param.x} raises."""
         config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"d": {"type": "delta", "alias": "${param.table}"}},
             "target": {},
         }
@@ -1781,14 +1804,15 @@ class TestThreadParameterizationE2E:
         from weevr.config.resolver import resolve_references
 
         thread_file = tmp_path / "simple.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_file,
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target: {}\n"
+            "target: {}\n",
         )
 
         weave_config = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [{"ref": "simple.thread"}],
         }
         result = resolve_references(weave_config, "weave", tmp_path)

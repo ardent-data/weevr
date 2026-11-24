@@ -4,10 +4,13 @@ from pathlib import Path
 
 import pytest
 
+from documents import write_document
 from weevr.config import load_config
 from weevr.config.parser import (
+    SUPPORTED_VERSIONS,
     detect_config_type,
     detect_config_type_from_extension,
+    document_kind,
     extract_config_version,
     parse_yaml,
     validate_config_version,
@@ -130,9 +133,8 @@ class TestValidateConfigVersion:
     def test_thread_unsupported_major(self):
         """Raise ConfigVersionError for unsupported major version."""
         with pytest.raises(ConfigVersionError) as exc_info:
-            validate_config_version((2, 0), "thread")
-        assert "Unsupported" in str(exc_info.value)
-        assert "2.0" in str(exc_info.value)
+            validate_config_version((3, 0), "thread")
+        assert _only_diagnostic(exc_info.value).code == "C203"
 
     def test_warp_version_1_0(self):
         """Accept version 1.0 for warp."""
@@ -196,7 +198,7 @@ class TestParserIntegration:
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
 
-        assert version == (1, 0)
+        assert version == (2, 0)
         assert config_type == "thread"
         assert "sources" in raw
 
@@ -207,7 +209,7 @@ class TestParserIntegration:
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
 
-        assert version == (1, 0)
+        assert version == (2, 0)
         assert config_type == "weave"
         assert "threads" in raw
 
@@ -218,7 +220,7 @@ class TestParserIntegration:
         config_type = detect_config_type(raw)
         validate_config_version(version, config_type)
 
-        assert version == (1, 0)
+        assert version == (2, 0)
         assert config_type == "loom"
         assert "weaves" in raw
 
@@ -310,7 +312,7 @@ class TestParseDiagnostics:
 
     def test_yaml_syntax_carries_line_and_column(self, tmp_path):
         path = tmp_path / "broken.thread"
-        path.write_text("config_version: '1.0'\nsources:\n  a: [1, 2\n")
+        path.write_text("config_version: '2.0'\nsources:\n  a: [1, 2\n")
         with pytest.raises(ConfigParseError) as exc_info:
             parse_yaml(path)
         diag = _only_diagnostic(exc_info.value)
@@ -354,18 +356,18 @@ class TestParseDiagnostics:
 
     def test_unsupported_major(self):
         with pytest.raises(ConfigVersionError) as exc_info:
-            validate_config_version((2, 0), "thread")
+            validate_config_version((3, 0), "thread")
         diag = _only_diagnostic(exc_info.value)
         assert diag.code == "C203"
         assert diag.pointer == "/config_version"
-        assert diag.expected == ("1.x",)
+        assert diag.expected == ("2.x",)
 
     def test_unknown_config_type(self):
         with pytest.raises(ConfigVersionError) as exc_info:
             validate_config_version((1, 0), "pipeline")
         diag = _only_diagnostic(exc_info.value)
         assert diag.code == "C204"
-        assert diag.expected == ("thread", "weave", "loom", "params", "warp")
+        assert diag.expected == ("project", "loom", "weave", "thread", "warp", "params")
 
     def test_undetectable_type(self):
         with pytest.raises(ConfigParseError) as exc_info:
@@ -374,9 +376,55 @@ class TestParseDiagnostics:
 
     def test_load_names_the_file_on_version_errors(self, tmp_path):
         path = tmp_path / "t.thread"
-        path.write_text("config_version: '9.0'\nsources: {}\n")
+        write_document(path, "config_version: '9.0'\nsources: {}\n")
         with pytest.raises(ConfigVersionError) as exc_info:
             load_config(path)
         diag = _only_diagnostic(exc_info.value)
         assert diag.code == "C203"
         assert diag.file == str(path)
+
+
+class TestDocumentKind:
+    """The envelope's ``kind`` decides a document's type ahead of its extension."""
+
+    @pytest.mark.parametrize("kind", ["project", "loom", "weave", "thread", "warp", "params"])
+    def test_every_kind_reads_major_2(self, kind):
+        assert SUPPORTED_VERSIONS[kind] == (2, 0)
+        validate_config_version((2, 0), kind)
+
+    def test_v1_documents_still_load(self):
+        validate_config_version((1, 0), "thread")
+
+    def test_declared_kind_wins_for_yaml(self):
+        raw = {"kind": "params", "config_version": "2.0", "threads": []}
+        assert document_kind(raw, None) == "params"
+
+    def test_declared_kind_matching_extension(self):
+        raw = {"kind": "weave", "config_version": "2.0", "threads": []}
+        assert document_kind(raw, "weave") == "weave"
+
+    def test_without_kind_falls_back_to_extension(self):
+        raw = {"config_version": "2.0", "sources": {}}
+        assert document_kind(raw, "weave") == "weave"
+
+    def test_without_kind_or_extension_detects_structure(self):
+        assert document_kind({"config_version": "1.0", "threads": []}, None) == "weave"
+
+    def test_kind_extension_mismatch(self):
+        raw = {"kind": "weave", "config_version": "2.0", "threads": []}
+        with pytest.raises(ConfigError) as exc_info:
+            document_kind(raw, "thread")
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C207"
+        assert diag.pointer == "/kind"
+        assert diag.expected == ("thread",)
+
+    @pytest.mark.parametrize("kind", ["pipeline", 3, None])
+    def test_unknown_kind(self, kind):
+        raw = {"kind": kind, "config_version": "2.0"}
+        with pytest.raises(ConfigError) as exc_info:
+            document_kind(raw, None)
+        diag = _only_diagnostic(exc_info.value)
+        assert diag.code == "C204"
+        assert diag.pointer == "/kind"
+        assert diag.expected == ("project", "loom", "weave", "thread", "warp", "params")

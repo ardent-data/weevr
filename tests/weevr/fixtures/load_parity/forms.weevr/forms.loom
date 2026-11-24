@@ -1,7 +1,8 @@
 # Entry forms x scopes: a file-referenced weave with a condition, a weave
 # found by convention, and an inline weave; lookups, column sets and
 # variables declared at loom, weave and thread level with shadowing.
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 
 params:
   env:
@@ -43,7 +44,7 @@ weaves:
       when: "'${param.env}' == 'dev'"
   - name: conv
   - name: inline_w
-    config_version: "1.0"
+    config_version: "2.0"
     lookups:
       shared:
         source:
@@ -51,7 +52,7 @@ weaves:
           alias: ref.shared_inline
     threads:
       - name: inline_t
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           s:
             lookup: shared

@@ -93,7 +93,7 @@ class TestResourceLifecycleIntegration:
 
         thread = Thread(
             name="inline_lkp_thread",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=src),
                 "ref": Source(lookup="my_lookup"),
@@ -130,7 +130,7 @@ class TestResourceLifecycleIntegration:
         # Thread overrides the weave-level lookup_a with a different source
         thread = Thread(
             name="override_thread",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=main_src),
                 "ref": Source(lookup="lookup_a"),
@@ -181,7 +181,7 @@ class TestResourceLifecycleIntegration:
         loom = Loom.model_validate(
             {
                 "name": "lifecycle_loom",
-                "config_version": "1",
+                "config_version": "2.0",
                 "weaves": ["lifecycle_weave"],
                 "pre_steps": [
                     {"type": "log_message", "message": "loom-pre-fired", "level": "info"}
@@ -193,13 +193,13 @@ class TestResourceLifecycleIntegration:
         )
 
         weave = Weave.model_validate(
-            {"config_version": "1", "name": "lifecycle_weave", "threads": ["loom_thread"]}
+            {"config_version": "2.0", "name": "lifecycle_weave", "threads": ["loom_thread"]}
         )
 
         thread = Thread.model_validate(
             {
                 "name": "loom_thread",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {"path": tgt},
             }

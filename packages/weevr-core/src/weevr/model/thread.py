@@ -1,7 +1,7 @@
 """Thread domain model."""
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
@@ -57,8 +57,12 @@ class Thread(FrozenBase):
             "Populated during hydration for telemetry and display."
         ),
     )
+    kind: Literal["thread"] = Field(
+        default="thread",
+        description="Document kind. A thread document declares 'thread'.",
+    )
     config_version: str = Field(
-        description="Configuration schema version. Must be '1.0'.",
+        description="Configuration schema version, 'major.minor'. This release reads '2.0'.",
     )
     sources: dict[str, Source] = Field(
         description="Named data source declarations. At least one entry required.",

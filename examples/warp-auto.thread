@@ -1,7 +1,8 @@
 # Warp auto-generation — with `warp_mode: auto` and `schema_drift: adaptive`,
 # the engine writes and evolves a .warp schema contract from the thread output.
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: warp-auto
 
 sources:

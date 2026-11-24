@@ -15,13 +15,14 @@
         "source": null
       }
     },
-    "config_version": "1.0",
+    "config_version": "2.0",
     "connections": null,
     "defaults": null,
     "execution": null,
     "exports": null,
     "failure": null,
     "keys": null,
+    "kind": "thread",
     "load": null,
     "lookups": {
       "shared": {

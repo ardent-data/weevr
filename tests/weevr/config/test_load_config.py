@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.errors import (
     ConfigError,
@@ -27,7 +28,7 @@ class TestLoadConfigHappyPath:
         """load_config returns a Thread model for a thread config."""
         result = load_config(FIXTURES / "valid_thread.thread")
         assert isinstance(result, Thread)
-        assert result.config_version == "1.0"
+        assert result.config_version == "2.0"
         assert "customers" in result.sources
         assert result.target is not None
 
@@ -36,22 +37,24 @@ class TestLoadConfigHappyPath:
         project = FIXTURES / "test_project.weevr"
         result = load_config(project / "dimensions" / "dim_customer.thread", project_root=project)
         assert isinstance(result, Thread)
-        assert result.config_version == "1.0"
+        assert result.config_version == "2.0"
         assert "customers" in result.sources
 
     def test_load_thread_with_variable_resolution(self, tmp_path):
         """load_config resolves variables and returns a typed Thread."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
     alias: ${lakehouse}.customers
 target:
   path: /data/${env}_output
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(
@@ -66,9 +69,10 @@ target:
     def test_standalone_thread_drops_disabled_export(self, tmp_path):
         """A thread loaded on its own does not keep an export with enabled: false."""
         thread_file = tmp_path / "thread.thread"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -83,7 +87,7 @@ exports:
     type: csv
     path: /data/extract
     enabled: false
-"""
+""",
         )
 
         result = load_config(thread_file)
@@ -95,16 +99,18 @@ exports:
     def test_load_thread_with_runtime_params(self, tmp_path):
         """load_config resolves variables from runtime params."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
     alias: ${lakehouse}.customers
 target:
   path: /data/${env}_output
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(thread_file, runtime_params={"lakehouse": "bronze", "env": "dev"})
@@ -116,9 +122,10 @@ target:
     def test_runtime_params_override_defaults(self, tmp_path):
         """Runtime params override config default values."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 defaults:
   env: dev
 sources:
@@ -127,7 +134,8 @@ sources:
     alias: lakehouse
 target:
   path: /data/output_${env}
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(
@@ -141,16 +149,18 @@ target:
     def test_variable_with_fallback_default(self, tmp_path):
         """Variables with fallback defaults use the default when unset."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
     alias: lakehouse
 target:
   path: ${output_table:-default_output}
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(thread_file)
@@ -163,7 +173,7 @@ target:
         project = FIXTURES / "test_project.weevr"
         result = load_config(project / "dimensions.weave", project_root=project)
         assert isinstance(result, Weave)
-        assert result.config_version == "1.0"
+        assert result.config_version == "2.0"
         assert any(e.ref == "dimensions/dim_customer.thread" for e in result.threads)
 
     def test_load_loom_returns_loom_model(self):
@@ -171,7 +181,7 @@ target:
         project = FIXTURES / "test_project.weevr"
         result = load_config(project / "nightly.loom", project_root=project)
         assert isinstance(result, Loom)
-        assert result.config_version == "1.0"
+        assert result.config_version == "2.0"
         assert any(e.ref == "dimensions.weave" for e in result.weaves)
 
 
@@ -209,9 +219,10 @@ class TestLoadConfigNameInjection:
         """Explicit name in config is preserved over derived name."""
         thread_file = tmp_path / "threads" / "my_thread.yaml"
         thread_file.parent.mkdir(parents=True)
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 name: custom.name
 sources:
   data:
@@ -219,7 +230,8 @@ sources:
     alias: lakehouse
 target:
   alias: test
-"""
+""",
+            kind="thread",
         )
         result = load_config(thread_file)
         assert isinstance(result, Thread)
@@ -257,11 +269,13 @@ class TestLoadConfigErrorHandling:
     def test_schema_validation_failure(self, tmp_path):
         """Raise ConfigSchemaError for structurally invalid schema."""
         bad_file = tmp_path / "bad_schema.yaml"
-        bad_file.write_text(
+        write_document(
+            bad_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 threads: not_a_list
-"""
+""",
+            kind="thread",
         )
 
         with pytest.raises(ConfigSchemaError) as exc_info:
@@ -271,16 +285,18 @@ threads: not_a_list
     def test_unresolved_variable(self, tmp_path):
         """Raise VariableResolutionError for missing variable."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
     alias: ${missing_var}.customers
 target:
   alias: test
-"""
+""",
+            kind="thread",
         )
 
         with pytest.raises(VariableResolutionError) as exc_info:
@@ -291,9 +307,10 @@ target:
     def test_model_validation_error_on_bad_thread(self, tmp_path):
         """Raise ModelValidationError when hydration fails (e.g., invalid step type)."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -303,7 +320,8 @@ target:
 steps:
   - pivot:
       columns: [x]
-"""
+""",
+            kind="thread",
         )
 
         with pytest.raises(ModelValidationError):
@@ -312,16 +330,18 @@ steps:
     def test_unsupported_source_type_fails_at_load(self, tmp_path):
         """A source with an unsupported type fails at load, before any read."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   book:
     type: excel
     path: /data/book.xlsx
 target:
   alias: test
-"""
+""",
+            kind="thread",
         )
 
         with pytest.raises(ModelValidationError, match="unsupported source type"):
@@ -334,9 +354,10 @@ class TestLoadConfigForeach:
     def test_foreach_expands_steps(self, tmp_path):
         """Foreach block in steps is expanded before hydration."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -351,7 +372,8 @@ steps:
         - cast:
             columns:
               "{col}": string
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(thread_file)
@@ -367,9 +389,10 @@ steps:
     def test_foreach_mixed_with_regular_steps(self, tmp_path):
         """Foreach interleaved with regular steps preserves order."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -388,7 +411,8 @@ steps:
               "{col}": "{col}_clean"
   - select:
       columns: [id]
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(thread_file)
@@ -398,9 +422,10 @@ steps:
     def test_foreach_with_variables(self, tmp_path):
         """Foreach works alongside variable resolution."""
         thread_file = tmp_path / "thread.yaml"
-        thread_file.write_text(
+        write_document(
+            thread_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -415,7 +440,8 @@ steps:
         - cast:
             columns:
               "{col}": string
-"""
+""",
+            kind="thread",
         )
 
         result = load_config(thread_file, runtime_params={"schema": "bronze"})
@@ -430,9 +456,10 @@ class TestLoadConfigTypedExtensions:
     def test_name_derived_from_stem(self, tmp_path):
         """Filename stem becomes the component name."""
         thread_file = tmp_path / "dim_customer.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
-            "    alias: raw.customers\ntarget:\n  alias: test\n"
+        write_document(
+            thread_file,
+            'config_version: "2.0"\nsources:\n  data:\n    type: delta\n'
+            "    alias: raw.customers\ntarget:\n  alias: test\n",
         )
         result = load_config(thread_file)
         assert isinstance(result, Thread)
@@ -441,9 +468,10 @@ class TestLoadConfigTypedExtensions:
     def test_declared_name_matches_stem(self, tmp_path):
         """Declared name matching stem passes validation."""
         thread_file = tmp_path / "dim_customer.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\nname: dim_customer\nsources:\n  data:\n'
-            "    type: delta\n    alias: raw.customers\ntarget:\n  alias: test\n"
+        write_document(
+            thread_file,
+            'config_version: "2.0"\nname: dim_customer\nsources:\n  data:\n'
+            "    type: delta\n    alias: raw.customers\ntarget:\n  alias: test\n",
         )
         result = load_config(thread_file)
         assert isinstance(result, Thread)
@@ -452,9 +480,10 @@ class TestLoadConfigTypedExtensions:
     def test_declared_name_mismatch_raises(self, tmp_path):
         """Declared name not matching stem raises ConfigError."""
         thread_file = tmp_path / "dim_customer.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\nname: wrong_name\nsources:\n  data:\n'
-            "    type: delta\n    alias: raw.customers\ntarget:\n  alias: test\n"
+        write_document(
+            thread_file,
+            'config_version: "2.0"\nname: wrong_name\nsources:\n  data:\n'
+            "    type: delta\n    alias: raw.customers\ntarget:\n  alias: test\n",
         )
         with pytest.raises(ConfigError, match="does not match filename stem"):
             load_config(thread_file)
@@ -465,9 +494,10 @@ class TestLoadConfigTypedExtensions:
         thread_dir = project / "dims"
         thread_dir.mkdir(parents=True)
         thread_file = thread_dir / "dim_customer.thread"
-        thread_file.write_text(
-            'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
-            "    alias: raw.customers\ntarget:\n  alias: test\n"
+        write_document(
+            thread_file,
+            'config_version: "2.0"\nsources:\n  data:\n    type: delta\n'
+            "    alias: raw.customers\ntarget:\n  alias: test\n",
         )
         result = load_config(thread_file, project_root=project)
         assert isinstance(result, Thread)
@@ -489,13 +519,15 @@ class TestLoadConfigLoomDeclaredParams:
         """Write a minimal ``<name>.weave`` plus the thread it references."""
         thread_dir = project / "threads"
         thread_dir.mkdir(exist_ok=True)
-        (thread_dir / "stub.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_dir / "stub.thread",
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target:\n  alias: out\n"
+            "target:\n  alias: out\n",
         )
-        (project / f"{name}.weave").write_text(
-            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n'
+        write_document(
+            project / f"{name}.weave",
+            'config_version: "2.0"\nthreads:\n  - ref: threads/stub.thread\n',
         )
 
     def _bug_report_loom(self, tmp_path: Path) -> Path:
@@ -503,9 +535,10 @@ class TestLoadConfigLoomDeclaredParams:
         project.mkdir()
         self._make_stub_weave(project)
         loom_file = project / "spartech_silver.loom"
-        loom_file.write_text(
+        write_document(
+            loom_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 weaves:
   - ref: stub.weave
@@ -525,7 +558,7 @@ connections:
     type: onelake
     workspace: "${param.workspace_id}"
     lakehouse: "${param.mirror_db_id}"
-"""
+""",
         )
         return loom_file
 
@@ -561,9 +594,10 @@ connections:
         project.mkdir()
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
-        loom_file.write_text(
+        write_document(
+            loom_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 weaves:
   - ref: stub.weave
@@ -580,7 +614,7 @@ connections:
     type: onelake
     workspace: "${param.region}"
     lakehouse: lh
-"""
+""",
         )
         result = load_config(loom_file, project_root=project)
         assert isinstance(result, Loom)
@@ -593,9 +627,10 @@ connections:
         project.mkdir()
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
-        loom_file.write_text(
+        write_document(
+            loom_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 weaves:
   - ref: stub.weave
@@ -614,7 +649,7 @@ connections:
     type: onelake
     workspace: "${param.workspace_id}"
     lakehouse: "${env}"
-"""
+""",
         )
         result = load_config(
             loom_file,
@@ -633,9 +668,10 @@ connections:
         project.mkdir()
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
-        loom_file.write_text(
+        write_document(
+            loom_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 weaves:
   - ref: stub.weave
@@ -651,7 +687,7 @@ connections:
     type: onelake
     workspace: "${param.workspaceid}"
     lakehouse: lh
-"""
+""",
         )
         with pytest.raises(VariableResolutionError) as exc_info:
             load_config(
@@ -669,9 +705,10 @@ connections:
         project.mkdir()
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
-        loom_file.write_text(
+        write_document(
+            loom_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 weaves:
   - ref: stub.weave
@@ -687,7 +724,7 @@ connections:
     type: onelake
     workspace: ws-1
     lakehouse: lh-1
-"""
+""",
         )
         with pytest.raises(ConfigSchemaError, match="expected int"):
             load_config(loom_file, runtime_params={"max_rows": "abc"}, project_root=project)
@@ -697,19 +734,21 @@ class TestLoadConfigExportEnabled:
     """A weave's export is suppressed by any enabled value the model reads as false."""
 
     def _project(self, tmp_path: Path, enabled: str) -> Path:
-        (tmp_path / "t.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            tmp_path / "t.thread",
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target:\n  alias: out\n"
+            "target:\n  alias: out\n",
         )
-        (tmp_path / "w.weave").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            tmp_path / "w.weave",
+            'config_version: "2.0"\n'
             "defaults:\n  exports:\n"
             "    - name: archive\n      type: parquet\n      path: /data/archive\n"
             f"      enabled: {enabled}\n"
             "params:\n  write_archive:\n    name: write_archive\n    type: string\n"
             "    required: false\n"
-            "threads:\n  - ref: t.thread\n"
+            "threads:\n  - ref: t.thread\n",
         )
         return tmp_path / "w.weave"
 
@@ -754,15 +793,17 @@ class TestLoadConfigWeaveDeclaredParams:
         project.mkdir()
         thread_dir = project / "threads"
         thread_dir.mkdir()
-        (thread_dir / "stub.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_dir / "stub.thread",
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target:\n  alias: out\n"
+            "target:\n  alias: out\n",
         )
         weave_file = project / "bronze_to_silver.weave"
-        weave_file.write_text(
+        write_document(
+            weave_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 threads:
   - ref: threads/stub.thread
@@ -778,7 +819,7 @@ connections:
     type: onelake
     workspace: "${param.workspace_id}"
     lakehouse: lh-bronze
-"""
+""",
         )
         result = load_config(
             weave_file,
@@ -795,15 +836,17 @@ connections:
         project.mkdir()
         thread_dir = project / "threads"
         thread_dir.mkdir()
-        (thread_dir / "stub.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_dir / "stub.thread",
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target:\n  alias: out\n"
+            "target:\n  alias: out\n",
         )
         weave_file = project / "bronze_to_silver.weave"
-        weave_file.write_text(
+        write_document(
+            weave_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 threads:
   - ref: threads/stub.thread
@@ -819,7 +862,7 @@ connections:
     type: onelake
     workspace: "${param.workspace_id}"
     lakehouse: lh-bronze
-"""
+""",
         )
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(weave_file, runtime_params={}, project_root=project)
@@ -829,7 +872,7 @@ connections:
 
 
 _VALID_THREAD = """
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -845,8 +888,9 @@ class TestLoadConfigErrorFileAttribution:
     def test_schema_error_names_file(self, tmp_path):
         """A schema-shape error carries the loaded file's path."""
         thread = tmp_path / "shape.thread"
-        thread.write_text(
-            'config_version: "1.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n'
+        write_document(
+            thread,
+            'config_version: "2.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n',
         )
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(thread)
@@ -856,7 +900,7 @@ class TestLoadConfigErrorFileAttribution:
     def test_version_error_names_file(self, tmp_path):
         """An unsupported config_version carries the loaded file's path."""
         thread = tmp_path / "ver.thread"
-        thread.write_text(_VALID_THREAD.replace('"1.0"', '"9.0"'))
+        write_document(thread, _VALID_THREAD.replace('"2.0"', '"9.0"'))
         with pytest.raises(ConfigVersionError) as exc_info:
             load_config(thread)
         assert exc_info.value.file_path == str(thread)
@@ -864,7 +908,7 @@ class TestLoadConfigErrorFileAttribution:
     def test_variable_error_names_file_and_keeps_key(self, tmp_path):
         """An unresolved variable carries the file's path and its config key."""
         thread = tmp_path / "vars.thread"
-        thread.write_text(_VALID_THREAD.replace("raw.customers", "${env.missing}"))
+        write_document(thread, _VALID_THREAD.replace("raw.customers", "${env.missing}"))
         with pytest.raises(VariableResolutionError) as exc_info:
             load_config(thread)
         assert exc_info.value.file_path == str(thread)
@@ -873,10 +917,11 @@ class TestLoadConfigErrorFileAttribution:
     def test_foreach_error_names_file(self, tmp_path):
         """A malformed foreach block carries the loaded file's path."""
         thread = tmp_path / "macro.thread"
-        thread.write_text(
+        write_document(
+            thread,
             _VALID_THREAD
             + "steps:\n  - foreach:\n      values: []\n      as: col\n"
-            + '      steps:\n        - filter:\n            expr: "x > 0"\n'
+            + '      steps:\n        - filter:\n            expr: "x > 0"\n',
         )
         with pytest.raises(ConfigError, match="foreach") as exc_info:
             load_config(thread)
@@ -889,23 +934,23 @@ class TestLoadConfigReferencedFileAttribution:
     @staticmethod
     def _write(root: Path, name: str, text: str) -> Path:
         path = root / name
-        path.write_text(text)
+        write_document(path, text)
         return path
 
     def _weave_of(self, root: Path, name: str, *entries: str) -> Path:
         body = "".join(f"  - {e}\n" for e in entries)
-        return self._write(root, name, f'config_version: "1.0"\nthreads:\n{body}')
+        return self._write(root, name, f'config_version: "2.0"\nthreads:\n{body}')
 
     def _loom_of(self, root: Path, *entries: str) -> Path:
         body = "".join(f"  - {e}\n" for e in entries)
-        return self._write(root, "top.loom", f'config_version: "1.0"\nweaves:\n{body}')
+        return self._write(root, "top.loom", f'config_version: "2.0"\nweaves:\n{body}')
 
     def test_referenced_thread_schema_error_names_thread(self, tmp_path):
         """A schema error in a ref'd thread names the thread."""
         thread = self._write(
             tmp_path,
             "shape.thread",
-            'config_version: "1.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n',
+            'config_version: "2.0"\nsources: ["not", "a", "mapping"]\ntarget:\n  path: Tables/x\n',
         )
         weave = self._weave_of(tmp_path, "w.weave", "ref: shape.thread")
         with pytest.raises(ConfigSchemaError) as exc_info:
@@ -924,7 +969,7 @@ class TestLoadConfigReferencedFileAttribution:
 
     def test_referenced_thread_version_error_names_thread(self, tmp_path):
         """An unsupported version in a ref'd thread names the thread."""
-        thread = self._write(tmp_path, "ver.thread", _VALID_THREAD.replace('"1.0"', '"9.0"'))
+        thread = self._write(tmp_path, "ver.thread", _VALID_THREAD.replace('"2.0"', '"9.0"'))
         weave = self._weave_of(tmp_path, "w.weave", "ref: ver.thread")
         with pytest.raises(ConfigVersionError) as exc_info:
             load_config(weave, project_root=tmp_path)
@@ -1002,14 +1047,14 @@ class TestLoadConfigChildValidation:
     @staticmethod
     def _write(root: Path, name: str, text: str) -> Path:
         path = root / name
-        path.write_text(text)
+        write_document(path, text)
         return path
 
     def test_weave_with_invalid_thread_raises(self, tmp_path):
         """A referenced thread that fails hydration fails the weave, naming the thread."""
         thread = self._write(tmp_path, "bad.thread", _VALID_THREAD + "write:\n  mode: bogus\n")
         weave = self._write(
-            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n'
+            tmp_path, "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: bad.thread\n'
         )
         with pytest.raises(ModelValidationError) as exc_info:
             load_config(weave, project_root=tmp_path)
@@ -1018,9 +1063,9 @@ class TestLoadConfigChildValidation:
     def test_loom_with_invalid_thread_raises(self, tmp_path):
         """Two levels down, an invalid thread still fails the loom, naming the thread."""
         thread = self._write(tmp_path, "bad.thread", _VALID_THREAD + "write:\n  mode: bogus\n")
-        self._write(tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n')
+        self._write(tmp_path, "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: bad.thread\n')
         loom = self._write(
-            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+            tmp_path, "top.loom", 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n'
         )
         with pytest.raises(ModelValidationError) as exc_info:
             load_config(loom, project_root=tmp_path)
@@ -1032,11 +1077,11 @@ class TestLoadConfigChildValidation:
         weave = self._write(
             tmp_path,
             "w.weave",
-            'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+            'config_version: "2.0"\nthreads:\n  - ref: t.thread\n'
             "lookups:\n  lk:\n    not_a_field: true\n",
         )
         loom = self._write(
-            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+            tmp_path, "top.loom", 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n'
         )
         with pytest.raises(ModelValidationError) as exc_info:
             load_config(loom, project_root=tmp_path)
@@ -1047,8 +1092,8 @@ class TestLoadConfigChildValidation:
         weave = self._write(
             tmp_path,
             "w.weave",
-            'config_version: "1.0"\nthreads:\n'
-            '  - name: t\n    config_version: "1.0"\n'
+            'config_version: "2.0"\nthreads:\n'
+            '  - name: t\n    config_version: "2.0"\n'
             "    sources:\n      data:\n        type: delta\n"
             "        alias: raw.c\n    target:\n      path: T/c\n"
             "    write:\n      mode: bogus\n",
@@ -1061,10 +1106,10 @@ class TestLoadConfigChildValidation:
         """Valid children don't change what load_config returns."""
         self._write(tmp_path, "t.thread", _VALID_THREAD)
         weave = self._write(
-            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+            tmp_path, "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: t.thread\n'
         )
         loom = self._write(
-            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+            tmp_path, "top.loom", 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n'
         )
         assert isinstance(load_config(weave, project_root=tmp_path), Weave)
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
@@ -1083,23 +1128,23 @@ class TestLoadConfigChildForeach:
     @staticmethod
     def _write(root: Path, name: str, text: str) -> Path:
         path = root / name
-        path.write_text(text)
+        write_document(path, text)
         return path
 
     def test_weave_with_foreach_thread_loads(self, tmp_path):
         """A referenced thread using foreach no longer fails its weave."""
         self._write(tmp_path, "fe.thread", _FOREACH_THREAD)
         weave = self._write(
-            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+            tmp_path, "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n'
         )
         assert isinstance(load_config(weave, project_root=tmp_path), Weave)
 
     def test_loom_with_foreach_thread_loads(self, tmp_path):
         """The same holds two levels down."""
         self._write(tmp_path, "fe.thread", _FOREACH_THREAD)
-        self._write(tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n')
+        self._write(tmp_path, "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n')
         loom = self._write(
-            tmp_path, "top.loom", 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n'
+            tmp_path, "top.loom", 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n'
         )
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
 
@@ -1113,7 +1158,7 @@ class TestLoadConfigChildForeach:
         weave = self._write(
             tmp_path,
             "w.weave",
-            'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+            'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n'
             "    params:\n      cols: [x, y]\n",
         )
         assert isinstance(load_config(weave, project_root=tmp_path), Weave)
@@ -1123,8 +1168,8 @@ class TestLoadConfigChildForeach:
         weave = self._write(
             tmp_path,
             "w.weave",
-            'config_version: "1.0"\nthreads:\n'
-            '  - name: t\n    config_version: "1.0"\n'
+            'config_version: "2.0"\nthreads:\n'
+            '  - name: t\n    config_version: "2.0"\n'
             "    sources:\n      data:\n        type: delta\n"
             "        alias: raw.c\n    target:\n      path: T/c\n"
             "    steps:\n      - foreach:\n          values: [a, b]\n          as: col\n"
@@ -1138,7 +1183,7 @@ class TestLoadConfigChildForeach:
             tmp_path, "fe.thread", _FOREACH_THREAD.replace("values: [a, b]", "values: []")
         )
         weave = self._write(
-            tmp_path, "w.weave", 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+            tmp_path, "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n'
         )
         with pytest.raises(ConfigError, match="foreach block at step index") as exc_info:
             load_config(weave, project_root=tmp_path)
@@ -1146,7 +1191,7 @@ class TestLoadConfigChildForeach:
 
 
 _INCREMENTAL_THREAD = (
-    'config_version: "1.0"\n'
+    'config_version: "2.0"\n'
     "sources:\n  s:\n    type: delta\n    alias: raw.c\n"
     "target:\n  path: Tables/c\n"
     "write:\n  mode: append\n"
@@ -1159,7 +1204,7 @@ class TestLoadConfigWatermarkTypeRequired:
     @staticmethod
     def _write(root: Path, name: str, text: str) -> Path:
         path = root / name
-        path.write_text(text)
+        write_document(path, text)
         return path
 
     def test_missing_watermark_type_names_thread(self, tmp_path):
@@ -1179,7 +1224,7 @@ class TestLoadConfigWatermarkTypeRequired:
         weave = self._write(
             tmp_path,
             "w.weave",
-            'config_version: "1.0"\n'
+            'config_version: "2.0"\n'
             "defaults:\n  load:\n    mode: incremental_watermark\n"
             "    watermark_column: ts\n    watermark_type: timestamp\n"
             "threads:\n  - ref: t.thread\n",
@@ -1196,7 +1241,7 @@ class TestLoadConfigWatermarkTypeRequired:
         weave = self._write(
             tmp_path,
             "w.weave",
-            'config_version: "1.0"\n'
+            'config_version: "2.0"\n'
             "defaults:\n  load:\n    watermark_type: date\n"
             "threads:\n  - ref: t.thread\n",
         )
@@ -1206,13 +1251,13 @@ class TestLoadConfigWatermarkTypeRequired:
 
 
 _INLINE_THREAD_BODY = (
-    '      - name: ops_audit\n        config_version: "1.0"\n'
+    '      - name: ops_audit\n        config_version: "2.0"\n'
     "        sources:\n          events:\n            type: delta\n"
     "            alias: raw.events\n        target:\n          alias: ops.audit\n"
 )
 
 _REF_THREAD = (
-    'config_version: "1.0"\nsources:\n  data:\n    type: delta\n'
+    'config_version: "2.0"\nsources:\n  data:\n    type: delta\n'
     "    alias: raw.orders\ntarget:\n  alias: stg.orders\n"
 )
 
@@ -1223,23 +1268,23 @@ class TestLoadConfigInlineWeaves:
     @staticmethod
     def _loom(tmp_path: Path, weaves: str) -> Path:
         loom = tmp_path / "x.loom"
-        loom.write_text('config_version: "1.0"\nweaves:\n' + weaves)
+        write_document(loom, 'config_version: "2.0"\nweaves:\n' + weaves)
         return loom
 
     def test_inline_weave_with_inline_thread_loads(self, tmp_path):
         """An inline weave defining its thread inline loads."""
         loom = self._loom(
             tmp_path,
-            '  - name: inline_ops\n    config_version: "1.0"\n    threads:\n' + _INLINE_THREAD_BODY,
+            '  - name: inline_ops\n    config_version: "2.0"\n    threads:\n' + _INLINE_THREAD_BODY,
         )
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
 
     def test_inline_weave_with_referenced_thread_loads(self, tmp_path):
         """An inline weave referencing a thread file loads."""
-        (tmp_path / "orders.thread").write_text(_REF_THREAD)
+        write_document(tmp_path / "orders.thread", _REF_THREAD)
         loom = self._loom(
             tmp_path,
-            '  - name: inline_ops\n    config_version: "1.0"\n    threads:\n'
+            '  - name: inline_ops\n    config_version: "2.0"\n    threads:\n'
             "      - ref: orders.thread\n",
         )
         assert isinstance(load_config(loom, project_root=tmp_path), Loom)
@@ -1248,7 +1293,7 @@ class TestLoadConfigInlineWeaves:
         """An invalid inline thread in an inline weave names the loom file."""
         loom = self._loom(
             tmp_path,
-            '  - name: inline_ops\n    config_version: "1.0"\n    threads:\n'
+            '  - name: inline_ops\n    config_version: "2.0"\n    threads:\n'
             + _INLINE_THREAD_BODY
             + "        write:\n          mode: bogus\n",
         )
@@ -1260,9 +1305,9 @@ class TestLoadConfigInlineWeaves:
         """A ${var} defined in the inline weave's own defaults resolves."""
         loom = self._loom(
             tmp_path,
-            '  - name: inline_ops\n    config_version: "1.0"\n'
+            '  - name: inline_ops\n    config_version: "2.0"\n'
             "    defaults:\n      tbl: ops.from_weave\n    threads:\n"
-            '      - name: ops_audit\n        config_version: "1.0"\n'
+            '      - name: ops_audit\n        config_version: "2.0"\n'
             "        sources:\n          events:\n            type: delta\n"
             "            alias: raw.events\n        target:\n"
             '          alias: "${tbl}"\n',
@@ -1287,13 +1332,13 @@ class TestLoadConfigRelativePathAttribution:
     """A relative path passed to load_config is reported as given."""
 
     _BAD_THREAD = (
-        'config_version: "1.0"\nsources:\n  d:\n    type: delta\n    alias: raw.x\n'
+        'config_version: "2.0"\nsources:\n  d:\n    type: delta\n    alias: raw.x\n'
         "target:\n  alias: out\nwrite:\n  mode: bogus\n"
     )
 
     def test_thread_failure_names_relative_path(self, tmp_path, monkeypatch):
         """A model failure in a directly loaded thread names the path as passed."""
-        (tmp_path / "bad.thread").write_text(self._BAD_THREAD)
+        write_document(tmp_path / "bad.thread", self._BAD_THREAD)
         monkeypatch.chdir(tmp_path)
         with pytest.raises(ModelValidationError) as exc_info:
             load_config("bad.thread")
@@ -1301,8 +1346,10 @@ class TestLoadConfigRelativePathAttribution:
 
     def test_child_failure_names_relative_path(self, tmp_path, monkeypatch):
         """A model failure in a referenced thread names that thread's relative path."""
-        (tmp_path / "bad.thread").write_text(self._BAD_THREAD)
-        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: bad.thread\n')
+        write_document(tmp_path / "bad.thread", self._BAD_THREAD)
+        write_document(
+            tmp_path / "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: bad.thread\n'
+        )
         monkeypatch.chdir(tmp_path)
         with pytest.raises(ModelValidationError) as exc_info:
             load_config("w.weave")
@@ -1310,7 +1357,7 @@ class TestLoadConfigRelativePathAttribution:
 
 
 _FILE_SOURCE_THREAD = (
-    'config_version: "1.0"\nsources:\n  orders:\n    type: csv\n    path: data/orders.csv\n'
+    'config_version: "2.0"\nsources:\n  orders:\n    type: csv\n    path: data/orders.csv\n'
     "target:\n  alias: stg.orders\n"
 )
 
@@ -1327,8 +1374,10 @@ class TestLoadConfigMatchesContext:
         """A thread's own execution block is warned about on the weevr.config logger."""
         import logging
 
-        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD + "execution:\n  log_level: debug\n")
-        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: t.thread\n')
+        write_document(
+            tmp_path / "t.thread", _FILE_SOURCE_THREAD + "execution:\n  log_level: debug\n"
+        )
+        write_document(tmp_path / "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: t.thread\n')
         with caplog.at_level(logging.WARNING, logger="weevr.config"):
             load_config(tmp_path / "w.weave", project_root=tmp_path)
         messages = [r.message for r in caplog.records if r.name.startswith("weevr.config")]
@@ -1336,14 +1385,14 @@ class TestLoadConfigMatchesContext:
 
     def test_relative_file_source_path_is_absolute(self, tmp_path):
         """A relative file-Source path resolves against the file's directory."""
-        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
+        write_document(tmp_path / "t.thread", _FILE_SOURCE_THREAD)
         thread = load_config(tmp_path / "t.thread")
         assert isinstance(thread, Thread)
         assert thread.sources["orders"].path == str(tmp_path / "data" / "orders.csv")
 
     def test_relative_thread_lookup_path_is_absolute(self, tmp_path):
         """A thread's own lookup resolves a relative file path like its sources."""
-        (tmp_path / "t.thread").write_text(_LOOKUP_THREAD)
+        write_document(tmp_path / "t.thread", _LOOKUP_THREAD)
         thread = load_config(tmp_path / "t.thread", project_root=tmp_path)
         assert isinstance(thread, Thread)
         assert thread.lookups is not None
@@ -1351,8 +1400,8 @@ class TestLoadConfigMatchesContext:
 
     def test_child_thread_lookup_path_is_absolute(self, tmp_path):
         """A weave's child thread resolves its own lookup's relative file path."""
-        (tmp_path / "t.thread").write_text(_LOOKUP_THREAD)
-        (tmp_path / "w.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: t.thread\n')
+        write_document(tmp_path / "t.thread", _LOOKUP_THREAD)
+        write_document(tmp_path / "w.weave", 'config_version: "2.0"\nthreads:\n  - ref: t.thread\n')
         result = load_resolved(tmp_path / "w.weave", project_root=tmp_path)
         thread = result.document.weave_threads()["w"]["t"]
         assert thread.lookups is not None
@@ -1360,8 +1409,8 @@ class TestLoadConfigMatchesContext:
 
     def test_template_thread_hint(self, tmp_path):
         """A standalone thread failing on ${param.x} says it may be a template."""
-        (tmp_path / "t.thread").write_text(
-            _FILE_SOURCE_THREAD.replace("stg.orders", "stg.${param.region}")
+        write_document(
+            tmp_path / "t.thread", _FILE_SOURCE_THREAD.replace("stg.orders", "stg.${param.region}")
         )
         with pytest.raises(VariableResolutionError, match="may be a template") as exc_info:
             load_config(tmp_path / "t.thread")
@@ -1370,7 +1419,7 @@ class TestLoadConfigMatchesContext:
 
     def test_qualified_key_without_project_root(self, tmp_path):
         """A typed file loaded without project_root gets a qualified_key."""
-        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
+        write_document(tmp_path / "t.thread", _FILE_SOURCE_THREAD)
         thread = load_config(tmp_path / "t.thread")
         assert isinstance(thread, Thread)
         assert thread.qualified_key == "t.thread"
@@ -1384,7 +1433,7 @@ class TestLoadConfigFlatAuditTemplates:
     @staticmethod
     def _thread(**extra: Any) -> dict[str, Any]:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"src": {"type": "delta", "alias": "lh.raw"}},
             "target": {"path": "/data/out", "audit_template": "lineage"},
             **extra,
@@ -1431,14 +1480,15 @@ class TestLoadConfigIncrementalDedupRule:
 
     def test_non_latest_dedup_fails_at_load(self, tmp_path):
         thread = tmp_path / "t.thread"
-        thread.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread,
+            'config_version: "2.0"\n'
             "sources:\n  s:\n    type: delta\n    alias: raw.c\n"
             "    dedup:\n      keys: [id]\n      order_by: ts ASC\n"
             "target:\n  path: Tables/c\n"
             "write:\n  mode: append\n"
             "load:\n  mode: incremental_watermark\n  watermark_column: ts\n"
-            "  watermark_type: timestamp\n"
+            "  watermark_type: timestamp\n",
         )
         with pytest.raises(ModelValidationError, match="ts DESC") as exc_info:
             load_config(thread, project_root=tmp_path)
@@ -1461,7 +1511,7 @@ class TestLoadConfigCdcRules:
     @staticmethod
     def _thread(**overrides: Any) -> dict[str, Any]:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"s": {"type": "delta", "alias": "raw.c"}},
             "target": {"path": "Tables/c"},
             **overrides,
@@ -1515,7 +1565,7 @@ class TestLoadConfigDimensionWriteMode:
 
     def _thread(self, write: dict[str, Any]) -> dict[str, Any]:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"s": {"type": "delta", "alias": "raw.c"}},
             "target": {"path": "Tables/c", "dimension": self.DIMENSION},
             "write": write,
@@ -1553,7 +1603,7 @@ class TestLoadConfigForeachInWith:
 
     def _thread(self) -> dict[str, Any]:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"s": {"type": "delta", "alias": "raw.c"}},
             "target": {"path": "Tables/c"},
             "with": {"cte": {"from": "s", "steps": [self.FOREACH]}},
@@ -1586,19 +1636,21 @@ class TestLoadConfigForeachInWith:
 def test_pre_step_row_count_delta_fails_at_load(tmp_path: Path) -> None:
     """A row_count_delta gate in pre_steps is rejected before anything runs."""
     weave = tmp_path / "nightly.weave"
-    weave.write_text(
-        "config_version: '1.0'\n"
+    write_document(
+        weave,
+        "config_version: '2.0'\n"
         "threads: [t1]\n"
         "pre_steps:\n"
         "  - type: quality_gate\n"
         "    check: row_count_delta\n"
         "    target: silver.orders\n"
-        "    max_decrease_pct: 10\n"
+        "    max_decrease_pct: 10\n",
     )
-    (tmp_path / "t1.thread").write_text(
-        "config_version: '1.0'\n"
+    write_document(
+        tmp_path / "t1.thread",
+        "config_version: '2.0'\n"
         "sources:\n  s: {type: delta, alias: raw.s}\n"
-        "target: {alias: silver.orders}\n"
+        "target: {alias: silver.orders}\n",
     )
     with pytest.raises(ModelValidationError, match=r"pre_steps\[0\].*post_steps") as exc_info:
         load_config(weave)
@@ -1619,11 +1671,12 @@ class TestLoadConfigLookupPaths:
 
     @staticmethod
     def _weave(tmp_path: Path) -> None:
-        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
-        (tmp_path / "w.weave").write_text(
-            'config_version: "1.0"\n'
+        write_document(tmp_path / "t.thread", _FILE_SOURCE_THREAD)
+        write_document(
+            tmp_path / "w.weave",
+            'config_version: "2.0"\n'
             + _lookups_block("countries", "ref/countries.csv")
-            + "threads:\n  - ref: t.thread\n"
+            + "threads:\n  - ref: t.thread\n",
         )
 
     def test_weave_lookup_path_is_absolute(self, tmp_path):
@@ -1637,13 +1690,14 @@ class TestLoadConfigLookupPaths:
     def test_loom_and_child_weave_lookup_paths_are_absolute(self, tmp_path):
         """A loom's lookups and its referenced and inline weaves' lookups are joined."""
         self._weave(tmp_path)
-        (tmp_path / "x.loom").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            tmp_path / "x.loom",
+            'config_version: "2.0"\n'
             + _lookups_block("calendar", "ref/calendar.csv")
             + "weaves:\n  - ref: w.weave\n"
-            + '  - name: inline_ops\n    config_version: "1.0"\n'
+            + '  - name: inline_ops\n    config_version: "2.0"\n'
             + _lookups_block("stores", "ref/stores.csv", indent="    ")
-            + "    threads:\n      - ref: t.thread\n"
+            + "    threads:\n      - ref: t.thread\n",
         )
         result = load_resolved(tmp_path / "x.loom", project_root=tmp_path)
         loom = result.model
@@ -1659,7 +1713,7 @@ class TestLoadConfigLookupPaths:
     def test_weave_lookup_joined_once_under_a_loom(self, tmp_path):
         """A weave's lookup path is the same loaded alone or as a loom's child."""
         self._weave(tmp_path)
-        (tmp_path / "x.loom").write_text('config_version: "1.0"\nweaves:\n  - ref: w.weave\n')
+        write_document(tmp_path / "x.loom", 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n')
         alone = load_config(tmp_path / "w.weave", project_root=tmp_path)
         child = load_resolved(tmp_path / "x.loom", project_root=tmp_path).document.weaves()["w"]
         assert isinstance(alone, Weave)
@@ -1668,11 +1722,12 @@ class TestLoadConfigLookupPaths:
 
     def test_absolute_weave_lookup_path_unchanged(self, tmp_path):
         """An absolute weave lookup path is used as written."""
-        (tmp_path / "t.thread").write_text(_FILE_SOURCE_THREAD)
-        (tmp_path / "w.weave").write_text(
-            'config_version: "1.0"\n'
+        write_document(tmp_path / "t.thread", _FILE_SOURCE_THREAD)
+        write_document(
+            tmp_path / "w.weave",
+            'config_version: "2.0"\n'
             + _lookups_block("countries", "/data/ref/countries.csv")
-            + "threads:\n  - ref: t.thread\n"
+            + "threads:\n  - ref: t.thread\n",
         )
         weave = load_config(tmp_path / "w.weave", project_root=tmp_path)
         assert isinstance(weave, Weave)

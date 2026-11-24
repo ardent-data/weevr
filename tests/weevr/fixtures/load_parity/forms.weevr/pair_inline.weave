@@ -1,8 +1,9 @@
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 
 threads:
   - name: pair
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       data:
         type: csv

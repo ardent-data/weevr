@@ -50,7 +50,7 @@ def _make_cdc_watermark_thread(
 
     return Thread(
         name=name,
-        config_version="1",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=source_path)},
         steps=[],
         target=Target(path=target_path),
@@ -1260,7 +1260,7 @@ class TestCdcSeeds:
         return Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": source}},
                 "target": {**target, **({"seed": seed} if seed else {})},
                 "write": {"mode": "merge", "match_keys": ["id"], **(write or {})},
@@ -1307,7 +1307,7 @@ class TestCdcSeeds:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {"path": tgt, "seed": self.SEED},
                 "write": {"mode": "merge", "match_keys": ["id"]},
@@ -1397,7 +1397,7 @@ class TestSeedsOnAliasTargetsPerWritePath:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {
                     "alias": "seed_plain.t",
@@ -1417,7 +1417,7 @@ class TestSeedsOnAliasTargetsPerWritePath:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {
                     "alias": "seed_dim.t",
@@ -1445,7 +1445,7 @@ class TestCdfFirstRun:
         return Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": source}},
                 "target": {"path": target},
                 "write": {"mode": "merge", "match_keys": ["id"]},

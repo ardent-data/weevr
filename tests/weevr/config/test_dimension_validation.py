@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.config.validation import validate_dimension_overrides
 from weevr.context import Context
@@ -179,7 +180,7 @@ _DIMENSION = {
 
 def _dim_thread(**extra: object) -> dict:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"src": {"type": "delta", "alias": "raw.customers"}},
         "target": {"alias": "gold.dim_customer", "dimension": _DIMENSION},
         **extra,
@@ -187,7 +188,7 @@ def _dim_thread(**extra: object) -> dict:
 
 
 def _write(path: Path, body: dict) -> Path:
-    path.write_text(json.dumps(body))
+    write_document(path, json.dumps(body))
     return path
 
 
@@ -256,7 +257,7 @@ class TestDimensionRulesOnLoad:
 
     def test_inline_thread_in_inline_weave_rejected(self, make_project: MakeProject) -> None:
         inline_thread = {"name": "dim", **_dim_thread(write={"mode": "overwrite"})}
-        inline_weave = {"name": "inl", "config_version": "1.0", "threads": [inline_thread]}
+        inline_weave = {"name": "inl", "config_version": "2.0", "threads": [inline_thread]}
         project = make_project(loom={"weaves": [inline_weave]})
         with pytest.raises(ConfigError, match=r"write\.mode") as exc:
             load_resolved(project / "l.loom", project_root=project)

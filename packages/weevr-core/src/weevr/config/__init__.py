@@ -37,7 +37,8 @@ def load_config(
     ``Context`` uses:
     1. Parse YAML file
     2. Extract and validate config_version
-    3. Detect config type (extension-based for components, content-based for params)
+    3. Take the config kind from the document's ``kind`` (checked against a typed
+       extension), else from the extension or content
     4. Validate schema with Pydantic
     5. Build parameter context (runtime > defaults)
     6. Resolve variable references (${var} and ${var:-default})

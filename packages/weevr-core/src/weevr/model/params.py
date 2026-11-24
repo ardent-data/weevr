@@ -41,4 +41,8 @@ class ParamsConfig(BaseModel):
 
     model_config = {"extra": "allow"}
 
+    kind: Literal["params"] = Field(
+        default="params",
+        description="Document kind. A params document declares 'params'.",
+    )
     config_version: str = Field(description="Schema version of the parameter file.")

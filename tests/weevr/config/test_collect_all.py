@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 import pytest
-import yaml
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.config.collect import collecting, combine, skip_on_error
 from weevr.diagnostics import REGISTRY, diagnostic
@@ -22,7 +22,7 @@ from weevr.errors import (
 
 def _thread(**extra: Any) -> dict[str, Any]:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"a": {"type": "delta", "alias": "x.y"}},
         "target": {"alias": "x.z"},
         **extra,
@@ -30,7 +30,7 @@ def _thread(**extra: Any) -> dict[str, Any]:
 
 
 def _write(path: Path, data: dict[str, Any] | str) -> Path:
-    path.write_text(data if isinstance(data, str) else yaml.safe_dump(data, sort_keys=False))
+    write_document(path, data)
     return path
 
 
@@ -47,7 +47,7 @@ def _fail_with(error: Exception) -> NoReturn:
 @pytest.fixture
 def broken_project(tmp_path: Path) -> Path:
     """A weave whose three threads each break in a different stage."""
-    _write(tmp_path / "a_parse.thread", "config_version: '1.0'\nsources: [1, 2\n")
+    _write(tmp_path / "a_parse.thread", "config_version: '2.0'\nsources: [1, 2\n")
     _write(tmp_path / "b_schema.thread", _thread(write={"mode": "bogus"}))
     _write(
         tmp_path / "c_lookup.thread",
@@ -57,7 +57,7 @@ def broken_project(tmp_path: Path) -> Path:
     return _write(
         tmp_path / "w.weave",
         {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "a_parse.thread"},
                 {"ref": "b_schema.thread"},
@@ -90,9 +90,9 @@ def test_class_is_the_first_diagnostics_stage(broken_project: Path) -> None:
 
 
 def test_a_file_that_fails_to_parse_is_not_checked_further(tmp_path: Path) -> None:
-    _write(tmp_path / "t.thread", "config_version: '1.0'\nwrite: {mode: bogus\n")
+    _write(tmp_path / "t.thread", "config_version: '2.0'\nwrite: {mode: bogus\n")
     weave = _write(
-        tmp_path / "w.weave", {"config_version": "1.0", "threads": [{"ref": "t.thread"}]}
+        tmp_path / "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]}
     )
     with pytest.raises(ConfigParseError) as exc_info:
         load_config(weave)
@@ -101,7 +101,7 @@ def test_a_file_that_fails_to_parse_is_not_checked_further(tmp_path: Path) -> No
 
 def test_a_single_problem_raises_as_before(tmp_path: Path) -> None:
     weave = _write(
-        tmp_path / "w.weave", {"config_version": "1.0", "threads": [{"ref": "nope.thread"}]}
+        tmp_path / "w.weave", {"config_version": "2.0", "threads": [{"ref": "nope.thread"}]}
     )
     with pytest.raises(ReferenceResolutionError) as exc_info:
         load_config(weave)
@@ -113,7 +113,7 @@ def test_inline_threads_are_collected_too(tmp_path: Path) -> None:
     weave = _write(
         tmp_path / "w.weave",
         {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"name": "one", **_thread(write={"mode": "bogus"})},
                 {"name": "two", **_thread(cache="maybe")},

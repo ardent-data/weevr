@@ -4,7 +4,8 @@
 # parameters, and execution settings. Configuration cascades from
 # loom defaults down to individual threads.
 
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 name: sales_lakehouse
 
 # The weaves (and their threads) are defined inline so the example is
@@ -12,10 +13,10 @@ name: sales_lakehouse
 # .thread files and be listed with `ref:`.
 weaves:
   - name: dimensions
-    config_version: "1.0"
+    config_version: "2.0"
     threads:
       - name: dim_customer
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           customers:
             type: delta
@@ -26,10 +27,10 @@ weaves:
   - name: facts
     condition:
       when: "table_exists('curated.dim_customer')"
-    config_version: "1.0"
+    config_version: "2.0"
     threads:
       - name: fact_orders
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           orders:
             type: delta

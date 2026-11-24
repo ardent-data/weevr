@@ -1,7 +1,8 @@
 # Transform extensions — concat, map, fill_null type_defaults,
 # and format in a single pipeline.
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: dim_contacts
 
 sources:

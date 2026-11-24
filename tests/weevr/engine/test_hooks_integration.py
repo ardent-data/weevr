@@ -42,7 +42,7 @@ def _make_thread_model(name: str) -> Thread:
     return Thread.model_validate(
         {
             "name": name,
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"_src": {"type": "delta", "alias": "_src"}},
             "target": {"alias": "test"},
         }
@@ -233,7 +233,7 @@ class TestLookupMaterialization:
         # Thread with a single lookup-based source
         thread = Thread(
             name="lkp_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="codes")},
             steps=[],
             target=Target(path=tgt),
@@ -281,7 +281,7 @@ class TestLookupOnDemand:
 
         thread = Thread(
             name="demand_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="lazy_ref")},
             steps=[],
             target=Target(path=tgt),
@@ -332,7 +332,7 @@ class TestNarrowLookupMaterialization:
 
         thread = Thread(
             name="narrow_proj_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="dim")},
             steps=[],
             target=Target(path=tgt),
@@ -383,7 +383,7 @@ class TestNarrowLookupMaterialization:
 
         thread = Thread(
             name="narrow_filt_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="active_dim")},
             steps=[],
             target=Target(path=tgt),
@@ -422,7 +422,7 @@ class TestNarrowLookupMaterialization:
 
         thread = Thread(
             name="narrow_combo_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="filtered_dim")},
             steps=[],
             target=Target(path=tgt),
@@ -462,7 +462,7 @@ class TestNarrowLookupMaterialization:
 
         thread = Thread(
             name="uk_pass_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="uk_dim")},
             steps=[],
             target=Target(path=tgt),
@@ -502,7 +502,7 @@ class TestNarrowLookupMaterialization:
 
         thread = Thread(
             name="uk_abort_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="dup_dim")},
             steps=[],
             target=Target(path=tmp_delta_path("uk_abort_tgt")),
@@ -538,7 +538,7 @@ class TestNarrowLookupMaterialization:
 
         thread = Thread(
             name="uk_warn_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="warn_dim")},
             steps=[],
             target=Target(path=tgt),
@@ -593,7 +593,7 @@ class TestNarrowLookupOnDemand:
 
         thread = Thread(
             name="narrow_demand_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="lazy_narrow")},
             steps=[],
             target=Target(path=tgt),
@@ -645,7 +645,7 @@ class TestNarrowLookupBackwardCompat:
 
         thread = Thread(
             name="compat_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="full_ref")},
             steps=[],
             target=Target(path=tgt),
@@ -868,7 +868,7 @@ class TestRowCountDeltaBaseline:
         mock_weave.side_effect = _run_weave
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "name": "nightly",
                 "weaves": ["w1"],
                 "post_steps": [
@@ -882,7 +882,7 @@ class TestRowCountDeltaBaseline:
                 ],
             }
         )
-        weaves = {"w1": Weave.model_validate({"config_version": "1.0", "threads": ["A"]})}
+        weaves = {"w1": Weave.model_validate({"config_version": "2.0", "threads": ["A"]})}
 
         with pytest.raises(HookError, match="decrease"):
             execute_loom(spark, loom, weaves, {"w1": {"A": _make_thread_model("A")}})
@@ -899,7 +899,7 @@ class TestRowCountDeltaBaseline:
         thread = Thread.model_validate(
             {
                 "name": "shrinker",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"s": {"type": "delta", "alias": source}},
                 "target": {"alias": target},
                 "write": {"mode": "overwrite"},

@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.context import Context
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.errors import ConfigError
@@ -46,7 +47,7 @@ class Project:
         return {"source": {"type": "delta", "alias": table}, **extra}
 
     def write(self, name: str, body: dict[str, Any]) -> None:
-        (self.dir / name).write_text(json.dumps({"config_version": "1.0", **body}))
+        write_document(self.dir / name, json.dumps({"config_version": "2.0", **body}))
 
     def thread(self, src: str, steps: list[dict[str, Any]], **extra: Any) -> None:
         sources = {"main": {"type": "delta", "alias": src}, **extra.pop("sources", {})}

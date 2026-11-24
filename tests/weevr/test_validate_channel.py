@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.context import Context
 from weevr.errors import ConfigError
 from weevr.result import ExecutionMode
@@ -18,13 +18,13 @@ pytestmark = pytest.mark.spark
 
 def _write(path: Path, data: dict[str, Any] | str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if isinstance(data, str) else yaml.safe_dump(data, sort_keys=False))
+    write_document(path, data)
     return path
 
 
 def _thread(source: str, target: str, **extra: Any) -> dict[str, Any]:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"src": {"type": "delta", "alias": source}},
         "target": {"path": target},
         **extra,
@@ -43,7 +43,7 @@ def project(tmp_path: Path) -> Path:
     _write(
         root / "w.weave",
         {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 {"ref": "broken.thread"},
                 {"ref": "one.thread", "dependencies": ["two"]},
@@ -79,7 +79,7 @@ class TestValidateReports:
         self, spark: SparkSession, tmp_path: Path
     ) -> None:
         root = tmp_path / "p.weevr"
-        _write(root / "t.thread", "config_version: '1.0'\nsources: [1, 2\n")
+        _write(root / "t.thread", "config_version: '2.0'\nsources: [1, 2\n")
         result = Context(spark, root).run("t.thread", mode="validate")
         assert result.status == "failure"
         assert _codes(result) == {"C005"}
@@ -101,7 +101,7 @@ class TestValidateReports:
             root / "t.thread",
             _thread("raw.a", str(tmp_path / "out"), execution={"log_level": "minimal"}),
         )
-        _write(root / "w.weave", {"config_version": "1.0", "threads": [{"ref": "t.thread"}]})
+        _write(root / "w.weave", {"config_version": "2.0", "threads": [{"ref": "t.thread"}]})
         result = Context(spark, root).run("w.weave", mode="validate")
         assert "C491" in _codes(result)
 
@@ -163,7 +163,7 @@ class TestSkippedThreads:
         _write(
             root / "w.weave",
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [{"ref": "a.thread"}, {"ref": "b.thread", "dependencies": ["a"]}],
             },
         )

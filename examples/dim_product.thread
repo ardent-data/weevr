@@ -4,7 +4,8 @@
 # matched on business keys; matched rows are updated, unmatched
 # source rows are inserted, and unmatched target rows are ignored.
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: dim_product
 
 sources:

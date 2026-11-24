@@ -194,7 +194,7 @@ class TestThreadActionBudget:
         thread = Thread.model_validate(
             {
                 "name": "budget_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [{"filter": {"expr": "id < 4"}}],
                 "target": {"path": tgt},
@@ -227,7 +227,7 @@ class TestThreadActionBudget:
         thread = Thread.model_validate(
             {
                 "name": "budget_exp_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -271,7 +271,7 @@ class TestFeatureEnableMatrix:
     def _base_cfg(src: str, tgt: str) -> dict:
         return {
             "name": "matrix_t",
-            "config_version": "1",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": src}},
             "steps": [],
             "target": {"path": tgt},

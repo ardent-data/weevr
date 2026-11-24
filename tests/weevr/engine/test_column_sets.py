@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.engine.column_sets import materialize_column_sets, resolve_column_set
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.column_set import ColumnSet, ColumnSetSource
@@ -690,7 +691,7 @@ class TestResolveOncePerScope:
             return Weave.model_validate(
                 {
                     "name": name,
-                    "config_version": "1",
+                    "config_version": "2.0",
                     "threads": [{"name": f"{name}_t"}],
                 }
             )
@@ -699,7 +700,7 @@ class TestResolveOncePerScope:
             return Thread.model_validate(
                 {
                     "name": name,
-                    "config_version": "1",
+                    "config_version": "2.0",
                     "sources": {"main": {"type": "delta", "alias": src}},
                     "steps": [{"rename": {"column_set": "loomset"}}],
                     "target": {"path": tgt},
@@ -710,7 +711,7 @@ class TestResolveOncePerScope:
         loom = Loom.model_validate(
             {
                 "name": "rps_loom",
-                "config_version": "1",
+                "config_version": "2.0",
                 "weaves": [{"name": "w1"}, {"name": "w2"}],
                 "column_sets": {"loomset": {"param": "cs_param"}},
             }
@@ -755,7 +756,7 @@ class TestResolveOncePerScope:
         thread = Thread.model_validate(
             {
                 "name": "ov_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [{"rename": {"column_set": "shared"}}],
                 "target": {"path": tgt},
@@ -801,7 +802,7 @@ class TestResolveOncePerScope:
         thread = Thread.model_validate(
             {
                 "name": "pre_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [{"rename": {"column_set": "loomset"}}],
                 "target": {"path": tgt},
@@ -990,7 +991,7 @@ class TestYamlColumnSetFile:
         thread = Thread.model_validate(
             {
                 "name": "yaml_cs_thread",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [{"rename": {"column_set": "names"}}],
                 "target": {"path": tgt},
@@ -1017,13 +1018,14 @@ class TestYamlColumnSetFile:
         src = str(tmp_path / "rel_cs_src")
         tgt = str(tmp_path / "rel_cs_tgt")
         spark.createDataFrame([{"cust_id": 1}]).write.format("delta").save(src)
-        (project / "orders.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            project / "orders.thread",
+            'config_version: "2.0"\n'
             f"sources:\n  main:\n    type: delta\n    alias: {src}\n"
             "steps:\n  - rename:\n      column_set: names\n"
             f"target:\n  path: {tgt}\n"
             "write:\n  mode: overwrite\n"
-            "column_sets:\n  names:\n    source:\n      type: yaml\n      path: maps/names.yaml\n"
+            "column_sets:\n  names:\n    source:\n      type: yaml\n      path: maps/names.yaml\n",
         )
 
         thread = load_config(project / "orders.thread", project_root=project)

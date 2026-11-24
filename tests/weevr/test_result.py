@@ -1294,7 +1294,7 @@ class TestLoadedConfig:
     def sample_thread(self) -> Thread:
         return Thread(
             name="dim_customer",
-            config_version="1.0",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias="raw_customers")},
             target=Target(path="/data/curated/dim_customer"),
         )
@@ -1303,7 +1303,7 @@ class TestLoadedConfig:
     def sample_weave(self) -> Weave:
         return Weave(
             name="dimensions",
-            config_version="1.0",
+            config_version="2.0",
             threads=[ThreadEntry(name="dim_customer")],
         )
 
@@ -1312,7 +1312,7 @@ class TestLoadedConfig:
         return Loom.model_validate(
             {
                 "name": "nightly",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["dimensions"],
             }
         )
@@ -1400,7 +1400,7 @@ class TestLoadedConfig:
 
     def test_getattr_proxies_config_version(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
-        assert loaded.config_version == "1.0"
+        assert loaded.config_version == "2.0"
 
     def test_getattr_proxies_sources(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
@@ -1752,7 +1752,7 @@ class TestSummaryPreviewMetadata:
 def _plan_thread(name: str, target: str) -> Thread:
     return Thread(
         name=name,
-        config_version="1.0",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=f"raw.{name}")},
         target=Target(alias=target),
     )
@@ -1761,7 +1761,7 @@ def _plan_thread(name: str, target: str) -> Thread:
 def _cyclic_weave() -> tuple[Weave, dict[str, Thread]]:
     weave = Weave(
         name="cyc",
-        config_version="1.0",
+        config_version="2.0",
         threads=[
             ThreadEntry(name="a", dependencies=["b"]),
             ThreadEntry(name="b", dependencies=["a"]),
@@ -1773,7 +1773,7 @@ def _cyclic_weave() -> tuple[Weave, dict[str, Thread]]:
 def _conflict_weave() -> tuple[Weave, dict[str, Thread]]:
     weave = Weave(
         name="dup",
-        config_version="1.0",
+        config_version="2.0",
         threads=[ThreadEntry(name="jan"), ThreadEntry(name="feb")],
     )
     return weave, {"jan": _plan_thread("jan", "out.same"), "feb": _plan_thread("feb", "out.same")}
@@ -1784,7 +1784,7 @@ class TestValidatePlans:
 
     @staticmethod
     def _loom(*names: str) -> Loom:
-        return Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": list(names)})
+        return Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": list(names)})
 
     def test_reports_every_failing_weave_in_loom_order(self) -> None:
         cyc, cyc_threads = _cyclic_weave()
@@ -1808,7 +1808,7 @@ class TestValidatePlans:
             config_type="loom",
             config_name="l",
             threads={"ok": {"a": _plan_thread("a", "out.a")}},
-            weaves={"ok": Weave(name="ok", config_version="1.0", threads=[ThreadEntry(name="a")])},
+            weaves={"ok": Weave(name="ok", config_version="2.0", threads=[ThreadEntry(name="a")])},
         )
         (issue,) = loaded.validate_plans()
         assert (issue.weave_name, issue.message, issue.error) == (
@@ -1820,7 +1820,7 @@ class TestValidatePlans:
         assert issue.diagnostic.code == "D104"
 
     def test_clean_weave_has_no_issues(self) -> None:
-        weave = Weave(name="w", config_version="1.0", threads=[ThreadEntry(name="a")])
+        weave = Weave(name="w", config_version="2.0", threads=[ThreadEntry(name="a")])
         loaded = LoadedConfig(
             model=weave,
             config_type="weave",

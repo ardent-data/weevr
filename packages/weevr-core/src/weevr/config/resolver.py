@@ -807,6 +807,7 @@ def resolve_references(
     from weevr.config.locations import LocalConfigLocation
     from weevr.config.parser import (
         detect_config_type_from_extension,
+        document_kind,
         extract_config_version,
         parse_yaml,
         validate_config_version,
@@ -851,7 +852,7 @@ def resolve_references(
                             raw = parse_yaml(weave_path)
                             version = extract_config_version(raw)
                             ext_type = detect_config_type_from_extension(weave_path)
-                            child_type = ext_type if ext_type else "weave"
+                            child_type = document_kind(raw, ext_type)
                             validate_config_version(version, child_type)
                             validated = validate_schema(raw, child_type)
                             child_dict = validated.model_dump(exclude_unset=True)
@@ -930,7 +931,7 @@ def resolve_references(
                                     conv_raw = parse_yaml(convention_path)
                                     conv_version = extract_config_version(conv_raw)
                                     conv_type = detect_config_type_from_extension(convention_path)
-                                    child_type = conv_type if conv_type else "weave"
+                                    child_type = document_kind(conv_raw, conv_type)
                                     validate_config_version(conv_version, child_type)
                                     validated = validate_schema(conv_raw, child_type)
                                     child_dict = validated.model_dump(exclude_unset=True)
@@ -1066,7 +1067,7 @@ def resolve_references(
                             raw = parse_yaml(thread_path)
                             version = extract_config_version(raw)
                             ext_type = detect_config_type_from_extension(thread_path)
-                            child_type = ext_type if ext_type else "thread"
+                            child_type = document_kind(raw, ext_type)
                             validate_config_version(version, child_type)
                             validated = validate_schema(raw, child_type)
                             child_dict = validated.model_dump(exclude_unset=True)

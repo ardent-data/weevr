@@ -30,7 +30,7 @@ from weevr.model.write import WriteConfig
 _DELTA = {"type": "delta", "alias": "db.src"}
 _THREAD: dict[str, Any] = {
     "name": "t",
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"a": _DELTA},
     "target": {"alias": "db.out"},
 }
@@ -373,16 +373,16 @@ VALIDATION_CASES = [
 
 _COLS = [{"name": "a", "type": "int"}, {"name": "b", "type": "int"}]
 WARP_CASES = [
-    (WarpConfig, {"config_version": "1.0", "columns": _COLS + _COLS[:1]}, "C444", ""),
+    (WarpConfig, {"config_version": "2.0", "columns": _COLS + _COLS[:1]}, "C444", ""),
     (
         WarpConfig,
-        {"config_version": "1.0", "columns": _COLS, "keys": {"surrogate": "zz"}},
+        {"config_version": "2.0", "columns": _COLS, "keys": {"surrogate": "zz"}},
         "C445",
         "",
     ),
     (
         WarpConfig,
-        {"config_version": "1.0", "columns": _COLS, "keys": {"business": ["a", "zz"]}},
+        {"config_version": "2.0", "columns": _COLS, "keys": {"business": ["a", "zz"]}},
         "C445",
         "",
     ),

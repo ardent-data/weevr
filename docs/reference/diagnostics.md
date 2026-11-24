@@ -164,6 +164,12 @@ The config's kind could not be determined, or is not one weevr knows.
 
 The declared name does not match the file name without its extension.
 
+### C207
+
+`kind-extension-mismatch` · error · stable
+
+The declared kind disagrees with the file's typed extension; expected names the kind.
+
 ## C3xx — References and entry forms
 
 ### C301

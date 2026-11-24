@@ -100,13 +100,13 @@ class TestWarpConfig:
     def test_minimal_valid(self):
         """WarpConfig with config_version and columns is valid."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[  # type: ignore[arg-type]
                 {"name": "customer_id", "type": "bigint"},
                 {"name": "customer_name", "type": "string"},
             ],
         )
-        assert warp.config_version == "1.0"
+        assert warp.config_version == "2.0"
         assert len(warp.columns) == 2
 
     def test_config_version_required(self):
@@ -119,12 +119,12 @@ class TestWarpConfig:
     def test_columns_required(self):
         """WarpConfig without columns raises ValidationError."""
         with pytest.raises(ValidationError):
-            WarpConfig(config_version="1.0")  # type: ignore[call-arg]
+            WarpConfig(config_version="2.0")  # type: ignore[call-arg]
 
     def test_with_keys(self):
         """WarpConfig accepts a keys section."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[  # type: ignore[arg-type]
                 {"name": "customer_sk", "type": "bigint"},
                 {"name": "customer_id", "type": "string"},
@@ -138,7 +138,7 @@ class TestWarpConfig:
     def test_auto_generated_flag(self):
         """WarpConfig accepts auto_generated marker."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[{"name": "id", "type": "bigint"}],  # type: ignore[arg-type]
             auto_generated=True,
         )
@@ -147,7 +147,7 @@ class TestWarpConfig:
     def test_auto_generated_default_false(self):
         """auto_generated defaults to False."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[{"name": "id", "type": "bigint"}],  # type: ignore[arg-type]
         )
         assert warp.auto_generated is False
@@ -156,7 +156,7 @@ class TestWarpConfig:
         """WarpConfig rejects duplicate column names."""
         with pytest.raises(ValidationError, match="[Dd]uplicate"):
             WarpConfig(
-                config_version="1.0",
+                config_version="2.0",
                 columns=[  # type: ignore[arg-type]
                     {"name": "id", "type": "bigint"},
                     {"name": "id", "type": "string"},
@@ -167,7 +167,7 @@ class TestWarpConfig:
         """keys.surrogate must reference a declared column."""
         with pytest.raises(ValidationError, match="surrogate"):
             WarpConfig(
-                config_version="1.0",
+                config_version="2.0",
                 columns=[{"name": "id", "type": "bigint"}],  # type: ignore[arg-type]
                 keys={"surrogate": "nonexistent_sk"},  # type: ignore[arg-type]
             )
@@ -176,7 +176,7 @@ class TestWarpConfig:
         """keys.business entries must reference declared columns."""
         with pytest.raises(ValidationError, match="business"):
             WarpConfig(
-                config_version="1.0",
+                config_version="2.0",
                 columns=[{"name": "id", "type": "bigint"}],  # type: ignore[arg-type]
                 keys={"business": ["id", "missing_col"]},  # type: ignore[arg-type]
             )
@@ -184,7 +184,7 @@ class TestWarpConfig:
     def test_keys_surrogate_valid_reference(self):
         """keys.surrogate referencing a valid column passes."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[  # type: ignore[arg-type]
                 {"name": "customer_sk", "type": "bigint"},
                 {"name": "customer_id", "type": "string"},
@@ -197,7 +197,7 @@ class TestWarpConfig:
     def test_keys_business_valid_references(self):
         """keys.business referencing valid columns passes."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[  # type: ignore[arg-type]
                 {"name": "customer_id", "type": "string"},
                 {"name": "source_system", "type": "string"},
@@ -210,7 +210,7 @@ class TestWarpConfig:
     def test_frozen(self):
         """WarpConfig is immutable."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[{"name": "id", "type": "bigint"}],  # type: ignore[arg-type]
         )
         with pytest.raises(ValidationError):
@@ -219,7 +219,7 @@ class TestWarpConfig:
     def test_round_trip(self):
         """WarpConfig round-trips through serialization."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[  # type: ignore[arg-type]
                 {"name": "customer_sk", "type": "bigint", "nullable": False},
                 {
@@ -236,7 +236,7 @@ class TestWarpConfig:
     def test_description_field(self):
         """WarpConfig accepts a top-level description."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[{"name": "id", "type": "bigint"}],  # type: ignore[arg-type]
             description="Customer dimension schema contract",
         )
@@ -245,4 +245,4 @@ class TestWarpConfig:
     def test_empty_columns_raises(self):
         """WarpConfig rejects empty columns list."""
         with pytest.raises(ValidationError):
-            WarpConfig(config_version="1.0", columns=[])  # type: ignore[arg-type]
+            WarpConfig(config_version="2.0", columns=[])  # type: ignore[arg-type]

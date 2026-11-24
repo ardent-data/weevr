@@ -1,7 +1,7 @@
 """Weave domain model."""
 
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -131,8 +131,12 @@ class Weave(FrozenBase):
             "(e.g. weaves/orders.weave). Set by the loader. An inline weave uses its name."
         ),
     )
+    kind: Literal["weave"] = Field(
+        default="weave",
+        description="Document kind. A weave document declares 'weave'.",
+    )
     config_version: str = Field(
-        description="Configuration schema version. Must be '1.0'.",
+        description="Configuration schema version, 'major.minor'. This release reads '2.0'.",
     )
     threads: list[ThreadEntry] = Field(
         description="Ordered list of thread references in this weave.",

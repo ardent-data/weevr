@@ -7,7 +7,7 @@
     "audit_templates": null,
     "cache": null,
     "column_sets": null,
-    "config_version": "1.0",
+    "config_version": "2.0",
     "connections": null,
     "defaults": null,
     "execution": {
@@ -19,6 +19,7 @@
     "exports": null,
     "failure": null,
     "keys": null,
+    "kind": "thread",
     "load": null,
     "lookups": null,
     "name": "stg_orders",

@@ -39,7 +39,7 @@ def _thread(
     """Construct a minimal Thread for orchestration integration testing."""
     data: dict = {
         "name": name,
-        "config_version": "1",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": source_path}},
         "target": {"path": target_path},
     }
@@ -55,7 +55,7 @@ def _thread_using_alias(name: str, source_alias: str, target_alias: str) -> Thre
     return Thread.model_validate(
         {
             "name": name,
-            "config_version": "1",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": source_alias}},
             "target": {"alias": target_alias},
         }
@@ -139,14 +139,14 @@ class TestEC003LoomSequential:
         create_delta_table(spark, src2, [{"id": 2}])
 
         loom = Loom.model_validate(
-            {"name": "nightly", "config_version": "1", "weaves": ["weave1", "weave2"]}
+            {"name": "nightly", "config_version": "2.0", "weaves": ["weave1", "weave2"]}
         )
         weaves = {
             "weave1": Weave.model_validate(
-                {"config_version": "1", "name": "weave1", "threads": ["t1"]}
+                {"config_version": "2.0", "name": "weave1", "threads": ["t1"]}
             ),
             "weave2": Weave.model_validate(
-                {"config_version": "1", "name": "weave2", "threads": ["t2"]}
+                {"config_version": "2.0", "name": "weave2", "threads": ["t2"]}
             ),
         }
         threads = {
@@ -413,7 +413,7 @@ class TestConditionMemoScope:
         loom = Loom.model_validate(
             {
                 "name": "memo_loom",
-                "config_version": "1",
+                "config_version": "2.0",
                 "weaves": [
                     {"name": "weave1", "condition": {"when": f"row_count('{tgt1}') == 0"}},
                     {"name": "weave2", "condition": {"when": f"row_count('{tgt1}') > 0"}},
@@ -422,10 +422,10 @@ class TestConditionMemoScope:
         )
         weaves = {
             "weave1": Weave.model_validate(
-                {"config_version": "1", "name": "weave1", "threads": ["t1"]}
+                {"config_version": "2.0", "name": "weave1", "threads": ["t1"]}
             ),
             "weave2": Weave.model_validate(
-                {"config_version": "1", "name": "weave2", "threads": ["t2"]}
+                {"config_version": "2.0", "name": "weave2", "threads": ["t2"]}
             ),
         }
         threads = {

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
+from documents import write_document
 from weevr.config import load_config
 from weevr.config.attribution import attribute_errors
 from weevr.config.audit_templates import resolve_template_columns
@@ -32,7 +33,7 @@ from weevr.errors import (
 )
 
 THREAD_BODY: dict[str, Any] = {
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"s": {"type": "delta", "alias": "raw.t"}},
     "target": {"alias": "out.t"},
 }
@@ -43,14 +44,13 @@ def _only(exc: ConfigError) -> Diagnostic:
     return exc.diagnostics[0]
 
 
-def _write(path: Path, data: dict[str, Any] | str) -> Path:
+def _write(path: Path, data: dict[str, Any] | str, kind: str | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if isinstance(data, str) else yaml.safe_dump(data, sort_keys=False))
-    return path
+    return write_document(path, data, kind=kind)
 
 
 def _weave(threads: list[Any]) -> dict[str, Any]:
-    return {"config_version": "1.0", "threads": threads}
+    return {"config_version": "2.0", "threads": threads}
 
 
 class TestParameters:
@@ -181,10 +181,10 @@ class TestReferences:
         assert diag.code == "C301"
         assert diag.file == str(weave)
         assert diag.pointer == "/threads/1/ref"
-        assert diag.line == 4
+        assert diag.line == 5
 
     def test_weave_without_definition(self, tmp_path):
-        loom = {"config_version": "1.0", "weaves": [{"name": "ghost"}]}
+        loom = {"config_version": "2.0", "weaves": [{"name": "ghost"}]}
         with pytest.raises(ReferenceResolutionError) as exc:
             resolve_references(loom, "loom", tmp_path)
         diag = _only(exc.value)
@@ -226,7 +226,7 @@ class TestReferences:
     def test_weave_name_outside_project(self, tmp_path):
         project = tmp_path / "proj"
         project.mkdir()
-        loom = {"config_version": "1.0", "weaves": [{"name": "../outside"}]}
+        loom = {"config_version": "2.0", "weaves": [{"name": "../outside"}]}
         with pytest.raises(ReferenceResolutionError) as exc:
             resolve_references(loom, "loom", project)
         diag = _only(exc.value)
@@ -237,7 +237,7 @@ class TestReferences:
         _write(tmp_path / "a.weave", _weave([{"ref": "a.weave"}]))
         loom = _write(
             tmp_path / "l.loom",
-            {"config_version": "1.0", "weaves": [{"ref": "a.weave"}]},
+            {"config_version": "2.0", "weaves": [{"ref": "a.weave"}]},
         )
         with pytest.raises(ReferenceResolutionError) as exc:
             load_config(loom, project_root=tmp_path)
@@ -257,8 +257,8 @@ class TestReferences:
         assert diag.expected == ("b.weave", "c.weave", "b.weave")
 
     def test_circular_convention_reference(self, tmp_path):
-        _write(tmp_path / "a.weave", {"config_version": "1.0", "threads": []})
-        loom = {"config_version": "1.0", "weaves": [{"name": "a"}]}
+        _write(tmp_path / "a.weave", {"config_version": "2.0", "threads": []})
+        loom = {"config_version": "2.0", "weaves": [{"name": "a"}]}
         with pytest.raises(ReferenceResolutionError) as exc:
             resolve_references(loom, "loom", tmp_path, visited={"a.weave": None})
         diag = _only(exc.value)
@@ -277,7 +277,7 @@ class TestEntryForms:
         assert diag.pointer == "/threads/1"
 
     def test_inline_weave_without_name(self, tmp_path):
-        loom = {"config_version": "1.0", "weaves": [{"threads": []}]}
+        loom = {"config_version": "2.0", "weaves": [{"threads": []}]}
         with pytest.raises(ConfigError) as exc:
             resolve_references(loom, "loom", tmp_path)
         diag = _only(exc.value)
@@ -324,11 +324,11 @@ class TestEntryForms:
 
     def test_inline_weave_entry_pointer_is_prefixed(self, tmp_path):
         loom = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": [
                 {
                     "name": "w",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "threads": [{**THREAD_BODY, "name": "a"}, {**THREAD_BODY, "name": "a"}],
                 },
             ],
@@ -368,7 +368,7 @@ class TestForeach:
 
 class TestEnvelopeAndRegistries:
     def test_unsupported_extension_at_load(self, tmp_path):
-        path = _write(tmp_path / "t.yaml", THREAD_BODY)
+        path = _write(tmp_path / "t.yaml", THREAD_BODY, kind="thread")
         with pytest.raises(ConfigError) as exc:
             resolve_config(LocalConfigLocation(path), require_typed_extension=True)
         diag = _only(exc.value)
@@ -430,13 +430,13 @@ def test_unresolved_variable_under_with_points_at_the_authored_key(tmp_path: Pat
     from weevr.errors import VariableResolutionError
 
     thread = {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
         "with": {"orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${nope}'"}}]}},
     }
     path = tmp_path / "t.thread"
-    path.write_text(yaml.safe_dump(thread, sort_keys=False))
+    write_document(path, yaml.safe_dump(thread, sort_keys=False))
     with pytest.raises(VariableResolutionError) as exc_info:
         load_config(path)
     (diag,) = exc_info.value.diagnostics
@@ -452,13 +452,13 @@ def test_a_user_key_named_with_underscore_keeps_its_name(tmp_path: Path) -> None
     from weevr.errors import VariableResolutionError
 
     thread = {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
         "steps": [{"derive": {"columns": {"with_": "'${nope}'"}}}],
     }
     path = tmp_path / "t.thread"
-    path.write_text(yaml.safe_dump(thread, sort_keys=False))
+    write_document(path, yaml.safe_dump(thread, sort_keys=False))
     with pytest.raises(VariableResolutionError) as exc_info:
         load_config(path)
     (diag,) = exc_info.value.diagnostics

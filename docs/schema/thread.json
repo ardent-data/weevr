@@ -4678,8 +4678,15 @@
       "description": "Raw ref string from the ThreadEntry that loaded this thread. Populated during hydration for telemetry and display.",
       "title": "Template Ref"
     },
+    "kind": {
+      "const": "thread",
+      "default": "thread",
+      "description": "Document kind. A thread document declares 'thread'.",
+      "title": "Kind",
+      "type": "string"
+    },
     "config_version": {
-      "description": "Configuration schema version. Must be '1.0'.",
+      "description": "Configuration schema version, 'major.minor'. This release reads '2.0'.",
       "title": "Config Version",
       "type": "string"
     },

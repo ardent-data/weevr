@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.config import load_resolved
 from weevr.config.validation import (
     collect_execution_scope_warnings,
@@ -35,7 +36,7 @@ def _codes(diagnostics: list[Any]) -> list[str]:
 
 def _thread(steps: list[dict[str, Any]] | None = None, **extra: Any) -> dict[str, Any]:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.sales"}},
         "steps": steps or [],
         "target": {"alias": "gold.fact_sales"},
@@ -265,19 +266,21 @@ class TestLoadReportsEveryError:
         (project / "b").mkdir()
         thread = json.dumps(_thread())
         for folder in ("a", "b"):
-            (project / folder / "x.thread").write_text(thread)
-            (project / folder / "main.weave").write_text(
-                json.dumps({"config_version": "1.0", "threads": [{"ref": f"{folder}/x.thread"}]})
+            write_document(project / folder / "x.thread", thread)
+            write_document(
+                project / folder / "main.weave",
+                json.dumps({"config_version": "2.0", "threads": [{"ref": f"{folder}/x.thread"}]}),
             )
-        (project / "all.loom").write_text(
-            'config_version: "1.0"\nweaves:\n  - ref: a/main.weave\n  - ref: b/main.weave\n'
+        write_document(
+            project / "all.loom",
+            'config_version: "2.0"\nweaves:\n  - ref: a/main.weave\n  - ref: b/main.weave\n',
         )
         with pytest.raises(ConfigError) as exc:
             load_resolved(project / "all.loom", project_root=project)
         (diag,) = exc.value.diagnostics
         assert diag.code == "C350"
         assert diag.pointer == "/weaves/1"
-        assert diag.line == 4
+        assert diag.line == 5
         assert diag.file == str(project / "all.loom")
         assert diag.node == "main"
 

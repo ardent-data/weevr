@@ -212,6 +212,16 @@
       "docs_anchor": "c205"
     },
     {
+      "code": "C207",
+      "name": "kind-extension-mismatch",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The declared kind disagrees with the file's typed extension; expected names the kind.",
+      "docs_anchor": "c207"
+    },
+    {
       "code": "C301",
       "name": "reference-not-found",
       "category": "config",

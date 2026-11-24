@@ -47,7 +47,7 @@ def _make_thread(
 
     data: dict[str, Any] = {
         "name": name,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": sources,
         "target": target,
     }
@@ -313,14 +313,14 @@ class TestLoomRunner:
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
         loom = Loom.model_validate(
-            {"name": "nightly", "config_version": "1.0", "weaves": ["dims", "facts"]}
+            {"name": "nightly", "config_version": "2.0", "weaves": ["dims", "facts"]}
         )
         weaves = {
             "dims": Weave.model_validate(
-                {"config_version": "1.0", "name": "dims", "threads": ["dim_a"]}
+                {"config_version": "2.0", "name": "dims", "threads": ["dim_a"]}
             ),
             "facts": Weave.model_validate(
-                {"config_version": "1.0", "name": "facts", "threads": ["fact_b"]}
+                {"config_version": "2.0", "name": "facts", "threads": ["fact_b"]}
             ),
         }
         threads = {
@@ -346,14 +346,14 @@ class TestLoomRunner:
         mock_exec.side_effect = side_effect
 
         loom = Loom.model_validate(
-            {"name": "nightly", "config_version": "1.0", "weaves": ["dims", "facts"]}
+            {"name": "nightly", "config_version": "2.0", "weaves": ["dims", "facts"]}
         )
         weaves = {
             "dims": Weave.model_validate(
-                {"config_version": "1.0", "name": "dims", "threads": ["dim_a"]}
+                {"config_version": "2.0", "name": "dims", "threads": ["dim_a"]}
             ),
             "facts": Weave.model_validate(
-                {"config_version": "1.0", "name": "facts", "threads": ["fact_b"]}
+                {"config_version": "2.0", "name": "facts", "threads": ["fact_b"]}
             ),
         }
         threads = {
@@ -370,10 +370,10 @@ class TestLoomRunner:
         """All weaves succeed → LoomResult.status='success'."""
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
-        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]})
+        loom = Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": ["w1", "w2"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]}),
-            "w2": Weave.model_validate({"config_version": "1.0", "name": "w2", "threads": ["t2"]}),
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]}),
+            "w2": Weave.model_validate({"config_version": "2.0", "name": "w2", "threads": ["t2"]}),
         }
         threads = {
             "w1": {"t1": _make_thread("t1")},
@@ -393,10 +393,10 @@ class TestLoomRunner:
 
         mock_exec.side_effect = side_effect
 
-        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]})
+        loom = Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": ["w1", "w2"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]}),
-            "w2": Weave.model_validate({"config_version": "1.0", "name": "w2", "threads": ["t2"]}),
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]}),
+            "w2": Weave.model_validate({"config_version": "2.0", "name": "w2", "threads": ["t2"]}),
         }
         threads = {
             "w1": {"t1": _make_thread("t1")},
@@ -417,10 +417,10 @@ class TestLoomRunner:
 
         mock_exec.side_effect = side_effect
 
-        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": ["w1"]})
         weaves = {
             "w1": Weave.model_validate(
-                {"config_version": "1.0", "name": "w1", "threads": ["t_ok", "t_fail"]}
+                {"config_version": "2.0", "name": "w1", "threads": ["t_ok", "t_fail"]}
             ),
         }
         threads = {
@@ -439,9 +439,9 @@ class TestLoomRunner:
         """LoomResult.duration_ms is a non-negative integer."""
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
-        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": ["w1"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]})
         }
         threads = {"w1": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
@@ -534,7 +534,7 @@ class TestParallelismCap:
         loom = Loom.model_validate(
             {
                 "name": "nightly",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["facts"],
                 "execution": {"max_parallel_threads": 2},
             }
@@ -542,7 +542,7 @@ class TestParallelismCap:
         weaves = {
             "facts": Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "name": "facts",
                     "threads": ["A", "B", "C", "D"],
                     "execution": {"log_level": "verbose"},
@@ -591,9 +591,9 @@ class TestParallelismCap:
 
 class TestLoomLogLevelOverride:
     def _loom_fixtures(self, weave_execution: dict | None, thread_fails: bool = False):
-        loom = Loom.model_validate({"name": "nightly", "config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"name": "nightly", "config_version": "2.0", "weaves": ["w1"]})
         weave_data: dict[str, Any] = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "name": "w1",
             "threads": ["A"],
         }
@@ -675,14 +675,14 @@ class TestTraceGating:
     ):
         loom_data: dict[str, Any] = {
             "name": "nightly",
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["w1"],
         }
         if loom_execution is not None:
             loom_data["execution"] = loom_execution
         loom = Loom.model_validate(loom_data)
         weave_data: dict[str, Any] = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "name": "w1",
             "threads": ["A"],
         }
@@ -738,7 +738,7 @@ class TestTraceGating:
         loom = Loom.model_validate(
             {
                 "name": "nightly",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "execution": {"trace": False},
                 "pre_steps": [{"type": "log_message", "message": "starting"}],
@@ -816,9 +816,9 @@ class TestLoomTelemetry:
         """LoomResult always has telemetry (collector created internally)."""
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
-        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": ["w1"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]})
         }
         threads = {"w1": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, threads)
@@ -832,10 +832,10 @@ class TestLoomTelemetry:
         """LoomTelemetry aggregates weave-level telemetry."""
         mock_exec.side_effect = lambda spark, thread, **kwargs: _make_result(thread.name)
 
-        loom = Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": ["w1", "w2"]})
+        loom = Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": ["w1", "w2"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]}),
-            "w2": Weave.model_validate({"config_version": "1.0", "name": "w2", "threads": ["t2"]}),
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]}),
+            "w2": Weave.model_validate({"config_version": "2.0", "name": "w2", "threads": ["t2"]}),
         }
         threads = {
             "w1": {"t1": _make_thread("t1")},
@@ -991,14 +991,14 @@ class TestConditionalWeaveExecution:
         """Weave with condition=False is skipped with a WeaveResult."""
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": [
                     {"name": "dims", "condition": {"when": "false"}},
                 ],
             }
         )
         weaves = {
-            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+            "dims": Weave.model_validate({"config_version": "2.0", "threads": ["t1"]}),
         }
         thread_map = {"dims": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map)
@@ -1027,14 +1027,14 @@ class TestConditionalWeaveExecution:
         )
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": [
                     {"name": "dims", "condition": {"when": "true"}},
                 ],
             }
         )
         weaves = {
-            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+            "dims": Weave.model_validate({"config_version": "2.0", "threads": ["t1"]}),
         }
         thread_map = {"dims": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map)
@@ -1046,14 +1046,14 @@ class TestConditionalWeaveExecution:
         """Weave with param condition that doesn't match is skipped."""
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": [
                     {"name": "dims", "condition": {"when": "${param.schedule} == 'daily'"}},
                 ],
             }
         )
         weaves = {
-            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+            "dims": Weave.model_validate({"config_version": "2.0", "threads": ["t1"]}),
         }
         thread_map = {"dims": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map, params={"schedule": "monthly"})
@@ -1075,14 +1075,14 @@ class TestConditionalWeaveExecution:
         )
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": [
                     {"name": "dims", "condition": {"when": "${param.schedule} == 'daily'"}},
                 ],
             }
         )
         weaves = {
-            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+            "dims": Weave.model_validate({"config_version": "2.0", "threads": ["t1"]}),
         }
         thread_map = {"dims": {"t1": _make_thread("t1")}}
         result = execute_loom(_MOCK_SPARK, loom, weaves, thread_map, params={"schedule": "daily"})
@@ -1105,12 +1105,12 @@ class TestConditionalWeaveExecution:
         )
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["dims"],
             }
         )
         weaves = {
-            "dims": Weave.model_validate({"config_version": "1.0", "threads": ["t1"]}),
+            "dims": Weave.model_validate({"config_version": "2.0", "threads": ["t1"]}),
         }
         thread_map = {"dims": {"t1": _make_thread("t1")}}
         execute_loom(_MOCK_SPARK, loom, weaves, thread_map, params={"env": "prod"})
@@ -1305,7 +1305,7 @@ class TestDeferredLookupMaterialization:
             "B": Thread.model_validate(
                 {
                     "name": "B",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
                     "target": {"alias": "test"},
                 }
@@ -1382,7 +1382,7 @@ class TestDeferredLookupMaterialization:
             "A": Thread.model_validate(
                 {
                     "name": "A",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"lk_ext": {"lookup": "ext"}},
                     "target": {"alias": "test"},
                 }
@@ -1423,7 +1423,7 @@ class TestDeferredLookupMaterialization:
             "B": Thread.model_validate(
                 {
                     "name": "B",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
                     "target": {"alias": "test"},
                 }
@@ -1471,7 +1471,7 @@ class TestDeferredLookupMaterialization:
             "B": Thread.model_validate(
                 {
                     "name": "B",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"lk_cust": {"lookup": "cust"}, "lk_ext": {"lookup": "ext_codes"}},
                     "target": {"alias": "test"},
                 }
@@ -1733,13 +1733,13 @@ class TestColumnSetsCascade:
         )
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "column_sets": {"sap": loom_cs.model_dump()},
             }
         )
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]})
         }
         threads = {"w1": {"t1": _make_thread("t1")}}
 
@@ -1773,7 +1773,7 @@ class TestColumnSetsCascade:
 
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "column_sets": {"sap": loom_cs.model_dump()},
             }
@@ -1781,7 +1781,7 @@ class TestColumnSetsCascade:
         weaves = {
             "w1": Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "name": "w1",
                     "threads": ["t1"],
                     "column_sets": {"sap": weave_cs.model_dump()},
@@ -1821,7 +1821,7 @@ class TestColumnSetsCascade:
 
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "column_sets": {"sap": loom_cs.model_dump()},
             }
@@ -1829,7 +1829,7 @@ class TestColumnSetsCascade:
         weaves = {
             "w1": Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "name": "w1",
                     "threads": ["t1"],
                     "column_sets": {"erp": weave_cs.model_dump()},
@@ -1860,9 +1860,9 @@ class TestColumnSetsCascade:
             duration_ms=0,
         )
 
-        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"config_version": "2.0", "weaves": ["w1"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]})
         }
         threads = {"w1": {"t1": _make_thread("t1")}}
 
@@ -1897,7 +1897,7 @@ class TestConnectionsCascade:
 
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "connections": {
                     "ref": {"type": "onelake", "workspace": "ws-1", "lakehouse": "lh-1"},
@@ -1905,7 +1905,7 @@ class TestConnectionsCascade:
             }
         )
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]})
         }
         threads = {"w1": {"t1": _make_thread("t1")}}
 
@@ -1932,7 +1932,7 @@ class TestConnectionsCascade:
 
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "connections": {
                     "ref": {"type": "onelake", "workspace": "ws", "lakehouse": "ref-lh"},
@@ -1942,7 +1942,7 @@ class TestConnectionsCascade:
         weaves = {
             "w1": Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "name": "w1",
                     "threads": ["t1"],
                     "connections": {
@@ -1976,7 +1976,7 @@ class TestConnectionsCascade:
 
         loom = Loom.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["w1"],
                 "connections": {
                     "ref": {"type": "onelake", "workspace": "ws", "lakehouse": "loom-lh"},
@@ -1986,7 +1986,7 @@ class TestConnectionsCascade:
         weaves = {
             "w1": Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "name": "w1",
                     "threads": ["t1"],
                     "connections": {
@@ -2015,9 +2015,9 @@ class TestConnectionsCascade:
             duration_ms=0,
         )
 
-        loom = Loom.model_validate({"config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"config_version": "2.0", "weaves": ["w1"]})
         weaves = {
-            "w1": Weave.model_validate({"config_version": "1.0", "name": "w1", "threads": ["t1"]})
+            "w1": Weave.model_validate({"config_version": "2.0", "name": "w1", "threads": ["t1"]})
         }
         threads = {"w1": {"t1": _make_thread("t1")}}
 
@@ -2196,11 +2196,11 @@ class TestLoomResourceLifecycle:
 
     def _make_loom(self, **overrides):
         """Build a minimal Loom with optional resource overrides."""
-        data = {"config_version": "1.0", "weaves": ["w1"], **overrides}
+        data = {"config_version": "2.0", "weaves": ["w1"], **overrides}
         return Loom.model_validate(data)
 
     def _make_weave(self, name="w1", **overrides):
-        data = {"config_version": "1.0", "name": name, "threads": ["t1"], **overrides}
+        data = {"config_version": "2.0", "name": name, "threads": ["t1"], **overrides}
         return Weave.model_validate(data)
 
     def _weave_result(self, name="w1"):
@@ -2597,7 +2597,7 @@ class TestConnectionPropagation:
             "B": Thread.model_validate(
                 {
                     "name": "B",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"lk_cust": {"lookup": "cust"}},
                     "target": {"alias": "test"},
                 }
@@ -2650,7 +2650,7 @@ class TestCaptureSamplesWiring:
         thread = Thread.model_validate(
             {
                 "name": "csw_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},

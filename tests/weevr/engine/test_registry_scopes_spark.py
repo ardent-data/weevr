@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.context import Context
 
 pytestmark = pytest.mark.spark
@@ -23,7 +24,7 @@ pytestmark = pytest.mark.spark
 
 def _thread(name: str, target: str) -> str:
     return (
-        'config_version: "1.0"\n'
+        'config_version: "2.0"\n'
         f"name: {name}\n"
         "sources:\n  ref:\n    lookup: shared\n"
         f'target:\n  path: "{target}"\n'
@@ -40,23 +41,27 @@ def project(spark: SparkSession, tmp_path: Path) -> dict[str, Any]:
         )
     root = tmp_path / "scopes.weevr"
     (root / "threads").mkdir(parents=True)
-    (root / "threads" / "t1.thread").write_text(_thread("t1", str(tables / "out_t1")))
-    (root / "threads" / "t2.thread").write_text(_thread("t2", str(tables / "out_t2")))
-    (root / "w1.weave").write_text(
-        'config_version: "1.0"\n'
+    write_document(root / "threads" / "t1.thread", _thread("t1", str(tables / "out_t1")))
+    write_document(root / "threads" / "t2.thread", _thread("t2", str(tables / "out_t2")))
+    write_document(
+        root / "w1.weave",
+        'config_version: "2.0"\n'
         "lookups:\n  shared:\n    source:\n      type: delta\n"
         f'      alias: "{tables / "weave_ref"}"\n    materialize: true\n'
-        "threads:\n  - ref: threads/t1.thread\n"
+        "threads:\n  - ref: threads/t1.thread\n",
     )
-    (root / "w2.weave").write_text('config_version: "1.0"\nthreads:\n  - ref: threads/t2.thread\n')
-    (root / "l.loom").write_text(
-        'config_version: "1.0"\n'
+    write_document(
+        root / "w2.weave", 'config_version: "2.0"\nthreads:\n  - ref: threads/t2.thread\n'
+    )
+    write_document(
+        root / "l.loom",
+        'config_version: "2.0"\n'
         "lookups:\n"
         "  shared:\n    source:\n      type: delta\n"
         f'      alias: "{tables / "loom_ref"}"\n    materialize: true\n'
         "  loom_only:\n    source:\n      type: delta\n"
         f'      alias: "{tables / "loom_ref"}"\n    materialize: true\n'
-        "weaves:\n  - ref: w1.weave\n  - ref: w2.weave\n"
+        "weaves:\n  - ref: w1.weave\n  - ref: w2.weave\n",
     )
     return {"root": root, "tables": tables}
 

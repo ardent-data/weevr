@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 
+from documents import write_document
+
 MakeProject = Callable[..., Path]
 
 
@@ -31,11 +33,11 @@ def make_project(tmp_path: Path) -> MakeProject:
         project = tmp_path / "p.weevr"
         project.mkdir()
         if thread is not None:
-            (project / thread_file).write_text(json.dumps(thread))
-        weave_body = {"config_version": "1.0", "threads": [{"ref": thread_file}], **(weave or {})}
-        (project / "w.weave").write_text(json.dumps(weave_body))
-        loom_body = {"config_version": "1.0", "weaves": [{"ref": "w.weave"}], **(loom or {})}
-        (project / "l.loom").write_text(json.dumps(loom_body))
+            write_document(project / thread_file, json.dumps(thread))
+        weave_body = {"config_version": "2.0", "threads": [{"ref": thread_file}], **(weave or {})}
+        write_document(project / "w.weave", json.dumps(weave_body))
+        loom_body = {"config_version": "2.0", "weaves": [{"ref": "w.weave"}], **(loom or {})}
+        write_document(project / "l.loom", json.dumps(loom_body))
         return project
 
     return make

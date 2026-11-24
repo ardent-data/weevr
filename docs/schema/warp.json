@@ -90,8 +90,15 @@
   },
   "description": "Typed configuration for a .warp file declaring a target table schema.\n\nA warp defines the intended shape of a target table: which columns\nshould exist, their types, nullability, and optional defaults.\nCross-field validators ensure column name uniqueness and key\nreference integrity.",
   "properties": {
+    "kind": {
+      "const": "warp",
+      "default": "warp",
+      "description": "Document kind. A warp document declares 'warp'.",
+      "title": "Kind",
+      "type": "string"
+    },
     "config_version": {
-      "description": "Schema version for the warp file (e.g. '1.0').",
+      "description": "Schema version for the warp file (e.g. '2.0').",
       "title": "Config Version",
       "type": "string"
     },

@@ -35,8 +35,8 @@ from weevr.config.locations import (
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
 from weevr.config.parser import (
     TYPED_EXTENSIONS,
-    detect_config_type,
     detect_config_type_from_extension,
+    document_kind,
     extract_config_version,
     parse_yaml,
     validate_config_version,
@@ -148,7 +148,7 @@ def resolve_config(
                 )
             ],
         )
-    config_type = ext_type if ext_type is not None else detect_config_type(raw)
+    config_type = document_kind(raw, ext_type)
 
     validate_config_version(version, config_type)
     validated = validate_schema(raw, config_type)

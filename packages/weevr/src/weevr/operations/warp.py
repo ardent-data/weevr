@@ -337,7 +337,8 @@ def _write_warp_yaml(path: Path, columns: list[dict[str, Any]]) -> None:
     import yaml
 
     data: dict[str, Any] = {
-        "config_version": "1.0",
+        "kind": "warp",
+        "config_version": "2.0",
         "auto_generated": True,
         "columns": columns,
     }

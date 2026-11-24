@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pyspark.sql import SparkSession
 
+from documents import write_document
 from weevr.context import Context
 from weevr.delta import resolve_delta_table
 from weevr.diagnostics import Diagnostic
@@ -180,7 +181,7 @@ class TestRemoteConfigPathRegression:
             lakehouse="lh-id",
         )
 
-        loom_yaml = "config_version: '1.0'\nname: silver\nweaves: []\n"
+        loom_yaml = "kind: loom\nconfig_version: '2.0'\nname: silver\nweaves: []\n"
 
         with (
             patch.object(RemoteConfigLocation, "read_text", return_value=loom_yaml),
@@ -239,21 +240,21 @@ class TestFilterThreads:
         return {
             "dim_customer": Thread(
                 name="dim_customer",
-                config_version="1.0",
+                config_version="2.0",
                 sources={"main": Source(type="delta", alias="raw_customers")},
                 target=Target(path="/data/dim_customer"),
                 tags=["dimension", "core"],
             ),
             "dim_product": Thread(
                 name="dim_product",
-                config_version="1.0",
+                config_version="2.0",
                 sources={"main": Source(type="delta", alias="raw_products")},
                 target=Target(path="/data/dim_product"),
                 tags=["dimension"],
             ),
             "fact_sales": Thread(
                 name="fact_sales",
-                config_version="1.0",
+                config_version="2.0",
                 sources={"main": Source(type="delta", alias="raw_sales")},
                 target=Target(path="/data/fact_sales"),
                 tags=["fact"],
@@ -302,18 +303,21 @@ class TestLoomDeclaredParamsViaContext:
         project.mkdir()
         thread_dir = project / "threads"
         thread_dir.mkdir()
-        (thread_dir / "stub.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread_dir / "stub.thread",
+            'config_version: "2.0"\n'
             "sources:\n  data:\n    type: delta\n    alias: raw\n"
-            "target:\n  alias: out\n"
+            "target:\n  alias: out\n",
         )
-        (project / "stub.weave").write_text(
-            'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n'
+        write_document(
+            project / "stub.weave",
+            'config_version: "2.0"\nthreads:\n  - ref: threads/stub.thread\n',
         )
         loom_file = project / "spartech_silver.loom"
-        loom_file.write_text(
+        write_document(
+            loom_file,
             """
-config_version: "1.0"
+config_version: "2.0"
 
 weaves:
   - ref: stub.weave
@@ -333,7 +337,7 @@ connections:
     type: onelake
     workspace: "${param.workspace_id}"
     lakehouse: "${param.mirror_db_id}"
-"""
+""",
         )
         return project
 
@@ -369,7 +373,7 @@ connections:
 
 
 _ATTR_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -391,7 +395,7 @@ class TestContextLoadErrorFileAttribution:
         project = tmp_path / "attr.weevr"
         project.mkdir()
         for name, text in files.items():
-            (project / name).write_text(text)
+            write_document(project / name, text)
         return project
 
     def test_schema_error_names_thread(self, tmp_path: Path) -> None:
@@ -400,7 +404,7 @@ class TestContextLoadErrorFileAttribution:
 
         project = self._project(
             tmp_path,
-            {"shape.thread": 'config_version: "1.0"\nsources: [a]\ntarget:\n  path: T/x\n'},
+            {"shape.thread": 'config_version: "2.0"\nsources: [a]\ntarget:\n  path: T/x\n'},
         )
         with pytest.raises(ConfigSchemaError) as exc_info:
             self._ctx(project).load("shape.thread")
@@ -410,7 +414,7 @@ class TestContextLoadErrorFileAttribution:
         """An unsupported version in the loaded thread names it."""
         from weevr.errors import ConfigVersionError
 
-        project = self._project(tmp_path, {"ver.thread": _ATTR_THREAD.replace('"1.0"', '"9.0"')})
+        project = self._project(tmp_path, {"ver.thread": _ATTR_THREAD.replace('"2.0"', '"9.0"')})
         with pytest.raises(ConfigVersionError) as exc_info:
             self._ctx(project).load("ver.thread")
         assert exc_info.value.file_path == str(project / "ver.thread")
@@ -450,8 +454,8 @@ class TestContextLoadErrorFileAttribution:
         project = self._project(
             tmp_path,
             {
-                "shape.thread": 'config_version: "1.0"\nsources: [a]\ntarget:\n  path: T/x\n',
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: shape.thread\n',
+                "shape.thread": 'config_version: "2.0"\nsources: [a]\ntarget:\n  path: T/x\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: shape.thread\n',
             },
         )
         with pytest.raises(ConfigSchemaError) as exc_info:
@@ -466,7 +470,7 @@ class TestContextLoadErrorFileAttribution:
             tmp_path,
             {
                 "bad.thread": _ATTR_THREAD + "write:\n  mode: bogus\n",
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: bad.thread\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: bad.thread\n',
             },
         )
         with pytest.raises(ModelValidationError) as exc_info:
@@ -481,9 +485,9 @@ class TestContextLoadErrorFileAttribution:
             tmp_path,
             {
                 "t.thread": _ATTR_THREAD,
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: t.thread\n'
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: t.thread\n'
                 "lookups:\n  lk:\n    not_a_field: true\n",
-                "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+                "top.loom": 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n',
             },
         )
         with pytest.raises(ModelValidationError) as exc_info:
@@ -495,7 +499,7 @@ class TestContextLoadErrorFileAttribution:
         from weevr.errors import ModelValidationError
 
         inline = (
-            '  - name: t\n    config_version: "1.0"\n'
+            '  - name: t\n    config_version: "2.0"\n'
             "    sources:\n      data:\n        type: delta\n"
             "        alias: raw.c\n    target:\n      path: T/c\n"
             "    write:\n      mode: bogus\n"
@@ -503,8 +507,8 @@ class TestContextLoadErrorFileAttribution:
         project = self._project(
             tmp_path,
             {
-                "w.weave": 'config_version: "1.0"\nthreads:\n' + inline,
-                "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n' + inline,
+                "top.loom": 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n',
             },
         )
         with pytest.raises(ModelValidationError) as exc_info:
@@ -531,7 +535,7 @@ class TestContextLoadChildForeach:
         project = tmp_path / "fe.weevr"
         project.mkdir()
         for name, text in files.items():
-            (project / name).write_text(text)
+            write_document(project / name, text)
         return project
 
     @staticmethod
@@ -544,7 +548,7 @@ class TestContextLoadChildForeach:
             tmp_path,
             {
                 "fe.thread": _FOREACH_THREAD,
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n',
             },
         )
         thread = self._ctx(project).load("w.weave").document.weave_threads()["w"]["fe"]
@@ -556,8 +560,8 @@ class TestContextLoadChildForeach:
             tmp_path,
             {
                 "fe.thread": _FOREACH_THREAD,
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
-                "top.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n',
+                "top.loom": 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n',
             },
         )
         resolved = self._ctx(project).load("top.loom")
@@ -571,7 +575,7 @@ class TestContextLoadChildForeach:
             tmp_path,
             {
                 "fe.thread": thread,
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n'
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n'
                 "    params:\n      cols: [x, y, z]\n",
             },
         )
@@ -588,7 +592,7 @@ class TestContextLoadChildForeach:
             tmp_path,
             {
                 "fe.thread": _FOREACH_THREAD.replace("values: [a, b]", "values: []"),
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n',
             },
         )
         with pytest.raises(ConfigError, match="foreach block at step index") as exc_info:
@@ -601,7 +605,7 @@ class TestContextLoadChildForeach:
             tmp_path,
             {
                 "fe.thread": _FOREACH_THREAD,
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: fe.thread\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: fe.thread\n',
             },
         )
         ctx = self._ctx(project)
@@ -615,13 +619,13 @@ class TestContextLoadInlineWeave:
     """A loom's inline weave hydrates, cascades, and plans like a weave file."""
 
     _LOOM = """\
-config_version: "1.0"
+config_version: "2.0"
 defaults:
   write:
     mode: append
 weaves:
   - name: inline_ops
-    config_version: "1.0"
+    config_version: "2.0"
     condition:
       when: "true"
     threads:
@@ -630,7 +634,7 @@ weaves:
         params:
           region: east
       - name: ops_audit
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           events:
             type: delta
@@ -642,7 +646,7 @@ weaves:
 """
 
     _REGIONAL = """\
-config_version: "1.0"
+config_version: "2.0"
 params:
   region:
     name: region
@@ -660,8 +664,8 @@ target:
     def _load(tmp_path: Path):
         project = tmp_path / "inline.weevr"
         project.mkdir()
-        (project / "x.loom").write_text(TestContextLoadInlineWeave._LOOM)
-        (project / "regional.thread").write_text(TestContextLoadInlineWeave._REGIONAL)
+        write_document(project / "x.loom", TestContextLoadInlineWeave._LOOM)
+        write_document(project / "regional.thread", TestContextLoadInlineWeave._REGIONAL)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
         return ctx.load("x.loom")
 
@@ -685,17 +689,17 @@ target:
     @staticmethod
     def _load_defaults(tmp_path: Path, loom_defaults: str, params: dict | None = None):
         loom = (
-            'config_version: "1.0"\n' + loom_defaults + "weaves:\n"
-            '  - name: inline_ops\n    config_version: "1.0"\n'
+            'config_version: "2.0"\n' + loom_defaults + "weaves:\n"
+            '  - name: inline_ops\n    config_version: "2.0"\n'
             "    defaults:\n      tbl: ops.from_weave\n    threads:\n"
-            '      - name: ops_audit\n        config_version: "1.0"\n'
+            '      - name: ops_audit\n        config_version: "2.0"\n'
             "        sources:\n          events:\n            type: delta\n"
             '            alias: "${src}"\n        target:\n'
             '          alias: "${tbl}"\n'
         )
         project = tmp_path / "defaults.weevr"
         project.mkdir()
-        (project / "x.loom").write_text(loom)
+        write_document(project / "x.loom", loom)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
         return ctx.load("x.loom").document.weave_threads()["inline_ops"]["ops_audit"]
 
@@ -753,9 +757,10 @@ def _create_thread_yaml(base: Path, name: str, src_alias: str, tgt_path: str) ->
     thread_dir = base / "threads"
     thread_dir.mkdir(parents=True, exist_ok=True)
     file_path = thread_dir / f"{name}.thread"
-    file_path.write_text(
+    write_document(
+        file_path,
         f"""\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -764,7 +769,7 @@ target:
   path: "{tgt_path}"
 write:
   mode: overwrite
-"""
+""",
     )
     return file_path
 
@@ -775,12 +780,13 @@ def _create_weave_yaml(base: Path, name: str, thread_names: list[str]) -> Path:
     weave_dir.mkdir(parents=True, exist_ok=True)
     file_path = weave_dir / f"{name}.weave"
     threads_yaml = "\n".join(f'  - ref: "threads/{t}.thread"' for t in thread_names)
-    file_path.write_text(
+    write_document(
+        file_path,
         f"""\
-config_version: "1.0"
+config_version: "2.0"
 threads:
 {threads_yaml}
-"""
+""",
     )
     return file_path
 
@@ -791,12 +797,13 @@ def _create_loom_yaml(base: Path, name: str, weave_names: list[str]) -> Path:
     loom_dir.mkdir(parents=True, exist_ok=True)
     file_path = loom_dir / f"{name}.loom"
     weaves_yaml = "\n".join(f'  - ref: "weaves/{w}.weave"' for w in weave_names)
-    file_path.write_text(
+    write_document(
+        file_path,
         f"""\
-config_version: "1.0"
+config_version: "2.0"
 weaves:
 {weaves_yaml}
-"""
+""",
     )
     return file_path
 
@@ -908,15 +915,16 @@ class TestContextRunExecute:
         weave_dir = project / "weaves"
         weave_dir.mkdir(parents=True, exist_ok=True)
         weave_yaml = weave_dir / "walias.weave"
-        weave_yaml.write_text(
+        write_document(
+            weave_yaml,
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 threads:
   - ref: "threads/t_base.thread"
     as: "gated_variant"
     condition:
       when: "table_exists('{absent_gate}')"
-"""
+""",
         )
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml)
@@ -987,8 +995,10 @@ threads:
         weave_dir = project / "weaves"
         weave_dir.mkdir(parents=True, exist_ok=True)
         weave_file = weave_dir / "wlkp.weave"
-        weave_file.write_text(f"""\
-config_version: "1.0"
+        write_document(
+            weave_file,
+            f"""\
+config_version: "2.0"
 lookups:
   labels:
     source:
@@ -996,7 +1006,8 @@ lookups:
       alias: "{lkp}"
 threads:
   - ref: "threads/tw_lkp.thread"
-""")
+""",
+        )
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_file)
 
@@ -1089,9 +1100,10 @@ class TestValidateMode:
         weave_dir = project / "weaves"
         weave_dir.mkdir(parents=True, exist_ok=True)
         weave_yaml = weave_dir / "vcdup.weave"
-        weave_yaml.write_text(
+        write_document(
+            weave_yaml,
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 threads:
   - ref: "threads/load_full.thread"
     condition:
@@ -1099,7 +1111,7 @@ threads:
   - ref: "threads/load_incr.thread"
     condition:
       when: "not table_empty('{tgt}')"
-"""
+""",
         )
         ctx = Context(spark=spark, project=project)
         result = ctx.run(weave_yaml, mode="validate")
@@ -1195,8 +1207,10 @@ class TestColumnSetWiring:
         thread_dir = project / "threads"
         thread_dir.mkdir(parents=True, exist_ok=True)
         thread_file = thread_dir / "cs_thread.thread"
-        thread_file.write_text(f"""\
-config_version: "1.0"
+        write_document(
+            thread_file,
+            f"""\
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -1208,20 +1222,24 @@ target:
   path: "{tgt}"
 write:
   mode: overwrite
-""")
+""",
+        )
 
         # Weave with a param-sourced column_set definition
         weave_dir = project / "weaves"
         weave_dir.mkdir(parents=True, exist_ok=True)
         weave_file = weave_dir / "cs_weave.weave"
-        weave_file.write_text("""\
-config_version: "1.0"
+        write_document(
+            weave_file,
+            """\
+config_version: "2.0"
 column_sets:
   my_mapping:
     param: col_map
 threads:
   - ref: "threads/cs_thread.thread"
-""")
+""",
+        )
 
         # Runtime params supply the mapping dict
         ctx = Context(
@@ -1255,16 +1273,18 @@ def _stub_execution_project(
     project = tmp_path / "stub.weevr"
     project.mkdir()
     (project / "threads").mkdir()
-    (project / "threads" / "stub.thread").write_text(
-        'config_version: "1.0"\n'
+    write_document(
+        project / "threads" / "stub.thread",
+        'config_version: "2.0"\n'
         "sources:\n  data:\n    type: delta\n    alias: raw\n"
-        "target:\n  alias: out\n" + thread_extra
+        "target:\n  alias: out\n" + thread_extra,
     )
-    (project / "stub.weave").write_text(
-        'config_version: "1.0"\nthreads:\n  - ref: threads/stub.thread\n' + weave_extra
+    write_document(
+        project / "stub.weave",
+        'config_version: "2.0"\nthreads:\n  - ref: threads/stub.thread\n' + weave_extra,
     )
-    (project / "stub.loom").write_text(
-        'config_version: "1.0"\nweaves:\n  - ref: stub.weave\n' + loom_extra
+    write_document(
+        project / "stub.loom", 'config_version: "2.0"\nweaves:\n  - ref: stub.weave\n' + loom_extra
     )
     return project
 
@@ -1553,9 +1573,10 @@ class TestPreviewStepStats:
         thread_dir = tmp_path / "threads"
         thread_dir.mkdir(parents=True, exist_ok=True)
         yaml_path = thread_dir / "pstats.thread"
-        yaml_path.write_text(
+        write_document(
+            yaml_path,
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -1570,7 +1591,7 @@ target:
   path: "{tgt}"
 write:
   mode: overwrite
-"""
+""",
         )
         pytest.importorskip("pandas")  # the sampling action needs pandas
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
@@ -1618,9 +1639,10 @@ write:
         thread_dir = tmp_path / "threads"
         thread_dir.mkdir(parents=True, exist_ok=True)
         yaml_path = thread_dir / "pdeg.thread"
-        yaml_path.write_text(
+        write_document(
+            yaml_path,
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -1635,7 +1657,7 @@ target:
   path: "{tgt}"
 write:
   mode: overwrite
-"""
+""",
         )
         ctx = Context(spark=spark, project=_project_dir(tmp_path))
         result = ctx.run(yaml_path, mode="preview")
@@ -1660,7 +1682,7 @@ class TestValidateModeSourceProbes:
         return Thread.model_validate(
             {
                 "name": "probe_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": source},
                 "target": {"path": tgt},
             }
@@ -1716,7 +1738,7 @@ class TestValidateModeSourceProbes:
         return Thread.model_validate(
             {
                 "name": "probe_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "connections": {
                     "lake": {"type": "onelake", "workspace": "ws", "lakehouse": "lh"},
                 },
@@ -1901,7 +1923,7 @@ class TestValidateInRunSources:
         writer = Thread.model_validate(
             {
                 "name": "writer",
-                "config_version": "1",
+                "config_version": "2.0",
                 "connections": conns,
                 "sources": {"main": {"type": "delta", "alias": one_row_src}},
                 "target": {"connection": "lake", "table": "shared"},
@@ -1910,7 +1932,7 @@ class TestValidateInRunSources:
         reader = Thread.model_validate(
             {
                 "name": "reader",
-                "config_version": "1",
+                "config_version": "2.0",
                 "connections": conns,
                 "sources": {"main": {"connection": "lake", "table": "shared"}},
                 "target": {"path": str(tmp_path / "out")},
@@ -1963,9 +1985,10 @@ class TestPreviewInRunSources:
         project = _project_dir(tmp_path)
         lake = tmp_path / "lake"
         _create_thread_yaml(project, "dim_customer", one_row_src, str(lake / "dim_customer"))
-        (project / "threads" / "fact_sales.thread").write_text(
+        write_document(
+            project / "threads" / "fact_sales.thread",
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 lookups:
   customers:
     source:
@@ -1981,7 +2004,7 @@ target:
   path: "{lake / "fact_sales"}"
 write:
   mode: overwrite
-"""
+""",
         )
         weave = _create_weave_yaml(project, "sales", ["dim_customer", "fact_sales"])
         result = Context(spark=spark, project=project).run(weave, mode="preview")
@@ -1997,9 +2020,10 @@ write:
         project = _project_dir(tmp_path)
         lake = tmp_path / "lake"
         _create_thread_yaml(project, "dim_customer", one_row_src, str(lake / "dim_customer"))
-        (project / "threads" / "fact_sales.thread").write_text(
+        write_document(
+            project / "threads" / "fact_sales.thread",
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 lookups:
   customers:
     source:
@@ -2019,7 +2043,7 @@ target:
   path: "{lake / "fact_sales"}"
 write:
   mode: overwrite
-"""
+""",
         )
         weave = _create_weave_yaml(project, "sales", ["dim_customer", "fact_sales"])
         result = Context(spark=spark, project=project).run(weave, mode="preview")
@@ -2103,7 +2127,7 @@ write:
         project = _project_dir(tmp_path)
         weave = _in_run_weave(project, one_row_src, tmp_path / "lake")
         fact = project / "threads" / "fact_orders.thread"
-        fact.write_text(fact.read_text() + "tags:\n  - fact\n")
+        write_document(fact, fact.read_text() + "tags:\n  - fact\n")
         result = Context(spark=spark, project=project).run(weave, mode="preview", tags=["fact"])
 
         assert result.preview_data is None
@@ -2209,9 +2233,10 @@ class TestPreviewValidationSkipsResults:
         thread_dir = base / "threads"
         thread_dir.mkdir(parents=True, exist_ok=True)
         file_path = thread_dir / f"{name}.thread"
-        file_path.write_text(
+        write_document(
+            file_path,
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -2227,7 +2252,7 @@ target:
   path: "{tgt}"
 write:
   mode: overwrite
-"""
+""",
         )
         return file_path
 
@@ -2307,9 +2332,10 @@ class TestHierarchyVariablesAtExecution:
         archive = tmp_path / "archive"
         thread_dir = project / "threads"
         thread_dir.mkdir()
-        (thread_dir / "orders.thread").write_text(
+        write_document(
+            thread_dir / "orders.thread",
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -2324,7 +2350,7 @@ exports:
   - name: archive
     type: parquet
     path: "{archive}/${{loom.name}}/${{weave.name}}/${{thread.name}}"
-"""
+""",
         )
         _create_weave_yaml(project, "daily", ["orders"])
         loom_yaml = _create_loom_yaml(project, "nightly", ["daily"])
@@ -2346,9 +2372,10 @@ class TestRunNamesOutsideLoom:
     def _orders_thread(project: Path, src: str, tgt: str, archive: Path) -> None:
         thread_dir = project / "threads"
         thread_dir.mkdir(parents=True, exist_ok=True)
-        (thread_dir / "orders.thread").write_text(
+        write_document(
+            thread_dir / "orders.thread",
             f"""\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   main:
     type: delta
@@ -2363,7 +2390,7 @@ exports:
   - name: archive
     type: parquet
     path: "{archive}/w=${{weave.name}}/${{thread.name}}"
-"""
+""",
         )
 
     @staticmethod
@@ -2429,12 +2456,12 @@ class TestPreviewLookups:
 
     @staticmethod
     def _write(project: Path, thread: dict, weave: dict | None = None, loom: dict | None = None):
-        body = {"config_version": "1.0", "target": {"path": str(project / "tgt")}, **thread}
-        (project / "fact.thread").write_text(json.dumps(body))
-        weave_body = {"config_version": "1.0", "threads": [{"ref": "fact.thread"}], **(weave or {})}
-        (project / "w.weave").write_text(json.dumps(weave_body))
-        loom_body = {"config_version": "1.0", "weaves": [{"ref": "w.weave"}], **(loom or {})}
-        (project / "l.loom").write_text(json.dumps(loom_body))
+        body = {"config_version": "2.0", "target": {"path": str(project / "tgt")}, **thread}
+        write_document(project / "fact.thread", json.dumps(body))
+        weave_body = {"config_version": "2.0", "threads": [{"ref": "fact.thread"}], **(weave or {})}
+        write_document(project / "w.weave", json.dumps(weave_body))
+        loom_body = {"config_version": "2.0", "weaves": [{"ref": "w.weave"}], **(loom or {})}
+        write_document(project / "l.loom", json.dumps(loom_body))
 
     def _preview(self, spark: SparkSession, project: Path, entry: str) -> RunResult:
         ctx = Context(spark=spark, project=project)
@@ -2551,13 +2578,15 @@ class TestPreviewLookups:
         broken = {"source": {"type": "delta", "alias": str(tmp_path / "missing")}}
         self._write(project, self._thread(orders, lookups={"dim": broken}))
         healthy = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": orders}},
             "target": {"path": str(project / "tgt2")},
         }
-        (project / "ok.thread").write_text(json.dumps(healthy))
+        write_document(project / "ok.thread", json.dumps(healthy))
         threads = [{"ref": "fact.thread"}, {"ref": "ok.thread"}]
-        (project / "w.weave").write_text(json.dumps({"config_version": "1.0", "threads": threads}))
+        write_document(
+            project / "w.weave", json.dumps({"config_version": "2.0", "threads": threads})
+        )
         result = self._preview(spark, project, "w.weave")
         assert result.preview_data is not None
         assert "ok" in result.preview_data
@@ -2674,10 +2703,12 @@ class TestPreviewWithBlocks:
         bad = self._thread(orders, {"kept": self._cte("no_such_column = 1")})
         good = self._thread(orders, {"kept": self._cte()})
         for name, thread in (("bad", bad), ("good", good)):
-            body = {"config_version": "1.0", "target": target, **thread}
-            (project / f"{name}.thread").write_text(json.dumps(body))
+            body = {"config_version": "2.0", "target": target, **thread}
+            write_document(project / f"{name}.thread", json.dumps(body))
         threads = [{"ref": "bad.thread"}, {"ref": "good.thread"}]
-        (project / "w.weave").write_text(json.dumps({"config_version": "1.0", "threads": threads}))
+        write_document(
+            project / "w.weave", json.dumps({"config_version": "2.0", "threads": threads})
+        )
         result = self._preview(spark, project, "w.weave")
         assert result.status == "partial"
         assert "good" in result.preview_data
@@ -2708,7 +2739,7 @@ class TestNamingOnJoinedColumns:
         target = tmp_path / "tgt"
         project = _project_dir(tmp_path)
         thread = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {
                 "a": {"type": "delta", "alias": left},
                 "b": {"type": "delta", "alias": right},
@@ -2724,7 +2755,7 @@ class TestNamingOnJoinedColumns:
             ],
             "target": {"path": str(target), "naming": {"columns": "snake_case"}},
         }
-        (project / "t.thread").write_text(json.dumps(thread))
+        write_document(project / "t.thread", json.dumps(thread))
         result = Context(spark=spark, project=project).run("t.thread")
         assert result.status == "failure"
         assert not target.exists()

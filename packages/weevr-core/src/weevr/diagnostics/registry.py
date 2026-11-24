@@ -164,6 +164,11 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "name-mismatch",
         "The declared name does not match the file name without its extension.",
     ),
+    _config(
+        "C207",
+        "kind-extension-mismatch",
+        "The declared kind disagrees with the file's typed extension; expected names the kind.",
+    ),
     # C3xx — references and entry forms (config/resolver.py, macros.py, warp.py)
     _config(
         "C301",

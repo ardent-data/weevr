@@ -42,7 +42,7 @@ def _make_thread(
     return Thread.model_validate(
         {
             "name": name,
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"src": {"type": "delta", "alias": "src_table"}},
             "target": target,
         }
@@ -131,7 +131,7 @@ class TestDriftDetectionIntegration:
         thread = Thread.model_validate(
             {
                 "name": "test_thread",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"src": {"type": "delta", "alias": "src_table"}},
                 "target": {
                     "path": path,
@@ -148,7 +148,8 @@ class TestDriftDetectionIntegration:
 
         yaml.safe_dump(
             {
-                "config_version": "1.0",
+                "kind": "warp",
+                "config_version": "2.0",
                 "columns": [
                     {"name": "id", "type": "bigint"},
                     {"name": "name", "type": "string"},
@@ -174,7 +175,7 @@ class TestDriftDetectionIntegration:
         thread = Thread.model_validate(
             {
                 "name": "test_thread",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"src": {"type": "delta", "alias": "src_table"}},
                 "target": {
                     "path": path,
@@ -190,7 +191,8 @@ class TestDriftDetectionIntegration:
 
         yaml.safe_dump(
             {
-                "config_version": "1.0",
+                "kind": "warp",
+                "config_version": "2.0",
                 "columns": [
                     {"name": "id", "type": "bigint"},
                     {"name": "name", "type": "string"},

@@ -126,14 +126,18 @@ def _version_format_error(message: str, cause: Exception | None = None) -> Confi
     )
 
 
-# Supported config versions by type
+# Supported config_version by document kind, in envelope order.
 SUPPORTED_VERSIONS: dict[str, tuple[int, int]] = {
-    "thread": (1, 0),
-    "weave": (1, 0),
-    "loom": (1, 0),
-    "params": (1, 0),
-    "warp": (1, 0),
+    "project": (2, 0),
+    "loom": (2, 0),
+    "weave": (2, 0),
+    "thread": (2, 0),
+    "warp": (2, 0),
+    "params": (2, 0),
 }
+
+# v1 documents keep loading until the v1 path is removed.
+_V1_MAJOR = 1
 
 
 def validate_config_version(version: tuple[int, int], config_type: str) -> None:
@@ -141,10 +145,11 @@ def validate_config_version(version: tuple[int, int], config_type: str) -> None:
 
     Args:
         version: Tuple of (major, minor) version
-        config_type: Type of config (thread, weave, loom, params)
+        config_type: Document kind (see ``SUPPORTED_VERSIONS``)
 
     Raises:
-        ConfigVersionError: If the major version doesn't match supported version
+        ConfigVersionError: If the kind is unknown or the major version is not
+            one this release reads.
     """
     if config_type not in SUPPORTED_VERSIONS:
         raise ConfigVersionError.from_diagnostic(
@@ -159,7 +164,7 @@ def validate_config_version(version: tuple[int, int], config_type: str) -> None:
     supported = SUPPORTED_VERSIONS[config_type]
     major, minor = version
 
-    if major != supported[0]:
+    if major not in (supported[0], _V1_MAJOR):
         raise ConfigVersionError.from_diagnostic(
             diagnostic(
                 "C203",
@@ -169,6 +174,50 @@ def validate_config_version(version: tuple[int, int], config_type: str) -> None:
                 expected=[f"{supported[0]}.x"],
             )
         )
+
+
+def document_kind(raw: dict[str, Any], ext_type: str | None) -> str:
+    """The kind of a parsed document: its declared ``kind``, else its extension.
+
+    ``kind`` is authoritative; a typed extension is a convention it must agree
+    with. A document without ``kind`` falls back to its typed extension, then
+    to detection from its structure.
+
+    Args:
+        raw: Parsed document.
+        ext_type: The kind its typed extension names, or ``None`` for
+            ``.yaml``/``.yml``.
+
+    Returns:
+        The document kind.
+
+    Raises:
+        ConfigParseError: ``kind`` is not a known kind (C204) or disagrees
+            with the typed extension (C207).
+    """
+    if "kind" not in raw:
+        return ext_type if ext_type is not None else detect_config_type(raw)
+
+    kind = raw["kind"]
+    if not isinstance(kind, str) or kind not in SUPPORTED_VERSIONS:
+        raise ConfigParseError.from_diagnostic(
+            diagnostic(
+                "C204",
+                f"Unknown kind {kind!r}, expected one of: {', '.join(SUPPORTED_VERSIONS)}",
+                pointer="/kind",
+                expected=list(SUPPORTED_VERSIONS),
+            )
+        )
+    if ext_type is not None and kind != ext_type:
+        raise ConfigParseError.from_diagnostic(
+            diagnostic(
+                "C207",
+                f"Declared kind '{kind}' does not match the .{ext_type} extension",
+                pointer="/kind",
+                expected=[ext_type],
+            )
+        )
+    return kind
 
 
 # Typed extensions map file suffix to config type

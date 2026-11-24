@@ -20,19 +20,19 @@ class TestThreadConfig:
     def test_minimal_valid_thread(self):
         """Valid minimal thread config."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"customers": "table://dim_customer"},
             "target": {"table": "fact_orders"},
         }
         config = ThreadConfig.model_validate(data)
-        assert config.config_version == "1.0"
+        assert config.config_version == "2.0"
         assert "customers" in config.sources
         assert config.target["table"] == "fact_orders"
 
     def test_full_thread_config(self):
         """Valid thread config with all optional fields."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"customers": "table://dim_customer"},
             "steps": [{"operation": "select", "columns": ["id", "name"]}],
             "target": {"table": "fact_orders"},
@@ -53,7 +53,7 @@ class TestThreadConfig:
     def test_thread_with_execution(self):
         """Thread config with execution block."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"customers": "table://dim_customer"},
             "target": {"table": "fact_orders"},
             "execution": {"log_level": "verbose", "trace": False},
@@ -66,7 +66,7 @@ class TestThreadConfig:
     def test_missing_required_sources(self):
         """Missing required 'sources' field."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "target": {"table": "fact_orders"},
         }
         with pytest.raises(ValidationError):
@@ -75,7 +75,7 @@ class TestThreadConfig:
     def test_missing_required_target(self):
         """Missing required 'target' field."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"customers": "table://dim_customer"},
         }
         with pytest.raises(ValidationError):
@@ -84,7 +84,7 @@ class TestThreadConfig:
     def test_wrong_field_type(self):
         """Wrong field type (sources should be dict)."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": "invalid_string",
             "target": {"table": "fact_orders"},
         }
@@ -98,7 +98,7 @@ class TestWeaveConfig:
     def test_valid_weave(self):
         """Valid weave config with threads list."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["dimensions.dim_customer", "dimensions.dim_product"],
         }
         config = WeaveConfig.model_validate(data)
@@ -108,7 +108,7 @@ class TestWeaveConfig:
     def test_weave_with_execution(self):
         """Weave config with execution block."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["thread1"],
             "execution": {"log_level": "minimal"},
         }
@@ -119,7 +119,7 @@ class TestWeaveConfig:
     def test_weave_with_defaults(self):
         """Weave config with defaults."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["thread1"],
             "defaults": {"write": {"mode": "merge"}},
         }
@@ -129,14 +129,14 @@ class TestWeaveConfig:
 
     def test_missing_threads(self):
         """Missing required 'threads' field."""
-        data = {"config_version": "1.0"}
+        data = {"config_version": "2.0"}
         with pytest.raises(ValidationError):
             WeaveConfig.model_validate(data)
 
     def test_threads_not_list(self):
         """Threads field must be a list."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": "not_a_list",
         }
         with pytest.raises(ValidationError):
@@ -145,7 +145,7 @@ class TestWeaveConfig:
     def test_weave_with_lookups(self):
         """Weave config with lookups passes schema validation."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["t1"],
             "lookups": {
                 "categories": {
@@ -161,7 +161,7 @@ class TestWeaveConfig:
     def test_weave_with_variables(self):
         """Weave config with variables passes schema validation."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["t1"],
             "variables": {"batch_id": {"type": "string"}},
         }
@@ -171,7 +171,7 @@ class TestWeaveConfig:
     def test_weave_with_pre_steps(self):
         """Weave config with pre_steps passes schema validation."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["t1"],
             "pre_steps": [{"type": "quality_gate", "check": "table_exists", "source": "raw"}],
         }
@@ -182,7 +182,7 @@ class TestWeaveConfig:
     def test_weave_with_post_steps(self):
         """Weave config with post_steps passes schema validation."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["t1"],
             "post_steps": [{"type": "log_message", "message": "done"}],
         }
@@ -196,7 +196,7 @@ class TestLoomConfig:
     def test_valid_loom(self):
         """Valid loom config with weaves list."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["dimensions", "facts"],
         }
         config = LoomConfig.model_validate(data)
@@ -206,7 +206,7 @@ class TestLoomConfig:
     def test_loom_with_execution(self):
         """Loom config with execution block."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["weave1"],
             "execution": {"log_level": "debug", "trace": True},
         }
@@ -217,7 +217,7 @@ class TestLoomConfig:
     def test_loom_with_defaults(self):
         """Loom config with defaults."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["weave1"],
             "defaults": {"tags": ["nightly"]},
         }
@@ -227,14 +227,14 @@ class TestLoomConfig:
 
     def test_missing_weaves(self):
         """Missing required 'weaves' field."""
-        data = {"config_version": "1.0"}
+        data = {"config_version": "2.0"}
         with pytest.raises(ValidationError):
             LoomConfig.model_validate(data)
 
     def test_weaves_not_list(self):
         """Weaves field must be a list."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": {"invalid": "dict"},
         }
         with pytest.raises(ValidationError):
@@ -247,26 +247,26 @@ class TestParamsConfig:
     def test_valid_params(self):
         """Valid params file with arbitrary fields."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "env": "dev",
             "lakehouse": "bronze",
             "source_path": "/data/raw",
         }
         config = ParamsConfig.model_validate(data)
-        assert config.config_version == "1.0"
+        assert config.config_version == "2.0"
         # Extra fields are allowed in ParamsConfig
 
     def test_nested_params(self):
         """Params file with nested structure."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "database": {
                 "host": "localhost",
                 "port": 5432,
             },
         }
         config = ParamsConfig.model_validate(data)
-        assert config.config_version == "1.0"
+        assert config.config_version == "2.0"
 
 
 class TestParamSpec:
@@ -309,7 +309,7 @@ class TestValidateSchema:
     def test_validate_thread(self):
         """Validate thread config."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"src": "table://data"},
             "target": {"table": "output"},
         }
@@ -319,7 +319,7 @@ class TestValidateSchema:
     def test_validate_weave(self):
         """Validate weave config."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["thread1"],
         }
         result = validate_schema(data, "weave")
@@ -328,7 +328,7 @@ class TestValidateSchema:
     def test_validate_loom(self):
         """Validate loom config."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["weave1"],
         }
         result = validate_schema(data, "loom")
@@ -337,7 +337,7 @@ class TestValidateSchema:
     def test_validate_params(self):
         """Validate params config."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "env": "dev",
         }
         result = validate_schema(data, "params")
@@ -346,7 +346,7 @@ class TestValidateSchema:
     def test_validate_warp(self):
         """Validate warp config."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "columns": [
                 {"name": "customer_id", "type": "bigint"},
                 {"name": "customer_name", "type": "string"},
@@ -358,7 +358,7 @@ class TestValidateSchema:
 
     def test_unknown_config_type(self):
         """Raise ConfigSchemaError for unknown type."""
-        data = {"config_version": "1.0"}
+        data = {"config_version": "2.0"}
         with pytest.raises(ConfigSchemaError) as exc_info:
             validate_schema(data, "unknown_type")
         assert "Unknown config type" in str(exc_info.value)
@@ -366,7 +366,7 @@ class TestValidateSchema:
     def test_validation_failure_wrapped(self):
         """Pydantic ValidationError wrapped in ConfigSchemaError."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             # Missing required 'threads' field
         }
         with pytest.raises(ConfigSchemaError) as exc_info:
@@ -376,7 +376,7 @@ class TestValidateSchema:
     def test_type_mismatch_wrapped(self):
         """Type mismatch wrapped in ConfigSchemaError."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": "not_a_list",  # Should be list
         }
         with pytest.raises(ConfigSchemaError) as exc_info:
@@ -386,7 +386,7 @@ class TestValidateSchema:
     def test_thread_with_exports(self):
         """Thread config with exports list passes schema validation."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"src": "table://data"},
             "target": {"table": "output"},
             "exports": [
@@ -402,7 +402,7 @@ class TestValidateSchema:
     def test_thread_with_with_block(self):
         """Thread config with with block (named sub-pipelines) passes schema validation."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"customers": "table://dim_customer", "orders": "table://fact_orders"},
             "target": {"table": "enriched_orders"},
             "with": {
@@ -413,7 +413,7 @@ class TestValidateSchema:
             },
         }
         config = ThreadConfig.model_validate(data)
-        assert config.config_version == "1.0"
+        assert config.config_version == "2.0"
         assert "customers" in config.sources
         assert config.target["table"] == "enriched_orders"
         # Verify with_ field is populated via alias

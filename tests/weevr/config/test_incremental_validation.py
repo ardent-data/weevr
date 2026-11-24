@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.config.validation import render_diagnostics, validate_incremental_config
 from weevr.errors import ConfigError
@@ -232,7 +233,7 @@ class TestValidateIncrementalConfig:
 
 
 _CDC_OVERWRITE = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   src: {type: delta, alias: raw.orders}
 target: {alias: silver.orders}
@@ -242,7 +243,7 @@ load:
 """
 
 _PARAM_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 params:
   start: {name: start, type: string, default: "2024-01-01"}
 sources:
@@ -255,7 +256,7 @@ load: {mode: incremental_parameter}
 """
 
 _PARAM_FREE_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   src: {type: delta, alias: raw.orders}
 steps:
@@ -271,7 +272,7 @@ def _project(tmp_path: Path, files: dict[str, str]) -> Path:
     for name, text in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+        write_document(path, text)
     return root
 
 
@@ -310,8 +311,8 @@ class TestIncrementalChecksAtLoad:
             tmp_path,
             {
                 "threads/t.thread": _CDC_OVERWRITE,
-                "w.weave": 'config_version: "1.0"\nthreads:\n  - ref: threads/t.thread\n',
-                "l.loom": 'config_version: "1.0"\nweaves:\n  - ref: w.weave\n',
+                "w.weave": 'config_version: "2.0"\nthreads:\n  - ref: threads/t.thread\n',
+                "l.loom": 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n',
             },
         )
         for config in ("w.weave", "l.loom"):
@@ -321,10 +322,10 @@ class TestIncrementalChecksAtLoad:
 
     def test_inline_thread_names_the_enclosing_file(self, tmp_path: Path) -> None:
         weave = (
-            'config_version: "1.0"\n'
+            'config_version: "2.0"\n'
             "threads:\n"
             "  - name: t\n"
-            '    config_version: "1.0"\n'
+            '    config_version: "2.0"\n'
             "    sources: {src: {type: delta, alias: raw.orders}}\n"
             "    target: {alias: silver.orders}\n"
             "    load: {mode: cdc, cdc: {preset: delta_cdf}}\n"
@@ -341,7 +342,7 @@ class TestIncrementalChecksAtLoad:
             {
                 "threads/t.thread": _CDC_OVERWRITE,
                 "w.weave": (
-                    'config_version: "1.0"\ndefaults:\n  write: {mode: merge, match_keys: [id]}\n'
+                    'config_version: "2.0"\ndefaults:\n  write: {mode: merge, match_keys: [id]}\n'
                     "threads:\n  - ref: threads/t.thread\n"
                 ),
             },
@@ -401,7 +402,7 @@ class TestIncrementalParameterWarning:
             {
                 "threads/t.thread": _PARAM_THREAD,
                 "w.weave": (
-                    'config_version: "1.0"\nthreads:\n'
+                    'config_version: "2.0"\nthreads:\n'
                     "  - ref: threads/t.thread\n    as: a\n    params: {start: '2025-01-01'}\n"
                 ),
             },
@@ -430,7 +431,7 @@ class TestIncrementalDiagnostics:
         return Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"src": {"type": "delta", "alias": "raw.orders"}},
                 "target": {"alias": "silver.orders"},
                 **fields,

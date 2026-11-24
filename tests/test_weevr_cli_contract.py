@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.config.parser import TYPED_EXTENSIONS
 from weevr.config.validation import validate_incremental_config
@@ -126,10 +127,11 @@ def test_validate_incremental_config_shape() -> None:
 def test_missing_parameter_error(tmp_path: Path) -> None:
     """weevr-cli spots a missing runtime parameter by this message and key."""
     cfg = tmp_path / "t.thread"
-    cfg.write_text(
-        'config_version: "1.0"\nparams:\n  region:\n    type: string\n    required: true\n'
+    write_document(
+        cfg,
+        'config_version: "2.0"\nparams:\n  region:\n    type: string\n    required: true\n'
         "sources:\n  d:\n    type: delta\n    alias: raw.${param.region}\n"
-        "target:\n  alias: out.x\n"
+        "target:\n  alias: out.x\n",
     )
     with pytest.raises(ConfigError) as exc:
         load_config(cfg)

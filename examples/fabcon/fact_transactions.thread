@@ -11,7 +11,8 @@
 #
 # Run: ctx.run("fact_transactions.thread")
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: fact_transactions
 
 sources:

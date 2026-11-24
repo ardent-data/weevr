@@ -4,7 +4,8 @@
 # Validations run pre-write on the DataFrame; assertions run post-write
 # against the target table.
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: dim_store
 
 sources:

@@ -16,7 +16,7 @@
   "model": {
     "audit_templates": null,
     "column_sets": null,
-    "config_version": "1.0",
+    "config_version": "2.0",
     "connections": null,
     "defaults": {
       "execution": {
@@ -32,6 +32,7 @@
       "max_parallel_threads": null,
       "trace": true
     },
+    "kind": "loom",
     "lookups": null,
     "name": "sales_lakehouse",
     "naming": null,
@@ -77,7 +78,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -89,6 +90,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "dim_customer",
@@ -161,7 +163,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -173,6 +175,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "fact_orders",
@@ -320,10 +323,11 @@
     "dimensions": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": null,
       "execution": null,
+      "kind": "weave",
       "lookups": null,
       "name": "dimensions",
       "naming": null,
@@ -346,10 +350,11 @@
     "facts": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": null,
       "execution": null,
+      "kind": "weave",
       "lookups": null,
       "name": "facts",
       "naming": null,

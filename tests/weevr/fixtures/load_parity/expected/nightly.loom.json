@@ -23,7 +23,7 @@
   "model": {
     "audit_templates": null,
     "column_sets": null,
-    "config_version": "1.0",
+    "config_version": "2.0",
     "connections": null,
     "defaults": {
       "execution": {
@@ -31,6 +31,7 @@
       }
     },
     "execution": null,
+    "kind": "loom",
     "lookups": null,
     "name": "nightly",
     "naming": null,
@@ -59,7 +60,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -71,6 +72,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "ops_audit",
@@ -132,7 +134,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -144,6 +146,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "ops_summary",
@@ -207,7 +210,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -219,6 +222,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "orders_east",
@@ -303,7 +307,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -315,6 +319,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "orders_west",
@@ -399,7 +404,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -411,6 +416,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "stg_orders",
@@ -616,12 +622,13 @@
     "inline_ops": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": {
         "audit_table": "ops.audit"
       },
       "execution": null,
+      "kind": "weave",
       "lookups": null,
       "name": "inline_ops",
       "naming": null,
@@ -654,7 +661,7 @@
     "sales": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": {
         "write": {
@@ -662,6 +669,7 @@
         }
       },
       "execution": null,
+      "kind": "weave",
       "lookups": null,
       "name": "sales",
       "naming": null,

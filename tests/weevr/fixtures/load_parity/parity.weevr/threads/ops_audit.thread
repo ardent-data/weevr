@@ -1,4 +1,5 @@
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   events:

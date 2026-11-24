@@ -18,7 +18,7 @@ from weevr.model.sub_pipeline import SubPipeline
 
 BASE: dict[str, Any] = {
     "name": "t",
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"a": {"type": "delta", "alias": "x.y"}},
     "target": {"alias": "x.z"},
 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -72,8 +72,12 @@ class WarpConfig(FrozenBase):
     reference integrity.
     """
 
+    kind: Literal["warp"] = Field(
+        default="warp",
+        description="Document kind. A warp document declares 'warp'.",
+    )
     config_version: str = Field(
-        description="Schema version for the warp file (e.g. '1.0').",
+        description="Schema version for the warp file (e.g. '2.0').",
     )
     description: str | None = Field(
         default=None,

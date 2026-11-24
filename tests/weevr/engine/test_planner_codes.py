@@ -2,6 +2,7 @@
 
 import pytest
 
+from documents import write_document
 from weevr.engine.planner import build_plan
 from weevr.errors.exceptions import ConfigError
 from weevr.model.source import Source
@@ -14,7 +15,7 @@ from weevr.result import LoadedConfig, PlanIssue
 def _thread(name: str, target: str, source: str | None = None) -> Thread:
     return Thread(
         name=name,
-        config_version="1.0",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=source or f"raw.{name}")},
         target=Target(alias=target),
     )
@@ -71,7 +72,7 @@ class TestPlanIssueDiagnostic:
         threads = {"a": _thread("a", "out.a"), "b": _thread("b", "out.b")}
         weave_cfg = {
             "name": "cyc",
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": [
                 ThreadEntry(name="a", dependencies=["b"]),
                 ThreadEntry(name="b", dependencies=["a"]),
@@ -97,7 +98,7 @@ def test_missing_weave_issue_is_coded() -> None:
     from weevr.model import Loom
     from weevr.result import LoadedConfig
 
-    loom = Loom.model_validate({"config_version": "1.0", "name": "l", "weaves": ["w"]})
+    loom = Loom.model_validate({"config_version": "2.0", "name": "l", "weaves": ["w"]})
     loaded = LoadedConfig(loom, "loom", "l", threads={}, weaves={})
     (issue,) = loaded.validate_plans()
     assert issue.error is None
@@ -112,24 +113,25 @@ def test_cycle_diagnostic_names_the_weave_file(tmp_path) -> None:
 
     def thread(name: str) -> dict:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"s": {"type": "delta", "alias": f"raw.{name}"}},
             "target": {"alias": f"out.{name}"},
         }
 
     for name in ("a", "b"):
-        (tmp_path / f"{name}.thread").write_text(yaml.safe_dump(thread(name)))
+        write_document(tmp_path / f"{name}.thread", yaml.safe_dump(thread(name)))
     weave = tmp_path / "w.weave"
-    weave.write_text(
+    write_document(
+        weave,
         yaml.safe_dump(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     {"ref": "a.thread", "dependencies": ["b"]},
                     {"ref": "b.thread", "dependencies": ["a"]},
                 ],
             }
-        )
+        ),
     )
     (issue,) = load_resolved(weave, project_root=tmp_path).validate_plans()
     assert issue.diagnostic is not None

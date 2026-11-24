@@ -7,12 +7,13 @@
 # inline so the example is self-contained; in a project they would usually live
 # in their own .thread files and be listed with `ref:`.
 
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: customer_pipeline
 
 threads:
   - name: staging_customers
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       raw_customers:
         type: delta
@@ -23,7 +24,7 @@ threads:
   - name: dim_customer
     dependencies:
       - staging_customers
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       customers:
         type: delta
@@ -34,7 +35,7 @@ threads:
   - name: fact_customer_orders
     dependencies:
       - dim_customer
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       orders:
         type: delta
