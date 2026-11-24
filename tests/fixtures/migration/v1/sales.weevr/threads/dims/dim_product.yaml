@@ -1,0 +1,9 @@
+config_version: "1.0"
+
+sources:
+  products:
+    type: delta
+    alias: raw.products
+
+target:
+  alias: gold.dim_product

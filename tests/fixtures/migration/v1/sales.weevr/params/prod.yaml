@@ -1,0 +1,4 @@
+# Parameter values for the prod environment.
+config_version: "1.0"
+env: prod
+region: eastus

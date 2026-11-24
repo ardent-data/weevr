@@ -1,0 +1,9 @@
+kind: warp
+config_version: "2.0"
+description: "Expected shape of gold.dim_customer"
+columns:
+  - name: customer_id
+    type: bigint
+    nullable: false
+  - name: customer_name
+    type: string
