@@ -131,7 +131,7 @@ _LOOKUP = {"source": {"type": "delta", "alias": "gold.dim_codes"}}
 
 def _thread(steps: list[dict], **extra: Any) -> dict:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.sales"}, **extra.pop("sources", {})},
         "steps": steps,
         "target": {"alias": "gold.fact_sales"},
@@ -251,13 +251,13 @@ class TestResolveLookupsInlineAndWith:
 
     def test_inline_thread_sees_loom_lookups(self, make_project: MakeProject) -> None:
         inline_thread = {"name": "fact", **_thread([{"resolve": _RESOLVE}])}
-        inline_weave = {"name": "inl", "config_version": "1.0", "threads": [inline_thread]}
+        inline_weave = {"name": "inl", "config_version": "2.0", "threads": [inline_thread]}
         proj = make_project(loom={"weaves": [inline_weave], "lookups": {"dim_codes": _LOOKUP}})
         load_resolved(proj / "l.loom", project_root=proj)
 
     def test_inline_thread_undefined_attributed_to_loom(self, make_project: MakeProject) -> None:
         inline_thread = {"name": "fact", **_thread([{"resolve": {**_RESOLVE, "lookup": "nope"}}])}
-        inline_weave = {"name": "inl", "config_version": "1.0", "threads": [inline_thread]}
+        inline_weave = {"name": "inl", "config_version": "2.0", "threads": [inline_thread]}
         proj = make_project(loom={"weaves": [inline_weave]})
         with pytest.raises(ConfigError, match="undefined lookup 'nope'") as exc:
             load_resolved(proj / "l.loom", project_root=proj)
@@ -297,7 +297,7 @@ class TestSourceLookupsAtLoad:
     @staticmethod
     def _thread(**overrides: Any) -> dict[str, Any]:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {
                 "s": {"type": "delta", "alias": "raw.c"},
                 "dim": {"lookup": "dim_codes"},

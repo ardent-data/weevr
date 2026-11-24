@@ -8,7 +8,8 @@
 # Threads reference lookups via the `lookup` key in their sources block
 # (instead of a direct `type` + `alias` reference).
 
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: enrichment_pipeline
 
 lookups:
@@ -29,7 +30,7 @@ lookups:
 # they would usually live in their own .thread files and be listed with `ref:`.
 threads:
   - name: enrich_customers
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       customers:
         type: delta
@@ -47,7 +48,7 @@ threads:
   - name: enrich_orders
     dependencies:
       - enrich_customers
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       orders:
         type: delta

@@ -2,7 +2,7 @@
 
 The corpus is every example config, the ``load_parity`` fixture project, and
 the ``forms`` project (each entry form at each scope: inline, file-referenced
-and convention weaves; inline, file-referenced and ``as``/``params`` template
+weaves; inline, file-referenced and ``as``/``params`` template
 threads; ``foreach``; defaults; lookups, column sets and variables declared at
 every level with shadowing; dependencies and conditions on entries).
 
@@ -28,8 +28,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from pyspark.sql import SparkSession
-from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, FABCON_DIR, REQUIRED_PARAMS
+from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, REQUIRED_PARAMS, project_root
 
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.config.validation import render_diagnostics
 from weevr.context import Context
@@ -75,7 +76,7 @@ class Case:
 
 
 def _example_case(path: Path) -> Case:
-    project = FABCON_DIR if FABCON_DIR in path.parents else EXAMPLES_DIR
+    project = project_root(path)
     rel = path.relative_to(EXAMPLES_DIR).as_posix()
     return Case(project, path.relative_to(project).as_posix(), REQUIRED_PARAMS.get(rel))
 
@@ -286,7 +287,7 @@ class TestContextLoadParity:
 
 
 _CYCLE_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -296,7 +297,7 @@ target:
 """
 
 _CYCLE_WEAVE = """\
-config_version: "1.0"
+config_version: "2.0"
 threads:
   - ref: a.thread
     dependencies: [b]
@@ -306,14 +307,14 @@ threads:
 
 
 _CONFLICT_WEAVE = """\
-config_version: "1.0"
+config_version: "2.0"
 threads:
   - ref: c.thread
   - ref: d.thread
 """
 
 _CONFLICT_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -328,17 +329,17 @@ class TestValidateWording:
 
     @staticmethod
     def _project(tmp_path: Path) -> Path:
-        project = tmp_path / "cycle.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "cycle.weevr")
         for name in ("a", "b"):
-            (project / f"{name}.thread").write_text(_CYCLE_THREAD.format(name=name))
-        (project / "cyc.weave").write_text(_CYCLE_WEAVE)
-        (project / "cyc.loom").write_text('config_version: "1.0"\nweaves:\n  - ref: cyc.weave\n')
+            write_document(project / f"{name}.thread", _CYCLE_THREAD.format(name=name))
+        write_document(project / "cyc.weave", _CYCLE_WEAVE)
+        write_document(project / "cyc.loom", 'config_version: "2.0"\nweaves:\n  - ref: cyc.weave\n')
         for name in ("c", "d"):
-            (project / f"{name}.thread").write_text(_CONFLICT_THREAD.format(name=name))
-        (project / "dup.weave").write_text(_CONFLICT_WEAVE)
-        (project / "both.loom").write_text(
-            'config_version: "1.0"\nweaves:\n  - ref: cyc.weave\n  - ref: dup.weave\n'
+            write_document(project / f"{name}.thread", _CONFLICT_THREAD.format(name=name))
+        write_document(project / "dup.weave", _CONFLICT_WEAVE)
+        write_document(
+            project / "both.loom",
+            'config_version: "2.0"\nweaves:\n  - ref: cyc.weave\n  - ref: dup.weave\n',
         )
         return project
 

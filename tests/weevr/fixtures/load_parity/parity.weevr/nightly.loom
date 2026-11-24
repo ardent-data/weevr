@@ -1,4 +1,5 @@
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 
 defaults:
   execution:
@@ -7,13 +8,13 @@ defaults:
 weaves:
   - ref: weaves/sales.weave
   - name: inline_ops
-    config_version: "1.0"
+    config_version: "2.0"
     defaults:
       audit_table: ops.audit
     threads:
       - ref: threads/ops_audit.thread
       - name: ops_summary
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           audit:
             type: delta

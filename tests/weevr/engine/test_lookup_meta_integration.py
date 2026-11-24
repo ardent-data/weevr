@@ -63,7 +63,7 @@ def _lookup_cfg(dim_path: str, *, unique_key: bool) -> dict[str, Any]:
 def _thread_cfg(src_path: str, tgt_path: str, *, lookups: dict[str, Any] | None = None) -> Thread:
     cfg: dict[str, Any] = {
         "name": "fact_t",
-        "config_version": "1",
+        "config_version": "2.0",
         "sources": {
             "main": {"type": "delta", "alias": src_path},
             "dim_codes": {"lookup": "dim_codes"},

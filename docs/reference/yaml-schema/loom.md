@@ -10,10 +10,11 @@ runtime settings that cascade down through weaves to threads.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
+| `kind` | `string` | yes | -- | Document kind: `loom` |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"2.0"`) |
 | `name` | `string` | no | `""` | Human-readable loom name |
 | `qualified_key` | `string` | -- | set by loader | Read-only. The loom file's path relative to the project root (for example `looms/nightly.loom`). Populated at load; not set in YAML. |
-| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave entries. Strings are shorthand for `{ name: "<value>" }`. Use `ref` for an external file, `name` alone for `<name>.weave` in the project root, or `name` plus a weave body for an inline weave. |
+| `weaves` | `list[WeaveEntry or string]` | yes | -- | Weave entries: `ref` for an external file, or `name` plus a weave body for an inline weave. A bare `name` with no body fails with `C313`. |
 | `defaults` | `dict[string, any]` | no | `null` | Default values cascaded into every weave and thread. `audit_columns` and `exports` use additive merge (see [Exports guide](../../guides/exports.md)). |
 | `params` | `dict[string, ParamSpec]` | no | `null` | Typed parameter declarations scoped to this loom |
 | `execution` | `ExecutionConfig` | no | `null` | Runtime settings: `log_level`, `trace`, `max_parallel_threads`, `capture_samples`. Merges field-level with weave blocks (weave-set fields win). See the [Execution Settings guide](../../guides/execution-settings.md). |
@@ -30,16 +31,17 @@ runtime settings that cascade down through weaves to threads.
 
 ## weaves (WeaveEntry)
 
-Each entry in the `weaves` list is either a plain string (shorthand) or a
-`WeaveEntry` object. An entry takes one of three forms:
+Each entry in the `weaves` list is a `WeaveEntry` object in one of two forms:
 
 - **`ref`** — an external `.weave` file, relative to the project root.
-- **`name` alone** — the weave file `<name>.weave` in the project root. If
-  that file does not exist, loading fails with an error naming it.
 - **`name` plus a weave body** — an inline weave defined in the loom. The body
   takes the same keys as a `.weave` file, including `config_version` and
   `threads`; threads can be inline or use `ref`. Errors in an inline weave
   name the loom file.
+
+A `name` with no body, or a plain string entry, fails the load with
+[`C313`](../diagnostics.md#c313): write `ref: <name>.weave` instead. weevr
+never loads a weave file by naming convention.
 
 Each weave's name must be unique within the loom; a second entry with the same
 name fails the load with an error naming both entries. A `ref` entry takes its
@@ -56,7 +58,7 @@ weaves:
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `ref` | `string` | no | `null` | Path to an external `.weave` file, relative to the project root. Mutually exclusive with an inline weave body. |
-| `name` | `string` | no | `""` | Weave name, unique within the loom. Without `ref`, names `<name>.weave` in the project root or an inline weave. With `ref`, overrides the name taken from the filename stem. |
+| `name` | `string` | no | `""` | Weave name, unique within the loom. Without `ref`, names the inline weave. With `ref`, overrides the name taken from the filename stem. |
 | `condition` | `ConditionSpec` | no | `null` | Conditional execution gate |
 
 ### weaves.condition (ConditionSpec)
@@ -158,7 +160,8 @@ weave field wins), and it never applies at thread scope. See the
 ## Complete example
 
 ```yaml
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 name: daily_etl
 
 weaves:
@@ -189,28 +192,13 @@ naming:
   tables: snake_case
 ```
 
-### Shorthand weave syntax
+### Referenced weaves
 
-Weave entries can be plain strings when the weave lives in `<name>.weave`
-in the project root and needs no condition:
+A weave entry is a `ref:` or an inline body. A bare `name:` with no body
+fails at load (`C313`); write `ref: <name>.weave` instead. No file is loaded
+by naming convention.
 
-```yaml
-weaves:
-  - ingest_raw
-  - build_curated
-  - publish_marts
-```
-
-This is equivalent to:
-
-```yaml
-weaves:
-  - name: ingest_raw
-  - name: build_curated
-  - name: publish_marts
-```
-
-For external file references, use `ref` explicitly:
+To reference external files, use `ref`:
 
 ```yaml
 weaves:
@@ -227,13 +215,13 @@ An inline weave keeps a small weave in the loom file itself:
 weaves:
   - ref: ingest_raw.weave
   - name: ops_audit
-    config_version: "1.0"
+    config_version: "2.0"
     condition:
       when: "table_exists('ops.audit_events')"
     threads:
       - ref: threads/audit_events.thread
       - name: audit_summary
-        config_version: "1.0"
+        config_version: "2.0"
         sources:
           events:
             type: delta

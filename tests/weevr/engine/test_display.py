@@ -1120,7 +1120,7 @@ class TestRenderFlowSvg:
         """A disabled export on a real thread renders no export node."""
         thread = Thread.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"customers": {"type": "delta", "alias": "raw.customers"}},
                 "target": {"alias": "test"},
                 "exports": [

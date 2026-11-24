@@ -8,7 +8,8 @@
 #
 # Variables are used to capture a SQL result and reference it in a log step.
 
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: orders_pipeline
 
 variables:
@@ -64,7 +65,7 @@ post_steps:
 # they would usually live in their own .thread files and be listed with `ref:`.
 threads:
   - name: staging_orders
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       raw_orders:
         type: delta
@@ -75,7 +76,7 @@ threads:
   - name: fact_orders
     dependencies:
       - staging_orders
-    config_version: "1.0"
+    config_version: "2.0"
     sources:
       orders:
         type: delta

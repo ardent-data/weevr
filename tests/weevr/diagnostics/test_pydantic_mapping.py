@@ -10,6 +10,7 @@ import yaml
 from pydantic import BaseModel, ValidationError, field_validator
 from pydantic_core import PydanticCustomError
 
+from documents import write_document
 from weevr.config import load_config
 from weevr.diagnostics import Diagnostic, track_usage
 from weevr.diagnostics.positions import json_pointer
@@ -19,7 +20,7 @@ from weevr.model import Thread, Weave
 
 BASE: dict[str, Any] = {
     "name": "t",
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"a": {"type": "delta", "alias": "x.y"}},
     "target": {"alias": "x.z"},
 }
@@ -62,7 +63,7 @@ class TestCodes:
         assert (diag.code, diag.resolved_path) == ("C102", path)
 
     def test_model_type_names_the_expected_shape(self) -> None:
-        diag = _one(Weave, {"name": "w", "config_version": "1.0", "threads": [5]})
+        diag = _one(Weave, {"name": "w", "config_version": "2.0", "threads": [5]})
         assert (diag.code, diag.resolved_path) == ("C102", "/threads/0")
 
     def test_literal_lists_allowed_values(self) -> None:
@@ -83,7 +84,7 @@ class TestCodes:
     def test_unknown_hook_step_type(self) -> None:
         data = {
             "name": "w",
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["a"],
             "pre_steps": [{"type": "x"}],
         }
@@ -151,7 +152,7 @@ class TestUnionNoise:
     def test_hook_step_path_drops_the_tag(self) -> None:
         data = {
             "name": "w",
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["a"],
             "pre_steps": [{"type": "log_message"}],
         }
@@ -190,7 +191,7 @@ class TestHydration:
 
     def _write(self, tmp_path: Path, name: str, data: dict[str, Any]) -> Path:
         path = tmp_path / name
-        path.write_text(yaml.safe_dump(data))
+        write_document(path, yaml.safe_dump(data))
         return path
 
     def test_thread(self, tmp_path: Path) -> None:
@@ -210,7 +211,7 @@ class TestHydration:
         weave = self._write(
             tmp_path,
             "w.weave",
-            {"config_version": "1.0", "name": "w", "threads": [{"ref": "child.thread"}]},
+            {"config_version": "2.0", "name": "w", "threads": [{"ref": "child.thread"}]},
         )
         with pytest.raises(ModelValidationError) as exc_info:
             load_config(weave)
@@ -226,7 +227,7 @@ class TestPreResolutionSchema:
         from weevr.errors import ConfigSchemaError
 
         with pytest.raises(ConfigSchemaError) as exc_info:
-            validate_schema({"config_version": "1.0", "sources": 5}, "thread")
+            validate_schema({"config_version": "2.0", "sources": 5}, "thread")
         assert {(d.code, d.resolved_path) for d in exc_info.value.diagnostics} == {
             ("C102", "/sources"),
             ("C101", "/target"),
@@ -244,14 +245,15 @@ class TestPreResolutionSchema:
         from weevr.errors import ConfigError
 
         weave = tmp_path / "w.weave"
-        weave.write_text(
+        write_document(
+            weave,
             yaml.safe_dump(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "name": "w",
                     "threads": [{"name": "ok"}, {"name": "bad", "sources": ["a"]}],
                 }
-            )
+            ),
         )
         with pytest.raises(ConfigError) as exc_info:
             load_config(weave)

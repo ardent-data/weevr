@@ -151,18 +151,48 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     _config(
         "C203",
         "unsupported-config-version",
-        "config_version names a major version this release does not read.",
+        "config_version names a major version this release does not read. A 1.x version "
+        "is a v1 document; the hint names the weevr-cli migrate command.",
     ),
     _config(
         "C204",
         "unknown-config-kind",
-        "The config's kind could not be determined, or is not one weevr knows.",
+        "The config's kind is not one weevr knows.",
     ),
-    # C205–C209 — envelope (config/loader.py)
+    # C205–C209 — envelope and project root (config/loader.py, config/project.py, config/root.py)
     _config(
         "C205",
         "name-mismatch",
         "The declared name does not match the file name without its extension.",
+    ),
+    _config(
+        "C206",
+        "missing-kind",
+        "The document declares no kind. The hint names the weevr-cli migrate command.",
+    ),
+    _config(
+        "C207",
+        "kind-extension-mismatch",
+        "The declared kind disagrees with the file's typed extension; expected names the kind.",
+    ),
+    _config(
+        "C208",
+        "engine-version-unsatisfied",
+        "The installed weevr is outside the project's requires_weevr specifier, or its "
+        "version cannot be determined (no package metadata); the message names the cause.",
+    ),
+    _config(
+        "C209",
+        "project-root-not-found",
+        "The Context's project directory holds no weevr.yaml; expected lists every location "
+        "probed.",
+    ),
+    # C210– — project document (config/project.py)
+    _config(
+        "C210",
+        "reserved-project-block",
+        "weevr.yaml declares a project-scope block (connections, params, defaults, "
+        "audit_templates) that is reserved and not yet supported.",
     ),
     # C3xx — references and entry forms (config/resolver.py, macros.py, warp.py)
     _config(
@@ -203,6 +233,16 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "C311",
         "absolute-path-reference",
         "A reference is an absolute path or URI where a path relative to the project belongs.",
+    ),
+    _config(
+        "C312",
+        "unsupported-reference-scheme",
+        "A reference names a scheme (scheme://) where a project-relative path belongs.",
+    ),
+    _config(
+        "C313",
+        "name-only-entry",
+        "A weave or thread entry gives a name but carries neither ref: nor an inline body.",
     ),
     # C350–C359 — loom entries
     _config(

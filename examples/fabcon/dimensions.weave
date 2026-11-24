@@ -3,7 +3,8 @@
 # Stages and builds the customer and product dimension tables.
 # Referenced by: daily.loom (Demo 5)
 
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: dimensions
 
 threads:

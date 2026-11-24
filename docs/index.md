@@ -33,7 +33,9 @@ ctx = Context(spark, "my-project.weevr")
 result = ctx.run("nightly.loom")
 ```
 
-See the [Your First Loom](tutorials/your-first-loom.md) tutorial for a complete walkthrough.
+A project is a folder with a `weevr.yaml` at its root; see
+[Project Layout](reference/project-layout.md). See the
+[Your First Loom](tutorials/your-first-loom.md) tutorial for a complete walkthrough.
 
 ## How it works
 

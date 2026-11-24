@@ -1321,8 +1321,15 @@
       "title": "Qualified Key",
       "type": "string"
     },
+    "kind": {
+      "const": "weave",
+      "default": "weave",
+      "description": "Document kind. A weave document declares 'weave'.",
+      "title": "Kind",
+      "type": "string"
+    },
     "config_version": {
-      "description": "Configuration schema version. Must be '1.0'.",
+      "description": "Configuration schema version, 'major.minor'. This release reads '2.0'.",
       "title": "Config Version",
       "type": "string"
     },

@@ -1,7 +1,7 @@
 """Loom domain model."""
 
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -74,8 +74,12 @@ class Loom(FrozenBase):
             "(e.g. looms/daily.loom). Set by the loader."
         ),
     )
+    kind: Literal["loom"] = Field(
+        default="loom",
+        description="Document kind. A loom document declares 'loom'.",
+    )
     config_version: str = Field(
-        description="Configuration schema version. Must be '1.0'.",
+        description="Configuration schema version, 'major.minor'. This release reads '2.0'.",
     )
     weaves: list[WeaveEntry] = Field(
         description="Ordered list of weave references in this loom.",

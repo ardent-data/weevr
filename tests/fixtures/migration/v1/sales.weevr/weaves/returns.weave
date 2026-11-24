@@ -1,0 +1,4 @@
+# Returns are loaded on their own schedule.
+config_version: "1.0"
+threads:
+  - ref: threads/facts/fact_returns.thread

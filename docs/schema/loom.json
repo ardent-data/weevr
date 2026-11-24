@@ -1278,8 +1278,15 @@
       "title": "Qualified Key",
       "type": "string"
     },
+    "kind": {
+      "const": "loom",
+      "default": "loom",
+      "description": "Document kind. A loom document declares 'loom'.",
+      "title": "Kind",
+      "type": "string"
+    },
     "config_version": {
-      "description": "Configuration schema version. Must be '1.0'.",
+      "description": "Configuration schema version, 'major.minor'. This release reads '2.0'.",
       "title": "Config Version",
       "type": "string"
     },

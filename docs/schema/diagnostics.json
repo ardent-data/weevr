@@ -188,7 +188,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "config_version names a major version this release does not read.",
+      "summary": "config_version names a major version this release does not read. A 1.x version is a v1 document; the hint names the weevr-cli migrate command.",
       "docs_anchor": "c203"
     },
     {
@@ -198,7 +198,7 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "The config's kind could not be determined, or is not one weevr knows.",
+      "summary": "The config's kind is not one weevr knows.",
       "docs_anchor": "c204"
     },
     {
@@ -210,6 +210,56 @@
       "removed_in": null,
       "summary": "The declared name does not match the file name without its extension.",
       "docs_anchor": "c205"
+    },
+    {
+      "code": "C206",
+      "name": "missing-kind",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The document declares no kind. The hint names the weevr-cli migrate command.",
+      "docs_anchor": "c206"
+    },
+    {
+      "code": "C207",
+      "name": "kind-extension-mismatch",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The declared kind disagrees with the file's typed extension; expected names the kind.",
+      "docs_anchor": "c207"
+    },
+    {
+      "code": "C208",
+      "name": "engine-version-unsatisfied",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The installed weevr is outside the project's requires_weevr specifier, or its version cannot be determined (no package metadata); the message names the cause.",
+      "docs_anchor": "c208"
+    },
+    {
+      "code": "C209",
+      "name": "project-root-not-found",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The Context's project directory holds no weevr.yaml; expected lists every location probed.",
+      "docs_anchor": "c209"
+    },
+    {
+      "code": "C210",
+      "name": "reserved-project-block",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is reserved and not yet supported.",
+      "docs_anchor": "c210"
     },
     {
       "code": "C301",
@@ -320,6 +370,26 @@
       "removed_in": null,
       "summary": "A reference is an absolute path or URI where a path relative to the project belongs.",
       "docs_anchor": "c311"
+    },
+    {
+      "code": "C312",
+      "name": "unsupported-reference-scheme",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A reference names a scheme (scheme://) where a project-relative path belongs.",
+      "docs_anchor": "c312"
+    },
+    {
+      "code": "C313",
+      "name": "name-only-entry",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "A weave or thread entry gives a name but carries neither ref: nor an inline body.",
+      "docs_anchor": "c313"
     },
     {
       "code": "C350",
@@ -773,5 +843,41 @@
     }
   ],
   "retired": [],
-  "removed_keys": []
+  "removed_keys": [
+    {
+      "kind": "thread",
+      "path": "/type",
+      "replacement": "/kind",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "weave",
+      "path": "/type",
+      "replacement": "/kind",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "loom",
+      "path": "/type",
+      "replacement": "/kind",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "params",
+      "path": "/type",
+      "replacement": "/kind",
+      "reason": null,
+      "removed_in": "2.0"
+    },
+    {
+      "kind": "warp",
+      "path": "/type",
+      "replacement": "/kind",
+      "reason": null,
+      "removed_in": "2.0"
+    }
+  ]
 }

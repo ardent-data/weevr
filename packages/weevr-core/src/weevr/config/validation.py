@@ -17,12 +17,13 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, ValidationError
 
+from weevr.config.project import split_reserved_blocks
 from weevr.diagnostics import Diagnostic, Severity, diagnostic
 from weevr.diagnostics.positions import json_pointer, pointed
 from weevr.diagnostics.pydantic import from_validation_error
@@ -30,6 +31,7 @@ from weevr.diagnostics.removed_keys import removed_key_diagnostics
 from weevr.errors import ConfigSchemaError
 from weevr.model.execution import resolve_effective_execution
 from weevr.model.params import ParamsConfig
+from weevr.model.project import Project
 from weevr.model.warp import WarpConfig
 
 if TYPE_CHECKING:
@@ -141,6 +143,13 @@ def authored_path(segments: Sequence[str | int]) -> tuple[str | int, ...]:
 _DUMPED_TO_AUTHORED: dict[str, str] = _dumped_to_authored()
 
 
+# Per-kind steps run on the raw document before its model validates it. Each
+# returns the document to validate and the diagnostics for keys it held back.
+_PRE_VALIDATE: dict[str, Callable[[Mapping[str, Any]], tuple[dict[str, Any], list[Diagnostic]]]] = {
+    "project": split_reserved_blocks,
+}
+
+
 def validate_schema(
     raw: dict[str, Any], config_type: str, *, at: tuple[str | int, ...] = ()
 ) -> BaseModel:
@@ -148,7 +157,7 @@ def validate_schema(
 
     Args:
         raw: Raw config dictionary (variables not yet resolved)
-        config_type: Type of config (thread, weave, loom, params)
+        config_type: Type of config (thread, weave, loom, params, warp, project)
         at: Where ``raw`` sits in its file, for an inline weave
 
     Returns:
@@ -163,6 +172,7 @@ def validate_schema(
         "loom": LoomConfig,
         "params": ParamsConfig,
         "warp": WarpConfig,
+        "project": Project,
     }
 
     if config_type not in model_map:
@@ -177,6 +187,10 @@ def validate_schema(
 
     model_class = model_map[config_type]
     removed = removed_key_diagnostics(raw, config_type, at=at)
+    pre_validate = _PRE_VALIDATE.get(config_type)
+    if pre_validate is not None:
+        raw, held_back = pre_validate(raw)
+        removed = [*removed, *held_back]
 
     try:
         validated = model_class.model_validate(raw)
@@ -188,7 +202,7 @@ def validate_schema(
         ) from exc
     if removed:
         raise ConfigSchemaError(
-            f"{config_type} config uses keys this version no longer reads",
+            f"{config_type} config uses keys this version does not read",
             diagnostics=removed,
         )
     return validated
@@ -197,9 +211,9 @@ def validate_schema(
 def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, ...] = ()) -> None:
     """Check the value types of an inline thread body before the cascade reads it.
 
-    Unlike :func:`validate_schema`, missing fields are not errors here: a
-    name-only entry, or an inline body without its target, is reported by
-    model hydration with the thread's name. Only values of the wrong type
+    Unlike :func:`validate_schema`, missing fields are not errors here: an
+    inline body without its target is reported by model hydration with the
+    thread's name. Only values of the wrong type
     (``sources: [a]``, ``lookups: 5``) are rejected, because the cascade and
     the load checks read them before hydration.
 
@@ -229,7 +243,7 @@ def validate_inline_thread_types(entry: dict[str, Any], *, at: tuple[str | int, 
             ) from exc
     if removed:
         raise ConfigSchemaError(
-            f"Inline thread '{entry.get('name', '')}' uses keys this version no longer reads",
+            f"Inline thread '{entry.get('name', '')}' uses keys this version does not read",
             diagnostics=removed,
         )
 

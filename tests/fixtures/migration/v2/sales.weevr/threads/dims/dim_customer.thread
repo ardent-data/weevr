@@ -1,0 +1,19 @@
+# Customer dimension.
+#
+# The target comes first here on purpose: key order is the author's.
+
+kind: thread
+target:
+  alias: gold.dim_customer  # matches dim_customer.warp
+
+sources:
+  customers:
+    type: delta
+    alias: raw.customers
+
+config_version: "2.0"  # set when the thread was created
+
+steps:
+  # Drop rows without a key before anything else.
+  - filter:
+      expr: "customer_id is not null"

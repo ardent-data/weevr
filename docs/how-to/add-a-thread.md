@@ -41,7 +41,8 @@ validate -> quarantine: failed rows {style.stroke-dash: 3}
 
 ## Prerequisites
 
-- A working weevr project with the [conventional directory structure](../tutorials/your-first-loom.md#project-structure)
+- A working weevr project with the [conventional directory structure](../tutorials/your-first-loom.md#project-structure),
+  including its `weevr.yaml` (see [Project Layout](../reference/project-layout.md))
 - At least one weave to add the thread to
 - Access to the source data (Delta table, CSV, Parquet, or other Spark-readable
   format)
@@ -52,7 +53,8 @@ Declare each data source your thread needs. The first source listed becomes the
 primary DataFrame that flows through the pipeline.
 
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   orders:
@@ -145,7 +147,8 @@ use paths relative to the project root, with typed extensions:
 
 ```yaml
 # orders.weave
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 
 threads:
   - ref: orders/fact_orders.thread

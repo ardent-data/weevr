@@ -22,7 +22,7 @@ def _file_uri(path: Path) -> str:
 class TestRemoteConfigLocationFileUri:
     def test_exists_true_against_real_file(self, spark, tmp_path: Path) -> None:
         f = tmp_path / "silver.loom"
-        f.write_text("config_version: '1.0'\nname: silver\n", encoding="utf-8")
+        f.write_text("config_version: '2.0'\nname: silver\n", encoding="utf-8")
         loc = RemoteConfigLocation(_file_uri(f), spark)
         assert loc.exists() is True
 
@@ -31,7 +31,7 @@ class TestRemoteConfigLocationFileUri:
         assert loc.exists() is False
 
     def test_read_text_roundtrip(self, spark, tmp_path: Path) -> None:
-        content = "config_version: '1.0'\nname: silver\nweaves: []\n"
+        content = "config_version: '2.0'\nname: silver\nweaves: []\n"
         f = tmp_path / "silver.loom"
         f.write_text(content, encoding="utf-8")
         loc = RemoteConfigLocation(_file_uri(f), spark)
@@ -46,13 +46,13 @@ class TestRemoteConfigLocationFileUri:
         sub = tmp_path / "dimensions"
         sub.mkdir()
         f = sub / "dim_customer.thread"
-        f.write_text("config_version: '1.0'\n", encoding="utf-8")
+        f.write_text("config_version: '2.0'\n", encoding="utf-8")
 
         root = RemoteConfigLocation(_file_uri(tmp_path), spark)
         leaf = root.join("dimensions/dim_customer.thread")
         assert isinstance(leaf, RemoteConfigLocation)
         assert leaf.exists() is True
-        assert leaf.read_text() == "config_version: '1.0'\n"
+        assert leaf.read_text() == "config_version: '2.0'\n"
 
     def test_dot_dot_normalization_against_real_file(self, spark, tmp_path: Path) -> None:
         f = tmp_path / "silver.loom"

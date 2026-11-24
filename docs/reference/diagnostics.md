@@ -150,19 +150,52 @@ config_version is not a 'major.minor' string of integers.
 
 `unsupported-config-version` · error · stable
 
-config_version names a major version this release does not read.
+config_version names a major version this release does not read. A 1.x version is a v1 document; the
+hint names the weevr-cli migrate command.
 
 ### C204
 
 `unknown-config-kind` · error · stable
 
-The config's kind could not be determined, or is not one weevr knows.
+The config's kind is not one weevr knows.
 
 ### C205
 
 `name-mismatch` · error · stable
 
 The declared name does not match the file name without its extension.
+
+### C206
+
+`missing-kind` · error · stable
+
+The document declares no kind. The hint names the weevr-cli migrate command.
+
+### C207
+
+`kind-extension-mismatch` · error · stable
+
+The declared kind disagrees with the file's typed extension; expected names the kind.
+
+### C208
+
+`engine-version-unsatisfied` · error · stable
+
+The installed weevr is outside the project's requires_weevr specifier, or its version cannot be
+determined (no package metadata); the message names the cause.
+
+### C209
+
+`project-root-not-found` · error · stable
+
+The Context's project directory holds no weevr.yaml; expected lists every location probed.
+
+### C210
+
+`reserved-project-block` · error · stable
+
+weevr.yaml declares a project-scope block (connections, params, defaults, audit_templates) that is
+reserved and not yet supported.
 
 ## C3xx — References and entry forms
 
@@ -231,6 +264,18 @@ A named warp file is not in any searched location.
 `absolute-path-reference` · error · stable
 
 A reference is an absolute path or URI where a path relative to the project belongs.
+
+### C312
+
+`unsupported-reference-scheme` · error · stable
+
+A reference names a scheme (scheme://) where a project-relative path belongs.
+
+### C313
+
+`name-only-entry` · error · stable
+
+A weave or thread entry gives a name but carries neither ref: nor an inline body.
 
 ### C350
 
@@ -520,4 +565,10 @@ A source's existence could not be checked, because probing its location failed.
 A key listed here fails the load with `C111` (removed) or `C112` (renamed),
 naming what to write instead. `*` matches any one key or list item.
 
-No keys have been removed or renamed yet.
+| Kind | Key | Replacement or reason | Removed in |
+|------|-----|-----------------------|------------|
+| thread | `/type` | `/kind` | 2.0 |
+| weave | `/type` | `/kind` | 2.0 |
+| loom | `/type` | `/kind` | 2.0 |
+| params | `/type` | `/kind` | 2.0 |
+| warp | `/type` | `/kind` | 2.0 |

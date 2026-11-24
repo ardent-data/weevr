@@ -43,12 +43,13 @@
         "source": null
       }
     },
-    "config_version": "1.0",
+    "config_version": "2.0",
     "connections": null,
     "defaults": {
       "target_schema": "gold"
     },
     "execution": null,
+    "kind": "loom",
     "lookups": {
       "regions": {
         "filter": null,
@@ -133,8 +134,8 @@
       },
       {
         "condition": null,
-        "name": "conv",
-        "ref": null
+        "name": "",
+        "ref": "conv.weave"
       },
       {
         "condition": null,
@@ -150,13 +151,14 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": null,
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "conv",
@@ -228,13 +230,14 @@
             "source": null
           }
         },
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": null,
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": {
           "shared": {
@@ -382,13 +385,14 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": null,
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "inline_core",
@@ -481,13 +485,14 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": null,
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "tpl_a",
@@ -572,13 +577,14 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": null,
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "tpl_b",
@@ -665,13 +671,14 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": null,
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "inline_t",
@@ -1507,7 +1514,7 @@
           "condition": null,
           "dependencies": null,
           "params": null,
-          "ref": null
+          "ref": "conv.weave"
         },
         "kind": "weave",
         "name": "conv",
@@ -1785,10 +1792,11 @@
     "conv": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": null,
       "execution": null,
+      "kind": "weave",
       "lookups": null,
       "name": "conv",
       "naming": null,
@@ -1819,7 +1827,7 @@
           "source": null
         }
       },
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": {
         "write": {
@@ -1827,6 +1835,7 @@
         }
       },
       "execution": null,
+      "kind": "weave",
       "lookups": {
         "shared": {
           "filter": null,
@@ -1937,10 +1946,11 @@
     "inline_w": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": null,
       "execution": null,
+      "kind": "weave",
       "lookups": {
         "shared": {
           "filter": null,

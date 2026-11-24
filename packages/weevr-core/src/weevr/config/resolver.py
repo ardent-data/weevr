@@ -403,10 +403,33 @@ def resolve_variables(
         return config
 
 
+# Keys an entry carries about its place in the parent, not about the child's body.
+_WEAVE_ENTRY_KEYS = frozenset({"name", "condition"})
+_THREAD_ENTRY_KEYS = frozenset({"name", "as", "params", "dependencies", "condition"})
+
+
+def _has_inline_body(entry: Any, entry_keys: frozenset[str]) -> bool:
+    """Whether a child entry carries an inline body: no ``ref`` and a key beyond ``entry_keys``."""
+    return isinstance(entry, dict) and "ref" not in entry and bool(set(entry) - entry_keys)
+
+
 def _is_inline_weave(entry: Any) -> bool:
     """Whether a loom weave entry carries an inline weave body."""
-    return (
-        isinstance(entry, dict) and "ref" not in entry and bool(set(entry) - {"name", "condition"})
+    return _has_inline_body(entry, _WEAVE_ENTRY_KEYS)
+
+
+def _is_inline_thread(entry: Any) -> bool:
+    """Whether a weave thread entry carries an inline thread body."""
+    return _has_inline_body(entry, _THREAD_ENTRY_KEYS)
+
+
+def _name_only_entry(kind: str, name: str, pointer: str) -> ReferenceResolutionError:
+    """A weave or thread entry that names a child but has neither ``ref`` nor a body."""
+    return _reference_error(
+        "C313",
+        f"{kind.capitalize()} entry '{name}' has a name but no body",
+        pointer=pointer,
+        hint=f"ref: {name}.{kind}",
     )
 
 
@@ -685,6 +708,36 @@ def _check_entry_refs(entries: list[Any], at: tuple[str | int, ...] = ()) -> Non
             )
 
 
+_SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*)://")
+
+
+def _reference_scheme(ref: str) -> str | None:
+    """The ``scheme`` of a ``scheme://path`` reference, or ``None`` when it has none."""
+    match = _SCHEME.match(ref)
+    return match.group(1) if match else None
+
+
+def _outside_root(ref: str, pointer: str | None) -> ReferenceResolutionError:
+    """The error for a reference that resolves outside the project root."""
+    return _reference_error(
+        "C303",
+        f"Reference '{ref}' resolves outside project root",
+        pointer=pointer,
+        file_path=ref,
+    )
+
+
+def _unsupported_scheme(ref: str, scheme: str, pointer: str | None) -> ReferenceResolutionError:
+    """The error for a reference that names a scheme; no scheme is supported."""
+    return _reference_error(
+        "C312",
+        f"Unsupported reference scheme '{scheme}' in '{ref}'",
+        pointer=pointer,
+        file_path=ref,
+        hint="Write the reference as a path relative to the project root.",
+    )
+
+
 def resolve_ref_path(
     ref: str, project_root: ConfigLocation | Path, pointer: str | None = None
 ) -> ConfigLocation:
@@ -703,12 +756,13 @@ def resolve_ref_path(
         Resolved location for the referenced config file.
 
     Raises:
-        ReferenceResolutionError: If the reference isn't a string, or the
+        ReferenceResolutionError: If the reference isn't a string (C304),
+            names a ``scheme://`` (C312), is an absolute path (C311), or the
             referenced file does not exist or resolves outside the project
-            root.
+            root (C303).
         ConfigError: If the reference does not have a typed extension.
     """
-    from weevr.config.locations import LocalConfigLocation
+    from weevr.config.locations import ConfigLocationError, LocalConfigLocation
 
     # Child entries reach here as unvalidated dicts, so the YAML may hold
     # any type. No file is named: the enclosing config's file is attached.
@@ -718,6 +772,11 @@ def resolve_ref_path(
             f"Reference must be a path string, got {type(ref).__name__}: {ref!r}",
             pointer=pointer,
         )
+
+    # A scheme is refused before any path handling, whatever it names.
+    scheme = _reference_scheme(ref)
+    if scheme is not None:
+        raise _unsupported_scheme(ref, scheme, pointer)
 
     if isinstance(project_root, Path):
         project_root = LocalConfigLocation(project_root)
@@ -741,13 +800,18 @@ def resolve_ref_path(
 
     try:
         resolved = project_root.join(ref)
+    except ConfigLocationError as exc:
+        if any(d.code == "C311" for d in exc.diagnostics):
+            raise _reference_error(
+                "C311",
+                f"Reference '{ref}' is an absolute path",
+                pointer=pointer,
+                file_path=ref,
+                hint="Write the reference relative to the project root.",
+            ) from exc
+        raise _outside_root(ref, pointer) from exc
     except ValueError as exc:
-        raise _reference_error(
-            "C303",
-            f"Reference '{ref}' resolves outside project root",
-            pointer=pointer,
-            file_path=ref,
-        ) from exc
+        raise _outside_root(ref, pointer) from exc
 
     if not resolved.is_relative_to(project_root):
         raise _reference_error(
@@ -804,13 +868,8 @@ def resolve_references(
         ConfigError: If an inline definition is missing a ``name`` field.
     """
     from weevr.config.attribution import attribute_errors
+    from weevr.config.document_load import load_document
     from weevr.config.locations import LocalConfigLocation
-    from weevr.config.parser import (
-        detect_config_type_from_extension,
-        extract_config_version,
-        parse_yaml,
-        validate_config_version,
-    )
     from weevr.config.validation import validate_inline_thread_types, validate_schema
 
     if isinstance(project_root, Path):
@@ -848,12 +907,7 @@ def resolve_references(
                     visited[ref] = None
                     try:
                         with attribute_errors(weave_path):
-                            raw = parse_yaml(weave_path)
-                            version = extract_config_version(raw)
-                            ext_type = detect_config_type_from_extension(weave_path)
-                            child_type = ext_type if ext_type else "weave"
-                            validate_config_version(version, child_type)
-                            validated = validate_schema(raw, child_type)
+                            child_type, validated = load_document(weave_path)
                             child_dict = validated.model_dump(exclude_unset=True)
 
                             # Inject name from filename stem
@@ -887,122 +941,50 @@ def resolve_references(
                         )
                     finally:
                         visited.pop(ref, None)
+                elif not isinstance(entry, dict):
+                    # Schema validation rejects other entry types before resolution.
+                    continue
+                elif not entry.get("name"):
+                    raise _entry_error(
+                        "C305",
+                        "Inline weave definition requires a 'name' field",
+                        json_pointer((*at, "weaves", index)),
+                    )
+                elif not _is_inline_weave(entry):
+                    # A bare name is not a reference: no file is loaded by name.
+                    raise _name_only_entry(
+                        "weave", entry["name"], json_pointer((*at, "weaves", index))
+                    )
                 else:
-                    # Name-only entry — resolve by convention to {name}.weave
-                    if isinstance(entry, dict) and not entry.get("name"):
-                        raise _entry_error(
-                            "C305",
-                            "Inline weave definition requires a 'name' field",
-                            json_pointer((*at, "weaves", index)),
+                    # Inline weave body.
+                    weave_name = entry["name"]
+                    # resolve_config_variables already resolved its variables
+                    # with the weave's own defaults; validate and resolve its
+                    # threads the way a weave file is.
+                    validated = validate_schema(entry, "weave", at=(*at, "weaves", index))
+                    inline = validated.model_dump(exclude_unset=True)
+                    inline["qualified_key"] = weave_name
+                    if "condition" in entry:
+                        inline["condition"] = entry["condition"]
+                    inline_authored = authored_entry("weaves", index)
+                    inline_at = (*at, "weaves", index)
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=inline,
+                            authored=inline_authored,
+                            children=resolve_references(
+                                inline,
+                                "weave",
+                                project_root,
+                                runtime_params,
+                                visited.copy(),
+                                authored=inline_authored,
+                                at=inline_at,
+                            ),
+                            at=inline_at,
                         )
-                    if isinstance(entry, dict):
-                        weave_name = entry["name"]
-                        convention_ref = f"{weave_name}.weave"
-                        # Held to the same containment rule as a ref entry.
-                        try:
-                            convention_path = project_root.join(convention_ref)
-                        except ValueError as exc:
-                            raise _reference_error(
-                                "C303",
-                                f"Weave name '{weave_name}' resolves outside project root",
-                                pointer=json_pointer((*at, "weaves", index, "name")),
-                                file_path=convention_ref,
-                            ) from exc
-                        if not convention_path.is_relative_to(project_root):
-                            raise _reference_error(
-                                "C303",
-                                f"Weave name '{weave_name}' resolves outside project root",
-                                pointer=json_pointer((*at, "weaves", index, "name")),
-                                file_path=str(convention_path),
-                            )
-                        if convention_path.exists():
-                            if convention_ref in visited:
-                                raise _circular_reference(
-                                    convention_ref,
-                                    visited,
-                                    json_pointer((*at, "weaves", index, "name")),
-                                )
-
-                            # Load the weave file by convention
-                            visited[convention_ref] = None
-                            try:
-                                with attribute_errors(convention_path):
-                                    conv_raw = parse_yaml(convention_path)
-                                    conv_version = extract_config_version(conv_raw)
-                                    conv_type = detect_config_type_from_extension(convention_path)
-                                    child_type = conv_type if conv_type else "weave"
-                                    validate_config_version(conv_version, child_type)
-                                    validated = validate_schema(conv_raw, child_type)
-                                    child_dict = validated.model_dump(exclude_unset=True)
-                                    if not child_dict.get("name"):
-                                        child_dict["name"] = weave_name
-                                    child_dict["qualified_key"] = convention_ref
-
-                                    # Preserve entry-level overrides (condition)
-                                    if "condition" in entry:
-                                        child_dict["condition"] = entry["condition"]
-
-                                    context = build_param_context(
-                                        runtime_params, child_dict.get("defaults")
-                                    )
-                                    resolved_child = resolve_variables(child_dict, context)
-                                    grandchildren = resolve_references(
-                                        resolved_child,
-                                        child_type,
-                                        project_root,
-                                        runtime_params,
-                                        visited.copy(),
-                                        authored=child_dict,
-                                    )
-                                children.append(
-                                    ResolvedChild(
-                                        entry=entry,
-                                        data=resolved_child,
-                                        source_path=str(convention_path),
-                                        authored=child_dict,
-                                        children=grandchildren,
-                                    )
-                                )
-                            finally:
-                                visited.pop(convention_ref, None)
-                        elif _is_inline_weave(entry):
-                            # Inline weave body. resolve_config_variables already
-                            # resolved its variables with the weave's own defaults;
-                            # validate and resolve its threads the way a weave
-                            # file is.
-                            validated = validate_schema(entry, "weave", at=(*at, "weaves", index))
-                            inline = validated.model_dump(exclude_unset=True)
-                            inline["qualified_key"] = weave_name
-                            if "condition" in entry:
-                                inline["condition"] = entry["condition"]
-                            inline_authored = authored_entry("weaves", index)
-                            inline_at = (*at, "weaves", index)
-                            children.append(
-                                ResolvedChild(
-                                    entry=entry,
-                                    data=inline,
-                                    authored=inline_authored,
-                                    children=resolve_references(
-                                        inline,
-                                        "weave",
-                                        project_root,
-                                        runtime_params,
-                                        visited.copy(),
-                                        authored=inline_authored,
-                                        at=inline_at,
-                                    ),
-                                    at=inline_at,
-                                )
-                            )
-                        else:
-                            raise _reference_error(
-                                "C301",
-                                f"Weave '{weave_name}' has no definition: expected "
-                                f"'{convention_ref}' in the project root or an inline "
-                                f"weave body (threads) in the loom",
-                                pointer=json_pointer((*at, "weaves", index)),
-                                hint=f"Add {convention_ref} or give the weave an inline body.",
-                            )
+                    )
 
     # Resolve threads in weave
     elif config_type == "weave" and "threads" in config:
@@ -1063,12 +1045,7 @@ def resolve_references(
                             )
 
                         with attribute_errors(thread_path):
-                            raw = parse_yaml(thread_path)
-                            version = extract_config_version(raw)
-                            ext_type = detect_config_type_from_extension(thread_path)
-                            child_type = ext_type if ext_type else "thread"
-                            validate_config_version(version, child_type)
-                            validated = validate_schema(raw, child_type)
+                            child_type, validated = load_document(thread_path)
                             child_dict = validated.model_dump(exclude_unset=True)
 
                             # Inject name from filename stem
@@ -1120,40 +1097,47 @@ def resolve_references(
                         )
                     finally:
                         visited.pop(ref, None)
+                elif not isinstance(entry, dict):
+                    # Schema validation rejects other entry types before resolution.
+                    continue
+                elif not entry.get("name"):
+                    raise _entry_error(
+                        "C305",
+                        "Inline thread definition requires a 'name' field",
+                        json_pointer((*at, "threads", index)),
+                    )
+                elif not _is_inline_thread(entry):
+                    # A bare name is not a reference: no file is loaded by name.
+                    raise _name_only_entry(
+                        "thread", entry["name"], json_pointer((*at, "threads", index))
+                    )
                 else:
-                    # Inline definition — must have name
-                    if isinstance(entry, dict) and not entry.get("name"):
+                    # Inline thread body.
+                    # The cascade and load checks read the body before
+                    # hydration, so its value types are checked here.
+                    validate_inline_thread_types(entry, at=(*at, "threads", index))
+                    inline = entry.copy()
+                    inline["qualified_key"] = entry.get("name", "")
+
+                    # Track effective name uniqueness
+                    effective_name = entry.get("as") or entry.get("name", "")
+                    if effective_name in seen_effective_names:
                         raise _entry_error(
-                            "C305",
-                            "Inline thread definition requires a 'name' field",
+                            "C306",
+                            f"Duplicate effective thread name '{effective_name}' "
+                            f"in weave. Use 'as' to give each instance a unique name.",
                             json_pointer((*at, "threads", index)),
+                            hint="Use 'as' to give each instance a unique name.",
                         )
-                    if isinstance(entry, dict):
-                        # The cascade and load checks read the body before
-                        # hydration, so its value types are checked here.
-                        validate_inline_thread_types(entry, at=(*at, "threads", index))
-                        inline = entry.copy()
-                        inline["qualified_key"] = entry.get("name", "")
+                    seen_effective_names.add(effective_name)
 
-                        # Track effective name uniqueness
-                        effective_name = entry.get("as") or entry.get("name", "")
-                        if effective_name in seen_effective_names:
-                            raise _entry_error(
-                                "C306",
-                                f"Duplicate effective thread name '{effective_name}' "
-                                f"in weave. Use 'as' to give each instance a unique name.",
-                                json_pointer((*at, "threads", index)),
-                                hint="Use 'as' to give each instance a unique name.",
-                            )
-                        seen_effective_names.add(effective_name)
-
-                        children.append(
-                            ResolvedChild(
-                                entry=entry,
-                                data=inline,
-                                authored=authored_entry("threads", index),
-                                at=(*at, "threads", index),
-                            )
+                    children.append(
+                        ResolvedChild(
+                            entry=entry,
+                            data=inline,
+                            authored=authored_entry("threads", index),
+                            at=(*at, "threads", index),
                         )
+                    )
 
     return children

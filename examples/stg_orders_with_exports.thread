@@ -5,7 +5,8 @@
 # then writes the same data to two additional locations: a Parquet archive
 # with dynamic path naming and a CSV export with custom options.
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: stg_orders_with_exports
 
 sources:

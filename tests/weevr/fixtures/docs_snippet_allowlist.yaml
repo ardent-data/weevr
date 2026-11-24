@@ -4,27 +4,25 @@
 # reports the stale entry). Prefer a weevr-snippet hint (path, params,
 # expect) on the page over an entry here.
 
-- key: concepts/thread-weave-loom.md#25498e20
+- key: concepts/thread-weave-loom.md#289b3cf9
   reason: References dimension threads the page doesn't show.
-- key: concepts/thread-weave-loom.md#17463410
+- key: concepts/thread-weave-loom.md#8e9a5b54
   reason: References weaves whose threads the page doesn't show.
-- key: guides/config-resolution.md#3ce597ef
+- key: guides/config-resolution.md#a43616c1
   reason: References weave files the page doesn't show.
-- key: guides/thread-templates.md#aba5fb8b
+- key: guides/thread-templates.md#712be4d6
   reason: Template thread with required params; it loads through the weave shown above it.
-- key: how-to/add-a-thread.md#40ad5910
+- key: how-to/add-a-thread.md#1752ec75
   reason: Step 1 of a thread the page builds up across steps (sources only, no target yet).
-- key: how-to/add-a-thread.md#612d440a
+- key: how-to/add-a-thread.md#711aef0e
   reason: References the thread the page builds up in steps and never shows whole.
-- key: how-to/cache-a-lookup.md#892c243b
+- key: how-to/cache-a-lookup.md#b860ec32
   reason: References a thread the page shows only in part.
-- key: reference/api/errors.md#06e93df7
+- key: reference/api/errors.md#19591bce
   reason: Shows the invalid and the fixed config in one block (duplicate keys).
-- key: reference/api/errors.md#e7aab510
+- key: reference/api/errors.md#e57c7c25
   reason: Shows the invalid and the fixed config in one block (duplicate keys).
-- key: reference/yaml-schema/loom.md#841db116
+- key: reference/yaml-schema/loom.md#ef592327
   reason: References weave files the page doesn't show.
-- key: reference/yaml-schema/weave.md#85116a1a
+- key: reference/yaml-schema/weave.md#0bb6f8bf
   reason: References thread files the page doesn't show.
-- key: release-notes/1.13.md#aba5fb8b
-  reason: Template thread with required params; it loads through the weave shown above it.

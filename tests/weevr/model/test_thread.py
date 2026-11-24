@@ -18,7 +18,7 @@ from weevr.model.validation import Assertion, ValidationRule
 from weevr.model.write import WriteConfig
 
 _MINIMAL = {
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"customers": {"type": "delta", "alias": "raw.customers"}},
     "target": {"alias": "test"},
 }
@@ -30,21 +30,21 @@ class TestThreadConstruction:
     def test_minimal_thread(self):
         """Thread from minimal dict constructs correctly."""
         t = Thread.model_validate(_MINIMAL)
-        assert t.config_version == "1.0"
+        assert t.config_version == "2.0"
         assert isinstance(t.sources["customers"], Source)
         assert isinstance(t.target, Target)
 
     def test_missing_sources_raises(self):
         """Thread without sources raises ValidationError."""
         with pytest.raises(ValidationError):
-            Thread.model_validate({"config_version": "1.0", "target": {"alias": "test"}})
+            Thread.model_validate({"config_version": "2.0", "target": {"alias": "test"}})
 
     def test_missing_target_raises(self):
         """Thread without target raises ValidationError."""
         with pytest.raises(ValidationError):
             Thread.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"s": {"type": "delta", "alias": "a"}},
                 }
             )
@@ -126,7 +126,7 @@ class TestThreadConstruction:
     def test_full_thread(self):
         """Thread from a fully populated dict constructs correctly."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {
                 "customers": {"type": "delta", "alias": "raw.customers"},
                 "orders": {"type": "csv", "path": "/data/orders.csv"},
@@ -436,7 +436,7 @@ class TestThreadSharedResourceFields:
         with pytest.raises(ValidationError, match="at least one entry"):
             Thread.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {},
                     "target": {"alias": "test"},
                 }
@@ -533,7 +533,7 @@ class TestThreadConnectionsField:
 
 
 _MINIMAL_WITH_SOURCES = {
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {
         "customers": {"type": "delta", "alias": "raw.customers"},
         "orders": {"type": "delta", "alias": "raw.orders"},
@@ -885,7 +885,7 @@ class TestIncrementalDedupRule:
         return Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": sources,
                 "target": {"path": "Tables/orders"},
                 "write": {"mode": "append"},
@@ -945,7 +945,7 @@ class TestCdcThreadRules:
         return Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": primary, **sources},
                 "target": {"path": "Tables/orders", **(target or {})},
                 "write": {"mode": "merge", "match_keys": ["id"]},
@@ -971,7 +971,7 @@ class TestCdcThreadRules:
             Thread.model_validate(
                 {
                     "name": "t",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
                     "target": {"path": "Tables/orders", "dimension": self.DIMENSION},
                     "load": load,
@@ -982,7 +982,7 @@ class TestCdcThreadRules:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
                 "target": {"path": "Tables/orders", "dimension": self.DIMENSION},
                 "load": {"mode": "full"},

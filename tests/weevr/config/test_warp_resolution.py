@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
+from documents import write_document
 from weevr.config import load_config, load_resolved
 from weevr.config.locations import ConfigLocation
 from weevr.config.warp import resolve_warp
@@ -17,12 +17,12 @@ from weevr.model.thread import Thread
 
 def _warp(*columns: str) -> str:
     body = "".join(f"  - name: {c}\n    type: string\n" for c in columns)
-    return f'config_version: "1.0"\ncolumns:\n{body}'
+    return f'kind: warp\nconfig_version: "2.0"\ncolumns:\n{body}'
 
 
 def _thread(target: dict[str, Any], name: str = "dim_customer") -> dict[str, Any]:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "name": name,
         "sources": {"src": {"type": "delta", "alias": "raw.customers"}},
         "target": target,
@@ -31,7 +31,7 @@ def _thread(target: dict[str, Any], name: str = "dim_customer") -> dict[str, Any
 
 def _write(path: Path, data: dict[str, Any] | str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if isinstance(data, str) else yaml.safe_dump(data, sort_keys=False))
+    write_document(path, data)
     return path
 
 
@@ -128,7 +128,7 @@ class TestChildThreadWarpResolution:
         )
         weave = _write(
             project / "w.weave",
-            {"config_version": "1.0", "threads": [{"ref": "threads/dims/dim_customer.thread"}]},
+            {"config_version": "2.0", "threads": [{"ref": "threads/dims/dim_customer.thread"}]},
         )
         loaded = load_resolved(weave, project_root=project)
         thread = loaded.document.weave_threads()["w"]["dim_customer"]
@@ -139,7 +139,7 @@ class TestChildThreadWarpResolution:
         inline = _thread({"alias": "gold.dim_customer", "warp": "dim_customer"})
         weave = _write(
             project / "weaves" / "w.weave",
-            {"config_version": "1.0", "threads": [inline]},
+            {"config_version": "2.0", "threads": [inline]},
         )
         loaded = load_resolved(weave, project_root=project)
         thread = loaded.document.weave_threads()["w"]["dim_customer"]
@@ -260,3 +260,27 @@ class TestNonLocalLocations:
         )
         assert warp is not None
         assert warp.columns[0].name == "remote"
+
+
+class TestWarpEnvelope:
+    """A warp file goes through the envelope, and its errors name the warp file."""
+
+    @pytest.mark.parametrize(
+        ("text", "code"),
+        [
+            ('config_version: "1.0"\ncolumns:\n  - name: a\n    type: string\n', "C203"),
+            ('config_version: "2.0"\ncolumns:\n  - name: a\n    type: string\n', "C206"),
+            (
+                'kind: warp\ntype: warp\nconfig_version: "2.0"\n'
+                "columns:\n  - name: a\n    type: string\n",
+                "C112",
+            ),
+        ],
+    )
+    def test_error_names_the_warp_file(self, tmp_path: Path, text: str, code: str):
+        warp = tmp_path / "dim_customer.warp"
+        warp.write_text(text)
+        with pytest.raises(ConfigError) as exc_info:
+            resolve_warp("dim_customer", tmp_path, tmp_path)
+        [diag] = [d for d in exc_info.value.diagnostics if d.code == code]
+        assert diag.file == str(warp)

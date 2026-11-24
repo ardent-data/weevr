@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.config.loader import resolve_source_paths
 from weevr.config.validation import render_diagnostics
@@ -159,26 +160,29 @@ class TestResolveColumnSetSourcePaths:
 
     def test_joined_at_loom_child_weave_and_child_thread(self, tmp_path: Path) -> None:
         """Each level that declares a YAML column set gets its path joined, child files too."""
-        project = tmp_path / "cs.weevr"
+        project = write_project(tmp_path / "cs.weevr")
         (project / "weaves").mkdir(parents=True)
         (project / "threads").mkdir()
 
         def _column_sets(path: str) -> str:
             return f"column_sets:\n  names:\n    source:\n      type: yaml\n      path: {path}\n"
 
-        (project / "nightly.loom").write_text(
-            'config_version: "1.0"\nweaves:\n  - ref: weaves/sales.weave\n'
-            + _column_sets("maps/loom.yaml")
+        write_document(
+            project / "nightly.loom",
+            'config_version: "2.0"\nweaves:\n  - ref: weaves/sales.weave\n'
+            + _column_sets("maps/loom.yaml"),
         )
-        (project / "weaves/sales.weave").write_text(
-            'config_version: "1.0"\nthreads:\n  - ref: threads/orders.thread\n'
-            + _column_sets("maps/weave.yaml")
+        write_document(
+            project / "weaves/sales.weave",
+            'config_version: "2.0"\nthreads:\n  - ref: threads/orders.thread\n'
+            + _column_sets("maps/weave.yaml"),
         )
-        (project / "threads/orders.thread").write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            project / "threads/orders.thread",
+            'config_version: "2.0"\n'
             "sources:\n  main:\n    type: delta\n    alias: raw.orders\n"
             "steps:\n  - rename:\n      column_set: names\n"
-            "target:\n  alias: stg.orders\n" + _column_sets("maps/thread.yaml")
+            "target:\n  alias: stg.orders\n" + _column_sets("maps/thread.yaml"),
         )
 
         loaded = load_resolved(project / "nightly.loom", project_root=project)
@@ -290,32 +294,34 @@ class TestLoadResolvedRejects:
 
     def test_yaml_extension_rejected(self, tmp_path: Path) -> None:
         cfg = tmp_path / "x.yaml"
-        cfg.write_text('config_version: "1.0"\nthreads:\n  - ref: t.thread\n')
+        write_document(cfg, 'config_version: "2.0"\nthreads:\n  - ref: t.thread\n', kind="weave")
         with pytest.raises(ConfigError, match=r"Expected \.thread, \.weave, or \.loom") as exc:
             load_resolved(cfg)
         assert exc.value.file_path == str(cfg)
 
     def test_name_stem_mismatch_rejected(self, tmp_path: Path) -> None:
         cfg = tmp_path / "t.thread"
-        cfg.write_text(
-            'config_version: "1.0"\nname: other\nsources:\n  d:\n    type: delta\n'
-            "    alias: raw.x\ntarget:\n  alias: out\n"
+        write_document(
+            cfg,
+            'config_version: "2.0"\nname: other\nsources:\n  d:\n    type: delta\n'
+            "    alias: raw.x\ntarget:\n  alias: out\n",
         )
         with pytest.raises(ConfigError, match="does not match filename stem"):
             load_resolved(cfg)
 
     def test_fabric_reference_without_default_raises(self, tmp_path: Path) -> None:
         cfg = tmp_path / "t.thread"
-        cfg.write_text(
-            'config_version: "1.0"\nsources:\n  d:\n    type: delta\n'
-            '    alias: "${fabric.workspace_id}"\ntarget:\n  alias: out\n'
+        write_document(
+            cfg,
+            'config_version: "2.0"\nsources:\n  d:\n    type: delta\n'
+            '    alias: "${fabric.workspace_id}"\ntarget:\n  alias: out\n',
         )
         with pytest.raises(VariableResolutionError, match="fabric.workspace_id"):
             load_resolved(cfg)
 
 
 _DUP_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -330,14 +336,15 @@ class TestDuplicateWeaveNames:
 
     @staticmethod
     def _project(tmp_path: Path, weaves: str) -> Path:
-        project = tmp_path / "dup.weevr"
+        project = write_project(tmp_path / "dup.weevr")
         for folder, thread in (("a", "x"), ("b", "y")):
             (project / folder).mkdir(parents=True)
-            (project / folder / f"{thread}.thread").write_text(_DUP_THREAD.format(name=thread))
-            (project / folder / "main.weave").write_text(
-                f'config_version: "1.0"\nthreads:\n  - ref: {folder}/{thread}.thread\n'
+            write_document(project / folder / f"{thread}.thread", _DUP_THREAD.format(name=thread))
+            write_document(
+                project / folder / "main.weave",
+                f'config_version: "2.0"\nthreads:\n  - ref: {folder}/{thread}.thread\n',
             )
-        (project / "all.loom").write_text(f'config_version: "1.0"\nweaves:\n{weaves}')
+        write_document(project / "all.loom", f'config_version: "2.0"\nweaves:\n{weaves}')
         return project
 
     def test_same_stem_in_two_folders_rejected(self, tmp_path: Path) -> None:
@@ -364,7 +371,7 @@ class TestDuplicateWeaveNames:
             tmp_path,
             "  - ref: a/main.weave\n"
             "  - name: main\n"
-            '    config_version: "1.0"\n'
+            '    config_version: "2.0"\n'
             "    threads:\n"
             "      - ref: b/y.thread\n",
         )
@@ -387,7 +394,7 @@ class TestDuplicateWeaveNames:
 
 
 _HIERARCHY_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -410,7 +417,7 @@ class TestHierarchyVariablesLoad:
 
     def test_standalone_thread_loads(self, tmp_path: Path) -> None:
         cfg = tmp_path / "orders.thread"
-        cfg.write_text(_HIERARCHY_THREAD)
+        write_document(cfg, _HIERARCHY_THREAD)
         thread = load_config(cfg, project_root=tmp_path)
         assert isinstance(thread, Thread)
         assert thread.exports is not None
@@ -418,9 +425,9 @@ class TestHierarchyVariablesLoad:
         assert thread.target.audit_columns == {"_src_thread": "'${thread.name}'"}
 
     def test_weave_referenced_thread_loads(self, tmp_path: Path) -> None:
-        (tmp_path / "orders.thread").write_text(_HIERARCHY_THREAD)
+        write_document(tmp_path / "orders.thread", _HIERARCHY_THREAD)
         cfg = tmp_path / "daily.weave"
-        cfg.write_text('config_version: "1.0"\nthreads:\n  - ref: orders.thread\n')
+        write_document(cfg, 'config_version: "2.0"\nthreads:\n  - ref: orders.thread\n')
         loaded = load_resolved(cfg, project_root=tmp_path)
         assert isinstance(loaded.model, Weave)
         thread = loaded.document.weave_threads()["daily"]["orders"]
@@ -436,10 +443,10 @@ class TestResolvedChildren:
         for name, text in files.items():
             path = root / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text)
+            write_document(path, text)
 
     _TEMPLATE = (
-        'config_version: "1.0"\n'
+        'config_version: "2.0"\n'
         "params:\n  table: {name: table, type: string, required: true}\n"
         'sources:\n  s: {type: delta, alias: "raw.${param.table}"}\n'
         'target: {alias: "out.${param.table}"}\n'
@@ -454,11 +461,11 @@ class TestResolvedChildren:
             {
                 "t.thread": self._TEMPLATE,
                 "w.weave": (
-                    'config_version: "1.0"\n'
+                    'config_version: "2.0"\n'
                     "defaults: {schema: gold}\n"
                     "threads:\n"
                     "  - ref: t.thread\n    as: a\n    params: {table: A}\n"
-                    '  - name: inline\n    config_version: "1.0"\n'
+                    '  - name: inline\n    config_version: "2.0"\n'
                     "    sources: {s: {type: delta, alias: raw.x}}\n"
                     '    target: {alias: "${schema}.inline"}\n'
                 ),
@@ -485,12 +492,12 @@ class TestResolvedChildren:
             tmp_path,
             {
                 "l.loom": (
-                    'config_version: "1.0"\n'
+                    'config_version: "2.0"\n'
                     "weaves:\n"
-                    '  - name: w\n    config_version: "1.0"\n'
+                    '  - name: w\n    config_version: "2.0"\n'
                     "    defaults: {schema: gold}\n"
                     "    threads:\n"
-                    '      - name: t\n        config_version: "1.0"\n'
+                    '      - name: t\n        config_version: "2.0"\n'
                     "        sources: {s: {type: delta, alias: raw.x}}\n"
                     '        target: {alias: "${schema}.t"}\n'
                 ),
@@ -531,3 +538,61 @@ class TestResolvedChildren:
 
         for data in [resolved.data, *walk(resolved.children)]:
             assert [key for key in data if key.startswith("_")] == []
+
+
+_ENVELOPE_THREAD = """\
+kind: {kind}
+config_version: "2.0"
+sources:
+  d:
+    type: delta
+    alias: raw.x
+target:
+  alias: out
+"""
+
+
+class TestEnvelope:
+    """A document's declared ``kind`` decides its type; extensions are convention."""
+
+    def test_v2_thread_loads(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "t.thread"
+        cfg.write_text(_ENVELOPE_THREAD.format(kind="thread"))
+        thread = load_config(cfg)
+        assert isinstance(thread, Thread)
+        assert thread.kind == "thread"
+        assert thread.config_version == "2.0"
+
+    def test_declared_kind_beats_structure(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "p.yaml"
+        cfg.write_text('kind: params\nconfig_version: "2.0"\ntarget: x\n')
+        assert isinstance(load_config(cfg), dict)
+
+    def test_yaml_with_kind_thread_loads_as_thread(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "t.yaml"
+        cfg.write_text(_ENVELOPE_THREAD.format(kind="thread"))
+        assert isinstance(load_config(cfg), Thread)
+
+    def test_kind_extension_mismatch(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "t.thread"
+        cfg.write_text(_ENVELOPE_THREAD.format(kind="weave"))
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(cfg)
+        codes = [(d.code, d.file) for d in exc_info.value.diagnostics]
+        assert codes == [("C207", str(cfg))]
+
+    def test_unknown_kind(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "t.thread"
+        cfg.write_text(_ENVELOPE_THREAD.format(kind="pipeline"))
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(cfg)
+        assert [d.code for d in exc_info.value.diagnostics] == ["C204"]
+
+    def test_referenced_child_mismatch(self, tmp_path: Path) -> None:
+        (tmp_path / "t.thread").write_text(_ENVELOPE_THREAD.format(kind="loom"))
+        weave = tmp_path / "w.weave"
+        weave.write_text('kind: weave\nconfig_version: "2.0"\nthreads:\n  - ref: t.thread\n')
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(weave)
+        codes = [(d.code, d.file) for d in exc_info.value.diagnostics]
+        assert codes == [("C207", str(tmp_path / "t.thread"))]

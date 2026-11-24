@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 
 def format_duration(ms: int | float) -> str:
     """Format milliseconds as a human-readable duration string.
@@ -21,3 +23,17 @@ def format_duration(ms: int | float) -> str:
     minutes = int(seconds // 60)
     remaining = seconds % 60
     return f"{minutes}m {remaining:.1f}s"
+
+
+def format_project(project: Any) -> str:
+    """Describe a project by name and id, for run output.
+
+    Args:
+        project: A :class:`~weevr.model.Project`, or ``None``.
+
+    Returns:
+        ``"<name> (<id>)"``, or ``"(none)"`` for a load without a ``weevr.yaml``.
+    """
+    if project is None:
+        return "(none)"
+    return f"{project.name} ({project.id})"

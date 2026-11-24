@@ -16,8 +16,8 @@ class TestWeave:
 
     def test_minimal_weave(self):
         """Weave from minimal dict normalizes string threads to ThreadEntry objects."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["dim_customer"]})
-        assert w.config_version == "1.0"
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["dim_customer"]})
+        assert w.config_version == "2.0"
         assert len(w.threads) == 1
         assert isinstance(w.threads[0], ThreadEntry)
         assert w.threads[0].name == "dim_customer"
@@ -25,18 +25,18 @@ class TestWeave:
     def test_missing_threads_raises(self):
         """Weave without threads raises ValidationError."""
         with pytest.raises(ValidationError):
-            Weave.model_validate({"config_version": "1.0"})
+            Weave.model_validate({"config_version": "2.0"})
 
     def test_threads_not_list_raises(self):
         """threads field must be a list."""
         with pytest.raises(ValidationError):
-            Weave.model_validate({"config_version": "1.0", "threads": "not_a_list"})
+            Weave.model_validate({"config_version": "2.0", "threads": "not_a_list"})
 
     def test_with_defaults(self):
         """Weave accepts optional defaults dict."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "defaults": {"write": {"mode": "merge"}},
             }
@@ -48,7 +48,7 @@ class TestWeave:
         """Weave accepts optional params dict."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "params": {"env": {"name": "env", "type": "string"}},
             }
@@ -58,25 +58,25 @@ class TestWeave:
 
     def test_frozen(self):
         """Weave is immutable."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["t1"]})
         with pytest.raises(ValidationError):
             w.config_version = "2.0"  # type: ignore[misc]
 
     def test_round_trip(self):
         """Weave round-trips."""
         w = Weave.model_validate(
-            {"config_version": "1.0", "threads": ["a", "b"], "defaults": {"x": 1}}
+            {"config_version": "2.0", "threads": ["a", "b"], "defaults": {"x": 1}}
         )
         assert Weave.model_validate(w.model_dump()) == w
 
     def test_name_defaults_to_empty_string(self):
         """name defaults to empty string when not provided."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["t1"]})
         assert w.name == ""
 
     def test_name_can_be_set(self):
         """name is stored when explicitly provided."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"], "name": "dimensions"})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["t1"], "name": "dimensions"})
         assert w.name == "dimensions"
 
 
@@ -85,20 +85,20 @@ class TestThreadEntry:
 
     def test_string_thread_list_normalizes_to_thread_entry(self):
         """Weave with string-only thread list normalizes to list[ThreadEntry]."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["a", "b", "c"]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["a", "b", "c"]})
         assert all(isinstance(e, ThreadEntry) for e in w.threads)
         assert [e.name for e in w.threads] == ["a", "b", "c"]
 
     def test_string_thread_entry_has_no_dependencies(self):
         """String-normalized ThreadEntry has dependencies=None."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["a"]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["a"]})
         assert w.threads[0].dependencies is None
 
     def test_map_thread_entry_with_dependencies(self):
         """Dict thread entry with dependencies parsed correctly."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     "a",
                     {"name": "b", "dependencies": ["a"]},
@@ -112,7 +112,7 @@ class TestThreadEntry:
 
     def test_map_thread_entry_no_dependencies(self):
         """Dict thread entry without dependencies has dependencies=None."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": [{"name": "x"}]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": [{"name": "x"}]})
         assert w.threads[0].name == "x"
         assert w.threads[0].dependencies is None
 
@@ -120,7 +120,7 @@ class TestThreadEntry:
         """Weave with mixed string/map entries normalizes correctly."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     "load_raw",
                     {"name": "clean", "dependencies": ["load_raw"]},
@@ -144,7 +144,7 @@ class TestThreadEntry:
         """Weave with ThreadEntry objects round-trips correctly."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     "a",
                     {"name": "b", "dependencies": ["a"]},
@@ -204,7 +204,7 @@ class TestThreadEntryParameterization:
         """Weave accepts thread entries with as and params."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     {
                         "ref": "silver/sap.thread",
@@ -273,7 +273,7 @@ class TestThreadEntryCondition:
         """Weave accepts thread entries with conditions."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     "always_run",
                     {
@@ -291,7 +291,7 @@ class TestThreadEntryCondition:
         """Weave with conditional threads round-trips correctly."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": [
                     {"name": "a", "condition": {"when": "true"}},
                     {"name": "b", "dependencies": ["a"]},
@@ -307,7 +307,7 @@ class TestWeaveHookFields:
 
     def test_backward_compatible(self):
         """Existing weaves without hook fields still work."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["t1"]})
         assert w.lookups is None
         assert w.variables is None
         assert w.pre_steps is None
@@ -317,7 +317,7 @@ class TestWeaveHookFields:
         """Weave with lookups dict."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "lookups": {
                     "categories": {
@@ -337,7 +337,7 @@ class TestWeaveHookFields:
         """Weave with variables dict."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "variables": {
                     "batch_id": {"type": "string"},
@@ -354,7 +354,7 @@ class TestWeaveHookFields:
         """Weave with pre_steps list."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "pre_steps": [
                     {
@@ -378,7 +378,7 @@ class TestWeaveHookFields:
         """Weave with post_steps list."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "post_steps": [
                     {
@@ -396,7 +396,7 @@ class TestWeaveHookFields:
         """Weave with all hook-related fields set."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "lookups": {
                     "regions": {
@@ -417,7 +417,7 @@ class TestWeaveHookFields:
         """Weave with hook fields round-trips."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "lookups": {"cats": {"source": {"type": "delta", "alias": "ref.cats"}}},
                 "variables": {"x": {"type": "int"}},
@@ -433,14 +433,14 @@ class TestWeaveConnectionsField:
 
     def test_connections_defaults_to_none(self):
         """Weave without connections has connections=None (backward compatible)."""
-        w = Weave.model_validate({"config_version": "1.0", "threads": ["t1"]})
+        w = Weave.model_validate({"config_version": "2.0", "threads": ["t1"]})
         assert w.connections is None
 
     def test_connections_with_valid_onelake_connection(self):
         """Weave with connections dict containing a valid OneLakeConnection parses."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "connections": {
                     "main": {
@@ -461,7 +461,7 @@ class TestWeaveConnectionsField:
         with pytest.raises(ValidationError):
             Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "threads": ["t1"],
                     "connections": {
                         "bad": {
@@ -478,7 +478,7 @@ class TestWeaveConnectionsField:
         with pytest.raises(ValidationError):
             Weave.model_validate(
                 {
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "threads": ["t1"],
                     "connections": {
                         "bad": {"type": "onelake"},
@@ -490,7 +490,7 @@ class TestWeaveConnectionsField:
         """Weave with connections round-trips through model_dump/model_validate."""
         w = Weave.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "threads": ["t1"],
                 "connections": {
                     "primary": {

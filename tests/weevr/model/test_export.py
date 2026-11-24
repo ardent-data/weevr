@@ -141,7 +141,7 @@ class TestThreadWithExports:
         ]
         t = Thread.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"src": {"type": "delta", "alias": "db.source"}},
                 "target": {"alias": "db.target"},
                 "exports": [e.model_dump() for e in exports],
@@ -158,7 +158,7 @@ class TestThreadWithExports:
 
         t = Thread.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"src": {"type": "delta", "alias": "db.source"}},
                 "target": {"alias": "db.target"},
             }

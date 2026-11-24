@@ -1,0 +1,5 @@
+kind: project
+config_version: "2.0"
+id: 6e2d4c8a-1f3b-4a5c-9d7e-2b4c6d8e0f1a
+name: examples
+description: Example threads, weaves and looms

@@ -10,12 +10,13 @@
 # Run: ctx = Context(spark, "fabcon", params={"lakehouse_path": "/lakehouse/default"})
 #      result = ctx.run("daily.loom")
 
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 name: daily
 
 weaves:
-  - name: dimensions
-  - name: facts
+  - ref: dimensions.weave
+  - ref: facts.weave
     condition:
       when: "table_exists('silver.dim_customer')"
 

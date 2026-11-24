@@ -17,7 +17,7 @@ pytestmark = pytest.mark.spark
 def _thread(name: str, src: str, tgt: str, *, depends: list[str] | None = None) -> Thread:
     cfg: dict[str, Any] = {
         "name": name,
-        "config_version": "1",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": src}},
         "steps": [],
         "target": {"path": tgt},
@@ -103,7 +103,7 @@ class TestRegistryThroughWeave:
             return Thread.model_validate(
                 {
                     "name": name,
-                    "config_version": "1",
+                    "config_version": "2.0",
                     "sources": {"main": {"type": "delta", "alias": shared}},
                     "steps": [],
                     "target": {"path": tgt},
@@ -191,7 +191,7 @@ class TestConnectionFormRegistry:
         producer = Thread.model_validate(
             {
                 "name": "producer",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw.x"}},
                 "steps": [],
                 "target": {"connection": "lake", "table": "shared"},
@@ -203,7 +203,7 @@ class TestConnectionFormRegistry:
             return Thread.model_validate(
                 {
                     "name": name,
-                    "config_version": "1",
+                    "config_version": "2.0",
                     "sources": {"main": {"connection": "lake", "table": "shared"}},
                     "steps": [],
                     "target": {"path": f"/tmp/{name}"},

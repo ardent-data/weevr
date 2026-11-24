@@ -1,0 +1,10 @@
+kind: thread
+config_version: "2.0"
+
+sources:
+  products:
+    type: delta
+    alias: raw.products
+
+target:
+  alias: gold.dim_product

@@ -91,7 +91,8 @@ fabcon/
 
 1. Create a Fabric workspace with a Lakehouse attached
 2. Install weevr: `pip install weevr`
-3. Upload the `fabcon/` directory to the Lakehouse `Files` area as `fabcon.weevr`
+3. Upload the `fabcon/` directory to the Lakehouse `Files` area as `fabcon.weevr` (it
+   includes its `weevr.yaml`)
 4. Paste `demo_setup.py` into a notebook cell and run `stage_all(spark)` to create
    all source Delta tables
 

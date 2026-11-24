@@ -98,7 +98,7 @@ class TestEntryMeta:
         assert core is not None
         assert core.ref == "weaves/core.weave"
         assert core.condition == ConditionSpec(when="'dev' == 'dev'")
-        assert doc.children["conv"].entry == EntryMeta()
+        assert doc.children["conv"].entry == EntryMeta(ref="conv.weave")
 
 
 class TestViews:

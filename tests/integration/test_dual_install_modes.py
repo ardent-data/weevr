@@ -41,6 +41,8 @@ from pathlib import Path
 
 import pytest
 
+from documents import write_document, write_project
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Pure-Python imports that must work in BOTH install modes. These touch
@@ -220,7 +222,7 @@ def test_core_only_install_does_not_pull_pyspark(
 
 
 _SMOKE_THREAD = """\
-config_version: "1.0"
+config_version: "2.0"
 sources:
   data:
     type: delta
@@ -262,15 +264,15 @@ def test_core_only_install_loads_resolved_children(
     python = _make_venv(tmp_path / "core_only_load", python_version)
     _pip_install(python, str(core))
 
-    project = tmp_path / "smoke.weevr"
-    project.mkdir()
+    project = write_project(tmp_path / "smoke.weevr", name="smoke")
     for name in ("a", "b"):
-        (project / f"{name}.thread").write_text(_SMOKE_THREAD.format(name=name))
-    (project / "w.weave").write_text(
-        'config_version: "1.0"\nthreads:\n  - ref: a.thread\n'
-        "  - ref: b.thread\n    dependencies: [a]\n"
+        write_document(project / f"{name}.thread", _SMOKE_THREAD.format(name=name))
+    write_document(
+        project / "w.weave",
+        'config_version: "2.0"\nthreads:\n  - ref: a.thread\n'
+        "  - ref: b.thread\n    dependencies: [a]\n",
     )
-    (project / "l.loom").write_text('config_version: "1.0"\nweaves:\n  - ref: w.weave\n')
+    write_document(project / "l.loom", 'config_version: "2.0"\nweaves:\n  - ref: w.weave\n')
 
     result = subprocess.run(
         [str(python), "-c", _SMOKE_LOAD, str(project)],

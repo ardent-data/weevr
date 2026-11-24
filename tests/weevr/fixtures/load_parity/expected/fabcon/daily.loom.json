@@ -21,7 +21,7 @@
   "model": {
     "audit_templates": null,
     "column_sets": null,
-    "config_version": "1.0",
+    "config_version": "2.0",
     "connections": null,
     "defaults": {
       "execution": {
@@ -40,6 +40,7 @@
       "max_parallel_threads": null,
       "trace": true
     },
+    "kind": "loom",
     "lookups": null,
     "name": "daily",
     "naming": null,
@@ -66,15 +67,15 @@
     "weaves": [
       {
         "condition": null,
-        "name": "dimensions",
-        "ref": null
+        "name": "",
+        "ref": "dimensions.weave"
       },
       {
         "condition": {
           "when": "table_exists('silver.dim_customer')"
         },
-        "name": "facts",
-        "ref": null
+        "name": "",
+        "ref": "facts.weave"
       }
     ]
   },
@@ -85,7 +86,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -117,6 +118,7 @@
             "output": "native"
           }
         },
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "dim_customer",
@@ -208,7 +210,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -230,6 +232,7 @@
             "output": "native"
           }
         },
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "dim_product",
@@ -320,7 +323,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -332,6 +335,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "stg_customers",
@@ -453,7 +457,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -465,6 +469,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "stg_products",
@@ -562,7 +567,7 @@
         "audit_templates": null,
         "cache": null,
         "column_sets": null,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "connections": null,
         "defaults": null,
         "execution": {
@@ -574,6 +579,7 @@
         "exports": null,
         "failure": null,
         "keys": null,
+        "kind": "thread",
         "load": null,
         "lookups": null,
         "name": "fact_orders",
@@ -819,7 +825,7 @@
           "condition": null,
           "dependencies": null,
           "params": null,
-          "ref": null
+          "ref": "dimensions.weave"
         },
         "kind": "weave",
         "name": "dimensions",
@@ -966,7 +972,7 @@
           "condition": "table_exists('silver.dim_customer')",
           "dependencies": null,
           "params": null,
-          "ref": null
+          "ref": "facts.weave"
         },
         "kind": "weave",
         "name": "facts",
@@ -986,10 +992,11 @@
     "dimensions": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": null,
       "execution": null,
+      "kind": "weave",
       "lookups": null,
       "name": "dimensions",
       "naming": null,
@@ -1040,10 +1047,11 @@
     "facts": {
       "audit_templates": null,
       "column_sets": null,
-      "config_version": "1.0",
+      "config_version": "2.0",
       "connections": null,
       "defaults": null,
       "execution": null,
+      "kind": "weave",
       "lookups": {
         "dim_customer": {
           "filter": null,

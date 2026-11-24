@@ -3,7 +3,8 @@
 # Reads raw products, selects and casts columns, writes to staging.
 # Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: stg_products
 
 sources:

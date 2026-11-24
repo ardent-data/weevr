@@ -1,3 +1,4 @@
+kind: thread
 config_version: "99.0"
 sources:
   customers: table://lakehouse.dim_customer

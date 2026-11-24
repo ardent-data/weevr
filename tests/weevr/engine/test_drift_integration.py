@@ -25,7 +25,7 @@ DIMENSION = {
 def _thread(target: dict[str, Any], write: dict[str, Any] | None = None, **extra: Any) -> Thread:
     body: dict[str, Any] = {
         "name": "t",
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"src": {"type": "delta", "alias": "src_table"}},
         "target": target,
         **extra,
@@ -231,7 +231,7 @@ class TestAdaptiveEvolution:
         thread = Thread.model_validate(
             {
                 "name": "cdc",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {"path": tgt, "schema_drift": "adaptive"},
                 "write": {"mode": "merge", "match_keys": ["id"]},
@@ -321,7 +321,7 @@ class TestMissingColumns:
         )
         warp = WarpConfig.model_validate(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "columns": [
                     {"name": "id", "type": "bigint"},
                     {"name": "name", "type": "string"},
@@ -350,7 +350,7 @@ class TestMissingColumns:
         thread = Thread.model_validate(
             {
                 "name": "cdc",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {"path": tgt, "schema_drift": "strict", "on_drift": on_drift},
                 "write": {"mode": "merge", "match_keys": ["id"]},

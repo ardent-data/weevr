@@ -1,0 +1,10 @@
+type: thread
+config_version: "1.0"
+
+sources:
+  orders:
+    type: delta
+    alias: raw.orders
+
+target:
+  alias: gold.fact_sales

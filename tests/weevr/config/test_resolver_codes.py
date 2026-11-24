@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
+from documents import write_document, write_project
 from weevr.config import load_config
 from weevr.config.attribution import attribute_errors
 from weevr.config.audit_templates import resolve_template_columns
@@ -32,7 +33,7 @@ from weevr.errors import (
 )
 
 THREAD_BODY: dict[str, Any] = {
-    "config_version": "1.0",
+    "config_version": "2.0",
     "sources": {"s": {"type": "delta", "alias": "raw.t"}},
     "target": {"alias": "out.t"},
 }
@@ -43,14 +44,13 @@ def _only(exc: ConfigError) -> Diagnostic:
     return exc.diagnostics[0]
 
 
-def _write(path: Path, data: dict[str, Any] | str) -> Path:
+def _write(path: Path, data: dict[str, Any] | str, kind: str | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if isinstance(data, str) else yaml.safe_dump(data, sort_keys=False))
-    return path
+    return write_document(path, data, kind=kind)
 
 
 def _weave(threads: list[Any]) -> dict[str, Any]:
-    return {"config_version": "1.0", "threads": threads}
+    return {"config_version": "2.0", "threads": threads}
 
 
 class TestParameters:
@@ -170,7 +170,8 @@ class TestReferences:
         assert diag.pointer == "/threads/0/ref"
 
     def test_ref_not_found_in_weave_names_file_and_pointer(self, tmp_path):
-        weave = _write(tmp_path / "w.weave", _weave([{"name": "a"}, {"ref": "gone.thread"}]))
+        _write(tmp_path / "a.thread", THREAD_BODY)
+        weave = _write(tmp_path / "w.weave", _weave([{"ref": "a.thread"}, {"ref": "gone.thread"}]))
         config = yaml.safe_load(weave.read_text())
         with (
             pytest.raises(ReferenceResolutionError) as exc,
@@ -181,15 +182,71 @@ class TestReferences:
         assert diag.code == "C301"
         assert diag.file == str(weave)
         assert diag.pointer == "/threads/1/ref"
-        assert diag.line == 4
+        assert diag.line == 5
 
-    def test_weave_without_definition(self, tmp_path):
-        loom = {"config_version": "1.0", "weaves": [{"name": "ghost"}]}
+    @pytest.mark.parametrize("with_file", [False, True])
+    def test_name_only_entry(self, tmp_path, with_file):
+        if with_file:
+            _write(tmp_path / "ghost.weave", {"config_version": "2.0", "threads": []})
+        loom = {"config_version": "2.0", "weaves": [{"name": "ghost"}]}
         with pytest.raises(ReferenceResolutionError) as exc:
             resolve_references(loom, "loom", tmp_path)
         diag = _only(exc.value)
-        assert diag.code == "C301"
+        assert diag.code == "C313"
         assert diag.pointer == "/weaves/0"
+        assert diag.hint == "ref: ghost.weave"
+
+    @pytest.mark.parametrize("with_file", [False, True])
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            "t",
+            {"name": "t"},
+            {"name": "t", "as": "t2", "dependencies": ["a"], "condition": {"when": "true"}},
+            {"name": "t", "params": {"region": "us"}},
+        ],
+    )
+    def test_name_only_thread_entry(self, tmp_path, entry, with_file):
+        if with_file:
+            _write(tmp_path / "t.thread", THREAD_BODY)
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_references(_weave([entry]), "weave", tmp_path)
+        diag = _only(exc.value)
+        assert diag.code == "C313"
+        assert diag.pointer == "/threads/0"
+        assert diag.hint == "ref: t.thread"
+
+    def test_name_only_thread_entry_in_weave_file_is_one_code(self, tmp_path):
+        _write(tmp_path / "t.thread", THREAD_BODY)
+        weave = _write(tmp_path / "w.weave", _weave(["t"]))
+        with pytest.raises(ConfigError) as exc:
+            load_config(weave, project_root=tmp_path)
+        diag = _only(exc.value)
+        assert (diag.code, diag.pointer, diag.file) == ("C313", "/threads/0", str(weave))
+
+    def test_inline_thread_with_entry_keys_and_body_still_loads(self, tmp_path):
+        weave = _weave([{"name": "t", "dependencies": [], **THREAD_BODY}])
+        (child,) = resolve_references(weave, "weave", tmp_path)
+        assert child.source_path is None
+        assert child.data["name"] == "t"
+
+    def test_aliased_refs_to_one_thread_still_load(self, tmp_path):
+        _write(tmp_path / "t.thread", THREAD_BODY)
+        weave = _weave([{"ref": "t.thread", "as": "a"}, {"ref": "t.thread", "as": "b"}])
+        assert len(resolve_references(weave, "weave", tmp_path)) == 2
+
+    def test_inline_body_wins_over_same_named_file(self, tmp_path):
+        _write(
+            tmp_path / "a.weave",
+            {"config_version": "2.0", "threads": [{"ref": "missing.thread"}]},
+        )
+        loom = {
+            "config_version": "2.0",
+            "weaves": [{"name": "a", "config_version": "2.0", "threads": []}],
+        }
+        (child,) = resolve_references(loom, "loom", tmp_path)
+        assert child.source_path is None
+        assert child.data["threads"] == []
 
     def test_unsupported_ref_extension_reuses_c007(self, tmp_path):
         with pytest.raises(ConfigError) as exc:
@@ -223,21 +280,59 @@ class TestReferences:
         assert diag.code == "C303"
         assert diag.pointer == "/threads/0/ref"
 
-    def test_weave_name_outside_project(self, tmp_path):
-        project = tmp_path / "proj"
-        project.mkdir()
-        loom = {"config_version": "1.0", "weaves": [{"name": "../outside"}]}
+    @pytest.mark.parametrize(
+        "ref",
+        [
+            "item://lake/x.thread",
+            "pkg://acme/x.thread",
+            "abfss://c@a.dfs.core.windows.net/x.thread",
+            "made-up+scheme.1://x",
+        ],
+    )
+    def test_ref_with_scheme_is_unsupported(self, tmp_path, ref):
         with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(loom, "loom", project)
+            resolve_ref_path(ref, tmp_path, "/threads/0/ref")
         diag = _only(exc.value)
-        assert diag.code == "C303"
-        assert diag.pointer == "/weaves/0/name"
+        assert diag.code == "C312"
+        assert diag.pointer == "/threads/0/ref"
+
+    def test_ref_scheme_through_weave_entry(self, tmp_path):
+        weave = _weave([{"name": "a", **THREAD_BODY}, {"ref": "item://x/y.thread"}])
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_references(weave, "weave", tmp_path)
+        diag = _only(exc.value)
+        assert diag.code == "C312"
+        assert diag.pointer == "/threads/1/ref"
+
+    def test_absolute_path_ref_stays_c311(self, tmp_path):
+        with pytest.raises(ReferenceResolutionError) as exc:
+            resolve_ref_path("/x/y.thread", tmp_path, "/threads/0/ref")
+        assert _only(exc.value).code == "C311"
+
+    def test_ref_resolves_from_project_root_whatever_the_document_folder(self, tmp_path):
+        """The same ref reads the same from documents in different folders (root-relative)."""
+        write_project(tmp_path)
+        _write(tmp_path / "threads" / "shared.thread", THREAD_BODY)
+        ref = {"ref": "threads/shared.thread"}
+        _write(tmp_path / "weaves" / "deep" / "a.weave", _weave([ref]))
+        _write(tmp_path / "b.weave", _weave([ref]))
+        _write(
+            tmp_path / "looms" / "main.loom",
+            {
+                "config_version": "2.0",
+                "weaves": [{"ref": "weaves/deep/a.weave"}, {"ref": "b.weave"}],
+            },
+        )
+        # A document-relative reading would look for looms/weaves/deep/a.weave and
+        # weaves/deep/threads/shared.thread; both loads must find the files instead.
+        load_config(tmp_path / "looms" / "main.loom")
+        load_config(tmp_path / "weaves" / "deep" / "a.weave")
 
     def test_circular_reference_through_load_names_file(self, tmp_path):
         _write(tmp_path / "a.weave", _weave([{"ref": "a.weave"}]))
         loom = _write(
             tmp_path / "l.loom",
-            {"config_version": "1.0", "weaves": [{"ref": "a.weave"}]},
+            {"config_version": "2.0", "weaves": [{"ref": "a.weave"}]},
         )
         with pytest.raises(ReferenceResolutionError) as exc:
             load_config(loom, project_root=tmp_path)
@@ -256,16 +351,6 @@ class TestReferences:
         assert diag.code == "C302"
         assert diag.expected == ("b.weave", "c.weave", "b.weave")
 
-    def test_circular_convention_reference(self, tmp_path):
-        _write(tmp_path / "a.weave", {"config_version": "1.0", "threads": []})
-        loom = {"config_version": "1.0", "weaves": [{"name": "a"}]}
-        with pytest.raises(ReferenceResolutionError) as exc:
-            resolve_references(loom, "loom", tmp_path, visited={"a.weave": None})
-        diag = _only(exc.value)
-        assert diag.code == "C302"
-        assert diag.expected == ("a.weave", "a.weave")
-        assert diag.pointer == "/weaves/0/name"
-
 
 class TestEntryForms:
     def test_inline_thread_without_name(self, tmp_path):
@@ -277,7 +362,7 @@ class TestEntryForms:
         assert diag.pointer == "/threads/1"
 
     def test_inline_weave_without_name(self, tmp_path):
-        loom = {"config_version": "1.0", "weaves": [{"threads": []}]}
+        loom = {"config_version": "2.0", "weaves": [{"threads": []}]}
         with pytest.raises(ConfigError) as exc:
             resolve_references(loom, "loom", tmp_path)
         diag = _only(exc.value)
@@ -324,11 +409,11 @@ class TestEntryForms:
 
     def test_inline_weave_entry_pointer_is_prefixed(self, tmp_path):
         loom = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": [
                 {
                     "name": "w",
-                    "config_version": "1.0",
+                    "config_version": "2.0",
                     "threads": [{**THREAD_BODY, "name": "a"}, {**THREAD_BODY, "name": "a"}],
                 },
             ],
@@ -368,7 +453,7 @@ class TestForeach:
 
 class TestEnvelopeAndRegistries:
     def test_unsupported_extension_at_load(self, tmp_path):
-        path = _write(tmp_path / "t.yaml", THREAD_BODY)
+        path = _write(tmp_path / "t.yaml", THREAD_BODY, kind="thread")
         with pytest.raises(ConfigError) as exc:
             resolve_config(LocalConfigLocation(path), require_typed_extension=True)
         diag = _only(exc.value)
@@ -430,13 +515,13 @@ def test_unresolved_variable_under_with_points_at_the_authored_key(tmp_path: Pat
     from weevr.errors import VariableResolutionError
 
     thread = {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
         "with": {"orders": {"from": "main", "steps": [{"filter": {"expr": "x = '${nope}'"}}]}},
     }
     path = tmp_path / "t.thread"
-    path.write_text(yaml.safe_dump(thread, sort_keys=False))
+    write_document(path, yaml.safe_dump(thread, sort_keys=False))
     with pytest.raises(VariableResolutionError) as exc_info:
         load_config(path)
     (diag,) = exc_info.value.diagnostics
@@ -452,13 +537,13 @@ def test_a_user_key_named_with_underscore_keeps_its_name(tmp_path: Path) -> None
     from weevr.errors import VariableResolutionError
 
     thread = {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"main": {"type": "delta", "alias": "raw.a"}},
         "target": {"alias": "out.a"},
         "steps": [{"derive": {"columns": {"with_": "'${nope}'"}}}],
     }
     path = tmp_path / "t.thread"
-    path.write_text(yaml.safe_dump(thread, sort_keys=False))
+    write_document(path, yaml.safe_dump(thread, sort_keys=False))
     with pytest.raises(VariableResolutionError) as exc_info:
         load_config(path)
     (diag,) = exc_info.value.diagnostics

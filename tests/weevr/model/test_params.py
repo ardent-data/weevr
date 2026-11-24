@@ -64,22 +64,22 @@ class TestParamsConfig:
 
     def test_minimal(self):
         """ParamsConfig with just config_version."""
-        pc = ParamsConfig(config_version="1.0")
-        assert pc.config_version == "1.0"
+        pc = ParamsConfig(config_version="2.0")
+        assert pc.config_version == "2.0"
 
     def test_extra_fields_allowed(self):
         """ParamsConfig accepts arbitrary extra fields."""
-        pc = ParamsConfig(config_version="1.0", env="dev", lakehouse="bronze")  # type: ignore[call-arg]
-        assert pc.config_version == "1.0"
+        pc = ParamsConfig(config_version="2.0", env="dev", lakehouse="bronze")  # type: ignore[call-arg]
+        assert pc.config_version == "2.0"
 
     def test_nested_extra_fields(self):
         """ParamsConfig accepts nested extra fields."""
-        pc = ParamsConfig(config_version="1.0", db={"host": "localhost", "port": 5432})  # type: ignore[call-arg]
-        assert pc.config_version == "1.0"
+        pc = ParamsConfig(config_version="2.0", db={"host": "localhost", "port": 5432})  # type: ignore[call-arg]
+        assert pc.config_version == "2.0"
 
     def test_mutable(self):
         """ParamsConfig is mutable (not FrozenBase)."""
-        pc = ParamsConfig(config_version="1.0")
+        pc = ParamsConfig(config_version="2.0")
         pc.config_version = "2.0"
         assert pc.config_version == "2.0"
 

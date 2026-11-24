@@ -175,7 +175,7 @@ class TestWeaveColumnSets:
         from weevr.model.weave import ThreadEntry, Weave
 
         weave = Weave(
-            config_version="1.0",
+            config_version="2.0",
             threads=[ThreadEntry(name="thread_a")],
             column_sets={
                 "sap_dict": ColumnSet(source=ColumnSetSource(type="delta", alias="silver.sap_map"))
@@ -190,7 +190,7 @@ class TestWeaveColumnSets:
         """Weave.column_sets defaults to None when not provided."""
         from weevr.model.weave import ThreadEntry, Weave
 
-        weave = Weave(config_version="1.0", threads=[ThreadEntry(name="thread_a")])
+        weave = Weave(config_version="2.0", threads=[ThreadEntry(name="thread_a")])
         assert weave.column_sets is None
 
     def test_weave_column_sets_multiple_entries(self):
@@ -198,7 +198,7 @@ class TestWeaveColumnSets:
         from weevr.model.weave import ThreadEntry, Weave
 
         weave = Weave(
-            config_version="1.0",
+            config_version="2.0",
             threads=[ThreadEntry(name="thread_a")],
             column_sets={
                 "sap_dict": ColumnSet(param="param_sap"),
@@ -220,7 +220,7 @@ class TestLoomColumnSets:
         from weevr.model.loom import Loom, WeaveEntry
 
         loom = Loom(
-            config_version="1.0",
+            config_version="2.0",
             weaves=[WeaveEntry(name="weave_a")],
             column_sets={
                 "sap_dict": ColumnSet(source=ColumnSetSource(type="delta", alias="gold.sap_map"))
@@ -235,7 +235,7 @@ class TestLoomColumnSets:
         """Loom.column_sets defaults to None when not provided."""
         from weevr.model.loom import Loom, WeaveEntry
 
-        loom = Loom(config_version="1.0", weaves=[WeaveEntry(name="weave_a")])
+        loom = Loom(config_version="2.0", weaves=[WeaveEntry(name="weave_a")])
         assert loom.column_sets is None
 
     def test_loom_column_sets_multiple_entries(self):
@@ -243,7 +243,7 @@ class TestLoomColumnSets:
         from weevr.model.loom import Loom, WeaveEntry
 
         loom = Loom(
-            config_version="1.0",
+            config_version="2.0",
             weaves=[WeaveEntry(name="weave_a")],
             column_sets={
                 "finance_dict": ColumnSet(param="param_finance"),

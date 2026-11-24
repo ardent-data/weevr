@@ -7,6 +7,7 @@ import pytest
 from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
 
+from documents import write_document, write_project
 from spark_helpers import create_delta_table
 from weevr import Context
 from weevr.engine.executor import execute_thread
@@ -35,7 +36,7 @@ def _make_watermark_thread(
     """Build a thread with incremental_watermark load config."""
     return Thread(
         name=name,
-        config_version="1",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=source_path)},
         steps=[],
         target=Target(path=target_path),
@@ -230,7 +231,7 @@ class TestWatermarkHwmFromSource:
         # The filter step will drop the ts=20 row, but HWM should still be 30
         thread = Thread(
             name="t1",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[FilterStep(filter=FilterParams(expr=SparkExpr("keep = true")))],
             target=Target(path=tgt),
@@ -375,16 +376,16 @@ class TestWatermarkTypeRequiredEndToEnd:
         target = tmp_path / "tgt"
         create_delta_table(spark, source, [{"id": 1, "ts": 1}, {"id": 2, "ts": 2}])
         type_line = f"  watermark_type: {watermark_type}\n" if watermark_type else ""
-        project = tmp_path / "wm.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "wm.weevr")
         thread = project / "t.thread"
-        thread.write_text(
-            'config_version: "1.0"\n'
+        write_document(
+            thread,
+            'config_version: "2.0"\n'
             f'sources:\n  s:\n    type: delta\n    alias: "{source}"\n'
             f'target:\n  path: "{target}"\n'
             "load:\n  mode: incremental_watermark\n  watermark_column: ts\n"
             + type_line
-            + "write:\n  mode: append\n"
+            + "write:\n  mode: append\n",
         )
         return project, thread, target
 

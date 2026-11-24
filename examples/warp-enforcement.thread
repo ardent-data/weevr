@@ -2,7 +2,8 @@
 # schema contract and violations fail the thread (`warp_enforcement: enforce`);
 # extra columns are dropped with a warning (`schema_drift: strict`, `on_drift: warn`).
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: warp-enforcement
 
 sources:

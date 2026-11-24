@@ -9,12 +9,14 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from weevr.engine.formatting import format_duration as _format_duration
+from weevr.engine.formatting import format_project as _format_project
 
 if TYPE_CHECKING:
     from weevr.config.document import ResolvedDocument
     from weevr.diagnostics import Diagnostic
     from weevr.engine.planner import ExecutionPlan
     from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
+    from weevr.model.project import Project
     from weevr.model.thread import Thread
     from weevr.model.weave import Weave
     from weevr.telemetry.results import LoomTelemetry, ThreadTelemetry, WeaveTelemetry
@@ -95,6 +97,10 @@ class RunResult:
             steps from them. ``None`` when not populated.
         preview_metadata: Per-thread output schema, row count, samples and
             step stats (preview mode only).
+        project: The project the run loaded under (its ``weevr.yaml``);
+            ``None`` without one.
+        project_root: The project root the run resolved against; ``None``
+            when not populated.
     """
 
     __slots__ = (
@@ -112,6 +118,8 @@ class RunResult:
         "warnings",
         "thread_models",
         "preview_metadata",
+        "project",
+        "project_root",
     )
 
     def __init__(
@@ -131,6 +139,8 @@ class RunResult:
         thread_models: Mapping[str, Thread] | None = None,
         preview_metadata: dict[str, PreviewThreadMetadata] | None = None,
         diagnostics: Sequence[Diagnostic] | None = None,
+        project: Project | None = None,
+        project_root: str | None = None,
     ) -> None:
         """Initialize a RunResult with execution outcome and telemetry."""
         self.status = status
@@ -149,6 +159,8 @@ class RunResult:
             MappingProxyType(dict(thread_models)) if thread_models is not None else None
         )
         self.preview_metadata = preview_metadata
+        self.project = project
+        self.project_root = project_root
 
     @property
     def validation_errors(self) -> list[str] | None:
@@ -476,6 +488,7 @@ class RunResult:
         lines: list[str] = [
             "Mode:   validate",
             f"Scope:  {self.config_type}:{self.config_name}",
+            *self._summary_project(),
         ]
 
         errors = [d for d in self.diagnostics if d.is_error]
@@ -488,10 +501,20 @@ class RunResult:
 
         return lines
 
+    def _summary_project(self) -> list[str]:
+        """The project root and identity lines, when the run recorded a root."""
+        if self.project_root is None:
+            return []
+        return [
+            f"Root:   {self.project_root}",
+            f"Project: {_format_project(self.project)}",
+        ]
+
     def _summary_plan(self) -> list[str]:
         lines: list[str] = [
             "Mode:   plan",
             f"Scope:  {self.config_type}:{self.config_name}",
+            *self._summary_project(),
         ]
 
         if self.execution_plan:
@@ -603,6 +626,9 @@ class LoadedConfig:
         config_type: Config kind (``"thread"``, ``"weave"``, ``"loom"``).
         config_name: Name derived from the config file path.
         document: The resolved config tree.
+        project: The project document the load ran under, or ``None``.
+        project_root: The project root the load resolved against; ``None``
+            when unknown.
         resolved_threads: Deprecated; use ``document``.
         resolved_weaves: Deprecated; use ``document``.
         diagnostics: The load's warning diagnostics.
@@ -676,6 +702,16 @@ class LoadedConfig:
     def model(self) -> Any:
         """The underlying Thread, Weave, or Loom model."""
         return self._document.model
+
+    @property
+    def project(self) -> Project | None:
+        """The project the config loaded under (its ``weevr.yaml``); ``None`` without one."""
+        return self._document.project
+
+    @property
+    def project_root(self) -> str | None:
+        """The project root references and Source paths resolved against; ``None`` if unknown."""
+        return self._document.project_root
 
     @property
     def config_type(self) -> str:

@@ -27,7 +27,7 @@ class TestEnforceWarp:
 
     def _make_warp(self, columns: list[dict]) -> WarpConfig:
         return WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[WarpColumn(**c) for c in columns],
         )
 
@@ -402,7 +402,8 @@ class TestAutoGenerateWarp:
         with open(tmp_path / "test_table.warp") as f:
             data = yaml.safe_load(f)
         assert data["auto_generated"] is True
-        assert data["config_version"] == "1.0"
+        assert data["kind"] == "warp"
+        assert data["config_version"] == "2.0"
 
     def test_includes_all_columns(self, spark: SparkSession, tmp_path: Path):
         """Auto-gen includes all columns from DataFrame schema."""
@@ -429,7 +430,7 @@ class TestAutoGenerateWarp:
         import yaml
 
         existing_warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[WarpColumn(name="id", type="bigint")],
         )
         drift_report = DriftReport(extra_columns=["new_col"])

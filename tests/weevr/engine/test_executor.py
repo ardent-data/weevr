@@ -60,7 +60,7 @@ def _make_thread(
     """Helper to construct a minimal Thread for testing."""
     return Thread(
         name=name,
-        config_version="1",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=source_path)},
         steps=steps or [],
         target=Target(path=target_path),
@@ -115,7 +115,7 @@ class TestCommitStampIntegration:
 
         thread = Thread(
             name="stamp_identity",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt, audit_columns={"_run_id": "'${run.id}'"}),
@@ -367,7 +367,7 @@ class TestExecuteThreadLookups:
         # Thread with a single lookup-based source
         thread = Thread(
             name="lookup_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="my_lookup")},
             steps=[],
             target=Target(path=tgt),
@@ -397,7 +397,7 @@ class TestExecuteThreadLookups:
 
         thread = Thread(
             name="demand_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="demand_lookup")},
             steps=[],
             target=Target(path=tgt),
@@ -423,7 +423,7 @@ class TestExecuteThreadLookups:
 
         thread = Thread(
             name="mixed_thread",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=two_row_src),
                 "ref": Source(lookup="ref_lookup"),
@@ -452,7 +452,7 @@ class TestExecuteThreadLookups:
 
         thread = Thread(
             name="undef_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"ref": Source(lookup="nonexistent")},
             steps=[],
             target=Target(path=tgt),
@@ -589,7 +589,7 @@ class TestThreadResourceLifecycle:
         ]
         thread = Thread(
             name="pre_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt),
@@ -619,7 +619,7 @@ class TestThreadResourceLifecycle:
         ]
         thread = Thread(
             name="post_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt),
@@ -644,7 +644,7 @@ class TestThreadResourceLifecycle:
         # Thread with a source that references a thread-level lookup
         thread = Thread(
             name="tlkp_thread",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=one_row_src),
                 "ref": Source(lookup="thread_ref"),
@@ -674,7 +674,7 @@ class TestThreadResourceLifecycle:
         # Thread with invalid source path but valid thread-level lookup
         thread = Thread(
             name="tlkp_fail_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias="/nonexistent/path")},
             steps=[],
             target=Target(path="/tmp/fail_tgt"),
@@ -708,7 +708,7 @@ class TestThreadResourceLifecycle:
         # Thread-level column_set overrides weave-level
         thread = Thread(
             name="tcs_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[
                 RenameStep(rename=RenameParams(column_set="my_cs")),
@@ -756,7 +756,7 @@ class TestThreadResourceLifecycle:
         # Thread has a variable with a default, used in a pre_step log message
         thread = Thread(
             name="tvar_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(path=tgt),
@@ -791,7 +791,7 @@ class TestExecuteThreadConnections:
 
         thread = Thread(
             name="undef_conn_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(connection="missing_conn", table="my_table"),
@@ -815,7 +815,7 @@ class TestExecuteThreadConnections:
 
         thread = Thread(
             name="conn_tgt_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=two_row_src)},
             steps=[],
             target=Target(connection="my_conn", table="sales"),
@@ -852,7 +852,7 @@ class TestExecuteThreadConnections:
 
         thread = Thread(
             name="schema_conn_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=one_row_src)},
             steps=[],
             target=Target(connection="silver_conn", schema_override="silver", table="customers"),  # type: ignore[call-arg]
@@ -961,7 +961,7 @@ class TestResolveWithBlock:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"orders": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -989,7 +989,7 @@ class TestResolveWithBlock:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"orders": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1024,7 +1024,7 @@ class TestResolveWithBlock:
         thread = Thread.model_validate(
             {
                 "name": "cte_join",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"orders": {"type": "delta", "alias": src}},
                 "steps": [{"join": {"source": "big_orders", "on": ["id"], "type": "inner"}}],
                 "target": {"path": tgt},
@@ -1056,7 +1056,7 @@ class TestResolveWithBlock:
         thread = Thread.model_validate(
             {
                 "name": "chain",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1080,7 +1080,7 @@ class TestResolveWithBlock:
 
         thread = Thread(
             name="no_cte",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             target=Target(path=tgt),
@@ -1109,7 +1109,7 @@ class TestResolveWithBlockTelemetry:
         thread = Thread.model_validate(
             {
                 "name": "multi_cte",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1141,7 +1141,7 @@ class TestResolveWithBlockTelemetry:
         thread = Thread.model_validate(
             {
                 "name": "dur_cte",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1172,7 +1172,7 @@ class TestResolveWithBlockTelemetry:
         thread = Thread.model_validate(
             {
                 "name": "rowcount_cte",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1200,7 +1200,7 @@ class TestResolveWithBlockTelemetry:
         thread = Thread.model_validate(
             {
                 "name": "parented_cte",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1227,7 +1227,7 @@ class TestResolveWithBlockTelemetry:
         thread = Thread.model_validate(
             {
                 "name": "no_collector",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"raw": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [],
                 "target": {"path": "/fake/target"},
@@ -1257,7 +1257,7 @@ class TestResolveWithBlockTelemetry:
         thread = Thread.model_validate(
             {
                 "name": "cte_tel_thread",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"orders": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -1347,7 +1347,7 @@ class TestWithBlockIntegration:
         thread = Thread.model_validate(
             {
                 "name": "sap_invoices",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {
                     "customers": {"type": "delta", "alias": customers_path},
                     "invoices": {"type": "delta", "alias": invoices_path},
@@ -1552,7 +1552,7 @@ class TestWithBlockColumnControlIntegration:
         thread = Thread.model_validate(
             {
                 "name": "sap_dim",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {
                     "materials": {"type": "delta", "alias": "/fake/materials"},
                     "hierarchy": {"type": "delta", "alias": "/fake/hierarchy"},
@@ -1685,7 +1685,7 @@ class TestWithBlockColumnControlIntegration:
         thread = Thread.model_validate(
             {
                 "name": "sap_dim_full",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {
                     "materials": {"type": "delta", "alias": src_materials},
                     "hierarchy": {"type": "delta", "alias": src_hierarchy},
@@ -1828,7 +1828,7 @@ class TestCteObservationScoping:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"orders": {"type": "delta", "alias": "/fake/path"}},
                 "steps": [map_step],
                 "target": {"path": "/fake/target"},
@@ -1866,7 +1866,7 @@ class TestCaptureSamplesGate:
         return Thread.model_validate(
             {
                 "name": "sample_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -1964,7 +1964,7 @@ class TestTargetHandle:
         thread = Thread.model_validate(
             {
                 "name": "handle_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -1991,7 +1991,7 @@ class TestTargetHandle:
         thread = Thread.model_validate(
             {
                 "name": "handle_seed_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {
@@ -2024,7 +2024,7 @@ class TestLazyExecutorCounts:
         thread = Thread.model_validate(
             {
                 "name": "lazy_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [{"filter": {"expr": "id < 5"}}],
                 "target": {"path": tgt},
@@ -2056,7 +2056,7 @@ class TestLazyExecutorCounts:
         thread = Thread.model_validate(
             {
                 "name": "lazy_m_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -2105,7 +2105,7 @@ class TestPersistBoundaries:
         thread = Thread.model_validate(
             {
                 "name": "pb_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -2135,7 +2135,7 @@ class TestPersistBoundaries:
 
         cfg = {
             "name": "pb_q_t",
-            "config_version": "1",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": src}},
             "steps": [],
             "target": {"path": tgt},
@@ -2184,7 +2184,7 @@ class TestFindingsRegression:
         thread = Thread.model_validate(
             {
                 "name": "fr_dim_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {
@@ -2226,7 +2226,7 @@ class TestFindingsRegression:
         thread = Thread.model_validate(
             {
                 "name": "fr_scd2_ow",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {
@@ -2294,7 +2294,7 @@ class TestFindingsRegression:
         thread = Thread.model_validate(
             {
                 "name": "fr_fail_t",
-                "config_version": "1",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "steps": [],
                 "target": {"path": tgt},
@@ -2405,7 +2405,7 @@ class TestThreadPhaseContract:
 
         thread = Thread(
             name="order_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             target=Target(path=tgt),
@@ -2458,7 +2458,7 @@ class TestThreadPhaseContract:
 
         thread = Thread(
             name="cdc_fail_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             target=Target(path=tgt),

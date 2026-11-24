@@ -1294,7 +1294,7 @@ class TestLoadedConfig:
     def sample_thread(self) -> Thread:
         return Thread(
             name="dim_customer",
-            config_version="1.0",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias="raw_customers")},
             target=Target(path="/data/curated/dim_customer"),
         )
@@ -1303,7 +1303,7 @@ class TestLoadedConfig:
     def sample_weave(self) -> Weave:
         return Weave(
             name="dimensions",
-            config_version="1.0",
+            config_version="2.0",
             threads=[ThreadEntry(name="dim_customer")],
         )
 
@@ -1312,7 +1312,7 @@ class TestLoadedConfig:
         return Loom.model_validate(
             {
                 "name": "nightly",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "weaves": ["dimensions"],
             }
         )
@@ -1386,6 +1386,12 @@ class TestLoadedConfig:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
         assert loaded.model is sample_thread
 
+    def test_unknown_project_root_is_none(self, sample_thread: Thread) -> None:
+        """Assembled without a load, the root is unknown — None, as on RunResult."""
+        loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
+        assert loaded.project_root is None
+        assert loaded.document.project_root is None
+
     def test_config_type(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
         assert loaded.config_type == "thread"
@@ -1400,7 +1406,7 @@ class TestLoadedConfig:
 
     def test_getattr_proxies_config_version(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
-        assert loaded.config_version == "1.0"
+        assert loaded.config_version == "2.0"
 
     def test_getattr_proxies_sources(self, sample_thread: Thread) -> None:
         loaded = LoadedConfig(sample_thread, "thread", "dim_customer")
@@ -1752,7 +1758,7 @@ class TestSummaryPreviewMetadata:
 def _plan_thread(name: str, target: str) -> Thread:
     return Thread(
         name=name,
-        config_version="1.0",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=f"raw.{name}")},
         target=Target(alias=target),
     )
@@ -1761,7 +1767,7 @@ def _plan_thread(name: str, target: str) -> Thread:
 def _cyclic_weave() -> tuple[Weave, dict[str, Thread]]:
     weave = Weave(
         name="cyc",
-        config_version="1.0",
+        config_version="2.0",
         threads=[
             ThreadEntry(name="a", dependencies=["b"]),
             ThreadEntry(name="b", dependencies=["a"]),
@@ -1773,7 +1779,7 @@ def _cyclic_weave() -> tuple[Weave, dict[str, Thread]]:
 def _conflict_weave() -> tuple[Weave, dict[str, Thread]]:
     weave = Weave(
         name="dup",
-        config_version="1.0",
+        config_version="2.0",
         threads=[ThreadEntry(name="jan"), ThreadEntry(name="feb")],
     )
     return weave, {"jan": _plan_thread("jan", "out.same"), "feb": _plan_thread("feb", "out.same")}
@@ -1784,7 +1790,7 @@ class TestValidatePlans:
 
     @staticmethod
     def _loom(*names: str) -> Loom:
-        return Loom.model_validate({"name": "l", "config_version": "1.0", "weaves": list(names)})
+        return Loom.model_validate({"name": "l", "config_version": "2.0", "weaves": list(names)})
 
     def test_reports_every_failing_weave_in_loom_order(self) -> None:
         cyc, cyc_threads = _cyclic_weave()
@@ -1808,7 +1814,7 @@ class TestValidatePlans:
             config_type="loom",
             config_name="l",
             threads={"ok": {"a": _plan_thread("a", "out.a")}},
-            weaves={"ok": Weave(name="ok", config_version="1.0", threads=[ThreadEntry(name="a")])},
+            weaves={"ok": Weave(name="ok", config_version="2.0", threads=[ThreadEntry(name="a")])},
         )
         (issue,) = loaded.validate_plans()
         assert (issue.weave_name, issue.message, issue.error) == (
@@ -1820,7 +1826,7 @@ class TestValidatePlans:
         assert issue.diagnostic.code == "D104"
 
     def test_clean_weave_has_no_issues(self) -> None:
-        weave = Weave(name="w", config_version="1.0", threads=[ThreadEntry(name="a")])
+        weave = Weave(name="w", config_version="2.0", threads=[ThreadEntry(name="a")])
         loaded = LoadedConfig(
             model=weave,
             config_type="weave",
@@ -1847,3 +1853,54 @@ class TestValidatePlans:
         issue = PlanIssue(weave_name="w", message="m", error=None)
         with pytest.raises(AttributeError):
             issue.message = "x"  # type: ignore[misc]
+
+
+class TestProjectIdentity:
+    """Validate and plan output show the project root and identity a run used."""
+
+    PROJECT_ID = "8f9d2c4e-1b3a-4c5d-9e6f-7a8b9c0d1e2f"
+
+    def _result(self, mode: ExecutionMode, *, with_project: bool = True) -> RunResult:
+        from weevr.model import Project
+
+        project = (
+            Project.model_validate(
+                {"kind": "project", "config_version": "2.0", "id": self.PROJECT_ID, "name": "sales"}
+            )
+            if with_project
+            else None
+        )
+        return RunResult(
+            status="success",
+            mode=mode,
+            config_type="weave",
+            config_name="w",
+            project=project,
+            project_root="/lake/Files/sales",
+        )
+
+    @pytest.mark.parametrize("mode", [ExecutionMode.VALIDATE, ExecutionMode.PLAN])
+    def test_summary_shows_root_and_identity(self, mode: ExecutionMode) -> None:
+        s = self._result(mode).summary()
+        assert "/lake/Files/sales" in s
+        assert "sales" in s
+        assert self.PROJECT_ID in s
+
+    @pytest.mark.parametrize("mode", [ExecutionMode.VALIDATE, ExecutionMode.PLAN])
+    def test_html_shows_root_and_identity(self, mode: ExecutionMode) -> None:
+        html_out = self._result(mode)._repr_html_()
+        assert html_out is not None
+        assert "/lake/Files/sales" in html_out
+        assert self.PROJECT_ID in html_out
+
+    def test_summary_without_project_shows_root(self) -> None:
+        result = self._result(ExecutionMode.VALIDATE, with_project=False)
+        assert result.project is None
+        assert "/lake/Files/sales" in result.summary()
+
+    def test_defaults_are_empty(self) -> None:
+        result = RunResult(
+            status="success", mode=ExecutionMode.PLAN, config_type="thread", config_name="t"
+        )
+        assert result.project is None
+        assert result.project_root is None

@@ -51,7 +51,7 @@ def _thread(
     return Thread.model_validate(
         {
             "name": name,
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": src}},
             "target": {"path": tgt},
             "write": {"mode": "append"},
@@ -225,7 +225,7 @@ class TestGenericCdcWatermark:
         thread = Thread.model_validate(
             {
                 "name": "cdc",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": src}},
                 "target": {"path": tgt},
                 "write": {"mode": "merge", "match_keys": ["id"]},
@@ -252,7 +252,7 @@ def _int_thread(src: str, tgt: str, store: str, *, write: dict[str, Any] | None 
     return Thread.model_validate(
         {
             "name": "t",
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"main": {"type": "delta", "alias": src}},
             "target": {"path": tgt},
             "write": write or {"mode": "append"},

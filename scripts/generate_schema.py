@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate JSON Schema files from weevr Pydantic models.
 
-Exports Thread, Weave, and Loom schemas to docs/schema/ as individual
+Exports Thread, Weave, Loom, Warp and Project schemas to docs/schema/ as individual
 JSON files plus a combined weevr.json bundle.
 
 Usage:
@@ -22,6 +22,7 @@ MODELS = {
     "weave": "weevr.model.weave:Weave",
     "loom": "weevr.model.loom:Loom",
     "warp": "weevr.model.warp:WarpConfig",
+    "project": "weevr.model.project:Project",
 }
 
 

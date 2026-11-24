@@ -1,3 +1,4 @@
+kind: thread
 sources:
   customers: table://lakehouse.dim_customer
 target:

@@ -80,7 +80,8 @@ pipeline.select -> target.table: write (merge)
 
 ```yaml
 # dimensions/dim_customer.thread
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources:
   customers:
     type: delta
@@ -126,7 +127,8 @@ Key responsibilities:
 
 ```yaml
 # dimensions.weave
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 threads:
   - ref: dimensions/dim_customer.thread
   - ref: dimensions/dim_product.thread
@@ -153,7 +155,8 @@ Key responsibilities:
 
 ```yaml
 # nightly.loom
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 weaves:
   - ref: dimensions.weave
   - ref: facts.weave
@@ -267,8 +270,10 @@ Loom default:   write.mode = overwrite
 ## Project -- the solution boundary
 
 Above the loom sits the **project**, a conceptual boundary that groups
-related looms. A project is not a configuration file -- it is the directory
-structure that provides the namespace for configuration resolution.
+related looms. A project is a directory whose root holds a `weevr.yaml` file
+(`kind: project`). That file marks the root that `ref:` paths resolve against.
+Every document, including `weevr.yaml`, opens with `kind:` and
+`config_version: "2.0"`. See [Project layout](../reference/project-layout.md).
 
 See the [YAML Schema Reference](../reference/yaml-schema/thread.md)
 for full details on configuration file structure and reference resolution.

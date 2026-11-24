@@ -18,7 +18,8 @@
 # Run in plan mode first:  ctx.run("customer_pipeline.weave", mode="plan")
 # Then execute:            ctx.run("customer_pipeline.weave")
 
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: customer_pipeline
 
 threads:

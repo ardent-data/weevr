@@ -142,7 +142,8 @@ in thread configuration:
 
 <!-- weevr-snippet: {params: {bronze_base: Tables, silver_base: Tables}} -->
 ```yaml
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 
 sources:
   raw_customers:

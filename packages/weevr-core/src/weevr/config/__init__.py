@@ -6,23 +6,38 @@ from typing import Any
 
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting
+from weevr.config.discovery import DiscoveredDocument, discover_documents
 from weevr.config.document import EntryMeta, ResolvedDocument, ScopeRegistries
 from weevr.config.loader import COMPONENT_TYPES as _COMPONENT_TYPES
 from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
 from weevr.config.loader import resolve_config as _resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
+from weevr.config.root import find_project_root
+from weevr.config.run_store import (
+    RUN_STORE_TABLES,
+    RunStoreLocation,
+    TableLocation,
+    resolve_run_store,
+)
 from weevr.config.validation import render_diagnostics
 from weevr.model import Loom, Thread, Weave
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "RUN_STORE_TABLES",
+    "DiscoveredDocument",
     "EntryMeta",
     "ResolvedDocument",
+    "RunStoreLocation",
     "ScopeRegistries",
+    "TableLocation",
+    "discover_documents",
+    "find_project_root",
     "load_config",
     "load_resolved",
+    "resolve_run_store",
 ]
 
 
@@ -37,7 +52,8 @@ def load_config(
     ``Context`` uses:
     1. Parse YAML file
     2. Extract and validate config_version
-    3. Detect config type (extension-based for components, content-based for params)
+    3. Take the config kind from the document's ``kind`` (checked against a typed
+       extension), else from the extension or content
     4. Validate schema with Pydantic
     5. Build parameter context (runtime > defaults)
     6. Resolve variable references (${var} and ${var:-default})
@@ -57,9 +73,10 @@ def load_config(
             URIs must be supplied as a :class:`RemoteConfigLocation` so the
             caller can attach a SparkSession.
         runtime_params: Optional runtime parameter overrides.
-        project_root: The ``.weevr`` project directory. Child references,
-            relative file-Source paths, and ``qualified_key`` resolve against
-            it; defaults to the file's directory. Accepts a
+        project_root: The project directory. Child references, relative
+            file-Source paths, and ``qualified_key`` resolve against it. When
+            omitted, the nearest folder above the file holding ``weevr.yaml``
+            is the root; with none, the file's directory is. Accepts a
             :class:`ConfigLocation` or a bare :class:`pathlib.Path`.
 
     Returns:

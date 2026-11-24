@@ -1,0 +1,20 @@
+# Nightly sales load: dimensions first, then facts.
+config_version: "1.0"
+
+weaves:
+  - dims
+  - name: facts
+    condition:
+      when: "table_exists('raw.orders')"
+  - ref: weaves/returns.weave
+  - name: audit
+    config_version: "1.0"
+    threads:
+      - name: audit_log
+        config_version: "1.0"
+        sources:
+          log:
+            type: delta
+            alias: raw.audit_log
+        target:
+          alias: ops.audit_log

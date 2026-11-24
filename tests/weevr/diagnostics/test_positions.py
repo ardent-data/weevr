@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
+from documents import write_document
 from weevr.config import load_config
 from weevr.diagnostics import diagnostic
 from weevr.diagnostics.positions import (
@@ -32,45 +33,46 @@ def _map(name: str) -> PositionMap:
 GOLDEN: dict[str, dict[str, tuple[int, int]]] = {
     "block.yaml": {
         "": (1, 1),
-        "/config_version": (1, 1),
-        "/sources": (2, 1),
-        "/sources/orders": (3, 3),
-        "/sources/orders/alias": (5, 5),
-        "/steps": (6, 1),
-        "/steps/0": (7, 5),
-        "/steps/0/filter/expr": (8, 7),
-        "/steps/1": (9, 5),
-        "/steps/1/derive/columns/total": (11, 9),
+        "/kind": (1, 1),
+        "/config_version": (2, 1),
+        "/sources": (3, 1),
+        "/sources/orders": (4, 3),
+        "/sources/orders/alias": (6, 5),
+        "/steps": (7, 1),
+        "/steps/0": (8, 5),
+        "/steps/0/filter/expr": (9, 7),
+        "/steps/1": (10, 5),
+        "/steps/1/derive/columns/total": (12, 9),
     },
     "flow.yaml": {
-        "/sources": (2, 1),
-        "/sources/orders": (2, 11),
-        "/sources/orders/type": (2, 20),
-        "/sources/orders/alias": (2, 33),
-        "/steps/0": (3, 9),
-        "/steps/0/filter/expr": (3, 19),
-        "/steps/1": (3, 41),
-        "/steps/1/drop/columns/1": (3, 62),
+        "/sources": (3, 1),
+        "/sources/orders": (3, 11),
+        "/sources/orders/type": (3, 20),
+        "/sources/orders/alias": (3, 33),
+        "/steps/0": (4, 9),
+        "/steps/0/filter/expr": (4, 19),
+        "/steps/1": (4, 41),
+        "/steps/1/drop/columns/1": (4, 62),
     },
     "anchors.yaml": {
-        "/defaults/type": (3, 3),
+        "/defaults/type": (4, 3),
         # An alias is placed where it is written ...
-        "/sources/orders": (6, 3),
+        "/sources/orders": (7, 3),
         # ... and what it holds, at the anchor that defines it.
-        "/sources/orders/type": (3, 3),
+        "/sources/orders/type": (4, 3),
         # A merged key is placed at the anchor; an explicit one overrides it.
-        "/sources/returns/type": (3, 3),
-        "/sources/returns/alias": (9, 5),
-        "/tags/0": (11, 5),
-        "/tags/1": (12, 5),
+        "/sources/returns/type": (4, 3),
+        "/sources/returns/alias": (10, 5),
+        "/tags/0": (12, 5),
+        "/tags/1": (13, 5),
     },
     "scalars.yaml": {
-        "/quoted key": (2, 1),
-        "/single~1quoted": (3, 1),
-        "/description": (4, 1),
-        "/next": (7, 1),
-        "/folded": (8, 1),
-        "/last": (11, 1),
+        "/quoted key": (3, 1),
+        "/single~1quoted": (4, 1),
+        "/description": (5, 1),
+        "/next": (8, 1),
+        "/folded": (9, 1),
+        "/last": (12, 1),
     },
 }
 
@@ -119,14 +121,14 @@ class TestPlace:
         diag = place(
             diagnostic("C102", "x", resolved_path="/sources/orders/alias"), _map("block.yaml")
         )
-        assert (diag.pointer, diag.line, diag.column) == ("/sources/orders/alias", 5, 5)
+        assert (diag.pointer, diag.line, diag.column) == ("/sources/orders/alias", 6, 5)
         assert not diag.location_fallback
 
     def test_missing_key_points_at_its_mapping(self) -> None:
         diag = place(
             diagnostic("C101", "x", resolved_path="/sources/orders/key"), _map("block.yaml")
         )
-        assert (diag.pointer, diag.line) == ("/sources/orders/key", 3)
+        assert (diag.pointer, diag.line) == ("/sources/orders/key", 4)
         assert not diag.location_fallback
 
     def test_value_from_elsewhere_keeps_pointer_without_line(self) -> None:
@@ -136,7 +138,7 @@ class TestPlace:
 
     def test_substituted_value_is_placed_and_flagged(self) -> None:
         diag = place(diagnostic("C103", "x", resolved_path="/last"), _map("scalars.yaml"))
-        assert (diag.line, diag.location_fallback) == (11, True)
+        assert (diag.line, diag.location_fallback) == (12, True)
 
     def test_expanded_list_is_placed_at_the_list(self) -> None:
         resolved: dict[str, Any] = {"steps": [{}, {}, {}, {"derive": {"columns": 1}}]}
@@ -145,7 +147,7 @@ class TestPlace:
             _map("block.yaml"),
             resolved,
         )
-        assert (diag.pointer, diag.line, diag.location_fallback) == ("/steps", 6, True)
+        assert (diag.pointer, diag.line, diag.location_fallback) == ("/steps", 7, True)
 
     def test_inline_document_is_placed_below_its_entry(self) -> None:
         text = "threads:\n  - name: a\n    sources: 5\n"
@@ -163,7 +165,7 @@ class TestPlace:
 
     def test_existing_pointer_is_kept(self) -> None:
         diag = place(diagnostic("C202", "x", pointer="/config_version"), _map("block.yaml"))
-        assert (diag.pointer, diag.line) == ("/config_version", 1)
+        assert (diag.pointer, diag.line) == ("/config_version", 2)
 
 
 def test_pointed_sets_pointer_below_at() -> None:
@@ -175,19 +177,19 @@ def test_fill_lines_only_touches_its_file() -> None:
     file = str(FIXTURES / "block.yaml")
     mine = diagnostic("C202", "x", file=file, pointer="/config_version")
     other = diagnostic("C202", "x", file="other.yaml", pointer="/config_version")
-    assert [d.line for d in fill_lines([mine, other], file)] == [1, None]
+    assert [d.line for d in fill_lines([mine, other], file)] == [2, None]
 
 
 class TestLoad:
     """Loading a broken project names the authored file and line."""
 
     def _write(self, path: Path, data: dict[str, Any]) -> Path:
-        path.write_text(yaml.safe_dump(data, sort_keys=False))
+        write_document(path, yaml.safe_dump(data, sort_keys=False))
         return path
 
     def _thread(self, **extra: Any) -> dict[str, Any]:
         return {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"a": {"type": "delta", "alias": "x.y"}},
             "target": {"alias": "x.z"},
             **extra,
@@ -201,7 +203,7 @@ class TestLoad:
         assert (diag.file, diag.pointer, diag.line, diag.column) == (
             str(thread),
             "/write/mode",
-            9,
+            10,
             3,
         )
         assert not diag.location_fallback
@@ -211,7 +213,7 @@ class TestLoad:
         weave = self._write(
             tmp_path / "w.weave",
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "name": "w",
                 "defaults": {"write": {"mode": "bogus"}},
                 "threads": [{"ref": "t.thread"}],
@@ -244,21 +246,22 @@ class TestLoad:
 
     def test_version_error_gets_a_line(self, tmp_path: Path) -> None:
         thread = tmp_path / "t.thread"
-        thread.write_text("sources: {}\nconfig_version: '9.0'\n")
+        write_document(thread, "sources: {}\nconfig_version: '9.0'\n")
         with pytest.raises(Exception) as exc_info:
             load_config(thread)
         [diag] = exc_info.value.diagnostics  # type: ignore[attr-defined]
-        assert (diag.code, diag.line) == ("C203", 2)
+        assert (diag.code, diag.line) == ("C203", 3)
 
 
 def test_inline_thread_foreach_error_points_into_the_weave(tmp_path: Path) -> None:
     from weevr.errors import ConfigError
 
     weave = tmp_path / "w.weave"
-    weave.write_text(
+    write_document(
+        weave,
         yaml.safe_dump(
             {
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "name": "w",
                 "threads": [
                     {
@@ -270,7 +273,7 @@ def test_inline_thread_foreach_error_points_into_the_weave(tmp_path: Path) -> No
                 ],
             },
             sort_keys=False,
-        )
+        ),
     )
     with pytest.raises(ConfigError) as exc_info:
         load_config(weave)

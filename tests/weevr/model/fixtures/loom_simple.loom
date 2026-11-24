@@ -1,7 +1,8 @@
-config_version: "1.0"
+kind: loom
+config_version: "2.0"
 weaves:
-  - dimensions
-  - facts
+  - ref: dimensions.weave
+  - ref: facts.weave
 defaults:
   tags:
     - production

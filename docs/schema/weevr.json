@@ -4679,8 +4679,15 @@
         "description": "Raw ref string from the ThreadEntry that loaded this thread. Populated during hydration for telemetry and display.",
         "title": "Template Ref"
       },
+      "kind": {
+        "const": "thread",
+        "default": "thread",
+        "description": "Document kind. A thread document declares 'thread'.",
+        "title": "Kind",
+        "type": "string"
+      },
       "config_version": {
-        "description": "Configuration schema version. Must be '1.0'.",
+        "description": "Configuration schema version, 'major.minor'. This release reads '2.0'.",
         "title": "Config Version",
         "type": "string"
       },
@@ -6422,8 +6429,15 @@
         "title": "Qualified Key",
         "type": "string"
       },
+      "kind": {
+        "const": "weave",
+        "default": "weave",
+        "description": "Document kind. A weave document declares 'weave'.",
+        "title": "Kind",
+        "type": "string"
+      },
       "config_version": {
-        "description": "Configuration schema version. Must be '1.0'.",
+        "description": "Configuration schema version, 'major.minor'. This release reads '2.0'.",
         "title": "Config Version",
         "type": "string"
       },
@@ -7909,8 +7923,15 @@
         "title": "Qualified Key",
         "type": "string"
       },
+      "kind": {
+        "const": "loom",
+        "default": "loom",
+        "description": "Document kind. A loom document declares 'loom'.",
+        "title": "Kind",
+        "type": "string"
+      },
       "config_version": {
-        "description": "Configuration schema version. Must be '1.0'.",
+        "description": "Configuration schema version, 'major.minor'. This release reads '2.0'.",
         "title": "Config Version",
         "type": "string"
       },
@@ -8208,8 +8229,15 @@
     },
     "description": "Typed configuration for a .warp file declaring a target table schema.\n\nA warp defines the intended shape of a target table: which columns\nshould exist, their types, nullability, and optional defaults.\nCross-field validators ensure column name uniqueness and key\nreference integrity.",
     "properties": {
+      "kind": {
+        "const": "warp",
+        "default": "warp",
+        "description": "Document kind. A warp document declares 'warp'.",
+        "title": "Kind",
+        "type": "string"
+      },
       "config_version": {
-        "description": "Schema version for the warp file (e.g. '1.0').",
+        "description": "Schema version for the warp file (e.g. '2.0').",
         "title": "Config Version",
         "type": "string"
       },
@@ -8259,6 +8287,133 @@
       "columns"
     ],
     "title": "WarpConfig",
+    "type": "object"
+  },
+  "project": {
+    "$defs": {
+      "RunStore": {
+        "additionalProperties": false,
+        "description": "Where runs write their output, and in which layout.\n\nEvery field applies to both layouts: ``connection`` moves the store's\nbase in either, and ``schema`` names the shared schema or overrides the\nper-project one.",
+        "properties": {
+          "connection": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Name of the connection whose lakehouse holds the run store.",
+            "title": "Connection"
+          },
+          "layout": {
+            "default": "per_project",
+            "description": "'per_project' gives the project its own tables; 'shared' writes to one schema that several projects share, each row carrying its project_id.",
+            "enum": [
+              "per_project",
+              "shared"
+            ],
+            "title": "Layout",
+            "type": "string"
+          },
+          "schema": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Schema name. shared: the shared schema (default 'weevr'); per_project: overrides the name derived from the project name.",
+            "title": "Schema"
+          }
+        },
+        "title": "RunStore",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "A project's root document, ``weevr.yaml``.\n\nIdentifies the project, optionally pins the weevr versions it runs on,\nand says where its run store is. The project-scope blocks\n(``connections``, ``params``, ``defaults``, ``audit_templates``) are\nreserved for a later release and rejected at load.",
+    "properties": {
+      "kind": {
+        "const": "project",
+        "default": "project",
+        "description": "Document kind. A project document declares 'project'.",
+        "title": "Kind",
+        "type": "string"
+      },
+      "config_version": {
+        "description": "Schema version of the document (e.g. '2.0').",
+        "title": "Config Version",
+        "type": "string"
+      },
+      "id": {
+        "description": "The project's GUID, generated once and never derived from Fabric IDs.",
+        "format": "uuid",
+        "title": "Id",
+        "type": "string"
+      },
+      "name": {
+        "description": "Project name; also the default run-store schema suffix, so it must be a schema-safe identifier.",
+        "maxLength": 100,
+        "minLength": 1,
+        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+        "title": "Name",
+        "type": "string"
+      },
+      "description": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "What the project is for.",
+        "title": "Description"
+      },
+      "requires_weevr": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "PEP 440 version specifier the installed weevr must satisfy (e.g. '>=2,<3').",
+        "title": "Requires Weevr"
+      },
+      "run_store": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/RunStore"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Run-store settings; omitted means the container's default."
+      }
+    },
+    "required": [
+      "config_version",
+      "id",
+      "name"
+    ],
+    "title": "Project",
     "type": "object"
   }
 }

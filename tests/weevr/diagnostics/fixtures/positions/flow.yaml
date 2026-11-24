@@ -1,3 +1,4 @@
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 sources: {orders: {type: delta, alias: raw.orders}}
 steps: [{filter: {expr: "amount > 0"}}, {drop: {columns: [a, b]}}]

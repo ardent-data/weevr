@@ -278,18 +278,18 @@ _OWNERS = {
     "loom": (
         "weevr.model.loom",
         "Loom",
-        {"config_version": "1.0", "weaves": ["w1"]},
+        {"config_version": "2.0", "weaves": ["w1"]},
     ),
     "weave": (
         "weevr.model.weave",
         "Weave",
-        {"config_version": "1.0", "threads": ["t1"]},
+        {"config_version": "2.0", "threads": ["t1"]},
     ),
     "thread": (
         "weevr.model.thread",
         "Thread",
         {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": {"customers": {"type": "delta", "alias": "raw.customers"}},
             "target": {"alias": "test"},
         },

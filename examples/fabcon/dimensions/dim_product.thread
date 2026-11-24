@@ -4,7 +4,8 @@
 # Generates an xxhash64 surrogate key (product_sk) from the business key.
 # Used by: customer_pipeline.weave (Demo 4), dimensions.weave (Demo 5)
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: dim_product
 
 sources:

@@ -36,7 +36,7 @@ def _make_thread(
 ) -> Thread:
     return Thread(
         name=name,
-        config_version="1",
+        config_version="2.0",
         sources={"main": Source(type="delta", alias=source_path)},
         steps=[],
         target=Target(path=target_path),
@@ -104,7 +104,7 @@ class TestWeaveExecutionIntegration:
             threads,
             list(
                 Weave.model_validate(
-                    {"config_version": "1.0", "name": "val_weave", "threads": ["val_thread"]}
+                    {"config_version": "2.0", "name": "val_weave", "threads": ["val_thread"]}
                 ).threads
             ),
         )
@@ -153,7 +153,7 @@ class TestWeaveExecutionIntegration:
             threads,
             list(
                 Weave.model_validate(
-                    {"config_version": "1.0", "name": "recon_weave", "threads": ["recon_thread"]}
+                    {"config_version": "2.0", "name": "recon_weave", "threads": ["recon_thread"]}
                 ).threads
             ),
         )
@@ -178,10 +178,10 @@ class TestLoomExecutionIntegration:
         create_delta_table(spark, src, [{"id": 1}, {"id": 2}, {"id": 3}])
 
         thread = _make_thread("loom_thread", src, tgt)
-        loom = Loom.model_validate({"name": "test_loom", "config_version": "1.0", "weaves": ["w1"]})
+        loom = Loom.model_validate({"name": "test_loom", "config_version": "2.0", "weaves": ["w1"]})
         weaves = {
             "w1": Weave.model_validate(
-                {"config_version": "1.0", "name": "w1", "threads": ["loom_thread"]}
+                {"config_version": "2.0", "name": "w1", "threads": ["loom_thread"]}
             )
         }
         threads = {"w1": {"loom_thread": thread}}
@@ -221,11 +221,11 @@ class TestLoomExecutionIntegration:
 
         thread = _make_thread("scored_thread", src, tgt, validations=rules, assertions=assertions)
         loom = Loom.model_validate(
-            {"name": "scoring_loom", "config_version": "1.0", "weaves": ["scoring"]}
+            {"name": "scoring_loom", "config_version": "2.0", "weaves": ["scoring"]}
         )
         weaves = {
             "scoring": Weave.model_validate(
-                {"config_version": "1.0", "name": "scoring", "threads": ["scored_thread"]}
+                {"config_version": "2.0", "name": "scoring", "threads": ["scored_thread"]}
             )
         }
         threads = {"scoring": {"scored_thread": thread}}
@@ -286,7 +286,7 @@ class TestFatalValidationIntegration:
 
         thread = Thread(
             name="err_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             # Write to an unresolvable path to trigger ExecutionError

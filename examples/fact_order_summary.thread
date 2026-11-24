@@ -3,7 +3,8 @@
 # Demonstrates chaining several pipeline steps: filter rows,
 # derive a computed column, select the final columns, and cast types.
 
-config_version: "1.0"
+kind: thread
+config_version: "2.0"
 name: fact_order_summary
 
 sources:

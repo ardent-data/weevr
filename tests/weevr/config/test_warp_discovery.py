@@ -172,7 +172,7 @@ class TestGetDriftBaseline:
     def test_with_warp_returns_warp_column_names(self):
         """With warp: returns warp column names as baseline."""
         warp = WarpConfig(
-            config_version="1.0",
+            config_version="2.0",
             columns=[  # type: ignore[arg-type]
                 {"name": "customer_id", "type": "bigint"},
                 {"name": "customer_name", "type": "string"},

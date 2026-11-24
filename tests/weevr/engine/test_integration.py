@@ -69,7 +69,7 @@ def _thread(
     """Construct a minimal Thread for integration testing."""
     return Thread(
         name=name,
-        config_version="1",
+        config_version="2.0",
         sources=sources or {"main": Source(type="delta", alias=src)},
         steps=steps or [],
         target=target or Target(path=tgt),
@@ -197,7 +197,7 @@ class TestFileSourceReaders:
 
         thread = Thread(
             name="csv_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="csv", path=csv_path, options={"header": "true"})},
             steps=[],
             target=Target(path=tgt),
@@ -217,7 +217,7 @@ class TestFileSourceReaders:
 
         thread = Thread(
             name="json_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="json", path=json_path)},
             steps=[],
             target=Target(path=tgt),
@@ -234,7 +234,7 @@ class TestFileSourceReaders:
 
         thread = Thread(
             name="parquet_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="parquet", path=parquet_path)},
             steps=[],
             target=Target(path=tgt),
@@ -271,7 +271,7 @@ class TestSourceDedup:
 
         thread = Thread(
             name="dedup_thread",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(
                     type="delta",
@@ -330,7 +330,7 @@ class TestPipelineStepTypes:
         steps: list = [UnionStep(union=UnionParams(sources=["right"], mode="by_name"))]
         thread = Thread(
             name="union_pipe",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=one_row_src),
                 "right": Source(type="delta", alias=src_b),
@@ -390,7 +390,7 @@ class TestJoins:
         ]
         thread = Thread(
             name="ns_join",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=src_left),
                 "right": Source(type="delta", alias=src_right),
@@ -442,7 +442,7 @@ class TestJoins:
         ]
         thread = Thread(
             name="std_join",
-            config_version="1",
+            config_version="2.0",
             sources={
                 "main": Source(type="delta", alias=src_left),
                 "right": Source(type="delta", alias=src_right),

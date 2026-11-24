@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
+from documents import write_document
 from weevr.config import load_config
 from weevr.diagnostics import removed_keys
 from weevr.diagnostics.removed_keys import REMOVED_KEYS, RemovedKey, removed_key_diagnostics
@@ -30,7 +31,7 @@ def table(monkeypatch: pytest.MonkeyPatch) -> tuple[RemovedKey, ...]:
 
 def _thread(**extra: Any) -> dict[str, Any]:
     return {
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": {"a": {"type": "delta", "alias": "x.y"}},
         "target": {"alias": "x.z"},
         **extra,
@@ -41,6 +42,17 @@ def test_shipped_table_is_valid() -> None:
     for row in REMOVED_KEYS:
         assert (row.replacement is None) != (row.reason is None)
         assert row.path.startswith("/")
+
+
+@pytest.mark.parametrize("kind", ["thread", "weave", "loom", "params", "warp"])
+def test_root_type_is_renamed_to_kind(kind: str) -> None:
+    """Every kind that accepted a root ``type:`` in v1 reports it renamed to ``/kind``."""
+    [diag] = removed_key_diagnostics({"type": kind, "config_version": "2.0"}, kind)
+    assert (diag.code, diag.pointer, diag.expected) == ("C112", "/type", ("/kind",))
+
+
+def test_nested_type_is_not_renamed() -> None:
+    assert removed_key_diagnostics(_thread(), "thread") == []
 
 
 def test_row_needs_a_replacement_or_a_reason() -> None:
@@ -88,7 +100,7 @@ class TestLoad:
 
     def test_thread_file(self, table: Any, tmp_path: Path) -> None:
         path = tmp_path / "t.thread"
-        path.write_text(yaml.safe_dump(_thread(legacy_mode=True), sort_keys=False))
+        write_document(path, yaml.safe_dump(_thread(legacy_mode=True), sort_keys=False))
         with pytest.raises(ConfigSchemaError) as exc_info:
             load_config(path)
         [diag] = exc_info.value.diagnostics
@@ -96,24 +108,25 @@ class TestLoad:
             "C111",
             str(path),
             "/legacy_mode",
-            8,
+            9,
         )
 
     def test_reported_with_other_schema_errors(self, table: Any, tmp_path: Path) -> None:
         path = tmp_path / "t.thread"
         data = _thread(legacy_mode=True)
         data["sources"] = 5
-        path.write_text(yaml.safe_dump(data, sort_keys=False))
+        write_document(path, yaml.safe_dump(data, sort_keys=False))
         with pytest.raises(ConfigError) as exc_info:
             load_config(path)
         assert {d.code for d in exc_info.value.diagnostics} == {"C111", "C102"}
 
     def test_inline_thread(self, table: Any, tmp_path: Path) -> None:
         weave = tmp_path / "w.weave"
-        weave.write_text(
+        write_document(
+            weave,
             yaml.safe_dump(
-                {"config_version": "1.0", "threads": [{"name": "t", **_thread(legacy_mode=1)}]}
-            )
+                {"config_version": "2.0", "threads": [{"name": "t", **_thread(legacy_mode=1)}]}
+            ),
         )
         with pytest.raises(ConfigError) as exc_info:
             load_config(weave)

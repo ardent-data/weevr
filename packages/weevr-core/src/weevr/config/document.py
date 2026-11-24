@@ -21,6 +21,7 @@ from weevr.model import Loom, Thread, Weave
 from weevr.model.column_set import ColumnSet
 from weevr.model.lookup import Lookup
 from weevr.model.loom import WeaveEntry
+from weevr.model.project import Project
 from weevr.model.variable import VariableSpec
 from weevr.model.weave import ConditionSpec, ThreadEntry
 
@@ -147,6 +148,12 @@ class ResolvedDocument:
         effective: The lookups, column sets and variables this config sees:
             its own merged over every enclosing scope's, its own names
             winning. Computed at load.
+        project: The project the load ran under: the ``weevr.yaml`` at the
+            project root; ``None`` when the root has none. Set on the loaded
+            file's node only.
+        project_root: The project root the load resolved references and
+            Source paths against; ``None`` when unknown. Set on the loaded
+            file's node only.
     """
 
     model: Thread | Weave | Loom
@@ -156,6 +163,8 @@ class ResolvedDocument:
     children: Mapping[str, ResolvedDocument] = field(default_factory=_frozen_children)
     source_ref: str = ""
     effective: ScopeRegistries = field(default_factory=ScopeRegistries)
+    project: Project | None = None
+    project_root: str | None = None
 
     def __post_init__(self) -> None:
         """Freeze ``children`` so the tree can't be changed through it."""

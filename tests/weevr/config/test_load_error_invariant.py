@@ -123,13 +123,13 @@ MUTATIONS = [
     Mutation("thread-lookups-list", BASE, _set("lookups", value=["shared"])),
     Mutation("thread-variables-string", BASE, _set("variables", value="x")),
     Mutation("thread-column-sets-list", BASE, _set("column_sets", value=["m"])),
-    Mutation("document-is-list", BASE, "- config_version: '1.0'\n"),
+    Mutation("document-is-list", BASE, "- config_version: '2.0'\n"),
     Mutation("document-is-scalar", BASE, "just text\n"),
     Mutation("document-is-empty", BASE, ""),
     # Unknown child references
     Mutation("missing-thread-ref", CORE, _set("threads", "0", "ref", value="threads/nope.thread")),
     Mutation("missing-weave-ref", "forms.loom", _set("weaves", "0", "ref", value="nope.weave")),
-    Mutation("missing-convention-weave", "forms.loom", _set("weaves", "1", value={"name": "nope"})),
+    Mutation("name-only-weave", "forms.loom", _set("weaves", "1", value={"name": "nope"})),
     Mutation("ref-wrong-extension", CORE, _set("threads", "0", "ref", value="threads/base.txt")),
     Mutation("ref-not-string", CORE, _set("threads", "0", "ref", value=5)),
     Mutation("missing-lookup", BASE, _set("sources", "region", "lookup", value="nope")),
@@ -138,9 +138,9 @@ MUTATIONS = [
     Mutation("loom-refs-itself", "forms.loom", _set("weaves", "0", "ref", value="forms.loom")),
     # (A thread dependency cycle is not a load error: plan and validate report it.)
     # Bad YAML
-    Mutation("bad-yaml-child", BASE, "config_version: '1.0'\nsources: [unclosed\n"),
-    Mutation("bad-yaml-top", "forms.loom", "config_version: '1.0'\nweaves:\n\t- ref: x\n"),
-    Mutation("duplicate-yaml-key", BASE, "config_version: '1.0'\ntarget: {}\ntarget: {}\n"),
+    Mutation("bad-yaml-child", BASE, "config_version: '2.0'\nsources: [unclosed\n"),
+    Mutation("bad-yaml-top", "forms.loom", "config_version: '2.0'\nweaves:\n\t- ref: x\n"),
+    Mutation("duplicate-yaml-key", BASE, "config_version: '2.0'\ntarget: {}\ntarget: {}\n"),
     # Bad as / params
     Mutation("template-missing-param", CORE, _drop("threads", "1", "params")),
     Mutation("template-ref-twice-no-as", CORE, _drop("threads", "2", "as")),
@@ -195,7 +195,7 @@ MUTATIONS = [
         "forms.loom",
         _set("lookups", "regions", "source", value={"type": "csv", "path": 5}),
     ),
-    Mutation("file-not-utf8", BASE, b"config_version: '1.0'\nname: \xff\n"),
+    Mutation("file-not-utf8", BASE, b"config_version: '2.0'\nname: \xff\n"),
 ]
 
 

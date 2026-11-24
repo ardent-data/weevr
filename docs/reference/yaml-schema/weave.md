@@ -10,10 +10,11 @@ runtime settings.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"1.0"`) |
+| `kind` | `string` | yes | -- | Document kind: `weave` |
+| `config_version` | `string` | yes | -- | Schema version identifier (e.g. `"2.0"`) |
 | `name` | `string` | no | `""` | Human-readable weave name |
 | `qualified_key` | `string` | -- | set by loader | Read-only. The weave file's path relative to the project root (for example `weaves/daily.weave`); an inline weave uses its name. Populated at load; not set in YAML. |
-| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread references. Strings are shorthand for `{ name: "<value>" }` (local name references). Use `ref` for external file references. |
+| `threads` | `list[ThreadEntry or string]` | yes | -- | Thread entries: `ref` to a `.thread` file, or an inline thread. A plain string is shorthand for `{ name: "<value>" }`, a name with no body, which fails with `C313`; it never loads a file by name, so use `ref` for files. |
 | `lookups` | `dict[string, Lookup]` | no | `null` | Named lookup sources shared across threads in this weave |
 | `column_sets` | `dict[string, ColumnSet]` | no | `null` | Named column sets for bulk rename from external dictionaries. Shared across threads in this weave. |
 | `variables` | `dict[string, VariableSpec]` | no | `null` | Weave-scoped typed variables, settable by hook steps |
@@ -30,9 +31,13 @@ runtime settings.
 
 ## threads (ThreadEntry)
 
-Each entry in the `threads` list is either a plain string (shorthand) or a
-`ThreadEntry` object. Use `ref` to reference an external `.thread` file, or
-`name` for inline thread definitions within the weave.
+Each entry in the `threads` list is a `ThreadEntry` object (or a plain string,
+shorthand for `{ name: "<value>" }`). Use `ref` to reference an external
+`.thread` file, relative to the project root, or `name` plus a thread body for
+an inline thread. A name alone never loads a `.thread` file: an entry with
+no `ref` and no thread body (only `name`, `as`, `params`, `dependencies`, or
+`condition`) fails with [`C313`](../diagnostics.md#c313); write
+`ref: <name>.thread` instead.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
@@ -418,7 +423,8 @@ strategy descriptions and YAML examples.
 ## Complete example
 
 ```yaml
-config_version: "1.0"
+kind: weave
+config_version: "2.0"
 name: sales_pipeline
 
 lookups:
@@ -504,26 +510,19 @@ naming:
     prefix: "_"
 ```
 
-### Shorthand thread syntax
+### Name-only thread entries
 
-Thread entries can be plain strings for inline definitions that need no
-overrides:
-
-```yaml
-threads:
-  - build_snapshot
-  - refresh_index
-```
-
-This is equivalent to:
+A plain string entry is shorthand for `{ name: "<value>" }`. A name with no
+`ref` and no thread body does not load a file by name; it fails at load with
+[`C313`](../diagnostics.md#c313):
 
 ```yaml
 threads:
-  - name: build_snapshot
-  - name: refresh_index
+  - build_snapshot          # fails: C313
+  - name: refresh_index     # fails: C313
 ```
 
-For external file references, use `ref` explicitly:
+Reference the files explicitly instead:
 
 ```yaml
 threads:

@@ -46,7 +46,7 @@ def _make_thread(
 
     data: dict = {
         "name": name,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": sources,
         "target": target,
     }
@@ -432,7 +432,7 @@ def _make_thread_with_lookup(
     return Thread.model_validate(
         {
             "name": name,
-            "config_version": "1.0",
+            "config_version": "2.0",
             "sources": sources,
             "target": target,
         }
@@ -613,7 +613,7 @@ def _make_resolving_thread(
         sources[alias] = {"lookup": lk}
     data: dict = {
         "name": name,
-        "config_version": "1.0",
+        "config_version": "2.0",
         "sources": sources,
         "target": {"alias": f"test.{name}"},
     }
@@ -670,7 +670,7 @@ class TestResolveLookupNames:
         thread = Thread.model_validate(
             {
                 "name": "t",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw.t"}},
                 "steps": [
                     {"resolve": {"name": "a", "lookup": "one", "match": "c", "pk": "sk"}},
@@ -724,7 +724,7 @@ class TestDuplicateTargets:
         path_only_target = Thread.model_validate(
             {
                 "name": "B",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"_default": {"type": "delta", "alias": "_default_src"}},
                 "target": {"path": "sales.monthly"},
             }
@@ -1028,7 +1028,7 @@ class TestConnectionFormIdentity:
         return Thread.model_validate(
             {
                 "name": "producer",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
                 "steps": [],
                 "target": {"connection": "lake", "table": "shared_dim"},
@@ -1040,7 +1040,7 @@ class TestConnectionFormIdentity:
         consumer = Thread.model_validate(
             {
                 "name": "consumer",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"connection": "lake", "table": "shared_dim"}},
                 "steps": [],
                 "target": {"path": "/tmp/out"},
@@ -1059,7 +1059,7 @@ class TestConnectionFormIdentity:
         writer_b = Thread.model_validate(
             {
                 "name": "writer_b",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw.other"}},
                 "steps": [],
                 "target": {"connection": "lake", "table": "shared_dim"},
@@ -1077,7 +1077,7 @@ class TestConnectionFormIdentity:
         consumer = Thread.model_validate(
             {
                 "name": "consumer",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": abfss}},
                 "steps": [],
                 "target": {"path": "/tmp/out2"},
@@ -1121,7 +1121,7 @@ class TestInRunProducers:
         writer = Thread.model_validate(
             {
                 "name": "writer",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw.orders"}},
                 "target": {"connection": "lake", "table": "shared_dim"},
                 "connections": self._CONN,
@@ -1136,7 +1136,7 @@ class TestInRunProducers:
         thread = Thread.model_validate(
             {
                 "name": "broken",
-                "config_version": "1.0",
+                "config_version": "2.0",
                 "sources": {"main": {"type": "delta", "alias": "raw"}},
                 "target": {"connection": "nope", "table": "t"},
             }

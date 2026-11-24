@@ -37,7 +37,7 @@ class TestCdcTelemetry:
 
         thread = Thread(
             name="cdc_tel",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             target=Target(path=tgt),
@@ -77,7 +77,7 @@ class TestIncrementalParameterTelemetry:
 
         thread = Thread(
             name="param_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             target=Target(path=tgt),
@@ -104,7 +104,7 @@ class TestFullModeTelemetryUnaffected:
 
         thread = Thread(
             name="full_thread",
-            config_version="1",
+            config_version="2.0",
             sources={"main": Source(type="delta", alias=src)},
             steps=[],
             target=Target(path=tgt),

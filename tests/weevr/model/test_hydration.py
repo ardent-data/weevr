@@ -43,7 +43,7 @@ class TestThreadHydrationViaPipeline:
         result = load_config(FIXTURES / "thread_minimal.thread")
 
         assert isinstance(result, Thread)
-        assert result.config_version == "1.0"
+        assert result.config_version == "2.0"
         assert isinstance(result.sources["customers"], Source)
         assert result.sources["customers"].type == "delta"
         assert result.sources["customers"].alias == "raw.customers"
@@ -194,7 +194,7 @@ class TestWeaveAndLoomModelHydration:
     def test_weave_hydrates_from_dict(self):
         """Weave model_validate() from a dict produces a frozen Weave."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "threads": ["dimensions.dim_customer", "dimensions.dim_product"],
             "defaults": {"tags": ["nightly"]},
         }
@@ -209,7 +209,7 @@ class TestWeaveAndLoomModelHydration:
     def test_loom_hydrates_from_dict(self):
         """Loom model_validate() from a dict produces a frozen Loom."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["dimensions", "facts"],
             "defaults": {"tags": ["production"]},
         }
@@ -222,9 +222,9 @@ class TestWeaveAndLoomModelHydration:
     def test_extra_keys_silently_ignored(self):
         """Extra keys (_resolved_weaves etc.) are silently dropped by Pydantic."""
         data = {
-            "config_version": "1.0",
+            "config_version": "2.0",
             "weaves": ["dimensions"],
-            "_resolved_weaves": [{"config_version": "1.0", "threads": ["t1"]}],
+            "_resolved_weaves": [{"config_version": "2.0", "threads": ["t1"]}],
         }
         loom = Loom.model_validate(data)
         assert not hasattr(loom, "_resolved_weaves")
