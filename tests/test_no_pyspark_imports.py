@@ -163,6 +163,26 @@ def test_import_diagnostics_without_engine_wheel() -> None:
         assert hasattr(diagnostics, "diagnostic")
 
 
+def test_resolve_run_store_without_pyspark() -> None:
+    """Run Store locations resolve with PySpark blocked."""
+    with _block_pyspark():
+        run_store = importlib.import_module("weevr.config.run_store")
+        project = importlib.import_module("weevr.model.project").Project.model_validate(
+            {"config_version": "2.0", "id": "8f9d2c4e-1b3a-4c5d-9e6f-7a8b9c0d1e2f", "name": "s"}
+        )
+        locations = importlib.import_module("weevr.config.locations")
+        root = locations.LocalConfigLocation(Path("/work/s"))
+        store = run_store.resolve_run_store(project, root)
+        assert store.base == "/work/s/.weevr/run_store"
+
+
+def test_resolve_run_store_without_engine_wheel() -> None:
+    """Run Store locations resolve in a core-only install."""
+    with _block_engine_wheel():
+        run_store = importlib.import_module("weevr.config.run_store")
+        assert hasattr(run_store, "resolve_run_store")
+
+
 def test_import_thread_model_without_pyspark() -> None:
     """``from weevr.model.thread import Thread`` must succeed with PySpark blocked."""
     with _block_pyspark():

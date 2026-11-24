@@ -1404,6 +1404,91 @@ class TestRunRecordsProject:
         assert loaded.project_root == str(project)
 
 
+class TestContextRunStore:
+    """``Context.run_store``: the project's Run Store, with the Context override first."""
+
+    def _project(self, tmp_path: Path, run_store: dict | None = None) -> Path:
+        project = _stub_execution_project(tmp_path)
+        body: dict = {"config_version": "2.0", "id": TEST_PROJECT_ID, "name": "sales"}
+        if run_store is not None:
+            body["run_store"] = run_store
+        write_document(project / "weevr.yaml", body, kind="project")
+        return project
+
+    def test_local_project_defaults_to_its_tooling_space(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path)
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        store = ctx.run_store
+        assert store is not None
+        assert store.base == f"{project}/.weevr/run_store"
+        assert store.schema == "weevr_sales"
+        assert str(store.project_id) == TEST_PROJECT_ID
+
+    def test_weevr_yaml_settings_apply(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, {"layout": "shared", "schema": "weevr_ops"})
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        assert ctx.run_store is not None
+        assert ctx.run_store.layout == "shared"
+        assert ctx.run_store.schema == "weevr_ops"
+
+    def test_context_argument_overrides_weevr_yaml(self, tmp_path: Path) -> None:
+        from weevr.model.project import RunStore
+
+        project = self._project(tmp_path, {"layout": "shared", "schema": "weevr_ops"})
+        ctx = Context(
+            spark=MagicMock(spec=SparkSession),
+            project=str(project),
+            run_store=RunStore(schema="mine"),
+        )
+        assert ctx.run_store is not None
+        assert ctx.run_store.layout == "per_project"
+        assert ctx.run_store.schema == "mine"
+
+    def test_run_store_must_be_run_store_settings(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path)
+        with pytest.raises(TypeError, match="run_store"):
+            Context(
+                spark=MagicMock(spec=SparkSession),
+                project=str(project),
+                run_store={"layout": "shared"},  # type: ignore[arg-type]
+            )
+
+    def test_connection_unknown_before_any_load_is_r201(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, {"connection": "central"})
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        with pytest.raises(ConfigError) as exc_info:
+            _ = ctx.run_store
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "R201"
+
+    def test_connection_resolves_through_the_loaded_config(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, {"connection": "central"})
+        write_document(
+            project / "stub.loom",
+            'config_version: "2.0"\nweaves:\n  - ref: stub.weave\n'
+            "connections:\n  central:\n    type: onelake\n"
+            "    workspace: ops-ws\n    lakehouse: central-lh\n",
+        )
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        ctx.load("stub.loom")
+        assert ctx.run_store is not None
+        assert ctx.run_store.base == "abfss://ops-ws@onelake.dfs.fabric.microsoft.com/central-lh"
+
+    def test_loading_a_config_without_connections_keeps_the_registry(self, tmp_path: Path) -> None:
+        project = self._project(tmp_path, {"connection": "central"})
+        write_document(
+            project / "stub.loom",
+            'config_version: "2.0"\nweaves:\n  - ref: stub.weave\n'
+            "connections:\n  central:\n    type: onelake\n"
+            "    workspace: ops-ws\n    lakehouse: central-lh\n",
+        )
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        ctx.load("stub.loom")
+        ctx.load("stub.weave")
+        assert ctx.run_store is not None
+        assert ctx.run_store.base == "abfss://ops-ws@onelake.dfs.fabric.microsoft.com/central-lh"
+
+
 class TestLogLevelWiring:
     """YAML log_level application with Context-argument precedence."""
 

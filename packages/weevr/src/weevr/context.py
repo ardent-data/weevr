@@ -19,6 +19,7 @@ from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteCo
 from weevr.config.onelake import resolve_connection_path
 from weevr.config.parser import TYPED_EXTENSIONS, declared_kind
 from weevr.config.root import PROJECT_FILE, project_root_not_found, read_project
+from weevr.config.run_store import RunStoreLocation, resolve_run_store
 from weevr.config.validation import (
     in_thread,
     partition_diagnostics,
@@ -47,7 +48,7 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
-from weevr.model.project import Project
+from weevr.model.project import Project, RunStore
 from weevr.model.source import Source
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
@@ -87,6 +88,8 @@ class Context:
             ``"verbose"``, or ``"debug"``.
         workspace: Fabric workspace ID for cross-lakehouse resolution.
         lakehouse: Fabric lakehouse ID for cross-lakehouse resolution.
+        run_store: Run Store settings that replace the ``run_store`` block of
+            ``weevr.yaml`` whole (see :attr:`run_store`).
     """
 
     def __init__(
@@ -98,10 +101,13 @@ class Context:
         log_level: str | None = None,
         workspace: str | None = None,
         lakehouse: str | None = None,
+        run_store: RunStore | None = None,
     ) -> None:
         """Initialize a Context with a SparkSession and project reference."""
         if not isinstance(spark, SparkSession):
             raise TypeError(f"'spark' must be a SparkSession, got {type(spark).__name__}")
+        if run_store is not None and not isinstance(run_store, RunStore):
+            raise TypeError(f"'run_store' must be a RunStore, got {type(run_store).__name__}")
 
         # An explicit argument is a runtime override that beats YAML
         # execution blocks. When omitted, STANDARD applies provisionally
@@ -124,6 +130,8 @@ class Context:
         self._project_root, self._project = self._resolve_project_path(
             project, workspace, lakehouse
         )
+        self._run_store_override = run_store
+        self._connections: dict[str, OneLakeConnection] | None = None
         configure_logging(self._log_level)
 
     def _resolve_project_path(
@@ -231,6 +239,28 @@ class Context:
     def project(self) -> Project:
         """The project document (``weevr.yaml``) at the project root."""
         return self._project
+
+    @property
+    def run_store(self) -> RunStoreLocation | None:
+        """Where this project's run outputs live, or ``None`` when nowhere.
+
+        Resolved on each access by
+        :func:`weevr.config.run_store.resolve_run_store` from the project
+        root and ``weevr.yaml``'s ``run_store`` block, which the
+        ``run_store`` argument replaces whole. The project-scope connection
+        registry is reserved, so ``run_store.connection`` is looked up in the
+        top-level connections of the config this Context loaded last; before
+        any load, or when that config doesn't declare it, access raises
+        :class:`~weevr.errors.ConfigLocationError` (``R201``). ``None`` means
+        the root implies no store and no connection names one; persistence is
+        then skipped.
+        """
+        return resolve_run_store(
+            self._project,
+            self._project_root,
+            self._run_store_override,
+            connections=self._connections,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -1157,7 +1187,13 @@ class Context:
         )
         for warning in render_diagnostics(warnings):
             logger.warning(warning)
-        return LoadedConfig.from_document(document, warnings)
+        loaded = LoadedConfig.from_document(document, warnings)
+        # Only a config that declares connections replaces the registry, so loading a
+        # thread or weave afterwards doesn't clear what a loom declared.
+        connections = getattr(loaded.model, "connections", None)
+        if connections:
+            self._connections = connections
+        return loaded
 
     def _plan_problems(self, path: str | Path) -> list[Diagnostic]:
         """Plan problems of the files of a config that do load, for a failed run."""
@@ -1189,7 +1225,13 @@ class Context:
                 logger.warning(warning)
         if document is None:
             return None, errors
-        return LoadedConfig.from_document(document, warnings), errors
+        loaded = LoadedConfig.from_document(document, warnings)
+        # Only a config that declares connections replaces the registry, so loading a
+        # thread or weave afterwards doesn't clear what a loom declared.
+        connections = getattr(loaded.model, "connections", None)
+        if connections:
+            self._connections = connections
+        return loaded, errors
 
 
 def _display_kind(location: ConfigLocation) -> str:
