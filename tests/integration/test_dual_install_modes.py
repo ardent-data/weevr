@@ -41,7 +41,7 @@ from pathlib import Path
 
 import pytest
 
-from documents import write_document
+from documents import write_document, write_project
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -264,8 +264,7 @@ def test_core_only_install_loads_resolved_children(
     python = _make_venv(tmp_path / "core_only_load", python_version)
     _pip_install(python, str(core))
 
-    project = tmp_path / "smoke.weevr"
-    project.mkdir()
+    project = write_project(tmp_path / "smoke.weevr", name="smoke")
     for name in ("a", "b"):
         write_document(project / f"{name}.thread", _SMOKE_THREAD.format(name=name))
     write_document(

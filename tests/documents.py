@@ -67,3 +67,36 @@ def write_document(path: Path, body: str | Mapping[str, Any], *, kind: str | Non
         raise ValueError(f"write_document needs kind= for {path.name}")
     path.write_text(with_kind(body, resolved))
     return path
+
+
+TEST_PROJECT_ID = "0b5f3c1e-2d4a-4b6c-8e9f-1a2b3c4d5e6f"
+"""The ``id`` of the projects :func:`write_project` writes."""
+
+
+def project_yaml(name: str = "test", project_id: str = TEST_PROJECT_ID) -> str:
+    """Return the text of a minimal ``weevr.yaml``.
+
+    Args:
+        name: The project name.
+        project_id: The project id.
+
+    Returns:
+        The document text.
+    """
+    return f'kind: project\nconfig_version: "2.0"\nid: {project_id}\nname: {name}\n'
+
+
+def write_project(root: Path, name: str = "test", project_id: str = TEST_PROJECT_ID) -> Path:
+    """Make ``root`` a project directory: create it and write its ``weevr.yaml``.
+
+    Args:
+        root: The project directory; created with its parents when missing.
+        name: The project name.
+        project_id: The project id.
+
+    Returns:
+        ``root``.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "weevr.yaml").write_text(project_yaml(name, project_id))
+    return root

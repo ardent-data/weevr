@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.config.validation import render_diagnostics, validate_incremental_config
 from weevr.errors import ConfigError
@@ -268,7 +268,7 @@ load: {mode: incremental_parameter}
 
 
 def _project(tmp_path: Path, files: dict[str, str]) -> Path:
-    root = tmp_path / "inc.weevr"
+    root = write_project(tmp_path / "inc.weevr")
     for name, text in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)

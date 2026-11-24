@@ -28,9 +28,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from pyspark.sql import SparkSession
-from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, FABCON_DIR, REQUIRED_PARAMS
+from validate_examples_core import CONFIG_FILES, EXAMPLES_DIR, REQUIRED_PARAMS, project_root
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.config.validation import render_diagnostics
 from weevr.context import Context
@@ -76,7 +76,7 @@ class Case:
 
 
 def _example_case(path: Path) -> Case:
-    project = FABCON_DIR if FABCON_DIR in path.parents else EXAMPLES_DIR
+    project = project_root(path)
     rel = path.relative_to(EXAMPLES_DIR).as_posix()
     return Case(project, path.relative_to(project).as_posix(), REQUIRED_PARAMS.get(rel))
 
@@ -329,8 +329,7 @@ class TestValidateWording:
 
     @staticmethod
     def _project(tmp_path: Path) -> Path:
-        project = tmp_path / "cycle.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "cycle.weevr")
         for name in ("a", "b"):
             write_document(project / f"{name}.thread", _CYCLE_THREAD.format(name=name))
         write_document(project / "cyc.weave", _CYCLE_WEAVE)

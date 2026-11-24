@@ -238,8 +238,18 @@
       "severity": "error",
       "stability": "stable",
       "removed_in": null,
-      "summary": "The installed weevr is outside the project's requires_weevr specifier; the message names both.",
+      "summary": "The installed weevr is outside the project's requires_weevr specifier, or its version cannot be determined (no package metadata); the message names the cause.",
       "docs_anchor": "c208"
+    },
+    {
+      "code": "C209",
+      "name": "project-root-not-found",
+      "category": "config",
+      "severity": "error",
+      "stability": "stable",
+      "removed_in": null,
+      "summary": "The Context's project directory holds no weevr.yaml; expected lists every location probed.",
+      "docs_anchor": "c209"
     },
     {
       "code": "C210",

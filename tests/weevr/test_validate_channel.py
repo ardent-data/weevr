@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.context import Context
 from weevr.errors import ConfigError
 from weevr.result import ExecutionMode
@@ -34,7 +34,7 @@ def _thread(source: str, target: str, **extra: Any) -> dict[str, Any]:
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     """A weave with a schema error, a dependency cycle and a missing source."""
-    root = tmp_path / "p.weevr"
+    root = write_project(tmp_path / "p.weevr")
     out = tmp_path / "out"
     _write(root / "broken.thread", _thread("raw.a", str(out / "a"), write={"mode": "bogus"}))
     _write(root / "one.thread", _thread("raw.b", str(out / "one")))
@@ -68,6 +68,9 @@ class TestValidateReports:
         result = Context(spark, project).run("w.weave", mode="validate")
         assert result.status == "failure"
         assert result.mode is ExecutionMode.VALIDATE
+        assert result.project_root == str(project)
+        assert result.project is not None
+        assert str(result.project.id) in result.summary()
         assert {"C103", "D101", "S101"} <= _codes(result)
         (schema,) = [d for d in result.diagnostics if d.code == "C103"]
         assert schema.file == str(project / "broken.thread")
@@ -78,7 +81,7 @@ class TestValidateReports:
     def test_a_file_that_fails_to_parse_is_reported(
         self, spark: SparkSession, tmp_path: Path
     ) -> None:
-        root = tmp_path / "p.weevr"
+        root = write_project(tmp_path / "p.weevr")
         _write(root / "t.thread", "config_version: '2.0'\nsources: [1, 2\n")
         result = Context(spark, root).run("t.thread", mode="validate")
         assert result.status == "failure"
@@ -88,16 +91,15 @@ class TestValidateReports:
     def test_config_type_of_a_failed_yaml_document_is_its_kind(
         self, spark: SparkSession, tmp_path: Path
     ) -> None:
-        root = tmp_path / "p.weevr"
+        root = write_project(tmp_path / "p.weevr")
         _write(root / "t.yaml", "config_version: '2.0'\nthreads: []\n", kind="weave")
         result = Context(spark, root).run("t.yaml", mode="validate")
         assert result.status == "failure"
         assert (result.config_type, result.config_name) == ("weave", "t")
 
     def test_v1_document_is_the_migration_error(self, spark: SparkSession, tmp_path: Path) -> None:
-        root = tmp_path / "p.weevr"
+        root = write_project(tmp_path / "p.weevr")
         path = root / "t.thread"
-        path.parent.mkdir(parents=True)
         path.write_text("config_version: '1.0'\nsources: {}\ntarget: {}\n")
         result = Context(spark, root).run("t.thread", mode="validate")
         assert _codes(result) == {"C203"}
@@ -106,7 +108,7 @@ class TestValidateReports:
     def test_standalone_column_set_error_is_reported(
         self, spark: SparkSession, tmp_path: Path
     ) -> None:
-        root = tmp_path / "p.weevr"
+        root = write_project(tmp_path / "p.weevr")
         thread = _thread("raw.a", str(tmp_path / "out"))
         thread["steps"] = [{"rename": {"column_set": "nope"}}]
         _write(root / "t.thread", thread)
@@ -114,7 +116,7 @@ class TestValidateReports:
         assert "R124" in _codes(result)
 
     def test_load_warnings_appear(self, spark: SparkSession, tmp_path: Path) -> None:
-        root = tmp_path / "p.weevr"
+        root = write_project(tmp_path / "p.weevr")
         _write(
             root / "t.thread",
             _thread("raw.a", str(tmp_path / "out"), execution={"log_level": "minimal"}),
@@ -174,7 +176,7 @@ class TestSkippedThreads:
     def test_dependency_on_a_broken_thread_is_not_d103(
         self, spark: SparkSession, tmp_path: Path
     ) -> None:
-        root = tmp_path / "p.weevr"
+        root = write_project(tmp_path / "p.weevr")
         out = tmp_path / "out"
         _write(root / "a.thread", _thread("raw.a", str(out / "a"), write={"mode": "bogus"}))
         _write(root / "b.thread", _thread("raw.b", str(out / "b")))

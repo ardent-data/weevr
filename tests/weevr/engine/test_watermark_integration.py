@@ -7,7 +7,7 @@ import pytest
 from delta.tables import DeltaTable
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from spark_helpers import create_delta_table
 from weevr import Context
 from weevr.engine.executor import execute_thread
@@ -376,8 +376,7 @@ class TestWatermarkTypeRequiredEndToEnd:
         target = tmp_path / "tgt"
         create_delta_table(spark, source, [{"id": 1, "ts": 1}, {"id": 2, "ts": 2}])
         type_line = f"  watermark_type: {watermark_type}\n" if watermark_type else ""
-        project = tmp_path / "wm.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "wm.weevr")
         thread = project / "t.thread"
         write_document(
             thread,

@@ -37,6 +37,7 @@ import pytest
 import yaml
 
 import weevr.errors
+from documents import write_project as make_project_dir
 from weevr.config import load_config, load_resolved
 from weevr.model.warp import WarpConfig
 
@@ -148,8 +149,7 @@ def snippet_path(snippet: Snippet) -> str:
 
 def write_project(snippets: list[Snippet], tmp_path: Path) -> Path:
     """Write a page's config snippets into one project; return its root."""
-    project = tmp_path / "docs.weevr"
-    project.mkdir(parents=True, exist_ok=True)
+    project = make_project_dir(tmp_path / "docs.weevr")
     for snippet in snippets:
         if snippet.kind in KINDS:
             target = project / snippet_path(snippet)

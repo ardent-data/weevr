@@ -42,6 +42,7 @@ from weevr.config.resolver import (
     resolve_references,
     validate_params,
 )
+from weevr.config.root import find_project_root, read_project
 from weevr.config.validation import (
     dimension_override_diagnostics,
     execution_scope_diagnostics,
@@ -56,6 +57,7 @@ from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import fill_lines, json_pointer, parse_pointer
 from weevr.errors import ConfigError, VariableResolutionError
 from weevr.model import Loom, Thread, Weave
+from weevr.model.project import Project
 from weevr.model.warp import WarpBinding
 
 logger = logging.getLogger("weevr.config")
@@ -79,6 +81,8 @@ class ResolvedConfig:
             threads) or a weave's threads, cascaded.
         authored: The config dict before variable substitution.
         warnings: Load warnings collected so far.
+        project: The project document at ``project_root``; ``None`` when it
+            has no ``weevr.yaml``.
     """
 
     location: ConfigLocation
@@ -89,6 +93,39 @@ class ResolvedConfig:
     children: list[ResolvedChild] = field(default_factory=list)
     authored: dict[str, Any] | None = None
     warnings: list[Diagnostic] = field(default_factory=list)
+    project: Project | None = None
+
+
+def resolve_project_root(
+    location: ConfigLocation,
+    project_root: ConfigLocation | None,
+    project: Project | None = None,
+) -> tuple[ConfigLocation, Project | None]:
+    """The root a load of ``location`` resolves against, and its project.
+
+    With no ``project_root``, the nearest folder above the file holding
+    ``weevr.yaml`` is the root; with none, the file's folder is, and there
+    is no project. A given ``project_root`` is used as it is, with
+    ``project`` when the caller already loaded it, else the root's own
+    ``weevr.yaml`` when it has one.
+
+    Args:
+        location: The config file being loaded.
+        project_root: The root the caller chose, if any.
+        project: The root's project document, when the caller loaded it.
+
+    Returns:
+        ``(root, project)``.
+
+    Raises:
+        ConfigError: The ``weevr.yaml`` found fails to load.
+    """
+    if project_root is not None:
+        return project_root, project if project is not None else read_project(project_root)
+    found = find_project_root(location.parent)
+    if found is None:
+        return location.parent, None
+    return found, read_project(found)
 
 
 def resolve_config(
@@ -98,6 +135,7 @@ def resolve_config(
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
     require_typed_extension: bool = False,
+    project: Project | None = None,
 ) -> ResolvedConfig:
     """Resolve one config file to a dict ready for hydration.
 
@@ -110,10 +148,13 @@ def resolve_config(
         location: The config file.
         runtime_params: Runtime parameter overrides.
         project_root: Root for child references and Source paths. Defaults to
+            the nearest folder above the file holding ``weevr.yaml``, else
             the file's directory.
         fabric_context: Optional Fabric environment values for ``${fabric.x}``.
         require_typed_extension: Reject files without a ``.thread``, ``.weave``,
             or ``.loom`` extension instead of reading the kind from the envelope.
+        project: The ``project_root``'s project document, when the caller
+            already loaded it; else it is read from the root.
 
     Returns:
         The resolved config.
@@ -122,6 +163,7 @@ def resolve_config(
         ConfigError: Unsupported extension or a name/filename mismatch.
         VariableResolutionError: A variable has no value and no default.
     """
+    root, project = resolve_project_root(location, project_root, project)
     config_type, validated = load_document(
         location, require_typed_extension=require_typed_extension
     )
@@ -157,7 +199,6 @@ def resolve_config(
             ) from exc
         raise
 
-    root = project_root if project_root is not None else location.parent
     data = resolved
     children = resolve_references(resolved, config_type, root, runtime_params, authored=config_dict)
 
@@ -218,6 +259,7 @@ def resolve_config(
         children=children,
         authored=config_dict,
         warnings=warnings,
+        project=project,
     )
 
 
@@ -403,6 +445,8 @@ def _assemble_document(
         name=resolved.config_name,
         children=children,
         source_ref=top_file,
+        project=resolved.project,
+        project_root=str(resolved.project_root),
     ).with_scopes()
 
 
@@ -448,6 +492,7 @@ def load_resolved_config(
     runtime_params: dict[str, Any] | None = None,
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
+    project: Project | None = None,
 ) -> tuple[ResolvedDocument, list[Diagnostic]]:
     """Load a typed thread, weave, or loom file with its resolved children.
 
@@ -460,8 +505,11 @@ def load_resolved_config(
         location: The config file (``.thread``, ``.weave``, or ``.loom``).
         runtime_params: Runtime parameter overrides.
         project_root: Root for child references and Source paths. Defaults to
+            the nearest folder above the file holding ``weevr.yaml``, else
             the file's directory.
         fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+        project: The ``project_root``'s project document, when the caller
+            already loaded it.
 
     Returns:
         ``(document, warnings)``: the resolved config tree and the load
@@ -475,6 +523,7 @@ def load_resolved_config(
                 project_root=project_root,
                 fabric_context=fabric_context,
                 require_typed_extension=True,
+                project=project,
             )
         )
 
@@ -485,6 +534,7 @@ def collect_resolved_config(
     runtime_params: dict[str, Any] | None = None,
     project_root: ConfigLocation | None = None,
     fabric_context: dict[str, Any] | None = None,
+    project: Project | None = None,
 ) -> tuple[ResolvedDocument | None, list[Diagnostic], list[Diagnostic]]:
     """Load like :func:`load_resolved_config`, returning problems instead of raising.
 
@@ -495,8 +545,11 @@ def collect_resolved_config(
         location: The config file (``.thread``, ``.weave``, or ``.loom``).
         runtime_params: Runtime parameter overrides.
         project_root: Root for child references and Source paths. Defaults to
+            the nearest folder above the file holding ``weevr.yaml``, else
             the file's directory.
         fabric_context: Optional Fabric environment values for ``${fabric.x}``.
+        project: The ``project_root``'s project document, when the caller
+            already loaded it.
 
     Returns:
         ``(document, warnings, errors)``: the tree, ``None`` when the file
@@ -513,6 +566,7 @@ def collect_resolved_config(
                 project_root=project_root,
                 fabric_context=fabric_context,
                 require_typed_extension=True,
+                project=project,
             )
         )
     found = diagnostics_of(errors)
@@ -542,13 +596,16 @@ def load_resolved(
         path: The config file. Local paths are wrapped automatically; remote
             URIs must be supplied as a :class:`RemoteConfigLocation`.
         runtime_params: Optional runtime parameter overrides.
-        project_root: The ``.weevr`` project directory. Child references,
-            relative file-Source paths, and ``qualified_key`` resolve against
-            it; defaults to the file's directory.
+        project_root: The project directory. Child references, relative
+            file-Source paths, and ``qualified_key`` resolve against it. When
+            omitted, the nearest folder above the file holding ``weevr.yaml``
+            is the root; with none, the file's directory is, and the result's
+            ``project`` is ``None``.
 
     Returns:
         A :class:`~weevr.result.LoadedConfig` with ``model``, ``document``
-        (the resolved config tree), ``warnings``, and ``execution_plan``.
+        (the resolved config tree), ``project`` and ``project_root``,
+        ``warnings``, and ``execution_plan``.
         Warnings are also logged on the ``weevr.config`` logger.
 
     Raises:

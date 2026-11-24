@@ -9,11 +9,11 @@ the document loads.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from packaging.specifiers import SpecifierSet
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 from weevr.diagnostics import Diagnostic, diagnostic
 from weevr.diagnostics.positions import json_pointer
@@ -61,13 +61,28 @@ def check_engine_floor(project: Project) -> None:
         project: The validated project document.
 
     Raises:
-        ConfigError: The installed version is outside the specifier (C208).
+        ConfigError: The installed version is outside the specifier, or
+            cannot be determined (C208).
     """
     spec = project.requires_weevr
     if spec is None:
         return
-    installed = installed_weevr_version()
-    if SpecifierSet(spec).contains(Version(installed), prereleases=True):
+    try:
+        installed = installed_weevr_version()
+        parsed = Version(installed)
+    except (PackageNotFoundError, InvalidVersion) as exc:
+        raise ConfigError.from_diagnostic(
+            diagnostic(
+                "C208",
+                f"Cannot check requires_weevr '{spec}': the installed weevr version is "
+                f"unknown ({exc})",
+                pointer="/requires_weevr",
+                expected=[spec],
+                hint="Install weevr as a package (with its metadata), or remove requires_weevr.",
+            ),
+            cause=exc,
+        ) from exc
+    if SpecifierSet(spec).contains(parsed, prereleases=True):
         return
     raise ConfigError.from_diagnostic(
         diagnostic(

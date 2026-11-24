@@ -159,7 +159,7 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
         "unknown-config-kind",
         "The config's kind is not one weevr knows.",
     ),
-    # C205–C209 — envelope (config/loader.py, config/project.py)
+    # C205–C209 — envelope and project root (config/loader.py, config/project.py, config/root.py)
     _config(
         "C205",
         "name-mismatch",
@@ -178,8 +178,14 @@ _ENTRIES: tuple[RegistryEntry, ...] = (
     _config(
         "C208",
         "engine-version-unsatisfied",
-        "The installed weevr is outside the project's requires_weevr specifier; the message "
-        "names both.",
+        "The installed weevr is outside the project's requires_weevr specifier, or its "
+        "version cannot be determined (no package metadata); the message names the cause.",
+    ),
+    _config(
+        "C209",
+        "project-root-not-found",
+        "The Context's project directory holds no weevr.yaml; expected lists every location "
+        "probed.",
     ),
     # C210– — project document (config/project.py)
     _config(

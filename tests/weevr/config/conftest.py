@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
+from documents import write_document, write_project
 
 MakeProject = Callable[..., Path]
 
@@ -30,8 +30,7 @@ def make_project(tmp_path: Path) -> MakeProject:
         weave: dict[str, Any] | None = None,
         loom: dict[str, Any] | None = None,
     ) -> Path:
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         if thread is not None:
             write_document(project / thread_file, json.dumps(thread))
         weave_body = {"config_version": "2.0", "threads": [{"ref": thread_file}], **(weave or {})}

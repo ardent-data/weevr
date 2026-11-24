@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.context import Context
 
 pytestmark = pytest.mark.spark
@@ -39,7 +39,7 @@ def project(spark: SparkSession, tmp_path: Path) -> dict[str, Any]:
         spark.createDataFrame([(1, label)], ["key", "label"]).write.format("delta").save(
             str(tables / name)
         )
-    root = tmp_path / "scopes.weevr"
+    root = write_project(tmp_path / "scopes.weevr")
     (root / "threads").mkdir(parents=True)
     write_document(root / "threads" / "t1.thread", _thread("t1", str(tables / "out_t1")))
     write_document(root / "threads" / "t2.thread", _thread("t2", str(tables / "out_t2")))

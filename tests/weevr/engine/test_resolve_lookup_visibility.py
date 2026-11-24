@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.context import Context
 from weevr.engine.result import LoomResult, ThreadResult, WeaveResult
 from weevr.errors import ConfigError
@@ -32,8 +32,7 @@ class Project:
     def __init__(self, spark: SparkSession, root: Path, dim: str, src: str) -> None:
         self.spark = spark
         self.root = root
-        self.dir = root / "p.weevr"
-        self.dir.mkdir()
+        self.dir = write_project(root / "p.weevr")
         self.target = str(root / "tgt")
         self.dim = dim
         self.src = src

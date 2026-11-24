@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config.audit_templates import (
     CONTEXT_VARIABLE_FIELDS,
     HIERARCHY_CONTEXT_KEYS,
@@ -823,8 +823,7 @@ class TestReferenceResolution:
         from weevr.config.resolver import resolve_references
         from weevr.errors import ReferenceResolutionError
 
-        project = tmp_path / "proj.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "proj.weevr")
         write_document(
             tmp_path / "outside.weave",
             'config_version: "2.0"\nthreads:\n  - name: t\n    config_version: "2.0"\n'
@@ -839,8 +838,7 @@ class TestReferenceResolution:
         from weevr.config.resolver import resolve_ref_path
         from weevr.errors import ReferenceResolutionError
 
-        project_root = tmp_path / "project.weevr"
-        project_root.mkdir()
+        project_root = write_project(tmp_path / "project.weevr")
 
         with pytest.raises(ReferenceResolutionError, match="resolves outside project root"):
             resolve_ref_path("../escape.thread", project_root)

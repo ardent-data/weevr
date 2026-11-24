@@ -18,6 +18,7 @@ from weevr.config.loader import collect_resolved_config, load_resolved_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, RemoteConfigLocation
 from weevr.config.onelake import resolve_connection_path
 from weevr.config.parser import TYPED_EXTENSIONS, declared_kind
+from weevr.config.root import PROJECT_FILE, project_root_not_found, read_project
 from weevr.config.validation import (
     in_thread,
     partition_diagnostics,
@@ -46,6 +47,7 @@ from weevr.model.connection import OneLakeConnection
 from weevr.model.execution import LogLevel, resolve_effective_execution
 from weevr.model.lookup import Lookup
 from weevr.model.loom import Loom
+from weevr.model.project import Project
 from weevr.model.source import Source
 from weevr.model.thread import Thread
 from weevr.model.weave import ConditionSpec, Weave
@@ -53,6 +55,9 @@ from weevr.result import ExecutionMode, LoadedConfig, PreviewThreadMetadata, Run
 from weevr.telemetry.logging import configure_logging
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_LAKEHOUSE_FILES = "/lakehouse/default/Files/"
+"""Where Tier 1 looks for a project named without a path."""
 
 
 class Context:
@@ -66,11 +71,17 @@ class Context:
         spark: Active SparkSession (required).
         project: Project identifier. Accepts three forms:
 
+            - **Direct path** (e.g., ``"/path/to/sales"``): an absolute path,
+              or a relative path to an existing directory, used as-is.
+            - **Qualified** (with *workspace* and *lakehouse*): resolved via
+              OneLake ABFS path to ``Files/<name>.weevr/``.
             - **Simple name** (e.g., ``"my_project"``): resolved via the
               default lakehouse at ``/lakehouse/default/Files/<name>.weevr/``.
-            - **Qualified** (with *workspace* and *lakehouse*): resolved via
-              OneLake ABFS path.
-            - **Direct path** (e.g., ``"/path/to/project.weevr"``): used as-is.
+
+            Whichever form resolves it, the project directory must hold a
+            ``weevr.yaml`` (``kind: project``); the ``.weevr`` folder suffix
+            is only the naming convention of the name forms. Without one,
+            construction fails with ``C209``, listing the location probed.
         params: Runtime parameter overrides.
         log_level: Logging verbosity — ``"minimal"``, ``"standard"`` (default),
             ``"verbose"``, or ``"debug"``.
@@ -110,7 +121,9 @@ class Context:
         self._spark = spark
         self._params = params
         self._log_level = resolved_level
-        self._project_root = self._resolve_project_path(project, workspace, lakehouse)
+        self._project_root, self._project = self._resolve_project_path(
+            project, workspace, lakehouse
+        )
         configure_logging(self._log_level)
 
     def _resolve_project_path(
@@ -118,8 +131,14 @@ class Context:
         project: str | Path,
         workspace: str | None,
         lakehouse: str | None,
-    ) -> ConfigLocation:
-        """Resolve the project path using three-tier resolution.
+    ) -> tuple[ConfigLocation, Project]:
+        """Resolve the project directory and load its ``weevr.yaml``.
+
+        The directory comes from three tiers: a direct path (absolute, or an
+        existing relative directory), then the OneLake path when
+        ``workspace`` and ``lakehouse`` are given, then the default
+        lakehouse. Whichever tier resolves it, the directory must hold a
+        ``weevr.yaml``.
 
         Args:
             project: Project name or direct path.
@@ -127,25 +146,45 @@ class Context:
             lakehouse: Optional Fabric lakehouse ID.
 
         Returns:
-            A :class:`ConfigLocation` for the project root. Tier 1 and Tier 3
-            return a :class:`LocalConfigLocation`; Tier 2 returns a
+            The project root and its project document. Tier 1 and Tier 3
+            give a :class:`LocalConfigLocation`; Tier 2 a
             :class:`RemoteConfigLocation` bound to ``self._spark``.
 
         Raises:
-            ConfigError: If the project cannot be loaded.
+            ConfigError: No ``weevr.yaml`` at the resolved directory (C209,
+                listing what was probed), or it fails to load.
         """
+        root = self._project_directory(project, workspace, lakehouse)
+        loaded = read_project(root)
+        if loaded is None:
+            tier_one = str(root).startswith(_DEFAULT_LAKEHOUSE_FILES)
+            raise project_root_not_found(
+                [root.join(PROJECT_FILE)],
+                hint=(
+                    "Add a weevr.yaml to that default lakehouse folder, or pass workspace "
+                    "and lakehouse, or a direct project path."
+                )
+                if tier_one
+                else None,
+            )
+        return root, loaded
+
+    def _project_directory(
+        self,
+        project: str | Path,
+        workspace: str | None,
+        lakehouse: str | None,
+    ) -> ConfigLocation:
+        """The project directory named by ``project``, before ``weevr.yaml`` is probed."""
         project_str = str(project)
 
-        # Tier 3: Direct path — absolute path or has .weevr suffix and exists
-        if os.path.isabs(project_str) or (
-            project_str.endswith(".weevr") and os.path.isdir(project_str)
-        ):
-            project_path = Path(project_str)
-            if not project_str.endswith(".weevr"):
-                raise ConfigError(f"Project directory must have .weevr extension: {project_str}")
-            if not project_path.is_dir():
-                raise ConfigError(f"Project directory not found: {project_str}")
-            return LocalConfigLocation(project_path)
+        # Tier 3: Direct path — absolute, or an existing relative directory when no
+        # OneLake location is named (a local folder must not shadow tier 2)
+        direct = os.path.isabs(project_str) or (
+            workspace is None and lakehouse is None and os.path.isdir(project_str)
+        )
+        if direct:
+            return LocalConfigLocation(Path(project_str))
 
         # Normalize: strip .weevr suffix if already present so Tier 1/2
         # don't produce a double extension (e.g. "my_project.weevr.weevr").
@@ -160,14 +199,7 @@ class Context:
             return RemoteConfigLocation(uri, self._spark)
 
         # Tier 1: Default lakehouse
-        default_path = Path(f"/lakehouse/default/Files/{base_name}.weevr")
-        if default_path.is_dir():
-            return LocalConfigLocation(default_path)
-
-        raise ConfigError(
-            f"Project directory not found at {default_path}. "
-            "Provide workspace and lakehouse parameters or a direct project path."
-        )
+        return LocalConfigLocation(Path(f"{_DEFAULT_LAKEHOUSE_FILES}{base_name}.weevr"))
 
     @property
     def spark(self) -> SparkSession:
@@ -194,6 +226,11 @@ class Context:
         by ``workspace`` and ``lakehouse`` (Tier 2 OneLake).
         """
         return self._project_root
+
+    @property
+    def project(self) -> Project:
+        """The project document (``weevr.yaml``) at the project root."""
+        return self._project
 
     # ------------------------------------------------------------------
     # Public API
@@ -276,7 +313,7 @@ class Context:
 
         start_ns = time.monotonic_ns()
         if resolved_mode is ExecutionMode.VALIDATE:
-            result = self._validate(path)
+            result = self._with_project(self._validate(path))
             result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
             return result
 
@@ -304,18 +341,26 @@ class Context:
                 )
         except (ExecutionError, DataValidationError) as exc:
             duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
-            return RunResult(
-                status="failure",
-                mode=resolved_mode,
-                config_type=loaded.config_type,
-                config_name=loaded.config_name,
-                duration_ms=duration_ms,
-                warnings=[str(exc)],
-                diagnostics=loaded.diagnostics,
+            return self._with_project(
+                RunResult(
+                    status="failure",
+                    mode=resolved_mode,
+                    config_type=loaded.config_type,
+                    config_name=loaded.config_name,
+                    duration_ms=duration_ms,
+                    warnings=[str(exc)],
+                    diagnostics=loaded.diagnostics,
+                )
             )
 
         result.duration_ms = (time.monotonic_ns() - start_ns) // 1_000_000
         result.diagnostics = [*loaded.diagnostics, *result.diagnostics]
+        return self._with_project(result)
+
+    def _with_project(self, result: RunResult) -> RunResult:
+        """Record the project root and identity the run used on its result."""
+        result.project = self._project
+        result.project_root = str(self._project_root)
         return result
 
     def _check_standalone_column_sets(self, loaded: LoadedConfig, path: str | Path) -> None:
@@ -1108,6 +1153,7 @@ class Context:
             runtime_params=self._params,
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
+            project=self._project,
         )
         for warning in render_diagnostics(warnings):
             logger.warning(warning)
@@ -1136,6 +1182,7 @@ class Context:
             runtime_params=self._params,
             project_root=self._project_root,
             fabric_context=build_fabric_context(self._spark),
+            project=self._project,
         )
         if log_warnings:
             for warning in render_diagnostics(warnings):

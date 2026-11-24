@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_resolved
 from weevr.config.validation import (
     collect_execution_scope_warnings,
@@ -261,7 +261,7 @@ class TestLoadReportsEveryError:
         assert warning.startswith("WARN: thread 'fact': rename step 1 references column set")
 
     def test_duplicate_weave_name_points_at_the_entry(self, tmp_path: Path) -> None:
-        project = tmp_path / "dup.weevr"
+        project = write_project(tmp_path / "dup.weevr")
         (project / "a").mkdir(parents=True)
         (project / "b").mkdir()
         thread = json.dumps(_thread())

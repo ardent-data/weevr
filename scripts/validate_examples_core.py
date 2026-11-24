@@ -26,13 +26,13 @@ from typing import Any
 
 import yaml
 
-from weevr.config import load_config
+from weevr.config import find_project_root, load_config
+from weevr.config.locations import make_location
 from weevr.config.warp import resolve_warp
 from weevr.model import Thread
 from weevr.model.warp import WarpConfig
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
-FABCON_DIR = EXAMPLES_DIR / "fabcon"
 
 CONFIG_FILES = sorted(
     p for ext in ("*.thread", "*.weave", "*.loom") for p in EXAMPLES_DIR.rglob(ext)
@@ -53,8 +53,15 @@ def rel(path: Path) -> str:
 
 
 def project_root(path: Path) -> Path:
-    """Return the project root an example resolves its references against."""
-    return FABCON_DIR if FABCON_DIR in path.parents else EXAMPLES_DIR
+    """Return the project root an example resolves its references against.
+
+    The nearest folder above the example holding ``weevr.yaml``, as a load
+    without an explicit root finds it.
+    """
+    root = find_project_root(make_location(path))
+    if root is None:
+        raise FileNotFoundError(f"No weevr.yaml above example {rel(path)}")
+    return Path(str(root))
 
 
 def names_warp(path: Path) -> bool:

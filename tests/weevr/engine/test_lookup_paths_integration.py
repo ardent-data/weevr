@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr import Context
 
 
@@ -21,7 +21,7 @@ def test_weave_lookup_reads_relative_csv_from_the_project(
     directory (fixed when the session starts), which is never the project
     folder in ``tmp_path``.
     """
-    project = tmp_path / "lookups.weevr"
+    project = write_project(tmp_path / "lookups.weevr")
     (project / "ref").mkdir(parents=True)
     (project / "ref" / "regions.csv").write_text("code,name\nN,North\nS,South\n")
     target = tmp_path / "lake" / "regions"

@@ -131,3 +131,26 @@ class TestEngineFloor:
         from importlib.metadata import version
 
         assert installed_weevr_version() == version("weevr-core")
+
+    def test_missing_distribution_metadata_is_coded(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from importlib.metadata import PackageNotFoundError
+
+        def _missing(name: str) -> str:
+            raise PackageNotFoundError(name)
+
+        monkeypatch.setattr(project_module, "version", _missing)
+        project = Project.model_validate({"kind": "project", **_body(requires_weevr=">=2")})
+        with pytest.raises(ConfigError) as exc_info:
+            check_engine_floor(project)
+        assert [(d.code, d.pointer) for d in exc_info.value.diagnostics] == [
+            ("C208", "/requires_weevr")
+        ]
+
+    def test_unparseable_installed_version_is_coded(self, installed: Any) -> None:
+        installed("not a version")
+        project = Project.model_validate({"kind": "project", **_body(requires_weevr=">=2")})
+        with pytest.raises(ConfigError) as exc_info:
+            check_engine_floor(project)
+        assert [(d.code, d.pointer) for d in exc_info.value.diagnostics] == [
+            ("C208", "/requires_weevr")
+        ]

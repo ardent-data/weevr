@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from weevr.engine.formatting import format_duration as _format_duration
+from weevr.engine.formatting import format_project
 from weevr.model.pipeline import STEP_TYPES
 
 if TYPE_CHECKING:
@@ -2377,6 +2378,7 @@ def render_plan_html(
         f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
         f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
     )
+    parts.append(_render_project_rows(result))
     counts = f"{total_threads} threads | {total_cached} cached"
     if total_lookups > 0:
         counts += f" | {total_lookups} lookups"
@@ -2436,6 +2438,20 @@ _STATUS_BADGE_MAP = {
     "partial": _S_BADGE_PARTIAL,
     "skipped": _S_BADGE_SKIPPED,
 }
+
+
+def _render_project_rows(result: Any) -> str:
+    """Summary-table rows for the project root and identity; empty without a root."""
+    root = getattr(result, "project_root", None)
+    if root is None:
+        return ""
+    identity = html.escape(format_project(getattr(result, "project", None)))
+    return (
+        f'<tr><td style="{_S_TD}"><strong>Root</strong></td>'
+        f'<td style="{_S_TD}">{html.escape(str(root))}</td></tr>'
+        f'<tr><td style="{_S_TD}"><strong>Project</strong></td>'
+        f'<td style="{_S_TD}">{identity}</td></tr>'
+    )
 
 
 def _status_badge(status: str) -> str:
@@ -3213,6 +3229,7 @@ def _render_validate_html(result: Any) -> str:
         f'<tr><td style="{_S_TD}"><strong>Scope</strong></td>'
         f'<td style="{_S_TD}">{config_type}: {config_name}</td></tr>'
     )
+    parts.append(_render_project_rows(result))
     parts.append("</table>")
 
     # Resolved parameters

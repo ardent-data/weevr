@@ -12,6 +12,7 @@ from weevr.config.loader import hydrate_resolved as _hydrate_resolved
 from weevr.config.loader import load_resolved
 from weevr.config.loader import resolve_config as _resolve_config
 from weevr.config.locations import ConfigLocation, LocalConfigLocation, make_location
+from weevr.config.root import find_project_root
 from weevr.config.validation import render_diagnostics
 from weevr.model import Loom, Thread, Weave
 
@@ -21,6 +22,7 @@ __all__ = [
     "EntryMeta",
     "ResolvedDocument",
     "ScopeRegistries",
+    "find_project_root",
     "load_config",
     "load_resolved",
 ]
@@ -58,9 +60,10 @@ def load_config(
             URIs must be supplied as a :class:`RemoteConfigLocation` so the
             caller can attach a SparkSession.
         runtime_params: Optional runtime parameter overrides.
-        project_root: The ``.weevr`` project directory. Child references,
-            relative file-Source paths, and ``qualified_key`` resolve against
-            it; defaults to the file's directory. Accepts a
+        project_root: The project directory. Child references, relative
+            file-Source paths, and ``qualified_key`` resolve against it. When
+            omitted, the nearest folder above the file holding ``weevr.yaml``
+            is the root; with none, the file's directory is. Accepts a
             :class:`ConfigLocation` or a bare :class:`pathlib.Path`.
 
     Returns:

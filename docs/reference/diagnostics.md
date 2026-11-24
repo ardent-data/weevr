@@ -181,7 +181,14 @@ The declared kind disagrees with the file's typed extension; expected names the 
 
 `engine-version-unsatisfied` · error · stable
 
-The installed weevr is outside the project's requires_weevr specifier; the message names both.
+The installed weevr is outside the project's requires_weevr specifier, or its version cannot be
+determined (no package metadata); the message names the cause.
+
+### C209
+
+`project-root-not-found` · error · stable
+
+The Context's project directory holds no weevr.yaml; expected lists every location probed.
 
 ### C210
 

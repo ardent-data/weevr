@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import TEST_PROJECT_ID, project_yaml, write_document, write_project
 from weevr.context import Context
 from weevr.delta import resolve_delta_table
 from weevr.diagnostics import Diagnostic
@@ -37,28 +39,83 @@ class TestContextValidation:
 
     def test_valid_construction(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        project_dir = tmp_path / "test.weevr"
-        project_dir.mkdir()
+        project_dir = write_project(tmp_path / "test.weevr")
         ctx = Context(
             spark=mock_spark, project=str(project_dir), params={"a": "1"}, log_level="minimal"
         )
         assert ctx.spark is mock_spark
         assert ctx.params == {"a": "1"}
         assert ctx.log_level.value == "minimal"
+        assert str(ctx.project.id) == TEST_PROJECT_ID
 
     def test_direct_path_resolution(self, tmp_path: Path) -> None:
         """Direct .weevr path resolves correctly."""
         from weevr.config.locations import LocalConfigLocation
 
         mock_spark = MagicMock(spec=SparkSession)
-        project_dir = tmp_path / "myproject.weevr"
-        project_dir.mkdir()
+        project_dir = write_project(tmp_path / "myproject.weevr")
         ctx = Context(spark=mock_spark, project=str(project_dir))
         assert isinstance(ctx.project_root, LocalConfigLocation)
         assert str(ctx.project_root) == str(project_dir)
 
-    def test_onelake_resolution(self, tmp_path: Path) -> None:
-        """Workspace + lakehouse produces ABFS path."""
+    def test_directory_without_weevr_suffix(self, tmp_path: Path) -> None:
+        """Any directory holding weevr.yaml is a project; the suffix is convention only."""
+        project_dir = write_project(tmp_path / "Sales.Project", name="sales")
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project_dir))
+        assert str(ctx.project_root) == str(project_dir)
+        assert ctx.project.name == "sales"
+
+    def test_relative_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        write_project(tmp_path / "sales")
+        monkeypatch.chdir(tmp_path)
+        ctx = Context(spark=MagicMock(spec=SparkSession), project="sales")
+        assert str(ctx.project_root) == "sales"
+
+    def test_directory_without_weevr_yaml_fails(self, tmp_path: Path) -> None:
+        project_dir = tmp_path / "test.weevr"
+        project_dir.mkdir()
+        with pytest.raises(ConfigError) as exc_info:
+            Context(spark=MagicMock(spec=SparkSession), project=str(project_dir))
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C209"
+        assert list(diag.expected or ()) == [str(project_dir / "weevr.yaml")]
+
+    def test_missing_directory_fails(self) -> None:
+        with pytest.raises(ConfigError) as exc_info:
+            Context(spark=MagicMock(spec=SparkSession), project="/path/without/extension")
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C209"
+        assert list(diag.expected or ()) == ["/path/without/extension/weevr.yaml"]
+
+    def test_invalid_weevr_yaml_fails_at_construction(self, tmp_path: Path) -> None:
+        project_dir = tmp_path / "p"
+        project_dir.mkdir()
+        (project_dir / "weevr.yaml").write_text('kind: project\nconfig_version: "2.0"\n')
+        with pytest.raises(ConfigError) as exc_info:
+            Context(spark=MagicMock(spec=SparkSession), project=str(project_dir))
+        assert {d.file for d in exc_info.value.diagnostics} == {str(project_dir / "weevr.yaml")}
+
+    def test_onelake_wins_over_same_named_local_directory(
+        self,
+        remote_project: list[str],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A cwd folder named like the project doesn't shadow the workspace + lakehouse tier."""
+        from weevr.config.locations import RemoteConfigLocation
+
+        write_project(tmp_path / "myproject")
+        monkeypatch.chdir(tmp_path)
+        ctx = Context(
+            spark=MagicMock(spec=SparkSession),
+            project="myproject",
+            workspace="ws-id",
+            lakehouse="lh-id",
+        )
+        assert isinstance(ctx.project_root, RemoteConfigLocation)
+
+    def test_onelake_resolution(self, remote_project: list[str]) -> None:
+        """Workspace + lakehouse produces ABFS path, then probes it for weevr.yaml."""
         from weevr.config.locations import RemoteConfigLocation
 
         mock_spark = MagicMock(spec=SparkSession)
@@ -74,8 +131,9 @@ class TestContextValidation:
         # for the original abfss:/ bug).
         assert str(ctx.project_root) == expected
         assert "abfss://" in str(ctx.project_root)
+        assert remote_project == [f"{expected}/weevr.yaml"]
 
-    def test_onelake_resolution_with_weevr_suffix(self) -> None:
+    def test_onelake_resolution_with_weevr_suffix(self, remote_project: list[str]) -> None:
         """Workspace + lakehouse strips .weevr suffix to avoid double extension."""
         from weevr.config.locations import RemoteConfigLocation
 
@@ -90,39 +148,86 @@ class TestContextValidation:
         assert isinstance(ctx.project_root, RemoteConfigLocation)
         assert str(ctx.project_root) == expected
 
-    def test_default_lakehouse_without_weevr_suffix(self) -> None:
-        """Default lakehouse resolution works with simple project name."""
+    def test_onelake_without_weevr_yaml_fails(self) -> None:
+        from weevr.config.locations import RemoteConfigLocation
+
+        with (
+            patch.object(RemoteConfigLocation, "exists", return_value=False),
+            pytest.raises(ConfigError) as exc_info,
+        ):
+            Context(
+                spark=MagicMock(spec=SparkSession),
+                project="myproject",
+                workspace="ws-id",
+                lakehouse="lh-id",
+            )
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C209"
+        assert list(diag.expected or ()) == [
+            "abfss://ws-id@onelake.dfs.fabric.microsoft.com/lh-id/Files/myproject.weevr/weevr.yaml"
+        ]
+
+    @pytest.mark.parametrize("project", ["myproject", "myproject.weevr"])
+    def test_default_lakehouse(self, project: str) -> None:
+        """Default lakehouse resolution takes a simple name, with or without the suffix."""
         from weevr.config.locations import LocalConfigLocation
 
         mock_spark = MagicMock(spec=SparkSession)
         expected = Path("/lakehouse/default/Files/myproject.weevr")
-        with patch.object(Path, "is_dir", return_value=True):
-            ctx = Context(spark=mock_spark, project="myproject")
-        assert isinstance(ctx.project_root, LocalConfigLocation)
-        assert str(ctx.project_root) == str(expected)
-
-    def test_default_lakehouse_with_weevr_suffix(self) -> None:
-        """Default lakehouse resolution strips .weevr suffix to avoid double extension."""
-        from weevr.config.locations import LocalConfigLocation
-
-        mock_spark = MagicMock(spec=SparkSession)
-        expected = Path("/lakehouse/default/Files/myproject.weevr")
-        with patch.object(Path, "is_dir", return_value=True):
-            ctx = Context(spark=mock_spark, project="myproject.weevr")
+        with _default_lakehouse_project(expected):
+            ctx = Context(spark=mock_spark, project=project)
         assert isinstance(ctx.project_root, LocalConfigLocation)
         assert str(ctx.project_root) == str(expected)
 
     def test_missing_project_raises(self) -> None:
-        """Non-absolute path without workspace/lakehouse and no default raises."""
+        """A name with no default-lakehouse project fails, listing the path probed."""
         mock_spark = MagicMock(spec=SparkSession)
-        with pytest.raises(ConfigError, match="Project directory not found"):
+        with pytest.raises(ConfigError) as exc_info:
             Context(spark=mock_spark, project="nonexistent")
+        [diag] = exc_info.value.diagnostics
+        assert diag.code == "C209"
+        probed = "/lakehouse/default/Files/nonexistent.weevr/weevr.yaml"
+        assert list(diag.expected or ()) == [probed]
 
-    def test_non_weevr_extension_raises(self) -> None:
-        """Absolute path without .weevr extension raises ConfigError."""
-        mock_spark = MagicMock(spec=SparkSession)
-        with pytest.raises(ConfigError, match=".weevr extension"):
-            Context(spark=mock_spark, project="/path/without/extension")
+
+@contextmanager
+def _default_lakehouse_project(root: Path) -> Iterator[None]:
+    """Make ``root``'s weevr.yaml readable without a real default lakehouse."""
+    from weevr.config.locations import LocalConfigLocation
+
+    marker = root / "weevr.yaml"
+    real_exists = LocalConfigLocation.exists
+    real_read = LocalConfigLocation.read_text
+
+    def _exists(self: LocalConfigLocation) -> bool:
+        return self.path == marker or real_exists(self)
+
+    def _read(self: LocalConfigLocation) -> str:
+        return project_yaml() if self.path == marker else real_read(self)
+
+    with (
+        patch.object(LocalConfigLocation, "exists", _exists),
+        patch.object(LocalConfigLocation, "read_text", _read),
+    ):
+        yield
+
+
+@pytest.fixture
+def remote_project() -> Iterator[list[str]]:
+    """Give every remote project directory a weevr.yaml; yields the paths read."""
+    from weevr.config.locations import RemoteConfigLocation
+
+    read: list[str] = []
+
+    def _read(self: RemoteConfigLocation) -> str:
+        read.append(str(self))
+        return project_yaml()
+
+    with (
+        patch.object(RemoteConfigLocation, "exists", return_value=True),
+        patch.object(RemoteConfigLocation, "read_text", _read),
+    ):
+        yield read
 
 
 class TestRemoteConfigPathRegression:
@@ -140,7 +245,7 @@ class TestRemoteConfigPathRegression:
         "/d1356ede-c76c-4abb-ae26-aaaabd74e84f/Files/spartech-data-lake.weevr"
     )
 
-    def test_resolve_config_path_preserves_double_slash(self) -> None:
+    def test_resolve_config_path_preserves_double_slash(self, remote_project: list[str]) -> None:
         """_resolve_config_path on a Tier 2 Context returns a remote location.
 
         The returned location's string form must contain ``abfss://`` (two
@@ -164,7 +269,7 @@ class TestRemoteConfigPathRegression:
         assert "abfss://" in str(resolved)
         assert str(resolved) == self.URI_PROJECT + "/silver.loom"
 
-    def test_load_routes_through_remote_location(self, tmp_path: Path) -> None:
+    def test_load_routes_through_remote_location(self, remote_project: list[str]) -> None:
         """Tier 2 Context.load feeds parse_yaml a RemoteConfigLocation, not a Path.
 
         We patch ``RemoteConfigLocation.read_text`` to return a minimal loom
@@ -196,16 +301,14 @@ class TestRemoteConfigPathRegression:
 class TestRunValidation:
     def test_invalid_mode(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        project_dir = tmp_path / "test.weevr"
-        project_dir.mkdir()
+        project_dir = write_project(tmp_path / "test.weevr")
         ctx = Context(spark=mock_spark, project=str(project_dir))
         with pytest.raises(ValueError, match="Invalid mode"):
             ctx.run("some/path.yaml", mode="bogus")
 
     def test_tags_and_threads_exclusive(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        project_dir = tmp_path / "test.weevr"
-        project_dir.mkdir()
+        project_dir = write_project(tmp_path / "test.weevr")
         ctx = Context(spark=mock_spark, project=str(project_dir))
         with pytest.raises(ValueError, match="mutually exclusive"):
             ctx.run("some/path.yaml", tags=["t1"], threads=["t2"])
@@ -214,8 +317,7 @@ class TestRunValidation:
 class TestRunErrorHandling:
     def test_execution_error_returns_failure_result(self, tmp_path: Path) -> None:
         mock_spark = MagicMock(spec=SparkSession)
-        project_dir = tmp_path / "test.weevr"
-        project_dir.mkdir()
+        project_dir = write_project(tmp_path / "test.weevr")
         ctx = Context(spark=mock_spark, project=str(project_dir))
 
         with (
@@ -299,8 +401,7 @@ class TestLoomDeclaredParamsViaContext:
     """``Context.load()`` resolves loom-level ``${param.x}`` from runtime params."""
 
     def _setup_loom_project(self, tmp_path: Path) -> Path:
-        project = tmp_path / "silver.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "silver.weevr")
         thread_dir = project / "threads"
         thread_dir.mkdir()
         write_document(
@@ -392,8 +493,7 @@ class TestContextLoadErrorFileAttribution:
 
     @staticmethod
     def _project(tmp_path: Path, files: dict[str, str]) -> Path:
-        project = tmp_path / "attr.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "attr.weevr")
         for name, text in files.items():
             write_document(project / name, text)
         return project
@@ -532,8 +632,7 @@ class TestContextLoadChildForeach:
 
     @staticmethod
     def _project(tmp_path: Path, files: dict[str, str]) -> Path:
-        project = tmp_path / "fe.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "fe.weevr")
         for name, text in files.items():
             write_document(project / name, text)
         return project
@@ -662,8 +761,7 @@ target:
 
     @staticmethod
     def _load(tmp_path: Path):
-        project = tmp_path / "inline.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "inline.weevr")
         write_document(project / "x.loom", TestContextLoadInlineWeave._LOOM)
         write_document(project / "regional.thread", TestContextLoadInlineWeave._REGIONAL)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
@@ -697,8 +795,7 @@ target:
             '            alias: "${src}"\n        target:\n'
             '          alias: "${tbl}"\n'
         )
-        project = tmp_path / "defaults.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "defaults.weevr")
         write_document(project / "x.loom", loom)
         ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project), params=params)
         return ctx.load("x.loom").document.weave_threads()["inline_ops"]["ops_audit"]
@@ -747,9 +844,7 @@ def _errors(result: RunResult) -> list[str] | None:
 
 def _project_dir(tmp_path: Path) -> Path:
     """Create and return a .weevr project directory in tmp_path."""
-    project = tmp_path / "test.weevr"
-    project.mkdir(exist_ok=True)
-    return project
+    return write_project(tmp_path / "test.weevr")
 
 
 def _create_thread_yaml(base: Path, name: str, src_alias: str, tgt_path: str) -> Path:
@@ -1270,8 +1365,7 @@ def _stub_execution_project(
     thread_extra: str = "",
 ) -> Path:
     """Minimal thread/weave/loom project for execution-settings tests."""
-    project = tmp_path / "stub.weevr"
-    project.mkdir()
+    project = write_project(tmp_path / "stub.weevr")
     (project / "threads").mkdir()
     write_document(
         project / "threads" / "stub.thread",
@@ -1287,6 +1381,27 @@ def _stub_execution_project(
         project / "stub.loom", 'config_version: "2.0"\nweaves:\n  - ref: stub.weave\n' + loom_extra
     )
     return project
+
+
+class TestRunRecordsProject:
+    """Run output carries the project root and identity the Context used."""
+
+    def test_plan_result_shows_root_and_identity(self, tmp_path: Path) -> None:
+        project = _stub_execution_project(tmp_path)
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        result = ctx.run("stub.weave", mode="plan")
+        assert result.project == ctx.project
+        assert result.project_root == str(project)
+        summary = result.summary()
+        assert str(project) in summary
+        assert TEST_PROJECT_ID in summary
+
+    def test_load_exposes_project(self, tmp_path: Path) -> None:
+        project = _stub_execution_project(tmp_path)
+        ctx = Context(spark=MagicMock(spec=SparkSession), project=str(project))
+        loaded = ctx.load("stub.loom")
+        assert loaded.project == ctx.project
+        assert loaded.project_root == str(project)
 
 
 class TestLogLevelWiring:

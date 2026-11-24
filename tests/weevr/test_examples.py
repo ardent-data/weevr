@@ -25,7 +25,7 @@ from validate_examples_core import (
     validate_warp,
 )
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.errors import ConfigError, ModelValidationError
 from weevr.model import Loom, Thread, Weave
@@ -113,8 +113,7 @@ class TestBrokenExamplesFail:
     """The load check catches the kinds of rot it exists for."""
 
     def _project(self, tmp_path: Path, files: dict[str, str]) -> Path:
-        root = tmp_path / "p.weevr"
-        root.mkdir()
+        root = write_project(tmp_path / "p.weevr")
         for name, body in files.items():
             write_document(root / name, body)
         return root

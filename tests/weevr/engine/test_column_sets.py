@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pyspark.sql import SparkSession
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.engine.column_sets import materialize_column_sets, resolve_column_set
 from weevr.errors.exceptions import ConfigError, ExecutionError
 from weevr.model.column_set import ColumnSet, ColumnSetSource
@@ -1010,7 +1010,7 @@ class TestYamlColumnSetFile:
         from weevr.config import load_config
         from weevr.engine.executor import execute_thread
 
-        project = tmp_path / "cs.weevr"
+        project = write_project(tmp_path / "cs.weevr")
         (project / "maps").mkdir(parents=True)
         (project / "maps/names.yaml").write_text(
             "- source_name: cust_id\n  target_name: customer_id\n"

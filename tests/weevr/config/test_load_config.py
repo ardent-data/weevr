@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.errors import (
     ConfigError,
@@ -489,7 +489,7 @@ class TestLoadConfigTypedExtensions:
 
     def test_qualified_key_set_with_project_root(self, tmp_path):
         """Qualified key is set relative to project root."""
-        project = tmp_path / "test.weevr"
+        project = write_project(tmp_path / "test.weevr")
         thread_dir = project / "dims"
         thread_dir.mkdir(parents=True)
         thread_file = thread_dir / "dim_customer.thread"
@@ -607,8 +607,7 @@ class TestLoadConfigLoomDeclaredParams:
         )
 
     def _bug_report_loom(self, tmp_path: Path) -> Path:
-        project = tmp_path / "silver.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "silver.weevr")
         self._make_stub_weave(project)
         loom_file = project / "spartech_silver.loom"
         write_document(
@@ -666,8 +665,7 @@ connections:
 
     def test_loom_declared_default_used_when_runtime_omits(self, tmp_path):
         """Optional loom param with default falls back to default value."""
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
         write_document(
@@ -699,8 +697,7 @@ connections:
 
     def test_defaults_and_params_coexist(self, tmp_path):
         """``defaults:`` (top-level) and ``params:`` (declared) both honored."""
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
         write_document(
@@ -740,8 +737,7 @@ connections:
 
     def test_param_typo_lists_available_names(self, tmp_path):
         """Typo on ``${param.x}`` raises with available declared param names."""
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
         write_document(
@@ -777,8 +773,7 @@ connections:
 
     def test_loom_param_type_mismatch_raises(self, tmp_path):
         """Runtime value of wrong declared type raises ConfigSchemaError."""
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         self._make_stub_weave(project)
         loom_file = project / "demo.loom"
         write_document(
@@ -865,8 +860,7 @@ class TestLoadConfigWeaveDeclaredParams:
 
     def test_weave_loaded_directly_resolves_declared_params(self, tmp_path):
         """A standalone .weave file with declared params: honors ${param.x} from runtime."""
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         thread_dir = project / "threads"
         thread_dir.mkdir()
         write_document(
@@ -908,8 +902,7 @@ connections:
 
     def test_weave_required_param_missing_raises(self, tmp_path):
         """Required weave-declared param missing surfaces ConfigSchemaError with file path."""
-        project = tmp_path / "p.weevr"
-        project.mkdir()
+        project = write_project(tmp_path / "p.weevr")
         thread_dir = project / "threads"
         thread_dir.mkdir()
         write_document(

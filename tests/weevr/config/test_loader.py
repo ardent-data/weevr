@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from documents import write_document
+from documents import write_document, write_project
 from weevr.config import load_config, load_resolved
 from weevr.config.loader import resolve_source_paths
 from weevr.config.validation import render_diagnostics
@@ -160,7 +160,7 @@ class TestResolveColumnSetSourcePaths:
 
     def test_joined_at_loom_child_weave_and_child_thread(self, tmp_path: Path) -> None:
         """Each level that declares a YAML column set gets its path joined, child files too."""
-        project = tmp_path / "cs.weevr"
+        project = write_project(tmp_path / "cs.weevr")
         (project / "weaves").mkdir(parents=True)
         (project / "threads").mkdir()
 
@@ -336,7 +336,7 @@ class TestDuplicateWeaveNames:
 
     @staticmethod
     def _project(tmp_path: Path, weaves: str) -> Path:
-        project = tmp_path / "dup.weevr"
+        project = write_project(tmp_path / "dup.weevr")
         for folder, thread in (("a", "x"), ("b", "y")):
             (project / folder).mkdir(parents=True)
             write_document(project / folder / f"{thread}.thread", _DUP_THREAD.format(name=thread))
