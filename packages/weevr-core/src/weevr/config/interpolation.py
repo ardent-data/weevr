@@ -151,6 +151,7 @@ def _lookup(
     at: tuple[str | int, ...],
     read_at: dict[str, str] | None = None,
     deferred: list[Diagnostic] | None = None,
+    fell_back: set[str] | None = None,
 ) -> Any:
     """The value of one reference, or ``_KEEP`` to leave it in place."""
     namespace, dotted, key = var_name.partition(".")
@@ -175,6 +176,8 @@ def _lookup(
         value = _get_dotted_value(context, var_name)
     except KeyError as exc:
         if default_value is not None:
+            if fell_back is not None:
+                fell_back.add(var_name)
             return default_value
         raise unresolved(var_name, context, scope, at) from exc
     if consumed_keys is not None:
@@ -193,6 +196,7 @@ def resolve_variables(
     scope: ReferenceScope | None = None,
     read_at: dict[str, str] | None = None,
     deferred: list[Diagnostic] | None = None,
+    fell_back: set[str] | None = None,
 ) -> Any:
     """Recursively resolve variable references in config.
 
@@ -222,6 +226,8 @@ def resolve_variables(
             Without it the references are still left in place but their
             ``P113`` diagnostics are dropped, so a caller resolving for a
             load must pass a list and report what it collects.
+        fell_back: Optional set filled with each ``param`` or ``fabric``
+            dotted key that had no value, so its ``:-`` fallback was used.
 
     Returns:
         Config with all variables resolved
@@ -244,6 +250,7 @@ def resolve_variables(
                 scope=scope,
                 read_at=read_at,
                 deferred=deferred,
+                fell_back=fell_back,
             )
             for k, v in config.items()
         }
@@ -258,6 +265,7 @@ def resolve_variables(
                 scope=scope,
                 read_at=read_at,
                 deferred=deferred,
+                fell_back=fell_back,
             )
             for i, item in enumerate(config)
         ]
@@ -269,14 +277,30 @@ def resolve_variables(
         if whole_match:
             var_name = whole_match.group(1).strip()
             value = _lookup(
-                var_name, whole_match.group(2), context, scope, consumed_keys, at, read_at, deferred
+                var_name,
+                whole_match.group(2),
+                context,
+                scope,
+                consumed_keys,
+                at,
+                read_at,
+                deferred,
+                fell_back,
             )
             return config if value is _KEEP else value
 
         def replace_var(match: re.Match[str]) -> str:
             var_name = match.group(1).strip()
             value = _lookup(
-                var_name, match.group(2), context, scope, consumed_keys, at, read_at, deferred
+                var_name,
+                match.group(2),
+                context,
+                scope,
+                consumed_keys,
+                at,
+                read_at,
+                deferred,
+                fell_back,
             )
             return match.group(0) if value is _KEEP else str(value)
 

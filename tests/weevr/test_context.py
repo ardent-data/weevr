@@ -3048,3 +3048,21 @@ class TestNamingOnJoinedColumns:
         assert result.status == "failure"
         assert not target.exists()
         assert "prefix" in result.summary()
+
+
+class TestLoadProvenance:
+    """``Context.load`` returns the tree with each node's param provenance."""
+
+    def test_runtime_param_recorded_at_the_root(self, tmp_path: Path) -> None:
+        project = write_project(tmp_path / "p.weevr")
+        thread = {
+            "config_version": "2.0",
+            "params": {"r": {"name": "r", "type": "string"}},
+            "sources": {"s": {"type": "delta", "alias": "raw.t"}},
+            "target": {"alias": "o.t"},
+        }
+        write_document(project / "t.thread", thread)
+        spark = MagicMock(spec=SparkSession)
+        spark.conf.get.side_effect = lambda key: ""
+        loaded = Context(spark, str(project), params={"r": "v"}).load("t.thread")
+        assert loaded.document.provenance.params["r"].source == "runtime"

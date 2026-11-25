@@ -19,7 +19,7 @@ from documents import write_document
 from weevr.config import load_resolved
 from weevr.config.interpolation import resolve_variables
 from weevr.config.interpolation_errors import ReferenceScope
-from weevr.config.params import declaration_block
+from weevr.config.params import ParamDeclaration, declaration_block
 from weevr.diagnostics import Diagnostic
 from weevr.errors import VariableResolutionError
 
@@ -109,7 +109,10 @@ class TestDeclaredUnbound:
         assert found.hint is None
 
     def test_declaring_file_off_the_trail_leaves_the_trail_out(self) -> None:
-        scope = ReferenceScope(declared={"x": "/elsewhere/a.weave"}, trail=("/p/t.thread",))
+        scope = ReferenceScope(
+            declared={"x": ParamDeclaration("weave", "/elsewhere/a.weave", "/params/x")},
+            trail=("/p/t.thread",),
+        )
         with pytest.raises(VariableResolutionError) as exc:
             resolve_variables("out.${param.x}", {}, scope=scope)
         (found,) = exc.value.diagnostics

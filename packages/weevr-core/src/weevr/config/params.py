@@ -28,12 +28,20 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from types import MappingProxyType
 from typing import Any, Literal
 
+from weevr.config.param_provenance import (
+    ParamDeclaration,
+    ParamPin,
+    ParamProvenance,
+    ParamSource,
+    ParamTier,
+    PinEntry,
+)
 from weevr.diagnostics import Diagnostic, Severity, diagnostic
 from weevr.diagnostics.positions import json_pointer
 from weevr.errors import ConfigSchemaError
@@ -54,11 +62,13 @@ class Binding:
             each scope from its effective spec.
         origin: The supplied binding this one coerces; ``None`` when the
             value is as supplied. Reading a coerced binding reads its origin.
+        pin: The entry pin that supplied the value, for a ``pin`` binding.
     """
 
     value: Any
     source: BindingSource
     origin: Binding | None = field(default=None, compare=False, repr=False)
+    pin: ParamPin | None = field(default=None, compare=False, repr=False)
 
     @property
     def supplied_binding(self) -> Binding:
@@ -84,6 +94,7 @@ class DeclaredSpec:
         file: The declaring file; ``None`` when unknown.
         at: Where the declaring document sits in ``file`` (empty for a
             document in its own file).
+        tier: The kind of the declaring document; ``None`` when unknown.
     """
 
     type: str | None
@@ -91,10 +102,16 @@ class DeclaredSpec:
     default: Any
     file: str | None
     at: tuple[str | int, ...] = ()
+    tier: ParamTier | None = None
 
     @classmethod
     def read(
-        cls, name: str, spec: Any, file: str | None, at: tuple[str | int, ...] = ()
+        cls,
+        name: str,
+        spec: Any,
+        file: str | None,
+        at: tuple[str | int, ...] = (),
+        tier: ParamTier | None = None,
     ) -> DeclaredSpec:
         """Read a ``ParamSpec`` or its mapping into a declared spec.
 
@@ -103,6 +120,7 @@ class DeclaredSpec:
             spec: The ``ParamSpec`` or its mapping, as declared.
             file: The declaring file.
             at: Where the declaring document sits in ``file``.
+            tier: The kind of the declaring document.
 
         Returns:
             The declared spec.
@@ -124,7 +142,12 @@ class DeclaredSpec:
             default=fields.get("default"),
             file=file,
             at=at,
+            tier=tier,
         )
+
+    def declaration(self, name: str) -> ParamDeclaration:
+        """Where this spec, declaring ``name``, is declared."""
+        return ParamDeclaration(self.tier, self.file, json_pointer((*self.at, "params", name)))
 
     def coerce(self, name: str, value: Any) -> Any:
         """``value`` coerced to this spec's type, or an error at this declaration.
@@ -188,7 +211,7 @@ class DeclaredSpec:
         value = self.coerce(name, supplied.value)
         if value is supplied.value:
             return supplied
-        return Binding(value, supplied.source, origin=supplied)
+        return Binding(value, supplied.source, origin=supplied, pin=supplied.pin)
 
 
 def _frozen(mapping: Mapping[str, Any] | None = None) -> Mapping[str, Any]:
@@ -205,15 +228,19 @@ class ParamScope:
     Attributes:
         bindings: Bound values by name.
         specs: Effective declared specs by name (nearest declaration wins).
+        sources: By bound name, where this scope's binding came from; set by
+            :meth:`child`, empty above the run root.
     """
 
     bindings: Mapping[str, Binding] = field(default_factory=_frozen)
     specs: Mapping[str, DeclaredSpec] = field(default_factory=_frozen)
+    sources: Mapping[str, ParamProvenance] = field(default_factory=_frozen)
 
     def __post_init__(self) -> None:
         """Freeze the mappings so a binding never changes after its scope opens."""
         object.__setattr__(self, "bindings", _frozen(self.bindings))
         object.__setattr__(self, "specs", _frozen(self.specs))
+        object.__setattr__(self, "sources", _frozen(self.sources))
 
     @classmethod
     def root(cls, runtime_params: Mapping[str, Any] | None = None) -> ParamScope:
@@ -244,8 +271,15 @@ class ParamScope:
         file: str | None = None,
         at: tuple[str | int, ...] = (),
         pins: Mapping[str, Any] | None = None,
+        tier: ParamTier | None = None,
+        pinned_by: PinEntry | None = None,
     ) -> ParamScope:
         """Open a nested scope declaring ``specs``.
+
+        Each binding's source is recorded in :attr:`sources`: a pin is
+        ``pin``; a supplied value the parent bound in a scope it opened is
+        ``inherited``, while one handed in above the run root keeps its own
+        source (``runtime``); a default is ``default``.
 
         Args:
             specs: The document's own ``params:`` (name to ``ParamSpec`` or
@@ -255,6 +289,8 @@ class ParamScope:
                 ``("weaves", 0)``); empty for a document in its own file.
             pins: Values the referencing entry binds for this scope, already
                 resolved in the parent scope. They beat inherited values.
+            tier: The document's kind, recorded on its declarations.
+            pinned_by: The entry holding ``pins``, recorded on their bindings.
 
         Returns:
             The child scope.
@@ -266,20 +302,30 @@ class ParamScope:
                 ``P103``, at that spec's declaration).
         """
         declared = {
-            name: DeclaredSpec.read(name, spec, file, at) for name, spec in (specs or {}).items()
+            name: DeclaredSpec.read(name, spec, file, at, tier)
+            for name, spec in (specs or {}).items()
         }
         effective = {**self.specs, **declared}
         supplied = {name: b for name, b in self.bindings.items() if b.supplied}
-        supplied.update({name: Binding(value, "pin") for name, value in (pins or {}).items()})
+        supplied.update(
+            {
+                name: Binding(value, "pin", pin=None if pinned_by is None else pinned_by.pin(name))
+                for name, value in (pins or {}).items()
+            }
+        )
         bindings = {
             name: effective[name].bind(name, b) if name in effective else b
             for name, b in supplied.items()
+        }
+        sources: dict[str, ParamSource] = {
+            name: "pin" if name in (pins or {}) else self._passed_down(name) for name in bindings
         }
         for name, spec in effective.items():
             if name in bindings:
                 continue
             if spec.default is not None:
                 bindings[name] = Binding(spec.coerce(name, spec.default), "default")
+                sources[name] = "default"
             elif spec.required:
                 message = (
                     f"Required parameter '{name}' is missing (no runtime value and no default)"
@@ -290,7 +336,42 @@ class ParamScope:
                     config_key=name,
                     diagnostics=[missing_parameter(name, message, spec.file, spec.at)],
                 )
-        return ParamScope(bindings=bindings, specs=effective)
+        return ParamScope(
+            bindings=bindings,
+            specs=effective,
+            sources={
+                name: ParamProvenance(
+                    source,
+                    _declaration(effective, name),
+                    bindings[name].supplied_binding.pin,
+                )
+                for name, source in sources.items()
+            },
+        )
+
+    def _passed_down(self, name: str) -> ParamSource:
+        """The source of this scope's supplied ``name`` as a child scope sees it."""
+        if name in self.sources:
+            return "inherited"
+        source = self.bindings[name].source
+        return "pin" if source == "pin" else "runtime"
+
+    def provenance(self, fallbacks: Iterable[str] = ()) -> Mapping[str, ParamProvenance]:
+        """Where each of this scope's params came from, read-only.
+
+        Args:
+            fallbacks: Names a ``${param.x:-d}`` reference in this scope read
+                through its fallback; the unbound ones are recorded as
+                ``fallback``.
+
+        Returns:
+            :attr:`sources`, with each unbound fallback name added.
+        """
+        found = dict(self.sources)
+        for name in fallbacks:
+            if name not in self.bindings:
+                found[name] = ParamProvenance("fallback", _declaration(self.specs, name))
+        return MappingProxyType(found)
 
     def open_child(
         self,
@@ -300,6 +381,8 @@ class ParamScope:
         at: tuple[str | int, ...] = (),
         pins: Mapping[str, Any] | None = None,
         reads: BindingReads | None = None,
+        tier: ParamTier | None = None,
+        pinned_by: PinEntry | None = None,
     ) -> ParamScope:
         """Open the child scope declaring ``specs``, with ``pins`` already resolved.
 
@@ -312,6 +395,8 @@ class ParamScope:
             at: Where the document sits in ``file``.
             pins: Values the referencing entry binds, already resolved in this scope.
             reads: Receives the declared bindings; ``None`` to record nothing.
+            tier: The document's kind, recorded on its declarations.
+            pinned_by: The entry holding ``pins``.
 
         Returns:
             The child scope.
@@ -319,7 +404,7 @@ class ParamScope:
         Raises:
             ConfigSchemaError: See :meth:`child`.
         """
-        opened = self.child(specs, file=file, at=at, pins=pins)
+        opened = self.child(specs, file=file, at=at, pins=pins, tier=tier, pinned_by=pinned_by)
         if reads is not None:
             for name in specs or {}:
                 binding = opened.bindings.get(name)
@@ -330,6 +415,12 @@ class ParamScope:
     def values(self) -> dict[str, Any]:
         """The bound values by name, for the ``param`` namespace."""
         return {name: binding.value for name, binding in self.bindings.items()}
+
+
+def _declaration(specs: Mapping[str, DeclaredSpec], name: str) -> ParamDeclaration | None:
+    """Where ``name``'s effective spec is declared; ``None`` when it has none."""
+    spec = specs.get(name)
+    return None if spec is None else spec.declaration(name)
 
 
 ScopePositions = dict[tuple[str | int, ...], ParamScope]

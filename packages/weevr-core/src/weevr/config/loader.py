@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from weevr.config.attribution import attribute_errors
 from weevr.config.collect import collecting, diagnostics_of, errors_recorded
-from weevr.config.document import ConfigKind, EntryMeta, ResolvedDocument
+from weevr.config.document import ConfigKind, EntryMeta, Provenance, ResolvedDocument
 from weevr.config.document_load import load_document
 from weevr.config.hydration import (
     check_column_set_references,
@@ -35,6 +36,7 @@ from weevr.config.locations import (
     make_location,
 )
 from weevr.config.macros import expand_foreach, reject_foreach_in_with
+from weevr.config.param_provenance import ParamProvenance
 from weevr.config.params import ScopePositions
 from weevr.config.parser import detect_config_type_from_extension
 from weevr.config.resolver import (
@@ -83,6 +85,7 @@ class ResolvedConfig:
         warnings: Load warnings collected so far.
         project: The project document at ``project_root``; ``None`` when it
             has no ``weevr.yaml``.
+        provenance: Where each of the config's own params came from.
     """
 
     location: ConfigLocation
@@ -94,6 +97,7 @@ class ResolvedConfig:
     authored: dict[str, Any] | None = None
     warnings: list[Diagnostic] = field(default_factory=list)
     project: Project | None = None
+    provenance: Mapping[str, ParamProvenance] = field(default_factory=dict)
 
 
 def resolve_project_root(
@@ -186,6 +190,7 @@ def resolve_config(
     walk = WalkState.start(
         config_dict,
         file=str(location),
+        kind=config_type,
         runtime_params=runtime_params,
         fabric_context=fabric_context,
         strict_override=strict_params,
@@ -280,6 +285,7 @@ def resolve_config(
         authored=config_dict,
         warnings=warnings,
         project=project,
+        provenance=walk.provenance,
     )
 
 
@@ -434,6 +440,7 @@ def _assemble_document(
                 name=name,
                 entry=EntryMeta.from_entry(entry),
                 source_ref=node.source_path or enclosing,
+                provenance=Provenance(params=node.provenance),
             )
         return docs
 
@@ -457,6 +464,7 @@ def _assemble_document(
                 entry=EntryMeta.from_entry(entry),
                 children=thread_docs(weave, threads.get(name, {}), node.children, weave_file),
                 source_ref=weave_file,
+                provenance=Provenance(params=node.provenance),
             )
 
     return ResolvedDocument(
@@ -467,6 +475,7 @@ def _assemble_document(
         source_ref=top_file,
         project=resolved.project,
         project_root=str(resolved.project_root),
+        provenance=Provenance(params=resolved.provenance),
     ).with_scopes()
 
 
