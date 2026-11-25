@@ -83,12 +83,12 @@ threads:
   - ref: silver/sap_table.thread
     as: sap_adr6
     params:
-      target_schema: "${env}_silver"
+      target_schema: "${param.env}_silver"
       table_name: ADR6
 ```
 
-Here `${env}` resolves from runtime or weave defaults
-before `target_schema` is injected into the thread.
+Here `${param.env}` resolves from runtime params or the weave's declared
+params before `target_schema` is injected into the thread.
 
 ## Validation
 

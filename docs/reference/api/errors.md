@@ -297,8 +297,9 @@ config_version: "2.0"
 
 ### VariableResolutionError
 
-Raised when a `${variable}` reference cannot be resolved and has no
-default value.
+Raised when a `${param.x}` or `${fabric.x}` reference cannot be resolved
+and has no default value, or when a reference names no namespace (`${x}`,
+`P111`) or an unknown one (`P112`).
 
 **Common causes:**
 
@@ -310,7 +311,7 @@ default value.
 
 1. Supply the missing parameter at runtime through the context:
    `Context(spark, "my-project.weevr", params={"env": "prod"})`
-2. Add a default value in the config: `${env:-dev}`
+2. Add a default value in the config: `${param.env:-dev}`
 3. Check for typos in the variable name
 
 **Example:**
@@ -320,13 +321,13 @@ default value.
 sources:
   orders:
     type: delta
-    alias: ${env}.raw.orders
+    alias: ${param.env}.raw.orders
 
 # Fixed — add a default value
 sources:
   orders:
     type: delta
-    alias: ${env:-dev}.raw.orders
+    alias: ${param.env:-dev}.raw.orders
 ```
 
 **Related:** [Config Resolution](../../guides/config-resolution.md)

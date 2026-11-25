@@ -135,7 +135,8 @@ ctx = Context(
 result = ctx.run("nightly.loom")
 ```
 
-Runtime parameters take highest priority, followed by config defaults.
+Configs read them as `${param.run_date}`; a runtime value beats a declared
+param default.
 
 ## Step 6 -- Schedule via a Fabric Data Pipeline
 

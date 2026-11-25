@@ -14,9 +14,10 @@ concrete.
 
 ## Key concepts
 
-- **Variable interpolation** — `${var}` placeholders in YAML values are
-  replaced with concrete values from runtime parameters or config defaults.
-  Default values use the `${var:-default}` syntax.
+- **Variable interpolation** — `${param.x}` and `${fabric.x}` placeholders
+  in YAML values are replaced with concrete values from params and the Fabric
+  context. Default values use the `${param.x:-default}` syntax. Every
+  reference names its namespace; a bare `${x}` fails at load.
 - **Reference resolution** — `ref:` entries in weave and loom configs load
   child configuration files recursively. Circular references are detected
   and rejected.
@@ -75,16 +76,16 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
    params file. Typed extensions (`.thread`, `.weave`, `.loom`) are checked
    first; if the extension is `.yaml` or `.yml`, the structure is inspected.
 - **Stage 4 — Validate schema.** Run the raw dictionary through a Pydantic model for
-   loose structural validation. At this stage, `${var}` placeholders are
+   loose structural validation. At this stage, `${...}` placeholders are
    permitted (the schema uses `extra="allow"`), so unresolved variables do not
    cause errors.
 
 ### Stage 5–6: Resolve values
 
-- **Stage 5 — Build parameter context.** Merge runtime parameters (highest
-   priority) over the `param.*` namespace over config-declared
-   defaults over fabric context (lowest priority) into a flat
-   context dictionary. The `param.*` namespace is populated from
+- **Stage 5 — Build parameter context.** Each namespace resolves on its
+   own: `param.*` holds the scope's bound params (runtime parameters, entry
+   pins, declared defaults) and `fabric.*` the Fabric context; `defaults:`
+   values are not variables. The `param.*` namespace is populated from
    either the loom/weave's own declared `params:` block (for
    top-level loads only; child configs loaded via `ref:` do not
    resolve their own `params:` block at this stage) or from a
@@ -92,9 +93,9 @@ resolve -> finalize: "refs loaded,\nvars resolved" {style.stroke: "#2E7D32"}
    [Declared `params:` and the `${param.x}` namespace](#declared-params-and-the-paramx-namespace)
    below and [Thread Templates](thread-templates.md). The
    `${fabric.*}` namespace comes from the fabric layer. Dotted
-   keys like `env.lakehouse` support nested access.
+   keys like `${param.env.lakehouse}` support nested access.
 - **Stage 6 — Resolve variables.** Recursively walk all values in the config and
-   resolve `${var}` references from the parameter context. Whole-value
+   resolve `${param.x}` and `${fabric.x}` references. Whole-value
    references return the native type; embedded references coerce to
    string (see [Parameter resolution](#parameter-resolution) below).
    Unresolved variables without defaults raise
@@ -355,18 +356,18 @@ fails at load.
 
 ### Whole-value resolution
 
-When an entire YAML value is a single `${param}` reference (no surrounding
+When an entire YAML value is a single `${param.x}` reference (no surrounding
 text), the resolver returns the native Python type of the referenced value.
 The result is not cast to string.
 
 ```yaml
-match_keys: ${pk_columns}
+match_keys: ${param.pk_columns}
 # pk_columns: ["mandt", "color"] → list[str]
 
-enabled: ${flag}
+enabled: ${param.flag}
 # flag: true → bool
 
-limit: ${max_rows}
+limit: ${param.max_rows}
 # max_rows: 1000 → int
 ```
 
@@ -374,20 +375,20 @@ A whole-value reference that resolves to `None` returns `null` rather than
 the string `"None"`:
 
 ```yaml
-optional_param: ${value}
+optional_param: ${param.value}
 # value: null → None
 ```
 
 ### Embedded resolution
 
-When `${param}` appears inside a larger string, standard string interpolation
+When `${param.x}` appears inside a larger string, standard string interpolation
 applies. The resolved value is coerced to string and substituted in place.
 
 ```yaml
-alias: "SAP.${table_name}"
+alias: "SAP.${param.table_name}"
 # table_name: "MARA" → "SAP.MARA"
 
-path: "/mnt/${env}/data/${table_name}"
+path: "/mnt/${param.env}/data/${param.table_name}"
 # env: "prod", table_name: "MARA" → "/mnt/prod/data/MARA"
 ```
 
@@ -396,9 +397,9 @@ Use whole-value references when you need null pass-through.
 
 ### Inline defaults
 
-The `${param:-default}` fallback syntax always returns the default as
+The `${param.x:-default}` fallback syntax always returns the default as
 a **string**, even in a whole-value position. For example,
-`limit: ${max_rows:-100}` returns the string `"100"` when `max_rows`
+`limit: ${param.max_rows:-100}` returns the string `"100"` when `max_rows`
 is missing — not the integer `100`. To use a typed default, supply
 the parameter value explicitly at runtime rather than relying on the
 inline `:-` fallback.
@@ -457,7 +458,8 @@ related limitations follow from this:
 
 Cross-scope cascade and child-config own-scope wiring are planned
 follow-ups; until then, declare the param in each top-level scope that
-references it, or use `${var.x}` / `defaults:` for cascading values.
+references it, or use `${var.x}` for cascading values (`defaults:`
+values are not variables).
 
 `${param.x}` references inside a thread template instantiated via
 `ThreadEntry.params` (the `as:` + `params:` form on a weave's `threads:`

@@ -100,10 +100,10 @@ to a physical location through variable injection:
 sources:
   customers:
     type: delta
-    alias: ${env.lakehouse}.customers   # env is a param you pass to Context
+    alias: ${param.env.lakehouse}.customers   # env is a param you pass to Context
   orders_file:
     type: csv
-    path: ${env.files_path}/orders/
+    path: ${param.env.files_path}/orders/
 ```
 
 Delta sources use an **alias** that resolves to a four-part name

@@ -148,10 +148,10 @@ config_version: "2.0"
 sources:
   raw_customers:
     type: delta
-    alias: "${bronze_base}/customers"
+    alias: "${param.bronze_base}/customers"
 
 target:
-  path: "${silver_base}/stg_customers"
+  path: "${param.silver_base}/stg_customers"
 
 write:
   mode: overwrite
